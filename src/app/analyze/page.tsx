@@ -49,12 +49,6 @@ const QUESTIONS = [
     placeholder:
       "e.g. I DMed 20 founders on Reddit. 8 responded. 3 said they'd pay for this today...",
   },
-  {
-    label: "07 →",
-    question: "What's your email address?",
-    hint: "We'll send your Kill or Build verdict here within 24 hours.",
-    placeholder: "e.g. yourname@email.com",
-  },
 ] as const;
 
 type Question = (typeof QUESTIONS)[number];
@@ -63,7 +57,7 @@ export default function AnalyzePage() {
   const router = useRouter();
 
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<string[]>(() => Array(7).fill(""));
+  const [answers, setAnswers] = useState<string[]>(() => Array(6).fill(""));
   const [inputValue, setInputValue] = useState("");
 
   const [nextLabel, setNextLabel] = useState("OK, NEXT →");
@@ -188,6 +182,19 @@ export default function AnalyzePage() {
         return;
       }
 
+      const userEmail =
+        user.email ??
+        (user.user_metadata?.email as string | undefined) ??
+        "";
+
+      if (!userEmail.trim()) {
+        setSubmitError(
+          "No email on your account. Add one in your auth profile and try again."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       console.log("Inserting analysis...");
       const insertPayload = {
         user_id: user.id,
@@ -197,7 +204,7 @@ export default function AnalyzePage() {
         existing_solutions: nextAnswers[3],
         unfair_advantage: nextAnswers[4],
         market_conversations: nextAnswers[5],
-        email: nextAnswers[6],
+        email: userEmail,
         status: "pending",
         verdict: null as string | null,
       };
@@ -234,7 +241,16 @@ export default function AnalyzePage() {
       setSubmitError("Something went wrong. Please try again.");
       setIsSubmitting(false);
     }
-  }, [answers, animateTo, current, inputValue, isSubmitting, router, totalQ]);
+  }, [
+    answers,
+    animateTo,
+    current,
+    inputValue,
+    isSubmitting,
+    router,
+    totalQ,
+    triggerShake,
+  ]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

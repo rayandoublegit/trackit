@@ -4,6 +4,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Klayan — Stop Building. Start Knowing.",
   description: "AI-powered idea validation for first-time SaaS builders.",
+  icons: {
+    icon: "https://i.ibb.co/FQszvMb/IMG-9312-2.jpg",
+    apple: "https://i.ibb.co/FQszvMb/IMG-9312-2.jpg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
