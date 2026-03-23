@@ -185,6 +185,8 @@ export default function DashboardPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [copyToast, setCopyToast] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -291,6 +293,18 @@ export default function DashboardPage() {
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const sync = () => {
+      const mobile = mq.matches;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     if (!showAvatarMenu) return;
@@ -574,8 +588,60 @@ export default function DashboardPage() {
         minHeight: "100vh",
         display: "flex",
         background: "#000000",
+        position: "relative",
       }}
     >
+      {isMobile && sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Close menu"
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 99,
+            background: "rgba(0,0,0,0.6)",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        />
+      ) : null}
+
+      {isMobile ? (
+        <button
+          type="button"
+          aria-expanded={sidebarOpen}
+          aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          onClick={() => setSidebarOpen((o) => !o)}
+          style={{
+            position: "fixed",
+            left: 0,
+            top: "50%",
+            transform: "translateY(-50%)",
+            zIndex: 101,
+            width: 32,
+            height: 80,
+            background: "#111",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderLeft: "none",
+            borderRadius: "0 12px 12px 0",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: 22,
+            fontWeight: 300,
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            padding: 0,
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+          {sidebarOpen ? "‹" : "›"}
+        </button>
+      ) : null}
+
       {/* Left sidebar */}
       <aside
         style={{
@@ -587,6 +653,18 @@ export default function DashboardPage() {
           flexDirection: "column",
           minHeight: "100vh",
           boxSizing: "border-box",
+          ...(isMobile
+            ? {
+                position: "fixed",
+                top: 0,
+                left: 0,
+                zIndex: 100,
+                height: "100vh",
+                maxHeight: "100dvh",
+                transform: `translateX(${sidebarOpen ? "0" : "-100%"})`,
+                transition: "transform 0.3s ease",
+              }
+            : {}),
         }}
       >
         <div style={{ padding: "24px 20px 20px" }}>
@@ -939,6 +1017,9 @@ export default function DashboardPage() {
                 >
                   <Link
                     href={`/verdict/${row.id}`}
+                    onClick={() => {
+                      if (isMobile) setSidebarOpen(false);
+                    }}
                     style={{
                       display: "flex",
                       alignItems: "flex-start",
@@ -1206,9 +1287,11 @@ export default function DashboardPage() {
           style={{
             position: "relative",
             zIndex: 1,
-            padding: "40px 40px 48px",
+            padding: isMobile ? "24px 16px 40px" : "40px 40px 48px",
             maxWidth: 920,
             margin: "0 auto",
+            width: "100%",
+            boxSizing: "border-box",
           }}
         >
           <h2

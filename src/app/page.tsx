@@ -767,15 +767,7 @@ export default function LandingPage() {
                   </div>
                   <div className="bubble bubble-white">This is a great idea!</div>
                 </div>
-                <div className="chat-row chat-row-pl">
-                  <svg
-                    className="cursor-icon"
-                    viewBox="0 0 24 24"
-                    fill="white"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M4 2L4 17L8 13L11 20L13 19L10 12L15 12L4 2Z" />
-                  </svg>
+                <div className="chat-row" style={{ marginTop: 8 }}>
                   <div
                     className="bubble bubble-yellow bubble-rotated2"
                     style={{ marginLeft: 0 }}
@@ -800,15 +792,7 @@ export default function LandingPage() {
                   </div>
                   <div className="bubble bubble-white">Okay let&apos;s go</div>
                 </div>
-                <div className="chat-row chat-row-pl">
-                  <svg
-                    className="cursor-icon"
-                    viewBox="0 0 24 24"
-                    fill="white"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path d="M4 2L4 17L8 13L11 20L13 19L10 12L15 12L4 2Z" />
-                  </svg>
+                <div className="chat-row" style={{ marginTop: 8 }}>
                   <div className="bubble bubble-yellow bubble-rotate-2">
                     Wait how do i start?
                   </div>
