@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -258,7 +259,7 @@ export default function AnalyzePage() {
       }}
     >
       <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
-        <a
+        <Link
           href="/"
           aria-label="Home"
           style={{
@@ -286,7 +287,7 @@ export default function AnalyzePage() {
               objectFit: "cover",
             }}
           />
-        </a>
+        </Link>
       </div>
 
       <div

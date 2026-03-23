@@ -1,14 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/** Routes that require a session — unauthenticated users are sent to /auth */
-export const protectedRouteMatcher = [
-  "/analyze",
-  "/analyze/:path*",
-  "/dashboard",
-  "/dashboard/:path*",
-];
-
 export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -50,6 +42,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: protectedRouteMatcher,
+  matcher: ['/dashboard/:path*', '/analyze/:path*', '/verdict/:path*'],
 };
-

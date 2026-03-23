@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -152,7 +153,7 @@ const LOGO_BLOCK = (
 
 const HOME_PILL = (
   <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
-    <a
+    <Link
       href="/"
       aria-label="Home"
       style={{
@@ -180,7 +181,7 @@ const HOME_PILL = (
           objectFit: "cover",
         }}
       />
-    </a>
+    </Link>
   </div>
 );
 
