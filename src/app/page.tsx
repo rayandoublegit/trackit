@@ -1030,25 +1030,34 @@ export default function LandingPage() {
             <div className="pricing-divider" />
             <ul className="pricing-features">
               <li>
-                <span className="feat-dot" /> 1 idea
+                <span className="feat-dot" /> 3 analyses per month
               </li>
               <li>
-                <span className="feat-dot" /> Kill or Build
+                <span className="feat-dot" /> Kill or Build verdict
               </li>
               <li>
-                <span className="feat-dot" /> Basic scan
+                <span className="feat-dot" /> Market research &amp; competitor scan
               </li>
               <li>
-                <span className="feat-dot" /> 10 outreach messages
+                <span className="feat-dot" /> Hard Truths + Opportunity analysis
+              </li>
+              <li>
+                <span className="feat-dot" /> Recommended Stack
               </li>
               <li className="locked">
-                <span className="feat-x">X</span> Signal Sprint
+                <span className="feat-x">✗</span> Signal Sprint
               </li>
               <li className="locked">
-                <span className="feat-x">X</span> Flip Engine
+                <span className="feat-x">✗</span> Flip Engine
               </li>
               <li className="locked">
-                <span className="feat-x">X</span> Roadmap
+                <span className="feat-x">✗</span> Business Structure
+              </li>
+              <li className="locked">
+                <span className="feat-x">✗</span> Revenue Roadmap
+              </li>
+              <li className="locked">
+                <span className="feat-x">✗</span> Marketing Machine
               </li>
             </ul>
           </div>
@@ -1067,31 +1076,25 @@ export default function LandingPage() {
             <div className="pricing-divider" />
             <ul className="pricing-features">
               <li>
-                <span className="feat-dot" /> 4 ideas
+                <span className="feat-dot" /> 10 analyses per month
               </li>
               <li>
-                <span className="feat-dot" /> Kill or Build
+                <span className="feat-dot" /> Everything in Spark
               </li>
               <li>
-                <span className="feat-dot" /> Signal Sprint
+                <span className="feat-dot" /> Signal Sprint (20 exact people to contact)
               </li>
               <li>
-                <span className="feat-dot" /> Instant Email Notifications
+                <span className="feat-dot" /> Flip Engine (3 alternative business models)
               </li>
               <li>
-                <span className="feat-dot" /> Flip Engine
-              </li>
-              <li>
-                <span className="feat-dot" /> Roadmap
-              </li>
-              <li>
-                <span className="feat-dot" /> Outreach
+                <span className="feat-dot" /> Business Structure recommendations
               </li>
               <li className="locked">
-                <span className="feat-x">X</span> + Marketing Machine
+                <span className="feat-x">✗</span> Revenue Roadmap
               </li>
               <li className="locked">
-                <span className="feat-x">X</span> + Daily plan
+                <span className="feat-x">✗</span> Marketing Machine
               </li>
             </ul>
           </div>
@@ -1111,19 +1114,20 @@ export default function LandingPage() {
           <div className="pricing-divider pricing-divider-mt" />
           <ul className="pricing-features">
             <li>
-              <span className="feat-dot" /> Unlimited Everything
+              <span className="feat-dot" /> Unlimited analyses
             </li>
             <li>
-              <span className="feat-dot" /> Dedicated onboarding call
+              <span className="feat-dot" /> Everything in Build
             </li>
             <li>
-              <span className="feat-dot" /> + Roadmap
+              <span className="feat-dot" /> Revenue Roadmap (day by day to $10K MRR)
             </li>
             <li>
-              <span className="feat-dot" /> + Marketing Machine
+              <span className="feat-dot" /> Marketing Machine (landing page copy,
+              outreach sequences, 30-day launch plan)
             </li>
             <li>
-              <span className="feat-dot" /> + Daily plan
+              <span className="feat-dot" /> Priority support
             </li>
           </ul>
         </div>

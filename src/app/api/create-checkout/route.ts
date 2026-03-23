@@ -30,10 +30,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log("Checkout: body", body);
 
-    const { priceId, userId, email } = body as {
+    const { priceId, userId, email, analysisId } = body as {
       priceId?: string;
       userId?: string;
       email?: string | null;
+      analysisId?: string;
     };
 
     if (!priceId) {
@@ -42,13 +43,18 @@ export async function POST(request: Request) {
 
     const base = (appUrl ?? "http://localhost:3000").replace(/\/$/, "");
 
+    const successUrl =
+      analysisId && String(analysisId).trim()
+        ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
+        : `${base}/dashboard?upgraded=true`;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
       metadata: userId ? { userId: String(userId) } : {},
-      success_url: `${base}/dashboard?upgraded=true`,
+      success_url: successUrl,
       cancel_url: `${base}/#pricing`,
     });
 

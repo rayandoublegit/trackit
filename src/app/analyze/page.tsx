@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getSparkPriceId } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const QUESTIONS = [
@@ -225,6 +226,72 @@ export default function AnalyzePage() {
       }
 
       const analysisId = data.id;
+
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const planRaw =
+        (profileRow?.plan as string | undefined)?.toLowerCase() ?? "spark";
+      const isSpark = planRaw !== "build" && planRaw !== "scale";
+
+      const { count, error: countError } = await supabase
+        .from("analyses")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      if (countError) {
+        console.error("Analyze: analyses count error", countError);
+      }
+
+      const FREE_ANALYSES = 1;
+      const analysisCount = count ?? 0;
+
+      const sparkPriceId = getSparkPriceId();
+
+      if (
+        isSpark &&
+        analysisCount > FREE_ANALYSES &&
+        sparkPriceId
+      ) {
+        const res = await fetch("/api/create-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: sparkPriceId,
+            userId: user.id,
+            email: user.email,
+            analysisId,
+          }),
+        });
+
+        const checkoutPayload = (await res.json().catch(() => ({}))) as {
+          url?: string;
+          error?: string;
+        };
+
+        if (!res.ok || !checkoutPayload.url) {
+          setSubmitError(
+            checkoutPayload.error ??
+              "Could not start checkout. Please try again."
+          );
+          setIsSubmitting(false);
+          return;
+        }
+
+        window.location.href = checkoutPayload.url;
+        return;
+      }
+
+      if (isSpark && analysisCount > FREE_ANALYSES && !sparkPriceId) {
+        setSubmitError(
+          "Subscription checkout is not configured. Contact support."
+        );
+        setIsSubmitting(false);
+        return;
+      }
 
       void fetch("/api/analyze", {
         method: "POST",
