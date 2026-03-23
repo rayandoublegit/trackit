@@ -151,6 +151,14 @@ const LOGO_BLOCK = (
   </div>
 );
 
+const LOADING_MESSAGES = [
+  "Klayan is researching your market...",
+  "Scanning competitor landscape...",
+  "Reading customer complaints...",
+  "Applying the unicorn filter...",
+  "Writing your verdict...",
+] as const;
+
 const HOME_PILL = (
   <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
     <Link
@@ -205,11 +213,28 @@ export default function VerdictPage() {
   } | null>(null);
 
   const [copied, setCopied] = useState(false);
-  const [pollTimedOut, setPollTimedOut] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
 
   const analysisSelectColumns =
     "idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
+
+  const showLoadingShell =
+    !analysisError &&
+    ((analysisLoading && !analysis) ||
+      (analysis !== null && analysis.verdict === null));
+
+  useEffect(() => {
+    if (!showLoadingShell) {
+      setLoadingMsgIndex(0);
+      return;
+    }
+    setLoadingMsgIndex(0);
+    const t = window.setInterval(() => {
+      setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, 10000);
+    return () => window.clearInterval(t);
+  }, [showLoadingShell]);
 
   useEffect(() => {
     if (!id) return;
@@ -220,12 +245,10 @@ export default function VerdictPage() {
 
     const client = supabase;
     let intervalId: number | undefined;
-    let timeoutId: number | undefined;
     let cancelled = false;
 
     setAnalysisLoading(true);
     setAnalysisError(null);
-    setPollTimedOut(false);
 
     const init = async () => {
       try {
@@ -254,19 +277,29 @@ export default function VerdictPage() {
 
         if (cancelled) return;
 
-        if (data.status === "pending") {
-          try {
-            await fetch("/api/analyze", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ analysisId: id }),
-            });
-          } catch (e) {
-            console.error("Verdict: /api/analyze request failed", e);
-          }
+        if (data.status === "pending" && !data.verdict) {
+          fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ analysisId: id }),
+          }).catch(console.error);
         }
 
-        const poll = async () => {
+        let attempts = 0;
+        const tick = async () => {
+          if (cancelled) return;
+          attempts += 1;
+          if (attempts > 40) {
+            if (intervalId) {
+              window.clearInterval(intervalId);
+              intervalId = undefined;
+            }
+            if (!cancelled) {
+              setAnalysisError("Analysis took too long. Please try again.");
+            }
+            return;
+          }
+
           try {
             const { data: polled, error: pollError } = await client
               .from("analyses")
@@ -276,8 +309,6 @@ export default function VerdictPage() {
 
             if (cancelled) return;
             if (pollError) return;
-
-            console.log("Poll:", polled);
 
             if (polled?.verdict) {
               setAnalysis((prev) => {
@@ -307,10 +338,6 @@ export default function VerdictPage() {
                 window.clearInterval(intervalId);
                 intervalId = undefined;
               }
-              if (timeoutId) {
-                window.clearTimeout(timeoutId);
-                timeoutId = undefined;
-              }
             }
           } catch (e) {
             console.error("Verdict: poll error", e);
@@ -319,18 +346,10 @@ export default function VerdictPage() {
 
         if (cancelled) return;
 
-        void poll();
+        void tick();
         intervalId = window.setInterval(() => {
-          void poll();
+          void tick();
         }, 3000);
-
-        timeoutId = window.setTimeout(() => {
-          if (intervalId) {
-            window.clearInterval(intervalId);
-            intervalId = undefined;
-          }
-          setPollTimedOut(true);
-        }, 120000);
       } catch (e) {
         console.error("Verdict: load analysis error", e);
         if (!cancelled) {
@@ -345,7 +364,6 @@ export default function VerdictPage() {
     return () => {
       cancelled = true;
       if (intervalId) window.clearInterval(intervalId);
-      if (timeoutId) window.clearTimeout(timeoutId);
     };
   }, [id, router]);
 
@@ -485,11 +503,83 @@ export default function VerdictPage() {
     return null;
   }
 
-  const loading =
-    (analysisLoading && !analysis) ||
-    (analysis !== null && analysis.verdict === null);
+  if (analysisError) {
+    const isTimeout =
+      analysisError === "Analysis took too long. Please try again.";
+    return (
+      <div
+        style={{
+          background: "#000",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "24px",
+          padding: 24,
+          boxSizing: "border-box",
+        }}
+      >
+        <img
+          src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+          alt=""
+          style={{ width: "56px", borderRadius: "50%" }}
+        />
+        <div
+          style={{
+            color: "white",
+            fontSize: "18px",
+            fontWeight: 600,
+            fontFamily: "'Inter', sans-serif",
+          }}
+        >
+          Something went wrong
+        </div>
+        <div
+          style={{
+            color: "rgba(255,255,255,0.5)",
+            fontSize: "14px",
+            fontFamily: "'Inter', sans-serif",
+            textAlign: "center",
+            maxWidth: 320,
+            lineHeight: 1.5,
+          }}
+        >
+          {isTimeout
+            ? "The analysis took too long to complete."
+            : analysisError}
+        </div>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          style={{
+            background: "white",
+            color: "black",
+            border: "none",
+            padding: "12px 28px",
+            borderRadius: "100px",
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "'Inter', sans-serif",
+          }}
+        >
+          Try again
+        </button>
+        <Link
+          href="/analyze"
+          style={{
+            color: "rgba(255,255,255,0.4)",
+            fontSize: "13px",
+            fontFamily: "'Inter', sans-serif",
+          }}
+        >
+          Start a new analysis
+        </Link>
+      </div>
+    );
+  }
 
-  if (loading) {
+  if (showLoadingShell) {
     return (
       <div
         style={{
@@ -500,6 +590,8 @@ export default function VerdictPage() {
           alignItems: "center",
           justifyContent: "center",
           gap: "32px",
+          padding: "0 24px",
+          boxSizing: "border-box",
         }}
       >
         <img
@@ -507,6 +599,19 @@ export default function VerdictPage() {
           alt=""
           style={{ width: "80px", height: "80px", objectFit: "contain" }}
         />
+        <div
+          style={{
+            fontSize: 15,
+            color: "rgba(255,255,255,0.85)",
+            fontFamily: "'Inter', sans-serif",
+            textAlign: "center",
+            maxWidth: 360,
+            lineHeight: 1.5,
+            minHeight: 48,
+          }}
+        >
+          {LOADING_MESSAGES[loadingMsgIndex]}
+        </div>
         <div
           style={{
             width: "200px",
@@ -525,20 +630,6 @@ export default function VerdictPage() {
             }}
           />
         </div>
-        {pollTimedOut ? (
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.45)",
-              fontFamily: "'Inter', sans-serif",
-              textAlign: "center",
-              maxWidth: 280,
-              lineHeight: 1.5,
-            }}
-          >
-            Analysis is taking longer than expected. Refresh the page.
-          </div>
-        ) : null}
         <style>{`
           @keyframes loading {
             0% { width: 0%; margin-left: 0%; }
@@ -628,33 +719,6 @@ export default function VerdictPage() {
       <div style={{ fontFamily: "'Inter', monospace" }}>{children}</div>
     </div>
   );
-
-  if (analysisError && !analysis) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "#3a3a3a",
-          padding: 32,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          boxSizing: "border-box",
-        }}
-      >
-        {HOME_PILL}
-        <div style={{ width: "100%", maxWidth: 700 }}>
-          {LOGO_BLOCK}
-          {cardShell(
-            <div style={{ fontSize: 14, color: "#ff4d4f", lineHeight: 1.6 }}>
-              {analysisError}
-            </div>
-          )}
-          {actionButtons}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div
