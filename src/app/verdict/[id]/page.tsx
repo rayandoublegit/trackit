@@ -259,10 +259,16 @@ export default function VerdictPage() {
         if (cancelled) return;
 
         if (!data.verdict) {
+          const {
+            data: { user: userForAnalyze },
+          } = await client.auth.getUser();
           fetch("/api/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ analysisId: id }),
+            body: JSON.stringify({
+              analysisId: id,
+              userId: userForAnalyze?.id,
+            }),
           }).catch(console.error);
         }
 

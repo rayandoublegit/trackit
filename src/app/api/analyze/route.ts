@@ -1,7 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export const maxDuration = 60;
@@ -179,19 +177,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const analysisId =
       typeof body?.analysisId === "string" ? body.analysisId.trim() : "";
+    const userId =
+      typeof body?.userId === "string" ? body.userId.trim() : "";
 
-    if (!analysisId) {
+    if (!analysisId || !userId) {
       return NextResponse.json(
-        { success: false, error: "analysisId is required" },
+        { success: false, error: "Missing fields" },
         { status: 400 }
       );
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl) {
       return NextResponse.json(
         { success: false, error: "Supabase environment is not configured" },
         { status: 500 }
@@ -222,37 +221,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const cookieStore = await cookies();
-    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options);
-          });
-        },
-      },
-    });
-
-    const { data: authData } = await supabase.auth.getUser();
-    if (!authData.user) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    const userId = authData.user.id;
-
     console.log("Fetching analysis...");
-    const { data: analysis, error: fetchError } = await supabase
+    const { data: analysis, error: fetchError } = await supabaseAdmin
       .from("analyses")
       .select(
         "id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations"
       )
       .eq("id", analysisId)
+      .eq("user_id", userId)
       .single();
 
     if (fetchError || !analysis) {
@@ -316,7 +292,8 @@ export async function POST(request: Request) {
         verdict,
         status: "complete",
       })
-      .eq("id", analysisId);
+      .eq("id", analysisId)
+      .eq("user_id", userId);
 
     console.log("Update error:", updateError);
 
