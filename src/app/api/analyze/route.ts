@@ -252,13 +252,13 @@ export async function POST(request: Request) {
     const userPrompt = buildUserPrompt(analysis, plan);
 
     const maxTokens =
-      plan === "scale" ? 12000 : plan === "build" ? 6000 : 2400;
+      plan === "scale" ? 12000 : plan === "build" ? 6000 : 1000;
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
     console.log("Calling Anthropic...", { plan, maxTokens });
     const completion = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: maxTokens,
       system: systemPrompt,
       tools: [
