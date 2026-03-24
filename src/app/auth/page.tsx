@@ -127,19 +127,6 @@ export default function AuthPage() {
       data: { subscription },
     } = client.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_IN" && session) {
-        const { data: profile } = await client
-          .from("profiles")
-          .select("plan")
-          .eq("id", session.user.id)
-          .maybeSingle();
-
-        if (!profile) {
-          await client.from("profiles").insert({
-            id: session.user.id,
-            username: session.user.email?.split("@")[0] ?? "founder",
-            plan: "spark",
-          });
-        }
         router.push("/pricing");
       }
     });
@@ -241,25 +228,6 @@ export default function AuthPage() {
       }
 
       if (data.session) {
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: user.id,
-          username: u,
-        });
-
-        if (profileError) {
-          console.error(profileError);
-          skipAuthRedirectForAvatarRef.current = false;
-          if (profileError.code === "23505") {
-            setUsernameError("This username is already taken");
-          } else {
-            setError(
-              profileError.message ||
-                "Account created but profile could not be saved. Try signing in."
-            );
-          }
-          return;
-        }
-
         setSignupStep(3);
       } else {
         skipAuthRedirectForAvatarRef.current = false;
@@ -317,14 +285,22 @@ export default function AuthPage() {
         const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
         const publicUrl = pub.publicUrl;
 
-        const { error: profileUpdateError } = await supabase
+        const { data: existingProfile } = await supabase
           .from("profiles")
-          .update({ avatar_url: publicUrl })
-          .eq("id", user.id);
+          .select("id")
+          .eq("id", user.id)
+          .maybeSingle();
 
-        if (profileUpdateError) {
-          setError(profileUpdateError.message);
-          return;
+        if (existingProfile) {
+          const { error: profileUpdateError } = await supabase
+            .from("profiles")
+            .update({ avatar_url: publicUrl })
+            .eq("id", user.id);
+
+          if (profileUpdateError) {
+            setError(profileUpdateError.message);
+            return;
+          }
         }
       }
 
@@ -359,7 +335,23 @@ export default function AuthPage() {
       if (msg) {
         setError(msg);
       } else {
-        router.replace("/dashboard");
+        const {
+          data: { user: signedInUser },
+        } = await supabase.auth.getUser();
+        if (!signedInUser) {
+          router.replace("/auth");
+          return;
+        }
+        const { data: profileRow } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", signedInUser.id)
+          .maybeSingle();
+        if (!profileRow) {
+          router.replace("/pricing");
+        } else {
+          router.replace("/dashboard");
+        }
       }
     } finally {
       setLoading(false);

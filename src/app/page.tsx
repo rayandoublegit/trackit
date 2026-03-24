@@ -18,6 +18,7 @@ import {
   type PlanTier,
 } from "@/lib/pricing-cta";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 const PROFILE_DROPDOWN_ITEM_STYLE: CSSProperties = {
   display: "block",
@@ -114,6 +115,29 @@ type EmailJs = {
 };
 
 export default function LandingPage() {
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const client = supabase;
+    const check = async () => {
+      const {
+        data: { user },
+      } = await client.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await client
+        .from("profiles")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        await client.auth.signOut();
+      }
+    };
+    void check();
+  }, []);
+
+  useRequireActiveSubscription();
   const [modalOpen, setModalOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [current, setCurrent] = useState(0);
@@ -163,7 +187,7 @@ export default function LandingPage() {
       .from("profiles")
       .select("username, avatar_url, plan")
       .eq("id", user.id)
-      .single()
+      .maybeSingle()
       .then(({ data, error }) => {
         if (error) {
           console.error("Landing: profiles query error", error);
@@ -172,15 +196,21 @@ export default function LandingPage() {
           setProfileUsername(null);
           return;
         }
+        if (!data) {
+          setAvatarUrl(null);
+          setUserPlan("spark");
+          setProfileUsername(null);
+          return;
+        }
         setProfileUsername(
-          typeof data?.username === "string" && data.username.trim()
+          typeof data.username === "string" && data.username.trim()
             ? data.username.trim()
             : null
         );
-        const u = data?.avatar_url;
+        const u = data.avatar_url;
         setAvatarUrl(typeof u === "string" && u ? u : null);
         const raw =
-          (data?.plan as string | undefined)?.toLowerCase() ?? "spark";
+          (data.plan as string | undefined)?.toLowerCase() ?? "spark";
         setUserPlan(
           raw === "build" || raw === "scale" ? raw : "spark"
         );

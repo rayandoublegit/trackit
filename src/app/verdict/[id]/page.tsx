@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 type VerdictType = "FLIP IT" | "BUILD IT" | "KILL IT";
 
@@ -186,6 +187,7 @@ const HOME_PILL = (
 );
 
 export default function VerdictPage() {
+  useRequireActiveSubscription();
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();

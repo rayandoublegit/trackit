@@ -28,6 +28,15 @@ export default function PricingPage() {
     })();
   }, [router]);
 
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
   const startCheckout = async (tier: Tier) => {
     if (!supabase) return;
     setPageError(null);
@@ -57,8 +66,8 @@ export default function PricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           priceId,
-          userId: user.id,
-          email: user.email,
+          userId: user?.id,
+          email: user?.email,
         }),
       });
 

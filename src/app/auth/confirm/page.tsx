@@ -38,22 +38,7 @@ function ConfirmContent() {
         } = await client.auth.getUser();
 
         if (user) {
-          const { data: profile } = await client
-            .from("profiles")
-            .select("plan")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (!profile) {
-            await client.from("profiles").insert({
-              id: user.id,
-              username: user.email?.split("@")[0] ?? "founder",
-              plan: "spark",
-            });
-            router.push("/pricing");
-          } else {
-            router.push("/dashboard");
-          }
+          router.push("/pricing");
         } else {
           router.push("/auth");
         }

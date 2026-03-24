@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getSparkPriceId } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 const QUESTIONS = [
   {
@@ -55,6 +56,7 @@ const QUESTIONS = [
 type Question = (typeof QUESTIONS)[number];
 
 export default function AnalyzePage() {
+  useRequireActiveSubscription();
   const router = useRouter();
 
   const [current, setCurrent] = useState(0);
@@ -198,7 +200,7 @@ export default function AnalyzePage() {
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("plan, subscription_active")
+        .select("subscription_status")
         .eq("id", user.id)
         .single();
 
@@ -209,13 +211,11 @@ export default function AnalyzePage() {
         return;
       }
 
-      const profilePlan =
-        (profile?.plan as string | undefined)?.toLowerCase() ?? "spark";
-      const hasActiveSubscription =
-        (profile as { subscription_active?: boolean } | null)
-          ?.subscription_active === true;
+      const subStatus =
+        (profile?.subscription_status as string | undefined)?.toLowerCase() ??
+        "inactive";
 
-      if (profilePlan === "spark" && !hasActiveSubscription) {
+      if (subStatus !== "active") {
         setIsSubmitting(false);
         window.location.href = "/pricing";
         return;

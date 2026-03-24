@@ -16,6 +16,7 @@ import {
   handleUpgrade,
 } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 type VerdictKind = "FLIP" | "BUILD" | "KILL";
 
@@ -168,6 +169,7 @@ function VerdictPill({ kind }: { kind: VerdictKind | null }) {
 }
 
 export default function DashboardPage() {
+  useRequireActiveSubscription();
   const router = useRouter();
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);

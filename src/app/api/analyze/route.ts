@@ -240,9 +240,19 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("plan")
+      .select("plan, subscription_status")
       .eq("id", userId)
       .single();
+
+    const subStatus =
+      (profile?.subscription_status as string | undefined)?.toLowerCase() ??
+      "inactive";
+    if (subStatus !== "active") {
+      return NextResponse.json(
+        { success: false, error: "Subscription required" },
+        { status: 403 }
+      );
+    }
 
     const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "spark";
     const plan =

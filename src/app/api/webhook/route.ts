@@ -62,6 +62,11 @@ export async function POST(request: Request) {
       ? String(session.metadata.userId)
       : null;
 
+    const email =
+      session.customer_email ??
+      session.customer_details?.email ??
+      null;
+
     const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
       expand: ["data.price"],
     });
@@ -89,15 +94,36 @@ export async function POST(request: Request) {
     console.log("Webhook: userId", userId);
 
     if (userId) {
-      const { error: updateError } = await supabaseAdmin
-        .from("profiles")
-        .update({ plan, subscription_active: true })
-        .eq("id", userId);
+      const usernameBase =
+        email?.split("@")[0]?.trim() || "founder";
 
-      console.log("Webhook: update result", updateError);
+      const { data: existing } = await supabaseAdmin
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const { error: profileError } = existing
+        ? await supabaseAdmin
+            .from("profiles")
+            .update({
+              plan,
+              subscription_active: true,
+              subscription_status: "active",
+            })
+            .eq("id", userId)
+        : await supabaseAdmin.from("profiles").insert({
+            id: userId,
+            username: usernameBase,
+            plan,
+            subscription_active: true,
+            subscription_status: "active",
+          });
+
+      console.log("Webhook: profile create/update result", profileError);
     } else {
       console.log(
-        "Webhook: update skipped — no userId in session.metadata"
+        "Webhook: upsert skipped — no userId in session.metadata"
       );
     }
   }
