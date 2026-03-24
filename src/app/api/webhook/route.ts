@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     if (userId) {
       const { error: updateError } = await supabaseAdmin
         .from("profiles")
-        .update({ plan })
+        .update({ plan, subscription_active: true })
         .eq("id", userId);
 
       console.log("Webhook: update result", updateError);

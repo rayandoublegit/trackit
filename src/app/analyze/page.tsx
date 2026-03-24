@@ -196,6 +196,31 @@ export default function AnalyzePage() {
         return;
       }
 
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("plan, subscription_active")
+        .eq("id", user.id)
+        .single();
+
+      if (profileErr) {
+        console.error("Analyze: profile fetch", profileErr);
+        setSubmitError("Could not verify your plan. Please try again.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const profilePlan =
+        (profile?.plan as string | undefined)?.toLowerCase() ?? "spark";
+      const hasActiveSubscription =
+        (profile as { subscription_active?: boolean } | null)
+          ?.subscription_active === true;
+
+      if (profilePlan === "spark" && !hasActiveSubscription) {
+        setIsSubmitting(false);
+        window.location.href = "/pricing";
+        return;
+      }
+
       console.log("Inserting analysis...");
       const insertPayload = {
         user_id: user.id,

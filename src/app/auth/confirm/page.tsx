@@ -40,7 +40,7 @@ function ConfirmContent() {
         if (user) {
           const { data: profile } = await client
             .from("profiles")
-            .select("id")
+            .select("plan")
             .eq("id", user.id)
             .maybeSingle();
 
@@ -50,10 +50,13 @@ function ConfirmContent() {
               username: user.email?.split("@")[0] ?? "founder",
               plan: "spark",
             });
+            router.push("/pricing");
+          } else {
+            router.push("/dashboard");
           }
+        } else {
+          router.push("/auth");
         }
-
-        router.push("/");
       })();
     } else {
       router.push("/auth");

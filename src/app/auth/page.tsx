@@ -119,17 +119,33 @@ export default function AuthPage() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
-        if (skipAuthRedirectForAvatarRef.current) return;
-        router.replace("/analyze");
+    if (!signupAwaitingEmail) return;
+    const client = supabase;
+    if (!client) return;
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session) {
+        const { data: profile } = await client
+          .from("profiles")
+          .select("plan")
+          .eq("id", session.user.id)
+          .maybeSingle();
+
+        if (!profile) {
+          await client.from("profiles").insert({
+            id: session.user.id,
+            username: session.user.email?.split("@")[0] ?? "founder",
+            plan: "spark",
+          });
+        }
+        router.push("/pricing");
       }
     });
-    return () => {
-      data.subscription.unsubscribe();
-    };
-  }, [router]);
+
+    return () => subscription.unsubscribe();
+  }, [signupAwaitingEmail, router]);
 
   const validateEmail = (value: string) => {
     const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -313,7 +329,7 @@ export default function AuthPage() {
       }
 
       skipAuthRedirectForAvatarRef.current = false;
-      router.replace("/");
+      router.replace("/pricing");
     } finally {
       setLoading(false);
     }
@@ -340,7 +356,11 @@ export default function AuthPage() {
         password,
       });
       const msg = getErrorMessage(signErr);
-      if (msg) setError(msg);
+      if (msg) {
+        setError(msg);
+      } else {
+        router.replace("/dashboard");
+      }
     } finally {
       setLoading(false);
     }

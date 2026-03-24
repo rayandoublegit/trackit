@@ -1206,6 +1206,45 @@ footer {
 .pricing-divider-mt {
   margin-top: 28px;
 }
+
+/* Standalone /pricing page */
+.pricing-page-wrap {
+  min-height: 100vh;
+  background: #000;
+  padding: 48px 64px 100px;
+  box-sizing: border-box;
+}
+.pricing-page-logo-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+.pricing-page-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--white);
+  margin: 0 0 12px;
+}
+.pricing-page-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+  margin: 0 auto 48px;
+  max-width: 480px;
+}
+.pricing-page-section.pricing-section {
+  padding: 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
 .pain-bubbles-row {
   display: flex;
   gap: 8px;
