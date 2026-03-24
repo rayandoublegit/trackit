@@ -108,7 +108,6 @@ export async function POST(request: Request) {
             .from("profiles")
             .update({
               plan,
-              subscription_active: true,
               subscription_status: "active",
             })
             .eq("id", userId)
@@ -116,7 +115,6 @@ export async function POST(request: Request) {
             id: userId,
             username: usernameBase,
             plan,
-            subscription_active: true,
             subscription_status: "active",
           });
 
