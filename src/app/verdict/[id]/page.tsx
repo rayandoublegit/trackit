@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
@@ -151,14 +151,6 @@ const LOGO_BLOCK = (
   </div>
 );
 
-const LOADING_MESSAGES = [
-  "Klayan is researching your market...",
-  "Scanning competitor landscape...",
-  "Reading customer complaints...",
-  "Applying the unicorn filter...",
-  "Writing your verdict...",
-] as const;
-
 const HOME_PILL = (
   <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
     <Link
@@ -197,6 +189,8 @@ export default function VerdictPage() {
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [analysisLoading, setAnalysisLoading] = useState(true);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<{
@@ -214,7 +208,6 @@ export default function VerdictPage() {
 
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
-  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
 
   const analysisSelectColumns =
     "idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
@@ -225,21 +218,9 @@ export default function VerdictPage() {
       (analysis !== null && analysis.verdict === null));
 
   useEffect(() => {
-    if (!showLoadingShell) {
-      setLoadingMsgIndex(0);
-      return;
-    }
-    setLoadingMsgIndex(0);
-    const t = window.setInterval(() => {
-      setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
-    }, 10000);
-    return () => window.clearInterval(t);
-  }, [showLoadingShell]);
-
-  useEffect(() => {
     if (!id) return;
     if (!isSupabaseConfigured || !supabase) {
-      router.push("/auth");
+      routerRef.current.push("/auth");
       return;
     }
 
@@ -277,7 +258,7 @@ export default function VerdictPage() {
 
         if (cancelled) return;
 
-        if (data.status === "pending" && !data.verdict) {
+        if (!data.verdict) {
           fetch("/api/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -365,7 +346,7 @@ export default function VerdictPage() {
       cancelled = true;
       if (intervalId) window.clearInterval(intervalId);
     };
-  }, [id, router]);
+  }, [id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -391,7 +372,7 @@ export default function VerdictPage() {
         setUserPlan("spark");
       }
     })();
-  }, [id]);
+  }, []);
 
   const parsedSections = useMemo(() => {
     if (!analysis?.verdict) return null;
@@ -610,7 +591,7 @@ export default function VerdictPage() {
             minHeight: 48,
           }}
         >
-          {LOADING_MESSAGES[loadingMsgIndex]}
+          Writing your verdict…
         </div>
         <div
           style={{
