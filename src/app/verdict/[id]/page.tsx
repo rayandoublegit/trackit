@@ -151,7 +151,7 @@ const LOGO_BLOCK = (
   </div>
 );
 
-const loadingMessages = [
+const LOADING_MESSAGES = [
   "Klayan is researching your market...",
   "Scanning competitor landscape...",
   "Reading customer complaints...",
@@ -231,7 +231,7 @@ export default function VerdictPage() {
     }
     setLoadingMsgIndex(0);
     const t = window.setInterval(() => {
-      setLoadingMsgIndex((i) => (i + 1) % loadingMessages.length);
+      setLoadingMsgIndex((i) => (i + 1) % LOADING_MESSAGES.length);
     }, 10000);
     return () => window.clearInterval(t);
   }, [showLoadingShell]);
@@ -286,65 +286,69 @@ export default function VerdictPage() {
         }
 
         let attempts = 0;
-        intervalId = window.setInterval(() => {
-          void (async () => {
+        const tick = async () => {
+          if (cancelled) return;
+          attempts += 1;
+          if (attempts > 40) {
+            if (intervalId) {
+              window.clearInterval(intervalId);
+              intervalId = undefined;
+            }
+            if (!cancelled) {
+              setAnalysisError("Analysis took too long. Please try again.");
+            }
+            return;
+          }
+
+          try {
+            const { data: polled, error: pollError } = await client
+              .from("analyses")
+              .select("verdict, status, idea")
+              .eq("id", id)
+              .single();
+
             if (cancelled) return;
-            attempts += 1;
-            if (attempts > 40) {
+            if (pollError) return;
+
+            if (polled?.verdict) {
+              setAnalysis((prev) => {
+                if (prev) {
+                  return {
+                    ...prev,
+                    verdict: polled.verdict,
+                    ...(polled.status != null ? { status: polled.status } : {}),
+                    ...(polled.idea != null ? { idea: polled.idea } : {}),
+                  };
+                }
+                return {
+                  idea: polled.idea ?? "",
+                  target_customer: "",
+                  why_problem: "",
+                  existing_solutions: "",
+                  unfair_advantage: "",
+                  market_conversations: "",
+                  email: "",
+                  status: polled.status ?? "",
+                  verdict: polled.verdict,
+                  created_at: new Date().toISOString(),
+                };
+              });
+              setAnalysisLoading(false);
               if (intervalId) {
                 window.clearInterval(intervalId);
                 intervalId = undefined;
               }
-              if (!cancelled) {
-                setAnalysisError("Analysis took too long. Please try again.");
-                setAnalysisLoading(false);
-              }
-              return;
             }
+          } catch (e) {
+            console.error("Verdict: poll error", e);
+          }
+        };
 
-            try {
-              const { data: polled, error: pollError } = await client
-                .from("analyses")
-                .select("verdict, status, idea")
-                .eq("id", id)
-                .single();
+        if (cancelled) return;
 
-              if (cancelled) return;
-              if (pollError) return;
-
-              if (polled?.verdict) {
-                setAnalysis((prev) => {
-                  if (prev) {
-                    return {
-                      ...prev,
-                      verdict: polled.verdict,
-                      ...(polled.status != null ? { status: polled.status } : {}),
-                      ...(polled.idea != null ? { idea: polled.idea } : {}),
-                    };
-                  }
-                  return {
-                    idea: polled.idea ?? "",
-                    target_customer: "",
-                    why_problem: "",
-                    existing_solutions: "",
-                    unfair_advantage: "",
-                    market_conversations: "",
-                    email: "",
-                    status: polled.status ?? "",
-                    verdict: polled.verdict,
-                    created_at: new Date().toISOString(),
-                  };
-                });
-                setAnalysisLoading(false);
-                if (intervalId) {
-                  window.clearInterval(intervalId);
-                  intervalId = undefined;
-                }
-              }
-            } catch (e) {
-              console.error("Verdict: poll error", e);
-            }
-          })();
+        void tick();
+        intervalId = window.setInterval(() => {
+          void tick();
         }, 3000);
       } catch (e) {
         console.error("Verdict: load analysis error", e);
@@ -561,7 +565,7 @@ export default function VerdictPage() {
         >
           Try again
         </button>
-        <a
+        <Link
           href="/analyze"
           style={{
             color: "rgba(255,255,255,0.4)",
@@ -570,7 +574,7 @@ export default function VerdictPage() {
           }}
         >
           Start a new analysis
-        </a>
+        </Link>
       </div>
     );
   }
@@ -606,7 +610,7 @@ export default function VerdictPage() {
             minHeight: 48,
           }}
         >
-          {loadingMessages[loadingMsgIndex]}
+          {LOADING_MESSAGES[loadingMsgIndex]}
         </div>
         <div
           style={{
