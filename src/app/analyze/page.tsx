@@ -293,20 +293,7 @@ export default function AnalyzePage() {
         return;
       }
 
-      // Fire and forget - do NOT await
-      const {
-        data: { user: userForAnalyze },
-      } = await supabase.auth.getUser();
-      console.log("Triggering analyze for:", data.id);
-      fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          analysisId: data.id,
-          userId: userForAnalyze?.id,
-        }),
-      }).catch(console.error);
-
+      // Verdict page mounts and calls /api/analyze while this tab stays on that URL
       window.location.href = `/verdict/${data.id}`;
     } catch (e) {
       console.error("Submit exception:", e);

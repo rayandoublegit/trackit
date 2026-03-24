@@ -258,7 +258,7 @@ export default function VerdictPage() {
 
         if (cancelled) return;
 
-        if (!data.verdict) {
+        if (data.status === "pending") {
           const {
             data: { user: userForAnalyze },
           } = await client.auth.getUser();
