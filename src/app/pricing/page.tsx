@@ -24,7 +24,20 @@ export default function PricingPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) router.replace("/auth");
+      if (!user) {
+        router.replace("/auth");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("subscription_status")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.subscription_status === "active") {
+        router.replace("/dashboard");
+      }
     })();
   }, [router]);
 
@@ -66,8 +79,8 @@ export default function PricingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           priceId,
-          userId: user?.id,
-          email: user?.email,
+          userId: user.id,
+          email: user.email,
         }),
       });
 
