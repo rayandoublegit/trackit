@@ -293,16 +293,15 @@ export default function AnalyzePage() {
         return;
       }
 
-      void fetch("/api/analyze", {
+      // Fire and forget - do NOT await
+      console.log("Triggering analyze for:", data.id);
+      fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysisId }),
-      }).catch(() => {
-        /* verdict page polls if this fails */
-      });
+        body: JSON.stringify({ analysisId: data.id }),
+      }).catch(console.error);
 
-      console.log("Redirecting to verdict...");
-      window.location.href = `/verdict/${analysisId}`;
+      window.location.href = `/verdict/${data.id}`;
     } catch (e) {
       console.error("Submit exception:", e);
       setSubmitError("Something went wrong. Please try again.");
