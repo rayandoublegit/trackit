@@ -306,9 +306,10 @@ export async function POST(request: Request) {
 
     console.log("Done");
     return NextResponse.json({ success: true, verdict });
-  } catch {
+  } catch (err: any) {
+    console.error('FULL ERROR:', err?.message, err?.status, err?.error);
     return NextResponse.json(
-      { success: false, error: "Unexpected server error" },
+      { success: false, error: err?.message },
       { status: 500 }
     );
   }
