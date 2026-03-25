@@ -780,7 +780,7 @@ export default function LandingPage() {
       </div>
 
       <section className="demo-section">
-        <div className="demo-video-wrap reveal">
+        <div className="demo-video-wrap reveal" id="demoVideoWrap">
           <video
             id="demoVideo"
             src="https://res.cloudinary.com/dqsk5btgz/video/upload/v1774400144/broski_ejduic.mp4"
@@ -866,6 +866,24 @@ export default function LandingPage() {
                 height="18"
               >
                 <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="demo-ctrl-btn"
+              aria-label="Fullscreen"
+              onClick={(e) => {
+                e.stopPropagation();
+                const wrap = document.getElementById("demoVideoWrap");
+                if (!document.fullscreenElement) {
+                  wrap?.requestFullscreen();
+                } else {
+                  document.exitFullscreen();
+                }
+              }}
+            >
+              <svg viewBox="0 0 24 24" fill="white" width="18" height="18">
+                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
               </svg>
             </button>
           </div>
