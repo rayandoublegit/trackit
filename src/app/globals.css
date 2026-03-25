@@ -1308,3 +1308,106 @@ footer {
     font-size: 15px;
   }
 }
+
+.demo-section {
+  padding: 80px 24px;
+  background: #000;
+}
+
+.demo-video-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+  position: relative;
+  cursor: pointer;
+}
+
+.demo-video {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.demo-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.85);
+  border: none;
+  cursor: pointer;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease, background 0.2s ease;
+  z-index: 2;
+}
+
+.demo-play-btn:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+  background: rgba(0,0,0,1);
+}
+
+.demo-play-btn.hidden {
+  display: none;
+}
+
+.demo-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.75));
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.demo-controls.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.demo-progress {
+  flex: 1;
+  height: 3px;
+  accent-color: #fff;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.demo-time {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  flex-shrink: 0;
+  min-width: 36px;
+}
+
+.demo-ctrl-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.demo-ctrl-btn:hover {
+  opacity: 1;
+}
