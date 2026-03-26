@@ -30,14 +30,14 @@ type AnalysisRow = {
 type DashboardProfile = {
   username: string | null;
   avatar_url: string | null;
-  plan: "spark" | "build" | "scale";
+  plan: "free" | "spark" | "build" | "scale";
 };
 
 function normalizeDashboardPlan(
   raw: string | undefined
-): "spark" | "build" | "scale" {
+): "free" | "spark" | "build" | "scale" {
   const p = raw?.toLowerCase() ?? "spark";
-  return p === "build" || p === "scale" ? p : "spark";
+  return p === "build" ? "build" : p === "scale" ? "scale" : p === "free" ? "free" : "spark";
 }
 
 /** Mirrors verdict page parsing; maps to short sidebar labels. */
