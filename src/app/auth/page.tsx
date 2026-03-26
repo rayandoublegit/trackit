@@ -128,7 +128,7 @@ export default function AuthPage() {
     } = client.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) {
         subscription.unsubscribe();
-        router.push("/pricing");
+        router.push("/analyze");
       }
     });
 
@@ -136,7 +136,7 @@ export default function AuthPage() {
       void client.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           clearInterval(interval);
-          router.push("/pricing");
+          router.push("/analyze");
         }
       });
     }, 2000);

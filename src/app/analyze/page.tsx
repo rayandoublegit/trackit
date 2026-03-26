@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getSparkPriceId } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 const QUESTIONS = [
   {
@@ -56,7 +55,6 @@ const QUESTIONS = [
 type Question = (typeof QUESTIONS)[number];
 
 export default function AnalyzePage() {
-  useRequireActiveSubscription();
   const router = useRouter();
 
   const [current, setCurrent] = useState(0);
@@ -198,28 +196,14 @@ export default function AnalyzePage() {
         return;
       }
 
-      const { data: profile, error: profileErr } = await supabase
+      const { data: profile } = await supabase
         .from("profiles")
-        .select("subscription_status")
+        .select("subscription_status, plan")
         .eq("id", user.id)
-        .single();
-
-      if (profileErr) {
-        console.error("Analyze: profile fetch", profileErr);
-        setSubmitError("Could not verify your plan. Please try again.");
-        setIsSubmitting(false);
-        return;
-      }
+        .maybeSingle();
 
       const subStatus =
-        (profile?.subscription_status as string | undefined)?.toLowerCase() ??
-        "inactive";
-
-      if (subStatus !== "active") {
-        setIsSubmitting(false);
-        window.location.href = "/pricing";
-        return;
-      }
+        (profile?.subscription_status as string | undefined)?.toLowerCase() ?? "inactive";
 
       console.log("Inserting analysis...");
       const insertPayload = {
