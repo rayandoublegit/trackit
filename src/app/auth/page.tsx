@@ -317,6 +317,22 @@ export default function AuthPage() {
         }
       }
 
+      // Create profile if it doesn't exist yet
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        await supabase.from("profiles").insert({
+          id: user.id,
+          username: username.trim() || user.email?.split("@")[0] || "founder",
+          plan: "free",
+          subscription_status: "inactive",
+        });
+      }
+
       skipAuthRedirectForAvatarRef.current = false;
       router.replace("/analyze");
     } finally {
