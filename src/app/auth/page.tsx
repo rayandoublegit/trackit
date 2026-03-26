@@ -123,15 +123,19 @@ export default function AuthPage() {
     const client = supabase;
     if (!client) return;
 
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
-        router.push("/pricing");
-      }
-    });
+    const interval = setInterval(() => {
+      void (async () => {
+        const {
+          data: { session },
+        } = await client.auth.getSession();
+        if (session) {
+          clearInterval(interval);
+          router.push("/pricing");
+        }
+      })();
+    }, 3000);
 
-    return () => subscription.unsubscribe();
+    return () => clearInterval(interval);
   }, [signupAwaitingEmail, router]);
 
   const validateEmail = (value: string) => {

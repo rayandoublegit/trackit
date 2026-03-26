@@ -33,15 +33,9 @@ function ConfirmContent() {
           return;
         }
 
-        const {
-          data: { user },
-        } = await client.auth.getUser();
+        await client.auth.getUser();
 
-        if (user) {
-          router.push("/pricing");
-        } else {
-          router.push("/auth");
-        }
+        // Stay on success screen — the signup device handles the redirect
       })();
     } else {
       router.push("/auth");
@@ -60,28 +54,47 @@ function ConfirmContent() {
         fontFamily: "Inter, sans-serif",
       }}
     >
-      <div style={{ textAlign: "center" }}>
+      <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
         <img
           src="https://i.ibb.co/msYn5RH/navbarlogo.png"
-          alt=""
+          alt="Klayan"
           style={{
-            width: "56px",
-            height: "56px",
+            width: 64,
+            height: 64,
             borderRadius: "50%",
-            marginBottom: "24px",
+            marginBottom: 32,
+            objectFit: "cover",
           }}
         />
-        <div style={{ fontSize: "18px", fontWeight: 600 }}>
-          Confirming your account...
+        <div
+          style={{
+            fontSize: 40,
+            marginBottom: 16,
+          }}
+        >
+          ✅
         </div>
         <div
           style={{
-            fontSize: "14px",
-            color: "rgba(255,255,255,0.5)",
-            marginTop: "8px",
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: 28,
+            fontWeight: 700,
+            letterSpacing: "-0.03em",
+            marginBottom: 12,
           }}
         >
-          Please wait
+          Email confirmed.
+        </div>
+        <div
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: 16,
+            fontWeight: 300,
+            color: "rgba(255,255,255,0.5)",
+            lineHeight: 1.6,
+          }}
+        >
+          Redirecting you to choose your plan...
         </div>
       </div>
     </div>
