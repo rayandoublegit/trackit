@@ -318,7 +318,7 @@ export default function AuthPage() {
       }
 
       skipAuthRedirectForAvatarRef.current = false;
-      router.replace("/pricing");
+      router.replace("/analyze");
     } finally {
       setLoading(false);
     }
@@ -361,7 +361,7 @@ export default function AuthPage() {
           .eq("id", signedInUser.id)
           .maybeSingle();
         if (!profileRow) {
-          router.replace("/pricing");
+          router.replace("/analyze");
         } else {
           router.replace("/dashboard");
         }
