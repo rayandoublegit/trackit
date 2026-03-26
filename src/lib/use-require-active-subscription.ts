@@ -7,10 +7,6 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const EXEMPT_PREFIXES = ["/pricing", "/auth", "/analyze", "/verdict"];
 
-/**
- * Redirects logged-in users without an active subscription to /pricing.
- * Skips /pricing and /auth so users can subscribe or sign in.
- */
 export function useRequireActiveSubscription() {
   const pathname = usePathname();
 
