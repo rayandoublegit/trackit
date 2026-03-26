@@ -130,9 +130,6 @@ export default function LandingPage() {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (!profile) {
-        await client.auth.signOut();
-      }
     };
     void check();
   }, []);
