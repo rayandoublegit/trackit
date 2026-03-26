@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-const EXEMPT_PREFIXES = ["/pricing", "/auth"];
+const EXEMPT_PREFIXES = ["/pricing", "/auth", "/analyze", "/verdict"];
 
 /**
  * Redirects logged-in users without an active subscription to /pricing.
@@ -37,13 +37,7 @@ export function useRequireActiveSubscription() {
         return;
       }
 
-      if (!profile) {
-        if (pathname === "/" || pathname === "") {
-          return;
-        }
-        window.location.href = "/pricing";
-        return;
-      }
+      if (!profile) return;
 
       const status =
         (profile.subscription_status as string | undefined)?.toLowerCase() ??
