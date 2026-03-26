@@ -259,7 +259,7 @@ export async function POST(request: Request) {
         .from("analyses")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId);
-      if ((count ?? 0) >= 1) {
+      if ((count ?? 0) > 1) {
         return NextResponse.json(
           { success: false, error: "Subscription required" },
           { status: 403 }
