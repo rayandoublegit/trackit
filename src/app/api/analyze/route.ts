@@ -250,7 +250,7 @@ export async function POST(request: Request) {
 
     const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "free";
     const plan =
-      rawPlan === "scale" || rawPlan === "build" ? rawPlan : "spark";
+      rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : "spark";
 
     // Allow free users to run their first analysis
     const isFree = subStatus !== "active";
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
         .from("analyses")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId);
-      if ((count ?? 0) > 1) {
+      if ((count ?? 0) >= 1) {
         return NextResponse.json(
           { success: false, error: "Subscription required" },
           { status: 403 }
@@ -277,7 +277,7 @@ export async function POST(request: Request) {
 
     console.log("Calling Anthropic...", { plan, maxTokens });
     const completion = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-4-20250514",
       max_tokens: maxTokens,
       system: systemPrompt,
       tools: [
