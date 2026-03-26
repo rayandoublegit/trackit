@@ -18,7 +18,6 @@ import {
   type PlanTier,
 } from "@/lib/pricing-cta";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 
 const PROFILE_DROPDOWN_ITEM_STYLE: CSSProperties = {
   display: "block",
@@ -134,7 +133,6 @@ export default function LandingPage() {
     void check();
   }, []);
 
-  useRequireActiveSubscription();
   const [modalOpen, setModalOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [current, setCurrent] = useState(0);
