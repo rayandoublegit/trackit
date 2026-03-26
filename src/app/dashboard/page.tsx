@@ -1202,7 +1202,7 @@ export default function DashboardPage() {
               ? "Scale Plan"
               : userPlan === "build"
                 ? "Build Plan"
-                : "Spark Plan"}
+                : userPlan === "free" ? "Free Plan" : "Spark Plan"}
           </div>
           {userPlan === "scale" ? (
             <div
@@ -1246,7 +1246,7 @@ export default function DashboardPage() {
                 fontFamily: "'Inter', sans-serif",
               }}
             >
-              {userPlan === "spark"
+              {userPlan === "spark" || userPlan === "free"
                 ? "Upgrade to Build →"
                 : "Upgrade to Scale →"}
             </button>
