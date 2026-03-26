@@ -247,16 +247,25 @@ export async function POST(request: Request) {
     const subStatus =
       (profile?.subscription_status as string | undefined)?.toLowerCase() ??
       "inactive";
-    if (subStatus !== "active") {
-      return NextResponse.json(
-        { success: false, error: "Subscription required" },
-        { status: 403 }
-      );
-    }
 
-    const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "spark";
+    const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "free";
     const plan =
       rawPlan === "scale" || rawPlan === "build" ? rawPlan : "spark";
+
+    // Allow free users to run their first analysis
+    const isFree = subStatus !== "active";
+    if (isFree) {
+      const { count } = await supabaseAdmin
+        .from("analyses")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId);
+      if ((count ?? 0) > 1) {
+        return NextResponse.json(
+          { success: false, error: "Subscription required" },
+          { status: 403 }
+        );
+      }
+    }
 
     const systemPrompt = buildSystemPrompt(plan);
     const userPrompt = buildUserPrompt(analysis, plan);
