@@ -111,7 +111,11 @@ RULES:
 - Every claim must come from live web search data
 - Never say "great idea" or any variation
 - If the idea is dead on arrival — say it clearly and fast
-- The locked sections must appear EXACTLY as written above — do not modify them`;
+- The locked sections must appear EXACTLY as written above — do not modify them
+- HARD TRUTHS: Each truth MUST be on its own line starting with 01 —, 02 —, 03 —. Never combine them in one paragraph.
+- RECOMMENDED STACK: List each tool on its own line with a dash. Minimum 3 tools. Explain in 5 words why each tool.
+- MARKET SIGNAL: Must name at least one real competitor with their actual pricing from the web.
+- Never put multiple numbered points in one paragraph block.`;
   }
   const base = SYSTEM_PROMPT_BASE;
   if (plan === "scale") return `${base}\n\n${BUILD_ADDONS}\n\n${SCALE_ADDONS}`;
