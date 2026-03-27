@@ -260,41 +260,12 @@ export default function AnalyzePage() {
 
       const sparkPriceId = getSparkPriceId();
 
-      if (
-        isSpark &&
-        analysisCount > FREE_ANALYSES &&
-        sparkPriceId
-      ) {
-        const res = await fetch("/api/create-checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            priceId: sparkPriceId,
-            userId: user.id,
-            email: user.email,
-            analysisId,
-          }),
-        });
-
-        const checkoutPayload = (await res.json().catch(() => ({}))) as {
-          url?: string;
-          error?: string;
-        };
-
-        if (!res.ok || !checkoutPayload.url) {
-          setSubmitError(
-            checkoutPayload.error ??
-              "Could not start checkout. Please try again."
-          );
-          setIsSubmitting(false);
-          return;
-        }
-
-        window.location.href = checkoutPayload.url;
+      if (isSpark && analysisCount > FREE_ANALYSES) {
+        window.location.href = "/pricing";
         return;
       }
 
-      if (isSpark && analysisCount > FREE_ANALYSES && !sparkPriceId) {
+      if (false) {
         setSubmitError(
           "Subscription checkout is not configured. Contact support."
         );
