@@ -381,7 +381,7 @@ export default function VerdictPage() {
           return;
         }
         const p = (data?.plan as string | undefined)?.toLowerCase() ?? "spark";
-        setUserPlan(p === "build" || p === "scale" ? p : "spark");
+        setUserPlan(p === "build" || p === "scale" ? p : p === "free" ? "free" : "spark");
       } catch (e) {
         console.error("Verdict: profile plan fetch error", e);
         setUserPlan("spark");
@@ -890,7 +890,7 @@ export default function VerdictPage() {
                   </div>
                 ))}
 
-                {userPlan === "spark" && parsedSections ? (
+                {(userPlan === "spark" || userPlan === "free") && parsedSections ? (
                   <div
                     style={{
                       margin: "32px auto 0",
