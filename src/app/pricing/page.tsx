@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import {
   getBuildPriceId,
@@ -13,10 +13,13 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type Tier = "spark" | "build" | "scale";
 
-export default function PricingPage() {
+function PricingPageInner() {
   const router = useRouter();
   const [busy, setBusy] = useState<Tier | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const analysisId = searchParams.get("analysisId") ?? undefined;
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -81,6 +84,7 @@ export default function PricingPage() {
           priceId,
           userId: user.id,
           email: user.email,
+          analysisId,
         }),
       });
 
@@ -278,5 +282,13 @@ export default function PricingPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={<div className="pricing-page-wrap" />}>
+      <PricingPageInner />
+    </Suspense>
   );
 }

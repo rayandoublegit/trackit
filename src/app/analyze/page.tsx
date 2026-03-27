@@ -258,7 +258,7 @@ export default function AnalyzePage() {
       const analysisCount = count ?? 0;
 
       if (isSpark && analysisCount > FREE_ANALYSES) {
-        window.location.href = "/pricing";
+        window.location.href = `/pricing?analysisId=${analysisId}`;
         return;
       }
 
