@@ -472,6 +472,26 @@ export default function AuthPage() {
               >
                 Check your email to confirm your account. Then come back and log in.
               </p>
+              <button
+                type="button"
+                onClick={() => router.push("/analyze")}
+                style={{
+                  marginTop: 20,
+                  background: "#000000",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "12px 24px",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  letterSpacing: "-0.02em",
+                  width: "100%",
+                }}
+              >
+                Already confirmed? Start validating →
+              </button>
             </div>
           </div>
         ) : null}

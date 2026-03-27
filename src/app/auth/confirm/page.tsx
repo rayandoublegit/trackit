@@ -55,17 +55,6 @@ function ConfirmContent() {
       }}
     >
       <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
-        <img
-          src="https://i.ibb.co/msYn5RH/navbarlogo.png"
-          alt="Klayan"
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            marginBottom: 32,
-            objectFit: "cover",
-          }}
-        />
         <div
           style={{
             fontSize: 40,
