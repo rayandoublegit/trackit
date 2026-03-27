@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getSparkPriceId } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 const QUESTIONS = [
@@ -258,18 +257,8 @@ export default function AnalyzePage() {
       const FREE_ANALYSES = 1;
       const analysisCount = count ?? 0;
 
-      const sparkPriceId = getSparkPriceId();
-
       if (isSpark && analysisCount > FREE_ANALYSES) {
         window.location.href = "/pricing";
-        return;
-      }
-
-      if (false) {
-        setSubmitError(
-          "Subscription checkout is not configured. Contact support."
-        );
-        setIsSubmitting(false);
         return;
       }
 
