@@ -264,23 +264,21 @@ export default function VerdictPage() {
           const {
             data: { user: userForAnalyze },
           } = await client.auth.getUser();
-          fetch("/api/analyze", {
+
+          const analyzeRes = await fetch("/api/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               analysisId: id,
               userId: userForAnalyze?.id,
             }),
-          }).then(async (res) => {
-            if (res.status === 403) {
-              cancelled = true;
-              if (intervalId) {
-                window.clearInterval(intervalId);
-                intervalId = undefined;
-              }
-              window.location.href = "/pricing";
-            }
-          }).catch(console.error);
+          }).catch(() => null);
+
+          if (analyzeRes?.status === 403) {
+            cancelled = true;
+            window.location.href = "/pricing";
+            return;
+          }
         }
 
         let attempts = 0;
