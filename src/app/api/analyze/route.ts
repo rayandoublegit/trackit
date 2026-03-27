@@ -258,8 +258,9 @@ export async function POST(request: Request) {
       const { count } = await supabaseAdmin
         .from("analyses")
         .select("*", { count: "exact", head: true })
-        .eq("user_id", userId);
-      if ((count ?? 0) > 1) {
+        .eq("user_id", userId)
+        .eq("status", "complete");
+      if ((count ?? 0) >= 1) {
         return NextResponse.json(
           { success: false, error: "Subscription required", redirect: "/pricing" },
           { status: 403 }
