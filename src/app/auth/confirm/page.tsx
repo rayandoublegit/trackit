@@ -94,7 +94,7 @@ function ConfirmContent() {
             lineHeight: 1.6,
           }}
         >
-          Redirecting you to choose your plan...
+          You can close this tab and go back to where you signed up.
         </div>
       </div>
     </div>
