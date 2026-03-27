@@ -995,7 +995,7 @@ export default function VerdictPage() {
                           fontFamily: "inherit",
                         }}
                       >
-                        {userPlan === "free" ? "Upgrade to Spark →" : "{userPlan === "free" ? "Upgrade to Spark →" : userPlan === "spark" ? "Upgrade to Build →" : "Upgrade to Scale →"}"}
+                        {userPlan === "free" ? "Upgrade to Spark →" : userPlan === "spark" ? "Upgrade to Build →" : "Upgrade to Scale →"}"}
                       </button>
                     </div>
                   </div>
