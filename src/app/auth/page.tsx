@@ -474,16 +474,9 @@ export default function AuthPage() {
               </p>
               <button
                 type="button"
-                onClick={async () => {
-                  if (!supabase) return;
-                  const {
-                    data: { user },
-                  } = await supabase.auth.getUser();
-                  if (user) {
-                    router.push("/analyze");
-                  } else {
-                    setError("Please confirm your email first before continuing.");
-                  }
+                onClick={() => {
+                  setSignupAwaitingEmail(false);
+                  setMode("login");
                 }}
                 style={{
                   marginTop: 20,
