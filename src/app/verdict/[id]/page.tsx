@@ -273,12 +273,12 @@ export default function VerdictPage() {
             }),
           }).then(async (res) => {
             if (res.status === 403) {
-              const payload = await res.json().catch(() => ({})) as { redirect?: string };
-              if (payload.redirect) {
-                window.location.href = payload.redirect;
-              } else {
-                window.location.href = "/pricing";
+              cancelled = true;
+              if (intervalId) {
+                window.clearInterval(intervalId);
+                intervalId = undefined;
               }
+              window.location.href = "/pricing";
             }
           }).catch(console.error);
         }
