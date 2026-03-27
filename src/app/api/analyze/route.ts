@@ -169,7 +169,7 @@ RECOMMENDED STACK
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 RULES:
-- Maximum 400 tokens total output
+- Maximum 300 tokens total output. Stop after the locked sections. Do NOT add any extra analysis, commentary, or sections beyond what is specified.
 - Be brutal but fair — no empty encouragement
 - Every claim must come from live web search data
 - Never say "great idea" or any variation
@@ -396,7 +396,7 @@ export async function POST(request: Request) {
     const userPrompt = buildUserPrompt(analysis, plan);
 
     const maxTokens =
-      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 2000 : 1000;
+      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 800 : 1000;
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 

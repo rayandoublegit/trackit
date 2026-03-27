@@ -1247,7 +1247,7 @@ export default function DashboardPage() {
               }}
             >
               {userPlan === "spark" || userPlan === "free"
-                ? "Upgrade to Build →"
+                ? userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"
                 : "Upgrade to Scale →"}
             </button>
           )}
