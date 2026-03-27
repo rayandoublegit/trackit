@@ -477,9 +477,9 @@ export default function AuthPage() {
                 onClick={async () => {
                   if (!supabase) return;
                   const {
-                    data: { session },
-                  } = await supabase.auth.getSession();
-                  if (session) {
+                    data: { user },
+                  } = await supabase.auth.getUser();
+                  if (user) {
                     router.push("/analyze");
                   } else {
                     setError("Please confirm your email first before continuing.");
@@ -500,7 +500,7 @@ export default function AuthPage() {
                   width: "100%",
                 }}
               >
-                Already confirmed? Start validating →
+                Already confirmed? Log in →
               </button>
             </div>
           </div>
