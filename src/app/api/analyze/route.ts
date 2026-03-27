@@ -261,7 +261,7 @@ export async function POST(request: Request) {
         .eq("user_id", userId);
       if ((count ?? 0) > 1) {
         return NextResponse.json(
-          { success: false, error: "Subscription required" },
+          { success: false, error: "Subscription required", redirect: "/pricing" },
           { status: 403 }
         );
       }

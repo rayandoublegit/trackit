@@ -271,6 +271,15 @@ export default function VerdictPage() {
               analysisId: id,
               userId: userForAnalyze?.id,
             }),
+          }).then(async (res) => {
+            if (res.status === 403) {
+              const payload = await res.json().catch(() => ({})) as { redirect?: string };
+              if (payload.redirect) {
+                window.location.href = payload.redirect;
+              } else {
+                window.location.href = "/pricing";
+              }
+            }
           }).catch(console.error);
         }
 
