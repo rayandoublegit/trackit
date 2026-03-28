@@ -102,7 +102,7 @@ function ConfirmContent() {
   return (
     <div style={{ background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontFamily: "Inter, sans-serif" }}>
       <div style={{ textAlign: "center" }}>
-        <img src="https://i.ibb.co/msYn5RH/navbarlogo.png" alt="" style={{ width: 56, height: 56, borderRadius: "50%", marginBottom: 24 }} />
+        <img src="/images/navbarlogo.png" alt="" style={{ width: 56, height: 56, borderRadius: "50%", marginBottom: 24 }} />
         <div style={{ fontSize: 18, fontWeight: 600 }}>Confirming your account...</div>
         <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>Please wait</div>
       </div>

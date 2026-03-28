@@ -685,7 +685,7 @@ export default function DashboardPage() {
             }}
           >
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt=""
               width={48}
               height={48}
@@ -1269,7 +1269,7 @@ export default function DashboardPage() {
             position: "absolute",
             inset: 0,
             backgroundImage:
-              "url(https://i.ibb.co/1YxCZPjC/bluepattern.png)",
+              "url(/images/bluepattern.png)",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}

@@ -544,7 +544,7 @@ export default function LandingPage() {
       <nav>
         <div className="nav-logo">
           <img
-            src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+            src="/images/navbarlogo.png"
             alt="Klayan"
             className="nav-logo-img"
           />
@@ -715,7 +715,7 @@ export default function LandingPage() {
               }}
             >
               <img
-                src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+                src="/images/navbarlogo.png"
                 alt=""
                 width={24}
                 height={24}
@@ -1009,7 +1009,7 @@ export default function LandingPage() {
             <div className="step-pill">Step 4</div>
             <div className="step-card-step4-logo-wrap">
               <img
-                src="https://i.ibb.co/rR3fVfcY/cardgif.gif"
+                src="/images/cardgif.gif"
                 alt=""
                 width={220}
                 height="auto"
@@ -1226,7 +1226,7 @@ export default function LandingPage() {
             <div className="pricing-popular-badge">
               Most Popular!{" "}
               <img
-                src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+                src="/images/navbarlogo.png"
                 alt=""
                 className="pricing-inline-logo"
               />
@@ -1265,7 +1265,7 @@ export default function LandingPage() {
           <div className="scale-badge">
             Get the best out of Klayan!{" "}
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt=""
               className="pricing-inline-logo"
             />
@@ -1475,7 +1475,7 @@ export default function LandingPage() {
 
       <div id="klayanSuccess" className={successOpen ? "is-open" : ""}>
         <img
-          src="https://i.ibb.co/rR3fVfcY/cardgif.gif"
+          src="/images/cardgif.gif"
           alt=""
           className="klayan-success-gif"
         />

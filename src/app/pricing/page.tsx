@@ -109,7 +109,7 @@ function PricingPageInner() {
       <div className="pricing-page-logo-row">
         <Link href="/" aria-label="Home">
           <img
-            src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+            src="/images/navbarlogo.png"
             alt="Klayan"
             style={{
               width: 56,
@@ -196,7 +196,7 @@ function PricingPageInner() {
             <div className="pricing-popular-badge">
               Most Popular!{" "}
               <img
-                src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+                src="/images/navbarlogo.png"
                 alt=""
                 className="pricing-inline-logo"
               />
@@ -245,7 +245,7 @@ function PricingPageInner() {
           <div className="scale-badge">
             Get the best out of Klayan!{" "}
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt=""
               className="pricing-inline-logo"
             />

@@ -322,7 +322,7 @@ export default function AnalyzePage() {
           }}
         >
           <img
-            src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+            src="/images/navbarlogo.png"
             alt=""
             style={{
               width: "28px",

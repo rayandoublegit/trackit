@@ -141,7 +141,7 @@ const LOGO_BLOCK = (
     }}
   >
     <img
-      src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+      src="/images/navbarlogo.png"
       alt="Klayan"
       style={{
         width: "56px",
@@ -173,7 +173,7 @@ const HOME_PILL = (
       }}
     >
       <img
-        src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+        src="/images/navbarlogo.png"
         alt=""
         style={{
           width: "28px",
@@ -517,7 +517,7 @@ export default function VerdictPage() {
         }}
       >
         <img
-          src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+          src="/images/navbarlogo.png"
           alt=""
           style={{ width: "56px", borderRadius: "50%" }}
         />
@@ -591,7 +591,7 @@ export default function VerdictPage() {
         }}
       >
         <img
-          src="https://i.ibb.co/rR3fVfcY/cardgif.gif"
+          src="/images/cardgif.gif"
           alt=""
           style={{ width: "80px", height: "80px", objectFit: "contain" }}
         />

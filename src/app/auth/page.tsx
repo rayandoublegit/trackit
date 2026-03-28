@@ -439,7 +439,7 @@ export default function AuthPage() {
             }}
           >
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt="Klayan"
               style={{
                 width: 60,
@@ -508,7 +508,7 @@ export default function AuthPage() {
             }}
           >
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt="Klayan"
               style={{
                 width: 60,
@@ -577,7 +577,7 @@ export default function AuthPage() {
             }}
           >
             <img
-              src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+              src="/images/navbarlogo.png"
               alt="Klayan"
               style={{
                 width: 60,
@@ -952,7 +952,7 @@ export default function AuthPage() {
               }}
             >
               <img
-                src="https://i.ibb.co/msYn5RH/navbarlogo.png"
+                src="/images/navbarlogo.png"
                 alt="Klayan"
                 style={{
                   width: 60,
