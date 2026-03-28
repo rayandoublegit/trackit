@@ -244,7 +244,7 @@ export default function AuthPage() {
         setSignupStep(3);
       } else {
         skipAuthRedirectForAvatarRef.current = false;
-        setSignupAwaitingEmail(true);
+        router.replace("/analyze");
       }
     } finally {
       setLoading(false);
