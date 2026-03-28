@@ -670,29 +670,6 @@ export default function LandingPage() {
               <a href="#pricing">{t.nav_pricing}</a>
             </li>
           </ul>
-          <button
-            type="button"
-            onClick={() => setLang(lang === "en" ? "fr" : "en")}
-            style={{
-              background: "rgba(171,171,171,0.24)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              border: "none",
-              borderRadius: 100,
-              padding: "8px 14px",
-              color: "#fff",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: "-0.02em",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {lang === "en" ? "🇫🇷 FR" : "🇬🇧 EN"}
-          </button>
           <a href="/analyze" className="nav-cta">
             {t.nav_analyze}
           </a>
@@ -865,6 +842,29 @@ export default function LandingPage() {
               {t.nav_signin}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setLang(lang === "en" ? "fr" : "en")}
+            style={{
+              background: "rgba(171,171,171,0.24)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              border: "none",
+              borderRadius: 100,
+              padding: "8px 14px",
+              color: "#fff",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "-0.02em",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {lang === "en" ? "🇫🇷 FR" : "🇬🇧 EN"}
+          </button>
         </div>
       </nav>
 
