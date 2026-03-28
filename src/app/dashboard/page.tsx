@@ -524,7 +524,7 @@ export default function DashboardPage() {
     return { total, flip, build, kill, withVerdict, hoursEst };
   }, [rows]);
 
-  const isFounder = user?.email === "klayan.app@gmail.com";
+  const isFounder = user?.email === "klayan.app@gmail.com" || user?.email === "nellecom21@gmail.com";
 
   const avatarUrl = profile?.avatar_url ?? null;
   const profileUsername = profile?.username ?? null;
