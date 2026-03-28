@@ -126,7 +126,7 @@ export default function AuthPage() {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session) {
+      if (event === "SIGNED_IN" && session?.user?.email_confirmed_at) {
         subscription.unsubscribe();
         router.push("/analyze");
       }
@@ -134,7 +134,7 @@ export default function AuthPage() {
 
     const interval = setInterval(() => {
       void client.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
+        if (session?.user?.email_confirmed_at) {
           clearInterval(interval);
           router.push("/analyze");
         }
