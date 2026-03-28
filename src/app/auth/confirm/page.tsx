@@ -11,15 +11,15 @@ function ConfirmContent() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const token_hash = searchParams.get("token_hash");
-    const type = searchParams.get("type");
-
     if (!supabase) {
       router.push("/auth");
       return;
     }
 
     const client = supabase;
+
+    const token_hash = searchParams.get("token_hash");
+    const type = searchParams.get("type");
 
     if (token_hash && type) {
       void (async () => {
@@ -34,12 +34,26 @@ function ConfirmContent() {
         }
 
         await client.auth.getUser();
-
         // Stay on success screen — the signup device handles the redirect
       })();
-    } else {
-      router.push("/auth");
+      return;
     }
+
+    // Handle Supabase hash fragment (#access_token=...)
+    const hash = window.location.hash;
+    if (hash && hash.includes("access_token")) {
+      void (async () => {
+        const { error } = await client.auth.getSession();
+        if (error) {
+          router.push("/auth?error=confirmation_failed");
+        }
+        // Stay on success screen
+      })();
+      return;
+    }
+
+    // No token found — redirect to auth
+    router.push("/auth");
   }, [router, searchParams]);
 
   return (
