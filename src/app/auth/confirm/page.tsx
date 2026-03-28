@@ -12,30 +12,28 @@ function ConfirmContent() {
 
   useEffect(() => {
     if (!supabase) {
-      router.push("/auth");
+      setStatus("error");
       return;
     }
 
     const client = supabase;
 
     void (async () => {
-      // Wait a moment for Supabase to process the hash fragment
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Check if we already have a valid confirmed session
-      const {
-        data: { session },
-      } = await client.auth.getSession();
-
-      if (session?.user?.email_confirmed_at) {
+      // Handle PKCE code exchange
+      const code = searchParams.get("code");
+      if (code) {
+        const { error } = await client.auth.exchangeCodeForSession(code);
+        if (error) {
+          setStatus("error");
+          return;
+        }
         setStatus("success");
         return;
       }
 
-      // Try token_hash query param flow
+      // Handle token_hash flow
       const token_hash = searchParams.get("token_hash");
       const type = searchParams.get("type");
-
       if (token_hash && type) {
         const { error } = await client.auth.verifyOtp({
           token_hash,
@@ -45,6 +43,15 @@ function ConfirmContent() {
           setStatus("error");
           return;
         }
+        setStatus("success");
+        return;
+      }
+
+      // Check existing session
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+      if (session) {
         setStatus("success");
         return;
       }
