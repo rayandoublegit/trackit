@@ -17,11 +17,25 @@ function ConfirmContent() {
     }
 
     const client = supabase;
-    const token_hash = searchParams.get("token_hash");
-    const type = searchParams.get("type");
 
     void (async () => {
-      // Try token_hash flow first
+      // Wait a moment for Supabase to process the hash fragment
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Check if we already have a valid confirmed session
+      const {
+        data: { session },
+      } = await client.auth.getSession();
+
+      if (session?.user?.email_confirmed_at) {
+        setStatus("success");
+        return;
+      }
+
+      // Try token_hash query param flow
+      const token_hash = searchParams.get("token_hash");
+      const type = searchParams.get("type");
+
       if (token_hash && type) {
         const { error } = await client.auth.verifyOtp({
           token_hash,
@@ -31,25 +45,6 @@ function ConfirmContent() {
           setStatus("error");
           return;
         }
-        setStatus("success");
-        return;
-      }
-
-      // Try hash fragment flow (#access_token=...)
-      const hash = window.location.hash;
-      if (hash && hash.includes("access_token")) {
-        const { error } = await client.auth.getSession();
-        if (error) {
-          setStatus("error");
-          return;
-        }
-        setStatus("success");
-        return;
-      }
-
-      // Try getting existing session (already confirmed)
-      const { data: { session } } = await client.auth.getSession();
-      if (session) {
         setStatus("success");
         return;
       }
