@@ -154,6 +154,118 @@ export default function LandingPage() {
   );
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [lang, setLang] = useState<"en" | "fr">("en");
+  const t = {
+    en: {
+      nav_services: "Services",
+      nav_pricing: "Pricing",
+      nav_analyze: "Analyze",
+      nav_signin: "Sign In",
+      hero_title: "Stop Building",
+      hero_italic: "Start Knowing.",
+      hero_sub:
+        "The AI co-founder that tells you the truth about your idea then structures your business — before you waste 6 months building the wrong thing.",
+      hero_cta: "Analyze my idea",
+      hero_note: "Free to start · No credit card required",
+      familiar_title: "Sounds familiar ?",
+      pain1_title: "You built something nobody wanted",
+      pain1_desc:
+        "Spent 4 months coding. Launched to crickets. Found out the market didn't care.",
+      pain2_title: "You asked ChatGPT. It said great idea.",
+      pain2_desc:
+        "Every idea is a great idea to ChatGPT. You need something that actually challenges you.",
+      pain3_title: "You don't know where to start",
+      pain3_desc:
+        "ICP, pricing, distribution, competitors — it's overwhelming and nobody gives you a straight answer.",
+      how_title: "How it works ?",
+      how_sub: "From raw idea to verdict in 10 minutes.",
+      step1_pill: "Step 1",
+      step1_title: "Kill or Build",
+      step1_desc:
+        "Drop your idea. Klayan analyzes real competitors, real market data, real distribution channels — and gives you a verdict. Not a score. A verdict.",
+      step2_pill: "Step 2",
+      step2_title: "Klayan researches live",
+      step2_desc:
+        "Real competitors scraped today. Real customer complaints from Reddit and G2. Real market signals — not 2023 training data.",
+      step3_pill: "Step 3",
+      step3_title: "Get your verdict",
+      step3_desc:
+        "Kill it. Flip it. Build it. With full evidence behind every decision. Not a score out of 10. A verdict.",
+      step4_pill: "Step 4",
+      step4_title: "Execute the plan",
+      step4_desc:
+        "Exact people to contact. Exact messages to send. Daily roadmap from idea to first paying customer.",
+      honest_title: "This is what honest AI looks like",
+      honest_tagline: "Not a score. A verdict.",
+      why_title: "6 reasons why Klayan is better than just asking ChatGPT.",
+      why_sub:
+        "ChatGPT is a tool. Klayan is a system built specifically for one thing — getting your idea to its first paying customer.",
+      pricing_label: "Simple. Honest. Revenue-led.",
+      story_quote:
+        '"I spent months building products nobody wanted. Pivoting. Rebuilding. Pivoting again. One night I spent 3 hours with an AI that actually pushed back. Killed the bad ideas fast. Gave me a real plan. That conversation became Klayan. Every founder deserves that conversation."',
+      story_author: "— Rayan, Founder of Klayan",
+      faq_title: "Everything you need to know.",
+      cta_title: "Your next idea deserves more than a gut feeling.",
+      cta_sub: "Join founders who validate first and build second.",
+      cta_btn: "Analyze my Idea",
+      cta_note: "Free to start · No credit card · Cancel anytime",
+      footer: "© 2026 Klayan — Built by founders, for founders.",
+    },
+    fr: {
+      nav_services: "Services",
+      nav_pricing: "Tarifs",
+      nav_analyze: "Analyser",
+      nav_signin: "Connexion",
+      hero_title: "Arrête de Builder",
+      hero_italic: "Commence à Savoir.",
+      hero_sub:
+        "Le co-fondateur IA qui te dit la vérité sur ton idée et structure ton business — avant que tu gaspilles 6 mois à construire la mauvaise chose.",
+      hero_cta: "Analyser mon idée",
+      hero_note: "Gratuit pour commencer · Pas de carte bancaire",
+      familiar_title: "Ça te parle ?",
+      pain1_title: "Tu as construit quelque chose que personne ne voulait",
+      pain1_desc: "4 mois de code. Lancé dans le vide. Le marché s'en foutait.",
+      pain2_title: "Tu as demandé à ChatGPT. Il a dit super idée.",
+      pain2_desc:
+        "Chaque idée est une super idée pour ChatGPT. T'as besoin de quelque chose qui te challenge vraiment.",
+      pain3_title: "Tu sais pas par où commencer",
+      pain3_desc:
+        "ICP, pricing, distribution, concurrents — c'est écrasant et personne te donne une vraie réponse.",
+      how_title: "Comment ça marche ?",
+      how_sub: "De l'idée brute au verdict en 10 minutes.",
+      step1_pill: "Étape 1",
+      step1_title: "Kill or Build",
+      step1_desc:
+        "Soumets ton idée. Klayan analyse les vrais concurrents, les vraies données de marché, les vrais canaux de distribution — et te donne un verdict. Pas un score. Un verdict.",
+      step2_pill: "Étape 2",
+      step2_title: "Klayan recherche en direct",
+      step2_desc:
+        "Vrais concurrents scannés aujourd'hui. Vraies plaintes clients de Reddit et G2. Vrais signaux de marché — pas des données de 2023.",
+      step3_pill: "Étape 3",
+      step3_title: "Reçois ton verdict",
+      step3_desc:
+        "Kill it. Flip it. Build it. Avec des preuves derrière chaque décision. Pas un score sur 10. Un verdict.",
+      step4_pill: "Étape 4",
+      step4_title: "Exécute le plan",
+      step4_desc:
+        "Les personnes exactes à contacter. Les messages exacts à envoyer. Roadmap quotidienne de l'idée au premier client payant.",
+      honest_title: "Voilà à quoi ressemble une IA honnête",
+      honest_tagline: "Pas un score. Un verdict.",
+      why_title: "6 raisons pour lesquelles Klayan est meilleur que ChatGPT.",
+      why_sub:
+        "ChatGPT est un outil. Klayan est un système conçu pour une seule chose — amener ton idée à son premier client payant.",
+      pricing_label: "Simple. Honnête. Orienté revenus.",
+      story_quote:
+        "\"J'ai passé des mois à construire des produits que personne ne voulait. Pivoter. Reconstruire. Pivoter encore. Un soir j'ai passé 3 heures avec une IA qui m'a vraiment challengé. Tué les mauvaises idées vite. Donné un vrai plan. Cette conversation est devenue Klayan. Chaque founder mérite cette conversation.\"",
+      story_author: "— Rayan, Fondateur de Klayan",
+      faq_title: "Tout ce que vous devez savoir.",
+      cta_title: "Ta prochaine idée mérite mieux qu'une intuition.",
+      cta_sub: "Rejoins les founders qui valident d'abord et buildent ensuite.",
+      cta_btn: "Analyser mon idée",
+      cta_note: "Gratuit · Pas de carte bancaire · Résiliable à tout moment",
+      footer: "© 2026 Klayan — Construit par des founders, pour des founders.",
+    },
+  }[lang];
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -552,14 +664,37 @@ export default function LandingPage() {
         <div className="nav-right">
           <ul className="nav-links">
             <li>
-              <a href="#services">Services</a>
+              <a href="#services">{t.nav_services}</a>
             </li>
             <li>
-              <a href="#pricing">Pricing</a>
+              <a href="#pricing">{t.nav_pricing}</a>
             </li>
           </ul>
+          <button
+            type="button"
+            onClick={() => setLang(lang === "en" ? "fr" : "en")}
+            style={{
+              background: "rgba(171,171,171,0.24)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              border: "none",
+              borderRadius: 100,
+              padding: "8px 14px",
+              color: "#fff",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "-0.02em",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {lang === "en" ? "🇫🇷 FR" : "🇬🇧 EN"}
+          </button>
           <a href="/analyze" className="nav-cta">
-            Analyze
+            {t.nav_analyze}
           </a>
           {user ? (
             <div
@@ -727,7 +862,7 @@ export default function LandingPage() {
                   display: "block",
                 }}
               />
-              Sign In
+              {t.nav_signin}
             </button>
           )}
         </div>
@@ -737,20 +872,16 @@ export default function LandingPage() {
         <div className="hero-box">
           <section className="hero" id="hero">
             <div className="hero-content">
-              <h1 className="hero-title">Stop Building</h1>
-              <span className="hero-title-italic">Start Knowing.</span>
-              <p className="hero-sub">
-                The AI co-founder that tells you the truth about your idea then
-                structures your business — before you waste 6 months building the
-                wrong thing.
-              </p>
+              <h1 className="hero-title">{t.hero_title}</h1>
+              <span className="hero-title-italic">{t.hero_italic}</span>
+              <p className="hero-sub">{t.hero_sub}</p>
               <div className="hero-cta-row">
                 <a href="/analyze" className="hero-btn">
-                  Analyze my idea
+                  {t.hero_cta}
                 </a>
                 <div className="hero-divider" />
                 <div className="hero-note">
-                  Free to start · No credit card required
+                  {t.hero_note}
                   <button
                     type="button"
                     className="hero-scroll-btn"
@@ -888,12 +1019,12 @@ export default function LandingPage() {
       <section className="familiar-section" id="services">
         <div className="familiar-inner">
           <div className="familiar-left">
-            <h2 className="familiar-title">Sounds familiar ?</h2>
+            <h2 className="familiar-title">{t.familiar_title}</h2>
           </div>
           <div className="familiar-right">
             <div className="pain-card reveal">
               <div className="pain-card-title">
-                You built something nobody wanted
+                {t.pain1_title}
               </div>
               <div className="pain-bubbles">
                 <div className="bubble bubble-dark">
@@ -908,17 +1039,10 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <p className="pain-desc">
-                Spent 4 months coding. Launched to crickets. Found out the market
-                didn&apos;t care.
-              </p>
+              <p className="pain-desc">{t.pain1_desc}</p>
             </div>
             <div className="pain-card reveal reveal-delay-1">
-              <div className="pain-card-title">
-                You asked ChatGPT.
-                <br />
-                It said great idea.
-              </div>
+              <div className="pain-card-title">{t.pain2_title}</div>
               <div className="pain-bubbles">
                 <div className="chat-row">
                   <div className="chatgpt-icon">
@@ -937,13 +1061,10 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <p className="pain-desc">
-                Every idea is a great idea to ChatGPT. You need something that
-                actually challenges you.
-              </p>
+              <p className="pain-desc">{t.pain2_desc}</p>
             </div>
             <div className="pain-card reveal reveal-delay-2">
-              <div className="pain-card-title">You don&apos;t know where to start</div>
+              <div className="pain-card-title">{t.pain3_title}</div>
               <div className="pain-bubbles">
                 <div className="chat-row">
                   <div className="chatgpt-icon">
@@ -959,50 +1080,35 @@ export default function LandingPage() {
                   </div>
                 </div>
               </div>
-              <p className="pain-desc">
-                ICP, pricing, distribution, competitors — it&apos;s overwhelming and
-                nobody gives you a straight answer.
-              </p>
+              <p className="pain-desc">{t.pain3_desc}</p>
             </div>
           </div>
         </div>
       </section>
 
       <section className="how-section" id="how">
-        <h2 className="section-title reveal">How it works ?</h2>
-        <p className="section-sub reveal">
-          From raw idea to verdict in 10 minutes.
-        </p>
+        <h2 className="section-title reveal">{t.how_title}</h2>
+        <p className="section-sub reveal">{t.how_sub}</p>
         <div className="steps-grid">
           <div className="step-card purple row-top reveal">
             <div className="step-pill">Step 1</div>
             <div className="step-text">
-              <h3 className="step-title">Kill or Build</h3>
-              <p className="step-desc">
-                Drop your idea. Klayan analyzes real competitors, real market
-                data, real distribution channels — and gives you a verdict. Not a
-                score. A verdict.
-              </p>
+              <h3 className="step-title">{t.step1_title}</h3>
+              <p className="step-desc">{t.step1_desc}</p>
             </div>
           </div>
           <div className="step-card dark row-top reveal reveal-delay-1">
             <div className="step-pill">Step 2</div>
             <div className="step-text">
-              <h3 className="step-title">Klayan researches live</h3>
-              <p className="step-desc">
-                Real competitors scraped today. Real customer complaints from
-                Reddit and G2. Real market signals — not 2023 training data.
-              </p>
+              <h3 className="step-title">{t.step2_title}</h3>
+              <p className="step-desc">{t.step2_desc}</p>
             </div>
           </div>
           <div className="step-card dark row-bottom reveal reveal-delay-2">
             <div className="step-pill">Step 3</div>
             <div className="step-text">
-              <h3 className="step-title">Get your verdict</h3>
-              <p className="step-desc">
-                Kill it. Flip it. Build it. With full evidence behind every
-                decision. Not a score out of 10. A verdict.
-              </p>
+              <h3 className="step-title">{t.step3_title}</h3>
+              <p className="step-desc">{t.step3_desc}</p>
             </div>
           </div>
           <div className="step-card dark row-tall step-card-step4 reveal reveal-delay-3">
@@ -1017,11 +1123,8 @@ export default function LandingPage() {
             </div>
             <div className="step-card-step4-text-wrap">
               <div className="step-text">
-                <h3 className="step-title">Execute the plan</h3>
-                <p className="step-desc">
-                  Exact people to contact. Exact messages to send. Daily roadmap
-                  from idea to first paying customer.
-                </p>
+                <h3 className="step-title">{t.step4_title}</h3>
+                <p className="step-desc">{t.step4_desc}</p>
               </div>
             </div>
           </div>
@@ -1029,7 +1132,7 @@ export default function LandingPage() {
       </section>
 
       <section className="honest-section">
-        <h2 className="honest-title reveal">This is what honest AI looks like</h2>
+        <h2 className="honest-title reveal">{t.honest_title}</h2>
         <div className="terminal-wrap reveal">
           <div className="terminal-bar">
             <div className="t-dot t-dot-a" />
@@ -1110,18 +1213,13 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-        <h2 className="honest-tagline reveal">Not a score. A verdict.</h2>
+        <h2 className="honest-tagline reveal">{t.honest_tagline}</h2>
       </section>
 
       <section className="why-section">
         <div className="why-header reveal">
-          <h2 className="why-title">
-            6 reasons why Klayan is better than just asking ChatGPT.
-          </h2>
-          <p className="why-sub">
-            ChatGPT is a tool. Klayan is a system built specifically for one thing
-            — getting your idea to its first paying customer.
-          </p>
+          <h2 className="why-title">{t.why_title}</h2>
+          <p className="why-sub">{t.why_sub}</p>
         </div>
         <div className="reasons-grid">
           <div className="reason-item reveal">
@@ -1182,7 +1280,7 @@ export default function LandingPage() {
       </section>
 
       <section className="pricing-section" id="pricing">
-        <p className="pricing-label reveal">Simple. Honest. Revenue-led.</p>
+        <p className="pricing-label reveal">{t.pricing_label}</p>
         <div className="pricing-grid reveal">
           <div className="pricing-card">
             <div className="pricing-card-name">Spark</div>
@@ -1295,18 +1393,12 @@ export default function LandingPage() {
       </section>
 
       <section className="story-section">
-        <div className="story-quote reveal">
-          &quot;I spent months building products nobody wanted. Pivoting.
-          Rebuilding. Pivoting again. One night I spent 3 hours with an AI that
-          actually pushed back. Killed the bad ideas fast. Gave me a real plan.
-          That conversation became Klayan. Every founder deserves that
-          conversation.&quot;
-        </div>
-        <div className="story-author reveal">— Rayan, Founder of Klayan</div>
+        <div className="story-quote reveal">{t.story_quote}</div>
+        <div className="story-author reveal">{t.story_author}</div>
       </section>
 
       <section className="faq-section">
-        <h2 className="faq-title reveal">Everything you need to know.</h2>
+        <h2 className="faq-title reveal">{t.faq_title}</h2>
         <p className="faq-sub reveal">
           More questions? Book a call or email us at{" "}
           <a href="#" className="faq-email-link" onClick={(e) => e.preventDefault()}>
@@ -1362,24 +1454,16 @@ export default function LandingPage() {
       </section>
 
       <section className="cta-section">
-        <h2 className="cta-title reveal">
-          Your next idea deserves more than a gut feeling.
-        </h2>
-        <p className="cta-sub reveal">
-          Join founders who validate first and build second.
-        </p>
+        <h2 className="cta-title reveal">{t.cta_title}</h2>
+        <p className="cta-sub reveal">{t.cta_sub}</p>
         <a href="/analyze" className="cta-big-btn reveal">
-          Analyze my Idea
+          {t.cta_btn}
         </a>
-        <p className="cta-note reveal">
-          Free to start · No credit card · Cancel anytime
-        </p>
+        <p className="cta-note reveal">{t.cta_note}</p>
       </section>
 
       <footer>
-        <div className="footer-copy">
-          © 2026 Klayan — Built by founders, for founders.
-        </div>
+        <div className="footer-copy">{t.footer}</div>
         <ul className="footer-links">
           <li>
             <a href="#" onClick={(e) => e.preventDefault()}>
