@@ -200,6 +200,24 @@ export default function LandingPage() {
       why_title: "6 reasons why Klayan is better than just asking ChatGPT.",
       why_sub:
         "ChatGPT is a tool. Klayan is a system built specifically for one thing — getting your idea to its first paying customer.",
+      reason1_title: "It tells you the truth.",
+      reason1_desc:
+        'ChatGPT agrees with everything. Every idea is "a great opportunity with strong potential." Klayan is designed to say no — with evidence behind every verdict.',
+      reason2_title: "It uses live data.",
+      reason2_desc:
+        "ChatGPT knows what it knew in 2023. Klayan searches the web right now — real competitors, real pricing, real customer complaints from Reddit and G2. Today. Not two years ago.",
+      reason3_title: "It remembers your journey.",
+      reason3_desc:
+        "Every conversation with ChatGPT starts from zero. Klayan remembers every idea, every pivot, every signal. Day 47 is smarter than Day 1 because it knows your history.",
+      reason4_title: "It asks the right questions.",
+      reason4_desc:
+        "With ChatGPT you need to know what to ask. Most founders don't. Klayan runs a structured process — the same questions a real investor would ask before writing a check.",
+      reason5_title: "It executes, not just advises.",
+      reason5_desc:
+        "ChatGPT gives you text. Klayan gives you the 20 exact people to contact, the exact message to send, your landing page copy, your pricing, your 30-day launch plan.",
+      reason6_title: "It stays with you.",
+      reason6_desc:
+        "ChatGPT is a one-time conversation. Klayan follows you from raw idea to first paying customer — adapting as your signals come in, never starting over.",
       pricing_label: "Simple. Honest. Revenue-led.",
       story_quote:
         '"I spent months building products nobody wanted. Pivoting. Rebuilding. Pivoting again. One night I spent 3 hours with an AI that actually pushed back. Killed the bad ideas fast. Gave me a real plan. That conversation became Klayan. Every founder deserves that conversation."',
@@ -254,6 +272,24 @@ export default function LandingPage() {
       why_title: "6 raisons pour lesquelles Klayan est meilleur que ChatGPT.",
       why_sub:
         "ChatGPT est un outil. Klayan est un système conçu pour une seule chose — amener ton idée à son premier client payant.",
+      reason1_title: "Il te dit la vérité.",
+      reason1_desc:
+        'ChatGPT est d\'accord avec tout. Chaque idée est "une grande opportunité avec un fort potentiel." Klayan est conçu pour dire non — avec des preuves derrière chaque verdict.',
+      reason2_title: "Il utilise des données en direct.",
+      reason2_desc:
+        "ChatGPT sait ce qu'il savait en 2023. Klayan cherche sur le web maintenant — vrais concurrents, vrais prix, vraies plaintes clients de Reddit et G2. Aujourd'hui. Pas il y a deux ans.",
+      reason3_title: "Il se souvient de ton parcours.",
+      reason3_desc:
+        "Chaque conversation avec ChatGPT repart de zéro. Klayan se souvient de chaque idée, chaque pivot, chaque signal. Le jour 47 est plus intelligent que le jour 1 parce qu'il connaît ton histoire.",
+      reason4_title: "Il pose les bonnes questions.",
+      reason4_desc:
+        "Avec ChatGPT tu dois savoir quoi demander. La plupart des founders ne savent pas. Klayan suit un processus structuré — les mêmes questions qu'un vrai investisseur poserait avant d'écrire un chèque.",
+      reason5_title: "Il exécute, pas seulement conseille.",
+      reason5_desc:
+        "ChatGPT te donne du texte. Klayan te donne les 20 personnes exactes à contacter, le message exact à envoyer, le texte de ta landing page, ton pricing, ton plan de lancement sur 30 jours.",
+      reason6_title: "Il reste avec toi.",
+      reason6_desc:
+        "ChatGPT est une conversation unique. Klayan te suit de l'idée brute au premier client payant — s'adaptant au fur et à mesure que tes signaux arrivent, sans jamais repartir de zéro.",
       pricing_label: "Simple. Honnête. Orienté revenus.",
       story_quote:
         "\"J'ai passé des mois à construire des produits que personne ne voulait. Pivoter. Reconstruire. Pivoter encore. Un soir j'ai passé 3 heures avec une IA qui m'a vraiment challengé. Tué les mauvaises idées vite. Donné un vrai plan. Cette conversation est devenue Klayan. Chaque founder mérite cette conversation.\"",
@@ -1224,57 +1260,33 @@ export default function LandingPage() {
         <div className="reasons-grid">
           <div className="reason-item reveal">
             <div className="reason-num">1</div>
-            <h3 className="reason-title">It tells you the truth.</h3>
-            <p className="reason-desc">
-              ChatGPT agrees with everything. Every idea is &quot;a great opportunity
-              with strong potential.&quot; Klayan is designed to say no — with evidence
-              behind every verdict.
-            </p>
+            <h3 className="reason-title">{t.reason1_title}</h3>
+            <p className="reason-desc">{t.reason1_desc}</p>
           </div>
           <div className="reason-item reveal reveal-delay-1">
             <div className="reason-num">2</div>
-            <h3 className="reason-title">It uses live data.</h3>
-            <p className="reason-desc">
-              ChatGPT knows what it knew in 2023. Klayan searches the web right now
-              — real competitors, real pricing, real customer complaints from Reddit
-              and G2. Today. Not two years ago.
-            </p>
+            <h3 className="reason-title">{t.reason2_title}</h3>
+            <p className="reason-desc">{t.reason2_desc}</p>
           </div>
           <div className="reason-item reveal reveal-delay-2">
             <div className="reason-num">3</div>
-            <h3 className="reason-title">It remembers your journey.</h3>
-            <p className="reason-desc">
-              Every conversation with ChatGPT starts from zero. Klayan remembers
-              every idea, every pivot, every signal. Day 47 is smarter than Day 1
-              because it knows your history.
-            </p>
+            <h3 className="reason-title">{t.reason3_title}</h3>
+            <p className="reason-desc">{t.reason3_desc}</p>
           </div>
           <div className="reason-item reveal">
             <div className="reason-num">4</div>
-            <h3 className="reason-title">It asks the right questions.</h3>
-            <p className="reason-desc">
-              With ChatGPT you need to know what to ask. Most founders don&apos;t.
-              Klayan runs a structured process — the same questions a real investor
-              would ask before writing a check.
-            </p>
+            <h3 className="reason-title">{t.reason4_title}</h3>
+            <p className="reason-desc">{t.reason4_desc}</p>
           </div>
           <div className="reason-item reveal reveal-delay-1">
             <div className="reason-num">5</div>
-            <h3 className="reason-title">It executes, not just advises.</h3>
-            <p className="reason-desc">
-              ChatGPT gives you text. Klayan gives you the 20 exact people to
-              contact, the exact message to send, your landing page copy, your
-              pricing, your 30-day launch plan.
-            </p>
+            <h3 className="reason-title">{t.reason5_title}</h3>
+            <p className="reason-desc">{t.reason5_desc}</p>
           </div>
           <div className="reason-item reveal reveal-delay-2">
             <div className="reason-num">6</div>
-            <h3 className="reason-title">It stays with you.</h3>
-            <p className="reason-desc">
-              ChatGPT is a one-time conversation. Klayan follows you from raw idea
-              to first paying customer — adapting as your signals come in, never
-              starting over.
-            </p>
+            <h3 className="reason-title">{t.reason6_title}</h3>
+            <p className="reason-desc">{t.reason6_desc}</p>
           </div>
         </div>
       </section>
