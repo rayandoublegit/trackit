@@ -219,6 +219,33 @@ export default function LandingPage() {
       reason6_desc:
         "ChatGPT is a one-time conversation. Klayan follows you from raw idea to first paying customer — adapting as your signals come in, never starting over.",
       pricing_label: "Simple. Honest. Revenue-led.",
+      pricing_spark: "Spark",
+      pricing_build: "Build",
+      pricing_scale: "Scale",
+      pricing_popular: "Most Popular!",
+      pricing_get_started: "Get started",
+      pricing_spark_f1: "3 analyses per month",
+      pricing_spark_f2: "Kill or Build verdict",
+      pricing_spark_f3: "Market research & competitor scan",
+      pricing_spark_f4: "Hard Truths + Opportunity analysis",
+      pricing_spark_f5: "Recommended Stack",
+      pricing_build_f1: "10 analyses per month",
+      pricing_build_f2: "Everything in Spark",
+      pricing_build_f3: "Signal Sprint (20 exact people to contact)",
+      pricing_build_f4: "Flip Engine (3 alternative business models)",
+      pricing_build_f5: "Business Structure recommendations",
+      pricing_scale_badge: "Get the best out of Klayan!",
+      pricing_scale_f1: "Unlimited analyses",
+      pricing_scale_f2: "Everything in Build",
+      pricing_scale_f3: "Revenue Roadmap (day by day to $10K MRR)",
+      pricing_scale_f4:
+        "Marketing Machine (landing page copy, outreach sequences, 30-day launch plan)",
+      pricing_scale_f5: "Priority support",
+      pricing_locked_signal: "Signal Sprint",
+      pricing_locked_flip: "Flip Engine",
+      pricing_locked_structure: "Business Structure",
+      pricing_locked_roadmap: "Revenue Roadmap",
+      pricing_locked_marketing: "Marketing Machine",
       story_quote:
         '"I spent months building products nobody wanted. Pivoting. Rebuilding. Pivoting again. One night I spent 3 hours with an AI that actually pushed back. Killed the bad ideas fast. Gave me a real plan. That conversation became Klayan. Every founder deserves that conversation."',
       story_author: "— Rayan, Founder of Klayan",
@@ -291,6 +318,33 @@ export default function LandingPage() {
       reason6_desc:
         "ChatGPT est une conversation unique. Klayan te suit de l'idée brute au premier client payant — s'adaptant au fur et à mesure que tes signaux arrivent, sans jamais repartir de zéro.",
       pricing_label: "Simple. Honnête. Orienté revenus.",
+      pricing_spark: "Spark",
+      pricing_build: "Build",
+      pricing_scale: "Scale",
+      pricing_popular: "Le plus populaire !",
+      pricing_get_started: "Commencer",
+      pricing_spark_f1: "3 analyses par mois",
+      pricing_spark_f2: "Verdict Kill or Build",
+      pricing_spark_f3: "Recherche de marché & scan des concurrents",
+      pricing_spark_f4: "Vérités difficiles + analyse des opportunités",
+      pricing_spark_f5: "Stack recommandé",
+      pricing_build_f1: "10 analyses par mois",
+      pricing_build_f2: "Tout ce qui est dans Spark",
+      pricing_build_f3: "Signal Sprint (20 personnes exactes à contacter)",
+      pricing_build_f4: "Flip Engine (3 modèles business alternatifs)",
+      pricing_build_f5: "Recommandations de structure business",
+      pricing_scale_badge: "Tire le meilleur de Klayan !",
+      pricing_scale_f1: "Analyses illimitées",
+      pricing_scale_f2: "Tout ce qui est dans Build",
+      pricing_scale_f3: "Revenue Roadmap (jour par jour jusqu'à 10K MRR)",
+      pricing_scale_f4:
+        "Marketing Machine (texte landing page, séquences de prospection, plan de lancement 30 jours)",
+      pricing_scale_f5: "Support prioritaire",
+      pricing_locked_signal: "Signal Sprint",
+      pricing_locked_flip: "Flip Engine",
+      pricing_locked_structure: "Structure Business",
+      pricing_locked_roadmap: "Revenue Roadmap",
+      pricing_locked_marketing: "Marketing Machine",
       story_quote:
         "\"J'ai passé des mois à construire des produits que personne ne voulait. Pivoter. Reconstruire. Pivoter encore. Un soir j'ai passé 3 heures avec une IA qui m'a vraiment challengé. Tué les mauvaises idées vite. Donné un vrai plan. Cette conversation est devenue Klayan. Chaque founder mérite cette conversation.\"",
       story_author: "— Rayan, Fondateur de Klayan",
@@ -621,7 +675,7 @@ export default function LandingPage() {
             scaleCls
           }
         >
-          {cta.label}
+          {t.pricing_get_started}
         </a>
       );
     }
@@ -1295,85 +1349,85 @@ export default function LandingPage() {
         <p className="pricing-label reveal">{t.pricing_label}</p>
         <div className="pricing-grid reveal">
           <div className="pricing-card">
-            <div className="pricing-card-name">Spark</div>
+            <div className="pricing-card-name">{t.pricing_spark}</div>
             <div className="pricing-price">$19/mo</div>
             {renderPricingCta("spark", false)}
             <div className="pricing-divider" />
             <ul className="pricing-features">
               <li>
-                <span className="feat-dot" /> 3 analyses per month
+                <span className="feat-dot" /> {t.pricing_spark_f1}
               </li>
               <li>
-                <span className="feat-dot" /> Kill or Build verdict
+                <span className="feat-dot" /> {t.pricing_spark_f2}
               </li>
               <li>
-                <span className="feat-dot" /> Market research &amp; competitor scan
+                <span className="feat-dot" /> {t.pricing_spark_f3}
               </li>
               <li>
-                <span className="feat-dot" /> Hard Truths + Opportunity analysis
+                <span className="feat-dot" /> {t.pricing_spark_f4}
               </li>
               <li>
-                <span className="feat-dot" /> Recommended Stack
+                <span className="feat-dot" /> {t.pricing_spark_f5}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Signal Sprint
+                <span className="feat-x">✗</span> {t.pricing_locked_signal}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Flip Engine
+                <span className="feat-x">✗</span> {t.pricing_locked_flip}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Business Structure
+                <span className="feat-x">✗</span> {t.pricing_locked_structure}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Revenue Roadmap
+                <span className="feat-x">✗</span> {t.pricing_locked_roadmap}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Marketing Machine
+                <span className="feat-x">✗</span> {t.pricing_locked_marketing}
               </li>
             </ul>
           </div>
           <div className="pricing-card featured">
             <div className="pricing-popular-badge">
-              Most Popular!{" "}
+              {t.pricing_popular}{" "}
               <img
                 src="/images/navbarlogo.png"
                 alt=""
                 className="pricing-inline-logo"
               />
             </div>
-            <div className="pricing-card-name">Build</div>
+            <div className="pricing-card-name">{t.pricing_build}</div>
             <div className="pricing-price pricing-price-black">$69/mo</div>
             {renderPricingCta("build", true)}
             <div className="pricing-divider" />
             <ul className="pricing-features">
               <li>
-                <span className="feat-dot" /> 10 analyses per month
+                <span className="feat-dot" /> {t.pricing_build_f1}
               </li>
               <li>
-                <span className="feat-dot" /> Everything in Spark
+                <span className="feat-dot" /> {t.pricing_build_f2}
               </li>
               <li>
-                <span className="feat-dot" /> Signal Sprint (20 exact people to contact)
+                <span className="feat-dot" /> {t.pricing_build_f3}
               </li>
               <li>
-                <span className="feat-dot" /> Flip Engine (3 alternative business models)
+                <span className="feat-dot" /> {t.pricing_build_f4}
               </li>
               <li>
-                <span className="feat-dot" /> Business Structure recommendations
+                <span className="feat-dot" /> {t.pricing_build_f5}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Revenue Roadmap
+                <span className="feat-x">✗</span> {t.pricing_locked_roadmap}
               </li>
               <li className="locked">
-                <span className="feat-x">✗</span> Marketing Machine
+                <span className="feat-x">✗</span> {t.pricing_locked_marketing}
               </li>
             </ul>
           </div>
         </div>
         <div className="pricing-card scale reveal pricing-card-scale-max">
-          <div className="pricing-card-name">Scale</div>
+          <div className="pricing-card-name">{t.pricing_scale}</div>
           <div className="scale-badge">
-            Get the best out of Klayan!{" "}
+            {t.pricing_scale_badge}{" "}
             <img
               src="/images/navbarlogo.png"
               alt=""
@@ -1385,20 +1439,19 @@ export default function LandingPage() {
           <div className="pricing-divider pricing-divider-mt" />
           <ul className="pricing-features">
             <li>
-              <span className="feat-dot" /> Unlimited analyses
+              <span className="feat-dot" /> {t.pricing_scale_f1}
             </li>
             <li>
-              <span className="feat-dot" /> Everything in Build
+              <span className="feat-dot" /> {t.pricing_scale_f2}
             </li>
             <li>
-              <span className="feat-dot" /> Revenue Roadmap (day by day to $10K MRR)
+              <span className="feat-dot" /> {t.pricing_scale_f3}
             </li>
             <li>
-              <span className="feat-dot" /> Marketing Machine (landing page copy,
-              outreach sequences, 30-day launch plan)
+              <span className="feat-dot" /> {t.pricing_scale_f4}
             </li>
             <li>
-              <span className="feat-dot" /> Priority support
+              <span className="feat-dot" /> {t.pricing_scale_f5}
             </li>
           </ul>
         </div>
