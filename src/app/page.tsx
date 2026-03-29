@@ -999,7 +999,7 @@ export default function LandingPage() {
         <div className="demo-video-wrap reveal" id="demoVideoWrap">
           <video
             id="demoVideo"
-            src="https://res.cloudinary.com/dqsk5btgz/video/upload/v1774400144/broski_ejduic.mp4"
+            src={lang === "fr" ? "https://res.cloudinary.com/dv1nagsve/video/upload/v1743743076/subtitlefrenchdemo_yrr4rf.mp4" : "https://res.cloudinary.com/dqsk5btgz/video/upload/v1774400144/broski_ejduic.mp4"}
             loop
             playsInline
             className="demo-video"
