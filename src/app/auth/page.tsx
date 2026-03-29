@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { AuthError } from "@supabase/supabase-js";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 
 type Mode = "login" | "signup";
 
@@ -77,6 +78,49 @@ const inputBase: CSSProperties = {
 
 export default function AuthPage() {
   const router = useRouter();
+  const lang = useLang();
+
+  const t = {
+    en: {
+      login_title: "Welcome back.",
+      login_sub: "Sign in to your Klayan account.",
+      signup_title: "Create your account.",
+      signup_sub: "Start validating your ideas with Klayan.",
+      email: "Email",
+      password: "Password",
+      username: "Username",
+      signin_btn: "Sign in →",
+      signup_btn: "Create account →",
+      no_account: "Don't have an account?",
+      has_account: "Already have an account?",
+      signup_link: "Sign up",
+      signin_link: "Sign in",
+      check_email: "Check your email.",
+      check_email_sub:
+        "We sent you a confirmation link. Click it to activate your account.",
+      confirmed_btn: "Already confirmed? Log in →",
+    },
+    fr: {
+      login_title: "Bon retour.",
+      login_sub: "Connecte-toi à ton compte Klayan.",
+      signup_title: "Crée ton compte.",
+      signup_sub: "Commence à valider tes idées avec Klayan.",
+      email: "Email",
+      password: "Mot de passe",
+      username: "Nom d'utilisateur",
+      signin_btn: "Se connecter →",
+      signup_btn: "Créer un compte →",
+      no_account: "Pas encore de compte ?",
+      has_account: "Déjà un compte ?",
+      signup_link: "S'inscrire",
+      signin_link: "Se connecter",
+      check_email: "Vérifie tes emails.",
+      check_email_sub:
+        "On t'a envoyé un lien de confirmation. Clique dessus pour activer ton compte.",
+      confirmed_btn: "Déjà confirmé ? Se connecter →",
+    },
+  }[lang];
+
   const skipAuthRedirectForAvatarRef = useRef(false);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<Mode>("signup");
@@ -468,9 +512,10 @@ export default function AuthPage() {
                   fontWeight: 500,
                   lineHeight: 1.55,
                   margin: 0,
+                  whiteSpace: "pre-line",
                 }}
               >
-                Check your email to confirm your account. Then come back and log in.
+                {`${t.check_email}\n${t.check_email_sub}`}
               </p>
               <button
                 type="button"
@@ -493,7 +538,7 @@ export default function AuthPage() {
                   width: "100%",
                 }}
               >
-                Already confirmed? Log in →
+                {t.confirmed_btn}
               </button>
             </div>
           </div>
@@ -530,7 +575,7 @@ export default function AuthPage() {
                 textAlign: "center",
               }}
             >
-              Welcome to Klayan
+              {mode === "login" ? t.login_title : t.signup_title}
             </div>
 
             <div
@@ -544,7 +589,7 @@ export default function AuthPage() {
                 textAlign: "center",
               }}
             >
-              Validate your idea before you build.
+              {mode === "login" ? t.login_sub : t.signup_sub}
             </div>
 
             <button
@@ -562,7 +607,9 @@ export default function AuthPage() {
                 lineHeight: 1.4,
               }}
             >
-              {mode === "login" ? "Sign Up" : "Log In"}
+              {mode === "login"
+                ? `${t.no_account} ${t.signup_link}`
+                : `${t.has_account} ${t.signin_link}`}
             </button>
           </div>
         ) : null}
@@ -643,7 +690,7 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
-              placeholder="Enter your email address"
+              placeholder={t.email}
               autoComplete="email"
               disabled={!isSupabaseConfigured || loading}
               style={{
@@ -672,7 +719,7 @@ export default function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type={loginPwVisible ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder={t.password}
                 autoComplete="current-password"
                 disabled={!isSupabaseConfigured || loading}
                 style={{ ...inputBase, marginBottom: 0 }}
@@ -729,7 +776,7 @@ export default function AuthPage() {
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? "Please wait..." : "Log In"}
+              {loading ? "Please wait..." : t.signin_btn}
             </button>
           </form>
         ) : null}
@@ -740,7 +787,7 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
-              placeholder="Enter your email address"
+              placeholder={t.email}
               autoComplete="email"
               disabled={!isSupabaseConfigured || loading}
               style={{
@@ -769,7 +816,7 @@ export default function AuthPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type={signupPwVisible ? "text" : "password"}
-                placeholder="Create a password"
+                placeholder={t.password}
                 autoComplete="new-password"
                 disabled={!isSupabaseConfigured || loading}
                 style={{ ...inputBase, marginBottom: 0 }}
@@ -876,7 +923,7 @@ export default function AuthPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               type="text"
-              placeholder="e.g. rayan_builds"
+              placeholder={t.username}
               autoComplete="username"
               disabled={!isSupabaseConfigured || loading}
               style={{
@@ -936,7 +983,7 @@ export default function AuthPage() {
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? "Please wait..." : "Create my account"}
+              {loading ? "Please wait..." : t.signup_btn}
             </button>
           </form>
         ) : null}

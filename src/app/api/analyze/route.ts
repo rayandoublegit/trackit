@@ -448,6 +448,31 @@ export async function POST(request: Request) {
       );
     }
 
+    const verdictUpper = verdict.toUpperCase();
+    const shouldCreateProject = verdictUpper.includes("BUILD IT") || verdictUpper.includes("FLIP IT");
+
+    if (shouldCreateProject) {
+      const projectStatus = verdictUpper.includes("FLIP IT") ? "pivoting" : "building";
+
+      const { data: analysisData } = await supabaseAdmin
+        .from("analyses")
+        .select("idea")
+        .eq("id", analysisId)
+        .single();
+
+      if (analysisData?.idea) {
+        await supabaseAdmin
+          .from("projects")
+          .insert({
+            user_id: userId,
+            analysis_id: analysisId,
+            idea_name: analysisData.idea.slice(0, 100),
+            status: projectStatus,
+          });
+        console.log(`Project auto-created with status: ${projectStatus}`);
+      }
+    }
+
     console.log("Done");
     return NextResponse.json({ success: true, verdict });
   } catch (err: any) {

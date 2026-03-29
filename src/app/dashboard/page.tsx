@@ -8,6 +8,8 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
+  type CSSProperties,
 } from "react";
 import type { User } from "@supabase/supabase-js";
 
@@ -16,6 +18,7 @@ import {
   handleUpgrade,
 } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 
 type VerdictKind = "FLIP" | "BUILD" | "KILL";
 
@@ -170,6 +173,73 @@ function VerdictPill({ kind }: { kind: VerdictKind | null }) {
 export default function DashboardPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const lang = useLang();
+
+  const t = {
+    en: {
+      workspaces: "Workspaces",
+      new_analysis: "+ New Analysis",
+      your_ideas: "YOUR IDEAS",
+      no_ideas: "No analyses yet. Start your first one.",
+      ideas_analyzed: "IDEAS ANALYZED",
+      verdicts: "VERDICTS",
+      view_last: "View last analysis",
+      home: "← Home",
+      free_plan: "Free Plan",
+      upgrade: "Upgrade to Spark →",
+      copy_verdict: "Copy verdict",
+      project_workspace: "Project workspace",
+      rename_project: "✎ Rename project",
+      remove_analysis: "Remove analysis",
+      your_workspaces: "Your Workspaces",
+      choose_project: "Choose an idea to work on",
+      no_workspaces:
+        "No workspaces yet. Run an analysis and get a BUILD IT or FLIP IT verdict to create one.",
+      rename_title: "Rename project",
+      cancel: "Cancel",
+      save: "Save",
+      building: "building",
+      pivoting: "pivoting",
+      killed: "killed",
+      last_analysis: "Your last analysis:",
+      no_analysis_yet: "No analysis yet",
+      flip: "FLIP",
+      build: "BUILD",
+      kill: "KILL",
+    },
+    fr: {
+      workspaces: "Espaces de travail",
+      new_analysis: "+ Nouvelle analyse",
+      your_ideas: "VOS IDÉES",
+      no_ideas: "Pas encore d'analyses. Commencez votre première.",
+      ideas_analyzed: "IDÉES ANALYSÉES",
+      verdicts: "VERDICTS",
+      view_last: "Voir la dernière analyse",
+      home: "← Accueil",
+      free_plan: "Plan Gratuit",
+      upgrade: "Passer à Spark →",
+      copy_verdict: "Copier le verdict",
+      project_workspace: "Espace de travail",
+      rename_project: "✎ Renommer le projet",
+      remove_analysis: "Supprimer l'analyse",
+      your_workspaces: "Vos espaces de travail",
+      choose_project: "Choisissez une idée sur laquelle travailler",
+      no_workspaces:
+        "Pas encore d'espaces de travail. Lancez une analyse et obtenez un verdict BUILD IT ou FLIP IT pour en créer un.",
+      rename_title: "Renommer le projet",
+      cancel: "Annuler",
+      save: "Sauvegarder",
+      building: "en construction",
+      pivoting: "en pivot",
+      killed: "abandonné",
+      last_analysis: "Ta dernière analyse :",
+      no_analysis_yet: "Pas encore d'analyse",
+      flip: "FLIP",
+      build: "BUILD",
+      kill: "KILL",
+    },
+  }[lang];
+
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<DashboardProfile | null>(null);
@@ -187,6 +257,20 @@ export default function DashboardPage() {
   const [copyToast, setCopyToast] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  /** analysis id → project id for analyses that have a workspace */
+  const [projectByAnalysisId, setProjectByAnalysisId] = useState<
+    Record<string, string>
+  >({});
+  const [showWorkspaces, setShowWorkspaces] = useState(false);
+  const [projects, setProjects] = useState<
+    Array<{ id: string; idea_name: string; status: string }>
+  >([]);
+  const [wallpaper, setWallpaper] = useState<string>("#0a0a0a");
+  const [wallpaperType, setWallpaperType] = useState<"color" | "gradient" | "image">("color");
+  const [showWallpaperPicker, setShowWallpaperPicker] = useState(false);
+  const [textColor, setTextColor] = useState<string>("#ffffff");
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -200,6 +284,8 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     setFatalError(null);
+    setProjectByAnalysisId({});
+    setProjects([]);
 
     try {
       const {
@@ -277,6 +363,54 @@ export default function DashboardPage() {
         );
         setRows([]);
       }
+
+      try {
+        const { data: projectsData, error: projError } = await supabase
+          .from("projects")
+          .select("id, analysis_id, idea_name, status")
+          .eq("user_id", u.id);
+
+        if (projError) {
+          console.error("Dashboard: projects query error", projError);
+          setProjectByAnalysisId({});
+          setProjects([]);
+        } else {
+          const map: Record<string, string> = {};
+          const list: Array<{ id: string; idea_name: string; status: string }> =
+            [];
+          for (const p of projectsData ?? []) {
+            const row = p as {
+              id?: string;
+              analysis_id?: string;
+              idea_name?: string;
+              status?: string;
+            };
+            if (
+              typeof row.analysis_id === "string" &&
+              typeof row.id === "string"
+            ) {
+              map[row.analysis_id] = row.id;
+            }
+            if (
+              typeof row.id === "string" &&
+              typeof row.idea_name === "string" &&
+              typeof row.status === "string"
+            ) {
+              list.push({
+                id: row.id,
+                idea_name: row.idea_name,
+                status: row.status,
+              });
+            }
+          }
+          setProjectByAnalysisId(map);
+          setProjects(list);
+        }
+      } catch (e) {
+        console.error("Dashboard: projects exception", e);
+        setProjectByAnalysisId({});
+        setProjects([]);
+      }
     } catch (e) {
       console.error("Dashboard: load failed", e);
       setFatalError(
@@ -285,6 +419,8 @@ export default function DashboardPage() {
       setUser(null);
       setRows([]);
       setProfile(null);
+      setProjectByAnalysisId({});
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -340,6 +476,43 @@ export default function DashboardPage() {
     document.addEventListener("mousedown", onDocDown);
     return () => document.removeEventListener("mousedown", onDocDown);
   }, [openMenuId]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("klayan_wallpaper") ?? "#0a0a0a";
+    const savedType = (localStorage.getItem("klayan_wallpaper_type") ?? "color") as "color" | "gradient" | "image";
+    setWallpaper(saved);
+    setWallpaperType(savedType);
+    const savedTextColor = localStorage.getItem("klayan_text_color") ?? "#ffffff";
+    setTextColor(savedTextColor);
+  }, []);
+
+  const applyWallpaper = useCallback((value: string, type: "color" | "gradient" | "image", nextTextColor?: string) => {
+    localStorage.setItem("klayan_wallpaper", value);
+    localStorage.setItem("klayan_wallpaper_type", type);
+    setWallpaper(value);
+    setWallpaperType(type);
+    if (nextTextColor !== undefined) {
+      localStorage.setItem("klayan_text_color", nextTextColor);
+      setTextColor(nextTextColor);
+    }
+    setShowWallpaperPicker(false);
+  }, []);
+
+  const applyTextColor = useCallback((color: string) => {
+    localStorage.setItem("klayan_text_color", color);
+    setTextColor(color);
+  }, []);
+
+  const handleWallpaperImageDash = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      applyWallpaper(result, "image");
+    };
+    reader.readAsDataURL(file);
+  };
 
   const openAvatarFilePicker = useCallback(() => {
     setAvatarActionError(null);
@@ -504,6 +677,14 @@ export default function DashboardPage() {
     },
     [pathname, router, supabase, user]
   );
+
+  const renameProject = useCallback(async (projectId: string, newName: string) => {
+    if (!supabase || !newName.trim()) return;
+    await supabase.from("projects").update({ idea_name: newName.trim() }).eq("id", projectId);
+    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, idea_name: newName.trim() } : p));
+    setRenamingProjectId(null);
+    setRenameValue("");
+  }, [supabase]);
 
   const last = rows[0] ?? null;
   const lastKind = last ? getVerdictKind(last.verdict) : null;
@@ -934,8 +1115,83 @@ export default function DashboardPage() {
               >
                 {user?.email ?? ""}
               </div>
+              <Link
+                href="/settings"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 8,
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 100,
+                  padding: "5px 12px",
+                  color: "rgba(255,255,255,0.35)",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  letterSpacing: "-0.01em",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
+              >
+                ⚙ Settings
+              </Link>
+              <a
+                href="https://discord.gg/nHVEPB2yXb"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 6,
+                  background: "transparent",
+                  border: "1px solid rgba(88,101,242,0.3)",
+                  borderRadius: 100,
+                  padding: "5px 12px",
+                  color: "rgba(88,101,242,0.8)",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  textDecoration: "none",
+                  letterSpacing: "-0.01em",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "#5865f2"; e.currentTarget.style.borderColor = "rgba(88,101,242,0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(88,101,242,0.8)"; e.currentTarget.style.borderColor = "rgba(88,101,242,0.3)"; }}
+              >
+                Discord Community
+              </a>
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowWorkspaces(!showWorkspaces)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              width: "100%",
+              background: showWorkspaces ? "rgba(255,255,255,0.1)" : "transparent",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 12,
+              padding: "12px 0",
+              color: "#fff",
+              fontFamily: "'Inter', sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "-0.02em",
+              marginBottom: 10,
+            }}
+          >
+            {t.workspaces}
+          </button>
 
           <Link
             href="/analyze"
@@ -956,9 +1212,106 @@ export default function DashboardPage() {
               marginBottom: 24,
             }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>+</span>
-            New Analysis
+            {t.new_analysis}
           </Link>
+
+          {showWorkspaces ? (
+            <div style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.7)",
+              backdropFilter: "blur(8px)",
+              zIndex: 1000,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
+            }}
+            onClick={() => setShowWorkspaces(false)}
+            >
+              <div
+                style={{
+                  background: "#111",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 20,
+                  padding: 32,
+                  width: "100%",
+                  maxWidth: 480,
+                  maxHeight: "80vh",
+                  overflowY: "auto",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em" }}>{t.your_workspaces}</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{t.choose_project}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowWorkspaces(false)}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 20, padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {projects.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
+                    {t.no_workspaces}
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {projects.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={`/project/${project.id}`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "16px 20px",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          borderRadius: 14,
+                          textDecoration: "none",
+                          color: "#fff",
+                          transition: "background 0.2s",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <div style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: "50%",
+                            background: project.status === "building" ? "#4ade80" : project.status === "pivoting" ? "#facc15" : "#f87171",
+                            flexShrink: 0,
+                          }} />
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 2 }}>
+                              {project.idea_name.length > 40 ? project.idea_name.slice(0, 37) + "..." : project.idea_name}
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "capitalize" }}>
+                              {project.status === "building"
+                                ? t.building
+                                : project.status === "pivoting"
+                                  ? t.pivoting
+                                  : project.status === "killed"
+                                    ? t.killed
+                                    : project.status}
+                            </div>
+                          </div>
+                        </div>
+                        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)" }}>→</span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <div
             style={{
@@ -969,7 +1322,7 @@ export default function DashboardPage() {
               marginBottom: 10,
             }}
           >
-            YOUR IDEAS
+            {t.your_ideas}
           </div>
         </div>
 
@@ -991,7 +1344,7 @@ export default function DashboardPage() {
             <p style={{ fontSize: 13, color: "#f87171", padding: "0 8px" }}>{error}</p>
           ) : rows.length === 0 ? (
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", padding: "0 8px", lineHeight: 1.5 }}>
-              No ideas yet. Start a new analysis.
+              {t.no_ideas}
             </p>
           ) : (
             rows.map((row) => {
@@ -1043,7 +1396,12 @@ export default function DashboardPage() {
                         overflow: "hidden",
                       }}
                     >
-                      {row.idea}
+                      {(() => {
+                        const projectId = projectByAnalysisId[row.id];
+                        const project = projectId ? projects.find((p) => p.id === projectId) : null;
+                        const name = project?.idea_name ?? row.idea;
+                        return name.length > 60 ? name.slice(0, 57) + "..." : name;
+                      })()}
                     </span>
                   </Link>
                   <div
@@ -1131,8 +1489,81 @@ export default function DashboardPage() {
                             e.currentTarget.style.background = "transparent";
                           }}
                         >
-                          📋 Copy verdict
+                          📋 {t.copy_verdict}
                         </button>
+
+                        {projectByAnalysisId[row.id] ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const projectIdForAnalysis = projectByAnalysisId[row.id];
+                                const proj = projects.find((p) => p.id === projectIdForAnalysis);
+                                setRenameValue(proj?.idea_name ?? "");
+                                setRenamingProjectId(projectIdForAnalysis);
+                                setOpenMenuId(null);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                width: "100%",
+                                background: "transparent",
+                                border: "none",
+                                color: "white",
+                                padding: "10px 12px",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                                fontFamily: "Inter, sans-serif",
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background =
+                                  "rgba(255,255,255,0.06)";
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              {t.rename_project}
+                            </button>
+                            <Link
+                              href={`/project/${projectByAnalysisId[row.id]}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                if (isMobile) setSidebarOpen(false);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                width: "100%",
+                                background: "transparent",
+                                border: "none",
+                                color: "white",
+                                padding: "10px 12px",
+                                borderRadius: 8,
+                                cursor: "pointer",
+                                fontSize: 13,
+                                fontWeight: 500,
+                                fontFamily: "Inter, sans-serif",
+                                textDecoration: "none",
+                              }}
+                              onMouseOver={(e) => {
+                                e.currentTarget.style.background =
+                                  "rgba(255,255,255,0.06)";
+                              }}
+                              onMouseOut={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                              }}
+                            >
+                              🎯 {t.project_workspace}
+                            </Link>
+                          </>
+                        ) : null}
 
                         <button
                           type="button"
@@ -1163,7 +1594,7 @@ export default function DashboardPage() {
                             e.currentTarget.style.background = "transparent";
                           }}
                         >
-                          🗑 Remove analysis
+                          🗑 {t.remove_analysis}
                         </button>
                       </div>
                     ) : null}
@@ -1202,7 +1633,7 @@ export default function DashboardPage() {
               ? "Scale Plan"
               : userPlan === "build"
                 ? "Build Plan"
-                : userPlan === "free" ? "Free Plan" : "Spark Plan"}
+                : userPlan === "free" ? t.free_plan : "Spark Plan"}
           </div>
           {userPlan === "scale" ? (
             <div
@@ -1247,7 +1678,7 @@ export default function DashboardPage() {
               }}
             >
               {userPlan === "spark" || userPlan === "free"
-                ? userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"
+                ? userPlan === "free" ? t.upgrade : "Upgrade to Build →"
                 : "Upgrade to Scale →"}
             </button>
           )}
@@ -1279,7 +1710,7 @@ export default function DashboardPage() {
           style={{
             position: "absolute",
             inset: 0,
-            background: "rgba(0,0,0,0.82)",
+            background: wallpaperType === "image" ? `url(${wallpaper}) center center / cover no-repeat` : wallpaper,
           }}
         />
 
@@ -1292,7 +1723,10 @@ export default function DashboardPage() {
             margin: "0 auto",
             width: "100%",
             boxSizing: "border-box",
-          }}
+            color: textColor,
+            "--dashboard-text": textColor,
+            "--text-primary": textColor,
+          } as CSSProperties}
         >
           <h2
             style={{
@@ -1302,33 +1736,23 @@ export default function DashboardPage() {
               letterSpacing: "-0.04em",
               lineHeight: 1.15,
               margin: "0 0 28px",
-              color: "#fff",
+              color: "var(--text-primary)",
             }}
           >
-            <span>Your last </span>
-            <span
-              style={{
-                fontFamily: "'Instrument Serif', serif",
-                fontStyle: "italic",
-                fontWeight: 400,
-              }}
-            >
-              analysis
-            </span>
-            <span>:</span>
+            {t.last_analysis}
           </h2>
 
           {loading ? (
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 16 }}>Loading…</p>
+            <p style={{ color: "color-mix(in srgb, var(--text-primary) 50%, transparent)", fontSize: 16 }}>Loading…</p>
           ) : !last ? (
-            <p style={{ color: "rgba(255,255,255,0.55)", fontSize: 17, lineHeight: 1.6, maxWidth: 560 }}>
+            <p style={{ color: "color-mix(in srgb, var(--text-primary) 55%, transparent)", fontSize: 17, lineHeight: 1.6, maxWidth: 560 }}>
               Run your first analysis to see your verdict, hard truths, and next steps here.
             </p>
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
                 <VerdictPill kind={lastKind} />
-                <span style={{ fontSize: 13, color: "rgba(255,255,255,0.45)" }}>
+                <span style={{ fontSize: 13, color: "color-mix(in srgb, var(--text-primary) 45%, transparent)" }}>
                   {new Date(last.created_at).toLocaleString(undefined, {
                     dateStyle: "medium",
                     timeStyle: "short",
@@ -1339,7 +1763,7 @@ export default function DashboardPage() {
                 style={{
                   fontSize: 18,
                   lineHeight: 1.65,
-                  color: "rgba(255,255,255,0.88)",
+                  color: "color-mix(in srgb, var(--text-primary) 88%, transparent)",
                   margin: "0 0 36px",
                   maxWidth: 720,
                 }}
@@ -1370,11 +1794,11 @@ export default function DashboardPage() {
                   fontSize: 11,
                   fontWeight: 600,
                   letterSpacing: "0.08em",
-                  color: "rgba(255,255,255,0.4)",
+                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
                   marginBottom: 8,
                 }}
               >
-                IDEAS ANALYZED
+                {t.ideas_analyzed}
               </div>
               <div
                 style={{
@@ -1400,19 +1824,19 @@ export default function DashboardPage() {
                   fontSize: 11,
                   fontWeight: 600,
                   letterSpacing: "0.08em",
-                  color: "rgba(255,255,255,0.4)",
+                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
                   marginBottom: 8,
                 }}
               >
-                VERDICTS
+                {t.verdicts}
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.7, color: "rgba(255,255,255,0.85)" }}>
+              <div style={{ fontSize: 14, lineHeight: 1.7, color: "color-mix(in srgb, var(--text-primary) 85%, transparent)" }}>
                 <span style={{ color: "#f5c842", fontWeight: 700 }}>{stats.flip}</span>
-                <span style={{ color: "rgba(255,255,255,0.35)" }}> FLIP · </span>
+                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> FLIP · </span>
                 <span style={{ color: "#4ade80", fontWeight: 700 }}>{stats.build}</span>
-                <span style={{ color: "rgba(255,255,255,0.35)" }}> BUILD · </span>
+                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> BUILD · </span>
                 <span style={{ color: "#ef4444", fontWeight: 700 }}>{stats.kill}</span>
-                <span style={{ color: "rgba(255,255,255,0.35)" }}> KILL</span>
+                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> KILL</span>
               </div>
             </div>
             <div
@@ -1428,7 +1852,7 @@ export default function DashboardPage() {
                   fontSize: 11,
                   fontWeight: 600,
                   letterSpacing: "0.08em",
-                  color: "rgba(255,255,255,0.4)",
+                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
                   marginBottom: 8,
                 }}
               >
@@ -1443,12 +1867,12 @@ export default function DashboardPage() {
                 }}
               >
                 {stats.hoursEst}
-                <span style={{ fontSize: 16, fontWeight: 600, color: "rgba(255,255,255,0.5)" }}>
+                <span style={{ fontSize: 16, fontWeight: 600, color: "color-mix(in srgb, var(--text-primary) 50%, transparent)" }}>
                   {" "}
                   hrs est.
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text-primary) 35%, transparent)", marginTop: 6 }}>
                 ~6 hrs per verdict vs. manual research
               </div>
             </div>
@@ -1471,7 +1895,7 @@ export default function DashboardPage() {
                   textDecoration: "none",
                 }}
               >
-                View last analysis
+                {t.view_last}
               </Link>
             ) : null}
             <Link
@@ -1483,14 +1907,14 @@ export default function DashboardPage() {
                 padding: "14px 26px",
                 borderRadius: 100,
                 background: "transparent",
-                color: "#fff",
+                color: "var(--text-primary)",
                 fontWeight: 600,
                 fontSize: 15,
                 textDecoration: "none",
                 border: "1px solid rgba(255,255,255,0.35)",
               }}
             >
-              + New Analysis
+              {t.new_analysis}
             </Link>
             <Link
               href="/"
@@ -1498,16 +1922,245 @@ export default function DashboardPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 padding: "14px 18px",
-                color: "rgba(255,255,255,0.45)",
+                color: "color-mix(in srgb, var(--text-primary) 45%, transparent)",
                 fontSize: 14,
                 textDecoration: "none",
               }}
             >
-              ← Home
+              {t.home}
             </Link>
           </div>
         </div>
+        <>
+          <button
+            type="button"
+            onClick={() => setShowWallpaperPicker(!showWallpaperPicker)}
+            style={{
+              position: "fixed",
+              bottom: 24,
+              right: 24,
+              background: "rgba(0,0,0,0.5)",
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 100,
+              padding: "8px 14px",
+              color: "rgba(255,255,255,0.5)",
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              letterSpacing: "-0.01em",
+              zIndex: 100,
+            }}
+          >
+            🖼 Wallpaper
+          </button>
+
+          {showWallpaperPicker ? (
+            <div style={{
+              position: "fixed",
+              bottom: 64,
+              right: 24,
+              background: "rgba(15,15,15,0.97)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 16,
+              padding: "20px",
+              zIndex: 200,
+              width: 280,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, letterSpacing: "-0.01em" }}>Wallpaper</div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Colors</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { value: "#0a0a0a", label: "Default" },
+                    { value: "#0f1117", label: "Midnight" },
+                    { value: "#0a0f0a", label: "Forest" },
+                    { value: "#0a0a1a", label: "Navy" },
+                    { value: "#1a0a0a", label: "Ember" },
+                    { value: "#0f0a1a", label: "Violet" },
+                  ].map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => applyWallpaper(c.value, "color")}
+                      title={c.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: c.value,
+                        border: wallpaper === c.value ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
+                        cursor: "pointer",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Gradients</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { value: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)", label: "Purple Night" },
+                    { value: "linear-gradient(135deg, #0a0a0a 0%, #0a1a0a 100%)", label: "Matrix" },
+                    { value: "linear-gradient(135deg, #0a0a1a 0%, #001a2e 100%)", label: "Ocean" },
+                    { value: "linear-gradient(135deg, #1a0a0a 0%, #2e0a0a 100%)", label: "Ember" },
+                    { value: "linear-gradient(135deg, #0a0a0a 0%, #1a1a00 100%)", label: "Gold" },
+                    { value: "linear-gradient(135deg, #0a0a2e 0%, #2e0a2e 100%)", label: "Cosmos" },
+                  ].map((g) => (
+                    <button
+                      key={g.value}
+                      type="button"
+                      onClick={() => applyWallpaper(g.value, "gradient")}
+                      title={g.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: g.value,
+                        border: wallpaper === g.value ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
+                        cursor: "pointer",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Custom Image</div>
+                <label style={{ cursor: "pointer", display: "inline-block" }}>
+                  <div style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    padding: "8px 16px",
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    color: "rgba(255,255,255,0.6)",
+                  }}>
+                    Upload PNG / JPG / GIF
+                  </div>
+                  <input type="file" accept="image/*,image/gif" onChange={handleWallpaperImageDash} style={{ display: "none" }} />
+                </label>
+              </div>
+
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Text Color</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[
+                    { value: "#ffffff", label: "White" },
+                    { value: "#000000", label: "Black" },
+                    { value: "#e2e8f0", label: "Silver" },
+                    { value: "#fbbf24", label: "Gold" },
+                    { value: "#60a5fa", label: "Blue" },
+                    { value: "#4ade80", label: "Green" },
+                  ].map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => applyTextColor(c.value)}
+                      title={c.label}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: c.value,
+                        border: textColor === c.value ? "2px solid rgba(255,255,255,0.8)" : "1px solid rgba(255,255,255,0.15)",
+                        cursor: "pointer",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowWallpaperPicker(false)}
+                style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: 16, padding: 4 }}
+              >
+                ✕
+              </button>
+            </div>
+          ) : null}
+        </>
       </main>
+
+      {renamingProjectId ? (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+        onClick={() => setRenamingProjectId(null)}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 16,
+              padding: 28,
+              width: "100%",
+              maxWidth: 400,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16, letterSpacing: "-0.02em" }}>{t.rename_title}</div>
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void renameProject(renamingProjectId, renameValue);
+                if (e.key === "Escape") setRenamingProjectId(null);
+              }}
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 10,
+                padding: "12px 16px",
+                color: "#fff",
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 14,
+                outline: "none",
+                boxSizing: "border-box",
+                marginBottom: 16,
+              }}
+            />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setRenamingProjectId(null)}
+                style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 20px", color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1 }}
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => void renameProject(renamingProjectId, renameValue)}
+                style={{ background: "#fff", color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", flex: 1 }}
+              >
+                {t.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {copyToast ? (
         <div

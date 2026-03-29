@@ -5,62 +5,123 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 
-const QUESTIONS = [
+type QuestionMeta = {
+  label: string;
+  placeholder: string;
+};
+
+const QUESTION_META: QuestionMeta[] = [
   {
     label: "01 →",
-    question: "What's your idea in one sentence?",
-    hint: "The problem, who has it, and how you solve it.",
     placeholder:
       "e.g. An AI tool that helps solo founders validate their SaaS idea before building anything...",
   },
   {
     label: "02 →",
-    question: "Who is your exact target customer?",
-    hint: "Not a category — a specific person. Job title, company size, daily frustration.",
     placeholder:
       "e.g. Solo SaaS founders aged 25-35 who keep building products nobody wants...",
   },
   {
     label: "03 →",
-    question: "Why do you believe this is a real problem?",
-    hint: "Did you experience it yourself or observe it in others?",
     placeholder:
       "e.g. I built 3 products in 12 months with zero paying customers because I never validated...",
   },
   {
     label: "04 →",
-    question: "What existing solutions are people using right now?",
-    hint: "Even bad ones. Spreadsheets, manual processes, expensive tools.",
     placeholder:
       "e.g. They ask ChatGPT, post on Reddit, or just wing it and hope for the best...",
   },
   {
     label: "05 →",
-    question: "What's your unfair advantage?",
-    hint: "Why you, why now?",
     placeholder:
       "e.g. I've lived this problem firsthand and know exactly what founders need...",
   },
   {
     label: "06 →",
-    question: "Have you talked to anyone in your target market yet?",
-    hint: "What did they say? Be specific.",
     placeholder:
       "e.g. I DMed 20 founders on Reddit. 8 responded. 3 said they'd pay for this today...",
   },
-] as const;
-
-type Question = (typeof QUESTIONS)[number];
+];
 
 export default function AnalyzePage() {
   const router = useRouter();
+  const lang = useLang();
+
+  const t = {
+    en: {
+      title: "What's your idea?",
+      subtitle:
+        "Be specific. The more detail you give, the more brutal and accurate the verdict.",
+      placeholder:
+        "Describe your idea in detail — what it does, who it's for, how it makes money...",
+      free_note: "You have 1 free analysis. No credit card required.",
+      thinking: "Klayan is thinking...",
+      thinking_sub:
+        "Searching competitors, scanning markets, building your verdict.",
+      error_empty: "✕ Type something to continue",
+      counter_of: "of",
+      counter_questions: "questions",
+      step1_title: "What's your idea in one sentence?",
+      step1_sub: "The problem, who has it, and how you solve it.",
+      step2_title: "Who's your target customer?",
+      step2_sub: "Be specific. Not 'everyone'. Who exactly has this problem?",
+      step3_title: "How do you make money?",
+      step3_sub: "Your pricing model, not your revenue projections.",
+      step4_title: "Who are your main competitors?",
+      step4_sub: "Direct and indirect. What are people using instead of you?",
+      step5_title: "What's your unfair advantage?",
+      step5_sub: "Why you, why now?",
+      step6_title: "Have you talked to anyone in your target market yet?",
+      step6_sub: "What did they say? Be specific.",
+      step_next: "OK, NEXT →",
+      step_back: "← Back",
+      step_submit: "Analyze my idea →",
+      step_analyzing: "Analyzing...",
+      step_hint: "Press Ctrl + Enter to continue",
+    },
+    fr: {
+      title: "C'est quoi ton idée ?",
+      subtitle:
+        "Sois précis. Plus tu donnes de détails, plus le verdict sera brutal et précis.",
+      placeholder:
+        "Décris ton idée en détail — ce qu'elle fait, pour qui, comment elle gagne de l'argent...",
+      free_note: "Tu as 1 analyse gratuite. Pas de carte bancaire requise.",
+      thinking: "Klayan réfléchit...",
+      thinking_sub:
+        "Recherche de concurrents, scan des marchés, construction de ton verdict.",
+      error_empty: "✕ Écris quelque chose pour continuer",
+      counter_of: "sur",
+      counter_questions: "questions",
+      step1_title: "C'est quoi ton idée en une phrase ?",
+      step1_sub: "Le problème, qui l'a, et comment tu le résous.",
+      step2_title: "C'est qui ton client cible ?",
+      step2_sub: "Sois précis. Pas 'tout le monde'. Qui exactement a ce problème ?",
+      step3_title: "Comment tu gagnes de l'argent ?",
+      step3_sub: "Ton modèle de prix, pas tes projections de revenus.",
+      step4_title: "C'est qui tes principaux concurrents ?",
+      step4_sub: "Directs et indirects. Qu'est-ce que les gens utilisent à la place ?",
+      step5_title: "C'est quoi ton avantage déloyal ?",
+      step5_sub: "Pourquoi toi, pourquoi maintenant ?",
+      step6_title: "Tu as déjà parlé à des gens de ton marché ?",
+      step6_sub: "Ils ont dit quoi ? Sois précis.",
+      step_next: "OK, SUIVANT →",
+      step_back: "← Retour",
+      step_submit: "Analyser mon idée →",
+      step_analyzing: "Analyse en cours...",
+      step_hint: "Appuie sur Ctrl + Entrée pour continuer",
+    },
+  }[lang];
+
+  const totalQ = QUESTION_META.length;
 
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<string[]>(() => Array(6).fill(""));
+  const [answers, setAnswers] = useState<string[]>(() =>
+    Array(QUESTION_META.length).fill("")
+  );
   const [inputValue, setInputValue] = useState("");
 
-  const [nextLabel, setNextLabel] = useState("OK, NEXT →");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInputError, setShowInputError] = useState(false);
 
@@ -69,13 +130,27 @@ export default function AnalyzePage() {
   const contentRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const totalQ = QUESTIONS.length;
   const progressPct = useMemo(
     () => ((current + 1) / totalQ) * 100,
     [current, totalQ]
   );
 
-  const q: Question = QUESTIONS[current];
+  const q = QUESTION_META[current];
+
+  const stepRows = [
+    [t.step1_title, t.step1_sub],
+    [t.step2_title, t.step2_sub],
+    [t.step3_title, t.step3_sub],
+    [t.step4_title, t.step4_sub],
+    [t.step5_title, t.step5_sub],
+    [t.step6_title, t.step6_sub],
+  ] as const;
+  const [stepTitle, stepSub] = stepRows[current];
+
+  const nextLabel = useMemo(
+    () => (current === totalQ - 1 ? t.step_submit : t.step_next),
+    [current, totalQ, t.step_submit, t.step_next]
+  );
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -85,11 +160,6 @@ export default function AnalyzePage() {
 
   useEffect(() => {
     setInputValue(answers[current] ?? "");
-    if (!isSubmitting) {
-      setNextLabel(
-        current === totalQ - 1 ? "ANALYZE MY IDEA →" : "OK, NEXT →"
-      );
-    }
     setShowInputError(false);
     setSubmitError(null);
     // Keep focus consistent with the original modal behavior.
@@ -354,9 +424,13 @@ export default function AnalyzePage() {
       </div>
 
       <div id="modalContent" ref={contentRef}>
-        <div id="qLabel">{q.label}</div>
-        <div id="qText">{q.question}</div>
-        <div id="qHint">{q.hint}</div>
+        {!isSubmitting ? <div id="qLabel">{q.label}</div> : null}
+        <div id="qText">
+          {isSubmitting ? t.thinking : stepTitle}
+        </div>
+        <div id="qHint">
+          {isSubmitting ? t.thinking_sub : stepSub}
+        </div>
 
         <textarea
           id="qInput"
@@ -364,27 +438,20 @@ export default function AnalyzePage() {
           rows={4}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={q.placeholder}
+          disabled={isSubmitting}
+          placeholder={
+            current === 0 ? t.placeholder : q.placeholder
+          }
         />
 
         <div
           id="qError"
           className={showInputError || submitError ? "is-visible" : ""}
         >
-          {submitError ? `✕ ${submitError}` : "✕ Type something to continue"}
+          {submitError ? `✕ ${submitError}` : t.error_empty}
         </div>
 
-        <div id="qCtrlHint">
-          Press{" "}
-          <span className="kbd" style={{ padding: "1px 6px", fontSize: 10 }}>
-            Ctrl
-          </span>{" "}
-          +{" "}
-          <span className="kbd" style={{ padding: "1px 6px", fontSize: 10 }}>
-            Enter
-          </span>{" "}
-          to continue
-        </div>
+        <div id="qCtrlHint">{t.step_hint}</div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
           <button
@@ -394,7 +461,7 @@ export default function AnalyzePage() {
             disabled={isSubmitting}
             style={{ opacity: isSubmitting ? 0.6 : 1 }}
           >
-            {isSubmitting ? "Saving..." : nextLabel}
+            {isSubmitting ? t.step_analyzing : nextLabel}
           </button>
 
           <button
@@ -403,14 +470,15 @@ export default function AnalyzePage() {
             className={current > 0 ? "is-visible" : ""}
             onClick={handlePrev}
           >
-            ↑ BACK
+            {t.step_back}
           </button>
         </div>
       </div>
 
       <div id="modalFooter">
         <span id="qCounter">
-          {current + 1} of {totalQ} questions
+          {current + 1} {t.counter_of} {totalQ} {t.counter_questions} ·{" "}
+          {t.free_note}
         </span>
         <div id="qDots">
           {Array.from({ length: totalQ }, (_, i) => (

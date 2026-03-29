@@ -155,6 +155,12 @@ export default function LandingPage() {
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "fr">("en");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
+    if (saved) setLang(saved);
+  }, []);
+
   const t = {
     en: {
       nav_services: "Services",
@@ -228,19 +234,20 @@ export default function LandingPage() {
       pricing_spark_f2: "Kill or Build verdict",
       pricing_spark_f3: "Market research & competitor scan",
       pricing_spark_f4: "Hard Truths + Opportunity analysis",
-      pricing_spark_f5: "Recommended Stack",
+      pricing_spark_f5: "Workspace + Notes",
       pricing_build_f1: "10 analyses per month",
       pricing_build_f2: "Everything in Spark",
-      pricing_build_f3: "Signal Sprint (20 exact people to contact)",
-      pricing_build_f4: "Flip Engine (3 alternative business models)",
-      pricing_build_f5: "Business Structure recommendations",
+      pricing_build_f3: "Weekly Check-in + AI report",
+      pricing_build_f4: "Milestone Engine + Playbooks",
+      pricing_build_f5: "Market Watch (monthly)",
+      pricing_build_f6: "Pivot Radar",
       pricing_scale_badge: "Get the best out of Klayan!",
       pricing_scale_f1: "Unlimited analyses",
       pricing_scale_f2: "Everything in Build",
-      pricing_scale_f3: "Revenue Roadmap (day by day to $10K MRR)",
-      pricing_scale_f4:
-        "Marketing Machine (landing page copy, outreach sequences, 30-day launch plan)",
-      pricing_scale_f5: "Priority support",
+      pricing_scale_f3: "Co-Founder Mode (unlimited sessions)",
+      pricing_scale_f4: "Market Watch (unlimited)",
+      pricing_scale_f5: "Revenue Roadmap",
+      pricing_scale_f6: "Marketing Machine",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Business Structure",
@@ -327,19 +334,20 @@ export default function LandingPage() {
       pricing_spark_f2: "Verdict Kill or Build",
       pricing_spark_f3: "Recherche de marché & scan des concurrents",
       pricing_spark_f4: "Vérités difficiles + analyse des opportunités",
-      pricing_spark_f5: "Stack recommandé",
+      pricing_spark_f5: "Espace de travail + Notes",
       pricing_build_f1: "10 analyses par mois",
       pricing_build_f2: "Tout ce qui est dans Spark",
-      pricing_build_f3: "Signal Sprint (20 personnes exactes à contacter)",
-      pricing_build_f4: "Flip Engine (3 modèles business alternatifs)",
-      pricing_build_f5: "Recommandations de structure business",
+      pricing_build_f3: "Check-in hebdomadaire + rapport IA",
+      pricing_build_f4: "Milestone Engine + Playbooks",
+      pricing_build_f5: "Market Watch (mensuel)",
+      pricing_build_f6: "Pivot Radar",
       pricing_scale_badge: "Tire le meilleur de Klayan !",
       pricing_scale_f1: "Analyses illimitées",
       pricing_scale_f2: "Tout ce qui est dans Build",
-      pricing_scale_f3: "Revenue Roadmap (jour par jour jusqu'à 10K MRR)",
-      pricing_scale_f4:
-        "Marketing Machine (texte landing page, séquences de prospection, plan de lancement 30 jours)",
-      pricing_scale_f5: "Support prioritaire",
+      pricing_scale_f3: "Mode Co-Fondateur (sessions illimitées)",
+      pricing_scale_f4: "Market Watch (illimité)",
+      pricing_scale_f5: "Revenue Roadmap",
+      pricing_scale_f6: "Marketing Machine",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Structure Business",
@@ -934,7 +942,11 @@ export default function LandingPage() {
           )}
           <button
             type="button"
-            onClick={() => setLang(lang === "en" ? "fr" : "en")}
+            onClick={() => {
+              const newLang = lang === "en" ? "fr" : "en";
+              setLang(newLang);
+              localStorage.setItem("klayan_lang", newLang);
+            }}
             style={{
               background: "rgba(171,171,171,0.24)",
               backdropFilter: "blur(8px)",
@@ -1415,11 +1427,8 @@ export default function LandingPage() {
               <li>
                 <span className="feat-dot" /> {t.pricing_build_f5}
               </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_roadmap}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_marketing}
+              <li>
+                <span className="feat-dot" /> {t.pricing_build_f6}
               </li>
             </ul>
           </div>
@@ -1452,6 +1461,9 @@ export default function LandingPage() {
             </li>
             <li>
               <span className="feat-dot" /> {t.pricing_scale_f5}
+            </li>
+            <li>
+              <span className="feat-dot" /> {t.pricing_scale_f6}
             </li>
           </ul>
         </div>

@@ -61,7 +61,9 @@ function parseNumberedLines(content: string) {
 
   const items: Array<{ index: number; text: string }> = [];
   for (const line of lines) {
-    const m = line.match(/^›\s*(\d+)\s*—\s*(.*)$/);
+    const m =
+      line.match(/^›\s*(\d+)\s*—\s*(.*)$/) ??
+      line.match(/^(\d+)\s*—\s*(.*)$/);
     if (!m) continue;
     const index = Number(m[1]);
     const text = m[2].trim();
@@ -72,7 +74,12 @@ function parseNumberedLines(content: string) {
 }
 
 function parseVerdictSections(verdictText: string): ParsedSection[] {
-  const normalized = verdictText.replace(/\r\n/g, "\n").trim();
+  const normalized = verdictText
+    .replace(/\r\n/g, "\n")
+    .replace(/(\d{2} —)\s*\n\s*/g, "$1 ")
+    .replace(/› (\d{2})/g, "$1")
+    .trim();
+
   const dividerLineRe = /^\s*━{10,}\s*$/m;
   const segments = normalized
     .split(dividerLineRe)
@@ -86,13 +93,10 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     const labelRaw = (lines[0] ?? "").trim();
     if (!labelRaw) continue;
 
-    const label = labelRaw.toUpperCase();
+    const label = labelRaw.toUpperCase().replace(/:$/, "").trim();
     const content = lines.slice(1).join("\n").trim();
 
-    if (!content) {
-      sections.push({ label, kind: "text", text: "" });
-      continue;
-    }
+    if (label.startsWith("KLAYAN ANALYSIS")) continue;
 
     if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS") {
       sections.push({
@@ -109,13 +113,16 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     }
 
     if (label === "VERDICT") {
-      const contentLines = content
+      let verdictContent = content;
+      if (!verdictContent && labelRaw.toUpperCase().startsWith("VERDICT:")) {
+        verdictContent = labelRaw.slice("VERDICT:".length).trim();
+      }
+      const contentLines = verdictContent
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
       const verdictLine = contentLines[0] ?? "";
       const explanation = contentLines.slice(1).join("\n").trim();
-
       sections.push({
         label,
         kind: "verdict",
@@ -127,6 +134,32 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     }
 
     sections.push({ label, kind: "text", text: content });
+  }
+
+  // If no VERDICT section found, try to detect it from content
+  const hasVerdict = sections.some((s) => s.kind === "verdict");
+  if (!hasVerdict) {
+    const fullText = normalized.toUpperCase();
+    let verdictKind: "build" | "kill" | "flip" | null = null;
+    if (fullText.includes("BUILD IT")) verdictKind = "build";
+    else if (fullText.includes("KILL IT")) verdictKind = "kill";
+    else if (fullText.includes("FLIP IT")) verdictKind = "flip";
+
+    if (verdictKind) {
+      const verdictLine =
+        verdictKind === "build"
+          ? "—— BUILD IT ——"
+          : verdictKind === "kill"
+            ? "—— KILL IT ——"
+            : "—— FLIP IT ——";
+      sections.unshift({
+        label: "VERDICT",
+        kind: "verdict",
+        verdictLine,
+        explanation: "",
+        verdictType: getVerdictType(verdictLine),
+      });
+    }
   }
 
   return sections;
@@ -196,6 +229,7 @@ export default function VerdictPage() {
   const [analysisLoading, setAnalysisLoading] = useState(true);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<{
+    id: string;
     idea: string;
     target_customer: string;
     why_problem: string;
@@ -210,9 +244,10 @@ export default function VerdictPage() {
 
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
 
   const analysisSelectColumns =
-    "idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
+    "id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
 
   const showLoadingShell =
     !analysisError &&
@@ -317,6 +352,7 @@ export default function VerdictPage() {
                   };
                 }
                 return {
+                  id,
                   idea: polled.idea ?? "",
                   target_customer: "",
                   why_problem: "",
@@ -388,6 +424,22 @@ export default function VerdictPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !analysis?.id) {
+      setProjectId(null);
+      return;
+    }
+    setProjectId(null);
+    void (async () => {
+      const { data } = await supabase
+        .from("projects")
+        .select("id")
+        .eq("analysis_id", analysis.id)
+        .maybeSingle();
+      if (data?.id) setProjectId(data.id);
+    })();
+  }, [analysis?.id]);
 
   const parsedSections = useMemo(() => {
     if (!analysis?.verdict) return null;
@@ -859,6 +911,28 @@ export default function VerdictPage() {
                         >
                           {sec.verdictLine}
                         </div>
+                        {projectId ? (
+                          <a
+                            href={`/project/${projectId}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 8,
+                              marginTop: 20,
+                              background: "#ffffff",
+                              color: "#000000",
+                              padding: "14px 28px",
+                              borderRadius: 100,
+                              fontFamily: "'Inter', sans-serif",
+                              fontSize: 15,
+                              fontWeight: 700,
+                              textDecoration: "none",
+                              letterSpacing: "-0.02em",
+                            }}
+                          >
+                            🚀 Start tracking this idea →
+                          </a>
+                        ) : null}
                         <div
                           style={{
                             fontSize: 12,
