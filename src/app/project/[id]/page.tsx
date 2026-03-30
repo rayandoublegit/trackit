@@ -116,7 +116,7 @@ const projectI18n: Record<
     checkin_submit: "Soumettre & obtenir un bilan IA →",
     checkin_submitting: "Génération de ton bilan...",
     checkin_report_title: "Ton bilan hebdomadaire ✓",
-    milestones_title: "Jalons",
+    milestones_title: "Étapes Importantes",
     milestone_first_user: "Premier utilisateur",
     milestone_first_user_desc: "Quelqu'un utilise ton produit",
     milestone_first_dollar: "Premier dollar",

@@ -167,10 +167,10 @@ export default function LandingPage() {
       nav_pricing: "Pricing",
       nav_analyze: "Analyze",
       nav_signin: "Sign In",
-      hero_title: "Stop Building",
-      hero_italic: "Start Knowing.",
+      hero_title: "From Idea to",
+      hero_italic: "10K MRR.",
       hero_sub:
-        "The AI co-founder that tells you the truth about your idea then structures your business — before you waste 6 months building the wrong thing.",
+        "Most founders waste 6 months building something nobody wants. Klayan tells you the truth on day one — then tracks your idea to $10K MRR with weekly check-ins, live market intelligence, and an AI co-founder that never lets you drift.",
       hero_cta: "Analyze my idea",
       hero_note: "Free to start · No credit card required",
       familiar_title: "Sounds familiar ?",
@@ -186,21 +186,21 @@ export default function LandingPage() {
       how_title: "How it works ?",
       how_sub: "From raw idea to verdict in 10 minutes.",
       step1_pill: "Step 1",
-      step1_title: "Kill or Build",
+      step1_title: "Validate",
       step1_desc:
-        "Drop your idea. Klayan analyzes real competitors, real market data, real distribution channels — and gives you a verdict. Not a score. A verdict.",
+        "Drop your idea. Klayan searches live competitors, real market data, and real customer complaints — and gives you a brutal verdict in minutes.",
       step2_pill: "Step 2",
-      step2_title: "Klayan researches live",
+      step2_title: "Decide",
       step2_desc:
-        "Real competitors scraped today. Real customer complaints from Reddit and G2. Real market signals — not 2023 training data.",
+        "Kill it. Flip it. Build it. Every verdict comes with full evidence, competitor breakdown, pricing analysis, and a recommended stack.",
       step3_pill: "Step 3",
-      step3_title: "Get your verdict",
+      step3_title: "Track",
       step3_desc:
-        "Kill it. Flip it. Build it. With full evidence behind every decision. Not a score out of 10. A verdict.",
+        "Open your workspace. Weekly check-ins, milestone engine, market watch — Klayan stays with you every step of the way.",
       step4_pill: "Step 4",
-      step4_title: "Execute the plan",
+      step4_title: "Win",
       step4_desc:
-        "Exact people to contact. Exact messages to send. Daily roadmap from idea to first paying customer.",
+        "Co-Founder Mode, Pivot Radar, and stage-specific playbooks. From raw idea to first paying customer — Klayan never lets you drift.",
       honest_title: "This is what honest AI looks like",
       honest_tagline: "Not a score. A verdict.",
       why_title: "6 reasons why Klayan is better than just asking ChatGPT.",
@@ -238,7 +238,7 @@ export default function LandingPage() {
       pricing_build_f1: "10 analyses per month",
       pricing_build_f2: "Everything in Spark",
       pricing_build_f3: "Weekly Check-in + AI report",
-      pricing_build_f4: "Milestone Engine + Playbooks",
+      pricing_build_f4: "Milestone Engine & Playbooks (Important Steps)",
       pricing_build_f5: "Market Watch (monthly)",
       pricing_build_f6: "Pivot Radar",
       pricing_scale_badge: "Get the best out of Klayan!",
@@ -257,6 +257,24 @@ export default function LandingPage() {
         '"I spent months building products nobody wanted. Pivoting. Rebuilding. Pivoting again. One night I spent 3 hours with an AI that actually pushed back. Killed the bad ideas fast. Gave me a real plan. That conversation became Klayan. Every founder deserves that conversation."',
       story_author: "— Rayan, Founder of Klayan",
       faq_title: "Everything you need to know.",
+      faq_q1: "Is Klayan just another AI chatbot?",
+      faq_a1:
+        "No. Klayan is a structured validation system. It searches the web in real time, analyzes real competitors, finds real customer complaints, and delivers a verdict — not a conversation. It's built specifically for one job: telling you if your idea is worth building.",
+      faq_q2: "How is this different from asking ChatGPT?",
+      faq_a2:
+        "ChatGPT agrees with everything. Klayan is designed to challenge you. It uses live web data, follows a strict validation framework, and gives you a Kill/Flip/Build verdict with evidence. ChatGPT gives you encouragement. Klayan gives you the truth.",
+      faq_q3: "What does the verdict actually include?",
+      faq_a3:
+        "A full verdict includes: the verdict (Kill/Flip/Build) with a brutal one-liner, 5 hard truths backed by real data, a competitor breakdown with pricing and weaknesses, the market opportunity, a recommended tech stack, your next 48-hour action plan, and the one question that will make or break your idea.",
+      faq_q4: "Can I get a refund?",
+      faq_a4:
+        "If you run your first analysis and feel it wasn't worth it, email us within 48 hours and we'll refund you. No questions asked.",
+      faq_q5: "What if my idea gets a KILL IT verdict?",
+      faq_a5:
+        "That's the most valuable verdict you can get. It saves you months of wasted time and thousands in development costs. Most failed startups wish someone had told them earlier. Klayan tells you on day one.",
+      faq_q6: "Is my idea kept private?",
+      faq_a6:
+        "Yes. Your ideas are stored securely and never shared, sold, or used to train AI models. What you submit stays yours.",
       cta_title: "Your next idea deserves more than a gut feeling.",
       cta_sub: "Join founders who validate first and build second.",
       cta_btn: "Analyze my Idea",
@@ -268,10 +286,10 @@ export default function LandingPage() {
       nav_pricing: "Tarifs",
       nav_analyze: "Analyser",
       nav_signin: "Connexion",
-      hero_title: "Arrête de Builder",
-      hero_italic: "Commence à Savoir.",
+      hero_title: "De l'Idée au",
+      hero_italic: "10K MRR.",
       hero_sub:
-        "Le co-fondateur IA qui te dit la vérité sur ton idée et structure ton business — avant que tu gaspilles 6 mois à construire la mauvaise chose.",
+        "La plupart des founders gaspillent 6 mois à construire quelque chose que personne ne veut. Klayan te dit la vérité dès le premier jour — puis suit ton idée jusqu'à 10K MRR avec des check-ins hebdomadaires, une veille de marché en direct, et un co-fondateur IA qui ne te laisse jamais dériver.",
       hero_cta: "Analyser mon idée",
       hero_note: "Gratuit pour commencer · Pas de carte bancaire",
       familiar_title: "Ça te parle ?",
@@ -286,21 +304,21 @@ export default function LandingPage() {
       how_title: "Comment ça marche ?",
       how_sub: "De l'idée brute au verdict en 10 minutes.",
       step1_pill: "Étape 1",
-      step1_title: "Kill or Build",
+      step1_title: "Valide",
       step1_desc:
-        "Soumets ton idée. Klayan analyse les vrais concurrents, les vraies données de marché, les vrais canaux de distribution — et te donne un verdict. Pas un score. Un verdict.",
+        "Soumets ton idée. Klayan recherche les vrais concurrents, les vraies données de marché et les vraies plaintes clients — et te donne un verdict brutal en quelques minutes.",
       step2_pill: "Étape 2",
-      step2_title: "Klayan recherche en direct",
+      step2_title: "Décide",
       step2_desc:
-        "Vrais concurrents scannés aujourd'hui. Vraies plaintes clients de Reddit et G2. Vrais signaux de marché — pas des données de 2023.",
+        "Kill it. Flip it. Build it. Chaque verdict inclut des preuves complètes, une analyse des concurrents, une analyse des prix et une stack recommandée.",
       step3_pill: "Étape 3",
-      step3_title: "Reçois ton verdict",
+      step3_title: "Suis",
       step3_desc:
-        "Kill it. Flip it. Build it. Avec des preuves derrière chaque décision. Pas un score sur 10. Un verdict.",
+        "Ouvre ton espace de travail. Check-ins hebdomadaires, Playbook pour les étapes importantes, veille de marché — Klayan reste avec toi à chaque étape.",
       step4_pill: "Étape 4",
-      step4_title: "Exécute le plan",
+      step4_title: "Gagne",
       step4_desc:
-        "Les personnes exactes à contacter. Les messages exacts à envoyer. Roadmap quotidienne de l'idée au premier client payant.",
+        "Mode Co-Fondateur, Radar de Pivot et playbooks spécifiques à chaque étape. De l'idée brute au premier client payant — Klayan ne te laisse jamais dériver.",
       honest_title: "Voilà à quoi ressemble une IA honnête",
       honest_tagline: "Pas un score. Un verdict.",
       why_title: "6 raisons pour lesquelles Klayan est meilleur que ChatGPT.",
@@ -338,7 +356,7 @@ export default function LandingPage() {
       pricing_build_f1: "10 analyses par mois",
       pricing_build_f2: "Tout ce qui est dans Spark",
       pricing_build_f3: "Check-in hebdomadaire + rapport IA",
-      pricing_build_f4: "Milestone Engine + Playbooks",
+      pricing_build_f4: "Machine d'Étapes Importantes & Playbooks",
       pricing_build_f5: "Market Watch (mensuel)",
       pricing_build_f6: "Pivot Radar",
       pricing_scale_badge: "Tire le meilleur de Klayan !",
@@ -357,6 +375,24 @@ export default function LandingPage() {
         "\"J'ai passé des mois à construire des produits que personne ne voulait. Pivoter. Reconstruire. Pivoter encore. Un soir j'ai passé 3 heures avec une IA qui m'a vraiment challengé. Tué les mauvaises idées vite. Donné un vrai plan. Cette conversation est devenue Klayan. Chaque founder mérite cette conversation.\"",
       story_author: "— Rayan, Fondateur de Klayan",
       faq_title: "Tout ce que vous devez savoir.",
+      faq_q1: "Klayan est-il juste un autre chatbot IA ?",
+      faq_a1:
+        "Non. Klayan est un système de validation structuré. Il recherche sur le web en temps réel, analyse de vrais concurrents, trouve de vraies plaintes clients, et délivre un verdict — pas une conversation. Il est conçu spécifiquement pour un seul travail : te dire si ton idée vaut la peine d'être construite.",
+      faq_q2: "En quoi est-ce différent de demander à ChatGPT ?",
+      faq_a2:
+        "ChatGPT est d'accord avec tout. Klayan est conçu pour te challenger. Il utilise des données web en direct, suit un cadre de validation strict, et te donne un verdict Kill/Flip/Build avec des preuves. ChatGPT te donne de l'encouragement. Klayan te donne la vérité.",
+      faq_q3: "Qu'est-ce que le verdict inclut exactement ?",
+      faq_a3:
+        "Un verdict complet inclut : le verdict (Kill/Flip/Build) avec une phrase brutale, 5 vérités difficiles soutenues par de vraies données, une analyse des concurrents avec prix et faiblesses, l'opportunité de marché, une stack technique recommandée, ton plan d'action pour les 48 prochaines heures, et la question qui fera ou brisera ton idée.",
+      faq_q4: "Puis-je obtenir un remboursement ?",
+      faq_a4:
+        "Si tu lances ta première analyse et que tu n'es pas satisfait, envoie-nous un email dans les 48 heures et nous te rembourserons. Sans questions.",
+      faq_q5: "Et si mon idée obtient un verdict KILL IT ?",
+      faq_a5:
+        "C'est le verdict le plus précieux que tu puisses obtenir. Il te fait économiser des mois de temps gaspillé et des milliers en coûts de développement. La plupart des startups qui ont échoué auraient voulu que quelqu'un leur dise plus tôt. Klayan te le dit dès le premier jour.",
+      faq_q6: "Mon idée reste-t-elle privée ?",
+      faq_a6:
+        "Oui. Tes idées sont stockées en sécurité et ne sont jamais partagées, vendues ou utilisées pour entraîner des modèles IA. Ce que tu soumets reste le tien.",
       cta_title: "Ta prochaine idée mérite mieux qu'une intuition.",
       cta_sub: "Rejoins les founders qui valident d'abord et buildent ensuite.",
       cta_btn: "Analyser mon idée",
@@ -974,8 +1010,16 @@ export default function LandingPage() {
         <div className="hero-box">
           <section className="hero" id="hero">
             <div className="hero-content">
-              <h1 className="hero-title">{t.hero_title}</h1>
-              <span className="hero-title-italic">{t.hero_italic}</span>
+              <div className="hero-title">
+                <span className="hero-title-main">
+                  {lang === "fr" ? "De l'Idée" : "From Idea"}
+                </span>
+                <br />
+                <span className="hero-title-italic">
+                  {lang === "fr" ? "au " : "to "}
+                  {"10K MRR."}
+                </span>
+              </div>
               <p className="hero-sub">{t.hero_sub}</p>
               <div className="hero-cta-row">
                 <a href="/analyze" className="hero-btn">
@@ -1192,28 +1236,28 @@ export default function LandingPage() {
         <h2 className="section-title reveal">{t.how_title}</h2>
         <p className="section-sub reveal">{t.how_sub}</p>
         <div className="steps-grid">
-          <div className="step-card purple row-top reveal">
+          <div className="step-card purple row-top">
             <div className="step-pill">Step 1</div>
             <div className="step-text">
               <h3 className="step-title">{t.step1_title}</h3>
               <p className="step-desc">{t.step1_desc}</p>
             </div>
           </div>
-          <div className="step-card dark row-top reveal reveal-delay-1">
+          <div className="step-card dark row-top">
             <div className="step-pill">Step 2</div>
             <div className="step-text">
               <h3 className="step-title">{t.step2_title}</h3>
               <p className="step-desc">{t.step2_desc}</p>
             </div>
           </div>
-          <div className="step-card dark row-bottom reveal reveal-delay-2">
+          <div className="step-card dark row-bottom">
             <div className="step-pill">Step 3</div>
             <div className="step-text">
               <h3 className="step-title">{t.step3_title}</h3>
               <p className="step-desc">{t.step3_desc}</p>
             </div>
           </div>
-          <div className="step-card dark row-tall step-card-step4 reveal reveal-delay-3">
+          <div className="step-card dark row-tall step-card-step4">
             <div className="step-pill">Step 4</div>
             <div className="step-card-step4-logo-wrap">
               <img
@@ -1484,29 +1528,15 @@ export default function LandingPage() {
         </p>
         <div className="faq-list reveal">
           {[
-            {
-              q: "Is Klayan just another ChatGPT wrapper?",
-              a: "No. Every other AI tool gives you generic advice from training data. Klayan pulls live data — real competitors, real market signals, real customer complaints from Reddit and G2 right now.",
-            },
-            {
-              q: "How is this different from ValidatorAI or IdeaProof?",
-              a: "Those tools give you a score out of 10 and wish you good luck. Klayan gives you a verdict with evidence, the exact people to contact, and a daily roadmap to first paying customer.",
-            },
-            {
-              q: "Do I need to be technical to use Klayan?",
-              a: "Zero technical knowledge required. You answer 7 questions. Klayan does the research, analysis, and planning. If you can type, you can use Klayan.",
-            },
-            {
-              q: "What if my idea gets a Kill It verdict?",
-              a: "That's the most valuable result you can get. Klayan doesn't just kill it — it shows you exactly why, and points you toward what to build instead. A kill verdict saves you 6 months.",
-            },
-            {
-              q: "How does the Flip Engine work?",
-              a: "When your initial model gets weak signals, Klayan generates 3 alternative versions of your business — different ICP, different pricing model, different distribution channel. With evidence behind each one.",
-            },
+            { q: t.faq_q1, a: t.faq_a1 },
+            { q: t.faq_q2, a: t.faq_a2 },
+            { q: t.faq_q3, a: t.faq_a3 },
+            { q: t.faq_q4, a: t.faq_a4 },
+            { q: t.faq_q5, a: t.faq_a5 },
+            { q: t.faq_q6, a: t.faq_a6 },
           ].map((item, index) => (
             <div
-              key={item.q}
+              key={index}
               className={`faq-item${openFaqIndex === index ? " open" : ""}`}
             >
               <div

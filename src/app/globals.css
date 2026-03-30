@@ -400,7 +400,6 @@ nav {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  transition: transform 0.25s ease;
 }
 
 .step-card.step-card-step4 {
@@ -430,8 +429,6 @@ nav {
   width: 100%;
   flex-shrink: 0;
 }
-
-.step-card:hover { transform: translateY(-3px); }
 
 .step-card.row-top { min-height: 420px; }
 .step-card.row-bottom { min-height: 420px; }
