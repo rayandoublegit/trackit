@@ -52,7 +52,7 @@ Keep it under 200 words. Be direct. No fluff.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
+    max_tokens: 400,
     messages: [{ role: "user", content: prompt }],
   });
 

@@ -50,7 +50,7 @@ Be specific to their idea. Not generic startup advice. Max 250 words.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 600,
+    max_tokens: 400,
     messages: [{ role: "user", content: prompt }],
   });
 

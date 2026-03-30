@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -67,6 +67,44 @@ const projectI18n: Record<
     pivot_empty: "No scan yet",
     pivot_empty_sub:
       "Run Pivot Radar after a few check-ins to detect if you're drifting",
+    marketing_title: "Marketing Engine",
+    marketing_sub: "Marketing angles, recruit radar & outreach messages",
+    marketing_run: "Run engine →",
+    marketing_running: "Generating...",
+    marketing_empty: "No report yet",
+    marketing_empty_sub:
+      "Run the Marketing Engine to get angles, recruit tips and outreach messages tailored to your idea",
+    outreach_title: "Outreach Engine",
+    outreach_sub: "Ready-to-send messages for any target",
+    outreach_target_label: "Who are you reaching out to?",
+    outreach_run: "Generate messages →",
+    outreach_running: "Writing...",
+    outreach_empty: "No messages yet",
+    outreach_empty_sub:
+      "Select a target and generate ready-to-send outreach messages tailored to your idea",
+    outreach_show: "+ Show messages",
+    outreach_hide: "− Hide messages",
+    competitor_title: "Competitor Tracker",
+    competitor_sub: "Deep dive on your top 3 competitors with gaps to exploit",
+    competitor_run: "Run tracker →",
+    competitor_running: "Scanning competitors...",
+    competitor_empty: "No tracker report yet",
+    competitor_empty_sub:
+      "Run the Competitor Tracker to get a deep dive on your top 3 competitors with real pricing and weaknesses",
+    pricing_strategy_title: "Pricing Strategy",
+    pricing_strategy_sub: "Recommended pricing model, tiers and psychological anchors",
+    pricing_strategy_run: "Generate strategy →",
+    pricing_strategy_running: "Analyzing... (15-30s)",
+    pricing_strategy_empty: "No strategy yet",
+    pricing_strategy_empty_sub:
+      "Generate a pricing strategy tailored to your idea and current revenue stage",
+    revenue_title: "Revenue Roadmap",
+    revenue_sub: "Your phase by phase plan from $0 to $10K MRR",
+    revenue_run: "Generate roadmap →",
+    revenue_running: "Building roadmap... (15-30s)",
+    revenue_empty: "No roadmap yet",
+    revenue_empty_sub:
+      "Generate your personalized revenue roadmap from where you are now to $10K MRR",
     notes_title: "Notes",
     notes_placeholder:
       "Write a note — ideas, blockers, customer feedback, decisions...",
@@ -149,6 +187,44 @@ const projectI18n: Record<
     pivot_empty: "Pas encore de scan",
     pivot_empty_sub:
       "Lance le radar de pivot après quelques check-ins pour détecter si tu dérives",
+    marketing_title: "Moteur Marketing",
+    marketing_sub: "Angles marketing, radar de recrutement & messages de prospection",
+    marketing_run: "Lancer →",
+    marketing_running: "Génération...",
+    marketing_empty: "Pas encore de rapport",
+    marketing_empty_sub:
+      "Lance le Moteur Marketing pour obtenir des angles, conseils de recrutement et messages de prospection adaptés à ton idée",
+    outreach_title: "Moteur de Prospection",
+    outreach_sub: "Messages prêts à envoyer pour n'importe quelle cible",
+    outreach_target_label: "À qui tu t'adresses ?",
+    outreach_run: "Générer les messages →",
+    outreach_running: "Rédaction...",
+    outreach_empty: "Pas encore de messages",
+    outreach_empty_sub:
+      "Sélectionne une cible et génère des messages de prospection prêts à envoyer adaptés à ton idée",
+    outreach_show: "+ Voir les messages",
+    outreach_hide: "− Masquer les messages",
+    competitor_title: "Suivi des Concurrents",
+    competitor_sub: "Analyse approfondie de tes 3 principaux concurrents avec les failles à exploiter",
+    competitor_run: "Lancer le suivi →",
+    competitor_running: "Scan des concurrents...",
+    competitor_empty: "Pas encore de rapport",
+    competitor_empty_sub:
+      "Lance le Suivi des Concurrents pour une analyse approfondie de tes 3 principaux concurrents avec prix réels et faiblesses",
+    pricing_strategy_title: "Stratégie de Prix",
+    pricing_strategy_sub: "Modèle de prix recommandé, paliers et ancres psychologiques",
+    pricing_strategy_run: "Générer la stratégie →",
+    pricing_strategy_running: "Analyse... (15-30s)",
+    pricing_strategy_empty: "Pas encore de stratégie",
+    pricing_strategy_empty_sub:
+      "Génère une stratégie de prix adaptée à ton idée et à ton stade de revenus actuel",
+    revenue_title: "Feuille de Route Revenus",
+    revenue_sub: "Ton plan phase par phase de 0 à 10K MRR",
+    revenue_run: "Générer la feuille de route →",
+    revenue_running: "Construction... (15-30s)",
+    revenue_empty: "Pas encore de feuille de route",
+    revenue_empty_sub:
+      "Génère ta feuille de route personnalisée depuis où tu en es jusqu'à 10K MRR",
     notes_title: "Notes",
     notes_placeholder:
       "Écris une note — idées, blocages, retours clients, décisions...",
@@ -199,7 +275,7 @@ function PlaybookToggle({
   playbook: string;
   lang: ProjectLang;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const t = projectI18n[lang];
   return (
     <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
@@ -222,7 +298,7 @@ function MarketWatchToggle({
   report: string;
   lang: ProjectLang;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const t = projectI18n[lang];
   return (
     <div>
@@ -245,7 +321,7 @@ function CheckinReportToggle({
   report: string;
   lang: ProjectLang;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const t = projectI18n[lang];
   return (
     <div>
@@ -268,7 +344,7 @@ function PivotReportToggle({
   report: string;
   lang: ProjectLang;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const t = projectI18n[lang];
   return (
     <div>
@@ -278,6 +354,131 @@ function PivotReportToggle({
         style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0, letterSpacing: "-0.01em" }}
       >
         {open ? t.hide_radar : t.show_radar}
+      </button>
+      {open ? <ReportDisplay text={report} /> : null}
+    </div>
+  );
+}
+
+function MarketingReportToggle({ report }: { report: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.4)",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          padding: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {open ? "− Hide report" : "+ Show report"}
+      </button>
+      {open ? <ReportDisplay text={report} /> : null}
+    </div>
+  );
+}
+
+function OutreachToggle({ report }: { report: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.4)",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          padding: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {open ? "− Hide messages" : "+ Show messages"}
+      </button>
+      {open ? <ReportDisplay text={report} /> : null}
+    </div>
+  );
+}
+
+function CompetitorToggle({ report }: { report: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.4)",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          padding: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {open ? "− Hide report" : "+ Show report"}
+      </button>
+      {open ? <ReportDisplay text={report} /> : null}
+    </div>
+  );
+}
+
+function PricingToggle({ report }: { report: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.4)",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          padding: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {open ? "− Hide strategy" : "+ Show strategy"}
+      </button>
+      {open ? <ReportDisplay text={report} /> : null}
+    </div>
+  );
+}
+
+function RevenueToggle({ report }: { report: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "rgba(255,255,255,0.4)",
+          cursor: "pointer",
+          fontSize: 12,
+          fontWeight: 600,
+          padding: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {open ? "− Hide roadmap" : "+ Show roadmap"}
       </button>
       {open ? <ReportDisplay text={report} /> : null}
     </div>
@@ -421,6 +622,24 @@ function LockedFeature({
   );
 }
 
+function playPopSound(ctx: AudioContext | null) {
+  if (!ctx) return;
+  try {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(600, ctx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.05);
+    oscillator.frequency.exponentialRampToValueAtTime(500, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.2);
+  } catch (e) {}
+}
+
 export default function ProjectPage() {
   const router = useRouter();
   const params = useParams();
@@ -473,7 +692,19 @@ export default function ProjectPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [pivotReport, setPivotReport] = useState<string | null>(null);
   const [runningPivot, setRunningPivot] = useState(false);
+  const [marketingReport, setMarketingReport] = useState<string | null>(null);
+  const [runningMarketing, setRunningMarketing] = useState(false);
+  const [outreachReport, setOutreachReport] = useState<string | null>(null);
+  const [runningOutreach, setRunningOutreach] = useState(false);
+  const [outreachTarget, setOutreachTarget] = useState("Potential customer");
+  const [competitorReport, setCompetitorReport] = useState<string | null>(null);
+  const [runningCompetitor, setRunningCompetitor] = useState(false);
+  const [pricingReport, setPricingReport] = useState<string | null>(null);
+  const [runningPricing, setRunningPricing] = useState(false);
+  const [revenueReport, setRevenueReport] = useState<string | null>(null);
+  const [runningRevenue, setRunningRevenue] = useState(false);
   const [userPlan, setUserPlan] = useState<"free" | "spark" | "build" | "scale">("free");
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
@@ -527,6 +758,25 @@ export default function ProjectPage() {
 
       setMilestones(milestonesData ?? []);
 
+      const { data: reportsData } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("project_id", id)
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (reportsData) {
+        for (const r of reportsData) {
+          if (r.type === "checkin_report") setCheckinReport(r.content as string);
+          if (r.type === "pivot") setPivotReport(r.content as string);
+          if (r.type === "marketing") setMarketingReport(r.content as string);
+          if (r.type === "outreach") setOutreachReport(r.content as string);
+          if (r.type === "competitor") setCompetitorReport(r.content as string);
+          if (r.type === "pricing") setPricingReport(r.content as string);
+          if (r.type === "revenue") setRevenueReport(r.content as string);
+        }
+      }
+
       const { data: marketWatchData } = await supabase
         .from("market_watches")
         .select("*")
@@ -538,6 +788,17 @@ export default function ProjectPage() {
       setLoading(false);
     })();
   }, [id, router]);
+
+  useEffect(() => {
+    const init = () => {
+      if (!audioCtxRef.current) {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) audioCtxRef.current = new AudioCtx();
+      }
+    };
+    window.addEventListener("click", init, { once: true });
+    return () => window.removeEventListener("click", init);
+  }, []);
 
   const addNote = useCallback(async () => {
     if (!newNote.trim() || !supabase || !user) return;
@@ -606,6 +867,11 @@ export default function ProjectPage() {
     const payload = await res.json().catch(() => ({})) as { report?: string };
     if (payload.report) {
       setCheckinReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "checkin_report", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
       await supabase.from("checkins").update({ ai_report: payload.report }).eq("id", checkinData.id);
       setCheckins((prev) => [{ ...checkinData, ai_report: payload.report ?? "" }, ...prev]);
     }
@@ -645,7 +911,10 @@ export default function ProjectPage() {
       .select()
       .single();
 
-    if (data) setMilestones((prev) => [...prev, data]);
+    if (data) {
+      setMilestones((prev) => [...prev, data]);
+      if (data.playbook) playPopSound(audioCtxRef.current);
+    }
     setClaimingMilestone(null);
   }, [id, user, project]);
 
@@ -671,6 +940,7 @@ export default function ProjectPage() {
         report: payload.report!,
         created_at: new Date().toISOString(),
       }, ...prev]);
+      playPopSound(audioCtxRef.current);
     }
 
     setRunningMarketWatch(false);
@@ -696,9 +966,186 @@ export default function ProjectPage() {
     });
 
     const payload = await res.json().catch(() => ({})) as { report?: string };
-    if (payload.report) setPivotReport(payload.report);
+    if (payload.report) {
+      setPivotReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "pivot", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
     setRunningPivot(false);
-  }, [user, project, notes, checkins]);
+  }, [user, project, notes, checkins, id]);
+
+  const runMarketingEngine = useCallback(async () => {
+    if (!supabase || !user) return;
+    setRunningMarketing(true);
+    setMarketingReport(null);
+
+    const res = await fetch("/api/marketing-engine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ideaName: project?.idea_name,
+        username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        checkins: checkins.slice(0, 3),
+        notes: notes.slice(0, 5),
+        marketWatches: marketWatches.slice(0, 1),
+      }),
+    });
+
+    const payload = await res.json().catch(() => ({})) as { report?: string };
+    if (payload.report) {
+      setMarketingReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "marketing", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
+    setRunningMarketing(false);
+  }, [user, project, checkins, notes, marketWatches, id]);
+
+  const runOutreachEngine = useCallback(async () => {
+    if (!supabase || !user) return;
+    setRunningOutreach(true);
+    setOutreachReport(null);
+
+    const context = notes.slice(0, 3).map((n) => n.content).join("\n");
+
+    const res = await fetch("/api/outreach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ideaName: project?.idea_name,
+        username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        targetType: outreachTarget,
+        context,
+      }),
+    });
+
+    const payload = await res.json().catch(() => ({})) as { report?: string };
+    if (payload.report) {
+      setOutreachReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "outreach", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
+    setRunningOutreach(false);
+  }, [user, project, notes, outreachTarget, id]);
+
+  const runCompetitorTracker = useCallback(async () => {
+    if (!supabase || !user) return;
+    setRunningCompetitor(true);
+    setCompetitorReport(null);
+
+    const res = await fetch("/api/competitor-tracker", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ideaName: project?.idea_name,
+        username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+      }),
+    });
+
+    const payload = await res.json().catch(() => ({})) as { report?: string };
+    if (payload.report) {
+      setCompetitorReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "competitor", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
+    setRunningCompetitor(false);
+  }, [user, project, id]);
+
+  const runPricingStrategy = useCallback(async () => {
+    if (!supabase || !user) return;
+    setRunningPricing(true);
+    setPricingReport(null);
+
+    const res = await fetch("/api/pricing-strategy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ideaName: project?.idea_name,
+        username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        checkins: checkins.slice(0, 5),
+      }),
+    });
+
+    const payload = await res.json().catch(() => ({})) as { report?: string };
+    if (payload.report) {
+      setPricingReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "pricing", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
+    setRunningPricing(false);
+  }, [user, project, checkins, id]);
+
+  const runRevenueRoadmap = useCallback(async () => {
+    if (!supabase || !user) return;
+    setRunningRevenue(true);
+    setRevenueReport(null);
+
+    const res = await fetch("/api/revenue-roadmap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ideaName: project?.idea_name,
+        username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        checkins: checkins.slice(0, 5),
+        milestones,
+      }),
+    });
+
+    const payload = await res.json().catch(() => ({})) as { report?: string };
+    if (payload.report) {
+      setRevenueReport(payload.report);
+      await supabase.from("reports").upsert(
+        { project_id: id, user_id: user.id, type: "revenue", content: payload.report },
+        { onConflict: "project_id,user_id,type" }
+      );
+      playPopSound(audioCtxRef.current);
+    }
+    setRunningRevenue(false);
+  }, [user, project, checkins, milestones, id]);
+
+  const deleteReport = useCallback(async (type: string) => {
+    if (!supabase || !user) return;
+    await supabase.from("reports").delete().eq("project_id", id).eq("user_id", user.id).eq("type", type);
+    if (type === "pivot") setPivotReport(null);
+    if (type === "marketing") setMarketingReport(null);
+    if (type === "outreach") setOutreachReport(null);
+    if (type === "competitor") setCompetitorReport(null);
+    if (type === "pricing") setPricingReport(null);
+    if (type === "revenue") setRevenueReport(null);
+    if (type === "checkin_report") setCheckinReport(null);
+  }, [supabase, user, id]);
+
+  const clearCheckinRowAiReport = useCallback(async (checkinId: string) => {
+    if (!supabase) return;
+    await supabase.from("checkins").update({ ai_report: "" }).eq("id", checkinId);
+    setCheckins((prev) => prev.map((c) => (c.id === checkinId ? { ...c, ai_report: "" } : c)));
+  }, [supabase]);
+
+  const deleteMarketWatch = useCallback(async (watchId: string) => {
+    if (!supabase) return;
+    await supabase.from("market_watches").delete().eq("id", watchId);
+    setMarketWatches((prev) => prev.filter((w) => w.id !== watchId));
+  }, [supabase]);
+
+  const clearMilestonePlaybook = useCallback(async (milestoneId: string) => {
+    if (!supabase) return;
+    await supabase.from("milestones").update({ playbook: null }).eq("id", milestoneId);
+    setMilestones((prev) => prev.map((m) => (m.id === milestoneId ? { ...m, playbook: null } : m)));
+  }, [supabase]);
 
   const sendMessage = useCallback(async () => {
     if (!chatInput.trim() || chatLoading) return;
@@ -931,7 +1378,18 @@ export default function ProjectPage() {
           {checkinReport ? (
             <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "#4ade80" }}>{t.checkin_report_title}</div>
-              <CheckinReportToggle lang={lang} report={checkinReport} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <CheckinReportToggle lang={lang} report={checkinReport} />
+                <button
+                  type="button"
+                  onClick={() => void deleteReport("checkin_report")}
+                  style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -948,7 +1406,18 @@ export default function ProjectPage() {
                     </span>
                   </div>
                   {c.ai_report ? (
-                    <CheckinReportToggle lang={lang} report={c.ai_report} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <CheckinReportToggle lang={lang} report={c.ai_report} />
+                      <button
+                        type="button"
+                        onClick={() => void clearCheckinRowAiReport(c.id)}
+                        style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               ))}
@@ -1026,7 +1495,18 @@ export default function ProjectPage() {
                     ) : null}
                   </div>
                   {achieved?.playbook ? (
-                    <PlaybookToggle lang={lang} playbook={achieved.playbook} />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 12 }}>
+                      <PlaybookToggle lang={lang} playbook={achieved.playbook} />
+                      <button
+                        type="button"
+                        onClick={() => void clearMilestonePlaybook(achieved.id)}
+                        style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               );
@@ -1077,7 +1557,18 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 12 }}>
                     {new Date(mw.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long", day: "numeric", year: "numeric" })}
                   </div>
-                  <MarketWatchToggle lang={lang} report={mw.report} />
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <MarketWatchToggle lang={lang} report={mw.report} />
+                    <button
+                      type="button"
+                      onClick={() => void deleteMarketWatch(mw.id)}
+                      style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1233,10 +1724,317 @@ export default function ProjectPage() {
             </div>
           ) : (
             <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-              <PivotReportToggle lang={lang} report={pivotReport} />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <PivotReportToggle lang={lang} report={pivotReport} />
+                <button
+                  type="button"
+                  onClick={() => void deleteReport("pivot")}
+                  style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           )}
         </div>
+        )}
+
+        {/* Marketing Engine */}
+        {userPlan !== "build" && userPlan !== "scale" ? (
+          <LockedFeature lang={lang} feature={t.marketing_title} requiredPlan="Build" />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.marketing_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.marketing_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runMarketingEngine()}
+                disabled={runningMarketing}
+                style={{
+                  background: runningMarketing ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningMarketing ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningMarketing ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningMarketing ? t.marketing_running : t.marketing_run}
+              </button>
+            </div>
+
+            {!marketingReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>📣</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.marketing_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.marketing_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <MarketingReportToggle report={marketingReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("marketing")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Outreach Engine */}
+        {userPlan !== "build" && userPlan !== "scale" ? (
+          <LockedFeature lang={lang} feature={t.outreach_title} requiredPlan="Build" />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.outreach_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.outreach_sub}</div>
+              </div>
+            </div>
+
+            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px", marginBottom: 16 }}>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>{t.outreach_target_label}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                {["Potential customer", "Potential partner", "Potential advisor", "Potential investor"].map((target) => (
+                  <button
+                    key={target}
+                    type="button"
+                    onClick={() => setOutreachTarget(target)}
+                    style={{
+                      background: outreachTarget === target ? "#ffffff" : "rgba(255,255,255,0.06)",
+                      color: outreachTarget === target ? "#000" : "rgba(255,255,255,0.6)",
+                      border: `1px solid ${outreachTarget === target ? "#ffffff" : "rgba(255,255,255,0.1)"}`,
+                      borderRadius: 100,
+                      padding: "6px 16px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {target}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => void runOutreachEngine()}
+                disabled={runningOutreach}
+                style={{
+                  background: runningOutreach ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningOutreach ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "10px 24px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningOutreach ? "not-allowed" : "pointer",
+                  width: "100%",
+                }}
+              >
+                {runningOutreach ? t.outreach_running : t.outreach_run}
+              </button>
+            </div>
+
+            {!outreachReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>✉️</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.outreach_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.outreach_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <OutreachToggle report={outreachReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("outreach")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Competitor Tracker */}
+        {userPlan !== "build" && userPlan !== "scale" ? (
+          <LockedFeature lang={lang} feature={t.competitor_title} requiredPlan="Build" />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.competitor_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.competitor_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runCompetitorTracker()}
+                disabled={runningCompetitor}
+                style={{
+                  background: runningCompetitor ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningCompetitor ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningCompetitor ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningCompetitor ? t.competitor_running : t.competitor_run}
+              </button>
+            </div>
+
+            {!competitorReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>🔍</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.competitor_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.competitor_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <CompetitorToggle report={competitorReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("competitor")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pricing Strategy */}
+        {userPlan !== "build" && userPlan !== "scale" ? (
+          <LockedFeature lang={lang} feature={t.pricing_strategy_title} requiredPlan="Build" />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.pricing_strategy_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.pricing_strategy_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runPricingStrategy()}
+                disabled={runningPricing}
+                style={{
+                  background: runningPricing ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningPricing ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningPricing ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningPricing ? t.pricing_strategy_running : t.pricing_strategy_run}
+              </button>
+            </div>
+
+            {!pricingReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>💰</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.pricing_strategy_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.pricing_strategy_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <PricingToggle report={pricingReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("pricing")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Revenue Roadmap */}
+        {userPlan !== "scale" ? (
+          <LockedFeature lang={lang} feature={t.revenue_title} requiredPlan="Scale" />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.revenue_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.revenue_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runRevenueRoadmap()}
+                disabled={runningRevenue}
+                style={{
+                  background: runningRevenue ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningRevenue ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningRevenue ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningRevenue ? t.revenue_running : t.revenue_run}
+              </button>
+            </div>
+
+            {!revenueReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>📈</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.revenue_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.revenue_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <RevenueToggle report={revenueReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("revenue")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Notes Section */}

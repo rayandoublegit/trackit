@@ -71,7 +71,7 @@ Be direct. Use their actual data. Max 300 words.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+    max_tokens: 400,
     messages: [{ role: "user", content: prompt }],
   });
 
