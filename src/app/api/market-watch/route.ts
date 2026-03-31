@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { projectId, userId, ideaName, originalVerdict } = body;
 
-  const prompt = `You are Klayan — an AI co-founder doing a monthly market intelligence scan for a founder building "${ideaName}".
+  const prompt = `You are Klayan — an AI co-founder doing a monthly market intelligence scan for a founder building a product called "${ideaName}". Do NOT ask for clarification. Search the web immediately for competitors, market trends, and customer complaints in the space this product operates in. Make your best inference about the market based on the product name and search broadly.
 
 Search the web RIGHT NOW for the latest market developments. Find:
 1. Any new competitors launched in the last 30 days
