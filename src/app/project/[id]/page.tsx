@@ -218,7 +218,7 @@ const projectI18n: Record<
     pricing_strategy_empty: "Pas encore de stratégie",
     pricing_strategy_empty_sub:
       "Génère une stratégie de prix adaptée à ton idée et à ton stade de revenus actuel",
-    revenue_title: "Feuille de Route Revenus",
+    revenue_title: "Roadmap des Revenus",
     revenue_sub: "Ton plan phase par phase de 0 à 10K MRR",
     revenue_run: "Générer la feuille de route →",
     revenue_running: "Construction... (15-30s)",

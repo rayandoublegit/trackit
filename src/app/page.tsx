@@ -241,13 +241,17 @@ export default function LandingPage() {
       pricing_build_f4: "Milestone Engine & Playbooks (Important Steps)",
       pricing_build_f5: "Market Watch (monthly)",
       pricing_build_f6: "Pivot Radar",
+      pricing_build_f7: "Marketing Engine",
+      pricing_build_f8: "Outreach Engine",
+      pricing_build_f9: "Competitor Tracker",
+      pricing_build_f10: "Pricing Strategy",
       pricing_scale_badge: "Get the best out of Klayan!",
       pricing_scale_f1: "Unlimited analyses",
       pricing_scale_f2: "Everything in Build",
       pricing_scale_f3: "Co-Founder Mode (unlimited sessions)",
       pricing_scale_f4: "Market Watch (unlimited)",
       pricing_scale_f5: "Revenue Roadmap",
-      pricing_scale_f6: "Marketing Machine",
+      pricing_scale_f6: "Priority support",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Business Structure",
@@ -356,16 +360,20 @@ export default function LandingPage() {
       pricing_build_f1: "10 analyses par mois",
       pricing_build_f2: "Tout ce qui est dans Spark",
       pricing_build_f3: "Check-in hebdomadaire + rapport IA",
-      pricing_build_f4: "Machine d'Étapes Importantes & Playbooks",
+      pricing_build_f4: "Machine d'Étapes Importantes & Playbook",
       pricing_build_f5: "Market Watch (mensuel)",
       pricing_build_f6: "Pivot Radar",
+      pricing_build_f7: "Moteur Marketing",
+      pricing_build_f8: "Moteur de Prospection",
+      pricing_build_f9: "Suivi des Concurrents",
+      pricing_build_f10: "Stratégie de Prix",
       pricing_scale_badge: "Tire le meilleur de Klayan !",
       pricing_scale_f1: "Analyses illimitées",
       pricing_scale_f2: "Tout ce qui est dans Build",
       pricing_scale_f3: "Mode Co-Fondateur (sessions illimitées)",
       pricing_scale_f4: "Market Watch (illimité)",
-      pricing_scale_f5: "Revenue Roadmap",
-      pricing_scale_f6: "Marketing Machine",
+      pricing_scale_f5: "Roadmap des Revenus",
+      pricing_scale_f6: "Support prioritaire",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Structure Business",
@@ -1473,6 +1481,18 @@ export default function LandingPage() {
               </li>
               <li>
                 <span className="feat-dot" /> {t.pricing_build_f6}
+              </li>
+              <li>
+                <span className="feat-dot" /> {t.pricing_build_f7}
+              </li>
+              <li>
+                <span className="feat-dot" /> {t.pricing_build_f8}
+              </li>
+              <li>
+                <span className="feat-dot" /> {t.pricing_build_f9}
+              </li>
+              <li>
+                <span className="feat-dot" /> {t.pricing_build_f10}
               </li>
             </ul>
           </div>
