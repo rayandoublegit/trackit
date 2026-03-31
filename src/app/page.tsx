@@ -1062,20 +1062,8 @@ export default function LandingPage() {
       </div>
 
       <section className="demo-section">
-        <div style={{
-          textAlign: "center",
-          marginBottom: 32,
-        }}>
-          <h2 style={{
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
-            fontSize: "clamp(28px, 4vw, 48px)",
-            fontWeight: 800,
-            letterSpacing: "-0.03em",
-            color: "#ffffff",
-            margin: 0,
-          }}>
-            {t.demo_title}
-          </h2>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <span className="section-label">{t.demo_title}</span>
         </div>
         <div className="demo-video-wrap reveal" id="demoVideoWrap">
           <video
