@@ -704,6 +704,8 @@ export default function ProjectPage() {
   const [revenueReport, setRevenueReport] = useState<string | null>(null);
   const [runningRevenue, setRunningRevenue] = useState(false);
   const [userPlan, setUserPlan] = useState<"free" | "spark" | "build" | "scale">("free");
+  const [resetting, setResetting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -1129,6 +1131,33 @@ export default function ProjectPage() {
     if (type === "checkin_report") setCheckinReport(null);
   }, [supabase, user, id]);
 
+  const resetWorkspace = useCallback(async () => {
+    if (!supabase || !user) return;
+    setResetting(true);
+
+    await Promise.all([
+      supabase.from("checkins").delete().eq("project_id", id).eq("user_id", user.id),
+      supabase.from("milestones").delete().eq("project_id", id).eq("user_id", user.id),
+      supabase.from("market_watches").delete().eq("project_id", id).eq("user_id", user.id),
+      supabase.from("notes").delete().eq("project_id", id).eq("user_id", user.id),
+      supabase.from("reports").delete().eq("project_id", id).eq("user_id", user.id),
+    ]);
+
+    setCheckins([]);
+    setMilestones([]);
+    setMarketWatches([]);
+    setNotes([]);
+    setCheckinReport(null);
+    setPivotReport(null);
+    setMarketingReport(null);
+    setOutreachReport(null);
+    setCompetitorReport(null);
+    setPricingReport(null);
+    setRevenueReport(null);
+    setShowResetConfirm(false);
+    setResetting(false);
+  }, [supabase, user, id]);
+
   const clearCheckinRowAiReport = useCallback(async (checkinId: string) => {
     if (!supabase) return;
     await supabase.from("checkins").update({ ai_report: "" }).eq("id", checkinId);
@@ -1231,6 +1260,26 @@ export default function ProjectPage() {
               {s === "building" ? t.building : s === "pivoting" ? t.pivoting : t.killed}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowResetConfirm(true)}
+            style={{
+              background: "transparent",
+              border: "1px solid rgba(248,113,113,0.2)",
+              borderRadius: 100,
+              padding: "6px 14px",
+              color: "rgba(248,113,113,0.5)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "-0.01em",
+              marginLeft: 8,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.6)"; e.currentTarget.style.color = "#f87171"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)"; e.currentTarget.style.color = "rgba(248,113,113,0.5)"; }}
+          >
+            Reset workspace
+          </button>
         </div>
       </div>
 
@@ -2122,6 +2171,56 @@ export default function ProjectPage() {
           )}
         </div>
       </div>
+
+      {showResetConfirm ? (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)",
+          backdropFilter: "blur(8px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+        onClick={() => setShowResetConfirm(false)}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid rgba(248,113,113,0.2)",
+              borderRadius: 16,
+              padding: 32,
+              width: "100%",
+              maxWidth: 400,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>Reset workspace?</div>
+            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24, lineHeight: 1.6 }}>
+              This will permanently delete all check-ins, milestones, notes, market watches and reports for this project. The project itself will remain.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 20px", color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void resetWorkspace()}
+                disabled={resetting}
+                style={{ background: "#f87171", color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", flex: 1, opacity: resetting ? 0.6 : 1 }}
+              >
+                {resetting ? "Resetting..." : "Yes, reset everything"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
