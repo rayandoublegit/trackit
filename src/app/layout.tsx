@@ -3,11 +3,48 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Klayan — Stop Building. Start Knowing.",
-  description: "AI-powered idea validation for first-time SaaS builders.",
-  icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+  title: "Klayan — From Idea to $10K MRR",
+  description: "The AI co-founder that validates your startup idea in 10 minutes then tracks your progress to $10K MRR. Kill it, Flip it, or Build it — with real data, live competitors, and a full founder workspace.",
+  keywords: "startup idea validation, AI co-founder, validate startup idea, idea validation tool, kill it flip it build it, startup validator, first customers SaaS, $10K MRR",
+  authors: [{ name: "Klayan" }],
+  creator: "Klayan",
+  publisher: "Klayan",
+  metadataBase: new URL("https://klayan.app"),
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "https://klayan.app",
+    title: "Klayan — From Idea to $10K MRR",
+    description: "The AI co-founder that validates your startup idea in 10 minutes then tracks your progress to $10K MRR.",
+    siteName: "Klayan",
+    images: [
+      {
+        url: "/images/navbarlogo.png",
+        width: 180,
+        height: 180,
+        alt: "Klayan",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Klayan — From Idea to $10K MRR",
+    description: "The AI co-founder that validates your startup idea in 10 minutes then tracks your progress to $10K MRR.",
+    images: ["/images/navbarlogo.png"],
+    creator: "@klayan_app",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
