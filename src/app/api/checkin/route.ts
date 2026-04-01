@@ -48,11 +48,13 @@ THIS WEEK'S ONE ACTION
 BRUTAL TRUTH
 [One hard truth about where ${username} is right now based on the data. Address them directly by name.]
 
-Keep it under 200 words. Be direct. No fluff.`;
+Keep it under 200 words. Be direct. No fluff.
+
+IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 400,
+    max_tokens: 800,
     messages: [{ role: "user", content: prompt }],
   });
 

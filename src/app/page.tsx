@@ -224,7 +224,6 @@ export default function LandingPage() {
       reason6_title: "It stays with you.",
       reason6_desc:
         "ChatGPT is a one-time conversation. Klayan follows you from raw idea to first paying customer — adapting as your signals come in, never starting over.",
-      demo_title: "Klayan V2 is here.",
       pricing_label: "Simple. Honest. Revenue-led.",
       pricing_spark: "Spark",
       pricing_build: "Build",
@@ -347,7 +346,6 @@ export default function LandingPage() {
       reason6_title: "Il reste avec toi.",
       reason6_desc:
         "ChatGPT est une conversation unique. Klayan te suit de l'idée brute au premier client payant — s'adaptant au fur et à mesure que tes signaux arrivent, sans jamais repartir de zéro.",
-      demo_title: "Klayan V2 est là.",
       pricing_label: "Simple. Honnête. Orienté revenus.",
       pricing_spark: "Spark",
       pricing_build: "Build",
@@ -1062,9 +1060,6 @@ export default function LandingPage() {
       </div>
 
       <section className="demo-section">
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <span className="section-label">{t.demo_title}</span>
-        </div>
         <div className="demo-video-wrap reveal" id="demoVideoWrap">
           <video
             id="demoVideo"

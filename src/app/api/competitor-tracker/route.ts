@@ -48,11 +48,13 @@ Gap to exploit: [Specific opportunity]
 YOUR WINNING MOVE
 [One specific positioning statement that exploits all 3 weaknesses at once]
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 400,
+    max_tokens: 800,
     messages: [{ role: "user", content: prompt }],
     tools: [{ type: "web_search_20250305", name: "web_search" }],
   });
