@@ -490,6 +490,8 @@ function ReportDisplay({ text }: { text: string }) {
     .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{1F100}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{1F004}]|[\u{1F0CF}]|⚡|⚠️|🎯|🔓|🔒|✅|👤|💵|🚀|🔥|❌|🎉|👋|💡|📊|👁️|🤝/gu, "")
     .replace(/\*\*/g, "")
     .replace(/\*/g, "")
+    .replace(/\s*\.\s*$/gm, "")
+    .replace(/^\s*\.\s*/gm, "")
     .trim();
   const lines = cleaned.split("\n");
   return (
