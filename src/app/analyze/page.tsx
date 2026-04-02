@@ -48,6 +48,7 @@ const QUESTION_META: QuestionMeta[] = [
 export default function AnalyzePage() {
   const router = useRouter();
   const lang = useLang();
+  const [showExample, setShowExample] = useState(false);
 
   const t = {
     en: {
@@ -111,6 +112,43 @@ export default function AnalyzePage() {
       step_submit: "Analyser mon idée →",
       step_analyzing: "Analyse en cours...",
       step_hint: "Appuie sur Ctrl + Entrée pour continuer",
+    },
+  }[lang];
+
+  const exampleVerdict = {
+    en: {
+      idea: "An AI tool that helps solo founders validate their SaaS idea before building",
+      verdict: "BUILD IT — but flip your positioning from 'validation tool' to 'AI co-founder that saves you 6 months of wasted work.'",
+      hard_truths: [
+        "35% of startups fail due to no market need — your problem is real and validated by CB Insights data",
+        "ValidatorAI already has 300,000 users — you're entering a crowded market and need sharp differentiation",
+        "ChatGPT is free and most founders use it to validate — your live web search is your only real moat",
+        "Founders on Reddit say existing tools give 'feel-good scores' not actionable verdicts — that's your opening",
+        "The market is growing — AI tools for founders is a $2.1B space by 2027 according to recent reports",
+      ],
+      opportunity: "No tool combines live web search + brutal verdict + actionable roadmap in one product. Most validators give you a score. None give you a co-founder.",
+      next_48h: [
+        "Post your landing page on r/SaaS and r/startups and ask for brutal feedback",
+        "DM 10 founders on X who complained about wasted time building — offer them a free analysis",
+        "Run your own idea through the tool and screenshot the verdict for social proof",
+      ],
+    },
+    fr: {
+      idea: "Un outil IA qui aide les founders solo à valider leur idée SaaS avant de construire",
+      verdict: "BUILD IT — mais repositionne-toi de 'outil de validation' à 'co-fondateur IA qui te fait économiser 6 mois de travail inutile.'",
+      hard_truths: [
+        "35% des startups échouent par manque de marché — ton problème est réel et validé par les données CB Insights",
+        "ValidatorAI a déjà 300 000 utilisateurs — tu entres dans un marché saturé et tu dois te différencier fortement",
+        "ChatGPT est gratuit et la plupart des founders l'utilisent pour valider — ta recherche web en direct est ton seul vrai avantage",
+        "Les founders sur Reddit disent que les outils existants donnent des 'scores feel-good' pas des verdicts actionnables — c'est ton ouverture",
+        "Le marché grandit — les outils IA pour founders représentent 2,1 milliards de dollars d'ici 2027",
+      ],
+      opportunity: "Aucun outil ne combine recherche web en direct + verdict brutal + roadmap actionnable en un seul produit. La plupart des validateurs te donnent un score. Aucun ne te donne un co-fondateur.",
+      next_48h: [
+        "Poste ta landing page sur r/SaaS et r/startups et demande un retour brutal",
+        "DM 10 founders sur X qui ont parlé de temps gaspillé à construire — offre-leur une analyse gratuite",
+        "Passe ta propre idée dans l'outil et prends une capture du verdict pour la preuve sociale",
+      ],
     },
   }[lang];
 
@@ -432,6 +470,25 @@ export default function AnalyzePage() {
           {isSubmitting ? t.thinking_sub : stepSub}
         </div>
 
+        <div style={{ marginBottom: 32, textAlign: "center" }}>
+          <button
+            type="button"
+            onClick={() => setShowExample(true)}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              textDecoration: "underline",
+              fontFamily: "'Inter', sans-serif",
+            }}
+          >
+            {lang === "fr" ? "Voir un exemple de verdict →" : "See an example verdict →"}
+          </button>
+        </div>
+
         <textarea
           id="qInput"
           ref={inputRef}
@@ -492,6 +549,111 @@ export default function AnalyzePage() {
           ))}
         </div>
       </div>
+
+      {showExample ? (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.9)",
+          backdropFilter: "blur(8px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          overflowY: "auto",
+        }}
+        onClick={() => setShowExample(false)}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20,
+              padding: 32,
+              width: "100%",
+              maxWidth: 600,
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.4)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                {lang === "fr" ? "Exemple de verdict" : "Example Verdict"}
+              </div>
+              <button type="button" onClick={() => setShowExample(false)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 18 }}>✕</button>
+            </div>
+
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginBottom: 8 }}>
+              {lang === "fr" ? "Idée soumise" : "Submitted idea"}
+            </div>
+            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", marginBottom: 24, fontStyle: "italic", lineHeight: 1.6 }}>
+              &quot;{exampleVerdict.idea}&quot;
+            </div>
+
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                {lang === "fr" ? "Verdict" : "Verdict"}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#4ade80", lineHeight: 1.5 }}>
+                {exampleVerdict.verdict}
+              </div>
+            </div>
+
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+                {lang === "fr" ? "Vérités difficiles" : "Hard Truths"}
+              </div>
+              {exampleVerdict.hard_truths.map((truth, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                  <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>0{i + 1} —</span>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>{truth}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+                {lang === "fr" ? "Opportunité" : "Opportunity"}
+              </div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                {exampleVerdict.opportunity}
+              </div>
+            </div>
+
+            <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 20, marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
+                {lang === "fr" ? "Prochaines 48h" : "Next 48 Hours"}
+              </div>
+              {exampleVerdict.next_48h.map((action, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                  <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0 }}>0{i + 1} —</span>
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>{action}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowExample(false)}
+              style={{
+                background: "#ffffff",
+                color: "#000",
+                border: "none",
+                borderRadius: 100,
+                padding: "12px 24px",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              {lang === "fr" ? "Valider ma propre idée →" : "Validate my own idea →"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
