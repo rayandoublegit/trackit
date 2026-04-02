@@ -155,6 +155,7 @@ export default function LandingPage() {
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "fr">("en");
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
@@ -172,6 +173,20 @@ export default function LandingPage() {
       localStorage.setItem("klayan_lang", "en");
     }
   }, []);
+
+  useEffect(() => {
+    if (!showLangDropdown) return;
+    const handleClick = (e: MouseEvent) => {
+      setShowLangDropdown(false);
+    };
+    const timer = setTimeout(() => {
+      window.addEventListener("click", handleClick);
+    }, 0);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("click", handleClick);
+    };
+  }, [showLangDropdown]);
 
   const t = {
     en: {
@@ -815,7 +830,7 @@ export default function LandingPage() {
             className="nav-logo-img"
           />
         </div>
-        <div className="nav-right">
+        <div className="nav-right" style={{ gap: 3 }}>
           <ul className="nav-links">
             <li>
               <a href="#services">{t.nav_services}</a>
@@ -996,33 +1011,81 @@ export default function LandingPage() {
               {t.nav_signin}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              const newLang = lang === "en" ? "fr" : "en";
-              setLang(newLang);
-              localStorage.setItem("klayan_lang", newLang);
-            }}
-            style={{
-              background: "rgba(171,171,171,0.24)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              border: "none",
-              borderRadius: 100,
-              padding: "8px 14px",
-              color: "#fff",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: "-0.02em",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {lang === "en" ? "🇫🇷 FR" : "🇬🇧 EN"}
-          </button>
+          <div style={{ position: "relative", marginLeft: 8 }}>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowLangDropdown(!showLangDropdown); }}
+              style={{
+                background: "rgba(171,171,171,0.15)",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 100,
+                padding: "8px 14px",
+                color: "#fff",
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 16,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {lang === "fr" ? "🇫🇷" : "🇬🇧"}
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.5)" }}>▾</span>
+            </button>
+
+            {showLangDropdown ? (
+              <div style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                background: "#111",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 12,
+                overflow: "hidden",
+                zIndex: 100,
+                minWidth: 120,
+              }}>
+                {[
+                  { code: "en", flag: "🇬🇧", label: "English" },
+                  { code: "fr", flag: "🇫🇷", label: "Français" },
+                ].map((l) => (
+                  <button
+                    key={l.code}
+                    type="button"
+                    onClick={() => {
+                      const newLang = l.code as "en" | "fr";
+                      setLang(newLang);
+                      localStorage.setItem("klayan_lang", newLang);
+                      setShowLangDropdown(false);
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      background: lang === l.code ? "rgba(255,255,255,0.08)" : "transparent",
+                      border: "none",
+                      padding: "10px 16px",
+                      color: "#fff",
+                      fontFamily: "'Inter', sans-serif",
+                      fontSize: 13,
+                      fontWeight: lang === l.code ? 600 : 400,
+                      cursor: "pointer",
+                      textAlign: "left",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = lang === l.code ? "rgba(255,255,255,0.08)" : "transparent"; }}
+                  >
+                    <span>{l.flag}</span>
+                    <span>{l.label}</span>
+                    {lang === l.code ? <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.4)" }}>✓</span> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </div>
       </nav>
 
