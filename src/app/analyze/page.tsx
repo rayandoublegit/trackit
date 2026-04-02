@@ -9,40 +9,15 @@ import { useLang } from "@/lib/useLang";
 
 type QuestionMeta = {
   label: string;
-  placeholder: string;
 };
 
 const QUESTION_META: QuestionMeta[] = [
-  {
-    label: "01 →",
-    placeholder:
-      "e.g. An AI tool that helps solo founders validate their SaaS idea before building anything...",
-  },
-  {
-    label: "02 →",
-    placeholder:
-      "e.g. Solo SaaS founders aged 25-35 who keep building products nobody wants...",
-  },
-  {
-    label: "03 →",
-    placeholder:
-      "e.g. I built 3 products in 12 months with zero paying customers because I never validated...",
-  },
-  {
-    label: "04 →",
-    placeholder:
-      "e.g. They ask ChatGPT, post on Reddit, or just wing it and hope for the best...",
-  },
-  {
-    label: "05 →",
-    placeholder:
-      "e.g. I've lived this problem firsthand and know exactly what founders need...",
-  },
-  {
-    label: "06 →",
-    placeholder:
-      "e.g. I DMed 20 founders on Reddit. 8 responded. 3 said they'd pay for this today...",
-  },
+  { label: "01 →" },
+  { label: "02 →" },
+  { label: "03 →" },
+  { label: "04 →" },
+  { label: "05 →" },
+  { label: "06 →" },
 ];
 
 export default function AnalyzePage() {
@@ -81,6 +56,12 @@ export default function AnalyzePage() {
       step_submit: "Analyze my idea →",
       step_analyzing: "Analyzing...",
       step_hint: "Press Ctrl + Enter to continue",
+      step1_eg: "e.g. A tool that helps freelancers send invoices in 30 seconds without an accountant.",
+      step2_eg: "e.g. Freelancers aged 25-40 who invoice 3-10 clients per month and hate spreadsheets.",
+      step3_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
+      step4_eg: "e.g. FreshBooks, Wave, QuickBooks — but they're too complex for solo freelancers.",
+      step5_eg: "e.g. I'm a freelancer myself and hate invoicing. I already have 5 friends who'd pay for this.",
+      step6_eg: "e.g. Yes — 8 freelancers. 6 out of 8 said invoicing is their biggest admin pain.",
     },
     fr: {
       title: "C'est quoi ton idée ?",
@@ -112,6 +93,12 @@ export default function AnalyzePage() {
       step_submit: "Analyser mon idée →",
       step_analyzing: "Analyse en cours...",
       step_hint: "Appuie sur Ctrl + Entrée pour continuer",
+      step1_eg: "ex. Un outil qui aide les freelances à envoyer des factures en 30 secondes sans comptable.",
+      step2_eg: "ex. Freelances de 25-40 ans qui facturent 3-10 clients par mois et détestent les tableurs.",
+      step3_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
+      step4_eg: "ex. FreshBooks, Wave, QuickBooks — mais trop complexes pour les freelances solo.",
+      step5_eg: "ex. Je suis moi-même freelance et je déteste la facturation. J'ai déjà 5 amis qui paieraient pour ça.",
+      step6_eg: "ex. Oui — 8 freelances. 6 sur 8 ont dit que la facturation est leur plus grande douleur administrative.",
     },
   }[lang];
 
@@ -188,6 +175,11 @@ export default function AnalyzePage() {
   const nextLabel = useMemo(
     () => (current === totalQ - 1 ? t.step_submit : t.step_next),
     [current, totalQ, t.step_submit, t.step_next]
+  );
+
+  const stepPlaceholders = useMemo(
+    () => [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg],
+    [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg]
   );
 
   useEffect(() => {
@@ -505,9 +497,7 @@ export default function AnalyzePage() {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           disabled={isSubmitting}
-          placeholder={
-            current === 0 ? t.placeholder : q.placeholder
-          }
+          placeholder={stepPlaceholders[current]}
         />
 
         <div

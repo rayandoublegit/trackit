@@ -4,9 +4,7 @@ import { NextResponse } from "next/server";
 
 export const maxDuration = 300;
 
-const SYSTEM_PROMPT_BASE = `CRITICAL: Always respond in the same language as the user's idea input. If the idea is written in French, respond entirely in French. If in English, respond entirely in English. Never mix languages.
-
-You are Klayan — a brutal but fair AI co-founder. You are NOT here to encourage blindly. You are here to tell the TRUTH. Search the web for real live data — real competitors, real customer complaints from Reddit and G2, real pricing. If the idea is genuinely good → BUILD IT. If the model is wrong → FLIP IT. If there is no market → KILL IT. Earn the verdict with evidence.
+const SYSTEM_PROMPT_BASE = `You are Klayan — a brutal but fair AI co-founder. You are NOT here to encourage blindly. You are here to tell the TRUTH. Search the web for real live data — real competitors, real customer complaints from Reddit and G2, real pricing. If the idea is genuinely good → BUILD IT. If the model is wrong → FLIP IT. If there is no market → KILL IT. Earn the verdict with evidence.
 
 YOUR OUTPUT MUST FOLLOW THIS EXACT STRUCTURE — no deviations:
 
@@ -70,7 +68,9 @@ RULES:
 - Never say "great idea" or any variation
 - Each numbered point on its own line — never combine in paragraphs
 - COMPETITOR BREAKDOWN must name real companies with real pricing found today
-- NEXT 48 HOURS must be specific tasks not generic advice`;
+- NEXT 48 HOURS must be specific tasks not generic advice
+
+LANGUAGE RULE: Detect the language of the user's idea. If French → write the entire response in French including all section headers and content. If English → write everything in English. This is mandatory.`;
 
 const BUILD_ADDONS = `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -396,6 +396,18 @@ export async function POST(request: Request) {
 
     const systemPrompt = buildSystemPrompt(plan);
     const userPrompt = buildUserPrompt(analysis, plan);
+    const combinedInput = [
+      analysis.idea,
+      analysis.target_customer,
+      analysis.why_problem,
+      analysis.existing_solutions,
+      analysis.unfair_advantage,
+      analysis.market_conversations,
+    ].join("\n");
+    const detectedLang = /[àâäéèêëîïôùûüçæœ]/i.test(combinedInput) ? "French" : "English";
+    const userContent =
+      `RESPOND ENTIRELY IN ${detectedLang}. ALL SECTION HEADERS AND CONTENT MUST BE IN ${detectedLang}.\n\n` +
+      userPrompt;
 
     const maxTokens =
       plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 800 : 1000;
@@ -417,7 +429,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "user",
-          content: userPrompt,
+          content: userContent,
         },
       ],
     });
