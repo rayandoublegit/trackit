@@ -26,13 +26,19 @@ function getVerdictType(verdict: string | null): VerdictType | null {
     if (first === "KILL IT") return "KILL IT";
   }
 
-  const mentionsFlip = inner.includes("FLIP IT");
-  const mentionsBuild = inner.includes("BUILD IT");
-  const mentionsKill = inner.includes("KILL IT");
+  const mentionsFlip = inner.includes("FLIP IT") || inner.includes("PIVOTEZ") || inner.includes("PIVOTER") || inner.includes("RETOURNEZ");
+  const mentionsBuild = inner.includes("BUILD IT") || inner.includes("CONSTRUISEZ") || inner.includes("CONSTRUIRE") || inner.includes("LANCEZ");
+  const mentionsKill = inner.includes("KILL IT") || inner.includes("ABANDONNEZ") || inner.includes("TUEZ") || inner.includes("ARRETEZ");
 
   if (mentionsFlip && !mentionsBuild && !mentionsKill) return "FLIP IT";
   if (mentionsBuild && !mentionsFlip && !mentionsKill) return "BUILD IT";
   if (mentionsKill && !mentionsFlip && !mentionsBuild) return "KILL IT";
+
+  // Full text search fallback
+  const fullText = verdict.toUpperCase();
+  if (fullText.includes("FLIP IT") || fullText.includes("PIVOTEZ") || fullText.includes("PIVOTER")) return "FLIP IT";
+  if (fullText.includes("BUILD IT") || fullText.includes("CONSTRUISEZ") || fullText.includes("CONSTRUIRE")) return "BUILD IT";
+  if (fullText.includes("KILL IT") || fullText.includes("ABANDONNEZ") || fullText.includes("TUEZ")) return "KILL IT";
 
   return null;
 }
