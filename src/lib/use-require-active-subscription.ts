@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
-const EXEMPT_PREFIXES = ["/pricing", "/auth", "/analyze", "/verdict"];
+const EXEMPT_PREFIXES = ["/pricing", "/auth", "/analyze", "/verdict", "/dashboard", "/project", "/settings", "/contact"];
 
 export function useRequireActiveSubscription() {
   const pathname = usePathname();
