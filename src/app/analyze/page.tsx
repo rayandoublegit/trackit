@@ -470,22 +470,31 @@ export default function AnalyzePage() {
           {isSubmitting ? t.thinking_sub : stepSub}
         </div>
 
-        <div style={{ marginBottom: 32, textAlign: "center" }}>
+        <div style={{ marginBottom: 32 }}>
           <button
             type="button"
             onClick={() => setShowExample(true)}
             style={{
-              background: "transparent",
-              border: "none",
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 13,
-              fontWeight: 500,
-              cursor: "pointer",
-              textDecoration: "underline",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              borderRadius: 12,
+              padding: "14px 24px",
+              color: "#ffffff",
               fontFamily: "'Inter', sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "-0.01em",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
           >
-            {lang === "fr" ? "Voir un exemple de verdict →" : "See an example verdict →"}
+            <span style={{ fontSize: 16 }}>👁️</span>
+            {lang === "fr" ? "Voir un exemple de verdict" : "See an example verdict"}
+            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>→</span>
           </button>
         </div>
 
