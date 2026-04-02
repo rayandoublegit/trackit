@@ -278,6 +278,7 @@ export default function DashboardPage() {
   const [textColor, setTextColor] = useState<string>("#ffffff");
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [showUpgradeSuccess, setShowUpgradeSuccess] = useState(false);
 
   const avatarMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -491,6 +492,16 @@ export default function DashboardPage() {
     setWallpaperType(savedType);
     const savedTextColor = localStorage.getItem("klayan_text_color") ?? "#ffffff";
     setTextColor(savedTextColor);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upgraded") === "true") {
+      setShowUpgradeSuccess(true);
+      window.history.replaceState({}, "", "/dashboard");
+      setTimeout(() => setShowUpgradeSuccess(false), 4000);
+    }
   }, []);
 
   const applyWallpaper = useCallback((value: string, type: "color" | "gradient" | "image", nextTextColor?: string) => {
@@ -779,6 +790,25 @@ export default function DashboardPage() {
         position: "relative",
       }}
     >
+      {showUpgradeSuccess ? (
+        <div style={{
+          position: "fixed",
+          top: 24,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#4ade80",
+          color: "#000",
+          padding: "14px 28px",
+          borderRadius: 100,
+          fontSize: 14,
+          fontWeight: 700,
+          zIndex: 9999,
+          letterSpacing: "-0.01em",
+          boxShadow: "0 8px 32px rgba(74,222,128,0.3)",
+        }}>
+          🎉 Plan upgraded successfully! Welcome to the next level.
+        </div>
+      ) : null}
       {isMobile && sidebarOpen ? (
         <button
           type="button"
