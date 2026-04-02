@@ -217,7 +217,7 @@ export default function LandingPage() {
       hero_title: "From Idea to",
       hero_italic: "10K MRR.",
       hero_sub:
-        "Most founders waste 6 months building something nobody wants. Klayan tells you the truth on day one — then tracks your idea to $10K MRR with weekly check-ins, live market intelligence, and an AI co-founder that never lets you drift.",
+        "Drowning in ideas but no idea which one to build? Klayan pulls you out. Brutal verdict in 10 minutes — real competitors, real market data, real next steps. Then stays with you every week until you hit $10K MRR.",
       hero_cta: "Analyze my idea",
       hero_note: "Free to start · No credit card required",
       familiar_title: "Sounds familiar ?",
@@ -340,7 +340,7 @@ export default function LandingPage() {
       hero_title: "De l'Idée au",
       hero_italic: "10K MRR.",
       hero_sub:
-        "La plupart des founders gaspillent 6 mois à construire quelque chose que personne ne veut. Klayan te dit la vérité dès le premier jour — puis suit ton idée jusqu'à 10K MRR avec des check-ins hebdomadaires, une veille de marché en direct, et un co-fondateur IA qui ne te laisse jamais dériver.",
+        "Tu te noies sous les idées mais tu sais pas laquelle construire ? Klayan te sort la tête de l'eau. Verdict brutal en 10 minutes — vrais concurrents, vraies données, vrais prochains pas. Puis reste avec toi chaque semaine jusqu'à 10K MRR.",
       hero_cta: "Analyser mon idée",
       hero_note: "Gratuit pour commencer · Pas de carte bancaire",
       familiar_title: "Ça te parle ?",
