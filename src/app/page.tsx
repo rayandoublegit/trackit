@@ -923,6 +923,23 @@ export default function LandingPage() {
                       e.currentTarget.style.opacity = "1";
                     }}
                   >
+                    {lang === "fr" ? "Espaces de travail" : "Workspaces"}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      window.location.href = "/dashboard";
+                    }}
+                    style={PROFILE_DROPDOWN_ITEM_STYLE}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = "0.5";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = "1";
+                    }}
+                  >
                     My Dashboard
                   </button>
                   <button
