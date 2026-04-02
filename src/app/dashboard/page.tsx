@@ -262,6 +262,13 @@ export default function DashboardPage() {
     Record<string, string>
   >({});
   const [showWorkspaces, setShowWorkspaces] = useState(false);
+  useEffect(() => {
+    const shouldOpen = localStorage.getItem("klayan_open_workspaces");
+    if (shouldOpen === "true") {
+      setShowWorkspaces(true);
+      localStorage.removeItem("klayan_open_workspaces");
+    }
+  }, []);
   const [projects, setProjects] = useState<
     Array<{ id: string; idea_name: string; status: string }>
   >([]);

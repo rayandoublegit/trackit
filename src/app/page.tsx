@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import type { User } from "@supabase/supabase-js";
 
@@ -114,6 +115,8 @@ type EmailJs = {
 };
 
 export default function LandingPage() {
+  const router = useRouter();
+
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
     const client = supabase;
@@ -156,6 +159,10 @@ export default function LandingPage() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "fr">("en");
   const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [showWorkspacePicker, setShowWorkspacePicker] = useState(false);
+  const [userProjects, setUserProjects] = useState<
+    Array<{ id: string; idea_name: string; status: string }>
+  >([]);
 
   useEffect(() => {
     const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
@@ -187,6 +194,19 @@ export default function LandingPage() {
       window.removeEventListener("click", handleClick);
     };
   }, [showLangDropdown]);
+
+  const openWorkspacePicker = useCallback(async () => {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { router.push("/auth"); return; }
+    const { data } = await supabase
+      .from("projects")
+      .select("id, idea_name, status")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    setUserProjects(data ?? []);
+    setShowWorkspacePicker(true);
+  }, [router]);
 
   const t = {
     en: {
@@ -908,12 +928,13 @@ export default function LandingPage() {
                     boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
                   }}
                 >
-                  <button
-                    type="button"
+                  <a
+                    href="#"
                     role="menuitem"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
                       setProfileMenuOpen(false);
-                      window.location.href = "/dashboard";
+                      void openWorkspacePicker();
                     }}
                     style={PROFILE_DROPDOWN_ITEM_STYLE}
                     onMouseEnter={(e) => {
@@ -924,7 +945,7 @@ export default function LandingPage() {
                     }}
                   >
                     {lang === "fr" ? "Espaces de travail" : "Workspaces"}
-                  </button>
+                  </a>
                   <button
                     type="button"
                     role="menuitem"
@@ -1795,6 +1816,89 @@ export default function LandingPage() {
           Back to Klayan
         </button>
       </div>
+
+      {showWorkspacePicker ? (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)",
+          backdropFilter: "blur(8px)",
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+        }}
+        onClick={() => setShowWorkspacePicker(false)}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20,
+              padding: 32,
+              width: "100%",
+              maxWidth: 480,
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em", color: "#fff" }}>
+                  {lang === "fr" ? "Vos espaces de travail" : "Your Workspaces"}
+                </div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>
+                  {lang === "fr" ? "Choisissez une idée" : "Choose an idea to work on"}
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowWorkspacePicker(false)} style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 20 }}>✕</button>
+            </div>
+
+            {userProjects.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
+                {lang === "fr" ? "Pas encore d'espaces de travail. Lance une analyse pour en créer un." : "No workspaces yet. Run an analysis to create one."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {userProjects.map((project) => (
+                  <a
+                    key={project.id}
+                    href={`/project/${project.id}`}
+                    onClick={() => setShowWorkspacePicker(false)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "16px 20px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 14,
+                      textDecoration: "none",
+                      color: "#fff",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: project.status === "building" ? "#4ade80" : project.status === "pivoting" ? "#facc15" : "#f87171",
+                        flexShrink: 0,
+                      }} />
+                      <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                        {project.idea_name.length > 40 ? project.idea_name.slice(0, 37) + "..." : project.idea_name}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)" }}>→</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
