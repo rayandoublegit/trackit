@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { getSparkPriceId, getBuildPriceId, getScalePriceId } from "@/lib/checkout";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
@@ -579,7 +580,23 @@ function EditableTitle({
   );
 }
 
-function LockedFeature({ feature, requiredPlan }: { feature: string; requiredPlan: string }) {
+async function upgradeToNextPlan(currentPlan: string) {
+  const targetPlan =
+    currentPlan === "free" ? "spark" :
+    currentPlan === "spark" ? "build" :
+    "scale";
+  window.location.href = `/pricing?plan=${targetPlan}`;
+}
+
+function LockedFeature({ feature, requiredPlan, userPlan }: { feature: string; requiredPlan: string; userPlan: string }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleUpgrade = async () => {
+    setLoading(true);
+    await upgradeToNextPlan(userPlan);
+    setLoading(false);
+  };
+
   return (
     <div style={{
       background: "rgba(255,255,255,0.02)",
@@ -594,13 +611,15 @@ function LockedFeature({ feature, requiredPlan }: { feature: string; requiredPla
         {feature}
       </div>
       <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8, lineHeight: 1.6 }}>
-        This feature is available on the <strong style={{ color: "#fff" }}>{requiredPlan}</strong> plan and above.
+        Available on the <strong style={{ color: "#fff" }}>{requiredPlan}</strong> plan and above.
       </div>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginBottom: 24, lineHeight: 1.6 }}>
-        Upgrade to unlock weekly check-ins, milestones, market watch, pivot radar and more.
+        {userPlan === "free" ? "Upgrade to unlock your full workspace." : `Upgrade from ${userPlan} to unlock this feature.`}
       </div>
-      <Link
-        href="/pricing"
+      <button
+        type="button"
+        onClick={() => void handleUpgrade()}
+        disabled={loading}
         style={{
           display: "inline-flex",
           alignItems: "center",
@@ -612,13 +631,13 @@ function LockedFeature({ feature, requiredPlan }: { feature: string; requiredPla
           padding: "12px 28px",
           fontSize: 14,
           fontWeight: 700,
-          textDecoration: "none",
           cursor: "pointer",
           letterSpacing: "-0.02em",
+          opacity: loading ? 0.6 : 1,
         }}
       >
-        Upgrade to {requiredPlan} →
-      </Link>
+        {loading ? "Redirecting..." : `Upgrade to ${requiredPlan} →`}
+      </button>
     </div>
   );
 }
@@ -1316,7 +1335,7 @@ export default function ProjectPage() {
         </div>
 
         {userPlan === "free" ? (
-          <LockedFeature feature={t.checkin_title} requiredPlan="Spark" />
+          <LockedFeature feature={t.checkin_title} requiredPlan="Spark" userPlan={userPlan} />
         ) : (
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1478,7 +1497,7 @@ export default function ProjectPage() {
 
         {/* Milestone Engine */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.locked_milestone_feature} requiredPlan="Build" />
+          <LockedFeature feature={t.locked_milestone_feature} requiredPlan="Build" userPlan={userPlan} />
         ) : (
         <div style={{ marginBottom: 48 }}>
           <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 20 }}>
@@ -1567,7 +1586,7 @@ export default function ProjectPage() {
 
         {/* Market Watch */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.market_title} requiredPlan="Build" />
+          <LockedFeature feature={t.market_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1628,7 +1647,7 @@ export default function ProjectPage() {
 
         {/* Co-Founder Mode */}
         {userPlan !== "scale" ? (
-          <LockedFeature feature={t.cofounder_title} requiredPlan="Scale" />
+          <LockedFeature feature={t.cofounder_title} requiredPlan="Scale" userPlan={userPlan} />
         ) : (
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1739,7 +1758,7 @@ export default function ProjectPage() {
 
         {/* Pivot Radar */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.pivot_title} requiredPlan="Build" />
+          <LockedFeature feature={t.pivot_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
         <div style={{ marginBottom: 48 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1793,7 +1812,7 @@ export default function ProjectPage() {
 
         {/* Marketing Engine */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.marketing_title} requiredPlan="Build" />
+          <LockedFeature feature={t.marketing_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
           <div style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1847,7 +1866,7 @@ export default function ProjectPage() {
 
         {/* Outreach Engine */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.outreach_title} requiredPlan="Build" />
+          <LockedFeature feature={t.outreach_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
           <div style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1927,7 +1946,7 @@ export default function ProjectPage() {
 
         {/* Competitor Tracker */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.competitor_title} requiredPlan="Build" />
+          <LockedFeature feature={t.competitor_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
           <div style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -1981,7 +2000,7 @@ export default function ProjectPage() {
 
         {/* Pricing Strategy */}
         {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.pricing_strategy_title} requiredPlan="Build" />
+          <LockedFeature feature={t.pricing_strategy_title} requiredPlan="Build" userPlan={userPlan} />
         ) : (
           <div style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -2035,7 +2054,7 @@ export default function ProjectPage() {
 
         {/* Revenue Roadmap */}
         {userPlan !== "scale" ? (
-          <LockedFeature feature={t.revenue_title} requiredPlan="Scale" />
+          <LockedFeature feature={t.revenue_title} requiredPlan="Scale" userPlan={userPlan} />
         ) : (
           <div style={{ marginBottom: 48 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>

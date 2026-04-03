@@ -112,12 +112,16 @@ function PricingPageInner() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("subscription_status")
+        .select("subscription_status, plan")
         .eq("id", user.id)
         .single();
 
       if (profile?.subscription_status === "active") {
-        router.replace("/dashboard");
+        const plan = profile?.plan ?? "free";
+        if (plan === "scale") {
+          router.replace("/dashboard");
+        }
+        // Otherwise stay on pricing so they can upgrade
       }
     })();
   }, [router]);
@@ -181,6 +185,15 @@ function PricingPageInner() {
       setBusy(null);
     }
   };
+
+  useEffect(() => {
+    if (!supabase) return;
+    const params = new URLSearchParams(window.location.search);
+    const plan = params.get("plan") as "spark" | "build" | "scale" | null;
+    if (plan && ["spark", "build", "scale"].includes(plan)) {
+      void startCheckout(plan);
+    }
+  }, []);
 
   return (
     <div className="pricing-page-wrap">
