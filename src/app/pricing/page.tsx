@@ -17,6 +17,7 @@ type Tier = "spark" | "build" | "scale";
 function PricingPageInner() {
   const router = useRouter();
   const lang = useLang();
+  const currency = lang === "fr" ? "€" : "$";
 
   const t = {
     en: {
@@ -236,7 +237,7 @@ function PricingPageInner() {
         <div className="pricing-grid">
           <div className="pricing-card">
             <div className="pricing-card-name">Spark</div>
-            <div className="pricing-price">{`$19${t.per_month}`}</div>
+            <div className="pricing-price">{`${currency}19${t.per_month}`}</div>
             <button
               type="button"
               className="pricing-btn pricing-btn-dark"
@@ -290,7 +291,7 @@ function PricingPageInner() {
               />
             </div>
             <div className="pricing-card-name">Build</div>
-            <div className="pricing-price pricing-price-black">{`$69${t.per_month}`}</div>
+            <div className="pricing-price pricing-price-black">{`${currency}69${t.per_month}`}</div>
             <button
               type="button"
               className="pricing-btn pricing-btn-light"
@@ -333,7 +334,7 @@ function PricingPageInner() {
               className="pricing-inline-logo"
             />
           </div>
-          <div className="pricing-price">{`$149${t.per_month}`}</div>
+          <div className="pricing-price">{`${currency}149${t.per_month}`}</div>
           <button
             type="button"
             className="pricing-btn pricing-btn-dark pricing-btn-scale"
