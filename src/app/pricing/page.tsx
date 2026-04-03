@@ -168,6 +168,7 @@ function PricingPageInner() {
           userId: user.id,
           email: user.email,
           analysisId,
+          currency: lang === "fr" ? "eur" : "usd",
         }),
       });
 

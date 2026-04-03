@@ -284,6 +284,9 @@ export default function LandingPage() {
       pricing_scale: "Scale",
       pricing_popular: "Most Popular!",
       pricing_get_started: "Get started",
+      price_spark: "$19",
+      price_build: "$69",
+      price_scale: "$149",
       pricing_spark_f1: "3 analyses per month",
       pricing_spark_f2: "Kill or Build verdict",
       pricing_spark_f3: "Market research & competitor scan",
@@ -413,6 +416,9 @@ export default function LandingPage() {
       pricing_scale: "Scale",
       pricing_popular: "Le plus populaire !",
       pricing_get_started: "Commencer",
+      price_spark: "19€",
+      price_build: "69€",
+      price_scale: "149€",
       pricing_spark_f1: "3 analyses par mois",
       pricing_spark_f2: "Verdict Kill or Build",
       pricing_spark_f3: "Recherche de marché & scan des concurrents",
@@ -1555,7 +1561,7 @@ export default function LandingPage() {
         <div className="pricing-grid reveal">
           <div className="pricing-card">
             <div className="pricing-card-name">{t.pricing_spark}</div>
-            <div className="pricing-price">$19/mo</div>
+            <div className="pricing-price">{t.price_spark}{lang === "fr" ? "/mois" : "/mo"}</div>
             {renderPricingCta("spark", false)}
             <div className="pricing-divider" />
             <ul className="pricing-features">
@@ -1601,7 +1607,7 @@ export default function LandingPage() {
               />
             </div>
             <div className="pricing-card-name">{t.pricing_build}</div>
-            <div className="pricing-price pricing-price-black">$69/mo</div>
+            <div className="pricing-price pricing-price-black">{t.price_build}{lang === "fr" ? "/mois" : "/mo"}</div>
             {renderPricingCta("build", true)}
             <div className="pricing-divider" />
             <ul className="pricing-features">
@@ -1648,7 +1654,7 @@ export default function LandingPage() {
               className="pricing-inline-logo"
             />
           </div>
-          <div className="pricing-price">$149/mo</div>
+          <div className="pricing-price">{t.price_scale}{lang === "fr" ? "/mois" : "/mo"}</div>
           {renderPricingCta("scale", false)}
           <div className="pricing-divider pricing-divider-mt" />
           <ul className="pricing-features">
