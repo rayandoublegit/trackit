@@ -506,11 +506,13 @@ function ReportDisplay({ text }: { text: string }) {
       {lines.map((line, i) => {
         const trimmed = line.trim();
         const isDivider = /^━{5,}/.test(trimmed);
+        const isKlayanHeader = trimmed.startsWith("KLAYAN") && trimmed.includes("—");
         const isHeader = /^[A-ZÀÂÄÉÈÊËÎÏÔÙÛÜÇÆŒ][A-ZÀÂÄÉÈÊËÎÏÔÙÛÜÇÆŒ\s\-—']+$/.test(trimmed) && trimmed.length > 3 && trimmed.length < 80 && !trimmed.startsWith("0");
         const isNumbered = /^[›]?\s*\d{2}\s*—/.test(trimmed) || /^\d{2}\s*—/.test(trimmed);
         const isVerdict = trimmed.startsWith("——") || trimmed.includes("BUILD IT") || trimmed.includes("KILL IT") || trimmed.includes("FLIP IT") || trimmed.startsWith("SCORE DE DÉRIVE") || trimmed.startsWith("DRIFT SCORE");
 
         if (isDivider) return <div key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.08)", margin: "20px 0" }} />;
+        if (isKlayanHeader) return null;
         if (isVerdict) return <div key={i} style={{ fontSize: 18, fontWeight: 800, color: "#ffffff", letterSpacing: "-0.02em", margin: "16px 0", textAlign: "center" }}>{trimmed}</div>;
         if (isHeader) return (
           <div key={i} style={{ marginTop: 24, marginBottom: 10 }}>
@@ -523,7 +525,12 @@ function ReportDisplay({ text }: { text: string }) {
             <span style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>{trimmed.replace(/^[›]?\s*\d{2}\s*—\s*/, "")}</span>
           </div>
         );
-        if (!trimmed) return <div key={i} style={{ height: 8 }} />;
+        if (!trimmed) {
+          // Skip if previous line was also empty
+          const prevLine = lines[i - 1]?.trim();
+          if (!prevLine) return null;
+          return <div key={i} style={{ height: 8 }} />;
+        }
         return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{trimmed}</div>;
       })}
     </div>
