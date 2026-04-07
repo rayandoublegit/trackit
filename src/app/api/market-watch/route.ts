@@ -60,7 +60,9 @@ Be specific. Use real data from web search. Max 300 words.
 
 IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.
 
-Do NOT use citation markers, superscript numbers, or standalone dots. Write in clean prose only.`;
+Do NOT use citation markers, superscript numbers, or standalone dots. Write in clean prose only.
+
+LANGUAGE RULE: Detect the language from the context and idea name provided. If French → respond entirely in French. If English → respond entirely in English. Never mix languages.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",

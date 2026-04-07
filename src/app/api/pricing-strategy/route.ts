@@ -53,7 +53,9 @@ BIGGEST PRICING MISTAKE TO AVOID
 
 Max 300 words. Be specific to the idea.
 
-IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.`;
+IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.
+
+LANGUAGE RULE: Detect the language from the context and idea name provided. If French → respond entirely in French. If English → respond entirely in English. Never mix languages.`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
