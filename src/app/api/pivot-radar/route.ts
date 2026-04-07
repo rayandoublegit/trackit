@@ -13,7 +13,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { ideaName, originalVerdict, checkins, notes, username } = body;
+  const { ideaName, originalVerdict, checkins, notes, username, lang } = body;
+  const isF = lang === "fr";
 
   const checkinsText = checkins
     .slice(0, 5)
@@ -70,12 +71,13 @@ STAY THE COURSE
 Be direct. Use their actual data. Max 300 words.
 
 IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.
-
-LANGUAGE RULE: Detect the language from the context and idea name provided. If French → respond entirely in French. If English → respond entirely in English. Never mix languages.`;
+${isF ? `
+CRITICAL: Respond ENTIRELY in French. ALL section headers, ALL content, ALL labels must be in French. Keep the exact same structure but translate everything. Never write a single word in English.` : `
+CRITICAL: Respond entirely in English.`}`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+    max_tokens: 1000,
     messages: [{ role: "user", content: prompt }],
   });
 

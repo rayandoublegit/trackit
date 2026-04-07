@@ -13,7 +13,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { ideaName, username, targetType, context } = body;
+  const { ideaName, username, targetType, context, lang } = body;
+  const isF = lang === "fr";
 
   const prompt = `You are Klayan — a sharp outreach strategist helping ${username} get their first customers for "${ideaName}".
 
@@ -51,7 +52,7 @@ LANGUAGE RULE: Detect the language from the context and idea name provided. If F
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+    max_tokens: 1000,
     messages: [{ role: "user", content: prompt }],
   });
 

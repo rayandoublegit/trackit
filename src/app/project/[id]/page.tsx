@@ -883,6 +883,7 @@ export default function ProjectPage() {
         revenue: checkinForm.revenue,
         notes: checkinForm.notes,
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        lang,
       }),
     });
 
@@ -901,7 +902,7 @@ export default function ProjectPage() {
     setSubmittingCheckin(false);
     setShowCheckin(false);
     setCheckinForm({ talked_to_users: false, users_count: 0, build_days: 0, revenue: 0, notes: "" });
-  }, [checkinForm, id, user, project]);
+  }, [checkinForm, id, user, project, lang]);
 
   const claimMilestone = useCallback(async (type: string) => {
     if (!supabase || !user) return;
@@ -916,6 +917,7 @@ export default function ProjectPage() {
         type,
         ideaName: project?.idea_name,
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        lang,
       }),
     });
 
@@ -938,7 +940,7 @@ export default function ProjectPage() {
       if (data.playbook) playPopSound(audioCtxRef.current);
     }
     setClaimingMilestone(null);
-  }, [id, user, project]);
+  }, [id, user, project, lang]);
 
   const runMarketWatch = useCallback(async () => {
     if (!supabase || !user) return;
@@ -951,6 +953,7 @@ export default function ProjectPage() {
         projectId: id,
         userId: user.id,
         ideaName: project?.idea_name,
+        lang,
       }),
     });
 
@@ -966,7 +969,7 @@ export default function ProjectPage() {
     }
 
     setRunningMarketWatch(false);
-  }, [id, user, project]);
+  }, [id, user, project, lang]);
 
   const runPivotRadar = useCallback(async () => {
     if (!supabase || !user) return;
@@ -984,6 +987,7 @@ export default function ProjectPage() {
         checkins: recentCheckins,
         notes: recentNotes,
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        lang,
       }),
     });
 
@@ -997,7 +1001,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningPivot(false);
-  }, [user, project, notes, checkins, id]);
+  }, [user, project, notes, checkins, id, lang]);
 
   const runMarketingEngine = useCallback(async () => {
     if (!supabase || !user) return;
@@ -1013,6 +1017,7 @@ export default function ProjectPage() {
         checkins: checkins.slice(0, 3),
         notes: notes.slice(0, 5),
         marketWatches: marketWatches.slice(0, 1),
+        lang,
       }),
     });
 
@@ -1026,7 +1031,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningMarketing(false);
-  }, [user, project, checkins, notes, marketWatches, id]);
+  }, [user, project, checkins, notes, marketWatches, id, lang]);
 
   const runOutreachEngine = useCallback(async () => {
     if (!supabase || !user) return;
@@ -1043,6 +1048,7 @@ export default function ProjectPage() {
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
         targetType: outreachTarget,
         context,
+        lang,
       }),
     });
 
@@ -1056,7 +1062,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningOutreach(false);
-  }, [user, project, notes, outreachTarget, id]);
+  }, [user, project, notes, outreachTarget, id, lang]);
 
   const runCompetitorTracker = useCallback(async () => {
     if (!supabase || !user) return;
@@ -1069,6 +1075,7 @@ export default function ProjectPage() {
       body: JSON.stringify({
         ideaName: project?.idea_name,
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
+        lang,
       }),
     });
 
@@ -1082,7 +1089,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningCompetitor(false);
-  }, [user, project, id]);
+  }, [user, project, id, lang]);
 
   const runPricingStrategy = useCallback(async () => {
     if (!supabase || !user) return;
@@ -1096,6 +1103,7 @@ export default function ProjectPage() {
         ideaName: project?.idea_name,
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
         checkins: checkins.slice(0, 5),
+        lang,
       }),
     });
 
@@ -1109,7 +1117,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningPricing(false);
-  }, [user, project, checkins, id]);
+  }, [user, project, checkins, id, lang]);
 
   const runRevenueRoadmap = useCallback(async () => {
     if (!supabase || !user) return;
@@ -1124,6 +1132,7 @@ export default function ProjectPage() {
         username: user?.user_metadata?.username ?? user?.email?.split("@")[0] ?? "founder",
         checkins: checkins.slice(0, 5),
         milestones,
+        lang,
       }),
     });
 
@@ -1137,7 +1146,7 @@ export default function ProjectPage() {
       playPopSound(audioCtxRef.current);
     }
     setRunningRevenue(false);
-  }, [user, project, checkins, milestones, id]);
+  }, [user, project, checkins, milestones, id, lang]);
 
   const deleteReport = useCallback(async (type: string) => {
     if (!supabase || !user) return;

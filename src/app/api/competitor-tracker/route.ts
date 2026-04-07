@@ -13,7 +13,8 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { ideaName, username } = body;
+  const { ideaName, username, lang } = body;
+  const isF = lang === "fr";
 
   const prompt = `You are Klayan — a brutal competitive intelligence analyst. ${username} is building a product called "${ideaName}". Do NOT ask for clarification. Search the web immediately and make your best inference about what market this product is in. Find real competitors that exist today. Search the web right now and find the 3 biggest DIRECT competitors in this space — meaning products or companies that solve the same problem or target the same customer.
 
@@ -51,12 +52,13 @@ YOUR WINNING MOVE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 IMPORTANT: Always finish your last sentence completely. Never cut off mid-word or mid-sentence. If you are running out of space, wrap up with a complete concluding sentence.
-
-LANGUAGE RULE: Detect the language from the context and idea name provided. If French → respond entirely in French. If English → respond entirely in English. Never mix languages.`;
+${isF ? `
+CRITICAL: Respond ENTIRELY in French. ALL section headers, ALL content, ALL labels must be in French. Keep the exact same structure but translate everything. Never write a single word in English.` : `
+CRITICAL: Respond entirely in English.`}`;
 
   const completion = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 800,
+    max_tokens: 1000,
     messages: [{ role: "user", content: prompt }],
     tools: [{ type: "web_search_20250305", name: "web_search" }],
   });
