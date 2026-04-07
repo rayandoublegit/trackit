@@ -491,14 +491,40 @@ function ReportDisplay({ text }: { text: string }) {
     .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F000}-\u{1F02F}]|[\u{1F0A0}-\u{1F0FF}]|[\u{1F100}-\u{1F1FF}]|[\u{1F200}-\u{1F2FF}]|[\u{1F004}]|[\u{1F0CF}]|⚡|⚠️|🎯|🔓|🔒|✅|👤|💵|🚀|🔥|❌|🎉|👋|💡|📊|👁️|🤝/gu, "")
     .replace(/\*\*/g, "")
     .replace(/\*/g, "")
+    .replace(/^\.\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s*\.\s*\n/g, "\n")
+    .replace(/^[\s.]+$/gm, "")
     .replace(/\s*\.\s*$/gm, "")
     .replace(/^\s*\.\s*/gm, "")
     .trim();
+
   const lines = cleaned.split("\n");
+
   return (
-    <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.75)", whiteSpace: "pre-wrap" }}>
+    <div style={{ marginTop: 12 }}>
       {lines.map((line, i) => {
-        return <div key={i}>{line || "\u00a0"}</div>;
+        const trimmed = line.trim();
+        const isDivider = /^━{5,}/.test(trimmed);
+        const isHeader = /^[A-ZÀÂÄÉÈÊËÎÏÔÙÛÜÇÆŒ][A-ZÀÂÄÉÈÊËÎÏÔÙÛÜÇÆŒ\s\-—']+$/.test(trimmed) && trimmed.length > 3 && trimmed.length < 80 && !trimmed.startsWith("0");
+        const isNumbered = /^[›]?\s*\d{2}\s*—/.test(trimmed) || /^\d{2}\s*—/.test(trimmed);
+        const isVerdict = trimmed.startsWith("——") || trimmed.includes("BUILD IT") || trimmed.includes("KILL IT") || trimmed.includes("FLIP IT") || trimmed.startsWith("SCORE DE DÉRIVE") || trimmed.startsWith("DRIFT SCORE");
+
+        if (isDivider) return <div key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.08)", margin: "20px 0" }} />;
+        if (isVerdict) return <div key={i} style={{ fontSize: 18, fontWeight: 800, color: "#ffffff", letterSpacing: "-0.02em", margin: "16px 0", textAlign: "center" }}>{trimmed}</div>;
+        if (isHeader) return (
+          <div key={i} style={{ marginTop: 24, marginBottom: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>{trimmed}</span>
+          </div>
+        );
+        if (isNumbered) return (
+          <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, marginTop: 4 }}>
+            <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0, fontSize: 13 }}>›</span>
+            <span style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>{trimmed.replace(/^[›]?\s*\d{2}\s*—\s*/, "")}</span>
+          </div>
+        );
+        if (!trimmed) return <div key={i} style={{ height: 8 }} />;
+        return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{trimmed}</div>;
       })}
     </div>
   );
