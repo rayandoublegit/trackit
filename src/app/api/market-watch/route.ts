@@ -40,20 +40,37 @@ Generate a Competitor Pulse report:
 KLAYAN MARKET WATCH — ${ideaName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+NOUVEAUX CONCURRENTS DÉTECTÉS
+[Nouveaux entrants ou "Aucun nouveau concurrent ce mois-ci."]
+
+FAIBLESSES DES CONCURRENTS CE MOIS
+[Nouvelles plaintes clients trouvées]
+
+MOUVEMENTS DE MARCHÉ
+[Levées de fonds, acquisitions, changements de prix]
+
+SIGNAL D'OPPORTUNITÉ
+[La plus grande opportunité ce mois-ci]
+
+ACTION CE MOIS
+[Une chose spécifique à faire]
+` : `
 NEW COMPETITORS DETECTED
-[Any new players in the last 30 days. If none, say "No new competitors detected this month."]
+[New players or "No new competitors detected this month."]
 
 COMPETITOR WEAKNESSES THIS MONTH
-[New complaints or issues found on Reddit, G2, Twitter about existing competitors]
+[New complaints found]
 
 MARKET MOVEMENTS
-[Funding rounds, acquisitions, pricing changes, partnerships in this space]
+[Funding, acquisitions, pricing changes]
 
 OPPORTUNITY SIGNAL
-[Based on this month's data, what's the biggest opportunity right now?]
+[Biggest opportunity this month]
 
 ACTION THIS MONTH
-[One specific thing to do based on this market intelligence]
+[One specific thing to do]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

@@ -50,21 +50,39 @@ Generate a Pivot Radar report in this exact format:
 PIVOT RADAR — ${username.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-DRIFT SCORE: [1-10 where 1 = perfectly on track, 10 = completely lost]
+${isF ? `
+SCORE DE DÉRIVE: [1-10]
+
+CE QUE TU CONSTRUIS VS CE QUE LE MARCHÉ VEUT
+[2-3 phrases]
+
+SIGNAUX DE DÉRIVE DÉTECTÉS
+01 — [Signal spécifique]
+02 — [Signal spécifique]
+03 — [Signal spécifique]
+
+ALERTE PIVOT
+[Recommandation si score 6+]
+
+CONTINUE COMME ÇA
+[Ce qui va bien]
+` : `
+DRIFT SCORE: [1-10]
 
 WHAT YOU'RE BUILDING vs WHAT THE MARKET WANTS
-[2-3 sentences comparing what they seem to be building vs what was validated]
+[2-3 sentences]
 
 DRIFT SIGNALS DETECTED
-01 — [Specific drift signal detected from their data]
-02 — [Specific drift signal detected from their data]
-03 — [Specific drift signal detected from their data]
+01 — [Specific signal]
+02 — [Specific signal]
+03 — [Specific signal]
 
 PIVOT WARNING
-[If drift score is 6+: specific recommendation to course correct. If under 6: what to watch out for]
+[Recommendation if score 6+]
 
 STAY THE COURSE
-[One thing they are doing right that they should double down on]
+[What they're doing right]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

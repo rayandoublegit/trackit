@@ -35,32 +35,61 @@ Generate a concrete revenue roadmap:
 REVENUE ROADMAP — ${ideaName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+STADE ACTUEL
+[Évaluation actuelle]
+
+PHASE 1 — 0 À 1K MRR
+Délai: [X semaines]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Métrique clé: [Un chiffre]
+
+PHASE 2 — 1K À 5K MRR
+Délai: [X semaines]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Métrique clé: [Un chiffre]
+
+PHASE 3 — 5K À 10K MRR
+Délai: [X semaines]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Métrique clé: [Un chiffre]
+
+LA CHOSE LA PLUS IMPORTANTE
+[L'action à plus fort levier]
+` : `
 CURRENT STAGE
-[Assess where ${username} is right now based on revenue and milestones]
+[Assess where they are]
 
 PHASE 1 — $0 TO $1K MRR
 Timeline: [X weeks]
-01 — [Specific action]
-02 — [Specific action]
-03 — [Specific action]
-Key metric to hit: [One number to track]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Key metric: [One number]
 
 PHASE 2 — $1K TO $5K MRR
 Timeline: [X weeks]
-01 — [Specific action]
-02 — [Specific action]
-03 — [Specific action]
-Key metric to hit: [One number to track]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Key metric: [One number]
 
 PHASE 3 — $5K TO $10K MRR
 Timeline: [X weeks]
-01 — [Specific action]
-02 — [Specific action]
-03 — [Specific action]
-Key metric to hit: [One number to track]
+01 — [Action]
+02 — [Action]
+03 — [Action]
+Key metric: [One number]
 
 THE ONE THING
-[The single highest leverage action ${username} should do this week]
+[Single highest leverage action]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

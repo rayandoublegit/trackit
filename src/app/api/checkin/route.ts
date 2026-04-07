@@ -36,18 +36,33 @@ THIS WEEK'S DATA:
 - What happened: ${notes || "Nothing reported"}
 
 Generate a sharp weekly check-up in this exact format:
+${isF ? `
+BILAN HEBDOMADAIRE
 
+CE QUI FONCTIONNE
+[1-2 phrases sur ce qui va bien]
+
+CE QUI TE BLOQUE
+[1-2 phrases sur le principal blocage]
+
+L'ACTION DE CETTE SEMAINE
+[Une action spécifique et concrète]
+
+VÉRITÉ BRUTALE
+[Une vérité difficile sur où tu en es]
+` : `
 WHAT'S WORKING
-[1-2 sentences on what's going well based on their data]
+[1-2 sentences on what's going well]
 
 WHAT'S BLOCKING YOU
-[1-2 sentences on the main blocker you detect]
+[1-2 sentences on the main blocker]
 
 THIS WEEK'S ONE ACTION
-[One specific, concrete action they must take this week. Not generic advice. Something they can do today.]
+[One specific concrete action]
 
 BRUTAL TRUTH
-[One hard truth about where ${username} is right now based on the data. Address them directly by name.]
+[One hard truth about where they are]
+`}
 
 Keep it under 200 words. Be direct. No fluff.
 

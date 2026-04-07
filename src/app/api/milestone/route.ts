@@ -30,22 +30,39 @@ export async function POST(request: Request) {
 MILESTONE ACHIEVED: ${milestoneLabel}
 
 Generate a specific, actionable playbook for this exact stage. Format:
+${isF ? `
+CE QUE ÇA SIGNIFIE
+[1-2 phrases]
 
-🎯 WHAT THIS MEANS
-[1-2 sentences on what reaching this milestone actually signals about their business]
+TES 5 PROCHAINS MOUVEMENTS
+01 — [Action spécifique]
+02 — [Action spécifique]
+03 — [Action spécifique]
+04 — [Action spécifique]
+05 — [Action spécifique]
 
-⚡ YOUR NEXT 5 MOVES
+LE PIÈGE À ÉVITER
+[Le piège n°1]
+
+CE QUI SE DÉBLOQUE ENSUITE
+[Ce sur quoi se concentrer]
+` : `
+WHAT THIS MEANS
+[1-2 sentences]
+
+YOUR NEXT 5 MOVES
 01 — [Specific action]
 02 — [Specific action]
 03 — [Specific action]
 04 — [Specific action]
 05 — [Specific action]
 
-⚠️ THE TRAP TO AVOID
-[The #1 mistake founders make right after hitting this milestone]
+THE TRAP TO AVOID
+[The #1 mistake]
 
-🔓 WHAT UNLOCKS NEXT
-[What they should be focused on to hit the next milestone]
+WHAT UNLOCKS NEXT
+[What to focus on next]
+`}
 
 Be specific to their idea. Not generic startup advice. Max 250 words.
 

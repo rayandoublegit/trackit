@@ -28,26 +28,49 @@ FORMAT EXACTLY:
 COMPETITOR TRACKER — ${ideaName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+CONCURRENT 01 — [Nom]
+Prix: [Prix actuel]
+Ce qu'ils font bien: [1 phrase]
+Plus grande faiblesse: [1 phrase]
+Faille à exploiter: [Opportunité]
+
+CONCURRENT 02 — [Nom]
+Prix: [Prix actuel]
+Ce qu'ils font bien: [1 phrase]
+Plus grande faiblesse: [1 phrase]
+Faille à exploiter: [Opportunité]
+
+CONCURRENT 03 — [Nom]
+Prix: [Prix actuel]
+Ce qu'ils font bien: [1 phrase]
+Plus grande faiblesse: [1 phrase]
+Faille à exploiter: [Opportunité]
+
+TON MOUVEMENT GAGNANT
+[Un positionnement qui exploite les 3 faiblesses]
+` : `
 COMPETITOR 01 — [Name]
 Pricing: [Current pricing]
 What they do well: [1 sentence]
-Biggest weakness: [1 sentence from real customer complaints]
+Biggest weakness: [1 sentence]
 Gap to exploit: [Specific opportunity]
 
 COMPETITOR 02 — [Name]
 Pricing: [Current pricing]
 What they do well: [1 sentence]
-Biggest weakness: [1 sentence from real customer complaints]
+Biggest weakness: [1 sentence]
 Gap to exploit: [Specific opportunity]
 
 COMPETITOR 03 — [Name]
 Pricing: [Current pricing]
 What they do well: [1 sentence]
-Biggest weakness: [1 sentence from real customer complaints]
+Biggest weakness: [1 sentence]
 Gap to exploit: [Specific opportunity]
 
 YOUR WINNING MOVE
-[One specific positioning statement that exploits all 3 weaknesses at once]
+[One positioning statement]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

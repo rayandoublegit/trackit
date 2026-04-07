@@ -44,30 +44,57 @@ Generate a complete Marketing Engine report in this exact format:
 MARKETING ENGINE — ${ideaName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+ANGLES MARKETING
+01 — [Nom]: [Hook + pourquoi ça marche]
+02 — [Nom]: [Hook + pourquoi ça marche]
+03 — [Nom]: [Hook + pourquoi ça marche]
+04 — [Nom]: [Hook + pourquoi ça marche]
+05 — [Nom]: [Hook + pourquoi ça marche]
+
+MEILLEUR CANAL POUR COMMENCER
+[Un canal spécifique et pourquoi]
+
+PREMIÈRE PERSONNE À RECRUTER
+[Type exact, où la trouver, quoi proposer]
+
+MESSAGES DE PROSPECTION
+
+EMAIL FROID
+Objet: [Ligne d'objet]
+[Corps 3-4 lignes]
+
+MESSAGE LINKEDIN
+[2-3 lignes]
+
+MESSAGE TWITTER
+[1-2 lignes]
+` : `
 MARKETING ANGLES
-01 — [Angle name]: [Hook + why it works for this specific idea]
-02 — [Angle name]: [Hook + why it works for this specific idea]
-03 — [Angle name]: [Hook + why it works for this specific idea]
-04 — [Angle name]: [Hook + why it works for this specific idea]
-05 — [Angle name]: [Hook + why it works for this specific idea]
+01 — [Angle name]: [Hook + why it works]
+02 — [Angle name]: [Hook + why it works]
+03 — [Angle name]: [Hook + why it works]
+04 — [Angle name]: [Hook + why it works]
+05 — [Angle name]: [Hook + why it works]
 
 BEST CHANNEL TO START
-[One specific channel — not "social media". Be specific: Reddit r/X, cold email to Y, TikTok format Z. Why this channel first.]
+[One specific channel and why]
 
 FIRST PERSON TO RECRUIT
-[Exact type of person, where to find them, what to offer them, why they're the right first hire/advisor for this stage]
+[Exact type, where to find, what to offer]
 
 OUTREACH MESSAGES
 
 COLD EMAIL
 Subject: [Subject line]
-[3-4 line cold email body. Personalized to the idea and target customer.]
+[Body 3-4 lines]
 
 LINKEDIN DM
-[2-3 line LinkedIn DM to a potential partner or advisor]
+[2-3 lines]
 
 TWITTER DM
-[1-2 line Twitter/X DM to a potential advisor or customer]
+[1-2 lines]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

@@ -29,20 +29,39 @@ FORMAT EXACTLY LIKE THIS:
 OUTREACH ENGINE — ${targetType.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+EMAIL FROID
+Objet: [Ligne d'objet sous 8 mots]
+
+[Prénom],
+[3-4 lignes max.]
+[Ton prénom]
+
+MESSAGE LINKEDIN
+[2-3 lignes.]
+
+MESSAGE TWITTER
+[1-2 lignes max.]
+
+POURQUOI ÇA MARCHE
+[2-3 phrases sur le levier psychologique]
+` : `
 COLD EMAIL
-Subject: [Sharp subject line under 8 words]
+Subject: [Subject line under 8 words]
 
 [First name],
-
-[3-4 lines max. Lead with their pain. One specific result. One CTA. No fluff.]
-
+[3-4 lines max.]
 [Your name]
 
 LINKEDIN DM
-[2-3 lines. Casual but sharp. Reference something specific about them or their company. End with a soft ask.]
+[2-3 lines.]
 
 TWITTER DM
-[1-2 lines max. Direct. Intriguing. Makes them want to reply.]
+[1-2 lines max.]
+
+WHY THESE WORK
+[2-3 sentences on psychological hook]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

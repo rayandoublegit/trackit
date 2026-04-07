@@ -30,8 +30,29 @@ Generate a sharp pricing strategy report:
 PRICING STRATEGY — ${ideaName.toUpperCase()}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+${isF ? `
+MODÈLE RECOMMANDÉ
+[Un modèle et pourquoi]
+
+PALIERS DE PRIX
+Gratuit: [Contenu et pourquoi]
+Palier 1 — [X]€/mois: [Nom + contenu]
+Palier 2 — [X]€/mois: [Nom + contenu]
+Palier 3 — [X]€/mois: [Nom + contenu]
+
+ANCRES PSYCHOLOGIQUES
+01 — [Astuce]
+02 — [Astuce]
+03 — [Astuce]
+
+LE SEUL PRIX POUR COMMENCER
+[Lequel et pourquoi]
+
+LA PLUS GRANDE ERREUR À ÉVITER
+[L'erreur n°1]
+` : `
 RECOMMENDED MODEL
-[Freemium / Flat rate / Usage-based / Per seat / Tiered — pick one and explain why for this specific idea]
+[One model and why]
 
 PRICING TIERS
 Free: [What's included and why]
@@ -40,15 +61,16 @@ Tier 2 — $[X]/mo: [Name + what's included]
 Tier 3 — $[X]/mo: [Name + what's included]
 
 PSYCHOLOGICAL ANCHORS
-01 — [Pricing psychology trick to apply]
-02 — [Pricing psychology trick to apply]
-03 — [Pricing psychology trick to apply]
+01 — [Trick]
+02 — [Trick]
+03 — [Trick]
 
 THE ONE PRICE TO START WITH
-[If ${username} can only charge one price right now, what is it and why]
+[Which and why]
 
-BIGGEST PRICING MISTAKE TO AVOID
-[The #1 mistake founders make with pricing at this stage]
+BIGGEST MISTAKE TO AVOID
+[The #1 mistake]
+`}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
