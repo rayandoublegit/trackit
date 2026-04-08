@@ -186,7 +186,10 @@ function isMarketSignalLabel(label: string): boolean {
   return (
     u === "MARKET SIGNAL" ||
     u === "SIGNAL DE MARCHÉ" ||
-    u === "SIGNAL DE MARCHE"
+    u === "SIGNAL DE MARCHE" ||
+    u === "OPPORTUNITY" ||
+    u === "OPPORTUNITÉ" ||
+    u === "OPPORTUNITE"
   );
 }
 
@@ -306,6 +309,7 @@ export default function VerdictPage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<{
     id: string;
+    user_id: string;
     idea: string;
     target_customer: string;
     why_problem: string;
@@ -323,7 +327,7 @@ export default function VerdictPage() {
   const [projectId, setProjectId] = useState<string | null>(null);
 
   const analysisSelectColumns =
-    "id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
+    "id,user_id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
 
   const showLoadingShell =
     !analysisError &&
@@ -416,7 +420,7 @@ export default function VerdictPage() {
           try {
             const { data: polled, error: pollError } = await client
               .from("analyses")
-              .select("verdict, status, idea")
+              .select("verdict, status, idea, user_id")
               .eq("id", id)
               .single();
 
@@ -431,10 +435,12 @@ export default function VerdictPage() {
                     verdict: polled.verdict,
                     ...(polled.status != null ? { status: polled.status } : {}),
                     ...(polled.idea != null ? { idea: polled.idea } : {}),
+                    ...(polled.user_id != null ? { user_id: polled.user_id } : {}),
                   };
                 }
                 return {
                   id,
+                  user_id: polled.user_id ?? "",
                   idea: polled.idea ?? "",
                   target_customer: "",
                   why_problem: "",
@@ -519,9 +525,41 @@ export default function VerdictPage() {
         .select("id")
         .eq("analysis_id", analysis.id)
         .maybeSingle();
-      if (data?.id) setProjectId(data.id);
+      if (data?.id) {
+        setProjectId(data.id);
+      } else if (analysis) {
+        const verdictUp = (analysis.verdict ?? "").toUpperCase();
+        const shouldCreate =
+          verdictUp.includes("BUILD IT") ||
+          verdictUp.includes("FLIP IT") ||
+          verdictUp.includes("CONSTRUISEZ") ||
+          verdictUp.includes("CONSTRUIRE") ||
+          verdictUp.includes("LANCEZ") ||
+          verdictUp.includes("PIVOTEZ") ||
+          verdictUp.includes("PIVOTER") ||
+          verdictUp.includes("RETOURNEZ");
+
+        if (shouldCreate) {
+          const { data: newProject } = await supabase
+            .from("projects")
+            .insert({
+              user_id: analysis.user_id,
+              analysis_id: analysis.id,
+              idea_name: (analysis.idea ?? "").slice(0, 100),
+              status:
+                verdictUp.includes("FLIP IT") ||
+                verdictUp.includes("PIVOTEZ") ||
+                verdictUp.includes("PIVOTER")
+                  ? "pivoting"
+                  : "building",
+            })
+            .select("id")
+            .single();
+          if (newProject?.id) setProjectId(newProject.id);
+        }
+      }
     })();
-  }, [analysis?.id]);
+  }, [analysis?.id, analysis?.verdict]);
 
   const parsedSections = useMemo(() => {
     if (!analysis?.verdict) return null;
@@ -1135,9 +1173,13 @@ export default function VerdictPage() {
                             lineHeight: 1.4,
                           }}
                         >
-                          {lang === "fr" ? "Disponible avec le plan" : "Available on the"}{" "}
-                          <strong>{requiredPlan}</strong>
-                          {lang === "fr" ? " et supérieur." : " plan and above."}
+                          {lang === "fr" ? (
+                            "Un seul pivot bien exécuté change tout."
+                          ) : (
+                            <>
+                              Available on the <strong>{requiredPlan}</strong> plan and above.
+                            </>
+                          )}
                         </div>
                       </div>
                       <div
@@ -1149,6 +1191,18 @@ export default function VerdictPage() {
                         }}
                       >
                         {t.locked_signal}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "rgba(255,255,255,0.45)",
+                          lineHeight: 1.6,
+                          paddingLeft: 34,
+                        }}
+                      >
+                        {lang === "fr"
+                          ? "La plupart des fondateurs abandonnent ici. Les autres trouvent le pivot."
+                          : "Most founders quit here. The others find the pivot."}
                       </div>
                       <button
                         type="button"
