@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
+import { useLang } from "@/lib/useLang";
 
 type VerdictType = "FLIP IT" | "BUILD IT" | "KILL IT";
 
@@ -227,6 +228,7 @@ const HOME_PILL = (
 
 export default function VerdictPage() {
   useRequireActiveSubscription();
+  const lang = useLang();
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
@@ -936,7 +938,7 @@ export default function VerdictPage() {
                               letterSpacing: "-0.02em",
                             }}
                           >
-                            🚀 Start tracking this idea →
+                            {lang === "fr" ? "🚀 Suivre cette idée →" : "🚀 Start tracking this idea →"}
                           </a>
                         ) : null}
                         <div
@@ -1043,7 +1045,7 @@ export default function VerdictPage() {
                           marginBottom: "8px",
                         }}
                       >
-                        Unlock Signal Sprint
+                        {lang === "fr" ? "🔒 Disponible avec le plan Spark" : "🔒 Unlock with Spark Plan"}
                       </div>
                       <div
                         style={{
@@ -1075,7 +1077,9 @@ export default function VerdictPage() {
                           fontFamily: "inherit",
                         }}
                       >
-                        {userPlan === "free" ? "Upgrade to Spark →" : userPlan === "spark" ? "Upgrade to Build →" : "Upgrade to Scale →"}
+                        {lang === "fr"
+                          ? `Passer au plan ${userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale"} →`
+                          : `Upgrade to ${userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale"} →`}
                       </button>
                     </div>
                   </div>
