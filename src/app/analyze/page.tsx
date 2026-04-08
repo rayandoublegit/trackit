@@ -21,6 +21,45 @@ const QUESTION_META: QuestionMeta[] = [
 ];
 
 export default function AnalyzePage() {
+  function playSendSound() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(400, ctx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+  }
+
+  function playVerdictSound() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.2);
+      });
+    } catch (e) {}
+  }
+
   const router = useRouter();
   const lang = useLang();
   const [showExample, setShowExample] = useState(false);
@@ -304,6 +343,7 @@ export default function AnalyzePage() {
       const subStatus =
         (profile?.subscription_status as string | undefined)?.toLowerCase() ?? "inactive";
 
+      playSendSound();
       console.log("Inserting analysis...");
       const insertPayload = {
         user_id: user.id,
@@ -363,6 +403,7 @@ export default function AnalyzePage() {
       }
 
       // Verdict page mounts and calls /api/analyze while this tab stays on that URL
+      playVerdictSound();
       window.location.href = `/verdict/${data.id}`;
     } catch (e) {
       console.error("Submit exception:", e);

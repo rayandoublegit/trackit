@@ -172,6 +172,24 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
   return sections;
 }
 
+function isRecommendedStackLabel(label: string): boolean {
+  const u = label.toUpperCase();
+  return (
+    u === "RECOMMENDED STACK" ||
+    u === "STACK RECOMMANDÉE" ||
+    u === "STACK RECOMMANDEE"
+  );
+}
+
+function isMarketSignalLabel(label: string): boolean {
+  const u = label.toUpperCase();
+  return (
+    u === "MARKET SIGNAL" ||
+    u === "SIGNAL DE MARCHÉ" ||
+    u === "SIGNAL DE MARCHE"
+  );
+}
+
 const LOGO_BLOCK = (
   <div
     style={{
@@ -191,6 +209,26 @@ const LOGO_BLOCK = (
     />
   </div>
 );
+
+function playVerdictArrivalSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.2);
+    });
+  } catch (e) {}
+}
 
 const HOME_PILL = (
   <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
@@ -291,6 +329,12 @@ export default function VerdictPage() {
     !analysisError &&
     ((analysisLoading && !analysis) ||
       (analysis !== null && analysis.verdict === null));
+
+  useEffect(() => {
+    if (analysis?.verdict) {
+      playVerdictArrivalSound();
+    }
+  }, [analysis?.verdict]);
 
   useEffect(() => {
     if (!id) return;
@@ -887,17 +931,20 @@ export default function VerdictPage() {
                     </span>
 
                     {sec.kind === "text" ? (
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 400,
-                          color: "rgba(255,255,255,0.5)",
-                          lineHeight: 1.7,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {sec.text}
-                      </div>
+                      isRecommendedStackLabel(sec.label) &&
+                      !["spark", "build", "scale"].includes(userPlan ?? "") ? null : (
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: "rgba(255,255,255,0.5)",
+                            lineHeight: 1.7,
+                            marginBottom: 4,
+                          }}
+                        >
+                          {sec.text}
+                        </div>
+                      )
                     ) : sec.kind === "numbered" ? (
                       <div
                         style={{
@@ -1002,6 +1049,50 @@ export default function VerdictPage() {
                         {sec.text}
                       </div>
                     )}
+                    {(userPlan === "spark" || userPlan === "free") &&
+                    parsedSections &&
+                    isMarketSignalLabel(sec.label) ? (
+                      <div
+                        style={{
+                          background:
+                            "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 14,
+                          padding: "18px 24px",
+                          marginBottom: 16,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 16,
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: "#fff",
+                              marginBottom: 4,
+                            }}
+                          >
+                            {lang === "fr"
+                              ? "Le pivot exact que personne dans ce marché ne fait encore →"
+                              : "The exact pivot nobody in this market is doing yet →"}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "rgba(255,255,255,0.4)",
+                            }}
+                          >
+                            {lang === "fr"
+                              ? "Réservé aux membres Spark"
+                              : "Reserved for Spark members"}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 24, flexShrink: 0 }}>🔒</div>
+                      </div>
+                    ) : null}
                   </div>
                 ))}
 
@@ -1079,8 +1170,8 @@ export default function VerdictPage() {
                         }}
                       >
                         {lang === "fr"
-                          ? `Passer au plan ${requiredPlan} →`
-                          : `Upgrade to ${requiredPlan} plan →`}
+                          ? "Voir le pivot exact + plan d'action 48h → Spark 19€"
+                          : "See exact pivot + 48h action plan → Spark $19"}
                       </button>
                     </div>
                   </div>
@@ -1095,6 +1186,36 @@ export default function VerdictPage() {
             ) : null}
           </>
         )}
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 32,
+            paddingTop: 24,
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <Link
+            href="/analyze"
+            style={{
+              color: "rgba(255,255,255,0.4)",
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: "none",
+              letterSpacing: "-0.01em",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+            }}
+          >
+            {lang === "fr"
+              ? "Tu as une autre idée ? Lance une 2ème analyse →"
+              : "Got another idea? Run a second analysis →"}
+          </Link>
+        </div>
 
         {actionButtons}
       </div>
