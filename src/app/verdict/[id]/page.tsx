@@ -193,6 +193,38 @@ function isMarketSignalLabel(label: string): boolean {
   );
 }
 
+function isHardTruthsLabel(label: string): boolean {
+  const u = label.toUpperCase();
+  return (
+    u === "HARD TRUTHS" ||
+    u === "VÉRITÉS BRUTALES" ||
+    u === "VERITES BRUTALES"
+  );
+}
+
+function reorderVerdictAfterHardTruths(
+  sections: ParsedSection[]
+): ParsedSection[] {
+  const verdictIdx = sections.findIndex((s) => s.kind === "verdict");
+  if (verdictIdx === -1) return sections;
+
+  const hardTruthsIdx = sections.findIndex((s) => isHardTruthsLabel(s.label));
+  if (hardTruthsIdx === -1) return sections;
+
+  if (verdictIdx > hardTruthsIdx) return sections;
+
+  const verdictSec = sections[verdictIdx];
+  const withoutVerdict = sections.filter((_, i) => i !== verdictIdx);
+  const htIdx = withoutVerdict.findIndex((s) => isHardTruthsLabel(s.label));
+  if (htIdx === -1) return sections;
+
+  return [
+    ...withoutVerdict.slice(0, htIdx + 1),
+    verdictSec,
+    ...withoutVerdict.slice(htIdx + 1),
+  ];
+}
+
 const LOGO_BLOCK = (
   <div
     style={{
@@ -566,6 +598,11 @@ export default function VerdictPage() {
     return parseVerdictSections(analysis.verdict);
   }, [analysis]);
 
+  const displaySections = useMemo(() => {
+    if (!parsedSections) return null;
+    return reorderVerdictAfterHardTruths(parsedSections);
+  }, [parsedSections]);
+
   const verdictType = useMemo(() => {
     const verdictSection = parsedSections?.find((s) => s.kind === "verdict");
     if (!verdictSection || verdictSection.kind !== "verdict") return null;
@@ -934,9 +971,9 @@ export default function VerdictPage() {
               {dividerLine}
             </div>
 
-            {parsedSections ? (
+            {displaySections ? (
               <>
-                {parsedSections.map((sec, idx) => (
+                {displaySections.map((sec, idx) => (
                   <div key={`${sec.label}-${idx}`}>
                     {idx > 0 ? (
                       <div
@@ -1088,7 +1125,7 @@ export default function VerdictPage() {
                       </div>
                     )}
                     {(userPlan === "spark" || userPlan === "free") &&
-                    parsedSections &&
+                    displaySections &&
                     isMarketSignalLabel(sec.label) ? (
                       <div
                         style={{
@@ -1134,7 +1171,7 @@ export default function VerdictPage() {
                   </div>
                 ))}
 
-                {(userPlan === "spark" || userPlan === "free") && parsedSections ? (
+                {(userPlan === "spark" || userPlan === "free") && displaySections ? (
                   <div style={{ margin: "32px auto 0", maxWidth: 500 }}>
                     <div
                       style={{
