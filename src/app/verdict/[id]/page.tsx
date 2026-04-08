@@ -727,6 +727,9 @@ export default function VerdictPage() {
     );
   }
 
+  const requiredPlan =
+    userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale";
+
   const actionButtons = (
     <div
       style={{
@@ -1003,89 +1006,55 @@ export default function VerdictPage() {
                 ))}
 
                 {(userPlan === "spark" || userPlan === "free") && parsedSections ? (
-                  <div
-                    style={{
-                      margin: "32px auto 0",
-                      maxWidth: 500,
-                      borderRadius: "12px",
-                      overflow: "hidden",
-                      position: "relative",
-                    }}
-                  >
+                  <div style={{ margin: "32px auto 0", maxWidth: 500 }}>
                     <div
                       style={{
-                        filter: "blur(4px)",
-                        pointerEvents: "none",
-                        background: "#111",
+                        background: "rgba(255,255,255,0.03)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: 16,
                         padding: "24px 28px",
-                        opacity: 0.6,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: "9px",
-                          fontWeight: 800,
-                          letterSpacing: "3px",
-                          color: "white",
-                        }}
-                      >
-                        SIGNAL SPRINT
-                      </div>
-                      <div
-                        style={{
-                          color: "rgba(255,255,255,0.5)",
-                          fontSize: "12px",
-                          marginTop: "8px",
-                        }}
-                      >
-                        › 01 — [20 exact people to contact with personalized messages...]
-                        <br />
-                        › 02 — [LinkedIn outreach sequence...]
-                        <br />
-                        › 03 — [Reddit DM strategy...]
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
+                        marginBottom: 12,
                         display: "flex",
                         flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        textAlign: "center",
-                        padding: "16px 20px",
-                        boxSizing: "border-box",
-                        background: "rgba(0,0,0,0.7)",
-                        backdropFilter: "blur(2px)",
-                        WebkitBackdropFilter: "blur(2px)",
+                        gap: 12,
                       }}
                     >
-                      <div style={{ fontSize: "20px", marginBottom: "8px", lineHeight: 1 }}>
-                        🔒
-                      </div>
                       <div
                         style={{
-                          color: "white",
-                          fontFamily: "'Plus Jakarta Sans', sans-serif",
-                          fontWeight: 700,
-                          fontSize: "18px",
-                          textAlign: "center",
-                          lineHeight: 1.2,
-                          marginBottom: "8px",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 14,
                         }}
                       >
-                        {lang === "fr" ? "🔒 Disponible avec le plan Spark" : "🔒 Unlock with Spark Plan"}
+                        <div
+                          style={{
+                            fontSize: 20,
+                            flexShrink: 0,
+                            marginTop: 2,
+                          }}
+                        >
+                          🔒
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: "rgba(255,255,255,0.5)",
+                            letterSpacing: "-0.01em",
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {lang === "fr" ? "Disponible avec le plan" : "Available on the"}{" "}
+                          <strong>{requiredPlan}</strong>
+                          {lang === "fr" ? " et supérieur." : " plan and above."}
+                        </div>
                       </div>
                       <div
                         style={{
-                          fontFamily: "'Inter', sans-serif",
-                          color: "rgba(255,255,255,0.5)",
-                          fontSize: "13px",
-                          textAlign: "center",
-                          lineHeight: 1.4,
-                          marginBottom: "16px",
-                          maxWidth: 320,
+                          fontSize: 13,
+                          color: "rgba(255,255,255,0.3)",
+                          lineHeight: 1.6,
+                          paddingLeft: 34,
                         }}
                       >
                         {t.locked_signal}
@@ -1094,22 +1063,24 @@ export default function VerdictPage() {
                         type="button"
                         onClick={() => void handleUpgrade()}
                         style={{
+                          alignSelf: "flex-start",
+                          marginLeft: 34,
                           background: "#ffffff",
                           color: "#000000",
-                          padding: "10px 24px",
-                          borderRadius: "100px",
+                          border: "none",
+                          borderRadius: 100,
+                          padding: "10px 22px",
+                          fontSize: 13,
                           fontWeight: 700,
-                          fontSize: "14px",
+                          cursor: "pointer",
+                          letterSpacing: "-0.01em",
                           textDecoration: "none",
                           display: "inline-block",
-                          border: "none",
-                          cursor: "pointer",
-                          fontFamily: "inherit",
                         }}
                       >
                         {lang === "fr"
-                          ? `Passer au plan ${userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale"} →`
-                          : `Upgrade to ${userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale"} →`}
+                          ? `Passer au plan ${requiredPlan} →`
+                          : `Upgrade to ${requiredPlan} plan →`}
                       </button>
                     </div>
                   </div>
