@@ -229,6 +229,24 @@ const HOME_PILL = (
 export default function VerdictPage() {
   useRequireActiveSubscription();
   const lang = useLang();
+  const t = {
+    en: {
+      new_analysis: "+ New Analysis",
+      dashboard: "← Dashboard",
+      copy: "Copy verdict",
+      copied: "Copied ✓",
+      start_tracking: "🚀 Start tracking this idea →",
+      view_verdict: "View last analysis",
+    },
+    fr: {
+      new_analysis: "+ Nouvelle analyse",
+      dashboard: "← Dashboard",
+      copy: "Copier le verdict",
+      copied: "Copié ✓",
+      start_tracking: "🚀 Suivre cette idée →",
+      view_verdict: "Voir la dernière analyse",
+    },
+  }[lang];
   const params = useParams();
   const id = params?.id as string;
   const router = useRouter();
@@ -629,7 +647,7 @@ export default function VerdictPage() {
             fontFamily: "'Inter', sans-serif",
           }}
         >
-          Start a new analysis
+          {t.new_analysis}
         </Link>
       </div>
     );
@@ -722,7 +740,7 @@ export default function VerdictPage() {
           cursor: "pointer",
         }}
       >
-        Start a new analysis
+        {t.new_analysis}
       </button>
       <button
         type="button"
@@ -739,7 +757,7 @@ export default function VerdictPage() {
           cursor: "pointer",
         }}
       >
-        Go to Dashboard
+        {t.dashboard}
       </button>
       <button
         type="button"
@@ -756,7 +774,7 @@ export default function VerdictPage() {
           cursor: "pointer",
         }}
       >
-        {copied ? "Copied! ✓" : "Share my verdict"}
+        {copied ? t.copied : t.copy}
       </button>
     </div>
   );
@@ -938,7 +956,7 @@ export default function VerdictPage() {
                               letterSpacing: "-0.02em",
                             }}
                           >
-                            {lang === "fr" ? "🚀 Suivre cette idée →" : "🚀 Start tracking this idea →"}
+                            {t.start_tracking}
                           </a>
                         ) : null}
                         <div
