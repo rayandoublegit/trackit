@@ -622,6 +622,7 @@ async function upgradeToNextPlan(currentPlan: string) {
 }
 
 function LockedFeature({ feature, requiredPlan, userPlan }: { feature: string; requiredPlan: string; userPlan: string }) {
+  const lang = useLang();
   const [loading, setLoading] = useState(false);
 
   const handleUpgrade = async () => {
@@ -644,10 +645,20 @@ function LockedFeature({ feature, requiredPlan, userPlan }: { feature: string; r
         {feature}
       </div>
       <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8, lineHeight: 1.6 }}>
-        Available on the <strong style={{ color: "#fff" }}>{requiredPlan}</strong> plan and above.
+        {lang === "fr"
+          ? <>Disponible avec le plan <strong style={{ color: "#fff" }}>{requiredPlan}</strong> et supérieur.</>
+          : <>Available on the <strong style={{ color: "#fff" }}>{requiredPlan}</strong> plan and above.</>
+        }
       </div>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", marginBottom: 24, lineHeight: 1.6 }}>
-        {userPlan === "free" ? "Upgrade to unlock your full workspace." : `Upgrade from ${userPlan} to unlock this feature.`}
+        {lang === "fr"
+          ? userPlan === "free"
+            ? "Passez à un plan payant pour accéder à votre workspace complet."
+            : `Passez de ${userPlan} pour débloquer cette fonctionnalité.`
+          : userPlan === "free"
+            ? "Upgrade to unlock your full workspace."
+            : `Upgrade from ${userPlan} to unlock this feature.`
+        }
       </div>
       <button
         type="button"
@@ -669,7 +680,10 @@ function LockedFeature({ feature, requiredPlan, userPlan }: { feature: string; r
           opacity: loading ? 0.6 : 1,
         }}
       >
-        {loading ? "Redirecting..." : `Upgrade to ${requiredPlan} →`}
+        {loading
+          ? (lang === "fr" ? "Redirection..." : "Redirecting...")
+          : (lang === "fr" ? `Passer à ${requiredPlan} →` : `Upgrade to ${requiredPlan} →`)
+        }
       </button>
     </div>
   );
