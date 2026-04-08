@@ -237,6 +237,12 @@ export default function VerdictPage() {
       copied: "Copied ✓",
       start_tracking: "🚀 Start tracking this idea →",
       view_verdict: "View last analysis",
+      locked_signal: "20 exact people to contact + outreach messages",
+      locked_flip: "3 alternative business models fully validated",
+      locked_structure: "Legal structure, equity split, contractor vs employee",
+      locked_roadmap: "Day by day plan from idea to $10K MRR",
+      locked_marketing: "Landing page copy, outreach sequences, 30-day launch plan",
+      locked_cofounder: "Unlimited strategic AI sessions with live web search",
     },
     fr: {
       new_analysis: "+ Nouvelle analyse",
@@ -245,6 +251,12 @@ export default function VerdictPage() {
       copied: "Copié ✓",
       start_tracking: "🚀 Suivre cette idée →",
       view_verdict: "Voir la dernière analyse",
+      locked_signal: "20 personnes exactes à contacter + messages de prospection",
+      locked_flip: "3 modèles business alternatifs entièrement validés",
+      locked_structure: "Structure légale, répartition des parts, freelance vs employé",
+      locked_roadmap: "Plan jour par jour de l'idée à 10K MRR",
+      locked_marketing: "Texte landing page, séquences de prospection, plan de lancement 30 jours",
+      locked_cofounder: "Sessions stratégiques IA illimitées avec recherche web en direct",
     },
   }[lang];
   const params = useParams();
@@ -1076,7 +1088,7 @@ export default function VerdictPage() {
                           maxWidth: 320,
                         }}
                       >
-                        20 exact people to contact + messages
+                        {t.locked_signal}
                       </div>
                       <button
                         type="button"
