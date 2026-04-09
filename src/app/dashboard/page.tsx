@@ -1695,7 +1695,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => {
-                const priceId = getPriceIdForUpgrade(userPlan === "free" ? "spark" : userPlan);
+                const priceId = getPriceIdForUpgrade(userPlan);
                 if (!priceId) return;
                 void handleUpgrade(priceId).catch(() => {});
               }}
