@@ -618,6 +618,38 @@ async function upgradeToNextPlan(currentPlan: string) {
     currentPlan === "free" ? "spark" :
     currentPlan === "spark" ? "build" :
     "scale";
+  const priceId =
+    targetPlan === "spark"
+      ? getSparkPriceId()
+      : targetPlan === "build"
+        ? getBuildPriceId()
+        : getScalePriceId();
+  if (!priceId || !supabase) {
+    window.location.href = `/pricing?plan=${targetPlan}`;
+    return;
+  }
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    window.location.href = "/auth";
+    return;
+  }
+  const res = await fetch("/api/create-checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      priceId,
+      userId: user.id,
+      email: user.email,
+      cancelUrl: window.location.href,
+    }),
+  });
+  const payload = (await res.json().catch(() => ({}))) as { url?: string };
+  if (payload.url) {
+    window.location.href = payload.url;
+    return;
+  }
   window.location.href = `/pricing?plan=${targetPlan}`;
 }
 

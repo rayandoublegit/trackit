@@ -30,12 +30,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log("Checkout: body", body);
 
-    const { priceId, userId, email, analysisId, currency } = body as {
+    const { priceId, userId, email, analysisId, currency, cancelUrl } = body as {
       priceId?: string;
       userId?: string;
       email?: string;
       analysisId?: string;
       currency?: string;
+      cancelUrl?: string;
     };
 
     if (!priceId) {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       ...(email ? { customer_email: email } : {}),
       metadata: userId ? { userId: String(userId) } : {},
       success_url: successUrl,
-      cancel_url: `${base}/pricing`,
+      cancel_url: cancelUrl ?? `${base}/pricing`,
     });
 
     console.log("Checkout: session created", session.url);

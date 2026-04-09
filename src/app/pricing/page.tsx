@@ -169,6 +169,7 @@ function PricingPageInner() {
           email: user.email,
           analysisId,
           currency: lang === "fr" ? "eur" : "usd",
+          cancelUrl: window.location.href,
         }),
       });
 
