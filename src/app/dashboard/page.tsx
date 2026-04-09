@@ -39,8 +39,8 @@ type DashboardProfile = {
 function normalizeDashboardPlan(
   raw: string | undefined
 ): "free" | "spark" | "build" | "scale" {
-  const p = raw?.toLowerCase() ?? "spark";
-  return p === "build" ? "build" : p === "scale" ? "scale" : p === "free" ? "free" : "spark";
+  const p = raw?.toLowerCase() ?? "free";
+  return p === "build" ? "build" : p === "scale" ? "scale" : p === "spark" ? "spark" : "free";
 }
 
 /** Mirrors verdict page parsing; maps to short sidebar labels. */
