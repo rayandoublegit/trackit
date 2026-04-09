@@ -564,12 +564,15 @@ export default function VerdictPage() {
         const shouldCreate =
           verdictUp.includes("BUILD IT") ||
           verdictUp.includes("FLIP IT") ||
+          verdictUp.includes("KILL IT") ||
           verdictUp.includes("CONSTRUISEZ") ||
           verdictUp.includes("CONSTRUIRE") ||
           verdictUp.includes("LANCEZ") ||
           verdictUp.includes("PIVOTEZ") ||
           verdictUp.includes("PIVOTER") ||
-          verdictUp.includes("RETOURNEZ");
+          verdictUp.includes("RETOURNEZ") ||
+          verdictUp.includes("ABANDONNEZ") ||
+          verdictUp.includes("TUEZ");
 
         if (shouldCreate) {
           const { data: newProject } = await supabase
@@ -583,7 +586,11 @@ export default function VerdictPage() {
                 verdictUp.includes("PIVOTEZ") ||
                 verdictUp.includes("PIVOTER")
                   ? "pivoting"
-                  : "building",
+                  : verdictUp.includes("KILL IT") ||
+                      verdictUp.includes("ABANDONNEZ") ||
+                      verdictUp.includes("TUEZ")
+                    ? "killed"
+                    : "building",
             })
             .select("id")
             .single();
@@ -941,14 +948,69 @@ export default function VerdictPage() {
           <>
             <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 3,
-                color: "rgba(255,255,255,0.3)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 16,
                 marginBottom: 12,
               }}
             >
-              KLAYAN ANALYSIS — YOUR IDEA
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: 3,
+                  color: "rgba(255,255,255,0.3)",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                KLAYAN ANALYSIS — YOUR IDEA
+              </div>
+              {analysis ? (
+                <a
+                  href={projectId ? `/project/${projectId}` : "#"}
+                  onClick={async (e) => {
+                    if (!projectId) {
+                      e.preventDefault();
+                      if (!supabase || !analysis) return;
+                      const { data: newProject } = await supabase
+                        .from("projects")
+                        .insert({
+                          user_id: analysis.user_id,
+                          analysis_id: analysis.id,
+                          idea_name: (analysis.idea ?? "").slice(0, 100),
+                          status: "building",
+                        })
+                        .select("id")
+                        .single();
+                      if (newProject?.id) {
+                        window.location.href = `/project/${newProject.id}`;
+                      }
+                    }
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "#ffffff",
+                    color: "#000000",
+                    border: "none",
+                    borderRadius: 100,
+                    padding: "12px 24px",
+                    fontSize: 14,
+                    fontWeight: 700,
+                    letterSpacing: "-0.01em",
+                    textDecoration: "none",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  {lang === "fr"
+                    ? "🚀 Suivre cette idée →"
+                    : "🚀 Start tracking this idea →"}
+                </a>
+              ) : null}
             </div>
 
             <div
@@ -1082,28 +1144,6 @@ export default function VerdictPage() {
                             ? "847 idées analysées sur Klayan — 61% ont reçu un KILL IT. Les BUILD IT sont rares."
                             : "847 ideas analyzed on Klayan — 61% received a KILL IT. BUILD IT verdicts are rare."}
                         </div>
-                        {projectId ? (
-                          <a
-                            href={`/project/${projectId}`}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 8,
-                              marginTop: 20,
-                              background: "#ffffff",
-                              color: "#000000",
-                              padding: "14px 28px",
-                              borderRadius: 100,
-                              fontFamily: "'Inter', sans-serif",
-                              fontSize: 15,
-                              fontWeight: 700,
-                              textDecoration: "none",
-                              letterSpacing: "-0.02em",
-                            }}
-                          >
-                            {t.start_tracking}
-                          </a>
-                        ) : null}
                         <div
                           style={{
                             fontSize: 12,
