@@ -152,7 +152,7 @@ export default function LandingPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userPlan, setUserPlan] = useState<"spark" | "build" | "scale">(
+  const [userPlan, setUserPlan] = useState<"free" | "spark" | "build" | "scale">("free"); //
     "spark"
   );
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
@@ -495,7 +495,7 @@ export default function LandingPage() {
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !user) {
       setAvatarUrl(null);
-      setUserPlan("spark");
+      setUserPlan("free");
       setProfileUsername(null);
       return;
     }
@@ -508,13 +508,13 @@ export default function LandingPage() {
         if (error) {
           console.error("Landing: profiles query error", error);
           setAvatarUrl(null);
-          setUserPlan("spark");
+          setUserPlan("free");
           setProfileUsername(null);
           return;
         }
         if (!data) {
           setAvatarUrl(null);
-          setUserPlan("spark");
+          setUserPlan("free");
           setProfileUsername(null);
           return;
         }
@@ -526,9 +526,9 @@ export default function LandingPage() {
         const u = data.avatar_url;
         setAvatarUrl(typeof u === "string" && u ? u : null);
         const raw =
-          (data.plan as string | undefined)?.toLowerCase() ?? "spark";
+          (data.plan as string | undefined)?.toLowerCase() ?? "free";
         setUserPlan(
-          raw === "build" || raw === "scale" ? raw : "spark"
+          raw === "build" ? "build" : raw === "scale" ? "scale" : raw === "spark" ? "spark" : "free"
         );
       });
   }, [user]);
