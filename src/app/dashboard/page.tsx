@@ -727,7 +727,7 @@ export default function DashboardPage() {
 
   const avatarUrl = profile?.avatar_url ?? null;
   const profileUsername = profile?.username ?? null;
-  const userPlan = profile?.plan ?? "spark";
+  const userPlan = profile?.plan ?? "free";
 
   const shell = {
     fontFamily: "'Inter', sans-serif",
