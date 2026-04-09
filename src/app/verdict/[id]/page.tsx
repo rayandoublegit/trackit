@@ -654,6 +654,7 @@ export default function VerdictPage() {
         priceId,
         userId: user?.id,
         email: user?.email,
+        cancelUrl: window.location.href,
       };
       console.log("[checkout] step 5: POST /api/create-checkout body", body);
 
