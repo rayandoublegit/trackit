@@ -1,6 +1,6 @@
 import { getBuildPriceId, getScalePriceId } from "@/lib/checkout";
 
-export type PlanTier = "spark" | "build" | "scale";
+export type PlanTier = "free" | "spark" | "build" | "scale";
 
 export type PricingCtaKind = "try-free" | "current" | "upgrade" | "downgrade";
 
@@ -21,6 +21,11 @@ export function getPricingCta(
   const { loggedIn, plan } = options;
   if (!loggedIn || plan === null) {
     return { kind: "try-free", label: "Try free" };
+  }
+  if (plan === "free" || (plan as string) === "free") {
+    if (card === "spark") return { kind: "upgrade", label: "Upgrade to Spark →", upgradeTarget: undefined };
+    if (card === "build") return { kind: "upgrade", label: "Upgrade to Build →", upgradeTarget: "build" };
+    return { kind: "upgrade", label: "Upgrade to Scale →", upgradeTarget: "scale" };
   }
   if (plan === "spark") {
     if (card === "spark") return { kind: "current", label: "Current plan" };
