@@ -1074,6 +1074,20 @@ export default function VerdictPage() {
                         >
                           {sec.verdictLine}
                         </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: "rgba(255,255,255,0.4)",
+                            textAlign: "center",
+                            marginTop: 8,
+                            marginBottom: 24,
+                            letterSpacing: "0.01em",
+                          }}
+                        >
+                          {lang === "fr"
+                            ? "847 idées analysées. 61% ont reçu un KILL IT."
+                            : "847 ideas analyzed. 61% received a KILL IT."}
+                        </div>
                         {projectId ? (
                           <a
                             href={`/project/${projectId}`}
@@ -1241,6 +1255,48 @@ export default function VerdictPage() {
                           ? "La plupart des fondateurs abandonnent ici. Les autres trouvent le pivot."
                           : "Most founders quit here. The others find the pivot."}
                       </div>
+                      {(() => {
+                        const deadline = new Date("2026-05-01T00:00:00");
+                        const now = new Date();
+                        const diff = deadline.getTime() - now.getTime();
+                        const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+                        return (
+                          <div
+                            style={{
+                              background: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(255,255,255,0.08)",
+                              borderRadius: 10,
+                              padding: "12px 16px",
+                              marginBottom: 16,
+                              textAlign: "center",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "#facc15",
+                                letterSpacing: "0.05em",
+                                textTransform: "uppercase",
+                                marginBottom: 4,
+                              }}
+                            >
+                              {lang === "fr" ? "Prix de lancement" : "Launch pricing"}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 13,
+                                color: "rgba(255,255,255,0.6)",
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {lang === "fr"
+                                ? `19€/mois. Prix monte à 29€ dans ${days} jour${days > 1 ? "s" : ""}.`
+                                : `$19/mo. Price goes up to $29 in ${days} day${days > 1 ? "s" : ""}.`}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       <button
                         type="button"
                         onClick={() => void handleUpgrade()}
