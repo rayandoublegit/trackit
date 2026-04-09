@@ -1076,17 +1076,18 @@ export default function VerdictPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: 13,
-                            color: "rgba(255,255,255,0.4)",
-                            textAlign: "center",
-                            marginTop: 8,
-                            marginBottom: 24,
-                            letterSpacing: "0.01em",
+                            fontSize: 12,
+                            color: "rgba(255,255,255,0.35)",
+                            textAlign: "left",
+                            marginTop: 6,
+                            marginBottom: 28,
+                            letterSpacing: "0.02em",
+                            fontWeight: 500,
                           }}
                         >
                           {lang === "fr"
-                            ? "847 idées analysées. 61% ont reçu un KILL IT."
-                            : "847 ideas analyzed. 61% received a KILL IT."}
+                            ? "847 idées analysées sur Klayan — 61% ont reçu un KILL IT. Les BUILD IT sont rares."
+                            : "847 ideas analyzed on Klayan — 61% received a KILL IT. BUILD IT verdicts are rare."}
                         </div>
                         {projectId ? (
                           <a
