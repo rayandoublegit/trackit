@@ -816,13 +816,19 @@ export default function LandingPage() {
     const priceId = cta.upgradeTarget
       ? getPriceIdForUpgradeTarget(cta.upgradeTarget)
       : getSparkPriceId();
+    const targetPlan = cta.upgradeTarget ?? "spark";
     return (
       <button
         type="button"
         className={"pricing-cta-upgrade" + scaleCls}
         onClick={() => {
-          if (!priceId) return;
-          void handleUpgrade(priceId).catch(() => {});
+          if (priceId) {
+            void handleUpgrade(priceId).catch(() => {
+              window.location.href = `/pricing?plan=${targetPlan}`;
+            });
+          } else {
+            window.location.href = `/pricing?plan=${targetPlan}`;
+          }
         }}
       >
         {cta.label}
