@@ -12,7 +12,8 @@ function getSparkPriceId(): string | undefined {
   return process.env.NEXT_PUBLIC_STRIPE_SPARK_PRICE_ID;
 }
 
-function getPriceIdForUpgrade(plan: "spark" | "build" | "scale"): string | undefined {
+function getPriceIdForUpgrade(plan: string): string | undefined {
+  if (plan === "free") return getSparkPriceId();
   if (plan === "spark") return getBuildPriceId();
   if (plan === "build") return getScalePriceId();
   return undefined;
