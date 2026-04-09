@@ -802,14 +802,14 @@ export default function LandingPage() {
           className={"pricing-cta-current" + scaleCls}
           aria-current="true"
         >
-          {cta.label}
+          {lang === "fr" ? "Plan actuel" : cta.label}
         </span>
       );
     }
     if (cta.kind === "downgrade") {
       return (
         <a href="/dashboard" className={"pricing-cta-downgrade" + scaleCls}>
-          {cta.label}
+          {lang === "fr" ? "Rétrograder" : cta.label}
         </a>
       );
     }
@@ -831,7 +831,13 @@ export default function LandingPage() {
           }
         }}
       >
-        {cta.label}
+        {lang === "fr"
+          ? cta.label
+              .replace("Upgrade to Spark →", "Passer à Spark →")
+              .replace("Upgrade to Build →", "Passer à Build →")
+              .replace("Upgrade to Scale →", "Passer à Scale →")
+              .replace("Try free", "Essayer gratuitement")
+          : cta.label}
       </button>
     );
   };
