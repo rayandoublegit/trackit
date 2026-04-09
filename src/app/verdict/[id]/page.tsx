@@ -619,17 +619,9 @@ export default function VerdictPage() {
   const dividerLine = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
   const handleUpgrade = async () => {
-    console.log("[checkout] step 1: handleUpgrade invoked");
-    const priceId = process.env.NEXT_PUBLIC_STRIPE_BUILD_PRICE_ID;
-    console.log(
-      "[checkout] step 2: NEXT_PUBLIC_STRIPE_BUILD_PRICE_ID =",
-      priceId ?? "(undefined — set in .env.local and restart dev server)"
-    );
-
+    const priceId = process.env.NEXT_PUBLIC_STRIPE_SPARK_PRICE_ID;
     if (!priceId) {
-      console.error(
-        "[checkout] abort: NEXT_PUBLIC_STRIPE_BUILD_PRICE_ID is missing; API will reject checkout."
-      );
+      window.location.href = "/pricing?plan=spark";
       return;
     }
 
