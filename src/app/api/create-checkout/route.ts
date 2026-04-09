@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       ...(email ? { customer_email: email } : {}),
       metadata: userId ? { userId: String(userId) } : {},
       success_url: successUrl,
-      cancel_url: cancelUrl ?? `${base}/pricing`,
+      cancel_url: cancelUrl ?? `${base}`,
     });
 
     console.log("Checkout: session created", session.url);
