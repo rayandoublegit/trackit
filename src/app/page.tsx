@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import Script from "next/script";
 import type { User } from "@supabase/supabase-js";
 
-import { handleUpgrade } from "@/lib/checkout";
+import { handleUpgrade, getSparkPriceId } from "@/lib/checkout";
 import {
   getPriceIdForUpgradeTarget,
   getPricingCta,
@@ -815,7 +815,7 @@ export default function LandingPage() {
     }
     const priceId = cta.upgradeTarget
       ? getPriceIdForUpgradeTarget(cta.upgradeTarget)
-      : undefined;
+      : getSparkPriceId();
     return (
       <button
         type="button"
