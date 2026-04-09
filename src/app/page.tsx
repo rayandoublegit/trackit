@@ -152,9 +152,7 @@ export default function LandingPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [userPlan, setUserPlan] = useState<"free" | "spark" | "build" | "scale">("free"); //
-    "spark"
-  );
+  const [userPlan, setUserPlan] = useState<"free" | "spark" | "build" | "scale">("free");
   const [profileUsername, setProfileUsername] = useState<string | null>(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [lang, setLang] = useState<"en" | "fr">("en");
