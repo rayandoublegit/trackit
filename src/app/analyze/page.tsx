@@ -397,10 +397,7 @@ export default function AnalyzePage() {
       const FREE_ANALYSES = 1;
       const analysisCount = count ?? 0;
 
-      if (isSpark && analysisCount > FREE_ANALYSES) {
-        window.location.href = `/pricing?analysisId=${analysisId}`;
-        return;
-      }
+
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -434,8 +431,7 @@ export default function AnalyzePage() {
         return;
       }
 
-      playVerdictSound();
-      window.location.href = `/verdict/${data.id}`;
+      window.location.href = `/verdict/${analysisId}`;
     } catch (e) {
       console.error("Submit exception:", e);
       setSubmitError("Something went wrong. Please try again.");
