@@ -357,10 +357,7 @@ export async function POST(request: Request) {
 
     // Enforce analysis limits per plan
     const analysisLimit =
-      plan === "scale" ? Infinity :
-      plan === "build" ? 10 :
-      plan === "spark" ? 3 :
-      1; // free
+      plan === "free" ? 1 : Infinity;
 
     if (analysisLimit !== Infinity) {
       const { count } = await supabaseAdmin
