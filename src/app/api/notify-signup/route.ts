@@ -12,6 +12,7 @@ export async function POST(request: Request) {
 
   await resend.emails.send({
     from: "Klayan <notifications@klayan.app>",
+    replyTo: "klayan.app@gmail.com",
     to: "klayan.app@gmail.com",
     subject: `🔥 New signup: ${email}`,
     html: `<p>New signup from <strong>${email}</strong> — let's go brother 🔥</p>`,
