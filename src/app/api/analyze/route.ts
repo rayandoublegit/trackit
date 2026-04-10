@@ -355,17 +355,23 @@ export async function POST(request: Request) {
     const plan =
       rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "free" ? "free" : "spark";
 
-    // Allow free users to run their first analysis
-    const isFree = subStatus !== "active";
-    if (isFree) {
+    // Enforce analysis limits per plan
+    const analysisLimit =
+      plan === "scale" ? Infinity :
+      plan === "build" ? 10 :
+      plan === "spark" ? 3 :
+      1; // free
+
+    if (analysisLimit !== Infinity) {
       const { count } = await supabaseAdmin
         .from("analyses")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "complete");
-      if ((count ?? 0) >= 1) {
+      if ((count ?? 0) >= analysisLimit) {
+        const nextPlan = plan === "free" ? "spark" : plan === "spark" ? "build" : "scale";
         return NextResponse.json(
-          { success: false, error: "Subscription required", redirect: "/pricing" },
+          { success: false, error: "Subscription required", redirect: `/pricing?plan=${nextPlan}` },
           { status: 403 }
         );
       }

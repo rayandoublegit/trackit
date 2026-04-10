@@ -402,7 +402,38 @@ export default function AnalyzePage() {
         return;
       }
 
-      // Verdict page mounts and calls /api/analyze while this tab stays on that URL
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          analysisId,
+          userId: user.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => ({}))) as { error?: string };
+        if (res.status === 500 || res.status === 529) {
+          setSubmitError(
+            lang === "fr"
+              ? "Notre IA est surchargée en ce moment. Réessaie dans 30 secondes."
+              : "Our AI is overloaded right now. Try again in 30 seconds."
+          );
+        } else if (errData.error === "Subscription required") {
+          setIsSubmitting(false);
+          router.push("/pricing");
+          return;
+        } else {
+          setSubmitError(
+            lang === "fr"
+              ? "Une erreur est survenue. Réessaie."
+              : "Something went wrong. Please try again."
+          );
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
       playVerdictSound();
       window.location.href = `/verdict/${data.id}`;
     } catch (e) {
@@ -416,6 +447,7 @@ export default function AnalyzePage() {
     current,
     inputValue,
     isSubmitting,
+    lang,
     router,
     totalQ,
     triggerShake,
