@@ -368,7 +368,7 @@ export async function POST(request: Request) {
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "complete");
-      if ((count ?? 0) >= analysisLimit) {
+      if ((count ?? 0) > analysisLimit) {
         const nextPlan = plan === "free" ? "spark" : plan === "spark" ? "build" : "scale";
         return NextResponse.json(
           { success: false, error: "Subscription required", redirect: `/pricing?plan=${nextPlan}` },
