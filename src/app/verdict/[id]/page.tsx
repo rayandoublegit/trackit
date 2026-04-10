@@ -245,26 +245,6 @@ const LOGO_BLOCK = (
   </div>
 );
 
-function playVerdictArrivalSound() {
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    [523, 659, 784].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
-      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.12);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.2);
-      osc.start(ctx.currentTime + i * 0.12);
-      osc.stop(ctx.currentTime + i * 0.12 + 0.2);
-    });
-  } catch (e) {}
-}
-
 const HOME_PILL = (
   <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
     <Link
@@ -298,6 +278,26 @@ const HOME_PILL = (
     </Link>
   </div>
 );
+
+function playVerdictSound() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    [523, 659, 784].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.3);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
+    });
+  } catch (e) {}
+}
 
 export default function VerdictPage() {
   useRequireActiveSubscription();
@@ -337,6 +337,7 @@ export default function VerdictPage() {
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
+  const verdictPlayedRef = useRef(false);
   const [analysisLoading, setAnalysisLoading] = useState(true);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<{
@@ -367,10 +368,12 @@ export default function VerdictPage() {
       (analysis !== null && analysis.verdict === null));
 
   useEffect(() => {
-    if (analysis?.verdict) {
-      playVerdictArrivalSound();
-    }
-  }, [analysis?.verdict]);
+    if (!analysis?.verdict) return;
+    if (analysis.status !== "complete") return;
+    if (verdictPlayedRef.current) return;
+    verdictPlayedRef.current = true;
+    playVerdictSound();
+  }, [analysis?.verdict, analysis?.status]);
 
   useEffect(() => {
     if (!id) return;
