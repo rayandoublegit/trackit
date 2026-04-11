@@ -809,16 +809,18 @@ export default function VerdictPage() {
         />
         <div
           style={{
-            fontSize: 15,
+            fontSize: 32,
+            fontWeight: 600,
+            letterSpacing: "-0.06em",
+            lineHeight: 1.0,
             color: "rgba(255,255,255,0.85)",
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
             textAlign: "center",
             maxWidth: 360,
-            lineHeight: 1.5,
             minHeight: 48,
           }}
         >
-          Writing your verdict…
+          {lang === "fr" ? "Klayan réfléchit…" : "Klayan is thinking…"}
         </div>
         <div
           style={{
