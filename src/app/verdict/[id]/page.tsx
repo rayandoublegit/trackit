@@ -1051,13 +1051,15 @@ export default function VerdictPage() {
                     <span
                       style={{
                         display: "block",
-                        fontSize: 9,
-                        fontWeight: 800,
-                        letterSpacing: 3,
+                        fontSize: 32,
+                        fontWeight: 600,
+                        letterSpacing: "-0.06em",
+                        lineHeight: 1.0,
                         textTransform: "uppercase",
                         color: "#fff",
-                        marginBottom: 8,
+                        marginBottom: 12,
                         marginTop: 4,
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
                     >
                       {sec.label}
@@ -1068,11 +1070,13 @@ export default function VerdictPage() {
                       !["spark", "build", "scale"].includes(userPlan ?? "") ? null : (
                         <div
                           style={{
-                            fontSize: 12,
-                            fontWeight: 400,
-                            color: "rgba(255,255,255,0.5)",
-                            lineHeight: 1.7,
+                            fontSize: 18,
+                            fontWeight: 300,
+                            color: "rgba(255,255,255,0.75)",
+                            lineHeight: 1.4,
+                            letterSpacing: "-0.02em",
                             marginBottom: 4,
+                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
                           {sec.text}
@@ -1108,10 +1112,12 @@ export default function VerdictPage() {
                             </span>
                             <span
                               style={{
-                                fontSize: 12,
-                                fontWeight: 400,
-                                color: "rgba(255,255,255,0.5)",
-                                lineHeight: 1.7,
+                                fontSize: 18,
+                                fontWeight: 300,
+                                color: "rgba(255,255,255,0.75)",
+                                lineHeight: 1.4,
+                                letterSpacing: "-0.02em",
+                                fontFamily: "'Inter', sans-serif",
                               }}
                             >
                               {item.text}
@@ -1149,12 +1155,14 @@ export default function VerdictPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: 12,
-                            fontWeight: 400,
-                            color: "rgba(255,255,255,0.5)",
-                            lineHeight: 1.7,
+                            fontSize: 18,
+                            fontWeight: 300,
+                            color: "rgba(255,255,255,0.75)",
+                            lineHeight: 1.4,
+                            letterSpacing: "-0.02em",
                             marginBottom: 4,
                             whiteSpace: "pre-wrap",
+                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
                           {sec.explanation}
