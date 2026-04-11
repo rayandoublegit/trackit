@@ -1051,13 +1051,13 @@ export default function VerdictPage() {
                     <span
                       style={{
                         display: "block",
-                        fontSize: 32,
+                        fontSize: 18,
                         fontWeight: 600,
-                        letterSpacing: "-0.06em",
+                        letterSpacing: "-0.04em",
                         lineHeight: 1.0,
                         textTransform: "uppercase",
                         color: "#fff",
-                        marginBottom: 12,
+                        marginBottom: 10,
                         marginTop: 4,
                         fontFamily: "'Plus Jakarta Sans', sans-serif",
                       }}
