@@ -1053,7 +1053,7 @@ export default function VerdictPage() {
                         display: "block",
                         fontSize: 18,
                         fontWeight: 600,
-                        letterSpacing: "-0.04em",
+                        letterSpacing: "0.08em",
                         lineHeight: 1.0,
                         textTransform: "uppercase",
                         color: "#fff",
