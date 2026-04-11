@@ -103,7 +103,7 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     const label = labelRaw.toUpperCase().replace(/:$/, "").trim();
     const content = lines.slice(1).join("\n").trim();
 
-    if (label.startsWith("KLAYAN ANALYSIS")) continue;
+    if (label.startsWith("KLAYAN ANALYSIS") || label.startsWith("KLAYAN")) continue;
 
     if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS") {
       sections.push({
@@ -968,8 +968,7 @@ export default function VerdictPage() {
                   minWidth: 0,
                 }}
               >
-                KLAYAN ANALYSIS — YOUR IDEA
-              </div>
+</div>
               {analysis ? (
                 <a
                   href={projectId ? `/project/${projectId}` : "#"}
