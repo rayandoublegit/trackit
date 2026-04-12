@@ -1,87 +1,21 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { Suspense, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 function ConfirmContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   useEffect(() => {
-    const client = createBrowserClient(supabaseUrl, supabaseAnonKey);
-
-    void (async () => {
-      const code = searchParams.get("code");
-      if (code) {
-        const { error } = await client.auth.exchangeCodeForSession(code);
-        if (error) {
-          console.log("EXCHANGE ERROR", error.message);
-          setStatus("error");
-          return;
-        }
-        router.replace("/dashboard");
-        return;
-      }
-
-      const token_hash = searchParams.get("token_hash");
-      const type = searchParams.get("type");
-      if (token_hash && type) {
-        const { error } = await client.auth.verifyOtp({
-          token_hash,
-          type: type as any,
-        });
-        if (error) {
-          setStatus("error");
-          return;
-        }
-        router.replace("/dashboard");
-        return;
-      }
-
-      const { data: { session } } = await client.auth.getSession();
-      if (session) {
-        router.replace("/dashboard");
-        return;
-      }
-
-      setStatus("error");
-    })();
-  }, [router, searchParams]);
-
-  if (status === "error") {
-    return (
-      <div style={{ background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontFamily: "Inter, sans-serif" }}>
-        <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>❌</div>
-          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", marginBottom: 12 }}>
-            Confirmation failed.
-          </div>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 300, color: "rgba(255,255,255,0.5)", lineHeight: 1.6, marginBottom: 24 }}>
-            The link may have expired. Try signing up again.
-          </div>
-          <button
-            type="button"
-            onClick={() => router.push("/auth")}
-            style={{ background: "#fff", color: "#000", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 15, fontWeight: 600, cursor: "pointer", width: "100%" }}
-          >
-            Back to Sign Up
-          </button>
-        </div>
-      </div>
-    );
-  }
+    router.replace("/dashboard");
+  }, [router]);
 
   return (
     <div style={{ background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontFamily: "Inter, sans-serif" }}>
       <div style={{ textAlign: "center" }}>
         <img src="/images/navbarlogo.png" alt="" style={{ width: 56, height: 56, borderRadius: "50%", marginBottom: 24 }} />
-        <div style={{ fontSize: 18, fontWeight: 600 }}>Confirming your account...</div>
-        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>Please wait</div>
+        <div style={{ fontSize: 18, fontWeight: 600 }}>Connexion en cours...</div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginTop: 8 }}>Redirection vers le dashboard</div>
       </div>
     </div>
   );
@@ -91,7 +25,7 @@ export default function ConfirmPage() {
   return (
     <Suspense fallback={
       <div style={{ background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "white" }}>
-        <div style={{ textAlign: "center", fontSize: 18 }}>Loading...</div>
+        <div style={{ textAlign: "center", fontSize: 18 }}>Chargement...</div>
       </div>
     }>
       <ConfirmContent />
