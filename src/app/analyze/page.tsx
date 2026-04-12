@@ -94,7 +94,7 @@ export default function AnalyzePage() {
       step_back: "← Back",
       step_submit: "Analyze my idea →",
       step_analyzing: "Analyzing...",
-      step_hint: "Press Ctrl + Enter to continue",
+      step_hint: "or press OK, NEXT →",
       step1_eg: "e.g. A tool that helps freelancers send invoices in 30 seconds without an accountant.",
       step2_eg: "e.g. Freelancers aged 25-40 who invoice 3-10 clients per month and hate spreadsheets.",
       step3_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
@@ -116,7 +116,7 @@ export default function AnalyzePage() {
       counter_of: "sur",
       counter_questions: "questions",
       step1_title: "C'est quoi ton idée en une phrase ?",
-      step1_sub: "Le problème, qui l'a, et comment tu le résous.",
+      step1_sub: "Une phrase. Pas un roman.",
       step2_title: "C'est qui ton client cible ?",
       step2_sub: "Sois précis. Pas 'tout le monde'. Qui exactement a ce problème ?",
       step3_title: "Comment tu gagnes de l'argent ?",
@@ -131,7 +131,7 @@ export default function AnalyzePage() {
       step_back: "← Retour",
       step_submit: "Analyser mon idée →",
       step_analyzing: "Analyse en cours...",
-      step_hint: "Appuie sur Ctrl + Entrée pour continuer",
+      step_hint: "ou appuie sur OK, SUIVANT →",
       step1_eg: "ex. Un outil qui aide les freelances à envoyer des factures en 30 secondes sans comptable.",
       step2_eg: "ex. Freelances de 25-40 ans qui facturent 3-10 clients par mois et détestent les tableurs.",
       step3_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
@@ -577,12 +577,14 @@ export default function AnalyzePage() {
             {t.step_back}
           </button>
         </div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 10, letterSpacing: "0.01em" }}>
+          {t.free_note}
+        </div>
       </div>
 
       <div id="modalFooter">
         <span id="qCounter">
-          {current + 1} {t.counter_of} {totalQ} {t.counter_questions} ·{" "}
-          {t.free_note}
+          {current + 1} {t.counter_of} {totalQ} {t.counter_questions}
         </span>
         <div id="qDots">
           {Array.from({ length: totalQ }, (_, i) => (
