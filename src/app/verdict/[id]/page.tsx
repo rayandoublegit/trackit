@@ -1071,7 +1071,7 @@ export default function VerdictPage() {
                       style={{
                         display: "block",
                         fontSize: 18,
-                        fontWeight: 600,
+                        fontWeight: 800,
                         letterSpacing: "0.08em",
                         lineHeight: 1.0,
                         textTransform: "uppercase",
@@ -1079,7 +1079,6 @@ export default function VerdictPage() {
                         marginBottom: 10,
                         marginTop: 4,
                         fontFamily: "'Inter', sans-serif",
-                        fontWeight: 800,
                       }}
                     >
                       {sec.label}
