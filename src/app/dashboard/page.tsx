@@ -210,7 +210,7 @@ export default function DashboardPage() {
       building: "building",
       pivoting: "pivoting",
       killed: "killed",
-      last_analysis: "Your last analysis:",
+      last_analysis: "Your last verdict",
       no_analysis_yet: "No analysis yet",
       flip: "FLIP",
       build: "BUILD",
@@ -241,7 +241,7 @@ export default function DashboardPage() {
       building: "en construction",
       pivoting: "en pivot",
       killed: "abandonné",
-      last_analysis: "Ta dernière analyse :",
+      last_analysis: "Ton dernier verdict",
       no_analysis_yet: "Pas encore d'analyse",
       flip: "FLIP",
       build: "BUILD",
@@ -878,7 +878,6 @@ export default function DashboardPage() {
           background: "#0a0a0a",
           display: "flex",
           flexDirection: "column",
-          minHeight: "100vh",
           boxSizing: "border-box",
           ...(isMobile
             ? {
@@ -888,10 +887,17 @@ export default function DashboardPage() {
                 zIndex: 100,
                 height: "100vh",
                 maxHeight: "100dvh",
+                overflowY: "auto",
+                WebkitOverflowScrolling: "touch",
                 transform: `translateX(${sidebarOpen ? "0" : "-100%"})`,
                 transition: "transform 0.3s ease",
               }
-            : {}),
+            : {
+                position: "sticky",
+                top: 0,
+                height: "100vh",
+                overflowY: "auto",
+              }),
         }}
       >
         <div style={{ padding: "24px 20px 20px" }}>
@@ -1375,7 +1381,6 @@ export default function DashboardPage() {
         <div
           style={{
             flex: 1,
-            overflowY: "auto",
             padding: "0 12px 16px",
             display: "flex",
             flexDirection: "column",
@@ -1785,7 +1790,20 @@ export default function DashboardPage() {
               color: "var(--text-primary)",
             }}
           >
-            {t.last_analysis}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 16 }}>
+              {t.last_analysis}
+              {lastKind && (
+                <span style={{
+                  fontSize: "clamp(18px, 2.5vw, 26px)",
+                  fontWeight: 900,
+                  letterSpacing: "0.06em",
+                  color: lastKind === "BUILD" ? "#4ade80" : lastKind === "FLIP" ? "#f5c842" : "#ef4444",
+                  fontFamily: "'Inter', sans-serif",
+                }}>
+                  {lastKind} IT
+                </span>
+              )}
+            </span>
           </h2>
 
           {loading ? (
@@ -1797,7 +1815,6 @@ export default function DashboardPage() {
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-                <VerdictPill kind={lastKind} />
                 <span style={{ fontSize: 13, color: "color-mix(in srgb, var(--text-primary) 45%, transparent)" }}>
                   {new Date(last.created_at).toLocaleString(undefined, {
                     dateStyle: "medium",
@@ -1902,28 +1919,51 @@ export default function DashboardPage() {
                   marginBottom: 8,
                 }}
               >
-                TIME SAVED
+                {lang === "fr" ? "TON PLAN" : "YOUR PLAN"}
               </div>
               <div
                 style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 28,
-                  fontWeight: 700,
-                  letterSpacing: "-0.03em",
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 22,
+                  fontWeight: 800,
+                  letterSpacing: "-0.02em",
+                  color: "var(--text-primary)",
+                  marginBottom: 8,
                 }}
               >
-                {stats.hoursEst}
-                <span style={{ fontSize: 16, fontWeight: 600, color: "color-mix(in srgb, var(--text-primary) 50%, transparent)" }}>
-                  {" "}
-                  hrs est.
-                </span>
+                {userPlan === "free" ? (lang === "fr" ? "Gratuit" : "Free") : userPlan === "spark" ? "Spark" : userPlan === "build" ? "Build" : "Scale"}
               </div>
-              <div style={{ fontSize: 12, color: "color-mix(in srgb, var(--text-primary) 35%, transparent)", marginTop: 6 }}>
-                ~6 hrs per verdict vs. manual research
-              </div>
+              {["free", "spark"].includes(userPlan) && (
+                <button
+                  onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#4ade80",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  {userPlan === "free"
+                    ? (lang === "fr" ? "Passer à Spark →" : "Upgrade to Spark →")
+                    : (lang === "fr" ? "Passer à Build →" : "Upgrade to Build →")}
+                </button>
+              )}
             </div>
           </div>
 
+          {["free", "spark"].includes(userPlan) && (
+            <div style={{ marginBottom: 24, fontSize: 14, color: "color-mix(in srgb, var(--text-primary) 55%, transparent)" }}>
+              {lang === "fr"
+                ? <>Tu veux le pivot exact sur tes idées ? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Passer à Spark →" : "Passer à Build →"}</button></>
+                : <>Want the exact pivot on your ideas? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"}</button></>
+              }
+            </div>
+          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {last ? (
               <Link
