@@ -28,6 +28,7 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        router.replace("/dashboard");
         return;
       }
 
@@ -44,6 +45,7 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        router.replace("/dashboard");
         return;
       }
 
@@ -53,6 +55,7 @@ function ConfirmContent() {
       } = await client.auth.getSession();
       if (session) {
         setStatus("success");
+        router.replace("/dashboard");
         return;
       }
 
