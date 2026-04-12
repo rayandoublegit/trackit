@@ -18,6 +18,12 @@ function ConfirmContent() {
 
     const client = supabase;
 
+    console.log("CONFIRM DEBUG", {
+      search: window.location.search,
+      hash: window.location.hash,
+      href: window.location.href,
+    });
+
     void (async () => {
       // Handle implicit flow: check session after hash-based redirect
       if (typeof window !== "undefined" && window.location.hash && window.location.hash.includes("access_token")) {
