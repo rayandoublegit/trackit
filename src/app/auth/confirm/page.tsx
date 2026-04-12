@@ -40,6 +40,7 @@ function ConfirmContent() {
       if (code) {
         const { error } = await client.auth.exchangeCodeForSession(code);
         if (error) {
+          console.log("EXCHANGE ERROR", error.message, error);
           setStatus("error");
           return;
         }
