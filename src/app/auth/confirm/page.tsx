@@ -18,6 +18,16 @@ function ConfirmContent() {
 
     const client = supabase;
 
+    // Handle implicit flow: tokens in URL hash
+    if (typeof window !== "undefined" && window.location.hash) {
+      const { error } = await client.auth.getSession();
+      if (!error) {
+        setStatus("success");
+        router.replace("/dashboard");
+        return;
+      }
+    }
+
     void (async () => {
       // Handle PKCE code exchange
       const code = searchParams.get("code");
