@@ -397,39 +397,19 @@ export default function AnalyzePage() {
       const FREE_ANALYSES = 1;
       const analysisCount = count ?? 0;
 
+      if (isSpark && analysisCount > FREE_ANALYSES) {
+        window.location.href = `/pricing?analysisId=${analysisId}`;
+        return;
+      }
 
-
-      const res = await fetch("/api/analyze", {
+      void fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           analysisId,
           userId: user.id,
         }),
-      });
-
-      if (!res.ok) {
-        const errData = (await res.json().catch(() => ({}))) as { error?: string };
-        if (res.status === 500 || res.status === 529) {
-          setSubmitError(
-            lang === "fr"
-              ? "Notre IA est surchargée en ce moment. Réessaie dans 30 secondes."
-              : "Our AI is overloaded right now. Try again in 30 seconds."
-          );
-        } else if (errData.error === "Subscription required") {
-          setIsSubmitting(false);
-          router.push("/pricing");
-          return;
-        } else {
-          setSubmitError(
-            lang === "fr"
-              ? "Une erreur est survenue. Réessaie."
-              : "Something went wrong. Please try again."
-          );
-        }
-        setIsSubmitting(false);
-        return;
-      }
+      }).catch(() => {});
 
       window.location.href = `/verdict/${analysisId}`;
     } catch (e) {
@@ -443,7 +423,6 @@ export default function AnalyzePage() {
     current,
     inputValue,
     isSubmitting,
-    lang,
     router,
     totalQ,
     triggerShake,

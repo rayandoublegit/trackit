@@ -820,7 +820,25 @@ export default function VerdictPage() {
             minHeight: 48,
           }}
         >
-          {lang === "fr" ? "Klayan réfléchit…" : "Klayan is thinking…"}
+          <>
+            <div>
+              {lang === "fr" ? "Klayan réfléchit…" : "Klayan is thinking…"}
+            </div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 400,
+                color: "rgba(255,255,255,0.4)",
+                fontFamily: "'Inter', sans-serif",
+                letterSpacing: "-0.01em",
+                marginTop: 8,
+              }}
+            >
+              {lang === "fr"
+                ? "Peut prendre jusqu'à 2 min (Spark) ou 3 min (Build/Scale)"
+                : "Usually takes 1–2 min (Spark) or up to 3 min (Build/Scale)"}
+            </div>
+          </>
         </div>
         <div
           style={{
