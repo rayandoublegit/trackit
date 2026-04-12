@@ -305,6 +305,15 @@ export default function DashboardPage() {
     setProjects([]);
 
     try {
+      // Handle OAuth code exchange if redirected from Google
+      if (typeof window !== "undefined") {
+        const code = new URLSearchParams(window.location.search).get("code");
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+          window.history.replaceState({}, "", "/dashboard");
+        }
+      }
+
       const {
         data: { session },
       } = await supabase.auth.getSession();
