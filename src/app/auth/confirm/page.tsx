@@ -2,8 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import type { EmailOtpType } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { createBrowserClient } from "@supabase/ssr";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 function ConfirmContent() {
   const router = useRouter();
@@ -11,67 +13,38 @@ function ConfirmContent() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   useEffect(() => {
-    if (!supabase) {
-      setStatus("error");
-      return;
-    }
-
-    const client = supabase;
-
-    console.log("CONFIRM DEBUG", {
-      search: window.location.search,
-      hash: window.location.hash,
-      href: window.location.href,
-    });
+    const client = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
     void (async () => {
-      // Handle implicit flow: check session after hash-based redirect
-      if (typeof window !== "undefined" && window.location.hash && window.location.hash.includes("access_token")) {
-        await new Promise(r => setTimeout(r, 500));
-        const { data: { session } } = await client.auth.getSession();
-        if (session) {
-          setStatus("success");
-          router.replace("/dashboard");
-          return;
-        }
-      }
-      // Handle PKCE code exchange
       const code = searchParams.get("code");
       if (code) {
         const { error } = await client.auth.exchangeCodeForSession(code);
         if (error) {
-          console.log("EXCHANGE ERROR", error.message, error);
+          console.log("EXCHANGE ERROR", error.message);
           setStatus("error");
           return;
         }
-        setStatus("success");
         router.replace("/dashboard");
         return;
       }
 
-      // Handle token_hash flow
       const token_hash = searchParams.get("token_hash");
       const type = searchParams.get("type");
       if (token_hash && type) {
         const { error } = await client.auth.verifyOtp({
           token_hash,
-          type: type as EmailOtpType,
+          type: type as any,
         });
         if (error) {
           setStatus("error");
           return;
         }
-        setStatus("success");
         router.replace("/dashboard");
         return;
       }
 
-      // Check existing session
-      const {
-        data: { session },
-      } = await client.auth.getSession();
+      const { data: { session } } = await client.auth.getSession();
       if (session) {
-        setStatus("success");
         router.replace("/dashboard");
         return;
       }
@@ -98,22 +71,6 @@ function ConfirmContent() {
           >
             Back to Sign Up
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "success") {
-    return (
-      <div style={{ background: "#000", height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontFamily: "Inter, sans-serif" }}>
-        <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>✅</div>
-          <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 28, fontWeight: 700, letterSpacing: "-0.03em", marginBottom: 12 }}>
-            Email confirmed.
-          </div>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 300, color: "rgba(255,255,255,0.5)", lineHeight: 1.6 }}>
-            You can close this tab and go back to where you signed up.
-          </div>
         </div>
       </div>
     );
