@@ -69,6 +69,15 @@ function getVerdictKind(verdict: string | null): VerdictKind | null {
   if (mentionsBuild && !mentionsFlip && !mentionsKill) return "BUILD";
   if (mentionsKill && !mentionsFlip && !mentionsBuild) return "KILL";
 
+  // Fallback: scan full verdict text
+  const full = verdict.toUpperCase();
+  if (full.includes("FLIP IT")) return "FLIP";
+  if (full.includes("BUILD IT")) return "BUILD";
+  if (full.includes("KILL IT")) return "KILL";
+  if (full.includes("PIVOTEZ") || full.includes("PIVOTER")) return "FLIP";
+  if (full.includes("CONSTRUISEZ") || full.includes("LANCEZ")) return "BUILD";
+  if (full.includes("ABANDONNEZ") || full.includes("TUEZ")) return "KILL";
+
   return null;
 }
 
