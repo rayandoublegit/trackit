@@ -1078,7 +1078,8 @@ export default function VerdictPage() {
                         color: "#fff",
                         marginBottom: 10,
                         marginTop: 4,
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        fontFamily: "'Inter', sans-serif",
+                        fontWeight: 800,
                       }}
                     >
                       {sec.label}
@@ -1149,10 +1150,11 @@ export default function VerdictPage() {
                         <div
                           style={{
                             fontSize: 24,
-                            fontWeight: 900,
-                            letterSpacing: 4,
+                            fontWeight: 800,
+                            letterSpacing: "0.08em",
                             color: verdictColor,
                             margin: "6px 0",
+                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
                           {sec.verdictLine}
