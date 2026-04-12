@@ -154,10 +154,7 @@ VERDICT must be exactly one line. Format: [BUILD IT / FLIP IT / KILL IT] — [on
 
 Tu as vu le problème. Le pivot exact et le plan d'action 48h sont réservés aux membres Spark.
 
-IMPORTANT: Output ONLY the 4 sections above. No opportunity. No next steps. No stack. No model. No closing question. Hard stop after the Spark teaser line.
-- RECOMMENDED STACK: List each tool on its own line with a dash. Minimum 3 tools. Explain in 5 words why each tool.
-- OPPORTUNITY: Must name at least one real competitor with their actual pricing from the web. Never cut this section short — complete every sentence.
-- Never put multiple numbered points in one paragraph block.`;
+IMPORTANT: Output ONLY the 4 sections above. No opportunity. No next steps. No stack. No model flip. No closing question. Hard stop after the Spark teaser line. Do not add any other sections.`;
   }
   const base = SYSTEM_PROMPT_BASE;
   if (plan === "scale") return `${base}\n\n${BUILD_ADDONS}\n\n${SCALE_ADDONS}`;
