@@ -429,7 +429,10 @@ export default function AuthPage() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/confirm` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/confirm`,
+        queryParams: { access_type: "offline", prompt: "consent" },
+      },
     });
     if (error) { setError(error.message); setLoading(false); }
   };

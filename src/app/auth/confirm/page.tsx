@@ -18,17 +18,17 @@ function ConfirmContent() {
 
     const client = supabase;
 
-    // Handle implicit flow: tokens in URL hash
-    if (typeof window !== "undefined" && window.location.hash) {
-      const { error } = await client.auth.getSession();
-      if (!error) {
-        setStatus("success");
-        router.replace("/dashboard");
-        return;
-      }
-    }
-
     void (async () => {
+      // Handle implicit flow: check session after hash-based redirect
+      if (typeof window !== "undefined" && window.location.hash && window.location.hash.includes("access_token")) {
+        await new Promise(r => setTimeout(r, 500));
+        const { data: { session } } = await client.auth.getSession();
+        if (session) {
+          setStatus("success");
+          router.replace("/dashboard");
+          return;
+        }
+      }
       // Handle PKCE code exchange
       const code = searchParams.get("code");
       if (code) {
