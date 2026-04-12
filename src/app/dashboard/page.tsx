@@ -1935,7 +1935,7 @@ export default function DashboardPage() {
               </div>
               {["free", "spark"].includes(userPlan) && (
                 <button
-                  onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)}
+                  onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan))}
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
@@ -1959,8 +1959,8 @@ export default function DashboardPage() {
           {["free", "spark"].includes(userPlan) && (
             <div style={{ marginBottom: 24, fontSize: 14, color: "color-mix(in srgb, var(--text-primary) 55%, transparent)" }}>
               {lang === "fr"
-                ? <>Tu veux le pivot exact sur tes idées ? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Passer à Spark →" : "Passer à Build →"}</button></>
-                : <>Want the exact pivot on your ideas? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan), router)} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"}</button></>
+                ? <>Tu veux le pivot exact sur tes idées ? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan))} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Passer à Spark →" : "Passer à Build →"}</button></>
+                : <>Want the exact pivot on your ideas? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan))} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"}</button></>
               }
             </div>
           )}
