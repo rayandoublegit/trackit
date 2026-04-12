@@ -320,7 +320,7 @@ export default function DashboardPage() {
           setProfile({
             username: null,
             avatar_url: null,
-            plan: "spark",
+            plan: "free",
           });
         } else {
           setProfile({
@@ -344,7 +344,7 @@ export default function DashboardPage() {
         setProfile({
           username: null,
           avatar_url: null,
-          plan: "spark",
+          plan: "free",
         });
       }
 
@@ -592,7 +592,7 @@ export default function DashboardPage() {
           : {
               username: null,
               avatar_url: publicUrl,
-              plan: "spark",
+              plan: "free",
             }
       );
       setAvatarImgKey((k) => k + 1);
