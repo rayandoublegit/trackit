@@ -1400,7 +1400,7 @@ export default function ProjectPage() {
           </div>
           <EditableTitle
             lang={lang}
-            value={project.idea_name}
+            value={(() => { const words = project.idea_name.split(" "); return words.length > 5 ? words.slice(0, 5).join(" ") + "..." : project.idea_name; })()}
             onSave={async (newName) => {
               if (!supabase) return;
               const { error } = await supabase.from("projects").update({ idea_name: newName }).eq("id", project.id);
@@ -1844,6 +1844,116 @@ export default function ProjectPage() {
         </div>
         )}
 
+
+        {/* Pricing Strategy */}
+        {userPlan === "free" || userPlan === "spark" ? (
+          <LockedFeature feature={t.pricing_strategy_title} requiredPlan="Build" userPlan={userPlan} />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.pricing_strategy_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.pricing_strategy_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runPricingStrategy()}
+                disabled={runningPricing}
+                style={{
+                  background: runningPricing ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningPricing ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningPricing ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningPricing ? t.pricing_strategy_running : t.pricing_strategy_run}
+              </button>
+            </div>
+
+            {!pricingReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>💰</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.pricing_strategy_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.pricing_strategy_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <PricingToggle report={pricingReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("pricing")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Revenue Roadmap */}
+        {userPlan !== "scale" ? (
+          <LockedFeature feature={t.revenue_title} requiredPlan="Scale" userPlan={userPlan} />
+        ) : (
+          <div style={{ marginBottom: 48 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.revenue_title}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.revenue_sub}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runRevenueRoadmap()}
+                disabled={runningRevenue}
+                style={{
+                  background: runningRevenue ? "rgba(255,255,255,0.1)" : "#ffffff",
+                  color: runningRevenue ? "rgba(255,255,255,0.5)" : "#000",
+                  border: "none",
+                  borderRadius: 100,
+                  padding: "8px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: runningRevenue ? "not-allowed" : "pointer",
+                }}
+              >
+                {runningRevenue ? t.revenue_running : t.revenue_run}
+              </button>
+            </div>
+
+            {!revenueReport ? (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: 24, marginBottom: 12 }}>📈</div>
+                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.revenue_empty}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.revenue_empty_sub}</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <RevenueToggle report={revenueReport} />
+                  <button
+                    type="button"
+                    onClick={() => void deleteReport("revenue")}
+                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
         {/* Pivot Radar */}
         {userPlan === "free" || userPlan === "spark" ? (
           <LockedFeature feature={t.pivot_title} requiredPlan="Build" userPlan={userPlan} />
@@ -2074,114 +2184,6 @@ export default function ProjectPage() {
                   <button
                     type="button"
                     onClick={() => void deleteReport("competitor")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pricing Strategy */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.pricing_strategy_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.pricing_strategy_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.pricing_strategy_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runPricingStrategy()}
-                disabled={runningPricing}
-                style={{
-                  background: runningPricing ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningPricing ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningPricing ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningPricing ? t.pricing_strategy_running : t.pricing_strategy_run}
-              </button>
-            </div>
-
-            {!pricingReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>💰</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.pricing_strategy_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.pricing_strategy_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <PricingToggle report={pricingReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("pricing")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Revenue Roadmap */}
-        {userPlan !== "scale" ? (
-          <LockedFeature feature={t.revenue_title} requiredPlan="Scale" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.revenue_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.revenue_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runRevenueRoadmap()}
-                disabled={runningRevenue}
-                style={{
-                  background: runningRevenue ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningRevenue ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningRevenue ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningRevenue ? t.revenue_running : t.revenue_run}
-              </button>
-            </div>
-
-            {!revenueReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>📈</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.revenue_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.revenue_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <RevenueToggle report={revenueReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("revenue")}
                     style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
