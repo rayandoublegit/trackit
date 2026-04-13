@@ -2308,7 +2308,7 @@ export default function DashboardPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {projects.map((project) => (
-                  
+                  <a
                     key={project.id}
                     href={"/project/" + project.id}
                     style={{
