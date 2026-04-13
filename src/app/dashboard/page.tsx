@@ -2310,7 +2310,7 @@ export default function DashboardPage() {
                 {projects.map((project) => (
                   
                     key={project.id}
-                    href={`/project/${project.id}`}
+                    href={"/project/" + project.id}
                     style={{
                       display: "flex",
                       alignItems: "center",
