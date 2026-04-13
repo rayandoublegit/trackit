@@ -350,7 +350,7 @@ export async function POST(request: Request) {
 
     const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "free";
     const plan =
-      rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "free" ? "free" : "spark";
+      rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "spark" ? "spark" : "free";
 
     // Enforce analysis limits per plan
     const analysisLimit =
