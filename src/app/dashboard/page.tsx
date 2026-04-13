@@ -1222,7 +1222,7 @@ export default function DashboardPage() {
 
           <button
             type="button"
-            onClick={() => setShowWorkspaces(!showWorkspaces)}
+            onClick={() => { setShowWorkspaces(!showWorkspaces); if (isMobile) setSidebarOpen(false); }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -1267,20 +1267,8 @@ export default function DashboardPage() {
             {t.new_analysis}
           </Link>
 
-          {showWorkspaces ? (
-            <div style={{
-              position: "fixed",
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: "rgba(0,0,0,0.7)",
-              backdropFilter: "blur(8px)",
-              zIndex: 1000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-            }}
-            onClick={() => setShowWorkspaces(false)}
-            >
+          {false ? (
+            <div>
               <div
                 style={{
                   background: "#111",
@@ -2269,6 +2257,81 @@ export default function DashboardPage() {
           }}
         >
           Copied!
+        </div>
+      ) : null}
+
+      {showWorkspaces ? (
+        <div
+          style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(8px)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+          onClick={() => setShowWorkspaces(false)}
+        >
+          <div
+            style={{
+              background: "#111",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20,
+              padding: 32,
+              width: "100%",
+              maxWidth: 480,
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em" }}>{t.your_workspaces}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{t.choose_project}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWorkspaces(false)}
+                style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 20, padding: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            {projects.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
+                {t.no_workspaces}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {projects.map((project) => (
+                  
+                    key={project.id}
+                    href={`/project/${project.id}`}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "16px 20px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: 14,
+                      textDecoration: "none",
+                      color: "#fff",
+                    }}
+                  >
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>
+                      {(() => { const words = project.idea_name.split(" "); return words.length > 5 ? words.slice(0, 5).join(" ") + "..." : project.idea_name; })()}
+                    </div>
+                    <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)" }}>→</div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
     </div>
