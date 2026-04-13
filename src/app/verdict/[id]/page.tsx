@@ -1252,6 +1252,11 @@ export default function VerdictPage() {
 
                 {(userPlan === "spark" || userPlan === "free") && displaySections ? (
                   <div style={{ margin: "32px auto 0", maxWidth: 500 }}>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", textAlign: "center", marginBottom: 16, lineHeight: 1.6 }}>
+                      {lang === "fr"
+                        ? "Le fondateur moyen perd 8 mois sur une idée non validée. Klayan te coûte 19€. Fais le calcul."
+                        : "The average founder wastes 8 months on an unvalidated idea. Klayan costs $19. Do the math."}
+                    </div>
                     <div
                       style={{
                         background: "rgba(255,255,255,0.03)",
@@ -1289,13 +1294,9 @@ export default function VerdictPage() {
                             lineHeight: 1.4,
                           }}
                         >
-                          {lang === "fr" ? (
-                            "Un seul pivot bien exécuté change tout."
-                          ) : (
-                            <>
-                              Available on the <strong>{requiredPlan}</strong> plan and above.
-                            </>
-                          )}
+                          {lang === "fr"
+                            ? "Pour 19€ — le pivot exact, le plan d'action 48h, 20 contacts qualifiés, et un workspace qui te suit jusqu'à 10K MRR."
+                            : "For $19 — the exact pivot, 48h action plan, 20 qualified contacts, and a workspace that follows you to $10K MRR."}
                         </div>
                       </div>
                       <div
@@ -1385,6 +1386,11 @@ export default function VerdictPage() {
                           ? "Voir le pivot exact + plan d'action 48h → Spark 19€"
                           : "See exact pivot + 48h action plan → Spark $19"}
                       </button>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 10, marginLeft: 34, lineHeight: 1.5 }}>
+                        {lang === "fr"
+                          ? "Moins cher qu'un café par semaine. Plus utile qu'un an de ChatGPT."
+                          : "Cheaper than a coffee a week. More useful than a year of ChatGPT."}
+                      </div>
                     </div>
                   </div>
                 ) : null}
