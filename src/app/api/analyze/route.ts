@@ -356,6 +356,7 @@ export async function POST(request: Request) {
       (profile?.subscription_status as string | undefined)?.toLowerCase() ??
       "inactive";
 
+    console.log("ANALYZE DEBUG", { userId, profilePlan: profile?.plan, profileNull: profile === null });
     const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "free";
     const plan =
       rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "spark" ? "spark" : "free";
