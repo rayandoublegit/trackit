@@ -1207,11 +1207,6 @@ export default function VerdictPage() {
                         >
                           {sec.explanation}
                         </div>
-                        {sec.questionBrutale && (
-                          <div style={{ fontSize: 16, fontStyle: "italic", color: "rgba(255,255,255,0.5)", marginTop: 16, lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
-                            {sec.questionBrutale}
-                          </div>
-                        )}
                       </>
                     ) : (
                       <div
@@ -1421,6 +1416,12 @@ export default function VerdictPage() {
                 ) : null}
               </>
             ) : null}
+
+            {displaySections && sections.some(s => s.kind === "verdict" && s.questionBrutale) && (
+              <div style={{ fontSize: 16, fontStyle: "italic", color: "rgba(255,255,255,0.45)", marginTop: 32, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", textAlign: "center", padding: "0 16px" }}>
+                {sections.find(s => s.kind === "verdict")?.questionBrutale}
+              </div>
+            )}
 
             {analysisError ? (
               <div style={{ marginTop: 16, fontSize: 12, color: "#ff4d4f" }}>
