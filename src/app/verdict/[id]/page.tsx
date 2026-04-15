@@ -56,6 +56,8 @@ type ParsedSection =
       label: string;
       kind: "verdict";
       verdictLine: string;
+      score?: string | null;
+      questionBrutale?: string | null;
       explanation: string;
       verdictType: VerdictType | null;
     };
@@ -105,7 +107,7 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
 
     if (label.startsWith("KLAYAN ANALYSIS") || label.startsWith("KLAYAN")) continue;
 
-    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS") {
+    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS" || label === "VÉRITÉS BRUTALES") {
       sections.push({
         label,
         kind: "numbered",
@@ -114,7 +116,7 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
       continue;
     }
 
-    if (label === "THE QUESTION THAT MATTERS") {
+    if (label === "THE QUESTION THAT MATTERS" || label === "QUESTION BRUTALE") {
       sections.push({ label, kind: "question", text: content });
       continue;
     }
@@ -128,13 +130,26 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      const verdictLine = contentLines[0] ?? "";
-      const explanation = contentLines.slice(1).join("\n").trim();
+      // Find the actual BUILD/KILL/FLIP line (skip SCORE line)
+      const verdictLine = contentLines.find((l) =>
+        l.toUpperCase().includes("BUILD IT") || l.toUpperCase().includes("KILL IT") || l.toUpperCase().includes("FLIP IT")
+      ) ?? contentLines[0] ?? "";
+      // Extract score if present
+      const scoreLine = contentLines.find((l) => l.toUpperCase().startsWith("SCORE:"));
+      const score = scoreLine ? scoreLine.replace(/score:/i, "").trim() : null;
+      // Extract question brutale if present
+      const questionLine = contentLines.find((l) => l.toUpperCase().startsWith("QUESTION BRUTALE:"));
+      const questionBrutale = questionLine ? questionLine.replace(/question brutale:/i, "").trim() : null;
+      const explanation = contentLines
+        .filter((l) => l !== verdictLine && !l.toUpperCase().startsWith("SCORE:") && !l.toUpperCase().startsWith("QUESTION BRUTALE:"))
+        .join("\n").trim();
       sections.push({
         label,
         kind: "verdict",
         verdictLine,
         explanation,
+        score,
+        questionBrutale,
         verdictType: getVerdictType(verdictLine),
       });
       continue;
@@ -1146,6 +1161,11 @@ export default function VerdictPage() {
                       </div>
                     ) : sec.kind === "verdict" ? (
                       <>
+                        {sec.score && (
+                          <div style={{ fontSize: 32, fontWeight: 900, fontFamily: "'Inter', sans-serif", color: verdictColor, letterSpacing: "-0.02em", marginBottom: 4 }}>
+                            {sec.score}
+                          </div>
+                        )}
                         <div
                           style={{
                             fontSize: 24,
@@ -1187,6 +1207,11 @@ export default function VerdictPage() {
                         >
                           {sec.explanation}
                         </div>
+                        {sec.questionBrutale && (
+                          <div style={{ fontSize: 16, fontStyle: "italic", color: "rgba(255,255,255,0.5)", marginTop: 16, lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
+                            {sec.questionBrutale}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div
