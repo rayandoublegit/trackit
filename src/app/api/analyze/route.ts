@@ -161,7 +161,7 @@ QUESTION BRUTALE: [One question that makes them confront their reality. Example:
 
 Tu as vu le problème. Le pivot exact et le plan d'action 48h sont réservés aux membres Spark.
 
-IMPORTANT: Output ONLY what is above. No opportunity. No next steps. No encouragement. No stack. Hard stop after the Spark line.\`;
+IMPORTANT: Output ONLY what is above. No opportunity. No next steps. No encouragement. No stack. Hard stop after the Spark line.`;
   }
   const base = SYSTEM_PROMPT_BASE;
   if (plan === "scale") return `${base}\n\n${BUILD_ADDONS}\n\n${SCALE_ADDONS}`;
