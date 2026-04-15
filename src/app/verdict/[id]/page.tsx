@@ -1205,7 +1205,7 @@ export default function VerdictPage() {
                             fontFamily: "'Inter', sans-serif",
                           }}
                         >
-                          {sec.explanation?.replace(/\s*QUESTION BRUTALE:.*$/si, "").trim()}
+                          {sec.explanation?.replace(/[\s\S]*?(QUESTION BRUTALE:.*)/i, "").replace(/QUESTION BRUTALE:[\s\S]*/i, "").trim()}
                         </div>
                       </>
                     ) : (
