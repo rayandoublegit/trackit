@@ -387,7 +387,7 @@ export async function POST(request: Request) {
       userPrompt;
 
     const maxTokens =
-      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 3000 : 3000;
+      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 1500 : 3000;
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 
