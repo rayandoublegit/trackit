@@ -1417,9 +1417,9 @@ export default function VerdictPage() {
               </>
             ) : null}
 
-            {displaySections && sections.some(s => s.kind === "verdict" && s.questionBrutale) && (
+            {displaySections?.some(s => s.kind === "verdict" && (s as any).questionBrutale) && (
               <div style={{ fontSize: 16, fontStyle: "italic", color: "rgba(255,255,255,0.45)", marginTop: 32, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", textAlign: "center", padding: "0 16px" }}>
-                {sections.find(s => s.kind === "verdict")?.questionBrutale}
+                {(displaySections.find(s => s.kind === "verdict") as any)?.questionBrutale}
               </div>
             )}
 
