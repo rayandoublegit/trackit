@@ -155,9 +155,10 @@ VÉRITÉS BRUTALES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SCORE: [X]/100
 
-[BUILD IT / FLIP IT / KILL IT] — [One sentence max. Brutal. Personal. No exceptions.]
+[BUILD IT / FLIP IT / KILL IT] — [One brutal sentence. No question here. No exceptions.]
 
-QUESTION BRUTALE: [One question that makes them confront their reality. Example: "Si tu lances cette idée demain, dans combien de semaines tu abandonnes ?"]
+
+QUESTION BRUTALE: [One question that makes them confront their reality. Must be on its own line. Start with "Si tu". Example: "Si tu lances cette idée demain, dans combien de semaines tu abandonnes ?"]
 
 Tu as vu le problème. Le pivot exact et le plan d'action 48h sont réservés aux membres Spark.
 
