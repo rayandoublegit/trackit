@@ -1694,7 +1694,7 @@ export default function LandingPage() {
       <section className="story-section">
         <div className="story-quote reveal">{t.story_quote}</div>
         <div className="story-author reveal" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
-          <img src="/images/navbarlogo.png" alt="Rayan" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+          <img src="/images/RAYAN.png" alt="Rayan" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
           <span>{t.story_author}</span>
         </div>
       </section>
