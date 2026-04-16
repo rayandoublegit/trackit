@@ -1217,113 +1217,41 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <section className="demo-section">
-        <div className="demo-video-wrap reveal" id="demoVideoWrap">
-          <video
-            id="demoVideo"
-            src={lang === "fr" ? "https://res.cloudinary.com/dv1nagsve/video/upload/v1774978474/v2demo.francais_tthimr.mp4" : "https://res.cloudinary.com/dv1nagsve/video/upload/v1774977967/v2demo.english_oa203v.mp4"}
-            loop
-            playsInline
-            className="demo-video"
-            onClick={() => {
-              const video = document.getElementById(
-                "demoVideo"
-              ) as HTMLVideoElement;
-              const btn = document.getElementById("demoPlayBtn");
-              const controls = document.getElementById("demoControls");
-              if (video.paused) {
-                void video.play();
-                if (btn) btn.classList.add("hidden");
-                if (controls) controls.classList.add("visible");
-              } else {
-                video.pause();
-                if (btn) btn.classList.remove("hidden");
-                if (controls) controls.classList.remove("visible");
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="demo-play-btn"
-            id="demoPlayBtn"
-            onClick={() => {
-              const video = document.getElementById(
-                "demoVideo"
-              ) as HTMLVideoElement;
-              const btn = document.getElementById("demoPlayBtn");
-              const controls = document.getElementById("demoControls");
-              void video.play();
-              if (btn) btn.classList.add("hidden");
-              if (controls) controls.classList.add("visible");
-            }}
-            aria-label="Play demo"
-          >
-            <svg viewBox="0 0 24 24" fill="white" width="28" height="28">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </button>
-          <div className="demo-controls" id="demoControls">
-            <input
-              type="range"
-              className="demo-progress"
-              id="demoProgress"
-              min={0}
-              max={100}
-              defaultValue={0}
-              onChange={(e) => {
-                const video = document.getElementById(
-                  "demoVideo"
-                ) as HTMLVideoElement;
-                video.currentTime =
-                  (Number(e.target.value) / 100) * video.duration;
-              }}
+      <section className="demo-section" style={{ padding: "80px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <div
+          className="reveal"
+          style={{
+            width: "100%",
+            maxWidth: 900,
+            borderRadius: 16,
+            overflow: "hidden",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
+            background: "#111",
+            position: "relative",
+          }}
+        >
+          {/* macOS-style top bar */}
+          <div style={{ background: "#1a1a1a", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
+            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
+            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
+            <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
+              <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 16px", fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>klayan.app</div>
+            </div>
+          </div>
+          {/* Video */}
+          <div style={{ position: "relative" }}>
+            <video
+              src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4"
+              autoPlay
+              muted
+              loop
+              playsInline
+              style={{ width: "100%", display: "block" }}
             />
-            <span className="demo-time" id="demoTime">
-              0:00
-            </span>
-            <button
-              type="button"
-              className="demo-ctrl-btn"
-              id="demoMuteBtn"
-              aria-label="Toggle mute"
-              onClick={(e) => {
-                e.stopPropagation();
-                const video = document.getElementById(
-                  "demoVideo"
-                ) as HTMLVideoElement;
-                const btn = document.getElementById("demoMuteBtn");
-                video.muted = !video.muted;
-                if (btn) btn.setAttribute("data-muted", String(video.muted));
-              }}
-            >
-              <svg
-                id="volumeIcon"
-                viewBox="0 0 24 24"
-                fill="white"
-                width="18"
-                height="18"
-              >
-                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="demo-ctrl-btn"
-              aria-label="Fullscreen"
-              onClick={(e) => {
-                e.stopPropagation();
-                const wrap = document.getElementById("demoVideoWrap");
-                if (!document.fullscreenElement) {
-                  wrap?.requestFullscreen();
-                } else {
-                  document.exitFullscreen();
-                }
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="white" width="18" height="18">
-                <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" />
-              </svg>
-            </button>
+            {/* Bottom fade */}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 120, background: "linear-gradient(to bottom, transparent, #000)", pointerEvents: "none" }} />
           </div>
         </div>
       </section>
