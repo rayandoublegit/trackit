@@ -915,8 +915,14 @@ export default function DashboardPage() {
         <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e5e5" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover" }} />
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", flexShrink: 0 }}>
+                {avatarUrl ? (
+                  <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: "cover", display: "block" }} />
+                ) : (
+                  <span style={{ color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>
+                    {(profileUsername?.trim() || user?.email?.split("@")[0] || "K")[0].toUpperCase()}
+                  </span>
+                )}
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#111", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
@@ -959,15 +965,22 @@ export default function DashboardPage() {
         </div>
 
         {/* Nav */}
-        <div style={{ padding: "12px", flex: 1, overflowY: "auto" }}>
+        <div style={{ padding: "12px" }}>
           <button type="button" onClick={() => { setShowWorkspaces(!showWorkspaces); if (isMobile) setSidebarOpen(false); }}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: showWorkspaces ? "#e9e9e9" : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: showWorkspaces ? "#e9e9e9" : "transparent", border: "1px solid #e5e5e5", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             {t.workspaces}
           </button>
 
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#aaa", margin: "16px 0 4px 12px", textTransform: "uppercase" }}>Main Menu</div>
-          <div style={{ height: 1, background: "#e5e5e5", margin: "4px 0 8px" }} />
+          <Link href="/dashboard"
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            Home
+          </Link>
+
           <button type="button" onClick={() => setIdeasOpen((v) => !v)}
             style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: ideasOpen ? "#ebebeb" : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
             onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
@@ -1083,23 +1096,37 @@ export default function DashboardPage() {
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#5865f2" }}><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
             Discord
           </a>
+          <a href="mailto:support@klayan.app"
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#111", fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Support
+          </a>
         </div>
         {/* Bottom */}
-        <div style={{ borderTop: "1px solid #e5e5e5", padding: "12px" }}>
+        <div style={{ borderTop: "1px solid #e5e5e5", padding: "12px", marginTop: "auto" }}>
 
-          {userPlan !== "scale" && (
-            <div style={{ marginTop: 12, background: "#111", borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
-                {userPlan === "free" ? "Upgrade to Spark" : userPlan === "spark" ? "Upgrade to Build" : "Upgrade to Scale"}
-              </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 12, lineHeight: 1.4 }}>Unlock premium features and get more from Klayan.</div>
-              <button type="button"
-                onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
-                style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#000", fontSize: 13, fontWeight: 700, background: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
-                Upgrade Now →
-              </button>
-            </div>
-          )}
+          <div style={{ background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: "14px 16px" }}>
+            {userPlan === "scale" ? (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 4 }}>You&apos;re on the best plan 🎉</div>
+                <div style={{ fontSize: 12, color: "#888", lineHeight: 1.4 }}>Scale gives you full access to everything Klayan has to offer.</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 4 }}>
+                  {userPlan === "free" ? "Upgrade to Spark" : userPlan === "spark" ? "Upgrade to Build" : "Upgrade to Scale"}
+                </div>
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.4 }}>Unlock all features and get the most out of Klayan.</div>
+                <button type="button"
+                  onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
+                  style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, background: "#111", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                  Upgrade Now →
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </aside>
 
