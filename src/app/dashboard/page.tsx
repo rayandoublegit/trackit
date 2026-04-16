@@ -874,16 +874,16 @@ export default function DashboardPage() {
         style={{
           width: 260,
           flexShrink: 0,
-          borderRight: "1px solid rgba(255,255,255,0.06)",
-          background: "#1a1a1a",
+          borderRight: "1px solid #e5e5e5",
+          background: "#f5f5f5",
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
+          fontFamily: "'Inter', sans-serif",
           ...(isMobile
             ? {
                 position: "fixed",
-                top: 0,
-                left: 0,
+                top: 0, left: 0,
                 zIndex: 100,
                 height: "100vh",
                 maxHeight: "100dvh",
@@ -900,828 +900,158 @@ export default function DashboardPage() {
               }),
         }}
       >
-        <div style={{ padding: "18px 14px 14px" }}>
-          <Link
-            href="/"
-            aria-label="Klayan home"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-              marginBottom: 0,
-              background: "transparent",
-              borderRadius: 0,
-              textDecoration: "none",
-            }}
-          >
-            <img
-              src="/images/navbarlogo.png"
-              alt=""
-              width={28}
-              height={28}
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                objectFit: "cover",
-                display: "block",
-              }}
-            />
-          </Link>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
-            <div
-              ref={avatarMenuRef}
-              style={{ position: "relative", flexShrink: 0 }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) void handleAvatarUpload(file);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setAvatarActionError(null);
-                  setShowAvatarMenu((v) => !v);
-                }}
-                aria-expanded={showAvatarMenu}
-                aria-haspopup="menu"
-                disabled={!user}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: "50%",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  letterSpacing: "-0.02em",
-                  overflow: "hidden",
-                  flexShrink: 0,
-                  padding: 0,
-                  cursor: user ? "pointer" : "default",
-                  color: "#fff",
-                }}
-              >
-                {user && avatarUrl ? (
-                  <img
-                    key={avatarImgKey}
-                    src={avatarUrl}
-                    alt=""
-                    width={44}
-                    height={44}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                ) : user ? (
-                  profileInitials(user, profileUsername)
-                ) : (
-                  "—"
-                )}
+        {/* Top: brand */}
+        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e5e5" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 24, height: 24, borderRadius: 4, objectFit: "cover" }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#111", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                  {profileUsername?.trim() || user?.email?.split("@")[0] || "Klayan"}
+                </div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 1 }}>{user?.email ?? ""}</div>
+              </div>
+            </div>
+            <div ref={avatarMenuRef} style={{ position: "relative" }}>
+              <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }}
+                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void handleAvatarUpload(file); }} />
+              <button type="button"
+                onClick={() => { setAvatarActionError(null); setShowAvatarMenu((v) => !v); }}
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#888", padding: 4, borderRadius: 6, display: "flex" }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" />
+                </svg>
               </button>
-
               {showAvatarMenu && user ? (
-                <div
-                  role="menu"
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    zIndex: 100,
-                    minWidth: 200,
-                    background: "#1a1a1a",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 12,
-                    padding: 8,
-                    boxShadow: "0 8px 24px rgba(0,0,0,0.45)",
-                  }}
-                >
+                <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, minWidth: 180, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
                   {avatarUrl ? (
                     <>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={avatarBusy}
-                        onClick={() => openAvatarFilePicker()}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          width: "100%",
-                          padding: "10px 10px",
-                          border: "none",
-                          borderRadius: 8,
-                          background: "transparent",
-                          color: "#fff",
-                          fontSize: 14,
-                          fontFamily: "'Inter', sans-serif",
-                          fontWeight: 500,
-                          cursor: avatarBusy ? "wait" : "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        <CameraIcon />
-                        Change photo
+                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#111", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                        <CameraIcon /> Change photo
                       </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        disabled={avatarBusy}
-                        onClick={() => void removeAvatar()}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 10,
-                          width: "100%",
-                          padding: "10px 10px",
-                          border: "none",
-                          borderRadius: 8,
-                          background: "transparent",
-                          color: "#ef4444",
-                          fontSize: 14,
-                          fontFamily: "'Inter', sans-serif",
-                          fontWeight: 500,
-                          cursor: avatarBusy ? "wait" : "pointer",
-                          textAlign: "left",
-                        }}
-                      >
-                        <TrashIcon />
-                        Remove photo
+                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => void removeAvatar()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#ef4444", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                        <TrashIcon /> Remove photo
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      disabled={avatarBusy}
-                      onClick={() => openAvatarFilePicker()}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        width: "100%",
-                        padding: "10px 10px",
-                        border: "none",
-                        borderRadius: 8,
-                        background: "transparent",
-                        color: "#fff",
-                        fontSize: 14,
-                        fontFamily: "'Inter', sans-serif",
-                        fontWeight: 500,
-                        cursor: avatarBusy ? "wait" : "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      <CameraIcon />
-                      Add photo
+                    <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#111", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                      <CameraIcon /> Add photo
                     </button>
                   )}
-                  {avatarActionError ? (
-                    <p
-                      style={{
-                        margin: "6px 4px 0",
-                        fontSize: 12,
-                        color: "#f87171",
-                        lineHeight: 1.4,
-                      }}
-                    >
-                      {avatarActionError}
-                    </p>
-                  ) : null}
+                  {avatarActionError ? <p style={{ margin: "4px 4px 0", fontSize: 12, color: "#f87171" }}>{avatarActionError}</p> : null}
                 </div>
               ) : null}
             </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif", fontWeight: 500, marginBottom: 3, letterSpacing: "0.01em" }}>
-                Welcome back,
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  minWidth: 0,
-                  lineHeight: 1.2,
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    fontSize: 16,
-                    fontWeight: 700,
-                    letterSpacing: "-0.03em",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    minWidth: 0,
-                  }}
-                >
-                  {profileUsername?.trim() ||
-                    user?.email?.split("@")[0] ||
-                    "Founder"}
-                </span>
-                {isFounder ? (
-                  <span
-                    style={{
-                      background: "linear-gradient(135deg, #f5c842, #ff6b35)",
-                      color: "#000",
-                      fontSize: 9,
-                      fontWeight: 800,
-                      padding: "2px 7px",
-                      borderRadius: "100px",
-                      letterSpacing: "0.05em",
-                      textTransform: "uppercase",
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                    }}
-                  >
-                    ⚡ Founder
-                  </span>
-                ) : null}
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  color: "rgba(255,255,255,0.3)",
-                  marginTop: 4,
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              >
-                Last login: {new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
-              </div>
-              <Link
-                href="/settings"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 8,
-                  background: "transparent",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 100,
-                  padding: "5px 12px",
-                  color: "rgba(255,255,255,0.35)",
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 11,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  textDecoration: "none",
-                  letterSpacing: "-0.01em",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.7)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
-              >
-                ⚙ Settings
-              </Link>
-              <a
-                href="https://discord.gg/nHVEPB2yXb"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  marginTop: 6,
-                  background: "transparent",
-                  border: "1px solid rgba(88,101,242,0.3)",
-                  borderRadius: 100,
-                  padding: "5px 12px",
-                  color: "rgba(88,101,242,0.8)",
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 11,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  textDecoration: "none",
-                  letterSpacing: "-0.01em",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#5865f2"; e.currentTarget.style.borderColor = "rgba(88,101,242,0.6)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(88,101,242,0.8)"; e.currentTarget.style.borderColor = "rgba(88,101,242,0.3)"; }}
-              >
-                Discord Community
-              </a>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => { setShowWorkspaces(!showWorkspaces); if (isMobile) setSidebarOpen(false); }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "flex-start",
-              gap: 8,
-              width: "100%",
-              background: showWorkspaces ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: 10,
-              padding: "11px 14px",
-              color: "#fff",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: "-0.01em",
-              marginBottom: 8,
-            }}
-          >
-            {t.workspaces}
-          </button>
-
-          <Link
-            href="/analyze"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              width: "100%",
-              background: "#ffffff",
-              color: "#000000",
-              borderRadius: 8,
-              padding: "9px 14px",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              fontWeight: 600,
-              textDecoration: "none",
-              marginBottom: 16,
-              border: "none",
-            }}
-          >
-            {t.new_analysis}
-          </Link>
-
-          {false ? (
-            <div>
-              <div
-                style={{
-                  background: "#111",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 20,
-                  padding: 32,
-                  width: "100%",
-                  maxWidth: 480,
-                  maxHeight: "80vh",
-                  overflowY: "auto",
-                }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-0.03em" }}>{t.your_workspaces}</div>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginTop: 4 }}>{t.choose_project}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowWorkspaces(false)}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontSize: 20, padding: 0 }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {projects.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.3)", fontSize: 14 }}>
-                    {t.no_workspaces}
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {projects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={`/project/${project.id}`}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          padding: "16px 20px",
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                          borderRadius: 14,
-                          textDecoration: "none",
-                          color: "#fff",
-                          transition: "background 0.2s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <div style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: "50%",
-                            background: project.status === "building" ? "#4ade80" : project.status === "pivoting" ? "#facc15" : "#f87171",
-                            flexShrink: 0,
-                          }} />
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", marginBottom: 2 }}>
-                              {project.idea_name.length > 40 ? project.idea_name.slice(0, 37) + "..." : project.idea_name}
-                            </div>
-                            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textTransform: "capitalize" }}>
-                              {project.status === "building"
-                                ? t.building
-                                : project.status === "pivoting"
-                                  ? t.pivoting
-                                  : project.status === "killed"
-                                    ? t.killed
-                                    : project.status}
-                            </div>
-                          </div>
-                        </div>
-                        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)" }}>→</span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : null}
-
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.1em",
-              color: "rgba(255,255,255,0.25)",
-              marginBottom: 8,
-              textTransform: "uppercase",
-            }}
-          >
-            {t.your_ideas}
           </div>
         </div>
 
-        <div
-          style={{
-            flex: 1,
-            padding: "0 12px 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-          }}
-        >
-          {loading ? (
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", padding: "0 8px" }}>
-              Loading…
-            </p>
-          ) : error ? (
-            <p style={{ fontSize: 13, color: "#f87171", padding: "0 8px" }}>{error}</p>
-          ) : rows.length === 0 ? (
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", padding: "0 8px", lineHeight: 1.5 }}>
-              {t.no_ideas}
-            </p>
-          ) : (
-            rows.map((row) => {
+        {/* Nav */}
+        <div style={{ padding: "12px", flex: 1, overflowY: "auto" }}>
+          <Link href="/analyze" style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "9px 12px", marginBottom: 8, background: "#111", color: "#fff", borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 600, boxSizing: "border-box" }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            {t.new_analysis}
+          </Link>
+
+          <button type="button" onClick={() => { setShowWorkspaces(!showWorkspaces); if (isMobile) setSidebarOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: showWorkspaces ? "#e9e9e9" : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            {t.workspaces}
+          </button>
+
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#aaa", margin: "14px 0 6px 12px", textTransform: "uppercase" }}>{t.your_ideas}</div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {loading ? (
+              <p style={{ fontSize: 13, color: "#aaa", padding: "0 12px" }}>Loading…</p>
+            ) : error ? (
+              <p style={{ fontSize: 13, color: "#ef4444", padding: "0 12px" }}>{error}</p>
+            ) : rows.length === 0 ? (
+              <p style={{ fontSize: 13, color: "#aaa", padding: "0 12px", lineHeight: 1.5 }}>{t.no_ideas}</p>
+            ) : rows.map((row) => {
               const kind = getVerdictKind(row.verdict);
-              const menuVisible =
-                hoveredRowId === row.id || openMenuId === row.id;
+              const menuVisible = hoveredRowId === row.id || openMenuId === row.id;
               return (
-                <div
-                  key={row.id}
-                  data-analysis-menu={row.id}
+                <div key={row.id} data-analysis-menu={row.id}
                   onMouseEnter={() => setHoveredRowId(row.id)}
                   onMouseLeave={() => setHoveredRowId(null)}
-                  style={{
-                    position: "relative",
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 8,
-                    padding: "12px 10px",
-                    borderRadius: 10,
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    marginBottom: 4,
-                  }}
-                >
-                  <Link
-                    href={`/verdict/${row.id}`}
-                    onClick={() => {
-                      if (isMobile) setSidebarOpen(false);
-                    }}
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 10,
-                      flex: 1,
-                      minWidth: 0,
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
-                  >
+                  style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", borderRadius: 8, background: hoveredRowId === row.id ? "#ebebeb" : "transparent" }}>
+                  <Link href={`/verdict/${row.id}`} onClick={() => { if (isMobile) setSidebarOpen(false); }}
+                    style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
                     <VerdictPill kind={kind} />
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        lineHeight: 1.4,
-                        color: "rgba(255,255,255,0.88)",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {(() => {
-                        const projectId = projectByAnalysisId[row.id];
-                        const project = projectId ? projects.find((p) => p.id === projectId) : null;
-                        const name = project?.idea_name ?? row.idea;
-                        return name.length > 60 ? name.slice(0, 57) + "..." : name;
-                      })()}
+                    <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: "#111", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                      {(() => { const pid = projectByAnalysisId[row.id]; const proj = pid ? projects.find((p) => p.id === pid) : null; const name = proj?.idea_name ?? row.idea; return name.length > 50 ? name.slice(0, 47) + "..." : name; })()}
                     </span>
                   </Link>
-                  <div
-                    style={{
-                      position: "relative",
-                      flexShrink: 0,
-                      alignSelf: "flex-start",
-                      opacity: menuVisible ? 1 : 0,
-                      pointerEvents: menuVisible ? "auto" : "none",
-                      transition: "opacity 0.12s ease",
-                    }}
-                  >
-                    <button
-                      type="button"
-                      aria-label="Analysis actions"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setOpenMenuId((cur) =>
-                          cur === row.id ? null : row.id
-                        );
-                      }}
-                      style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "rgba(255,255,255,0.4)",
-                        cursor: "pointer",
-                        fontSize: 16,
-                        padding: "4px 8px",
-                        borderRadius: 6,
-                        lineHeight: 1,
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.background =
-                          "rgba(255,255,255,0.08)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      ⋯
-                    </button>
-
+                  <div style={{ position: "relative", flexShrink: 0, opacity: menuVisible ? 1 : 0, pointerEvents: menuVisible ? "auto" : "none", transition: "opacity 0.12s" }}>
+                    <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenMenuId((cur) => cur === row.id ? null : row.id); }}
+                      style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}
+                      onMouseOver={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
+                      onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>⋯</button>
                     {openMenuId === row.id ? (
-                      <div
-                        style={{
-                          position: "absolute",
-                          right: 0,
-                          top: "100%",
-                          background: "#1a1a1a",
-                          border: "1px solid rgba(255,255,255,0.08)",
-                          borderRadius: 12,
-                          padding: 6,
-                          zIndex: 100,
-                          minWidth: 180,
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleCopyVerdict(row);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            width: "100%",
-                            background: "transparent",
-                            border: "none",
-                            color: "white",
-                            padding: "10px 12px",
-                            borderRadius: 8,
-                            cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: 500,
-                            fontFamily: "Inter, sans-serif",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background =
-                              "rgba(255,255,255,0.06)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "transparent";
-                          }}
-                        >
+                      <div style={{ position: "absolute", right: 0, top: "100%", background: "#fff", border: "1px solid #e5e5e5", borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); void handleCopyVerdict(row); }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#111", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                           📋 {t.copy_verdict}
                         </button>
-
                         {projectByAnalysisId[row.id] ? (
                           <>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const projectIdForAnalysis = projectByAnalysisId[row.id];
-                                const proj = projects.find((p) => p.id === projectIdForAnalysis);
-                                setRenameValue(proj?.idea_name ?? "");
-                                setRenamingProjectId(projectIdForAnalysis);
-                                setOpenMenuId(null);
-                              }}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                width: "100%",
-                                background: "transparent",
-                                border: "none",
-                                color: "white",
-                                padding: "10px 12px",
-                                borderRadius: 8,
-                                cursor: "pointer",
-                                fontSize: 13,
-                                fontWeight: 500,
-                                fontFamily: "Inter, sans-serif",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background =
-                                  "rgba(255,255,255,0.06)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                              }}
-                            >
+                            <button type="button" onClick={(e) => { e.stopPropagation(); const pid = projectByAnalysisId[row.id]; const proj = projects.find((p) => p.id === pid); setRenameValue(proj?.idea_name ?? ""); setRenamingProjectId(pid); setOpenMenuId(null); }}
+                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#111", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                               {t.rename_project}
                             </button>
-                            <Link
-                              href={`/project/${projectByAnalysisId[row.id]}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuId(null);
-                                if (isMobile) setSidebarOpen(false);
-                              }}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                width: "100%",
-                                background: "transparent",
-                                border: "none",
-                                color: "white",
-                                padding: "10px 12px",
-                                borderRadius: 8,
-                                cursor: "pointer",
-                                fontSize: 13,
-                                fontWeight: 500,
-                                fontFamily: "Inter, sans-serif",
-                                textDecoration: "none",
-                              }}
-                              onMouseOver={(e) => {
-                                e.currentTarget.style.background =
-                                  "rgba(255,255,255,0.06)";
-                              }}
-                              onMouseOut={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                              }}
-                            >
-                              🎯 {t.project_workspace}
+                            <Link href={"/project/" + projectByAnalysisId[row.id]}
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); if (isMobile) setSidebarOpen(false); }}
+                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", borderRadius: 7, color: "#111", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif", textDecoration: "none" }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                              {t.project_workspace}
                             </Link>
                           </>
                         ) : null}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDeleteAnalysis(row.id);
-                          }}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            width: "100%",
-                            background: "transparent",
-                            border: "none",
-                            color: "#ef4444",
-                            padding: "10px 12px",
-                            borderRadius: 8,
-                            cursor: "pointer",
-                            fontSize: 13,
-                            fontWeight: 500,
-                            fontFamily: "Inter, sans-serif",
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.background =
-                              "rgba(239,68,68,0.08)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.background = "transparent";
-                          }}
-                        >
-                          🗑 {t.remove_analysis}
+                        <div style={{ height: 1, background: "#e5e5e5", margin: "4px 0" }} />
+                        <button type="button" onClick={(e) => { e.stopPropagation(); setDeletingId(row.id); setOpenMenuId(null); }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#ef4444", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
+                          onMouseOver={(e) => { e.currentTarget.style.background = "#fff0f0"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                          {t.delete}
                         </button>
                       </div>
                     ) : null}
                   </div>
                 </div>
               );
-            })
-          )}
+            })}
+          </div>
         </div>
 
-        <div
-          style={{
-            padding: "16px 20px 24px",
-            borderTop: "1px solid rgba(255,255,255,0.08)",
-            marginTop: "auto",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.45)",
-              marginBottom: 10,
-            }}
-          >
-            Plan
-          </div>
-          <div
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontSize: 16,
-              fontWeight: 700,
-              marginBottom: 12,
-            }}
-          >
-            {userPlan === "scale"
-              ? "Scale Plan"
-              : userPlan === "build"
-                ? "Build Plan"
-                : userPlan === "free" ? t.free_plan : "Spark Plan"}
-          </div>
-          {userPlan === "scale" ? (
-            <div
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "center",
-                padding: "10px 14px",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: "'Inter', sans-serif",
-                background: "rgba(255,255,255,0.1)",
-                color: "rgba(255,255,255,0.4)",
-                cursor: "default",
-                userSelect: "none",
-              }}
-            >
-              Current plan
+        {/* Bottom */}
+        <div style={{ borderTop: "1px solid #e5e5e5", padding: "12px" }}>
+          <Link href="/settings"
+            style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#555", fontSize: 14, fontWeight: 500, marginBottom: 2 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            Settings
+          </Link>
+          <a href="https://discord.gg/nHVEPB2yXb" target="_blank" rel="noopener noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#555", fontSize: 14, fontWeight: 500 }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+            Discord
+          </a>
+          {userPlan !== "scale" && (
+            <div style={{ marginTop: 12, background: "#111", borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 4 }}>
+                {userPlan === "free" ? "Upgrade to Spark" : userPlan === "spark" ? "Upgrade to Build" : "Upgrade to Scale"}
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 12, lineHeight: 1.4 }}>Unlock premium features and get more from Klayan.</div>
+              <button type="button"
+                onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
+                style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#000", fontSize: 13, fontWeight: 700, background: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                Upgrade Now →
+              </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                const priceId = getPriceIdForUpgrade(userPlan);
-                if (!priceId) return;
-                void handleUpgrade(priceId).catch(() => {});
-              }}
-              style={{
-                display: "block",
-                width: "100%",
-                textAlign: "center",
-                padding: "12px 14px",
-                borderRadius: 10,
-                border: "none",
-                color: "#000",
-                fontSize: 13,
-                fontWeight: 700,
-                background: "#ffffff",
-                cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {userPlan === "spark" || userPlan === "free"
-                ? userPlan === "free" ? t.upgrade : "Upgrade to Build →"
-                : "Upgrade to Scale →"}
-            </button>
           )}
         </div>
       </aside>
