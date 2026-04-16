@@ -795,7 +795,7 @@ export default function DashboardPage() {
         ...shell,
         minHeight: "100vh",
         display: "flex",
-        background: "#000000",
+        background: "#0d0d0d",
         position: "relative",
       }}
     >
@@ -872,10 +872,10 @@ export default function DashboardPage() {
       {/* Left sidebar */}
       <aside
         style={{
-          width: 300,
+          width: 260,
           flexShrink: 0,
-          borderRight: "1px solid rgba(255,255,255,0.08)",
-          background: "#0a0a0a",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          background: "#1a1a1a",
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
@@ -900,7 +900,7 @@ export default function DashboardPage() {
               }),
         }}
       >
-        <div style={{ padding: "24px 20px 20px" }}>
+        <div style={{ padding: "18px 14px 14px" }}>
           <Link
             href="/"
             aria-label="Klayan home"
@@ -908,20 +908,18 @@ export default function DashboardPage() {
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: 4,
-              marginBottom: 22,
-              background: "rgba(171,171,171,0.24)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              borderRadius: "50%",
+              padding: 0,
+              marginBottom: 0,
+              background: "transparent",
+              borderRadius: 0,
               textDecoration: "none",
             }}
           >
             <img
               src="/images/navbarlogo.png"
               alt=""
-              width={48}
-              height={48}
+              width={28}
+              height={28}
               style={{
                 width: 48,
                 height: 48,
@@ -1110,18 +1108,22 @@ export default function DashboardPage() {
               ) : null}
             </div>
             <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "'Inter', sans-serif", fontWeight: 500, marginBottom: 3, letterSpacing: "0.01em" }}>
+                Welcome back,
+              </div>
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   minWidth: 0,
                   lineHeight: 1.2,
+                  gap: 8,
                 }}
               >
                 <span
                   style={{
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: 700,
                     letterSpacing: "-0.03em",
                     overflow: "hidden",
@@ -1137,16 +1139,14 @@ export default function DashboardPage() {
                 {isFounder ? (
                   <span
                     style={{
-                      background:
-                        "linear-gradient(135deg, #f5c842, #ff6b35)",
+                      background: "linear-gradient(135deg, #f5c842, #ff6b35)",
                       color: "#000",
-                      fontSize: 10,
+                      fontSize: 9,
                       fontWeight: 800,
-                      padding: "2px 8px",
+                      padding: "2px 7px",
                       borderRadius: "100px",
                       letterSpacing: "0.05em",
                       textTransform: "uppercase",
-                      marginLeft: 8,
                       whiteSpace: "nowrap",
                       flexShrink: 0,
                     }}
@@ -1157,15 +1157,13 @@ export default function DashboardPage() {
               </div>
               <div
                 style={{
-                  fontSize: 12,
-                  color: "rgba(255,255,255,0.4)",
-                  marginTop: 2,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.3)",
+                  marginTop: 4,
+                  fontFamily: "'Inter', sans-serif",
                 }}
               >
-                {user?.email ?? ""}
+                Last login: {new Date().toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
               </div>
               <Link
                 href="/settings"
@@ -1226,20 +1224,20 @@ export default function DashboardPage() {
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "flex-start",
               gap: 8,
               width: "100%",
-              background: showWorkspaces ? "rgba(255,255,255,0.1)" : "transparent",
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 12,
-              padding: "12px 0",
+              background: showWorkspaces ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 10,
+              padding: "11px 14px",
               color: "#fff",
               fontFamily: "'Inter', sans-serif",
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 600,
               cursor: "pointer",
-              letterSpacing: "-0.02em",
-              marginBottom: 10,
+              letterSpacing: "-0.01em",
+              marginBottom: 8,
             }}
           >
             {t.workspaces}
@@ -1253,15 +1251,16 @@ export default function DashboardPage() {
               justifyContent: "center",
               gap: 8,
               width: "100%",
-              background: "#fff",
-              color: "#000",
-              borderRadius: 10,
-              padding: "12px 16px",
+              background: "#ffffff",
+              color: "#000000",
+              borderRadius: 8,
+              padding: "9px 14px",
               fontFamily: "'Inter', sans-serif",
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 600,
               textDecoration: "none",
-              marginBottom: 24,
+              marginBottom: 16,
+              border: "none",
             }}
           >
             {t.new_analysis}
@@ -1357,9 +1356,10 @@ export default function DashboardPage() {
             style={{
               fontSize: 11,
               fontWeight: 600,
-              letterSpacing: "0.12em",
-              color: "rgba(255,255,255,0.35)",
-              marginBottom: 10,
+              letterSpacing: "0.1em",
+              color: "rgba(255,255,255,0.25)",
+              marginBottom: 8,
+              textTransform: "uppercase",
             }}
           >
             {t.your_ideas}
@@ -1400,11 +1400,12 @@ export default function DashboardPage() {
                     position: "relative",
                     display: "flex",
                     alignItems: "flex-start",
-                    gap: 4,
-                    padding: "10px 10px",
+                    gap: 8,
+                    padding: "12px 10px",
                     borderRadius: 10,
                     background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    marginBottom: 4,
                   }}
                 >
                   <Link
@@ -1705,15 +1706,16 @@ export default function DashboardPage() {
                 display: "block",
                 width: "100%",
                 textAlign: "center",
-                padding: "10px 14px",
+                padding: "12px 14px",
                 borderRadius: 10,
                 border: "none",
                 color: "#000",
                 fontSize: 13,
-                fontWeight: 600,
-                background: "#fff",
+                fontWeight: 700,
+                background: "#ffffff",
                 cursor: "pointer",
                 fontFamily: "'Inter', sans-serif",
+                letterSpacing: "-0.01em",
               }}
             >
               {userPlan === "spark" || userPlan === "free"
@@ -1738,10 +1740,7 @@ export default function DashboardPage() {
           style={{
             position: "absolute",
             inset: 0,
-            backgroundImage:
-              "url(/images/bluepattern.png)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            background: "#111111",
           }}
         />
         <div
@@ -1757,8 +1756,8 @@ export default function DashboardPage() {
           style={{
             position: "relative",
             zIndex: 1,
-            padding: isMobile ? "24px 16px 40px" : "40px 40px 48px",
-            maxWidth: 920,
+            padding: isMobile ? "24px 16px 40px" : "40px 48px 48px",
+            maxWidth: 1000,
             margin: "0 auto",
             width: "100%",
             boxSizing: "border-box",
@@ -1770,11 +1769,11 @@ export default function DashboardPage() {
           <h2
             style={{
               fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontSize: "clamp(28px, 4vw, 44px)",
+              fontSize: "clamp(20px, 2.5vw, 28px)",
               fontWeight: 700,
-              letterSpacing: "-0.04em",
-              lineHeight: 1.15,
-              margin: "0 0 28px",
+              letterSpacing: "-0.03em",
+              lineHeight: 1.2,
+              margin: "0 0 20px",
               color: "var(--text-primary)",
             }}
           >
@@ -1827,9 +1826,9 @@ export default function DashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-              gap: 16,
-              marginBottom: 36,
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 14,
+              marginBottom: 32,
             }}
           >
             <div
@@ -1854,9 +1853,9 @@ export default function DashboardPage() {
               <div
                 style={{
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 32,
-                  fontWeight: 700,
-                  letterSpacing: "-0.03em",
+                  fontSize: 40,
+                  fontWeight: 800,
+                  letterSpacing: "-0.04em",
                 }}
               >
                 {stats.total}

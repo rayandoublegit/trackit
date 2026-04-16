@@ -460,14 +460,34 @@ export default function AuthPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#000000",
         color: "var(--white)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 24,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Blurred landing video background */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        style={{
+          position: "fixed",
+          top: 0, left: 0, width: "100%", height: "100%",
+          objectFit: "cover",
+          filter: "blur(18px) brightness(0.35)",
+          transform: "scale(1.08)",
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+        src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4"
+      />
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1, pointerEvents: "none" }} />
+      <div style={{ position: "relative", zIndex: 2, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div
         style={{
           width: "100%",
@@ -1164,6 +1184,7 @@ export default function AuthPage() {
             </button>
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

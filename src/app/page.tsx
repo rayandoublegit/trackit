@@ -842,6 +842,34 @@ export default function LandingPage() {
     );
   };
 
+
+  useEffect(() => {
+    const frame = document.getElementById("demoFrame") as HTMLElement | null;
+    if (!frame) return;
+    let current = { angle: 18, scale: 0.96 };
+    let target = { angle: 18, scale: 0.96 };
+    let rafId: number;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const animate = () => {
+      current.angle = lerp(current.angle, target.angle, 0.07);
+      current.scale = lerp(current.scale, target.scale, 0.07);
+      frame.style.transform = `rotateX(${current.angle.toFixed(3)}deg) scale(${current.scale.toFixed(4)})`;
+      rafId = requestAnimationFrame(animate);
+    };
+    rafId = requestAnimationFrame(animate);
+    const onScroll = () => {
+      const rect = frame.getBoundingClientRect();
+      const windowH = window.innerHeight;
+      const progress = Math.min(1, Math.max(0, (windowH - rect.top) / (windowH * 0.65)));
+      target.angle = 18 - progress * 18;
+      target.scale = 0.96 + progress * 0.04;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(rafId); };
+  }, []);
+
+
   return (
     <>
       <Script
@@ -1217,43 +1245,37 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <section className="demo-section" style={{ padding: "80px 24px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <section className="demo-section" style={{ padding: "80px 24px 0", display: "flex", flexDirection: "column", alignItems: "center", perspective: "1200px", position: "relative" }}>
         <div
-          className="reveal"
+          id="demoFrame"
           style={{
             width: "100%",
-            maxWidth: 900,
+            maxWidth: 1060,
             borderRadius: 16,
             overflow: "hidden",
-            border: "1px solid rgba(255,255,255,0.1)",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
-            background: "#111",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "0 0 0 1px rgba(255,255,255,0.04), 0 60px 120px rgba(0,0,0,0.9)",
+            background: "#000",
             position: "relative",
+            transformOrigin: "top center",
+            transform: "rotateX(18deg) scale(0.96)",
+            transition: "transform 0.1s linear",
           }}
         >
-          {/* macOS-style top bar */}
-          <div style={{ background: "#1a1a1a", padding: "10px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
-            <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
-            <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-              <div style={{ background: "rgba(255,255,255,0.07)", borderRadius: 6, padding: "3px 16px", fontSize: 11, color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>klayan.app</div>
-            </div>
-          </div>
-          {/* Video */}
-          <div style={{ position: "relative" }}>
+          {/* Video — no top bar, just raw content */}
+          <div style={{ position: "relative", lineHeight: 0 }}>
             <video
               src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4"
               autoPlay
               muted
               loop
               playsInline
-              style={{ width: "100%", display: "block" }}
+              style={{ width: "100%", display: "block", borderRadius: 0 }}
             />
-            {/* Bottom fade */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 120, background: "linear-gradient(to bottom, transparent, #000)", pointerEvents: "none" }} />
           </div>
+          {/* Fade sits outside overflow:hidden to cover the border */}
         </div>
+        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 220, background: "linear-gradient(to bottom, transparent 0%, #000 100%)", pointerEvents: "none", zIndex: 10 }} />
       </section>
 
       <section className="familiar-section" id="services">
