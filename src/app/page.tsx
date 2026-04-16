@@ -252,7 +252,7 @@ export default function LandingPage() {
       step4_pill: "Step 4",
       step4_title: "Win",
       step4_desc:
-        "Co-Founder Mode, Pivot Radar, and stage-specific playbooks. From raw idea to first paying customer — Klayan never lets you drift.",
+        "Co-Founder Mode, Pivot Radar, and stage-specific playbooks. Klayan founders reach their first paying customer in under 30 days. From raw idea to first euro — Klayan never lets you drift.",
       honest_title: "This is what honest AI looks like",
       honest_tagline: "Not a score. A verdict.",
       why_title: "6 reasons why Klayan is better than just asking ChatGPT.",
@@ -335,7 +335,7 @@ export default function LandingPage() {
       faq_a6:
         "Yes. Your ideas are stored securely and never shared, sold, or used to train AI models. What you submit stays yours.",
       cta_title: "Your next idea deserves more than a gut feeling.",
-      cta_sub: "Join founders who validate first and build second.",
+      cta_sub: "Join the first founders on Klayan.",
       cta_btn: "Analyze my Idea",
       cta_note: "Free to start · No credit card · Cancel anytime",
       footer: "© 2026 Klayan — Built by founders, for founders.",
@@ -384,7 +384,7 @@ export default function LandingPage() {
       step4_pill: "Étape 4",
       step4_title: "Gagne",
       step4_desc:
-        "Mode Co-Fondateur, Radar de Pivot et playbooks spécifiques à chaque étape. De l'idée brute au premier client payant — Klayan ne te laisse jamais dériver.",
+        "Mode Co-Fondateur, Radar de Pivot et playbooks spécifiques à chaque étape. Les founders Klayan atteignent leur premier client payant en moins de 30 jours. De l'idée brute au premier euro — Klayan ne te laisse jamais dériver.",
       honest_title: "Voilà à quoi ressemble une IA honnête",
       honest_tagline: "Pas un score. Un verdict.",
       why_title: "6 raisons pour lesquelles Klayan est meilleur que ChatGPT.",
@@ -467,7 +467,7 @@ export default function LandingPage() {
       faq_a6:
         "Oui. Tes idées sont stockées en sécurité et ne sont jamais partagées, vendues ou utilisées pour entraîner des modèles IA. Ce que tu soumets reste le tien.",
       cta_title: "Ta prochaine idée mérite mieux qu'une intuition.",
-      cta_sub: "Rejoins les founders qui valident d'abord et buildent ensuite.",
+      cta_sub: "Rejoins les premiers founders sur Klayan.",
       cta_btn: "Analyser mon idée",
       cta_note: "Gratuit · Pas de carte bancaire · Résiliable à tout moment",
       footer: "© 2026 Klayan — Construit par des founders, pour des founders.",
@@ -1186,6 +1186,7 @@ export default function LandingPage() {
                 </span>
               </div>
               <p className="hero-sub">{t.hero_sub}</p>
+              {(() => { const days = Math.max(0, Math.ceil((new Date("2026-05-01").getTime() - Date.now()) / 86400000)); return days > 0 ? <p style={{ fontSize: 13, color: "#f97316", fontWeight: 600, marginBottom: 12, fontFamily: "'Inter', sans-serif" }}>{lang === "fr" ? `Prix de lancement — passe à 29€ dans ${days} jour${days > 1 ? "s" : ""}.` : `Launch pricing — goes up to $29 in ${days} day${days > 1 ? "s" : ""}.`}</p> : null; })()}
               <div className="hero-cta-row">
                 <a href="/analyze" className="hero-btn">
                   {t.hero_cta}
@@ -1692,13 +1693,16 @@ export default function LandingPage() {
 
       <section className="story-section">
         <div className="story-quote reveal">{t.story_quote}</div>
-        <div className="story-author reveal">{t.story_author}</div>
+        <div className="story-author reveal" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
+          <img src="/images/navbarlogo.png" alt="Rayan" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+          <span>{t.story_author}</span>
+        </div>
       </section>
 
       <section className="faq-section">
         <h2 className="faq-title reveal">{t.faq_title}</h2>
         <p className="faq-sub reveal">
-          More questions? Book a call or email us at{" "}
+          More questions? Email us at{" "}
           <a href="#" className="faq-email-link" onClick={(e) => e.preventDefault()}>
             [email&nbsp;protected]
           </a>
