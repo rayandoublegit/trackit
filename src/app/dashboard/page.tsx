@@ -1012,7 +1012,7 @@ export default function DashboardPage() {
                           </>
                         ) : null}
                         <div style={{ height: 1, background: "#e5e5e5", margin: "4px 0" }} />
-                        <button type="button" onClick={(e) => { e.stopPropagation(); setDeletingId(row.id); setOpenMenuId(null); }}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); void handleDeleteAnalysis(row.id); setOpenMenuId(null); }}
                           style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#ef4444", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
                           onMouseOver={(e) => { e.currentTarget.style.background = "#fff0f0"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                           {t.delete}
