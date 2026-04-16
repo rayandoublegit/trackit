@@ -180,16 +180,43 @@ export default function AnalyzePage() {
 
   const totalQ = QUESTION_META.length;
 
-  const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<string[]>(() =>
-    Array(QUESTION_META.length).fill("")
-  );
-  const [inputValue, setInputValue] = useState("");
+  const [current, setCurrent] = useState(() => {
+    if (typeof window === "undefined") return 0;
+    const d = localStorage.getItem("klayan_draft");
+    if (!d) return 0;
+    try { return JSON.parse(d).current ?? 0; } catch { return 0; }
+  });
+  const [answers, setAnswers] = useState<string[]>(() => {
+    if (typeof window === "undefined") return Array(QUESTION_META.length).fill("");
+    const d = localStorage.getItem("klayan_draft");
+    if (!d) return Array(QUESTION_META.length).fill("");
+    try { return JSON.parse(d).answers ?? Array(QUESTION_META.length).fill(""); } catch { return Array(QUESTION_META.length).fill(""); }
+  });
+  const [inputValue, setInputValue] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const d = localStorage.getItem("klayan_draft");
+    if (!d) return "";
+    try { return JSON.parse(d).inputValue ?? ""; } catch { return ""; }
+  });
+  const [hasDraft, setHasDraft] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const d = localStorage.getItem("klayan_draft");
+    if (!d) return false;
+    try { const p = JSON.parse(d); return !!(p.answers?.[0]); } catch { return false; }
+  });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInputError, setShowInputError] = useState(false);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Auto-save draft
+  useEffect(() => {
+    if (answers.some(a => a.trim())) {
+      localStorage.setItem("klayan_draft", JSON.stringify({ current, answers, inputValue }));
+      setHasDraft(true);
+    }
+  }, [current, answers, inputValue]);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -411,6 +438,7 @@ export default function AnalyzePage() {
         }),
       }).catch(() => {});
 
+      localStorage.removeItem("klayan_draft");
       window.location.href = `/verdict/${analysisId}`;
     } catch (e) {
       console.error("Submit exception:", e);
@@ -450,6 +478,17 @@ export default function AnalyzePage() {
         flexDirection: "column",
       }}
     >
+      {hasDraft && (
+        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 2000, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "10px 18px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Inter', sans-serif" }}>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+            {lang === "fr" ? "Brouillon restauré — question " : "Draft restored — question "}{current + 1}/{totalQ}
+          </span>
+          <button type="button" onClick={() => { localStorage.removeItem("klayan_draft"); setCurrent(0); setAnswers(Array(totalQ).fill("")); setInputValue(""); setHasDraft(false); }}
+            style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontFamily: "'Inter', sans-serif" }}>
+            {lang === "fr" ? "Effacer" : "Clear"}
+          </button>
+        </div>
+      )}
       <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
         <Link
           href="/"

@@ -188,7 +188,7 @@ export default function DashboardPage() {
     en: {
       workspaces: "Workspaces",
       new_analysis: "+ New Analysis",
-      your_ideas: "YOUR IDEAS",
+      your_ideas: "Ideas",
       no_ideas: "No analyses yet. Start your first one.",
       ideas_analyzed: "IDEAS ANALYZED",
       verdicts: "VERDICTS",
@@ -219,7 +219,7 @@ export default function DashboardPage() {
     fr: {
       workspaces: "Espaces de travail",
       new_analysis: "+ Nouvelle analyse",
-      your_ideas: "VOS IDÉES",
+      your_ideas: "Idées",
       no_ideas: "Pas encore d'analyses. Commencez votre première.",
       ideas_analyzed: "IDÉES ANALYSÉES",
       verdicts: "VERDICTS",
@@ -271,6 +271,11 @@ export default function DashboardPage() {
     Record<string, string>
   >({});
   const [showWorkspaces, setShowWorkspaces] = useState(false);
+  const [ideasOpen, setIdeasOpen] = useState(true);
+  const [dashHasDraft, setDashHasDraft] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { const d = localStorage.getItem("klayan_draft"); return !!(d && JSON.parse(d).answers?.[0]); } catch { return false; }
+  });
   useEffect(() => {
     const shouldOpen = localStorage.getItem("klayan_open_workspaces");
     if (shouldOpen === "true") {
@@ -960,9 +965,33 @@ export default function DashboardPage() {
             {t.workspaces}
           </button>
 
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#aaa", margin: "14px 0 6px 12px", textTransform: "uppercase" }}>{t.your_ideas}</div>
+          {dashHasDraft && (
+            <Link href="/analyze"
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginBottom: 4, background: "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
+              onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "#111" }}>Draft</span>
+              </div>
+              <span style={{ fontSize: 11, background: "#f0fdf4", color: "#16a34a", borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>1</span>
+            </Link>
+          )}
+          <div style={{ height: 1, background: "#e5e5e5", margin: "8px 0" }} />
+          <button type="button" onClick={() => setIdeasOpen((v) => !v)}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: ideasOpen ? "#ebebeb" : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
+            onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
+            onMouseOut={(e) => { e.currentTarget.style.background = ideasOpen ? "#ebebeb" : "transparent"; }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#111" }}>{t.your_ideas}</span>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2.5" style={{ transform: ideasOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {ideasOpen && <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
             {loading ? (
               <p style={{ fontSize: 13, color: "#aaa", padding: "0 12px" }}>Loading…</p>
             ) : error ? (
@@ -1015,7 +1044,7 @@ export default function DashboardPage() {
                         <button type="button" onClick={(e) => { e.stopPropagation(); void handleDeleteAnalysis(row.id); setOpenMenuId(null); }}
                           style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#ef4444", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
                           onMouseOver={(e) => { e.currentTarget.style.background = "#fff0f0"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
-                          {t.delete}
+                          Delete
                         </button>
                       </div>
                     ) : null}
@@ -1023,7 +1052,7 @@ export default function DashboardPage() {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </div>
 
         {/* Bottom */}
