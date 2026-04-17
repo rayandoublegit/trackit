@@ -94,7 +94,7 @@ export default function AnalyzePage() {
       step_back: "← Back",
       step_submit: "Analyze my idea →",
       step_analyzing: "Analyzing...",
-      step_hint: "or press OK, NEXT →",
+      step_hint: "Press Ctrl + Enter to continue",
       step1_eg: "e.g. A tool that helps freelancers send invoices in 30 seconds without an accountant.",
       step2_eg: "e.g. Freelancers aged 25-40 who invoice 3-10 clients per month and hate spreadsheets.",
       step3_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
@@ -116,7 +116,7 @@ export default function AnalyzePage() {
       counter_of: "sur",
       counter_questions: "questions",
       step1_title: "C'est quoi ton idée en une phrase ?",
-      step1_sub: "Une phrase. Pas un roman.",
+      step1_sub: "Le problème, qui l'a, et comment tu le résous.",
       step2_title: "C'est qui ton client cible ?",
       step2_sub: "Sois précis. Pas 'tout le monde'. Qui exactement a ce problème ?",
       step3_title: "Comment tu gagnes de l'argent ?",
@@ -131,7 +131,7 @@ export default function AnalyzePage() {
       step_back: "← Retour",
       step_submit: "Analyser mon idée →",
       step_analyzing: "Analyse en cours...",
-      step_hint: "ou appuie sur OK, SUIVANT →",
+      step_hint: "Appuie sur Ctrl + Entrée pour continuer",
       step1_eg: "ex. Un outil qui aide les freelances à envoyer des factures en 30 secondes sans comptable.",
       step2_eg: "ex. Freelances de 25-40 ans qui facturent 3-10 clients par mois et détestent les tableurs.",
       step3_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
@@ -180,43 +180,16 @@ export default function AnalyzePage() {
 
   const totalQ = QUESTION_META.length;
 
-  const [current, setCurrent] = useState(() => {
-    if (typeof window === "undefined") return 0;
-    const d = localStorage.getItem("klayan_draft");
-    if (!d) return 0;
-    try { return JSON.parse(d).current ?? 0; } catch { return 0; }
-  });
-  const [answers, setAnswers] = useState<string[]>(() => {
-    if (typeof window === "undefined") return Array(QUESTION_META.length).fill("");
-    const d = localStorage.getItem("klayan_draft");
-    if (!d) return Array(QUESTION_META.length).fill("");
-    try { return JSON.parse(d).answers ?? Array(QUESTION_META.length).fill(""); } catch { return Array(QUESTION_META.length).fill(""); }
-  });
-  const [inputValue, setInputValue] = useState(() => {
-    if (typeof window === "undefined") return "";
-    const d = localStorage.getItem("klayan_draft");
-    if (!d) return "";
-    try { return JSON.parse(d).inputValue ?? ""; } catch { return ""; }
-  });
-  const [hasDraft, setHasDraft] = useState(() => {
-    if (typeof window === "undefined") return false;
-    const d = localStorage.getItem("klayan_draft");
-    if (!d) return false;
-    try { const p = JSON.parse(d); return !!(p.answers?.[0]); } catch { return false; }
-  });
+  const [current, setCurrent] = useState(0);
+  const [answers, setAnswers] = useState<string[]>(() =>
+    Array(QUESTION_META.length).fill("")
+  );
+  const [inputValue, setInputValue] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showInputError, setShowInputError] = useState(false);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  // Auto-save draft
-  useEffect(() => {
-    if (answers.some(a => a.trim())) {
-      localStorage.setItem("klayan_draft", JSON.stringify({ current, answers, inputValue }));
-      setHasDraft(true);
-    }
-  }, [current, answers, inputValue]);
 
   const contentRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -429,17 +402,9 @@ export default function AnalyzePage() {
         return;
       }
 
-      void fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          analysisId,
-          userId: user.id,
-        }),
-      }).catch(() => {});
-
-      localStorage.removeItem("klayan_draft");
-      window.location.href = `/verdict/${analysisId}`;
+      // Verdict page mounts and calls /api/analyze while this tab stays on that URL
+      playVerdictSound();
+      window.location.href = `/verdict/${data.id}`;
     } catch (e) {
       console.error("Submit exception:", e);
       setSubmitError("Something went wrong. Please try again.");
@@ -478,17 +443,6 @@ export default function AnalyzePage() {
         flexDirection: "column",
       }}
     >
-      {hasDraft && (
-        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 2000, background: "#1a1a1a", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: "10px 18px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", fontFamily: "'Inter', sans-serif" }}>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
-            {lang === "fr" ? "Brouillon restauré — question " : "Draft restored — question "}{current + 1}/{totalQ}
-          </span>
-          <button type="button" onClick={() => { localStorage.removeItem("klayan_draft"); setCurrent(0); setAnswers(Array(totalQ).fill("")); setInputValue(""); setHasDraft(false); }}
-            style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", background: "transparent", border: "none", cursor: "pointer", padding: 0, fontFamily: "'Inter', sans-serif" }}>
-            {lang === "fr" ? "Effacer" : "Clear"}
-          </button>
-        </div>
-      )}
       <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
         <Link
           href="/"
@@ -616,14 +570,12 @@ export default function AnalyzePage() {
             {t.step_back}
           </button>
         </div>
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginTop: 10, letterSpacing: "0.01em" }}>
-          {t.free_note}
-        </div>
       </div>
 
       <div id="modalFooter">
         <span id="qCounter">
-          {current + 1} {t.counter_of} {totalQ} {t.counter_questions}
+          {current + 1} {t.counter_of} {totalQ} {t.counter_questions} ·{" "}
+          {t.free_note}
         </span>
         <div id="qDots">
           {Array.from({ length: totalQ }, (_, i) => (

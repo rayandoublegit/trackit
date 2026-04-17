@@ -85,7 +85,7 @@ export default function AuthPage() {
       login_title: "Welcome back.",
       login_sub: "Sign in to your Klayan account.",
       signup_title: "Create your account.",
-      signup_sub: "What's your idea worth? Find out in 10 minutes.",
+      signup_sub: "Start validating your ideas with Klayan.",
       email: "Email",
       password: "Password",
       username: "Username",
@@ -104,7 +104,7 @@ export default function AuthPage() {
       login_title: "Bon retour.",
       login_sub: "Connecte-toi à ton compte Klayan.",
       signup_title: "Crée ton compte.",
-      signup_sub: "Ton idée vaut combien ? Découvre-le en 10 minutes.",
+      signup_sub: "Commence à valider tes idées avec Klayan.",
       email: "Email",
       password: "Mot de passe",
       username: "Nom d'utilisateur",
@@ -218,30 +218,31 @@ export default function AuthPage() {
     resetFieldErrors();
 
     if (!validateEmail(email.trim())) {
-      setEmailError("Adresse email invalide");
+      setEmailError("Please enter a valid email address");
       return;
     }
     if (password.length < 12) {
-      setPasswordError("12 caractères minimum");
+      setPasswordError("At least 12 characters required");
       return;
     }
     if (!/[A-Z]/.test(password)) {
-      setPasswordError("Au moins une majuscule requise");
+      setPasswordError("At least one uppercase letter required");
       return;
     }
     if (!/[!@#$%^&*]/.test(password)) {
-      setPasswordError("Au moins un symbole requis (!@#$%^&*)");
+      setPasswordError("At least one symbol required (!@#$%^&*)");
       return;
     }
     if (confirmPassword !== password) {
-      setConfirmPasswordError("Les mots de passe ne correspondent pas");
+      setConfirmPasswordError("Passwords do not match");
       return;
     }
 
-    void handleCreateAccount_inner();
+    setSignupStep(2);
   };
 
-  const handleCreateAccount_inner = async () => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!supabase) {
       setError("Supabase is not configured yet.");
       return;
@@ -249,7 +250,13 @@ export default function AuthPage() {
 
     resetFieldErrors();
 
-    const u = email.trim().split("@")[0].replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 20) || "founder";
+    const u = username.trim();
+    if (!validateUsername(u)) {
+      setUsernameError(
+        "3–20 characters: letters, numbers, and underscores only"
+      );
+      return;
+    }
 
     setLoading(true);
     skipAuthRedirectForAvatarRef.current = true;
@@ -387,7 +394,7 @@ export default function AuthPage() {
     resetFieldErrors();
 
     if (!validateEmail(email.trim())) {
-      setEmailError("Adresse email invalide");
+      setEmailError("Please enter a valid email address");
       return;
     }
 
@@ -422,19 +429,6 @@ export default function AuthPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGoogleSignIn = async () => {
-    if (!supabase) return;
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/api/auth-callback`,
-        queryParams: { access_type: "offline", prompt: "consent" },
-      },
-    });
-    if (error) { setError(error.message); setLoading(false); }
   };
 
   const toggleMode = () => {
@@ -637,65 +631,72 @@ export default function AuthPage() {
                 ? `${t.no_account} ${t.signup_link}`
                 : `${t.has_account} ${t.signin_link}`}
             </button>
-
-            {mode === "signup" && (
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", marginTop: 10, textAlign: "center" }}>
-                Rejoins 13 fondateurs qui ont déjà validé leur idée.
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => void handleGoogleSignIn()}
-              style={{
-                marginTop: 20,
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
-                background: "#fff",
-                color: "#000",
-                border: "none",
-                borderRadius: 100,
-                padding: "14px 24px",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
-                <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
-                <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
-                <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
-              </svg>
-              {mode === "signup" ? "Continuer avec Google" : "Se connecter avec Google"}
-            </button>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0 0", width: "100%" }}>
-              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,0.3)", fontFamily: "'Inter', sans-serif" }}>ou</span>
-              <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.1)" }} />
-            </div>
           </div>
         ) : null}
 
-        {false ? (
+        {!signupAwaitingEmail && showSignupStep2 ? (
           <div
             style={{
-              display: "none",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              marginBottom: 22,
             }}
           >
+            <img
+              src="/images/navbarlogo.png"
+              alt="Klayan"
+              style={{
+                width: 60,
+                height: 60,
+                objectFit: "cover",
+                borderRadius: 50,
+                marginBottom: 18,
+              }}
+            />
+            <div
+              style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: 32,
+                fontWeight: 700,
+                letterSpacing: "-0.04em",
+                lineHeight: 1.0,
+                marginBottom: 10,
+                textAlign: "center",
+              }}
+            >
+              One last thing.
+            </div>
+            <div
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 16,
+                fontWeight: 300,
+                color: "var(--muted)",
+                lineHeight: 1.6,
+                marginBottom: 8,
+                textAlign: "center",
+              }}
+            >
+              Choose your username.
+            </div>
             <button
               type="button"
               onClick={() => {
                 setSignupStep(1);
+                setUsernameError(null);
+                setError(null);
               }}
               style={{
-                display: "none",
+                border: "none",
+                background: "transparent",
+                color: "var(--muted)",
+                cursor: "pointer",
+                fontFamily: "'Inter', sans-serif",
+                fontSize: 14,
+                fontWeight: 300,
+                padding: 0,
+                marginTop: 4,
               }}
             >
               ← Back
@@ -937,7 +938,7 @@ export default function AuthPage() {
         ) : null}
 
         {!signupAwaitingEmail && showSignupStep2 ? (
-          <form onSubmit={(e) => { e.preventDefault(); void handleCreateAccount_inner(); }}>
+          <form onSubmit={(e) => void handleCreateAccount(e)}>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}

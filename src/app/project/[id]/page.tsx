@@ -926,6 +926,10 @@ export default function ProjectPage() {
     setNotes((prev) => prev.filter((n) => n.id !== noteId));
   }, []);
 
+
+
+
+
   const submitCheckin = useCallback(async () => {
     if (!supabase || !user) return;
     setSubmittingCheckin(true);
@@ -1324,1013 +1328,613 @@ export default function ProjectPage() {
     return "#ffffff";
   };
 
-  if (loading) {
-    return (
-      <div style={{ background: "#000", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ color: "rgba(255,255,255,0.5)", fontFamily: "Inter, sans-serif", fontSize: 14 }}>{t.loading}</div>
-      </div>
-    );
-  }
+  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("checkin");
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const [collapsedReports, setCollapsedReports] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    const saved = localStorage.getItem("klayan_dark");
+    setDarkMode(saved === null ? true : saved === "1");
+    setMounted(true);
+  }, []);
+
+  const D = darkMode;
+  const th = {
+    bg: D ? "#0d0d0d" : "#f5f5f5",
+    sidebar: D ? "#111" : "#fff",
+    sidebarBorder: D ? "#222" : "#e5e5e5",
+    text: D ? "#f0f0f0" : "#111",
+    textMuted: D ? "#888" : "#666",
+    cardBg: D ? "#1a1a1a" : "#fff",
+    cardBorder: D ? "#2a2a2a" : "#e5e5e5",
+    activeNav: D ? "#2b2d31" : "#e8e8e8",
+    inputBg: D ? "#1a1a1a" : "#fff",
+    divider: D ? "#222" : "#e5e5e5",
+  };
+
+  const canAccess = (plan: string) => {
+    const order = ["free", "spark", "build", "scale"];
+    return order.indexOf(userPlan) >= order.indexOf(plan.toLowerCase());
+  };
+
+  const navItems = [
+    { id: "checkin", label: t.checkin_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'/></svg>", plan: "spark", group: "Core" },
+    { id: "milestones", label: t.milestones_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M6 9H4.5a2.5 2.5 0 010-5H6m12 5h1.5a2.5 2.5 0 000-5H18M8 21h8m-4-4v4m-7-4a7 7 0 0114 0H5z'/></svg>", plan: "free", group: "Core" },
+    { id: "market", label: t.market_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728M8.464 15.536a5 5 0 010-7.072m7.072 0a5 5 0 010 7.072M12 12h.01'/></svg>", plan: "build", group: "Intelligence" },
+    { id: "competitor", label: t.competitor_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.35-4.35'/></svg>", plan: "build", group: "Intelligence" },
+    { id: "pivot", label: t.pivot_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M1 4v6h6M23 20v-6h-6'/><path d='M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15'/></svg>", plan: "build", group: "Intelligence" },
+    { id: "marketing", label: t.marketing_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M22 12h-4l-3 9L9 3l-3 9H2'/></svg>", plan: "build", group: "Growth" },
+    { id: "outreach", label: t.outreach_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'/><polyline points='22,6 12,13 2,6'/></svg>", plan: "build", group: "Growth" },
+    { id: "pricing", label: t.pricing_strategy_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><line x1='12' y1='1' x2='12' y2='23'/><path d='M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'/></svg>", plan: "build", group: "Growth" },
+    { id: "revenue", label: t.revenue_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><polyline points='23 6 13.5 15.5 8.5 10.5 1 18'/><polyline points='17 6 23 6 23 12'/></svg>", plan: "build", group: "Growth" },
+    { id: "cofounder", label: t.cofounder_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><rect x='3' y='11' width='18' height='11' rx='2'/><path d='M12 2a2 2 0 012 2v3H10V4a2 2 0 012-2z'/><circle cx='9' cy='16' r='1'/><circle cx='15' cy='16' r='1'/></svg>", plan: "scale", group: "AI" },
+    { id: "notes", label: t.notes_title, icon: "<svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.8'><path d='M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7'/><path d='M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z'/></svg>", plan: "free", group: "Other" },
+  ];
+
+  const groups = ["Core", "Intelligence", "Growth", "AI", "Other"];
+
+  const Paygate = ({ feature, plan }: { feature: string; plan: string }) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 400, textAlign: "center", padding: "48px 32px" }}>
+      <div style={{ width: 64, height: 64, borderRadius: "50%", background: D ? "#1a1a1a" : "#f0f0f0", border: `1px solid ${th.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, marginBottom: 24 }}>🔒</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: th.text, marginBottom: 8, letterSpacing: "-0.02em" }}>{feature}</div>
+      <div style={{ fontSize: 15, color: th.textMuted, marginBottom: 6, lineHeight: 1.6 }}>
+        {lang === "fr" ? <>Disponible avec le plan <strong style={{ color: th.text }}>{plan}</strong> et supérieur.</> : <>Available on the <strong style={{ color: th.text }}>{plan}</strong> plan and above.</>}
+      </div>
+      <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 32, lineHeight: 1.6, maxWidth: 400 }}>
+        {lang === "fr" ? "Débloquez cette fonctionnalité pour accélérer votre croissance." : "Unlock this feature to accelerate your growth."}
+      </div>
+      <button type="button" onClick={() => void upgradeToNextPlan(userPlan)}
+        style={{ background: "#111", color: "#fff", border: "none", borderRadius: 100, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? `Passer à ${plan} →` : `Upgrade to ${plan} →`}
+      </button>
+    </div>
+  );
+
+  const ReportDisplay = ({ report }: { report: string }) => (
+    <div style={{ fontSize: 14, lineHeight: 1.8, color: th.text, whiteSpace: "pre-wrap", fontFamily: "'Inter', sans-serif" }}>
+      {report.replace(/\*\*/g, "").replace(/^#+\s/gm, "").replace(/^\*\s/gm, "").replace(/^-\s/gm, "").trim()}
+    </div>
+  );
+
+  if (!mounted) return <div style={{ background: "#0d0d0d", minHeight: "100vh" }} />;
+  if (loading) return <div style={{ background: th.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: th.textMuted, fontFamily: "'Inter', sans-serif" }}>Loading...</div>;
   if (!project) return null;
 
-  return (
-    <div style={{ background: "#0a0a0a", minHeight: "100vh", color: "#fff", fontFamily: "'Inter', sans-serif" }}>
 
-      {/* Header */}
-      <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <Link href="/dashboard" style={{ color: "rgba(255,255,255,0.4)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
-            {t.back}
-          </Link>
-          <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)" }} />
-          <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {(["building", "pivoting", "killed"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => void updateStatus(s)}
-              style={{
-                background: project.status === s ? "rgba(255,255,255,0.1)" : "transparent",
-                border: `1px solid ${project.status === s ? statusColor(s) : "rgba(255,255,255,0.1)"}`,
-                borderRadius: 100,
-                padding: "6px 14px",
-                color: project.status === s ? statusColor(s) : "rgba(255,255,255,0.3)",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                textTransform: "capitalize",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {s === "building" ? t.building : s === "pivoting" ? t.pivoting : t.killed}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setShowResetConfirm(true)}
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(248,113,113,0.2)",
-              borderRadius: 100,
-              padding: "6px 14px",
-              color: "rgba(248,113,113,0.5)",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: "-0.01em",
-              marginLeft: 8,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.6)"; e.currentTarget.style.color = "#f87171"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)"; e.currentTarget.style.color = "rgba(248,113,113,0.5)"; }}
-          >
-            Reset workspace
-          </button>
-        </div>
+  return (
+    <div suppressHydrationWarning style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: th.bg, fontFamily: "'Inter', sans-serif", color: th.text }}>
+
+      {/* TOP BAR — spans full width */}
+      <div style={{ display: "flex", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid ${th.sidebarBorder}`, background: th.sidebar, flexShrink: 0 }}>
+        <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 40, height: 40, objectFit: "contain" }} />
       </div>
 
-      <div style={{ maxWidth: 800, margin: "0 auto", padding: "48px 32px" }}>
+      {/* BODY */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
-        {/* Project Title */}
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 12 }}>
-            {t.active_project}
-          </div>
-          <EditableTitle
-            lang={lang}
-            value={(() => { const words = project.idea_name.split(" "); return words.length > 5 ? words.slice(0, 5).join(" ") + "..." : project.idea_name; })()}
-            onSave={async (newName) => {
-              if (!supabase) return;
-              const { error } = await supabase.from("projects").update({ idea_name: newName }).eq("id", project.id);
-              console.log("Rename result:", error);
-              if (!error) setProject((prev) => prev ? { ...prev, idea_name: newName } : prev);
-            }}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: statusColor(project.status) }} />
-              <span style={{ fontSize: 13, color: statusColor(project.status), fontWeight: 600, textTransform: "capitalize" }}>
-                {project.status === "building" ? t.building : project.status === "pivoting" ? t.pivoting : project.status === "killed" ? t.killed : project.status}
-              </span>
+      {/* SIDEBAR */}
+      <aside suppressHydrationWarning style={{ width: 260, flexShrink: 0, borderRight: `1px solid ${th.sidebarBorder}`, background: th.sidebar, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", boxSizing: "border-box" }}>
+
+        {/* Top */}
+        <div style={{ padding: "20px 20px 16px" }}>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: statusColor(project.status), flexShrink: 0 }} />
+            <div style={{ fontSize: 12, fontWeight: 500, color: statusColor(project.status), textTransform: "capitalize", fontFamily: "'Europa Grotesk No 2 SH', 'Plus Jakarta Sans', sans-serif", letterSpacing: "-0.01em" }}>
+              {project.status === "building" ? t.building : project.status === "pivoting" ? t.pivoting : t.killed}
             </div>
-            <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 13 }}>·</span>
-            <Link href={`/verdict/${project.analysis_id}`} style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>
-              {t.view_verdict}
+          </div>
+          <div style={{ marginBottom: 4 }} dangerouslySetInnerHTML={{ __html: `<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="folderBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a3a3a"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="doc1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0f0f0"/>
+      <stop offset="100%" stop-color="#d0d0d0"/>
+    </linearGradient>
+    <linearGradient id="doc2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8e8e8"/>
+      <stop offset="100%" stop-color="#c8c8c8"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.5)"/>
+    </filter>
+  </defs>
+  <!-- Folder body -->
+  <rect x="4" y="20" width="64" height="46" rx="10" fill="url(#folderBg)" filter="url(#shadow)"/>
+  <!-- Folder tab -->
+  <path d="M4 28 Q4 20 12 20 L28 20 Q32 20 34 24 L38 30 H4 Z" fill="#2a2a2a"/>
+  <!-- Doc back (right, rotated) -->
+  <g transform="rotate(8, 36, 36)">
+    <rect x="28" y="14" width="26" height="34" rx="4" fill="url(#doc1)" opacity="0.85"/>
+    <rect x="32" y="22" width="14" height="2" rx="1" fill="#bbb"/>
+    <rect x="32" y="27" width="10" height="2" rx="1" fill="#ccc"/>
+    <rect x="32" y="32" width="12" height="2" rx="1" fill="#bbb"/>
+  </g>
+  <!-- Doc front (left, slightly rotated) -->
+  <g transform="rotate(-5, 36, 36)">
+    <rect x="18" y="12" width="26" height="34" rx="4" fill="url(#doc2)" opacity="0.95"/>
+    <rect x="23" y="20" width="14" height="2" rx="1" fill="#aaa"/>
+    <rect x="23" y="25" width="10" height="2" rx="1" fill="#bbb"/>
+    <rect x="23" y="30" width="12" height="2" rx="1" fill="#aaa"/>
+  </g>
+  <!-- Folder front flap -->
+  <path d="M4 38 Q4 66 14 66 H58 Q68 66 68 56 V38 Z" fill="url(#folderBg)" opacity="0.92"/>
+  <!-- Shine on folder -->
+  <path d="M4 38 Q4 44 36 44 Q68 44 68 38 Z" fill="rgba(255,255,255,0.06)"/>
+</svg>` }} />
+          <div style={{ fontSize: 20, fontWeight: 500, color: th.text, letterSpacing: "-0.02em", marginBottom: 12, fontFamily: "'Europa Grotesk No 2 SH', 'Plus Jakarta Sans', sans-serif" }}>
+            Workspace
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <Link href="/dashboard" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: th.textMuted, textDecoration: "none", padding: "5px 10px", borderRadius: 6, border: `1px solid ${th.cardBorder}`, background: th.cardBg }}>
+              ← {lang === "fr" ? "Tableau de bord" : "Dashboard"}
+            </Link>
+            <Link href={`/verdict/${project.analysis_id}`} style={{ display: "inline-flex", alignItems: "center", fontSize: 12, color: th.textMuted, textDecoration: "none", padding: "5px 10px", borderRadius: 6, border: `1px solid ${th.cardBorder}`, background: th.cardBg }}>
+              {lang === "fr" ? "Verdict original" : "Original Verdict"}
             </Link>
           </div>
+          {/* Search bar */}
+          <div style={{ marginTop: 14, position: "relative" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: th.textMuted, pointerEvents: "none" }}>
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              type="text"
+              placeholder={lang === "fr" ? "Rechercher..." : "Search..."}
+              value={sidebarSearch}
+              onChange={e => setSidebarSearch(e.target.value)}
+              style={{ width: "100%", background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "8px 10px 8px 30px", fontSize: 12, color: th.text, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }}
+            />
+          </div>
         </div>
 
-        {userPlan === "free" ? (
-          <LockedFeature feature={t.checkin_title} requiredPlan="Spark" userPlan={userPlan} />
-        ) : (
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.checkin_title}</div>
-            <button
-              type="button"
-              onClick={() => setShowCheckin(!showCheckin)}
-              style={{
-                background: "#ffffff",
-                color: "#000",
-                border: "none",
-                borderRadius: 100,
-                padding: "8px 20px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
+        {/* Nav */}
+        <div style={{ padding: "6px 12px", flex: 1 }}>
+          {groups.map(group => {
+            const items = navItems.filter(n => n.group === group && (sidebarSearch === "" || n.label.toLowerCase().includes(sidebarSearch.toLowerCase())));
+            return (
+              <div key={group} style={{ marginBottom: 8, display: items.length === 0 ? "none" : "block" }}>
+                <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", color: th.textMuted, margin: "12px 0 4px 8px", textTransform: "uppercase" }}>{group}</div>
+                {items.map(item => {
+                  const locked = !canAccess(item.plan);
+                  const active = activeTab === item.id;
+                  return (
+                    <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", marginBottom: 2, borderRadius: 8, border: "none", background: active ? th.activeNav : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: active ? 600 : 400, color: locked ? th.textMuted : th.text, textAlign: "left", boxSizing: "border-box" }}>
+                      <span style={{ opacity: locked ? 0.4 : 1, display: "flex", alignItems: "center" }} dangerouslySetInnerHTML={{ __html: item.icon }} />
+                      <span style={{ flex: 1, opacity: locked ? 0.5 : 1 }}>{item.label}</span>
+                      {locked && <span style={{ fontSize: 10, color: th.textMuted, background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>{item.plan.toUpperCase()}</span>}
+                      {!locked && (() => { const countMap: Record<string, number> = { checkin: checkins.length, milestones: milestones.filter(m => m.achieved_at).length, market: marketWatches.length, competitor: competitorReport ? 1 : 0, pivot: pivotReport ? 1 : 0, marketing: marketingReport ? 1 : 0, outreach: outreachReport ? 1 : 0, pricing: pricingReport ? 1 : 0, revenue: revenueReport ? 1 : 0, notes: notes.length, cofounder: chatMessages.filter(m => m.role === "assistant").length }; const count = countMap[item.id] ?? 0; return count > 0 ? <span style={{ fontSize: 11, color: th.textMuted, background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 6, padding: "1px 7px", fontWeight: 500, minWidth: 20, textAlign: "center" as any }}>{count}</span> : null; })()}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom — plan badge */}
+        <div style={{ padding: "12px", borderTop: `1px solid ${th.sidebarBorder}` }}>
+          <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: th.text, marginBottom: 2, textTransform: "capitalize" }}>{userPlan} {lang === "fr" ? "plan" : "plan"}</div>
+            <div style={{ fontSize: 11, color: th.textMuted }}>{lang === "fr" ? "Votre plan actuel" : "Your current plan"}</div>
+          </div>
+          <button type="button"
+            onClick={() => setShowResetConfirm(true)}
+            style={{ width: "100%", background: "transparent", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "rgba(248,113,113,0.6)", cursor: "pointer", fontFamily: "'Inter', sans-serif", textAlign: "left" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.6)"; e.currentTarget.style.color = "#f87171"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)"; e.currentTarget.style.color = "rgba(248,113,113,0.6)"; }}>
+            {lang === "fr" ? "Réinitialiser le workspace" : "Reset workspace"}
+          </button>
+        </div>
+      </aside>
+
+      {/* MAIN */}
+      <main suppressHydrationWarning style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: th.textMuted, fontWeight: 500, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+  {navItems.find(n => n.id === activeTab)?.label}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: th.text, letterSpacing: "-0.02em" }}>
+                {project.idea_name.length > 60 ? project.idea_name.slice(0, 60) + "..." : project.idea_name}
+              </div>
+            </div>
+            {/* Rename button — pixel perfect */}
+            <button type="button"
+              onClick={async () => {
+                const newName = window.prompt(lang === "fr" ? "Renommer le projet :" : "Rename project:", project.idea_name);
+                if (!newName || !newName.trim() || !supabase) return;
+                const { error } = await supabase.from("projects").update({ idea_name: newName.trim() }).eq("id", project.id);
+                if (!error) setProject((prev) => prev ? { ...prev, idea_name: newName.trim() } : prev);
               }}
-            >
-              {t.checkin_new}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 100, border: "1.5px dashed #22c55e", background: "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", color: "#22c55e", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
+              <span style={{ width: 16, height: 16, borderRadius: "50%", background: D ? "#1a1a1a" : "#f0fdf4", border: "1px solid #22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#22c55e", flexShrink: 0 }}>+</span>
+              {lang === "fr" ? "Renommer" : "Add Name"}
             </button>
           </div>
 
-          {showCheckin ? (
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 20, color: "rgba(255,255,255,0.7)" }}>
-                {t.checkin_week}
-              </div>
+        </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <label style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>{t.checkin_talked}</label>
-                  <button
-                    type="button"
-                    onClick={() => setCheckinForm(f => ({ ...f, talked_to_users: !f.talked_to_users }))}
-                    style={{
-                      background: checkinForm.talked_to_users ? "#4ade80" : "rgba(255,255,255,0.1)",
-                      color: checkinForm.talked_to_users ? "#000" : "#fff",
-                      border: "none",
-                      borderRadius: 100,
-                      padding: "6px 16px",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {checkinForm.talked_to_users ? t.checkin_yes : t.checkin_no}
+        {/* Separator */}
+        <div style={{ height: 1, background: th.sidebarBorder, width: "100%" }} />
+
+        {/* Content */}
+        <div style={{ flex: 1, padding: "32px", maxWidth: 860, width: "100%", boxSizing: "border-box" }}>
+
+          {/* CHECKIN TAB */}
+          {activeTab === "checkin" && (
+            canAccess("spark") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.checkin_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Ton bilan hebdomadaire avec ton co-fondateur IA" : "Your weekly review with your AI co-founder"}</div>
+                  <button type="button" onClick={() => setShowCheckin(!showCheckin)}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: "pointer" }}>
+                    {t.checkin_new}
                   </button>
                 </div>
 
-                {checkinForm.talked_to_users ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <label style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>{t.checkin_how_many}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={checkinForm.users_count}
-                      onChange={(e) => setCheckinForm(f => ({ ...f, users_count: Number(e.target.value) }))}
-                      style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 12px", color: "#fff", fontFamily: "Inter, sans-serif", fontSize: 13, width: 80 }}
-                    />
-                  </div>
-                ) : null}
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <label style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>{t.checkin_build_days}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={7}
-                    value={checkinForm.build_days}
-                    onChange={(e) => setCheckinForm(f => ({ ...f, build_days: Number(e.target.value) }))}
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 12px", color: "#fff", fontFamily: "Inter, sans-serif", fontSize: 13, width: 80 }}
-                  />
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <label style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", flexShrink: 0 }}>{t.checkin_revenue}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={checkinForm.revenue}
-                    onChange={(e) => setCheckinForm(f => ({ ...f, revenue: Number(e.target.value) }))}
-                    style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 12px", color: "#fff", fontFamily: "Inter, sans-serif", fontSize: 13, width: 120 }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 8 }}>{t.checkin_what}</label>
-                  <textarea
-                    value={checkinForm.notes}
-                    onChange={(e) => setCheckinForm(f => ({ ...f, notes: e.target.value }))}
-                    placeholder={t.checkin_placeholder}
-                    rows={3}
-                    style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 12px", color: "#fff", fontFamily: "Inter, sans-serif", fontSize: 13, resize: "none", outline: "none", boxSizing: "border-box" }}
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => void submitCheckin()}
-                  disabled={submittingCheckin}
-                  style={{ background: "#ffffff", color: "#000", border: "none", borderRadius: 100, padding: "12px 24px", fontSize: 14, fontWeight: 700, cursor: "pointer", opacity: submittingCheckin ? 0.6 : 1 }}
-                >
-                  {submittingCheckin ? t.checkin_submitting : t.checkin_submit}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {checkinReport ? (
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: "#4ade80" }}>{t.checkin_report_title}</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <CheckinReportToggle lang={lang} report={checkinReport} />
-                <button
-                  type="button"
-                  onClick={() => void deleteReport("checkin_report")}
-                  style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {checkins.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {checkins.map((c) => (
-                <div key={c.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "14px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>
-                      {new Date(c.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })}
-                    </span>
-                    <span style={{ fontSize: 12, color: c.revenue > 0 ? "#4ade80" : "rgba(255,255,255,0.3)" }}>
-                      {c.revenue > 0 ? `$${c.revenue} ${t.checkin_row_revenue}` : t.checkin_row_no_revenue}
-                    </span>
-                  </div>
-                  {c.ai_report ? (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <CheckinReportToggle lang={lang} report={c.ai_report} />
-                      <button
-                        type="button"
-                        onClick={() => void clearCheckinRowAiReport(c.id)}
-                        style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-        )}
-
-        {/* Milestone Engine */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.locked_milestone_feature} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 20 }}>
-            {t.milestones_title}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {[
-              { type: "first_user", label: t.milestone_first_user, icon: "👤", desc: t.milestone_first_user_desc },
-              { type: "first_dollar", label: t.milestone_first_dollar, icon: "💵", desc: t.milestone_first_dollar_desc },
-              { type: "1k_mrr", label: t.milestone_1k, icon: "🚀", desc: t.milestone_1k_desc },
-              { type: "10k_mrr", label: t.milestone_10k, icon: "🔥", desc: t.milestone_10k_desc },
-            ].map((m, idx) => {
-              const achieved = milestones.find((ms) => ms.type === m.type);
-              const prevType = ["first_user", "first_dollar", "1k_mrr", "10k_mrr"][idx - 1];
-              const prevAchieved = idx === 0 || milestones.find((ms) => ms.type === prevType);
-              const isLocked = !prevAchieved && !achieved;
-
-              return (
-                <div key={m.type} style={{
-                  background: achieved ? "rgba(74,222,128,0.05)" : "rgba(255,255,255,0.02)",
-                  border: `1px solid ${achieved ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)"}`,
-                  borderRadius: 14,
-                  padding: "16px 20px",
-                  opacity: isLocked ? 0.4 : 1,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: achieved ? "#4ade80" : isLocked ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.4)",
-                        flexShrink: 0,
-                        marginTop: 4,
-                      }} />
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 2 }}>{m.label}</div>
-                        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{m.desc}</div>
+                {showCheckin && (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: "24px", marginBottom: 24 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: th.text, marginBottom: 20 }}>{t.checkin_week}</div>
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{t.checkin_talked}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        {[true, false].map(val => (
+                          <button key={String(val)} type="button" onClick={() => setCheckinForm(p => ({ ...p, talked_to_users: val }))}
+                            style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${checkinForm.talked_to_users === val ? th.text : th.cardBorder}`, background: checkinForm.talked_to_users === val ? th.text : "transparent", color: checkinForm.talked_to_users === val ? th.bg : th.textMuted, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                            {val ? t.checkin_yes : t.checkin_no}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    {!achieved && !isLocked ? (
-                      <button
-                        type="button"
-                        onClick={() => void claimMilestone(m.type)}
-                        disabled={claimingMilestone === m.type}
-                        style={{
-                          background: "#ffffff",
-                          color: "#000",
-                          border: "none",
-                          borderRadius: 100,
-                          padding: "8px 18px",
-                          fontSize: 12,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          opacity: claimingMilestone === m.type ? 0.6 : 1,
-                        }}
-                      >
-                        {claimingMilestone === m.type ? t.milestone_claiming : t.milestone_claim}
-                      </button>
-                    ) : achieved ? (
-                      <span style={{ fontSize: 12, color: "rgba(74,222,128,0.7)" }}>
-                        {new Date(achieved.achieved_at!).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" })}
-                      </span>
-                    ) : null}
-                  </div>
-                  {achieved?.playbook ? (
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginTop: 12 }}>
-                      <PlaybookToggle lang={lang} playbook={achieved.playbook} />
-                      <button
-                        type="button"
-                        onClick={() => void clearMilestonePlaybook(achieved.id)}
-                        style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                      >
-                        Delete
-                      </button>
+                    {checkinForm.talked_to_users && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{t.checkin_how_many}</div>
+                        <input type="number" value={checkinForm.users_count} onChange={e => setCheckinForm(p => ({ ...p, users_count: Number(e.target.value) }))}
+                          style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 120, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                      </div>
+                    )}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                      {[{ label: t.checkin_build_days, key: "build_days" }, { label: t.checkin_revenue, key: "revenue" }].map(({ label, key }) => (
+                        <div key={key}>
+                          <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{label}</div>
+                          <input type="number" value={(checkinForm as any)[key]} onChange={e => setCheckinForm(p => ({ ...p, [key]: Number(e.target.value) }))}
+                            style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                        </div>
+                      ))}
                     </div>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        )}
-
-        {/* Market Watch */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.market_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.market_title}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.market_sub}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void runMarketWatch()}
-              disabled={runningMarketWatch}
-              style={{
-                background: runningMarketWatch ? "rgba(255,255,255,0.1)" : "#ffffff",
-                color: runningMarketWatch ? "rgba(255,255,255,0.5)" : "#000",
-                border: "none",
-                borderRadius: 100,
-                padding: "8px 20px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: runningMarketWatch ? "not-allowed" : "pointer",
-              }}
-            >
-              {runningMarketWatch ? t.market_running : t.market_run}
-            </button>
-          </div>
-
-          {marketWatches.length === 0 ? (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>👁️</div>
-              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.market_empty}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.market_empty_sub}</div>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {marketWatches.map((mw) => (
-                <div key={mw.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", marginBottom: 12 }}>
-                    {new Date(mw.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long", day: "numeric", year: "numeric" })}
+                    <div style={{ marginBottom: 20 }}>
+                      <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{t.checkin_what}</div>
+                      <textarea value={checkinForm.notes} onChange={e => setCheckinForm(p => ({ ...p, notes: e.target.value }))}
+                        onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submitCheckin(); }}
+                        placeholder={t.checkin_placeholder} rows={4}
+                        style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "12px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" as any }} />
+                      <div style={{ fontSize: 11, color: th.textMuted, marginTop: 4 }}>{t.checkin_hint}</div>
+                    </div>
+                    <button type="button" onClick={() => void submitCheckin()} disabled={submittingCheckin}
+                      style={{ background: "#4ade80", color: "#000", border: "none", borderRadius: 100, padding: "12px 24px", fontSize: 13, fontWeight: 700, cursor: submittingCheckin ? "not-allowed" : "pointer", opacity: submittingCheckin ? 0.7 : 1, fontFamily: "'Inter', sans-serif" }}>
+                      {submittingCheckin ? t.checkin_submitting : t.checkin_submit}
+                    </button>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <MarketWatchToggle lang={lang} report={mw.report} />
-                    <button
-                      type="button"
-                      onClick={() => void deleteMarketWatch(mw.id)}
-                      style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                    >
-                      Delete
+                )}
+
+                {checkinReport && (
+                  <div style={{ background: th.cardBg, border: `1px solid #4ade8033`, borderRadius: 12, padding: "24px", marginBottom: 24 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#4ade80", marginBottom: 16 }}>{t.checkin_report_title}</div>
+                    <ReportDisplay report={checkinReport} />
+                  </div>
+                )}
+
+                {checkins.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: th.text, marginBottom: 12 }}>{lang === "fr" ? "Historique" : "History"}</div>
+                    {checkins.map(c => (
+                      <div key={c.id} style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 10, padding: "16px 20px", marginBottom: 10 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                          <div style={{ fontSize: 12, color: th.textMuted }}>{new Date(c.created_at).toLocaleDateString()}</div>
+                          <div style={{ display: "flex", gap: 12, fontSize: 12, color: th.textMuted }}>
+                            <span>{lang === "fr" ? `${c.build_days}j de build` : `${c.build_days} build days`}</span>
+                            <span>${c.revenue}</span>
+                            {c.talked_to_users && <span style={{ color: "#4ade80" }}>✓ {lang === "fr" ? "parlé aux users" : "talked to users"}</span>}
+                          </div>
+                        </div>
+                        {c.notes && <div style={{ fontSize: 13, color: th.text, lineHeight: 1.6 }}>{c.notes}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.checkin_title} plan="Spark" />
+          )}
+
+          {/* MILESTONES TAB */}
+          {activeTab === "milestones" && (
+            <div>
+              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.milestones_title}</div>
+              <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Célèbre tes victoires et reçois un playbook IA" : "Celebrate wins and get an AI playbook"}</div>
+              {[
+                { type: "first_user", label: t.milestone_first_user, desc: t.milestone_first_user_desc, icon: "👤" },
+                { type: "first_dollar", label: t.milestone_first_dollar, desc: t.milestone_first_dollar_desc, icon: "💵" },
+                { type: "1k_mrr", label: t.milestone_1k, desc: t.milestone_1k_desc, icon: "🎯" },
+                { type: "10k_mrr", label: t.milestone_10k, desc: t.milestone_10k_desc, icon: "🚀" },
+              ].map(m => {
+                const achieved = milestones.find(ms => ms.type === m.type);
+                const claiming = claimingMilestone === m.type;
+                return (
+                  <div key={m.type} style={{ background: th.cardBg, border: `1px solid ${achieved ? "#4ade8033" : th.cardBorder}`, borderRadius: 12, padding: "20px 24px", marginBottom: 12, display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ fontSize: 28 }}>{m.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: th.text, marginBottom: 2 }}>{m.label}</div>
+                      <div style={{ fontSize: 13, color: th.textMuted }}>{m.desc}</div>
+                      {achieved?.playbook && (
+                        <div style={{ marginTop: 12, fontSize: 13, color: th.text, lineHeight: 1.7, padding: "12px", background: D ? "#0d1a0d" : "#f0fdf0", borderRadius: 8 }}>
+                          <ReportDisplay report={achieved.playbook} />
+                        </div>
+                      )}
+                    </div>
+                    {achieved ? (
+                      <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 600, whiteSpace: "nowrap" }}>✓ {lang === "fr" ? "Atteint" : "Achieved"}</div>
+                    ) : (
+                      <button type="button" onClick={() => void claimMilestone(m.type)} disabled={claiming}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: claiming ? "not-allowed" : "pointer", opacity: claiming ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                        {claiming ? t.milestone_claiming : t.milestone_claim}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* MARKET WATCH TAB */}
+          {activeTab === "market" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.market_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{t.market_sub}</div>
+                  <button type="button" onClick={() => void runMarketWatch()} disabled={runningMarketWatch}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketWatch ? "not-allowed" : "pointer", opacity: runningMarketWatch ? 0.6 : 1 }}>
+                    {runningMarketWatch ? (lang === "fr" ? "Analyse..." : "Scanning...") : (lang === "fr" ? "Lancer l'analyse →" : "Run scan →")}
+                  </button>
+                </div>
+                {marketWatches.map((mw, i) => (
+                  <div key={mw.id} style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: "24px", marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}><div style={{ fontSize: 12, color: i === 0 ? "#4ade80" : th.textMuted, fontWeight: 600 }}>{i === 0 ? "● " : ""}{lang === "fr" ? "Rapport" : "Report"} · {new Date(mw.created_at).toLocaleDateString()}</div><div style={{ display: "flex", gap: 6, alignItems: "center" }}><button type="button" onClick={() => setCollapsedReports(p => ({ ...p, ["mw_" + mw.id]: !p["mw_" + mw.id] }))} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", fontSize: 11 }}>{collapsedReports["mw_" + mw.id] ? "▼" : "▲"}</button><button type="button" onClick={() => void deleteMarketWatch(mw.id)} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button></div></div>{!collapsedReports["mw_" + mw.id] && <ReportDisplay report={mw.report} />}</div>
+                ))}
+                {marketWatches.length === 0 && !runningMarketWatch && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance ton premier scan de marché." : "Run your first market scan."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.market_title} plan="Build" />
+          )}
+
+          {/* COMPETITOR TAB */}
+          {activeTab === "competitor" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.competitor_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Analyse approfondie de tes concurrents" : "Deep competitor analysis"}</div>
+                  <button type="button" onClick={() => void runCompetitorTracker()} disabled={runningCompetitor}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningCompetitor ? "not-allowed" : "pointer", opacity: runningCompetitor ? 0.6 : 1 }}>
+                    {runningCompetitor ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
+                  </button>
+                </div>
+                {competitorReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["competitor"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "competitor": !p["competitor"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("competitor"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["competitor"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["competitor"] && <div style={{ padding: "20px" }}><ReportDisplay report={competitorReport} /></div>}</div>
+                ) : !runningCompetitor && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance une analyse de tes concurrents." : "Run a competitor analysis."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.competitor_title} plan="Build" />
+          )}
+
+          {/* PIVOT RADAR TAB */}
+          {activeTab === "pivot" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.pivot_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Détecte les signaux de pivot" : "Detect pivot signals"}</div>
+                  <button type="button" onClick={() => void runPivotRadar()} disabled={runningPivot}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPivot ? "not-allowed" : "pointer", opacity: runningPivot ? 0.6 : 1 }}>
+                    {runningPivot ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
+                  </button>
+                </div>
+                {pivotReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["pivot"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "pivot": !p["pivot"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("pivot"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["pivot"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["pivot"] && <div style={{ padding: "20px" }}><ReportDisplay report={pivotReport} /></div>}</div>
+                ) : !runningPivot && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance le radar de pivot." : "Run the pivot radar."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.pivot_title} plan="Build" />
+          )}
+
+          {/* MARKETING TAB */}
+          {activeTab === "marketing" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.marketing_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie marketing IA personnalisée" : "AI-powered marketing strategy"}</div>
+                  <button type="button" onClick={() => void runMarketingEngine()} disabled={runningMarketing}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketing ? "not-allowed" : "pointer", opacity: runningMarketing ? 0.6 : 1 }}>
+                    {runningMarketing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
+                  </button>
+                </div>
+                {marketingReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["marketing"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "marketing": !p["marketing"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("marketing"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["marketing"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["marketing"] && <div style={{ padding: "20px" }}><ReportDisplay report={marketingReport} /></div>}</div>
+                ) : !runningMarketing && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance le moteur marketing." : "Run the marketing engine."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.marketing_title} plan="Build" />
+          )}
+
+          {/* OUTREACH TAB */}
+          {activeTab === "outreach" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.outreach_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Messages de prospection personnalisés" : "Personalized outreach messages"}</div>
+                  <button type="button" onClick={() => void runOutreachEngine()} disabled={runningOutreach}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningOutreach ? "not-allowed" : "pointer", opacity: runningOutreach ? 0.6 : 1 }}>
+                    {runningOutreach ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
+                  </button>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{lang === "fr" ? "Cible" : "Target"}</div>
+                  <input value={outreachTarget} onChange={e => setOutreachTarget(e.target.value)}
+                    style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 300, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                </div>
+                {outreachReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["outreach"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "outreach": !p["outreach"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("outreach"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["outreach"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["outreach"] && <div style={{ padding: "20px" }}><ReportDisplay report={outreachReport} /></div>}</div>
+                ) : !runningOutreach && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance le moteur de prospection." : "Run the outreach engine."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.outreach_title} plan="Build" />
+          )}
+
+          {/* PRICING TAB */}
+          {activeTab === "pricing" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.pricing_strategy_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie de prix optimale pour ton marché" : "Optimal pricing strategy for your market"}</div>
+                  <button type="button" onClick={() => void runPricingStrategy()} disabled={runningPricing}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPricing ? "not-allowed" : "pointer", opacity: runningPricing ? 0.6 : 1 }}>
+                    {runningPricing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
+                  </button>
+                </div>
+                {pricingReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["pricing"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "pricing": !p["pricing"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("pricing"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["pricing"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["pricing"] && <div style={{ padding: "20px" }}><ReportDisplay report={pricingReport} /></div>}</div>
+                ) : !runningPricing && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance la stratégie de prix." : "Run the pricing strategy."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.pricing_strategy_title} plan="Build" />
+          )}
+
+          {/* REVENUE TAB */}
+          {activeTab === "revenue" && (
+            canAccess("build") ? (
+              <div>
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.revenue_title}</div>
+                  <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Roadmap vers ton premier $10K MRR" : "Roadmap to your first $10K MRR"}</div>
+                  <button type="button" onClick={() => void runRevenueRoadmap()} disabled={runningRevenue}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningRevenue ? "not-allowed" : "pointer", opacity: runningRevenue ? 0.6 : 1 }}>
+                    {runningRevenue ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
+                  </button>
+                </div>
+                {revenueReport ? (
+                  <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["revenue"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "revenue": !p["revenue"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("revenue"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["revenue"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["revenue"] && <div style={{ padding: "20px" }}><ReportDisplay report={revenueReport} /></div>}</div>
+                ) : !runningRevenue && (
+                  <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>
+                    {lang === "fr" ? "Lance ta roadmap revenus." : "Run your revenue roadmap."}
+                  </div>
+                )}
+              </div>
+            ) : <Paygate feature={t.revenue_title} plan="Build" />
+          )}
+
+          {/* COFOUNDER TAB */}
+          {activeTab === "cofounder" && (
+            canAccess("scale") ? (
+              <div>
+                <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.cofounder_title}</div>
+                <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Ton co-fondateur IA avec accès au web en temps réel" : "Your AI co-founder with real-time web access"}</div>
+                <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ padding: "20px 24px", minHeight: 300, maxHeight: 500, overflowY: "auto" }}>
+                    {chatMessages.length === 0 && (
+                      <div style={{ textAlign: "center", padding: "48px 0", color: th.textMuted, fontSize: 14 }}>
+                        {lang === "fr" ? "Pose une question à ton co-fondateur IA..." : "Ask your AI co-founder anything..."}
+                      </div>
+                    )}
+                    {chatMessages.map((msg, i) => (
+                      <div key={i} style={{ marginBottom: 16, display: "flex", gap: 12, justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
+                        <div style={{ maxWidth: "80%", background: msg.role === "user" ? th.text : D ? "#1e1e1e" : "#f0f0f0", color: msg.role === "user" ? th.bg : th.text, borderRadius: 12, padding: "10px 14px", fontSize: 13, lineHeight: 1.6 }}>
+                          {msg.content}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ borderTop: `1px solid ${th.cardBorder}`, padding: "16px 24px", display: "flex", gap: 12 }}>
+                    <input value={chatInput} onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) void sendCofounderMessage(); }}
+                      placeholder={lang === "fr" ? "Demande quelque chose..." : "Ask something..."}
+                      style={{ flex: 1, background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, fontFamily: "'Inter', sans-serif", outline: "none" }} />
+                    <button type="button" onClick={() => void sendCofounderMessage()} disabled={chatLoading || !chatInput.trim()}
+                      style={{ background: th.text, color: th.bg, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', sans-serif", opacity: chatLoading || !chatInput.trim() ? 0.5 : 1 }}>
+                      {chatLoading ? "..." : "→"}
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : <Paygate feature={t.cofounder_title} plan="Scale" />
           )}
-        </div>
-        )}
 
-        {/* Co-Founder Mode */}
-        {userPlan !== "scale" ? (
-          <LockedFeature feature={t.cofounder_title} requiredPlan="Scale" userPlan={userPlan} />
-        ) : (
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          {/* NOTES TAB */}
+          {activeTab === "notes" && (
             <div>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.cofounder_title}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.cofounder_sub}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowCofounder(!showCofounder)}
-              style={{
-                background: showCofounder ? "rgba(255,255,255,0.1)" : "#ffffff",
-                color: showCofounder ? "#fff" : "#000",
-                border: "none",
-                borderRadius: 100,
-                padding: "8px 20px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {showCofounder ? t.cofounder_close : t.cofounder_open}
-            </button>
-          </div>
-
-          {showCofounder ? (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, overflow: "hidden" }}>
-              {/* Messages */}
-              <div style={{ padding: "20px", maxHeight: 400, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-                {chatMessages.length === 0 ? (
-                  <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
-                    {t.cofounder_empty}
-                  </div>
-                ) : chatMessages.map((msg, i) => (
-                  <div key={i} style={{
-                    display: "flex",
-                    justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
-                  }}>
-                    <div style={{
-                      maxWidth: "80%",
-                      background: msg.role === "user" ? "#ffffff" : "rgba(255,255,255,0.06)",
-                      color: msg.role === "user" ? "#000" : "rgba(255,255,255,0.85)",
-                      borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                      padding: "12px 16px",
-                      fontSize: 13,
-                      lineHeight: 1.6,
-                    }}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-                {chatLoading ? (
-                  <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center", gap: 8 }}>
-                    <img
-                      src="/images/navbarlogo.png"
-                      alt="Klayan"
-                      style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                    />
-                    <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                      {t.cofounder_thinking}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Input */}
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "16px 20px", display: "flex", gap: 12 }}>
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") void sendMessage(); }}
-                  placeholder={t.cofounder_placeholder}
-                  style={{
-                    flex: 1,
-                    background: "transparent",
-                    border: "none",
-                    color: "#fff",
-                    fontFamily: "Inter, sans-serif",
-                    fontSize: 13,
-                    outline: "none",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => void sendMessage()}
-                  disabled={chatLoading || !chatInput.trim()}
-                  style={{
-                    background: "#ffffff",
-                    color: "#000",
-                    border: "none",
-                    borderRadius: 100,
-                    padding: "8px 18px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    opacity: chatLoading || !chatInput.trim() ? 0.4 : 1,
-                    flexShrink: 0,
-                  }}
-                >
-                  {t.cofounder_send}
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-        )}
-
-
-        {/* Pricing Strategy */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.pricing_strategy_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.pricing_strategy_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.pricing_strategy_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runPricingStrategy()}
-                disabled={runningPricing}
-                style={{
-                  background: runningPricing ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningPricing ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningPricing ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningPricing ? t.pricing_strategy_running : t.pricing_strategy_run}
-              </button>
-            </div>
-
-            {!pricingReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>💰</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.pricing_strategy_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.pricing_strategy_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <PricingToggle report={pricingReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("pricing")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
+              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.notes_title}</div>
+              <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Tes notes privées pour ce projet" : "Your private notes for this project"}</div>
+              <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: "20px", marginBottom: 16 }}>
+                <textarea value={newNote} onChange={e => setNewNote(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void addNote(); }}
+                  placeholder={lang === "fr" ? "Nouvelle note... (⌘ + Entrée pour sauvegarder)" : "New note... (⌘ + Enter to save)"}
+                  rows={3}
+                  style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", resize: "none", boxSizing: "border-box" as any }} />
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <button type="button" onClick={() => void addNote()} disabled={savingNote || !newNote.trim()}
+                    style={{ background: th.text, color: th.bg, border: "none", borderRadius: 100, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: savingNote || !newNote.trim() ? 0.5 : 1, fontFamily: "'Inter', sans-serif" }}>
+                    {savingNote ? "..." : (lang === "fr" ? "Sauvegarder" : "Save")}
                   </button>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Revenue Roadmap */}
-        {userPlan !== "scale" ? (
-          <LockedFeature feature={t.revenue_title} requiredPlan="Scale" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.revenue_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.revenue_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runRevenueRoadmap()}
-                disabled={runningRevenue}
-                style={{
-                  background: runningRevenue ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningRevenue ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningRevenue ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningRevenue ? t.revenue_running : t.revenue_run}
-              </button>
-            </div>
-
-            {!revenueReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>📈</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.revenue_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.revenue_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <RevenueToggle report={revenueReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("revenue")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-
-        {/* Pivot Radar */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.pivot_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-        <div style={{ marginBottom: 48 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.pivot_title}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.pivot_sub}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => void runPivotRadar()}
-              disabled={runningPivot}
-              style={{
-                background: runningPivot ? "rgba(255,255,255,0.1)" : "#ffffff",
-                color: runningPivot ? "rgba(255,255,255,0.5)" : "#000",
-                border: "none",
-                borderRadius: 100,
-                padding: "8px 20px",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: runningPivot ? "not-allowed" : "pointer",
-              }}
-            >
-              {runningPivot ? t.pivot_running : t.pivot_run}
-            </button>
-          </div>
-
-          {!pivotReport ? (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-              <div style={{ fontSize: 24, marginBottom: 12 }}>🎯</div>
-              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.pivot_empty}</div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.pivot_empty_sub}</div>
-            </div>
-          ) : (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <PivotReportToggle lang={lang} report={pivotReport} />
-                <button
-                  type="button"
-                  onClick={() => void deleteReport("pivot")}
-                  style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        )}
-
-        {/* Marketing Engine */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.marketing_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.marketing_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.marketing_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runMarketingEngine()}
-                disabled={runningMarketing}
-                style={{
-                  background: runningMarketing ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningMarketing ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningMarketing ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningMarketing ? t.marketing_running : t.marketing_run}
-              </button>
-            </div>
-
-            {!marketingReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>📣</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.marketing_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.marketing_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <MarketingReportToggle report={marketingReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("marketing")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Outreach Engine */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.outreach_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.outreach_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.outreach_sub}</div>
-              </div>
-            </div>
-
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px", marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>{t.outreach_target_label}</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
-                {["Potential customer", "Potential partner", "Potential advisor", "Potential investor"].map((target) => (
-                  <button
-                    key={target}
-                    type="button"
-                    onClick={() => setOutreachTarget(target)}
-                    style={{
-                      background: outreachTarget === target ? "#ffffff" : "rgba(255,255,255,0.06)",
-                      color: outreachTarget === target ? "#000" : "rgba(255,255,255,0.6)",
-                      border: `1px solid ${outreachTarget === target ? "#ffffff" : "rgba(255,255,255,0.1)"}`,
-                      borderRadius: 100,
-                      padding: "6px 16px",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    {target}
-                  </button>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => void runOutreachEngine()}
-                disabled={runningOutreach}
-                style={{
-                  background: runningOutreach ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningOutreach ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "10px 24px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningOutreach ? "not-allowed" : "pointer",
-                  width: "100%",
-                }}
-              >
-                {runningOutreach ? t.outreach_running : t.outreach_run}
-              </button>
-            </div>
-
-            {!outreachReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>✉️</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.outreach_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.outreach_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <OutreachToggle report={outreachReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("outreach")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Competitor Tracker */}
-        {userPlan === "free" || userPlan === "spark" ? (
-          <LockedFeature feature={t.competitor_title} requiredPlan="Build" userPlan={userPlan} />
-        ) : (
-          <div style={{ marginBottom: 48 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em" }}>{t.competitor_title}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 4 }}>{t.competitor_sub}</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void runCompetitorTracker()}
-                disabled={runningCompetitor}
-                style={{
-                  background: runningCompetitor ? "rgba(255,255,255,0.1)" : "#ffffff",
-                  color: runningCompetitor ? "rgba(255,255,255,0.5)" : "#000",
-                  border: "none",
-                  borderRadius: 100,
-                  padding: "8px 20px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: runningCompetitor ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningCompetitor ? t.competitor_running : t.competitor_run}
-              </button>
-            </div>
-
-            {!competitorReport ? (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "32px", textAlign: "center" }}>
-                <div style={{ fontSize: 24, marginBottom: 12 }}>🔍</div>
-                <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 8 }}>{t.competitor_empty}</div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.2)" }}>{t.competitor_empty_sub}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, padding: "20px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <CompetitorToggle report={competitorReport} />
-                  <button
-                    type="button"
-                    onClick={() => void deleteReport("competitor")}
-                    style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 11, padding: 0, flexShrink: 0, marginLeft: 12 }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Notes Section */}
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 20 }}>
-            {t.notes_title}
-          </div>
-
-          {/* Add Note */}
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 20, marginBottom: 20 }}>
-            <textarea
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              placeholder={t.notes_placeholder}
-              rows={3}
-              style={{
-                width: "100%",
-                background: "transparent",
-                border: "none",
-                color: "#fff",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 14,
-                fontWeight: 300,
-                resize: "none",
-                outline: "none",
-                boxSizing: "border-box",
-                lineHeight: 1.6,
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && e.metaKey) void addNote();
-              }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>{t.notes_hint}</span>
-              <button
-                type="button"
-                onClick={() => void addNote()}
-                disabled={savingNote || !newNote.trim()}
-                style={{
-                  background: "#ffffff",
-                  color: "#000",
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "8px 18px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  opacity: savingNote || !newNote.trim() ? 0.4 : 1,
-                }}
-              >
-                {savingNote ? t.notes_saving : t.notes_save}
-              </button>
-            </div>
-          </div>
-
-          {/* Notes List */}
-          {notes.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "rgba(255,255,255,0.2)", fontSize: 14 }}>
-              {t.notes_empty}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {notes.map((note) => (
-                <div key={note.id} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "16px 20px" }}>
-                  <div style={{ fontSize: 14, lineHeight: 1.6, color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap", marginBottom: 12 }}>
-                    {note.content}
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: "rgba(255,255,255,0.2)" }}>
-                      {new Date(note.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void deleteNote(note.id)}
-                      style={{ background: "transparent", border: "none", color: "rgba(255,255,255,0.2)", cursor: "pointer", fontSize: 12, padding: 0 }}
-                      onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(255,255,255,0.2)"; }}
-                    >
-                      {t.notes_delete}
-                    </button>
+              {notes.map(note => (
+                <div key={note.id} style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 10, padding: "16px 20px", marginBottom: 10, display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ flex: 1, fontSize: 13, color: th.text, lineHeight: 1.6 }}>{note.content}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <div style={{ fontSize: 11, color: th.textMuted }}>{new Date(note.created_at).toLocaleDateString()}</div>
+                    <button type="button" onClick={() => void deleteNote(note.id)}
+                      style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px" }}>×</button>
                   </div>
                 </div>
               ))}
+              {notes.length === 0 && <div style={{ textAlign: "center", padding: "48px", color: th.textMuted, fontSize: 14 }}>{lang === "fr" ? "Aucune note pour l'instant." : "No notes yet."}</div>}
             </div>
           )}
+
         </div>
+      </main>
       </div>
-
-      {showResetConfirm ? (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(0,0,0,0.8)",
-          backdropFilter: "blur(8px)",
-          zIndex: 1000,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-        }}
-        onClick={() => setShowResetConfirm(false)}
-        >
-          <div
-            style={{
-              background: "#111",
-              border: "1px solid rgba(248,113,113,0.2)",
-              borderRadius: 16,
-              padding: 32,
-              width: "100%",
-              maxWidth: 400,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, letterSpacing: "-0.02em" }}>Reset workspace?</div>
-            <div style={{ fontSize: 14, color: "rgba(255,255,255,0.4)", marginBottom: 24, lineHeight: 1.6 }}>
-              This will permanently delete all check-ins, milestones, notes, market watches and reports for this project. The project itself will remain.
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setShowResetConfirm(false)}
-                style={{ background: "transparent", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "10px 20px", color: "rgba(255,255,255,0.5)", fontSize: 13, fontWeight: 600, cursor: "pointer", flex: 1 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void resetWorkspace()}
-                disabled={resetting}
-                style={{ background: "#f87171", color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", flex: 1, opacity: resetting ? 0.6 : 1 }}
-              >
-                {resetting ? "Resetting..." : "Yes, reset everything"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

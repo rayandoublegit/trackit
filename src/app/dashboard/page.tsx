@@ -148,7 +148,17 @@ function profileInitials(user: User, profileUsername?: string | null): string {
   return local.slice(0, 2).toUpperCase() || "?";
 }
 
-function VerdictPill({ kind }: { kind: VerdictKind | null }) {
+function VerdictPill({
+  kind,
+  labelBuilding,
+  labelPivoting,
+  labelKilled,
+}: {
+  kind: VerdictKind | null;
+  labelBuilding: string;
+  labelPivoting: string;
+  labelKilled: string;
+}) {
   if (!kind) {
     return (
       <span
@@ -167,8 +177,8 @@ function VerdictPill({ kind }: { kind: VerdictKind | null }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: verdictBadgeColor(kind), display: "inline-block", flexShrink: 0 }} />
-      <span style={{ fontSize: 13, fontWeight: 500, color: theme.textSub, fontFamily: "'Inter', sans-serif" }}>
-        {kind === "BUILD" ? "Building" : kind === "FLIP" ? "Pivoting" : "Killed"}
+      <span style={{ fontSize: 13, fontWeight: 500, color: "#aaa", fontFamily: "'Inter', sans-serif" }}>
+        {kind === "BUILD" ? labelBuilding : kind === "FLIP" ? labelPivoting : labelKilled}
       </span>
     </span>
   );
@@ -188,7 +198,7 @@ export default function DashboardPage() {
       ideas_analyzed: "IDEAS ANALYZED",
       verdicts: "VERDICTS",
       view_last: "View last analysis",
-      home: "← Home",
+      home: "Home",
       free_plan: "Free Plan",
       upgrade: "Upgrade to Spark →",
       copy_verdict: "Copy verdict",
@@ -210,6 +220,72 @@ export default function DashboardPage() {
       flip: "FLIP",
       build: "BUILD",
       kill: "KILL",
+      dashboard: "Dashboard",
+      welcome_back: "Welcome back,",
+      search: "Search ideas...",
+      status: "Status",
+      sort: "Sort",
+      newest: "Newest",
+      oldest: "Oldest",
+      overview: "Overview",
+      ideas_tab: "Ideas",
+      settings_tab: "Settings",
+      profile_tab: "Profile",
+      billing_tab: "Billing",
+      open_workspace: "Open workspace",
+      main_menu: "Main Menu",
+      others: "Others",
+      account: "Account",
+      homepage: "Homepage",
+      light: "Light",
+      dark: "Dark",
+      english: "English",
+      français: "Français",
+      upgrade_build: "Upgrade to Build",
+      upgrade_desc: "Unlock all features and get the most out of Klayan.",
+      upgrade_now: "Upgrade Now →",
+      username: "Username",
+      appearance: "Appearance",
+      appearance_desc: "Choose how the dashboard looks.",
+      language: "Language",
+      language_desc: "Choose the language for verdicts and analysis reports.",
+      delete_account: "Delete account",
+      delete_account_desc: "Permanently delete your account and all data. This cannot be undone.",
+      save: "Sauvegarder",
+      recent_ideas: "Recent Ideas",
+      settings_title: "Settings",
+      settings_desc: "Customize your Klayan experience.",
+      billing_title: "Billing",
+      billing_desc: "Manage your subscription.",
+      profile_title: "Profile",
+      profile_desc: "Manage your account settings.",
+      all: "All",
+      current_plan: "Current plan",
+      payment_method: "Payment method",
+      manage_billing: "Manage billing →",
+      cancel_subscription: "Cancel subscription",
+      cancel_plan: "Cancel plan",
+      upgrade_plan: "Upgrade plan →",
+      sign_out: "Sign out",
+      sign_out_desc: "You will be redirected to the login page.",
+      unlimited_analyses: "{t.unlimited_analyses}",
+      payment_desc: "Manage your payment method via the Stripe customer portal.",
+      cancel_desc: "You will lose access to premium features at the end of your billing period.",
+      billing_desc2: "Manage your subscription and payment methods.",
+      ideas_analyzed: "Ideas Analyzed",
+      total_analyses: "Total analyses run",
+      all_time: "All time",
+      verdicts_title: "Verdicts",
+      build_flip_kill: "Build · Flip · Kill",
+      across_all: "Across all ideas",
+      your_plan: "Your Plan",
+      current_sub: "Current subscription",
+      upgrade_available: "Upgrade available",
+      full_access: "Full access",
+      active_projects: "active projects",
+      eight_active: "8 active projects",
+      view: "View →",
+      open_workspace: "Ouvrir l'espace",
     },
     fr: {
       workspaces: "Espaces de travail",
@@ -219,7 +295,7 @@ export default function DashboardPage() {
       ideas_analyzed: "IDÉES ANALYSÉES",
       verdicts: "VERDICTS",
       view_last: "Voir la dernière analyse",
-      home: "← Accueil",
+      home: "Accueil",
       free_plan: "Plan Gratuit",
       upgrade: "Passer à Spark →",
       copy_verdict: "Copier le verdict",
@@ -228,19 +304,82 @@ export default function DashboardPage() {
       remove_analysis: "Supprimer l'analyse",
       your_workspaces: "Vos espaces de travail",
       choose_project: "Choisissez une idée sur laquelle travailler",
-      no_workspaces:
-        "Pas encore d'espaces de travail. Lancez une analyse et obtenez un verdict BUILD IT ou FLIP IT pour en créer un.",
+      no_workspaces: "Pas encore d'espaces de travail. Lancez une analyse et obtenez un verdict BUILD IT ou FLIP IT pour en créer un.",
       rename_title: "Renommer le projet",
       cancel: "Annuler",
       save: "Sauvegarder",
-      building: "en construction",
-      pivoting: "en pivot",
-      killed: "abandonné",
+      building: "En construction",
+      pivoting: "En pivot",
+      killed: "Abandonné",
       last_analysis: "Ton dernier verdict",
       no_analysis_yet: "Pas encore d'analyse",
       flip: "FLIP",
       build: "BUILD",
       kill: "KILL",
+      dashboard: "Tableau de bord",
+      welcome_back: "Bon retour,",
+      search: "Rechercher des idées...",
+      status: "Statut",
+      sort: "Trier",
+      newest: "Récent",
+      oldest: "Ancien",
+      overview: "Aperçu",
+      ideas_tab: "Idées",
+      settings_tab: "Paramètres",
+      profile_tab: "Profil",
+      billing_tab: "Facturation",
+      open_workspace: "Ouvrir l'espace",
+      main_menu: "Menu principal",
+      others: "Autres",
+      account: "Compte",
+      homepage: "Page d'accueil",
+      light: "Clair",
+      dark: "Sombre",
+      english: "English",
+      français: "Français",
+      upgrade_build: "Passer à Build",
+      upgrade_desc: "Débloquez toutes les fonctionnalités de Klayan.",
+      upgrade_now: "Mettre à niveau →",
+      username: "Nom d'utilisateur",
+      appearance: "Apparence",
+      appearance_desc: "Choisissez l'apparence du tableau de bord.",
+      language: "Langue",
+      language_desc: "Choisissez la langue pour les verdicts et rapports.",
+      delete_account: "Supprimer le compte",
+      delete_account_desc: "Supprimez définitivement votre compte et toutes vos données. Cette action est irréversible.",
+      recent_ideas: "Idées récentes",
+      settings_title: "Paramètres",
+      settings_desc: "Personnalisez votre expérience Klayan.",
+      billing_title: "Facturation",
+      billing_desc: "Gérez votre abonnement.",
+      profile_title: "Profil",
+      profile_desc: "Gérez les paramètres de votre compte.",
+      all: "Tous",
+      current_plan: "Plan actuel",
+      payment_method: "Méthode de paiement",
+      manage_billing: "Gérer la facturation →",
+      cancel_subscription: "Annuler l'abonnement",
+      cancel_plan: "Annuler le plan",
+      upgrade_plan: "Mettre à niveau →",
+      sign_out: "Se déconnecter",
+      sign_out_desc: "Vous serez redirigé vers la page de connexion.",
+      unlimited_analyses: "19€/mois — analyses illimitées.",
+      payment_desc: "Gérez votre méthode de paiement via le portail Stripe.",
+      cancel_desc: "Vous perdrez l'accès aux fonctionnalités premium à la fin de votre période de facturation.",
+      billing_desc2: "Gérez votre abonnement et vos méthodes de paiement.",
+      upgrade_build: "Passer à Build",
+      ideas_analyzed: "Idées analysées",
+      total_analyses: "Total des analyses",
+      all_time: "Depuis toujours",
+      verdicts_title: "Verdicts",
+      build_flip_kill: "Build · Flip · Kill",
+      across_all: "Toutes les idées",
+      your_plan: "Votre plan",
+      current_sub: "Abonnement actuel",
+      upgrade_available: "Mise à niveau disponible",
+      full_access: "Accès complet",
+      active_projects: "projets actifs",
+      view: "Voir →",
     },
   }[lang];
 
@@ -271,7 +410,14 @@ export default function DashboardPage() {
   const [selectedLang, setSelectedLang] = useState<"en" | "fr">(() => (typeof window !== "undefined" ? (localStorage.getItem("klayan_lang") as "en" | "fr" | null) ?? "en" : "en"));
   const [statusFilter, setStatusFilter] = useState<"all" | "BUILD" | "FLIP" | "KILL">("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "az">("newest");
-  const [darkMode, setDarkMode] = useState<boolean>(() => typeof window !== "undefined" ? localStorage.getItem("klayan_dark") === "1" : false);
+  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const saved = localStorage.getItem("klayan_dark");
+    setDarkMode(saved === null ? true : saved === "1");
+    setMounted(true);
+
+  }, []);
   const [notifications, setNotifications] = useState<{id: string; title: string; body: string; created_at: string; read_by: string[]}[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -876,6 +1022,9 @@ export default function DashboardPage() {
     inputBg: D ? "#1a1a1a" : "#fff",
     inputBorder: D ? "#333" : "#e5e5e5",
     hover: D ? "#222" : "#ebebeb",
+    ctaBg: "#fff",
+    ctaText: "#000",
+    activeNav: D ? "#2b2d31" : "#e0e0e0",
     tabActive: D ? "#fff" : "#111",
     tabActiveBorder: D ? "#fff" : "#111",
     tabInactive: D ? "#666" : "#888",
@@ -885,8 +1034,11 @@ export default function DashboardPage() {
     dropdownBorder: D ? "#333" : "#e5e5e5",
   };
 
+  if (!mounted) return <div style={{ background: "#0d0d0d", minHeight: "100vh" }} />;
   return (
     <div
+      suppressHydrationWarning
+      data-dark={D ? "true" : "false"}
       style={{
         ...shell,
         minHeight: "100vh",
@@ -967,6 +1119,7 @@ export default function DashboardPage() {
 
       {/* Left sidebar */}
       <aside
+        suppressHydrationWarning
         style={{
           width: 260,
           flexShrink: 0,
@@ -1000,7 +1153,7 @@ export default function DashboardPage() {
         <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${theme.divider}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
                 {avatarUrl ? (
                   <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: "cover", display: "block" }} />
                 ) : (
@@ -1057,11 +1210,11 @@ export default function DashboardPage() {
             {t.workspaces}
           </button>
 
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "16px 0 4px 12px", textTransform: "uppercase" }}>Main Menu</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "16px 0 4px 12px", textTransform: "uppercase" }}>{t.main_menu}</div>
           <button type="button" onClick={() => setActiveTab("home")}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "home" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Inter', sans-serif", boxSizing: "border-box", cursor: "pointer" }} className="kly-nav-btn">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-            Home
+            {t.home}
           </button>
 
           <button type="button" onClick={() => { setActiveTab("ideas"); }}
@@ -1157,12 +1310,12 @@ export default function DashboardPage() {
 
         {/* Others */}
         <div style={{ padding: "0 12px 4px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>Others</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>{t.others}</div>
           <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
           <button type="button" onClick={() => setActiveTab("settings" as any)}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: activeTab === "settings" ? theme.activeNav : "transparent", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-            Settings
+            {t.settings_tab}
           </button>
           <a href="https://discord.gg/nHVEPB2yXb" target="_blank" rel="noopener noreferrer"
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}>
@@ -1177,19 +1330,19 @@ export default function DashboardPage() {
         </div>
         {/* Account */}
         <div style={{ padding: "0 12px 4px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>Account</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>{t.account}</div>
           <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
           <button type="button" onClick={() => setActiveTab("profile" as any)}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "profile" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left", boxSizing: "border-box" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "profile" ? "#ebebeb" : "transparent"; }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Profile
+            {t.profile_tab}
           </button>
           <button type="button" onClick={() => setActiveTab("billing" as any)}
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "billing" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left", boxSizing: "border-box" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "billing" ? "#ebebeb" : "transparent"; }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-            Billing
+            {t.billing_tab}
           </button>
         </div>
         {/* Bottom */}
@@ -1204,13 +1357,13 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>
-                  {userPlan === "free" ? "Upgrade to Spark" : userPlan === "spark" ? "Upgrade to Build" : "Upgrade to Scale"}
+                  {userPlan === "free" ? (lang === "fr" ? "Passer à Spark" : "Upgrade to Spark") : userPlan === "spark" ? t.upgrade_build : (lang === "fr" ? "Passer à Scale" : "Upgrade to Scale")}
                 </div>
-                <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 12, lineHeight: 1.4 }}>Unlock all features and get the most out of Klayan.</div>
+                <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 12, lineHeight: 1.4 }}>{t.upgrade_desc}</div>
                 <button type="button"
                   onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
                   style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, background: "#111", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
-                  Upgrade Now →
+                  {t.upgrade_now}
                 </button>
               </>
             )}
@@ -1219,21 +1372,28 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
+      <main suppressHydrationWarning style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
 
         {/* Top bar */}
         <div style={{ padding: "20px 32px 0", borderBottom: `1px solid ${theme.divider}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingBottom: 12, borderBottom: `1px solid ${theme.divider}` }}>
+            <Link href="/" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: theme.textMuted, textDecoration: "none", padding: "6px 10px", borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.card }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              {t.homepage}
+            </Link>
+            <img src="/images/navbarlogo.png" alt="Klayan" style={{ height: 28, objectFit: "contain" }} />
+          </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 4 }}>Dashboard</div>
-              <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>Welcome back,</h1>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 4 }}>{t.dashboard}</div>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{t.welcome_back}</h1>
               <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{profileUsername?.trim() || user?.email?.split("@")[0] || "Founder"} 👋</h1>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: theme.inputBg, border: `1px solid ${theme.inputBorder}`, borderRadius: 8, padding: "7px 14px", minWidth: 220 }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search ideas..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Inter', sans-serif" }} />
+                  placeholder={t.search} style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Inter', sans-serif" }} />
                 {searchQuery ? (
                   <button type="button" onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
                 ) : (
@@ -1290,12 +1450,12 @@ export default function DashboardPage() {
               <div ref={statusMenuRef} style={{ position: "relative" }}>
                 <button type="button" onClick={() => { setShowStatusMenu(v => !v); setShowSortMenu(false); }}
                   style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Inter', sans-serif" }}>
-                  Status: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 4 }}>{statusFilter === "all" ? "All" : statusFilter === "BUILD" ? "Building" : statusFilter === "FLIP" ? "Pivoting" : "Killed"}</span>
+                  Status: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 4 }}>{statusFilter === "all" ? "All" : statusFilter === "BUILD" ? t.building : statusFilter === "FLIP" ? t.pivoting : t.killed}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
                 {showStatusMenu && (
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 140, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
-                    {[{val: "all", label: "All"}, {val: "BUILD", label: "Building"}, {val: "FLIP", label: "Pivoting"}, {val: "KILL", label: "Killed"}].map(({val, label}) => (
+                    {[{val: "all", label: t.all}, {val: "BUILD", label: t.building}, {val: "FLIP", label: t.pivoting}, {val: "KILL", label: t.killed}].map(({val, label}) => (
                       <button key={val} type="button" onClick={() => { setStatusFilter(val as any); setShowStatusMenu(false); }}
                         style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: statusFilter === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: statusFilter === val ? 600 : 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left" }}>
                         {label}
@@ -1308,7 +1468,7 @@ export default function DashboardPage() {
                 <button type="button" onClick={() => { setShowSortMenu(v => !v); setShowStatusMenu(false); }}
                   style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Inter', sans-serif" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
-                  Sort: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 2 }}>{sortOrder === "newest" ? "Newest" : sortOrder === "oldest" ? "Oldest" : "A→Z"}</span>
+                  Sort: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 2 }}>{sortOrder === "newest" ? t.newest : sortOrder === "oldest" ? t.oldest : "A→Z"}</span>
                 </button>
                 {showSortMenu && (
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 130, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
@@ -1326,7 +1486,7 @@ export default function DashboardPage() {
 
           {/* Tab nav */}
           <div style={{ display: "flex", gap: 0 }}>
-            {[{key: "home", label: "Overview"}, {key: "ideas", label: "Ideas"}, {key: "workspaces", label: "Workspaces"}, {key: "settings", label: "Settings"}, {key: "profile", label: "Profile"}, {key: "billing", label: "Billing"}].map(({key, label}) => (
+            {[{key: "home", label: t.overview}, {key: "ideas", label: t.ideas_tab}, {key: "workspaces", label: t.workspaces}, {key: "settings", label: t.settings_tab}, {key: "profile", label: t.profile_tab}, {key: "billing", label: t.billing_tab}].map(({key, label}) => (
               <button key={key} type="button" onClick={() => setActiveTab(key as any)}
                 style={{ padding: "10px 18px", background: "transparent", border: "none", borderBottom: activeTab === key ? `2px solid ${theme.tabActive}` : "2px solid transparent", cursor: "pointer", fontSize: 14, fontWeight: activeTab === key ? 600 : 400, color: activeTab === key ? theme.tabActive : theme.tabInactive, fontFamily: "'Inter', sans-serif", marginBottom: -1, whiteSpace: "nowrap" }}>
                 {label}
@@ -1347,7 +1507,7 @@ export default function DashboardPage() {
                 </div>
                 <Link href="/analyze" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", background: theme.ctaBg, color: theme.ctaText, borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 600 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
-                  New Analysis
+                  {t.new_analysis}
                 </Link>
               </div>
               <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
@@ -1402,7 +1562,7 @@ export default function DashboardPage() {
             <div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div>
-                  <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>Workspaces</h2>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>{t.workspaces}</h2>
                   <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{projects.length} active {projects.length === 1 ? "project" : "projects"}</div>
                 </div>
               </div>
@@ -1450,7 +1610,7 @@ export default function DashboardPage() {
                         <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 6, lineHeight: 1.4 }}>{project.idea_name.length > 50 ? project.idea_name.slice(0, 47) + "..." : project.idea_name}</div>
                         <div style={{ fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 4 }}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-                          Open workspace
+                          {t.open_workspace}
                         </div>
                       </Link>
                     </div>
@@ -1463,15 +1623,15 @@ export default function DashboardPage() {
 
           {activeTab === "settings" && (
             <div style={{ maxWidth: 520 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Settings</h2>
-              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Customize your Klayan experience.</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>{t.settings_title}</h2>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>{t.settings_desc}</div>
 
               {/* Dark mode toggle */}
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Appearance</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 14 }}>Choose how the dashboard looks.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.appearance}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 14 }}>{t.appearance_desc}</div>
                 <div style={{ display: "flex", gap: 10 }}>
-                  {[{val: false, label: "☀️ Light"}, {val: true, label: "🌑 Dark"}].map(({val, label}) => (
+                  {[{val: false, label: t.light}, {val: true, label: t.dark}].map(({val, label}) => (
                     <button key={String(val)} type="button" onClick={() => {
                       setDarkMode(val);
                       localStorage.setItem("klayan_dark", val ? "1" : "0");
@@ -1483,13 +1643,14 @@ export default function DashboardPage() {
               </div>
 
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Language</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Choose the language for verdicts and analysis reports.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.language}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.language_desc}</div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {[{val: "en", label: "🇬🇧 English"}, {val: "fr", label: "🇫🇷 Français"}].map(({val, label}) => (
+                  {[{val: "en", label: t.english}, {val: "fr", label: t.français}].map(({val, label}) => (
                     <button key={val} type="button"
                       onClick={async () => {
                         localStorage.setItem("klayan_lang", val);
+                        window.dispatchEvent(new StorageEvent("storage", { key: "klayan_lang", newValue: val }));
                         setSelectedLang(val as "en" | "fr");
                         window.dispatchEvent(new CustomEvent("klayan_lang_change", { detail: val }));
                         if (!user) return;
@@ -1501,16 +1662,10 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Dashboard wallpaper</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Personalize your dashboard background.</div>
-                <Link href="/settings#wallpaper" style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 500, color: theme.text, textDecoration: "none", display: "inline-block" }}>
-                  Open wallpaper settings →
-                </Link>
-              </div>
+
               <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Delete account</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Permanently delete your account and all data. This cannot be undone.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.delete_account}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.delete_account_desc}</div>
                 <button type="button"
                   style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
                   onClick={() => { if (confirm("Are you sure? This will permanently delete your account.")) alert("Contact support to delete your account."); }}>
@@ -1522,17 +1677,17 @@ export default function DashboardPage() {
 
           {activeTab === "billing" && (
             <div style={{ maxWidth: 480 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Billing</h2>
-              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Manage your subscription and payment methods.</div>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>{t.billing_title}</h2>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>{t.billing_desc2}</div>
 
               {/* Current plan */}
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Current plan</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>{t.current_plan}</div>
                   <span style={{ fontSize: 12, fontWeight: 700, color: userPlan === "scale" ? "#16a34a" : "#f59e0b", background: userPlan === "scale" ? "#f0fdf4" : "#fefce8", padding: "2px 10px", borderRadius: 100, textTransform: "capitalize" }}>{userPlan}</span>
                 </div>
                 <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 16 }}>
-                  {userPlan === "free" ? "1 free analysis. Upgrade to unlock more." : userPlan === "spark" ? "$19/mo — unlimited analyses." : userPlan === "build" ? "$69/mo — all features." : "$149/mo — full access including Co-Founder Mode."}
+                  {userPlan === "free" ? "1 free analysis. Upgrade to unlock more." : userPlan === "spark" ? "{t.unlimited_analyses}" : userPlan === "build" ? "$69/mo — all features." : "$149/mo — full access including Co-Founder Mode."}
                 </div>
                 {userPlan !== "scale" && (
                   <button type="button" onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
@@ -1544,9 +1699,9 @@ export default function DashboardPage() {
 
               {/* Payment method */}
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Payment method</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Manage your payment method via the Stripe customer portal.</div>
-                <button type="button" onClick={() => window.open("https://billing.stripe.com/p/login/test_00000", "_blank")}
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.payment_method}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.payment_desc}</div>
+                <button type="button" onClick={async () => { const res = await fetch("/api/billing-portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user?.id }) }); const data = await res.json(); if (data.url) window.open(data.url, "_blank"); }}
                   style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 500, color: theme.text }}>
                   Manage billing →
                 </button>
@@ -1555,9 +1710,9 @@ export default function DashboardPage() {
               {/* Cancel */}
               {userPlan !== "free" && (
                 <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Cancel subscription</div>
-                  <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>You will lose access to premium features at the end of your billing period.</div>
-                  <button type="button" onClick={() => window.open("https://billing.stripe.com/p/login/test_00000", "_blank")}
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.cancel_subscription}</div>
+                  <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.cancel_desc}</div>
+                  <button type="button" onClick={async () => { const res = await fetch("/api/billing-portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user?.id }) }); const data = await res.json(); if (data.url) window.open(data.url, "_blank"); }}
                     style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     Cancel plan
                   </button>
@@ -1568,7 +1723,7 @@ export default function DashboardPage() {
 
           {activeTab === "profile" && (
             <div style={{ maxWidth: 480 }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Profile</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>{t.profile_title}</h2>
               <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Manage your account information.</div>
 
               {/* Avatar */}
@@ -1601,9 +1756,9 @@ export default function DashboardPage() {
 
               {/* Username */}
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>Username</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{t.username}</div>
                 <input type="text" defaultValue={profileUsername ?? ""} id="profile-username-input"
-                  style={{ width: "100%", padding: "9px 12px", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: "'Inter', sans-serif", color: theme.text, outline: "none", boxSizing: "border-box" }} />
+                  style={{ width: "100%", padding: "9px 12px", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: "'Inter', sans-serif", color: theme.text, background: theme.inputBg, outline: "none", boxSizing: "border-box" }} />
                 <button type="button" onClick={async () => {
                   const val = (document.getElementById("profile-username-input") as HTMLInputElement)?.value?.trim();
                   if (!val || !user) return;
@@ -1623,8 +1778,8 @@ export default function DashboardPage() {
 
               {/* Sign out */}
               <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Sign out</div>
-                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>You will be redirected to the login page.</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.sign_out}</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.sign_out_desc}</div>
                 <button type="button" onClick={() => { void supabase.auth.signOut().then(() => router.push("/auth")); }}
                   style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                   Sign out
@@ -1640,21 +1795,21 @@ export default function DashboardPage() {
             {/* Card 1 */}
             <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Ideas Analyzed</span>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.ideas_analyzed}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6 }}>{stats.total}</div>
-              <div style={{ fontSize: 12, color: theme.textMuted }}>Total analyses run</div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>{t.total_analyses}</div>
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#16a34a" }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-                All time
+                {t.all_time}
               </div>
             </div>
 
             {/* Card 2 */}
             <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Verdicts</span>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.verdicts_title}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6 }}>
@@ -1664,24 +1819,24 @@ export default function DashboardPage() {
                 <span style={{ fontSize: 16, color: "#ccc", margin: "0 6px" }}>·</span>
                 <span style={{ color: "#ef4444" }}>{stats.kill}</span>
               </div>
-              <div style={{ fontSize: 12, color: theme.textMuted }}>Build · Flip · Kill</div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>{t.build_flip_kill}</div>
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textMuted }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                Across all ideas
+                {t.across_all}
               </div>
             </div>
 
             {/* Card 3 */}
             <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Your Plan</span>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.your_plan}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6, textTransform: "capitalize" }}>{userPlan}</div>
-              <div style={{ fontSize: 12, color: theme.textMuted }}>Current subscription</div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>{t.current_sub}</div>
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textMuted }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-                {userPlan === "scale" ? "Full access" : "Upgrade available"}
+                {userPlan === "scale" ? t.full_access : t.upgrade_available}
               </div>
             </div>
           </div>
@@ -1690,7 +1845,7 @@ export default function DashboardPage() {
           <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "16px 24px", borderBottom: `1px solid ${theme.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textSub} strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <span style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>Recent Ideas</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{t.recent_ideas}</span>
               <span style={{ fontSize: 13, color: theme.textMuted, marginLeft: 4 }}>({stats.total})</span>
             </div>
             {loading ? (

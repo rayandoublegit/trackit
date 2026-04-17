@@ -50,8 +50,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var d=localStorage.getItem('klayan_dark');if(d===null||d==='1'){document.documentElement.setAttribute('data-dark','true');}})();` }} />
         <link rel="icon" href="/icon.png" />
         <link rel="apple-touch-icon" href="/icon.png" />
         <link

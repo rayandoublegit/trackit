@@ -1,3 +1,4 @@
+html, body { background: #0d0d0d; color: #f0f0f0; }
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -1418,16 +1419,16 @@ footer {
 
 
 
-[data-dark="true"] .kly-nav-btn:hover { background: #2a2a2e !important; }
+
 [data-dark="true"] .kly-row:hover { background: #222226 !important; }
-[data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
+[data-dark="true"] .kly-ws-card:hover { background: transparent !important; }
 [data-dark="true"] .kly-dropdown-item:hover { background: #2a2a2e !important; }
 
 
 
-[data-dark="true"] .kly-nav-btn:hover { background: #2a2a2e !important; }
+
 [data-dark="true"] .kly-row:hover { background: #222226 !important; }
-[data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
+[data-dark="true"] .kly-ws-card:hover { background: transparent !important; }
 [data-dark="true"] .kly-dropdown-item:hover { background: #2a2a2e !important; }
 
 
@@ -1442,5 +1443,5 @@ footer {
 [data-dark="true"] .kly-row:hover { background: #222226 !important; }
 
 .kly-ws-card { transition: background 0.1s; }
-.kly-ws-card:hover { background: #f5f5f5 !important; }
-[data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
+.kly-ws-card:hover { background: transparent !important; }
+[data-dark="true"] .kly-ws-card:hover { background: transparent !important; }

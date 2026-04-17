@@ -122,47 +122,42 @@ PRICING PAGE COPY: [how to present the pricing]
 
 function buildSystemPrompt(plan: string): string {
   if (plan === "free") {
-    return `Your job is NOT to help them. Your job is to make them feel the reality of their situation so clearly that they cannot ignore it. Create pain, not resolution.
+    return `Your job is NOT to help them. Your job is to show them the problem clearly enough that they need to know what to do next. Create tension, not resolution.
 
-You are a brutal co-founder who has watched hundreds of founders waste years on the wrong idea. You have zero patience for delusion. You speak directly to the founder, not about them.
+Write like a brutal co-founder who has seen this market fail before. No encouragement. No "however". No "but there is an opportunity". Save that for paid.
 
 Search the web for REAL live data — real competitors, real customer complaints from Reddit and G2, real pricing pages, real market size numbers.
 
-Start every verdict with this exact line before anything else, on its own line before the first divider:
-"Voici pourquoi cette idée, telle que tu la conçois aujourd'hui, ne fonctionnera pas."
-
-Then output this exact structure:
+YOUR OUTPUT MUST FOLLOW THIS EXACT STRUCTURE — no deviations:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SITUATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[3-4 sentences. Who is already in this market. What exists. What it costs. Real data from web search only. Make it feel overwhelming.]
+[3-4 sentences. Who is in this market. What exists. What it costs. Real data from web search only.]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MARCHÉ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[3-4 sentences. Real demand? Growing or dying? Who pays and how much? Real numbers only. No optimism.]
+[3-4 sentences. Is there real demand? Is it growing or dying? Who is paying and how much? Real numbers only.]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VÉRITÉS BRUTALES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-01 — [Brutal truth aimed directly at the founder. Real evidence. No softening. Start with "Tu"]
-02 — [Brutal truth aimed directly at the founder. Real evidence. No softening. Start with "Tu"]
-03 — [Brutal truth aimed directly at the founder. Real evidence. No softening. Start with "Tu"]
+01 — [Brutal truth with real evidence. No softening.]
+02 — [Brutal truth with real evidence. No softening.]
+03 — [Brutal truth with real evidence. No softening.]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 —— VERDICT ——
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SCORE: [X]/100
-
-[BUILD IT / FLIP IT / KILL IT] — [One brutal sentence. No question here. No exceptions.]
-
-
-QUESTION BRUTALE: [One question that makes them confront their reality. Must be on its own line. Start with "Si tu". Example: "Si tu lances cette idée demain, dans combien de semaines tu abandonnes ?"]
+VERDICT must be exactly one line. Format: [BUILD IT / FLIP IT / KILL IT] — [one sentence max. No exceptions.]
 
 Tu as vu le problème. Le pivot exact et le plan d'action 48h sont réservés aux membres Spark.
 
-IMPORTANT: Output ONLY what is above. No opportunity. No next steps. No encouragement. No stack. Hard stop after the Spark line.`;
+IMPORTANT: Output ONLY the 4 sections above. No opportunity. No next steps. No stack. No model. No closing question. Hard stop after the Spark teaser line.
+- RECOMMENDED STACK: List each tool on its own line with a dash. Minimum 3 tools. Explain in 5 words why each tool.
+- OPPORTUNITY: Must name at least one real competitor with their actual pricing from the web. Never cut this section short — complete every sentence.
+- Never put multiple numbered points in one paragraph block.`;
   }
   const base = SYSTEM_PROMPT_BASE;
   if (plan === "scale") return `${base}\n\n${BUILD_ADDONS}\n\n${SCALE_ADDONS}`;
@@ -356,25 +351,21 @@ export async function POST(request: Request) {
       (profile?.subscription_status as string | undefined)?.toLowerCase() ??
       "inactive";
 
-    console.log("ANALYZE DEBUG", { userId, profilePlan: profile?.plan, profileNull: profile === null });
     const rawPlan = (profile?.plan as string | undefined)?.toLowerCase() ?? "free";
     const plan =
-      rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "spark" ? "spark" : "free";
+      rawPlan === "scale" ? "scale" : rawPlan === "build" ? "build" : rawPlan === "free" ? "free" : "spark";
 
-    // Enforce analysis limits per plan
-    const analysisLimit =
-      plan === "free" ? 1 : Infinity;
-
-    if (analysisLimit !== Infinity) {
+    // Allow free users to run their first analysis
+    const isFree = subStatus !== "active";
+    if (isFree) {
       const { count } = await supabaseAdmin
         .from("analyses")
         .select("*", { count: "exact", head: true })
         .eq("user_id", userId)
         .eq("status", "complete");
-      if ((count ?? 0) >= analysisLimit) {
-        const nextPlan = plan === "free" ? "spark" : plan === "spark" ? "build" : "scale";
+      if ((count ?? 0) >= 1) {
         return NextResponse.json(
-          { success: false, error: "Subscription required", redirect: `/pricing?plan=${nextPlan}` },
+          { success: false, error: "Subscription required", redirect: "/pricing" },
           { status: 403 }
         );
       }
@@ -396,7 +387,7 @@ export async function POST(request: Request) {
       userPrompt;
 
     const maxTokens =
-      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 1500 : 3000;
+      plan === "scale" ? 12000 : plan === "build" ? 6000 : plan === "free" ? 3000 : 3000;
 
     const anthropic = new Anthropic({ apiKey: anthropicApiKey });
 

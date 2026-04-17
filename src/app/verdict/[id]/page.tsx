@@ -56,8 +56,6 @@ type ParsedSection =
       label: string;
       kind: "verdict";
       verdictLine: string;
-      score?: string | null;
-      questionBrutale?: string | null;
       explanation: string;
       verdictType: VerdictType | null;
     };
@@ -105,9 +103,9 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     const label = labelRaw.toUpperCase().replace(/:$/, "").trim();
     const content = lines.slice(1).join("\n").trim();
 
-    if (label.startsWith("KLAYAN ANALYSIS") || label.startsWith("KLAYAN")) continue;
+    if (label.startsWith("KLAYAN ANALYSIS")) continue;
 
-    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS" || label === "VÉRITÉS BRUTALES") {
+    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS") {
       sections.push({
         label,
         kind: "numbered",
@@ -116,7 +114,7 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
       continue;
     }
 
-    if (label === "THE QUESTION THAT MATTERS" || label === "QUESTION BRUTALE") {
+    if (label === "THE QUESTION THAT MATTERS") {
       sections.push({ label, kind: "question", text: content });
       continue;
     }
@@ -130,26 +128,13 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      // Find the actual BUILD/KILL/FLIP line (skip SCORE line)
-      const verdictLine = contentLines.find((l) =>
-        l.toUpperCase().includes("BUILD IT") || l.toUpperCase().includes("KILL IT") || l.toUpperCase().includes("FLIP IT")
-      ) ?? contentLines[0] ?? "";
-      // Extract score if present
-      const scoreLine = contentLines.find((l) => l.toUpperCase().startsWith("SCORE:"));
-      const score = scoreLine ? scoreLine.replace(/score:/i, "").trim() : null;
-      // Extract question brutale if present
-      const questionLine = contentLines.find((l) => l.toUpperCase().startsWith("QUESTION BRUTALE:"));
-      const questionBrutale = questionLine ? questionLine.replace(/question brutale:/i, "").trim() : null;
-      const explanation = contentLines
-        .filter((l) => l !== verdictLine && !l.toUpperCase().startsWith("SCORE:") && !l.toUpperCase().startsWith("QUESTION BRUTALE:"))
-        .join("\n").trim();
+      const verdictLine = contentLines[0] ?? "";
+      const explanation = contentLines.slice(1).join("\n").trim();
       sections.push({
         label,
         kind: "verdict",
         verdictLine,
         explanation,
-        score,
-        questionBrutale,
         verdictType: getVerdictType(verdictLine),
       });
       continue;
@@ -824,36 +809,16 @@ export default function VerdictPage() {
         />
         <div
           style={{
-            fontSize: 32,
-            fontWeight: 600,
-            letterSpacing: "-0.06em",
-            lineHeight: 1.0,
+            fontSize: 15,
             color: "rgba(255,255,255,0.85)",
-            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontFamily: "'Inter', sans-serif",
             textAlign: "center",
             maxWidth: 360,
+            lineHeight: 1.5,
             minHeight: 48,
           }}
         >
-          <>
-            <div>
-              {lang === "fr" ? "Klayan réfléchit…" : "Klayan is thinking…"}
-            </div>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 400,
-                color: "rgba(255,255,255,0.4)",
-                fontFamily: "'Inter', sans-serif",
-                letterSpacing: "-0.01em",
-                marginTop: 8,
-              }}
-            >
-              {lang === "fr"
-                ? "Peut prendre jusqu'à 2 min (Spark) ou 3 min (Build/Scale)"
-                : "Usually takes 1–2 min (Spark) or up to 3 min (Build/Scale)"}
-            </div>
-          </>
+          Writing your verdict…
         </div>
         <div
           style={{
@@ -1003,7 +968,8 @@ export default function VerdictPage() {
                   minWidth: 0,
                 }}
               >
-</div>
+                KLAYAN ANALYSIS — YOUR IDEA
+              </div>
               {analysis ? (
                 <a
                   href={projectId ? `/project/${projectId}` : "#"}
@@ -1085,15 +1051,13 @@ export default function VerdictPage() {
                     <span
                       style={{
                         display: "block",
-                        fontSize: 18,
+                        fontSize: 9,
                         fontWeight: 800,
-                        letterSpacing: "0.08em",
-                        lineHeight: 1.0,
+                        letterSpacing: 3,
                         textTransform: "uppercase",
                         color: "#fff",
-                        marginBottom: 10,
+                        marginBottom: 8,
                         marginTop: 4,
-                        fontFamily: "'Inter', sans-serif",
                       }}
                     >
                       {sec.label}
@@ -1104,13 +1068,11 @@ export default function VerdictPage() {
                       !["spark", "build", "scale"].includes(userPlan ?? "") ? null : (
                         <div
                           style={{
-                            fontSize: 18,
-                            fontWeight: 300,
-                            color: "rgba(255,255,255,0.75)",
-                            lineHeight: 1.4,
-                            letterSpacing: "-0.02em",
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: "rgba(255,255,255,0.5)",
+                            lineHeight: 1.7,
                             marginBottom: 4,
-                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
                           {sec.text}
@@ -1146,12 +1108,10 @@ export default function VerdictPage() {
                             </span>
                             <span
                               style={{
-                                fontSize: 18,
-                                fontWeight: 300,
-                                color: "rgba(255,255,255,0.75)",
-                                lineHeight: 1.4,
-                                letterSpacing: "-0.02em",
-                                fontFamily: "'Inter', sans-serif",
+                                fontSize: 12,
+                                fontWeight: 400,
+                                color: "rgba(255,255,255,0.5)",
+                                lineHeight: 1.7,
                               }}
                             >
                               {item.text}
@@ -1161,19 +1121,13 @@ export default function VerdictPage() {
                       </div>
                     ) : sec.kind === "verdict" ? (
                       <>
-                        {sec.score && (
-                          <div style={{ fontSize: 32, fontWeight: 900, fontFamily: "'Inter', sans-serif", color: verdictColor, letterSpacing: "-0.02em", marginBottom: 4 }}>
-                            {sec.score}
-                          </div>
-                        )}
                         <div
                           style={{
                             fontSize: 24,
-                            fontWeight: 800,
-                            letterSpacing: "0.08em",
+                            fontWeight: 900,
+                            letterSpacing: 4,
                             color: verdictColor,
                             margin: "6px 0",
-                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
                           {sec.verdictLine}
@@ -1195,17 +1149,15 @@ export default function VerdictPage() {
                         </div>
                         <div
                           style={{
-                            fontSize: 18,
-                            fontWeight: 300,
-                            color: "rgba(255,255,255,0.75)",
-                            lineHeight: 1.4,
-                            letterSpacing: "-0.02em",
+                            fontSize: 12,
+                            fontWeight: 400,
+                            color: "rgba(255,255,255,0.5)",
+                            lineHeight: 1.7,
                             marginBottom: 4,
                             whiteSpace: "pre-wrap",
-                            fontFamily: "'Inter', sans-serif",
                           }}
                         >
-                          {sec.explanation?.replace(/[\s\S]*?(QUESTION BRUTALE:.*)/i, "").replace(/QUESTION BRUTALE:[\s\S]*/i, "").trim()}
+                          {sec.explanation}
                         </div>
                       </>
                     ) : (
@@ -1272,11 +1224,6 @@ export default function VerdictPage() {
 
                 {(userPlan === "spark" || userPlan === "free") && displaySections ? (
                   <div style={{ margin: "32px auto 0", maxWidth: 500 }}>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,0.35)", textAlign: "center", marginBottom: 16, lineHeight: 1.6 }}>
-                      {lang === "fr"
-                        ? "Le fondateur moyen perd 8 mois sur une idée non validée. Klayan te coûte 19€. Fais le calcul."
-                        : "The average founder wastes 8 months on an unvalidated idea. Klayan costs $19. Do the math."}
-                    </div>
                     <div
                       style={{
                         background: "rgba(255,255,255,0.03)",
@@ -1314,9 +1261,13 @@ export default function VerdictPage() {
                             lineHeight: 1.4,
                           }}
                         >
-                          {lang === "fr"
-                            ? "Pour 19€ — le pivot exact, le plan d'action 48h, 20 contacts qualifiés, et un workspace qui te suit jusqu'à 10K MRR."
-                            : "For $19 — the exact pivot, 48h action plan, 20 qualified contacts, and a workspace that follows you to $10K MRR."}
+                          {lang === "fr" ? (
+                            "Un seul pivot bien exécuté change tout."
+                          ) : (
+                            <>
+                              Available on the <strong>{requiredPlan}</strong> plan and above.
+                            </>
+                          )}
                         </div>
                       </div>
                       <div
@@ -1406,22 +1357,11 @@ export default function VerdictPage() {
                           ? "Voir le pivot exact + plan d'action 48h → Spark 19€"
                           : "See exact pivot + 48h action plan → Spark $19"}
                       </button>
-                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", marginTop: 10, marginLeft: 34, lineHeight: 1.5 }}>
-                        {lang === "fr"
-                          ? "Moins cher qu'un café par semaine. Plus utile qu'un an de ChatGPT."
-                          : "Cheaper than a coffee a week. More useful than a year of ChatGPT."}
-                      </div>
                     </div>
                   </div>
                 ) : null}
               </>
             ) : null}
-
-            {displaySections?.some(s => s.kind === "verdict" && (s as any).questionBrutale) && (
-              <div style={{ fontSize: 16, fontStyle: "italic", color: "rgba(255,255,255,0.45)", marginTop: 32, lineHeight: 1.6, fontFamily: "'Inter', sans-serif", textAlign: "center", padding: "0 16px" }}>
-                {(displaySections.find(s => s.kind === "verdict") as any)?.questionBrutale}
-              </div>
-            )}
 
             {analysisError ? (
               <div style={{ marginTop: 16, fontSize: 12, color: "#ff4d4f" }}>

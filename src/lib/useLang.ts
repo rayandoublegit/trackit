@@ -15,8 +15,8 @@ export function useLang() {
     }
 
     const handler = (e: Event) => {
-      const newLang = (e as CustomEvent).detail as "en" | "fr";
-      setLang(newLang);
+      const val = (e as CustomEvent).detail;
+      if (val === "en" || val === "fr") setLang(val);
     };
     window.addEventListener("klayan_lang_change", handler);
     return () => window.removeEventListener("klayan_lang_change", handler);
