@@ -165,16 +165,11 @@ function VerdictPill({ kind }: { kind: VerdictKind | null }) {
     );
   }
   return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 800,
-        letterSpacing: "0.08em",
-        color: verdictBadgeColor(kind),
-        flexShrink: 0,
-      }}
-    >
-      {kind}
+    <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+      <span style={{ width: 8, height: 8, borderRadius: "50%", background: verdictBadgeColor(kind), display: "inline-block", flexShrink: 0 }} />
+      <span style={{ fontSize: 13, fontWeight: 500, color: theme.textSub, fontFamily: "'Inter', sans-serif" }}>
+        {kind === "BUILD" ? "Building" : kind === "FLIP" ? "Pivoting" : "Killed"}
+      </span>
     </span>
   );
 }
@@ -272,7 +267,66 @@ export default function DashboardPage() {
   >({});
   const [showWorkspaces, setShowWorkspaces] = useState(false);
   const [ideasOpen, setIdeasOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<"home" | "ideas" | "workspaces" | "profile" | "settings" | "billing">("home");
+  const [selectedLang, setSelectedLang] = useState<"en" | "fr">(() => (typeof window !== "undefined" ? (localStorage.getItem("klayan_lang") as "en" | "fr" | null) ?? "en" : "en"));
+  const [statusFilter, setStatusFilter] = useState<"all" | "BUILD" | "FLIP" | "KILL">("all");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "az">("newest");
+  const [darkMode, setDarkMode] = useState<boolean>(() => typeof window !== "undefined" ? localStorage.getItem("klayan_dark") === "1" : false);
+  const [notifications, setNotifications] = useState<{id: string; title: string; body: string; created_at: string; read_by: string[]}[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const statusMenuRef = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [dashHasDraft, setDashHasDraft] = useState(false);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      if (data) setNotifications(data);
+    });
+    const channel = supabase.channel("notifications").on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+      void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+        if (data) setNotifications(data);
+      });
+    }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [supabase]);
+
+  useEffect(() => {
+    void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      if (data) setNotifications(data);
+    });
+    const channel = supabase.channel("notifications").on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+      void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+        if (data) setNotifications(data);
+      });
+    }).subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [supabase]);
 
   useEffect(() => {
     const checkDraft = () => {
@@ -693,6 +747,12 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handleDeleteProject = useCallback(async (projectId: string) => {
+    if (!confirm("Delete this workspace? This cannot be undone.")) return;
+    await supabase.from("projects").delete().eq("id", projectId);
+    setProjects((prev) => prev.filter((p) => p.id !== projectId));
+  }, [supabase]);
+
   const handleDeleteAnalysis = useCallback(
     async (id: string) => {
       if (!supabase || !user) return;
@@ -777,7 +837,7 @@ export default function DashboardPage() {
           type="button"
           onClick={() => void loadDashboard()}
           style={{
-            background: "#fff",
+            background: theme.card,
             color: "#000",
             border: "none",
             borderRadius: 10,
@@ -799,6 +859,31 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const D = darkMode;
+  const theme = {
+    bg: D ? "#0d0d0d" : "#f7f7f7",
+    sidebar: D ? "#111" : "#fff",
+    sidebarBorder: D ? "#222" : "#e5e5e5",
+    main: D ? "#111" : "#fff",
+    card: D ? "#1a1a1a" : "#fff",
+    cardBorder: D ? "#2a2a2a" : "#e5e5e5",
+    topbar: D ? "#111" : "#fff",
+    topbarBorder: D ? "#222" : "#e5e5e5",
+    text: D ? "#f0f0f0" : "#111",
+    textMuted: D ? "#888" : "#aaa",
+    textSub: D ? "#aaa" : "#555",
+    inputBg: D ? "#1a1a1a" : "#fff",
+    inputBorder: D ? "#333" : "#e5e5e5",
+    hover: D ? "#222" : "#ebebeb",
+    tabActive: D ? "#fff" : "#111",
+    tabActiveBorder: D ? "#fff" : "#111",
+    tabInactive: D ? "#666" : "#888",
+    divider: D ? "#222" : "#e5e5e5",
+    upgradeBg: D ? "#1a1a1a" : "#fff",
+    dropdownBg: D ? "#1a1a1a" : "#fff",
+    dropdownBorder: D ? "#333" : "#e5e5e5",
+  };
 
   return (
     <div
@@ -885,8 +970,8 @@ export default function DashboardPage() {
         style={{
           width: 260,
           flexShrink: 0,
-          borderRight: "1px solid #e5e5e5",
-          background: "#f5f5f5",
+          borderRight: `1px solid ${theme.sidebarBorder}`,
+          background: theme.hover,
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
@@ -912,7 +997,7 @@ export default function DashboardPage() {
         }}
       >
         {/* Top: brand */}
-        <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e5e5" }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${theme.divider}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", flexShrink: 0 }}>
@@ -925,10 +1010,10 @@ export default function DashboardPage() {
                 )}
               </div>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#111", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
                   {profileUsername?.trim() || user?.email?.split("@")[0] || "Klayan"}
                 </div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 1 }}>{user?.email ?? ""}</div>
+                <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 1 }}>{user?.email ?? ""}</div>
               </div>
             </div>
             <div ref={avatarMenuRef} style={{ position: "relative" }}>
@@ -936,16 +1021,16 @@ export default function DashboardPage() {
                 onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void handleAvatarUpload(file); }} />
               <button type="button"
                 onClick={() => { setAvatarActionError(null); setShowAvatarMenu((v) => !v); }}
-                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#888", padding: 4, borderRadius: 6, display: "flex" }}>
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 4, borderRadius: 6, display: "flex" }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" />
                 </svg>
               </button>
               {showAvatarMenu && user ? (
-                <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, minWidth: 180, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, minWidth: 180, background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
                   {avatarUrl ? (
                     <>
-                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#111", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
                         <CameraIcon /> Change photo
                       </button>
                       <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => void removeAvatar()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#ef4444", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
@@ -953,7 +1038,7 @@ export default function DashboardPage() {
                       </button>
                     </>
                   ) : (
-                    <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#111", fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                    <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
                       <CameraIcon /> Add photo
                     </button>
                   )}
@@ -966,61 +1051,53 @@ export default function DashboardPage() {
 
         {/* Nav */}
         <div style={{ padding: "12px" }}>
-          <button type="button" onClick={() => { setShowWorkspaces(!showWorkspaces); if (isMobile) setSidebarOpen(false); }}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: showWorkspaces ? "#e9e9e9" : "transparent", border: "1px solid #e5e5e5", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}>
+          <button type="button" onClick={() => { setActiveTab("workspaces"); if (isMobile) setSidebarOpen(false); }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "workspaces" ? theme.activeNav : "transparent", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             {t.workspaces}
           </button>
 
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#aaa", margin: "16px 0 4px 12px", textTransform: "uppercase" }}>Main Menu</div>
-          <Link href="/dashboard"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "16px 0 4px 12px", textTransform: "uppercase" }}>Main Menu</div>
+          <button type="button" onClick={() => setActiveTab("home")}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "home" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Inter', sans-serif", boxSizing: "border-box", cursor: "pointer" }} className="kly-nav-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             Home
-          </Link>
+          </button>
 
-          <button type="button" onClick={() => setIdeasOpen((v) => !v)}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: ideasOpen ? "#ebebeb" : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
-            onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseOut={(e) => { e.currentTarget.style.background = ideasOpen ? "#ebebeb" : "transparent"; }}>
+          <button type="button" onClick={() => { setActiveTab("ideas"); }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: activeTab === "ideas" ? theme.activeNav : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
+            className="kly-nav-btn">
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              <span style={{ fontSize: 14, fontWeight: 500, color: "#111" }}>{t.your_ideas}</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{t.your_ideas}</span>
             </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2.5" style={{ transform: ideasOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease", flexShrink: 0 }}>
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
           </button>
           {dashHasDraft && (
             <Link href="/analyze"
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginTop: 2, background: "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+              className="kly-nav-btn">
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                <span style={{ fontSize: 14, fontWeight: 500, color: "#111" }}>Draft</span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>Draft</span>
               </div>
               <span style={{ fontSize: 11, background: "#f0fdf4", color: "#16a34a", borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>1</span>
             </Link>
           )}
 
           <Link href="/analyze"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 8, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: "#111", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
-            onMouseOver={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.7"><path d="M12 5v14M5 12h14"/></svg>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 8, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
+            className="kly-nav-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 5v14M5 12h14"/></svg>
             {t.new_analysis}
           </Link>
 
-          {ideasOpen && <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
+          {false && <div style={{ display: "flex", flexDirection: "column", gap: 1, marginTop: 2 }}>
             {loading ? (
-              <p style={{ fontSize: 13, color: "#aaa", padding: "0 12px" }}>Loading…</p>
+              <p style={{ fontSize: 13, color: theme.textMuted, padding: "0 12px" }}>Loading…</p>
             ) : error ? (
               <p style={{ fontSize: 13, color: "#ef4444", padding: "0 12px" }}>{error}</p>
             ) : rows.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#aaa", padding: "0 12px", lineHeight: 1.5 }}>{t.no_ideas}</p>
+              <p style={{ fontSize: 13, color: theme.textMuted, padding: "0 12px", lineHeight: 1.5 }}>{t.no_ideas}</p>
             ) : rows.map((row) => {
               const kind = getVerdictKind(row.verdict);
               const menuVisible = hoveredRowId === row.id || openMenuId === row.id;
@@ -1032,38 +1109,38 @@ export default function DashboardPage() {
                   <Link href={`/verdict/${row.id}`} onClick={() => { if (isMobile) setSidebarOpen(false); }}
                     style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
                     <VerdictPill kind={kind} />
-                    <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: "#111", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: theme.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                       {(() => { const pid = projectByAnalysisId[row.id]; const proj = pid ? projects.find((p) => p.id === pid) : null; const name = proj?.idea_name ?? row.idea; return name.length > 50 ? name.slice(0, 47) + "..." : name; })()}
                     </span>
                   </Link>
                   <div style={{ position: "relative", flexShrink: 0, opacity: menuVisible ? 1 : 0, pointerEvents: menuVisible ? "auto" : "none", transition: "opacity 0.12s" }}>
                     <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenMenuId((cur) => cur === row.id ? null : row.id); }}
-                      style={{ background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}
+                      style={{ background: "transparent", border: "none", color: theme.textMuted, cursor: "pointer", fontSize: 16, padding: "2px 6px", borderRadius: 6, lineHeight: 1 }}
                       onMouseOver={(e) => { e.currentTarget.style.background = "rgba(0,0,0,0.06)"; }}
                       onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>⋯</button>
                     {openMenuId === row.id ? (
-                      <div style={{ position: "absolute", right: 0, top: "100%", background: "#fff", border: "1px solid #e5e5e5", borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
+                      <div style={{ position: "absolute", right: 0, top: "100%", background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 10, padding: 5, zIndex: 100, minWidth: 170, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
                         <button type="button" onClick={(e) => { e.stopPropagation(); void handleCopyVerdict(row); }}
-                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#111", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: theme.text, padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
                           onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                           📋 {t.copy_verdict}
                         </button>
                         {projectByAnalysisId[row.id] ? (
                           <>
                             <button type="button" onClick={(e) => { e.stopPropagation(); const pid = projectByAnalysisId[row.id]; const proj = projects.find((p) => p.id === pid); setRenameValue(proj?.idea_name ?? ""); setRenamingProjectId(pid); setOpenMenuId(null); }}
-                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#111", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
+                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: theme.text, padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
                               onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                               {t.rename_project}
                             </button>
                             <Link href={"/project/" + projectByAnalysisId[row.id]}
                               onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); if (isMobile) setSidebarOpen(false); }}
-                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", borderRadius: 7, color: "#111", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif", textDecoration: "none" }}
+                              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", borderRadius: 7, color: theme.text, fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif", textDecoration: "none" }}
                               onMouseOver={(e) => { e.currentTarget.style.background = "#f5f5f5"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
                               {t.project_workspace}
                             </Link>
                           </>
                         ) : null}
-                        <div style={{ height: 1, background: "#e5e5e5", margin: "4px 0" }} />
+                        <div style={{ height: 1, background: theme.divider, margin: "4px 0" }} />
                         <button type="button" onClick={(e) => { e.stopPropagation(); void handleDeleteAnalysis(row.id); setOpenMenuId(null); }}
                           style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "transparent", border: "none", color: "#ef4444", padding: "9px 10px", borderRadius: 7, cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "Inter, sans-serif" }}
                           onMouseOver={(e) => { e.currentTarget.style.background = "#fff0f0"; }} onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; }}>
@@ -1080,45 +1157,56 @@ export default function DashboardPage() {
 
         {/* Others */}
         <div style={{ padding: "0 12px 4px" }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: "#aaa", margin: "8px 0 4px 12px", textTransform: "uppercase" }}>Others</div>
-          <div style={{ height: 1, background: "#e5e5e5", margin: "4px 0 6px" }} />
-          <Link href="/settings"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#111", fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>Others</div>
+          <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
+          <button type="button" onClick={() => setActiveTab("settings" as any)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: activeTab === "settings" ? theme.activeNav : "transparent", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             Settings
-          </Link>
+          </button>
           <a href="https://discord.gg/nHVEPB2yXb" target="_blank" rel="noopener noreferrer"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#111", fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}}}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#5865f2" }}><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
             Discord
           </a>
           <a href="mailto:support@klayan.app"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: "#111", fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#ebebeb"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#333" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Inter', sans-serif" }}}}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             Support
           </a>
         </div>
+        {/* Account */}
+        <div style={{ padding: "0 12px 4px" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>Account</div>
+          <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
+          <button type="button" onClick={() => setActiveTab("profile" as any)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "profile" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left", boxSizing: "border-box" }}}
+            onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "profile" ? "#ebebeb" : "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile
+          </button>
+          <button type="button" onClick={() => setActiveTab("billing" as any)}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "billing" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left", boxSizing: "border-box" }}}
+            onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "billing" ? "#ebebeb" : "transparent"; }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Billing
+          </button>
+        </div>
         {/* Bottom */}
-        <div style={{ borderTop: "1px solid #e5e5e5", padding: "12px", marginTop: "auto" }}>
+        <div style={{ borderTop: `1px solid ${theme.divider}`, padding: "12px", marginTop: "auto" }}>
 
-          <div style={{ background: "#fff", border: "1px solid #e5e5e5", borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ background: theme.upgradeBg, border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "14px 16px" }}>
             {userPlan === "scale" ? (
               <>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 4 }}>You&apos;re on the best plan 🎉</div>
-                <div style={{ fontSize: 12, color: "#888", lineHeight: 1.4 }}>Scale gives you full access to everything Klayan has to offer.</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>You&apos;re on the best plan 🎉</div>
+                <div style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.4 }}>Scale gives you full access to everything Klayan has to offer.</div>
               </>
             ) : (
               <>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#111", marginBottom: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: theme.text, marginBottom: 4 }}>
                   {userPlan === "free" ? "Upgrade to Spark" : userPlan === "spark" ? "Upgrade to Build" : "Upgrade to Scale"}
                 </div>
-                <div style={{ fontSize: 12, color: "#888", marginBottom: 12, lineHeight: 1.4 }}>Unlock all features and get the most out of Klayan.</div>
+                <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 12, lineHeight: 1.4 }}>Unlock all features and get the most out of Klayan.</div>
                 <button type="button"
                   onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
                   style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, background: "#111", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
@@ -1131,444 +1219,521 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main
-        style={{
-          flex: 1,
-          minWidth: 0,
-          position: "relative",
-          minHeight: "100vh",
-        }}
-      >
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "#111111",
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: wallpaperType === "image" ? `url(${wallpaper}) center center / cover no-repeat` : wallpaper,
-          }}
-        />
+      <main style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Inter', sans-serif" }}>
 
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            padding: isMobile ? "24px 16px 40px" : "40px 48px 48px",
-            maxWidth: 1000,
-            margin: "0 auto",
-            width: "100%",
-            boxSizing: "border-box",
-            color: textColor,
-            "--dashboard-text": textColor,
-            "--text-primary": textColor,
-          } as CSSProperties}
-        >
-          <h2
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontSize: "clamp(20px, 2.5vw, 28px)",
-              fontWeight: 700,
-              letterSpacing: "-0.03em",
-              lineHeight: 1.2,
-              margin: "0 0 20px",
-              color: "var(--text-primary)",
-            }}
-          >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 16 }}>
-              {t.last_analysis}
-              {lastKind && (
-                <span style={{
-                  fontSize: "clamp(18px, 2.5vw, 26px)",
-                  fontWeight: 900,
-                  letterSpacing: "0.06em",
-                  color: lastKind === "BUILD" ? "#4ade80" : lastKind === "FLIP" ? "#f5c842" : "#ef4444",
-                  fontFamily: "'Inter', sans-serif",
-                }}>
-                  {lastKind} IT
-                </span>
-              )}
-            </span>
-          </h2>
-
-          {loading ? (
-            <p style={{ color: "color-mix(in srgb, var(--text-primary) 50%, transparent)", fontSize: 16 }}>Loading…</p>
-          ) : !last ? (
-            <p style={{ color: "color-mix(in srgb, var(--text-primary) 55%, transparent)", fontSize: 17, lineHeight: 1.6, maxWidth: 560 }}>
-              Run your first analysis to see your verdict, hard truths, and next steps here.
-            </p>
-          ) : (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, color: "color-mix(in srgb, var(--text-primary) 45%, transparent)" }}>
-                  {new Date(last.created_at).toLocaleString(undefined, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
-                </span>
-              </div>
-              <p
-                style={{
-                  fontSize: 18,
-                  lineHeight: 1.65,
-                  color: "color-mix(in srgb, var(--text-primary) 88%, transparent)",
-                  margin: "0 0 36px",
-                  maxWidth: 720,
-                }}
-              >
-                {last.idea.length > 320 ? `${last.idea.slice(0, 320)}…` : last.idea}
-              </p>
-            </>
-          )}
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 14,
-              marginBottom: 32,
-            }}
-          >
-            <div
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 14,
-                padding: "18px 20px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
-                  marginBottom: 8,
-                }}
-              >
-                {t.ideas_analyzed}
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 40,
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                }}
-              >
-                {stats.total}
-              </div>
+        {/* Top bar */}
+        <div style={{ padding: "20px 32px 0", borderBottom: `1px solid ${theme.divider}` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 4 }}>Dashboard</div>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>Welcome back,</h1>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{profileUsername?.trim() || user?.email?.split("@")[0] || "Founder"} 👋</h1>
             </div>
-            <div
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 14,
-                padding: "18px 20px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
-                  marginBottom: 8,
-                }}
-              >
-                {t.verdicts}
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: theme.inputBg, border: `1px solid ${theme.inputBorder}`, borderRadius: 8, padding: "7px 14px", minWidth: 220 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search ideas..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Inter', sans-serif" }} />
+                {searchQuery ? (
+                  <button type="button" onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#bbb", background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>⌘ F</span>
+                )}
               </div>
-              <div style={{ fontSize: 14, lineHeight: 1.7, color: "color-mix(in srgb, var(--text-primary) 85%, transparent)" }}>
-                <span style={{ color: "#f5c842", fontWeight: 700 }}>{stats.flip}</span>
-                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> FLIP · </span>
-                <span style={{ color: "#4ade80", fontWeight: 700 }}>{stats.build}</span>
-                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> BUILD · </span>
-                <span style={{ color: "#ef4444", fontWeight: 700 }}>{stats.kill}</span>
-                <span style={{ color: "color-mix(in srgb, var(--text-primary) 35%, transparent)" }}> KILL</span>
-              </div>
-            </div>
-            <div
-              style={{
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 14,
-                padding: "18px 20px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: "0.08em",
-                  color: "color-mix(in srgb, var(--text-primary) 40%, transparent)",
-                  marginBottom: 8,
-                }}
-              >
-                {lang === "fr" ? "TON PLAN" : "YOUR PLAN"}
-              </div>
-              <div
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 22,
-                  fontWeight: 800,
-                  letterSpacing: "-0.02em",
-                  color: "var(--text-primary)",
-                  marginBottom: 8,
-                }}
-              >
-                {userPlan === "free" ? (lang === "fr" ? "Gratuit" : "Free") : userPlan === "spark" ? "Spark" : userPlan === "build" ? "Build" : "Scale"}
-              </div>
-              {["free", "spark"].includes(userPlan) && (
-                <button
-                  onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan) ?? "")}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#4ade80",
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  {userPlan === "free"
-                    ? (lang === "fr" ? "Passer à Spark →" : "Upgrade to Spark →")
-                    : (lang === "fr" ? "Passer à Build →" : "Upgrade to Build →")}
+              <div ref={notifRef} style={{ position: "relative" }}>
+                <button type="button" onClick={() => setShowNotifications(v => !v)}
+                  style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textSub} strokeWidth="1.8"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+                  {notifications.filter(n => !n.read_by.includes(user?.id ?? "")).length > 0 && (
+                    <span style={{ position: "absolute", top: 4, right: 4, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "2px solid #fff" }} />
+                  )}
                 </button>
-              )}
+                {showNotifications && (
+                  <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 200, width: 320, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+                    <div style={{ padding: "14px 16px", borderBottom: `1px solid ${theme.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Notifications</span>
+                      {notifications.some(n => !n.read_by.includes(user?.id ?? "")) && (
+                        <button type="button" onClick={async () => {
+                          if (!user) return;
+                          await Promise.all(notifications.filter(n => !n.read_by.includes(user.id)).map(n =>
+                            supabase.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id)
+                          ));
+                          setNotifications(prev => prev.map(n => ({ ...n, read_by: n.read_by.includes(user.id) ? n.read_by : [...n.read_by, user.id] })));
+                        }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div style={{ padding: "32px 16px", textAlign: "center", color: theme.textMuted, fontSize: 13 }}>No notifications yet</div>
+                    ) : notifications.map(n => {
+                      const isRead = n.read_by.includes(user?.id ?? "");
+                      return (
+                        <div key={n.id} onClick={async () => {
+                          if (!user || isRead) return;
+                          await supabase.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id);
+                          setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read_by: [...x.read_by, user.id] } : x));
+                        }} style={{ padding: "12px 16px", borderBottom: `1px solid ${theme.divider}`, cursor: isRead ? "default" : "pointer", background: isRead ? "transparent" : "#fafafa" }}}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = isRead ? "transparent" : (darkMode ? "#1a1a1c" : "#fafafa"); }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                            {!isRead && <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#111", flexShrink: 0, display: "inline-block" }} />}
+                            <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>{n.title}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: theme.textMuted, lineHeight: 1.5, paddingLeft: isRead ? 0 : 15 }}>{n.body}</div>
+                          <div style={{ fontSize: 11, color: "#ccc", marginTop: 4, paddingLeft: isRead ? 0 : 15 }}>{new Date(n.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div ref={statusMenuRef} style={{ position: "relative" }}>
+                <button type="button" onClick={() => { setShowStatusMenu(v => !v); setShowSortMenu(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Inter', sans-serif" }}>
+                  Status: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 4 }}>{statusFilter === "all" ? "All" : statusFilter === "BUILD" ? "Building" : statusFilter === "FLIP" ? "Pivoting" : "Killed"}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                {showStatusMenu && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 140, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
+                    {[{val: "all", label: "All"}, {val: "BUILD", label: "Building"}, {val: "FLIP", label: "Pivoting"}, {val: "KILL", label: "Killed"}].map(({val, label}) => (
+                      <button key={val} type="button" onClick={() => { setStatusFilter(val as any); setShowStatusMenu(false); }}
+                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: statusFilter === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: statusFilter === val ? 600 : 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div ref={sortMenuRef} style={{ position: "relative" }}>
+                <button type="button" onClick={() => { setShowSortMenu(v => !v); setShowStatusMenu(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Inter', sans-serif" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+                  Sort: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 2 }}>{sortOrder === "newest" ? "Newest" : sortOrder === "oldest" ? "Oldest" : "A→Z"}</span>
+                </button>
+                {showSortMenu && (
+                  <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 130, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
+                    {[{val: "newest", label: "Newest first"}, {val: "oldest", label: "Oldest first"}, {val: "az", label: "A → Z"}].map(({val, label}) => (
+                      <button key={val} type="button" onClick={() => { setSortOrder(val as any); setShowSortMenu(false); }}
+                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: sortOrder === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sortOrder === val ? 600 : 400, color: theme.text, fontFamily: "'Inter', sans-serif", textAlign: "left" }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {["free", "spark"].includes(userPlan) && (
-            <div style={{ marginBottom: 24, fontSize: 14, color: "color-mix(in srgb, var(--text-primary) 55%, transparent)" }}>
-              {lang === "fr"
-                ? <>Tu veux le pivot exact sur tes idées ? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan) ?? "")} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Passer à Spark →" : "Passer à Build →"}</button></>
-                : <>Want the exact pivot on your ideas? <button onClick={() => handleUpgrade(getPriceIdForUpgrade(userPlan) ?? "")} style={{ background: "none", border: "none", color: "#4ade80", fontWeight: 600, fontSize: 14, cursor: "pointer", padding: 0 }}>{userPlan === "free" ? "Upgrade to Spark →" : "Upgrade to Build →"}</button></>
-              }
-            </div>
-          )}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {last ? (
-              <Link
-                href={`/verdict/${last.id}`}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "14px 26px",
-                  borderRadius: 100,
-                  background: "#fff",
-                  color: "#000",
-                  fontWeight: 600,
-                  fontSize: 15,
-                  textDecoration: "none",
-                }}
-              >
-                {t.view_last}
-              </Link>
-            ) : null}
-            <Link
-              href="/analyze"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "14px 26px",
-                borderRadius: 100,
-                background: "transparent",
-                color: "var(--text-primary)",
-                fontWeight: 600,
-                fontSize: 15,
-                textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.35)",
-              }}
-            >
-              {t.new_analysis}
-            </Link>
-            <Link
-              href="/"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "14px 18px",
-                color: "color-mix(in srgb, var(--text-primary) 45%, transparent)",
-                fontSize: 14,
-                textDecoration: "none",
-              }}
-            >
-              {t.home}
-            </Link>
+          {/* Tab nav */}
+          <div style={{ display: "flex", gap: 0 }}>
+            {[{key: "home", label: "Overview"}, {key: "ideas", label: "Ideas"}, {key: "workspaces", label: "Workspaces"}, {key: "settings", label: "Settings"}, {key: "profile", label: "Profile"}, {key: "billing", label: "Billing"}].map(({key, label}) => (
+              <button key={key} type="button" onClick={() => setActiveTab(key as any)}
+                style={{ padding: "10px 18px", background: "transparent", border: "none", borderBottom: activeTab === key ? `2px solid ${theme.tabActive}` : "2px solid transparent", cursor: "pointer", fontSize: 14, fontWeight: activeTab === key ? 600 : 400, color: activeTab === key ? theme.tabActive : theme.tabInactive, fontFamily: "'Inter', sans-serif", marginBottom: -1, whiteSpace: "nowrap" }}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-        <>
-          <button
-            type="button"
-            onClick={() => setShowWallpaperPicker(!showWallpaperPicker)}
-            style={{
-              position: "fixed",
-              bottom: 24,
-              right: 24,
-              background: "rgba(0,0,0,0.5)",
-              backdropFilter: "blur(8px)",
-              WebkitBackdropFilter: "blur(8px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 100,
-              padding: "8px 14px",
-              color: "rgba(255,255,255,0.5)",
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              letterSpacing: "-0.01em",
-              zIndex: 100,
-            }}
-          >
-            🖼 Wallpaper
-          </button>
 
-          {showWallpaperPicker ? (
-            <div style={{
-              position: "fixed",
-              bottom: 64,
-              right: 24,
-              background: "rgba(15,15,15,0.97)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 16,
-              padding: "20px",
-              zIndex: 200,
-              width: 280,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.8)",
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16, letterSpacing: "-0.01em" }}>Wallpaper</div>
+        {/* Content */}
+        <div style={{ padding: "28px 32px", flex: 1, overflowY: "auto" }}>
 
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Colors</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[
-                    { value: "#0a0a0a", label: "Default" },
-                    { value: "#0f1117", label: "Midnight" },
-                    { value: "#0a0f0a", label: "Forest" },
-                    { value: "#0a0a1a", label: "Navy" },
-                    { value: "#1a0a0a", label: "Ember" },
-                    { value: "#0f0a1a", label: "Violet" },
-                  ].map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => applyWallpaper(c.value, "color")}
-                      title={c.label}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: c.value,
-                        border: wallpaper === c.value ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
-                        cursor: "pointer",
-                      }}
-                    />
-                  ))}
+          {activeTab === "ideas" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>All Ideas</h2>
+                  <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{rows.length} {rows.length === 1 ? "idea" : "ideas"} analyzed</div>
                 </div>
+                <Link href="/analyze" style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", background: theme.ctaBg, color: theme.ctaText, borderRadius: 8, textDecoration: "none", fontSize: 13, fontWeight: 600 }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                  New Analysis
+                </Link>
               </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Gradients</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[
-                    { value: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)", label: "Purple Night" },
-                    { value: "linear-gradient(135deg, #0a0a0a 0%, #0a1a0a 100%)", label: "Matrix" },
-                    { value: "linear-gradient(135deg, #0a0a1a 0%, #001a2e 100%)", label: "Ocean" },
-                    { value: "linear-gradient(135deg, #1a0a0a 0%, #2e0a0a 100%)", label: "Ember" },
-                    { value: "linear-gradient(135deg, #0a0a0a 0%, #1a1a00 100%)", label: "Gold" },
-                    { value: "linear-gradient(135deg, #0a0a2e 0%, #2e0a2e 100%)", label: "Cosmos" },
-                  ].map((g) => (
-                    <button
-                      key={g.value}
-                      type="button"
-                      onClick={() => applyWallpaper(g.value, "gradient")}
-                      title={g.label}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: g.value,
-                        border: wallpaper === g.value ? "2px solid #fff" : "1px solid rgba(255,255,255,0.15)",
-                        cursor: "pointer",
-                      }}
-                    />
-                  ))}
+              <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 100px", padding: "10px 20px", borderBottom: `1px solid ${theme.divider}`, background: D ? "#1a1a1d" : "#f9f9f9" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Idea</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Verdict</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Date</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Action</span>
                 </div>
+                {loading ? (
+                  <div style={{ padding: "40px", textAlign: "center", color: theme.textMuted }}>Loading…</div>
+                ) : rows.length === 0 ? (
+                  <div style={{ padding: "40px", textAlign: "center", color: theme.textMuted }}>No ideas yet. Run your first analysis.</div>
+                ) : rows.filter(row => {
+                  const pid = projectByAnalysisId[row.id];
+                  const proj = pid ? projects.find((p) => p.id === pid) : null;
+                  const name = proj?.idea_name ?? row.idea;
+                  if (searchQuery && !name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+                  if (statusFilter !== "all" && getVerdictKind(row.verdict) !== statusFilter) return false;
+                  return true;
+                }).sort((a, b) => {
+                  if (sortOrder === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+                  if (sortOrder === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+                  const na = (projectByAnalysisId[a.id] ? projects.find(p => p.id === projectByAnalysisId[a.id])?.idea_name : null) ?? a.idea;
+                  const nb = (projectByAnalysisId[b.id] ? projects.find(p => p.id === projectByAnalysisId[b.id])?.idea_name : null) ?? b.idea;
+                  return na.localeCompare(nb);
+                }).map((row, idx) => {
+                  const kind = getVerdictKind(row.verdict);
+                  const projectId = projectByAnalysisId[row.id];
+                  const project = projectId ? projects.find((p) => p.id === projectId) : null;
+                  const name = project?.idea_name ?? row.idea;
+                  return (
+                    <div key={row.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 100px", padding: "14px 20px", borderBottom: idx < rows.length - 1 ? `1px solid ${theme.divider}` : "none", alignItems: "center" }}}}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name.length > 60 ? name.slice(0, 57) + "..." : name}</div>
+                        <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.idea.slice(0, 60)}…</div>
+                      </div>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", padding: "3px 10px", borderRadius: 100, display: "inline-block" }}>{kind}</span>
+                      <span style={{ fontSize: 12, color: theme.textMuted }}>{new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
+                      <Link href={"/verdict/" + row.id} style={{ fontSize: 12, fontWeight: 600, color: theme.text, textDecoration: "none", border: `1px solid ${theme.cardBorder}`, borderRadius: 6, padding: "5px 12px", display: "inline-block" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f5f5"; }}}>
+                        View →
+                      </Link>
+                    </div>
+                  );
+                })}
               </div>
-
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Custom Image</div>
-                <label style={{ cursor: "pointer", display: "inline-block" }}>
-                  <div style={{
-                    background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 8,
-                    padding: "8px 16px",
-                    fontSize: 12,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    color: "rgba(255,255,255,0.6)",
-                  }}>
-                    Upload PNG / JPG / GIF
-                  </div>
-                  <input type="file" accept="image/*,image/gif" onChange={handleWallpaperImageDash} style={{ display: "none" }} />
-                </label>
-              </div>
-
-              <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Text Color</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {[
-                    { value: "#ffffff", label: "White" },
-                    { value: "#000000", label: "Black" },
-                    { value: "#e2e8f0", label: "Silver" },
-                    { value: "#fbbf24", label: "Gold" },
-                    { value: "#60a5fa", label: "Blue" },
-                    { value: "#4ade80", label: "Green" },
-                  ].map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => applyTextColor(c.value)}
-                      title={c.label}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: c.value,
-                        border: textColor === c.value ? "2px solid rgba(255,255,255,0.8)" : "1px solid rgba(255,255,255,0.15)",
-                        cursor: "pointer",
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowWallpaperPicker(false)}
-                style={{ position: "absolute", top: 12, right: 12, background: "transparent", border: "none", color: "rgba(255,255,255,0.3)", cursor: "pointer", fontSize: 16, padding: 4 }}
-              >
-                ✕
-              </button>
             </div>
-          ) : null}
-        </>
+          )}
+
+          {activeTab === "workspaces" && (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>Workspaces</h2>
+                  <div style={{ fontSize: 13, color: theme.textMuted, marginTop: 2 }}>{projects.length} active {projects.length === 1 ? "project" : "projects"}</div>
+                </div>
+              </div>
+              {(() => {
+                const filtered = projects.filter(p => {
+                  if (statusFilter === "all") return true;
+                  if (statusFilter === "BUILD") return p.status === "building";
+                  if (statusFilter === "FLIP") return p.status === "pivoting";
+                  if (statusFilter === "KILL") return p.status === "killed";
+                  return true;
+                });
+                const statusLabel = statusFilter === "BUILD" ? "building" : statusFilter === "FLIP" ? "pivoting" : statusFilter === "KILL" ? "killed" : "";
+                if (projects.length === 0) return (
+                  <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "60px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>🚀</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 6 }}>No workspaces yet</div>
+                    <div style={{ fontSize: 13, color: theme.textMuted }}>Get a BUILD IT or FLIP IT verdict to create a workspace.</div>
+                  </div>
+                );
+                if (filtered.length === 0) return (
+                  <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "60px 24px", textAlign: "center" }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>🔍</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 6 }}>No {statusLabel} workspaces</div>
+                    <div style={{ fontSize: 13, color: theme.textMuted }}>No {statusLabel} projects for the moment.</div>
+                  </div>
+                );
+                return (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+                  {filtered.map((project) => (
+                    <div key={project.id} style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px", background: "transparent", position: "relative" }}
+                      className="kly-ws-card">
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 10, height: 10, borderRadius: "50%", background: project.status === "building" ? "#4ade80" : project.status === "pivoting" ? "#f5c842" : "#f87171", flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, fontWeight: 400, color: theme.textSub, fontFamily: "'Inter', sans-serif" }}>{project.status === "building" ? "Building" : project.status === "pivoting" ? "Pivoting" : "Killed"}</span>
+                        </div>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); void handleDeleteProject(project.id); }}
+                          style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ccc", padding: 4, borderRadius: 6, display: "flex", alignItems: "center" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.color = "#ccc"; }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        </button>
+                      </div>
+                      <Link href={"/project/" + project.id} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: theme.text, marginBottom: 6, lineHeight: 1.4 }}>{project.idea_name.length > 50 ? project.idea_name.slice(0, 47) + "..." : project.idea_name}</div>
+                        <div style={{ fontSize: 12, color: theme.textMuted, display: "flex", alignItems: "center", gap: 4 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                          Open workspace
+                        </div>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {activeTab === "settings" && (
+            <div style={{ maxWidth: 520 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Settings</h2>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Customize your Klayan experience.</div>
+
+              {/* Dark mode toggle */}
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Appearance</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 14 }}>Choose how the dashboard looks.</div>
+                <div style={{ display: "flex", gap: 10 }}>
+                  {[{val: false, label: "☀️ Light"}, {val: true, label: "🌑 Dark"}].map(({val, label}) => (
+                    <button key={String(val)} type="button" onClick={() => {
+                      setDarkMode(val);
+                      localStorage.setItem("klayan_dark", val ? "1" : "0");
+                    }} style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, border: darkMode === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: darkMode === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: darkMode === val ? 600 : 500, color: darkMode === val ? "#fff" : "#111" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Language</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Choose the language for verdicts and analysis reports.</div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[{val: "en", label: "🇬🇧 English"}, {val: "fr", label: "🇫🇷 Français"}].map(({val, label}) => (
+                    <button key={val} type="button"
+                      onClick={async () => {
+                        localStorage.setItem("klayan_lang", val);
+                        setSelectedLang(val as "en" | "fr");
+                        window.dispatchEvent(new CustomEvent("klayan_lang_change", { detail: val }));
+                        if (!user) return;
+                        await supabase.from("profiles").update({ language: val }).eq("id", user.id);
+                      }}
+                      style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, border: selectedLang === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: selectedLang === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: selectedLang === val ? 600 : 500, color: selectedLang === val ? "#fff" : "#111" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Dashboard wallpaper</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Personalize your dashboard background.</div>
+                <Link href="/settings#wallpaper" style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 500, color: theme.text, textDecoration: "none", display: "inline-block" }}>
+                  Open wallpaper settings →
+                </Link>
+              </div>
+              <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Delete account</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Permanently delete your account and all data. This cannot be undone.</div>
+                <button type="button"
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}
+                  onClick={() => { if (confirm("Are you sure? This will permanently delete your account.")) alert("Contact support to delete your account."); }}>
+                  Delete account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "billing" && (
+            <div style={{ maxWidth: 480 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Billing</h2>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Manage your subscription and payment methods.</div>
+
+              {/* Current plan */}
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>Current plan</div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: userPlan === "scale" ? "#16a34a" : "#f59e0b", background: userPlan === "scale" ? "#f0fdf4" : "#fefce8", padding: "2px 10px", borderRadius: 100, textTransform: "capitalize" }}>{userPlan}</span>
+                </div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 16 }}>
+                  {userPlan === "free" ? "1 free analysis. Upgrade to unlock more." : userPlan === "spark" ? "$19/mo — unlimited analyses." : userPlan === "build" ? "$69/mo — all features." : "$149/mo — full access including Co-Founder Mode."}
+                </div>
+                {userPlan !== "scale" && (
+                  <button type="button" onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
+                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                    Upgrade plan →
+                  </button>
+                )}
+              </div>
+
+              {/* Payment method */}
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Payment method</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>Manage your payment method via the Stripe customer portal.</div>
+                <button type="button" onClick={() => window.open("https://billing.stripe.com/p/login/test_00000", "_blank")}
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 500, color: theme.text }}>
+                  Manage billing →
+                </button>
+              </div>
+
+              {/* Cancel */}
+              {userPlan !== "free" && (
+                <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Cancel subscription</div>
+                  <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>You will lose access to premium features at the end of your billing period.</div>
+                  <button type="button" onClick={() => window.open("https://billing.stripe.com/p/login/test_00000", "_blank")}
+                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                    Cancel plan
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "profile" && (
+            <div style={{ maxWidth: 480 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: theme.text, letterSpacing: "-0.02em", margin: "0 0 4px" }}>Profile</h2>
+              <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 28 }}>Manage your account information.</div>
+
+              {/* Avatar */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28, padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12 }}>
+                <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+                  {avatarUrl ? (
+                    <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 64, height: 64, objectFit: "cover" }} />
+                  ) : (
+                    <span style={{ color: "#fff", fontSize: 24, fontWeight: 700 }}>
+                      {(profileUsername?.trim() || user?.email?.split("@")[0] || "K")[0].toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>Profile photo</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => openAvatarFilePicker()}
+                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", color: theme.text, fontFamily: "'Inter', sans-serif" }}>
+                      {avatarUrl ? "Change" : "Upload"}
+                    </button>
+                    {avatarUrl && (
+                      <button type="button" onClick={() => void removeAvatar()}
+                        style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: "1px solid #fecaca", background: theme.card, cursor: "pointer", color: "#ef4444", fontFamily: "'Inter', sans-serif" }}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Username */}
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>Username</div>
+                <input type="text" defaultValue={profileUsername ?? ""} id="profile-username-input"
+                  style={{ width: "100%", padding: "9px 12px", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: "'Inter', sans-serif", color: theme.text, outline: "none", boxSizing: "border-box" }} />
+                <button type="button" onClick={async () => {
+                  const val = (document.getElementById("profile-username-input") as HTMLInputElement)?.value?.trim();
+                  if (!val || !user) return;
+                  await supabase.from("profiles").update({ username: val }).eq("id", user.id);
+                  setProfileUsername(val);
+                }}
+                  style={{ marginTop: 10, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                  Save
+                </button>
+              </div>
+
+              {/* Email */}
+              <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Email</div>
+                <div style={{ fontSize: 14, color: theme.textMuted }}>{user?.email}</div>
+              </div>
+
+              {/* Sign out */}
+              <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>Sign out</div>
+                <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>You will be redirected to the login page.</div>
+                <button type="button" onClick={() => { void supabase.auth.signOut().then(() => router.push("/auth")); }}
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                  Sign out
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "home" && (<div>
+
+          {/* Stats cards */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
+            {/* Card 1 */}
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Ideas Analyzed</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6 }}>{stats.total}</div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>Total analyses run</div>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#16a34a" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                All time
+              </div>
+            </div>
+
+            {/* Card 2 */}
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Verdicts</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6 }}>
+                <span style={{ color: "#4ade80" }}>{stats.build}</span>
+                <span style={{ fontSize: 16, color: "#ccc", margin: "0 6px" }}>·</span>
+                <span style={{ color: "#f5c842" }}>{stats.flip}</span>
+                <span style={{ fontSize: 16, color: "#ccc", margin: "0 6px" }}>·</span>
+                <span style={{ color: "#ef4444" }}>{stats.kill}</span>
+              </div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>Build · Flip · Kill</div>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textMuted }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Across all ideas
+              </div>
+            </div>
+
+            {/* Card 3 */}
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>Your Plan</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 700, color: theme.text, letterSpacing: "-0.04em", marginBottom: 6, textTransform: "capitalize" }}>{userPlan}</div>
+              <div style={{ fontSize: 12, color: theme.textMuted }}>Current subscription</div>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: theme.textMuted }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+                {userPlan === "scale" ? "Full access" : "Upgrade available"}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Ideas */}
+          <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "16px 24px", borderBottom: `1px solid ${theme.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textSub} strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>Recent Ideas</span>
+              <span style={{ fontSize: 13, color: theme.textMuted, marginLeft: 4 }}>({stats.total})</span>
+            </div>
+            {loading ? (
+              <div style={{ padding: "40px 24px", textAlign: "center", color: theme.textMuted, fontSize: 14 }}>Loading…</div>
+            ) : rows.length === 0 ? (
+              <div style={{ padding: "40px 24px", textAlign: "center", color: theme.textMuted, fontSize: 14 }}>No ideas yet. Run your first analysis.</div>
+            ) : rows.filter(row => {
+              const pid = projectByAnalysisId[row.id];
+              const proj = pid ? projects.find((p) => p.id === pid) : null;
+              const name = proj?.idea_name ?? row.idea;
+              if (searchQuery && !name.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+              if (statusFilter !== "all" && getVerdictKind(row.verdict) !== statusFilter) return false;
+              return true;
+            }).sort((a, b) => {
+              if (sortOrder === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+              if (sortOrder === "oldest") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              const na = (projectByAnalysisId[a.id] ? projects.find(p => p.id === projectByAnalysisId[a.id])?.idea_name : null) ?? a.idea;
+              const nb = (projectByAnalysisId[b.id] ? projects.find(p => p.id === projectByAnalysisId[b.id])?.idea_name : null) ?? b.idea;
+              return na.localeCompare(nb);
+            }).map((row, idx, arr) => {
+              const kind = getVerdictKind(row.verdict);
+              const projectId = projectByAnalysisId[row.id];
+              const project = projectId ? projects.find((p) => p.id === projectId) : null;
+              const name = project?.idea_name ?? row.idea;
+              return (
+                <Link key={row.id} href={"/verdict/" + row.id}
+                  style={{ display: "flex", alignItems: "center", padding: "14px 24px", borderBottom: idx < rows.length - 1 ? `1px solid ${theme.divider}` : "none", textDecoration: "none", color: "inherit", gap: 16 }}}}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626"} strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name.length > 60 ? name.slice(0, 57) + "..." : name}</div>
+                    <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>{new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</div>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", padding: "3px 10px", borderRadius: 100 }}>{kind}</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                </Link>
+              );
+            })}
+          </div>
+
+          </div>)}
+        </div>
       </main>
 
       {renamingProjectId ? (
@@ -1630,7 +1795,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => void renameProject(renamingProjectId, renameValue)}
-                style={{ background: "#fff", color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", flex: 1 }}
+                style={{ background: theme.card, color: "#000", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", flex: 1 }}
               >
                 {t.save}
               </button>

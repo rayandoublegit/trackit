@@ -7,16 +7,19 @@ export function useLang() {
     const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
     if (saved) {
       setLang(saved);
-      return;
-    }
-    const browserLang = navigator.language || (navigator as any).userLanguage || "";
-    if (browserLang.toLowerCase().startsWith("fr")) {
-      setLang("fr");
-      localStorage.setItem("klayan_lang", "fr");
     } else {
-      setLang("en");
-      localStorage.setItem("klayan_lang", "en");
+      const browserLang = navigator.language || (navigator as any).userLanguage || "";
+      const detected = browserLang.toLowerCase().startsWith("fr") ? "fr" : "en";
+      setLang(detected);
+      localStorage.setItem("klayan_lang", detected);
     }
+
+    const handler = (e: Event) => {
+      const newLang = (e as CustomEvent).detail as "en" | "fr";
+      setLang(newLang);
+    };
+    window.addEventListener("klayan_lang_change", handler);
+    return () => window.removeEventListener("klayan_lang_change", handler);
   }, []);
 
   return lang;
