@@ -915,9 +915,9 @@ export default function DashboardPage() {
         <div style={{ padding: "20px 20px 16px", borderBottom: "1px solid #e5e5e5" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden", flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
                 {avatarUrl ? (
-                  <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: "cover", display: "block" }} />
+                  <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: "cover", display: "block", borderRadius: "50%" }} />
                 ) : (
                   <span style={{ color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>
                     {(profileUsername?.trim() || user?.email?.split("@")[0] || "K")[0].toUpperCase()}
