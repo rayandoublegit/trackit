@@ -1416,37 +1416,31 @@ footer {
   opacity: 1;
 }
 
-/* Klayan dashboard hover classes */
-.kly-nav-btn { transition: background 0.15s ease; }
-.kly-nav-btn:hover { background: #ebebeb !important; }
-.kly-row { transition: background 0.15s ease; }
-.kly-row:hover { background: #f7f7f7 !important; }
-.kly-ws-card { transition: background 0.15s ease; }
-.kly-ws-card:hover { background: #fafafa !important; }
-.kly-dropdown-item { transition: background 0.15s ease; }
-.kly-dropdown-item:hover { background: #f0f0f0 !important; }
+
 
 [data-dark="true"] .kly-nav-btn:hover { background: #2a2a2e !important; }
 [data-dark="true"] .kly-row:hover { background: #222226 !important; }
 [data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
 [data-dark="true"] .kly-dropdown-item:hover { background: #2a2a2e !important; }
 
-/* Klayan dashboard hover classes */
-.kly-nav-btn { transition: background 0.15s ease; }
-.kly-nav-btn:hover { background: #ebebeb !important; }
-.kly-row { transition: background 0.15s ease; }
-.kly-row:hover { background: #f7f7f7 !important; }
-.kly-ws-card { transition: background 0.15s ease; }
-.kly-ws-card:hover { background: #fafafa !important; }
-.kly-dropdown-item { transition: background 0.15s ease; }
-.kly-dropdown-item:hover { background: #f0f0f0 !important; }
+
 
 [data-dark="true"] .kly-nav-btn:hover { background: #2a2a2e !important; }
 [data-dark="true"] .kly-row:hover { background: #222226 !important; }
 [data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
 [data-dark="true"] .kly-dropdown-item:hover { background: #2a2a2e !important; }
 
-/* Fix nav active + hover - no ghost */
-.kly-nav-btn { border-radius: 8px; transition: background 0.12s ease; }
+
+
+/* Klayan dashboard - clean hovers */
+.kly-nav-btn { border-radius: 8px; transition: background 0.1s; }
 .kly-nav-btn:hover { background: #ebebeb !important; }
 [data-dark="true"] .kly-nav-btn:hover { background: #2d2d31 !important; }
+
+.kly-row { transition: background 0.1s; }
+.kly-row:hover { background: #f5f5f5 !important; }
+[data-dark="true"] .kly-row:hover { background: #222226 !important; }
+
+.kly-ws-card { transition: background 0.1s; }
+.kly-ws-card:hover { background: #f5f5f5 !important; }
+[data-dark="true"] .kly-ws-card:hover { background: #222226 !important; }
