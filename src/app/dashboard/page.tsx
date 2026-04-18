@@ -476,7 +476,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const checkDraft = () => {
-      try { const d = localStorage.getItem("klayan_draft"); setDashHasDraft(!!(d && JSON.parse(d).answers?.[0])); } catch { setDashHasDraft(false); }
+      try { const d = localStorage.getItem("klayan_analyze_draft"); setDashHasDraft(!!(d && JSON.parse(d).answers?.[0])); } catch { setDashHasDraft(false); }
     };
     checkDraft();
     window.addEventListener("focus", checkDraft);
@@ -1225,17 +1225,15 @@ export default function DashboardPage() {
               <span style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>{t.your_ideas}</span>
             </div>
           </button>
-          {dashHasDraft && (
-            <Link href="/analyze"
+          <Link href="/analyze?resume=1"
               style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginTop: 2, background: "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
               className="kly-nav-btn">
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 <span style={{ fontSize: 14, fontWeight: 500, color: theme.text }}>Draft</span>
               </div>
-              <span style={{ fontSize: 11, background: "#f0fdf4", color: "#16a34a", borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>1</span>
+              {dashHasDraft && <span style={{ fontSize: 11, background: "#f0fdf4", color: "#16a34a", borderRadius: 6, padding: "2px 7px", fontWeight: 600 }}>1</span>}
             </Link>
-          )}
 
           <Link href="/analyze"
             style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 8, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Inter', sans-serif", boxSizing: "border-box" }}
@@ -1545,10 +1543,10 @@ export default function DashboardPage() {
                         <div style={{ fontSize: 14, fontWeight: 500, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name.length > 60 ? name.slice(0, 57) + "..." : name}</div>
                         <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.idea.slice(0, 60)}…</div>
                       </div>
-                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", padding: "3px 10px", borderRadius: 100, display: "inline-block" }}>{kind}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: "transparent", padding: "3px 10px", borderRadius: 100, display: "inline-block" }}>{kind}</span>
                       <span style={{ fontSize: 12, color: theme.textMuted }}>{new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
                       <Link href={"/verdict/" + row.id} style={{ fontSize: 12, fontWeight: 600, color: theme.text, textDecoration: "none", border: `1px solid ${theme.cardBorder}`, borderRadius: 6, padding: "5px 12px", display: "inline-block" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#f5f5f5"; }}>
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }} onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}>
                         View →
                       </Link>
                     </div>
@@ -1790,6 +1788,25 @@ export default function DashboardPage() {
 
           {activeTab === "home" && (<div>
 
+          {/* Draft card */}
+          {dashHasDraft && (
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", background: theme.card }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: theme.activeNav, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: theme.text, marginBottom: 2 }}>Draft in progress</div>
+                  <div style={{ fontSize: 12, color: theme.textMuted }}>You left an analysis unfinished. Pick up where you left off.</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button type="button" onClick={() => { localStorage.removeItem("klayan_analyze_draft"); setDashHasDraft(false); }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", padding: "6px 10px" }}>Discard</button>
+                <a href="/analyze?resume=1" style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: theme.text, borderRadius: 8, padding: "7px 14px", textDecoration: "none" }}>Resume →</a>
+              </div>
+            </div>
+          )}
+
           {/* Stats cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
             {/* Card 1 */}
@@ -1873,14 +1890,14 @@ export default function DashboardPage() {
               return (
                 <Link key={row.id} href={"/verdict/" + row.id}
                   style={{ display: "flex", alignItems: "center", padding: "14px 24px", borderBottom: idx < rows.length - 1 ? `1px solid ${theme.divider}` : "none", textDecoration: "none", color: "inherit", gap: 16 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 8, background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626"} strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="22" height="22" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="100" height="100" rx="18" fill="#1c1c1e"/><rect x="18" y="10" width="42" height="52" rx="6" fill="#c8c8c8"/><rect x="26" y="6" width="42" height="52" rx="6" fill="#d8d8d8"/><rect x="34" y="2" width="42" height="52" rx="6" fill="#efefef"/><rect x="34" y="2" width="42" height="52" rx="6" fill="url(#doc_lines)"/><defs><pattern id="doc_lines" patternUnits="userSpaceOnUse" x="34" y="18" width="42" height="36"><line x1="6" y1="0" x2="30" y2="0" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="26" y2="6" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="12" x2="22" y2="12" stroke="#ccc" strokeWidth="2.5" strokeLinecap="round"/></pattern></defs><rect x="12" y="48" width="76" height="46" rx="8" fill="#2a2a2e"/><path d="M12 62 Q12 48 26 48 H74 Q88 48 88 62 V94 Q88 94 74 94 H26 Q12 94 12 94 Z" fill="url(#folder_grad)"/><defs><linearGradient id="folder_grad" x1="50" y1="48" x2="50" y2="94" gradientUnits="userSpaceOnUse"><stop offset="0%" stopColor="#5a5a5e"/><stop offset="100%" stopColor="#1c1c1e"/></linearGradient></defs></svg>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: theme.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name.length > 60 ? name.slice(0, 57) + "..." : name}</div>
                     <div style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>{new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</div>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: kind === "BUILD" ? "#f0fdf4" : kind === "FLIP" ? "#fefce8" : "#fef2f2", padding: "3px 10px", borderRadius: 100 }}>{kind}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", color: kind === "BUILD" ? "#16a34a" : kind === "FLIP" ? "#ca8a04" : "#dc2626", background: "transparent", padding: "3px 10px", borderRadius: 100 }}>{kind}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </Link>
               );

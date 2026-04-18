@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { handleUpgrade } from "@/lib/checkout";
 import { useRequireActiveSubscription } from "@/lib/use-require-active-subscription";
 import { useLang } from "@/lib/useLang";
 
@@ -358,6 +359,59 @@ export default function VerdictPage() {
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [upgrading, setUpgrading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("klayan_dark");
+      setDarkMode(saved === "1");
+    } catch (e) {}
+  }, []);
+
+  const D = darkMode;
+  const theme = {
+    bg: D ? "#111" : "#f2f1ef",
+    card: D ? "#1c1c1e" : "#fff",
+    cardBorder: D ? "#2a2a2a" : "#e8e6e1",
+    text: D ? "#f5f5f5" : "#111",
+    textMuted: D ? "#888" : "#666",
+    divider: D ? "#2a2a2a" : "#e8e6e1",
+    topBar: D ? "#1c1c1e" : "#fff",
+    shadow: D ? "0 1px 4px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.3)" : "0 1px 4px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06)",
+  };
+
+  const handleVerdictUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      const priceId =
+        userPlan === "free" || !userPlan
+          ? process.env.NEXT_PUBLIC_STRIPE_SPARK_PRICE_ID
+          : userPlan === "spark"
+          ? process.env.NEXT_PUBLIC_STRIPE_BUILD_PRICE_ID
+          : process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID;
+      if (priceId) {
+        await handleUpgrade(priceId);
+      } else {
+        window.location.href = "/pricing";
+      }
+    } catch {
+      window.location.href = "/pricing";
+    }
+    setUpgrading(false);
+  };
+
+  const upgradeLabel = () => {
+    if (!userPlan || userPlan === "free") return lang === "fr" ? "Voir le pivot exact + plan 48h → Spark 19€" : "See exact pivot + 48h action plan → Spark $19";
+    if (userPlan === "spark") return lang === "fr" ? "Accéder au workspace complet → Build 69€" : "Get full workspace access → Build $69";
+    return lang === "fr" ? "Débloquer le co-fondateur IA → Scale 149€" : "Unlock AI Co-Founder → Scale $149";
+  };
+
+  const upgradeSubtext = () => {
+    if (!userPlan || userPlan === "free") return lang === "fr" ? "19€/mois. Le prix passe à 29€ dans 13 jours." : "$19/mo. Price goes up to $29 in 13 days.";
+    if (userPlan === "spark") return lang === "fr" ? "69€/mois · Annulez quand vous voulez." : "$69/mo · Cancel anytime.";
+    return lang === "fr" ? "149€/mois · Sessions IA illimitées." : "$149/mo · Unlimited AI sessions.";
+  };
 
   const analysisSelectColumns =
     "id,user_id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
@@ -603,805 +657,286 @@ export default function VerdictPage() {
     })();
   }, [analysis?.id, analysis?.verdict]);
 
-  const parsedSections = useMemo(() => {
+
+  const sections = useMemo(() => {
     if (!analysis?.verdict) return null;
     return parseVerdictSections(analysis.verdict);
-  }, [analysis]);
+  }, [analysis?.verdict]);
 
-  const displaySections = useMemo(() => {
-    if (!parsedSections) return null;
-    return reorderVerdictAfterHardTruths(parsedSections);
-  }, [parsedSections]);
+  const orderedSections = useMemo(() => {
+    if (!sections) return null;
+    return reorderVerdictAfterHardTruths(sections);
+  }, [sections]);
 
+  const verdictSection = orderedSections?.find((s) => s.kind === "verdict") ?? null;
   const verdictType = useMemo(() => {
-    const verdictSection = parsedSections?.find((s) => s.kind === "verdict");
     if (!verdictSection || verdictSection.kind !== "verdict") return null;
     return verdictSection.verdictType;
-  }, [parsedSections]);
+  }, [verdictSection]);
 
-  const verdictColor = useMemo(() => {
-    if (!verdictType) return "#ffffff";
-    if (verdictType === "FLIP IT") return "#f5c842";
-    if (verdictType === "BUILD IT") return "#4ade80";
-    return "#ef4444";
-  }, [verdictType]);
+  const verdictColor =
+    verdictType === "BUILD IT" ? "#16a34a" :
+    verdictType === "FLIP IT" ? "#d97706" :
+    verdictType === "KILL IT" ? "#dc2626" : "#111";
 
-  const dividerLine = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  const handleUpgrade = async () => {
-    const priceId = process.env.NEXT_PUBLIC_STRIPE_SPARK_PRICE_ID;
-    if (!priceId) {
-      window.location.href = "/pricing?plan=spark";
-      return;
-    }
-
-    if (!supabase) {
-      console.error("[checkout] abort: supabase client is null");
-      return;
-    }
-
-    try {
-      console.log("[checkout] step 3: calling supabase.auth.getUser()");
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-      console.log("[checkout] step 4: getUser result", {
-        userId: user?.id,
-        email: user?.email,
-        userError: userError?.message,
-      });
-
-      const body = {
-        priceId,
-        userId: user?.id,
-        email: user?.email,
-        cancelUrl: window.location.href,
-      };
-      console.log("[checkout] step 5: POST /api/create-checkout body", body);
-
-      const res = await fetch("/api/create-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      console.log(
-        "[checkout] step 6: fetch response",
-        res.status,
-        res.statusText
-      );
-
-      const data = (await res.json()) as { url?: string; error?: string };
-      console.log("[checkout] step 7: Checkout response:", data);
-
-      if (data.url) {
-        console.log("[checkout] step 8: redirecting to Stripe Checkout URL");
-        window.location.href = data.url;
-      } else {
-        console.error("[checkout] step 8: No URL returned:", data);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
       }
-    } catch (e) {
-      console.error("[checkout] Checkout error:", e);
-    }
-  };
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
-  const handleShare = async () => {
-    const verdictText = analysis?.verdict ?? "";
-    try {
-      await navigator.clipboard.writeText(verdictText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = verdictText;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
+  const handleCopy = () => {
+    if (analysis?.verdict) {
+      navigator.clipboard.writeText(analysis.verdict).catch(() => {});
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+    setMenuOpen(false);
   };
 
-  if (!params?.id) {
-    return null;
-  }
+  const europaBold = "'Europa Grotesk No 2 SH', 'Plus Jakarta Sans', sans-serif";
+  const europaLight = "'Europa Grotesk No 2 SH', 'Plus Jakarta Sans', sans-serif";
+
+  const formattedDate = analysis?.created_at
+    ? new Date(analysis.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { year: "numeric", month: "long", day: "numeric" })
+    : "";
 
   if (analysisError) {
-    const isTimeout =
-      analysisError === "Analysis took too long. Please try again.";
     return (
-      <div
-        style={{
-          background: "#000",
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "24px",
-          padding: 24,
-          boxSizing: "border-box",
-        }}
-      >
-        <img
-          src="/images/navbarlogo.png"
-          alt=""
-          style={{ width: "56px", borderRadius: "50%" }}
-        />
-        <div
-          style={{
-            color: "white",
-            fontSize: "18px",
-            fontWeight: 600,
-            fontFamily: "'Inter', sans-serif",
-          }}
-        >
-          Something went wrong
+      <div style={{ minHeight: "100vh", background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: europaBold }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 16, color: "#666", marginBottom: 16 }}>{analysisError}</div>
+          <Link href="/dashboard" style={{ fontSize: 14, color: "#111", textDecoration: "underline" }}>{t.dashboard}</Link>
         </div>
-        <div
-          style={{
-            color: "rgba(255,255,255,0.5)",
-            fontSize: "14px",
-            fontFamily: "'Inter', sans-serif",
-            textAlign: "center",
-            maxWidth: 320,
-            lineHeight: 1.5,
-          }}
-        >
-          {isTimeout
-            ? "The analysis took too long to complete."
-            : analysisError}
-        </div>
-        <button
-          type="button"
-          onClick={() => window.location.reload()}
-          style={{
-            background: "white",
-            color: "black",
-            border: "none",
-            padding: "12px 28px",
-            borderRadius: "100px",
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: "'Inter', sans-serif",
-          }}
-        >
-          Try again
-        </button>
-        <Link
-          href="/analyze"
-          style={{
-            color: "rgba(255,255,255,0.4)",
-            fontSize: "13px",
-            fontFamily: "'Inter', sans-serif",
-          }}
-        >
-          {t.new_analysis}
-        </Link>
       </div>
     );
   }
 
   if (showLoadingShell) {
     return (
-      <div
-        style={{
-          background: "#000000",
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "32px",
-          padding: "0 24px",
-          boxSizing: "border-box",
-        }}
-      >
-        <img
-          src="/images/cardgif.gif"
-          alt=""
-          style={{ width: "80px", height: "80px", objectFit: "contain" }}
-        />
-        <div
-          style={{
-            fontSize: 15,
-            color: "rgba(255,255,255,0.85)",
-            fontFamily: "'Inter', sans-serif",
-            textAlign: "center",
-            maxWidth: 360,
-            lineHeight: 1.5,
-            minHeight: 48,
-          }}
-        >
-          Writing your verdict…
+      <div style={{ minHeight: "100vh", background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 760, maxWidth: "calc(100vw - 48px)", background: theme.card, borderRadius: 16, boxShadow: theme.shadow, padding: "48px 56px" }}>
+          {[180, 120, 240, 160, 200].map((w, i) => (
+            <div key={i} style={{ height: i === 0 ? 28 : 14, width: w, background: "#e8e8e8", borderRadius: 4, marginBottom: i === 0 ? 32 : 12, animation: "pulse 1.5s ease-in-out infinite" }} />
+          ))}
         </div>
-        <div
-          style={{
-            width: "200px",
-            height: "2px",
-            background: "rgba(255,255,255,0.08)",
-            borderRadius: "2px",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              background: "#ffffff",
-              borderRadius: "2px",
-              animation: "loading 2s ease-in-out infinite",
-            }}
-          />
-        </div>
-        <style>{`
-          @keyframes loading {
-            0% { width: 0%; margin-left: 0%; }
-            50% { width: 60%; margin-left: 20%; }
-            100% { width: 0%; margin-left: 100%; }
-          }
-        `}</style>
+        <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
       </div>
     );
   }
 
-  const requiredPlan =
-    userPlan === "free" ? "Spark" : userPlan === "spark" ? "Build" : "Scale";
-
-  const actionButtons = (
-    <div
-      style={{
-        display: "flex",
-        gap: 12,
-        marginTop: 20,
-        flexWrap: "wrap",
-        justifyContent: "center",
-      }}
-    >
-      <button
-        type="button"
-        onClick={() => router.push("/analyze")}
-        style={{
-          background: "#fff",
-          color: "#000",
-          border: "none",
-          borderRadius: 100,
-          padding: "12px 24px",
-          fontFamily: "'Inter', sans-serif",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        {t.new_analysis}
-      </button>
-      <button
-        type="button"
-        onClick={() => router.push("/dashboard")}
-        style={{
-          background: "#fff",
-          color: "#000",
-          border: "none",
-          borderRadius: 100,
-          padding: "12px 24px",
-          fontFamily: "'Inter', sans-serif",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        {t.dashboard}
-      </button>
-      <button
-        type="button"
-        onClick={() => void handleShare()}
-        style={{
-          background: "#fff",
-          color: "#000",
-          border: "none",
-          borderRadius: 100,
-          padding: "12px 24px",
-          fontFamily: "'Inter', sans-serif",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        {copied ? t.copied : t.copy}
-      </button>
-    </div>
-  );
-
-  const cardShell = (children: ReactNode) => (
-    <div
-      style={{
-        width: "100%",
-        background: "#111",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: 12,
-        padding: 32,
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={{ fontFamily: "'Inter', monospace" }}>{children}</div>
-    </div>
-  );
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#3a3a3a",
-        padding: 32,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        boxSizing: "border-box",
-      }}
-    >
-      {HOME_PILL}
-      <div style={{ width: "100%", maxWidth: 700 }}>
-        {LOGO_BLOCK}
+    <div style={{ minHeight: "100vh", background: theme.bg, padding: "48px 24px 80px", fontFamily: europaBold }}>
 
-        {cardShell(
-          <>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: 16,
-                marginBottom: 12,
-              }}
+      {/* Paper card */}
+      <div style={{ width: 760, maxWidth: "calc(100vw - 48px)", margin: "0 auto", background: theme.card, borderRadius: 16, boxShadow: theme.shadow, overflow: "hidden" }}>
+
+        {/* Top bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid #e8e6e1" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, fontFamily: europaBold, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            {lang === "fr" ? "Analyse produit" : "Product Analysis"}{" · "}{analysis?.created_at ? new Date(analysis.created_at).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long" }) : ""}{" 2026"}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }} ref={menuRef}>
+            {/* 3-dot menu */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              style={{ background: "none", border: "none", cursor: "pointer", padding: "4px 6px", borderRadius: 6, color: "#666", display: "flex", alignItems: "center" }}
             >
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: 3,
-                  color: "rgba(255,255,255,0.3)",
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                KLAYAN ANALYSIS — YOUR IDEA
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+            </button>
+            {menuOpen && (
+              <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #e8e6e1", borderRadius: 8, boxShadow: "0 4px 20px rgba(0,0,0,0.12)", zIndex: 100, minWidth: 180, overflow: "hidden" }}>
+                <button type="button" onClick={handleCopy} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px", background: "none", border: "none", cursor: "pointer", fontSize: 13, color: "#111", fontFamily: europaLight, textAlign: "left" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f5f4f0"}
+                  onMouseLeave={e => e.currentTarget.style.background = "none"}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  {copied ? t.copied : t.copy}
+                </button>
+                <div style={{ height: 1, background: "#e8e6e1" }} />
+                <Link href="/dashboard" onClick={() => setMenuOpen(false)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px", fontSize: 13, color: "#111", fontFamily: europaLight, textDecoration: "none" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#f5f4f0"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "none"}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                  {lang === "fr" ? "Tableau de bord" : "Dashboard"}
+                </Link>
+                {projectId && (
+                  <>
+                    <div style={{ height: 1, background: "#e8e6e1" }} />
+                    <Link href={`/project/${projectId}`} onClick={() => setMenuOpen(false)} style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 16px", fontSize: 13, color: "#111", fontFamily: europaLight, textDecoration: "none" }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#f5f4f0"}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "none"}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                      {lang === "fr" ? "Workspace" : "Workspace"}
+                    </Link>
+                  </>
+                )}
               </div>
-              {analysis ? (
-                <a
-                  href={projectId ? `/project/${projectId}` : "#"}
-                  onClick={async (e) => {
-                    if (!projectId) {
-                      e.preventDefault();
-                      if (!supabase || !analysis) return;
-                      const { data: newProject } = await supabase
-                        .from("projects")
-                        .insert({
-                          user_id: analysis.user_id,
-                          analysis_id: analysis.id,
-                          idea_name: (analysis.idea ?? "").slice(0, 100),
-                          status: "building",
-                        })
-                        .select("id")
-                        .single();
-                      if (newProject?.id) {
-                        window.location.href = `/project/${newProject.id}`;
-                      }
-                    }
-                  }}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 8,
-                    background: "#ffffff",
-                    color: "#000000",
-                    border: "none",
-                    borderRadius: 100,
-                    padding: "12px 24px",
-                    fontSize: 14,
-                    fontWeight: 700,
-                    letterSpacing: "-0.01em",
-                    textDecoration: "none",
-                    cursor: "pointer",
-                    flexShrink: 0,
-                  }}
-                >
-                  {lang === "fr"
-                    ? "🚀 Suivre cette idée →"
-                    : "🚀 Start tracking this idea →"}
-                </a>
-              ) : null}
-            </div>
-
-            <div
-              style={{
-                fontSize: 10,
-                color: "rgba(255,255,255,0.06)",
-                margin: "10px 0",
-                letterSpacing: -1,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-              }}
-            >
-              {dividerLine}
-            </div>
-
-            {displaySections ? (
-              <>
-                {displaySections.map((sec, idx) => (
-                  <div key={`${sec.label}-${idx}`}>
-                    {idx > 0 ? (
-                      <div
-                        style={{
-                          fontSize: 10,
-                          color: "rgba(255,255,255,0.06)",
-                          margin: "10px 0",
-                          letterSpacing: -1,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {dividerLine}
-                      </div>
-                    ) : null}
-
-                    <span
-                      style={{
-                        display: "block",
-                        fontSize: 9,
-                        fontWeight: 800,
-                        letterSpacing: 3,
-                        textTransform: "uppercase",
-                        color: "#fff",
-                        marginBottom: 8,
-                        marginTop: 4,
-                      }}
-                    >
-                      {sec.label}
-                    </span>
-
-                    {sec.kind === "text" ? (
-                      isRecommendedStackLabel(sec.label) &&
-                      !["spark", "build", "scale"].includes(userPlan ?? "") ? null : (
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 400,
-                            color: "rgba(255,255,255,0.5)",
-                            lineHeight: 1.7,
-                            marginBottom: 4,
-                          }}
-                        >
-                          {sec.text}
-                        </div>
-                      )
-                    ) : sec.kind === "numbered" ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 3,
-                          marginBottom: 4,
-                        }}
-                      >
-                        {sec.items.slice(0, 3).map((item) => (
-                          <div
-                            key={item.index}
-                            style={{
-                              display: "flex",
-                              gap: 8,
-                              alignItems: "flex-start",
-                            }}
-                          >
-                            <span
-                              style={{
-                                color: "#fff",
-                                fontWeight: 700,
-                                flexShrink: 0,
-                                fontSize: 12,
-                              }}
-                            >
-                              › {String(item.index).padStart(2, "0")} —
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 400,
-                                color: "rgba(255,255,255,0.5)",
-                                lineHeight: 1.7,
-                              }}
-                            >
-                              {item.text}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : sec.kind === "verdict" ? (
-                      <>
-                        <div
-                          style={{
-                            fontSize: 24,
-                            fontWeight: 900,
-                            letterSpacing: 4,
-                            color: verdictColor,
-                            margin: "6px 0",
-                          }}
-                        >
-                          {sec.verdictLine}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            color: "rgba(255,255,255,0.35)",
-                            textAlign: "left",
-                            marginTop: 6,
-                            marginBottom: 28,
-                            letterSpacing: "0.02em",
-                            fontWeight: 500,
-                          }}
-                        >
-                          {lang === "fr"
-                            ? "847 idées analysées sur Klayan — 61% ont reçu un KILL IT. Les BUILD IT sont rares."
-                            : "847 ideas analyzed on Klayan — 61% received a KILL IT. BUILD IT verdicts are rare."}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 400,
-                            color: "rgba(255,255,255,0.5)",
-                            lineHeight: 1.7,
-                            marginBottom: 4,
-                            whiteSpace: "pre-wrap",
-                          }}
-                        >
-                          {sec.explanation}
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 700,
-                          color: "#fff",
-                          borderLeft: "2px solid #fff",
-                          paddingLeft: 12,
-                          lineHeight: 1.6,
-                          marginBottom: 20,
-                        }}
-                      >
-                        {sec.text}
-                      </div>
-                    )}
-                    {(userPlan === "spark" || userPlan === "free") &&
-                    displaySections &&
-                    isMarketSignalLabel(sec.label) ? (
-                      <div
-                        style={{
-                          background:
-                            "linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02))",
-                          border: "1px solid rgba(255,255,255,0.12)",
-                          borderRadius: 14,
-                          padding: "18px 24px",
-                          marginBottom: 16,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 16,
-                        }}
-                      >
-                        <div>
-                          <div
-                            style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: "#fff",
-                              marginBottom: 4,
-                            }}
-                          >
-                            {lang === "fr"
-                              ? "Le pivot exact que personne dans ce marché ne fait encore →"
-                              : "The exact pivot nobody in this market is doing yet →"}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "rgba(255,255,255,0.4)",
-                            }}
-                          >
-                            {lang === "fr"
-                              ? "Réservé aux membres Spark"
-                              : "Reserved for Spark members"}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 24, flexShrink: 0 }}>🔒</div>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-
-                {(userPlan === "spark" || userPlan === "free") && displaySections ? (
-                  <div style={{ margin: "32px auto 0", maxWidth: 500 }}>
-                    <div
-                      style={{
-                        background: "rgba(255,255,255,0.03)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 16,
-                        padding: "24px 28px",
-                        marginBottom: 12,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 12,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 14,
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 20,
-                            flexShrink: 0,
-                            marginTop: 2,
-                          }}
-                        >
-                          🔒
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 700,
-                            color: "rgba(255,255,255,0.5)",
-                            letterSpacing: "-0.01em",
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {lang === "fr" ? (
-                            "Un seul pivot bien exécuté change tout."
-                          ) : (
-                            <>
-                              Available on the <strong>{requiredPlan}</strong> plan and above.
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "rgba(255,255,255,0.3)",
-                          lineHeight: 1.6,
-                          paddingLeft: 34,
-                        }}
-                      >
-                        {t.locked_signal}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "rgba(255,255,255,0.45)",
-                          lineHeight: 1.6,
-                          paddingLeft: 34,
-                        }}
-                      >
-                        {lang === "fr"
-                          ? "La plupart des fondateurs abandonnent ici. Les autres trouvent le pivot."
-                          : "Most founders quit here. The others find the pivot."}
-                      </div>
-                      {(() => {
-                        const deadline = new Date("2026-05-01T00:00:00");
-                        const now = new Date();
-                        const diff = deadline.getTime() - now.getTime();
-                        const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
-                        return (
-                          <div
-                            style={{
-                              background: "rgba(255,255,255,0.04)",
-                              border: "1px solid rgba(255,255,255,0.08)",
-                              borderRadius: 10,
-                              padding: "12px 16px",
-                              marginBottom: 16,
-                              textAlign: "center",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: "#facc15",
-                                letterSpacing: "0.05em",
-                                textTransform: "uppercase",
-                                marginBottom: 4,
-                              }}
-                            >
-                              {lang === "fr" ? "Prix de lancement" : "Launch pricing"}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 13,
-                                color: "rgba(255,255,255,0.6)",
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              {lang === "fr"
-                                ? `19€/mois. Prix monte à 29€ dans ${days} jour${days > 1 ? "s" : ""}.`
-                                : `$19/mo. Price goes up to $29 in ${days} day${days > 1 ? "s" : ""}.`}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                      <button
-                        type="button"
-                        onClick={() => void handleUpgrade()}
-                        style={{
-                          alignSelf: "flex-start",
-                          marginLeft: 34,
-                          background: "#ffffff",
-                          color: "#000000",
-                          border: "none",
-                          borderRadius: 100,
-                          padding: "10px 22px",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          letterSpacing: "-0.01em",
-                          textDecoration: "none",
-                          display: "inline-block",
-                        }}
-                      >
-                        {lang === "fr"
-                          ? "Voir le pivot exact + plan d'action 48h → Spark 19€"
-                          : "See exact pivot + 48h action plan → Spark $19"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-
-            {analysisError ? (
-              <div style={{ marginTop: 16, fontSize: 12, color: "#ff4d4f" }}>
-                {analysisError}
-              </div>
-            ) : null}
-          </>
-        )}
-
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 32,
-            paddingTop: 24,
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          <Link
-            href="/analyze"
-            style={{
-              color: "rgba(255,255,255,0.4)",
-              fontSize: 14,
-              fontWeight: 500,
-              textDecoration: "none",
-              letterSpacing: "-0.01em",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#fff";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "rgba(255,255,255,0.4)";
-            }}
-          >
-            {lang === "fr"
-              ? "Tu as une autre idée ? Lance une 2ème analyse →"
-              : "Got another idea? Run a second analysis →"}
-          </Link>
+            )}
+          </div>
         </div>
 
-        {actionButtons}
+        {/* Content */}
+        <div style={{ padding: "48px 56px 56px" }}>
+
+          {/* Big title */}
+          <h1 style={{ fontSize: 36, fontWeight: 600, color: D ? "#ffffff" : "#111", letterSpacing: "-0.03em", fontFamily: europaBold, margin: "0 0 28px", lineHeight: 1.15 }}>
+            {analysis?.idea ?? ""}
+          </h1>
+
+          {/* Metadata row + CTA */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 32 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#93c5fd", borderRadius: 6, padding: "5px 10px" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span style={{ fontSize: 12, color: "#111", fontFamily: europaLight }}>
+                  {lang === "fr" ? "Créé le" : "Created"} <strong style={{ color: "#111", fontWeight: 600 }}>{formattedDate}</strong>
+                </span>
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#c4b5fd", borderRadius: 6, padding: "5px 10px" }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <span style={{ fontSize: 12, color: "#111", fontFamily: europaLight }}>
+                  {lang === "fr" ? "Source" : "Source"} <strong style={{ color: "#111", fontWeight: 600 }}>Live web data · Klayan AI</strong>
+                </span>
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f9a8d4", borderRadius: 6, padding: "5px 10px" }}>
+                <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 13, height: 13, borderRadius: "50%", objectFit: "cover" }} />
+                <span style={{ fontSize: 12, color: "#111", fontFamily: europaLight }}>
+                  {lang === "fr" ? "Analysé par" : "Analyzed by"} <strong style={{ color: "#111", fontWeight: 600 }}>Klayan · 2026</strong>
+                </span>
+              </div>
+            </div>
+            {projectId && (
+              <Link href={`/project/${projectId}`} style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: 260, minHeight: 110, background: "#2563eb", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: europaBold, letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+                  {lang === "fr" ? "Suivre cette idée aujourd'hui." : "Start tracking this idea today."}
+                </span>
+                <div style={{ flexShrink: 0, width: 36, height: 36, background: "#fff", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+              </Link>
+            )}
+          </div>
+
+          {/* Separator */}
+          <div style={{ height: 1, background: "#e8e6e1", marginBottom: 40 }} />
+
+          {/* Sections */}
+          {orderedSections?.map((section, idx) => {
+            if (section.kind === "verdict") {
+              return (
+                <div key={idx} style={{ marginBottom: 40, padding: "28px 32px", background: verdictColor === "#16a34a" ? "#f0fdf4" : verdictColor === "#dc2626" ? "#fef2f2" : "#fffbeb", borderRadius: 6, border: `1px solid ${verdictColor === "#16a34a" ? "#bbf7d0" : verdictColor === "#dc2626" ? "#fecaca" : "#fde68a"}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: verdictColor, marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: verdictColor, letterSpacing: "-0.02em", fontFamily: europaBold, marginBottom: section.explanation ? 12 : 0 }}>{section.verdictLine}</div>
+                  {section.explanation && <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.85)" : "#444", lineHeight: 1.7, fontFamily: europaLight, fontWeight: 300 }}>{section.explanation}</div>}
+                </div>
+              );
+            }
+
+            if (section.kind === "numbered") {
+              return (
+                <div key={idx} style={{ marginBottom: 36 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 600, color: D ? "#ffffff" : "#111", letterSpacing: "-0.02em", fontFamily: europaBold, margin: "0 0 16px" }}>{section.label}</h2>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {section.items.map((item) => (
+                      <div key={item.index} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#999", minWidth: 20, paddingTop: 2, fontFamily: europaBold }}>{String(item.index).padStart(2, "0")}</span>
+                        <span style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.8)" : "#444", lineHeight: 1.7, fontFamily: europaLight, fontWeight: 300 }}>{item.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            if (section.kind === "question") {
+              return (
+                <div key={idx} style={{ marginBottom: 36, padding: "24px 28px", background: "#fafaf8", borderRadius: 6, borderLeft: "3px solid #111" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: D ? "#ffffff" : "#999", marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
+                  <div style={{ fontSize: 17, color: D ? "#ffffff" : "#111", lineHeight: 1.65, fontFamily: europaBold, fontWeight: 500, fontStyle: "italic" }}>{section.text}</div>
+                </div>
+              );
+            }
+
+            return (
+              <div key={idx} style={{ marginBottom: 36 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 600, color: D ? "#ffffff" : "#111", letterSpacing: "-0.02em", fontFamily: europaBold, margin: "0 0 12px" }}>{section.label}</h2>
+                <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.8)" : "#444", lineHeight: 1.75, fontFamily: europaLight, fontWeight: 300, whiteSpace: "pre-wrap" }}>{section.text}</div>
+              </div>
+            );
+          })}
+
+
+
+          {/* Paywall — free users only */}
+          {userPlan !== "scale" && <div style={{ height: 1, background: theme.divider, margin: "48px 0 32px" }} />}
+          {userPlan !== "scale" && <div style={{ background: "#0f0f0f", borderRadius: 16, padding: "40px 40px 36px", position: "relative", overflow: "hidden" }}>
+            {/* subtle grid texture */}
+            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 80% 20%, rgba(37,99,235,0.15) 0%, transparent 60%)", pointerEvents: "none" }} />
+
+            <div style={{ position: "relative", zIndex: 1 }}>
+              {/* Lock + headline */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                <div style={{ width: 32, height: 32, background: "rgba(255,255,255,0.08)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", fontFamily: europaBold }}>
+                  {lang === "fr" ? "TARIF DE LANCEMENT" : "LAUNCH PRICING"}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 26, fontWeight: 700, color: "#fff", fontFamily: europaBold, letterSpacing: "-0.03em", lineHeight: 1.2, marginBottom: 12, maxWidth: 480 }}>
+                {(!userPlan || userPlan === "free") && (lang === "fr" ? "Pour 19€ — le pivot exact, plan 48h, 20 contacts qualifiés, et un workspace jusqu'à 10K MRR." : "For $19 — the exact pivot, 48h action plan, 20 qualified contacts, and a workspace that follows you to $10K MRR.")}
+                {userPlan === "spark" && (lang === "fr" ? "Passez à Build — workspace complet, Market Watch, Competitor Tracker, et plus." : "Upgrade to Build — full workspace, Market Watch, Competitor Tracker, and more.")}
+                {userPlan === "build" && (lang === "fr" ? "Passez à Scale — Co-Fondateur IA illimité avec recherche web en direct." : "Upgrade to Scale — unlimited AI Co-Founder with live web search.")}
+              </div>
+
+              <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", fontFamily: europaLight, marginBottom: 28, lineHeight: 1.6 }}>
+                {lang === "fr"
+                  ? "La plupart des fondateurs abandonnent ici. Les autres trouvent le pivot."
+                  : "Most founders quit here. The others find the pivot."}
+              </div>
+
+              {/* Feature bullets */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 32 }}>
+                {[
+                  lang === "fr" ? "20 personnes exactes à contacter + messages de prospection" : "20 exact people to contact + outreach messages",
+                  lang === "fr" ? "3 modèles business alternatifs entièrement validés" : "3 alternative business models fully validated",
+                  lang === "fr" ? "Plan jour par jour de l'idée à 10K MRR" : "Day by day plan from idea to $10K MRR",
+                  lang === "fr" ? "Sessions stratégiques IA illimitées avec recherche web en direct" : "Unlimited strategic AI sessions with live web search",
+                ].map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", background: "rgba(37,99,235,0.4)", border: "1px solid rgba(37,99,235,0.6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", fontFamily: europaLight }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* CTA row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                <button type="button" onClick={() => void handleVerdictUpgrade()} disabled={upgrading} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 24px", background: "#2563eb", borderRadius: 100, fontSize: 14, fontWeight: 700, color: "#fff", border: "none", cursor: upgrading ? "not-allowed" : "pointer", fontFamily: europaBold, letterSpacing: "-0.01em", opacity: upgrading ? 0.7 : 1 }}>
+                  {upgrading ? (lang === "fr" ? "Redirection..." : "Redirecting...") : upgradeLabel()}
+                </button>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", fontFamily: europaLight }}>
+                  {upgradeSubtext()}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, fontSize: 12, color: "rgba(255,255,255,0.25)", fontFamily: europaLight, fontStyle: "italic" }}>
+                {lang === "fr" ? "Moins cher qu'un café par semaine. Plus utile qu'un an de ChatGPT." : "Cheaper than a coffee a week. More useful than a year of ChatGPT."}
+              </div>
+            </div>
+          </div>}
+        </div>
       </div>
     </div>
   );

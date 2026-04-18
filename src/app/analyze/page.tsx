@@ -64,6 +64,19 @@ export default function AnalyzePage() {
   const lang = useLang();
   const [showExample, setShowExample] = useState(false);
 
+  // Draft logic — auto-save to localStorage
+  const DRAFT_KEY = "klayan_analyze_draft";
+
+  const saveDraft = (answers: string[]) => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ answers, savedAt: Date.now() }));
+    } catch (e) {}
+  };
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  };
+
   const t = {
     en: {
       title: "What's your idea?",
@@ -80,16 +93,18 @@ export default function AnalyzePage() {
       counter_questions: "questions",
       step1_title: "What's your idea in one sentence?",
       step1_sub: "The problem, who has it, and how you solve it.",
-      step2_title: "Who's your target customer?",
-      step2_sub: "Be specific. Not 'everyone'. Who exactly has this problem?",
-      step3_title: "How do you make money?",
-      step3_sub: "Your pricing model, not your revenue projections.",
-      step4_title: "Who are your main competitors?",
-      step4_sub: "Direct and indirect. What are people using instead of you?",
-      step5_title: "What's your unfair advantage?",
-      step5_sub: "Why you, why now?",
-      step6_title: "Have you talked to anyone in your target market yet?",
-      step6_sub: "What did they say? Be specific.",
+      step2_title: "Who specifically is your target customer?",
+      step2_sub: "Not 'everyone'. A specific person with a specific pain.",
+      step3_title: "What's the biggest problem your target customer has right now?",
+      step3_sub: "Be brutal. What keeps them up at night?",
+      step4_title: "How do you make money?",
+      step4_sub: "Your pricing model, not your revenue projections.",
+      step5_title: "Have you talked to anyone in your target market yet?",
+      step5_sub: "What did they say? Be specific.",
+      step6_title: "Why are you the right person to build this?",
+      step6_sub: "Your unfair edge — experience, network, obsession.",
+      step7_title: "What's your biggest fear about this idea?",
+      step7_sub: "Be honest. This helps Klayan give you a real verdict.",
       step_next: "OK, NEXT →",
       step_back: "← Back",
       step_submit: "Analyze my idea →",
@@ -97,10 +112,11 @@ export default function AnalyzePage() {
       step_hint: "Press Ctrl + Enter to continue",
       step1_eg: "e.g. A tool that helps freelancers send invoices in 30 seconds without an accountant.",
       step2_eg: "e.g. Freelancers aged 25-40 who invoice 3-10 clients per month and hate spreadsheets.",
-      step3_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
-      step4_eg: "e.g. FreshBooks, Wave, QuickBooks — but they're too complex for solo freelancers.",
-      step5_eg: "e.g. I'm a freelancer myself and hate invoicing. I already have 5 friends who'd pay for this.",
-      step6_eg: "e.g. Yes — 8 freelancers. 6 out of 8 said invoicing is their biggest admin pain.",
+      step3_eg: "e.g. They lose hours every month on manual invoicing and often get paid late because of it.",
+      step4_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
+      step5_eg: "e.g. Yes — 8 freelancers. 6 out of 8 said invoicing is their biggest admin pain.",
+      step6_eg: "e.g. I'm a freelancer myself, I've felt this pain daily for 3 years.",
+      step7_eg: "e.g. That people won't pay for it because they think spreadsheets are good enough.",
     },
     fr: {
       title: "C'est quoi ton idée ?",
@@ -117,16 +133,18 @@ export default function AnalyzePage() {
       counter_questions: "questions",
       step1_title: "C'est quoi ton idée en une phrase ?",
       step1_sub: "Le problème, qui l'a, et comment tu le résous.",
-      step2_title: "C'est qui ton client cible ?",
-      step2_sub: "Sois précis. Pas 'tout le monde'. Qui exactement a ce problème ?",
-      step3_title: "Comment tu gagnes de l'argent ?",
-      step3_sub: "Ton modèle de prix, pas tes projections de revenus.",
-      step4_title: "C'est qui tes principaux concurrents ?",
-      step4_sub: "Directs et indirects. Qu'est-ce que les gens utilisent à la place ?",
-      step5_title: "C'est quoi ton avantage déloyal ?",
-      step5_sub: "Pourquoi toi, pourquoi maintenant ?",
-      step6_title: "Tu as déjà parlé à des gens de ton marché ?",
-      step6_sub: "Ils ont dit quoi ? Sois précis.",
+      step2_title: "C'est qui exactement ton client cible ?",
+      step2_sub: "Pas 'tout le monde'. Une personne précise avec une douleur précise.",
+      step3_title: "C'est quoi le plus grand problème de ton client cible en ce moment ?",
+      step3_sub: "Sois brutal. Qu'est-ce qui l'empêche de dormir la nuit ?",
+      step4_title: "Comment tu gagnes de l'argent ?",
+      step4_sub: "Ton modèle de prix, pas tes projections de revenus.",
+      step5_title: "Tu as déjà parlé à des gens de ton marché ?",
+      step5_sub: "Ils ont dit quoi ? Sois précis.",
+      step6_title: "Pourquoi tu es la bonne personne pour construire ça ?",
+      step6_sub: "Ton avantage déloyal — expérience, réseau, obsession.",
+      step7_title: "C'est quoi ta plus grande peur sur cette idée ?",
+      step7_sub: "Sois honnête. Ça aide Klayan à te donner un vrai verdict.",
       step_next: "OK, SUIVANT →",
       step_back: "← Retour",
       step_submit: "Analyser mon idée →",
@@ -134,10 +152,11 @@ export default function AnalyzePage() {
       step_hint: "Appuie sur Ctrl + Entrée pour continuer",
       step1_eg: "ex. Un outil qui aide les freelances à envoyer des factures en 30 secondes sans comptable.",
       step2_eg: "ex. Freelances de 25-40 ans qui facturent 3-10 clients par mois et détestent les tableurs.",
-      step3_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
-      step4_eg: "ex. FreshBooks, Wave, QuickBooks — mais trop complexes pour les freelances solo.",
-      step5_eg: "ex. Je suis moi-même freelance et je déteste la facturation. J'ai déjà 5 amis qui paieraient pour ça.",
-      step6_eg: "ex. Oui — 8 freelances. 6 sur 8 ont dit que la facturation est leur plus grande douleur administrative.",
+      step3_eg: "ex. Ils perdent des heures chaque mois sur la facturation manuelle et se font souvent payer en retard.",
+      step4_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
+      step5_eg: "ex. Oui — 8 freelances. 6 sur 8 ont dit que la facturation est leur plus grande douleur admin.",
+      step6_eg: "ex. Je suis moi-même freelance, j'ai vécu cette douleur chaque jour pendant 3 ans.",
+      step7_eg: "ex. Que les gens ne voudront pas payer parce qu'ils pensent que les tableurs suffisent.",
     },
   }[lang];
 
@@ -181,9 +200,16 @@ export default function AnalyzePage() {
   const totalQ = QUESTION_META.length;
 
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<string[]>(() =>
-    Array(QUESTION_META.length).fill("")
-  );
+  const [answers, setAnswers] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("klayan_analyze_draft");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.answers && Array.isArray(parsed.answers)) return parsed.answers;
+      }
+    } catch (e) {}
+    return Array(QUESTION_META.length).fill("");
+  });
   const [inputValue, setInputValue] = useState("");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -208,6 +234,7 @@ export default function AnalyzePage() {
     [t.step4_title, t.step4_sub],
     [t.step5_title, t.step5_sub],
     [t.step6_title, t.step6_sub],
+    [t.step7_title, t.step7_sub],
   ] as const;
   const [stepTitle, stepSub] = stepRows[current];
 
@@ -217,8 +244,8 @@ export default function AnalyzePage() {
   );
 
   const stepPlaceholders = useMemo(
-    () => [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg],
-    [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg]
+    () => [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg, t.step7_eg],
+    [t.step1_eg, t.step2_eg, t.step3_eg, t.step4_eg, t.step5_eg, t.step6_eg, t.step7_eg]
   );
 
   useEffect(() => {
@@ -283,24 +310,13 @@ export default function AnalyzePage() {
   const handleNext = useCallback(async () => {
     if (isSubmitting) return;
 
-    const val = inputValue.trim();
-    if (!val) {
-      setShowInputError(true);
-      setSubmitError(null);
-      triggerShake();
+    if (!answers.every(a => a.trim())) {
+      setSubmitError(lang === "fr" ? "Réponds à toutes les questions." : "Please answer all questions.");
       return;
     }
 
-    setShowInputError(false);
-
+    setSubmitError(null);
     const nextAnswers = [...answers];
-    nextAnswers[current] = val;
-    setAnswers(nextAnswers);
-
-    if (current < totalQ - 1) {
-      animateTo(current + 1, "next");
-      return;
-    }
 
     if (!supabase) return;
 
@@ -351,8 +367,9 @@ export default function AnalyzePage() {
         target_customer: nextAnswers[1],
         why_problem: nextAnswers[2],
         existing_solutions: nextAnswers[3],
-        unfair_advantage: nextAnswers[4],
-        market_conversations: nextAnswers[5],
+        market_conversations: nextAnswers[4],
+        unfair_advantage: nextAnswers[5],
+        biggest_fear: nextAnswers[6],
         email: userEmail,
         status: "pending",
         verdict: null as string | null,
@@ -404,6 +421,7 @@ export default function AnalyzePage() {
 
       // Verdict page mounts and calls /api/analyze while this tab stays on that URL
       playVerdictSound();
+      clearDraft();
       window.location.href = `/verdict/${data.id}`;
     } catch (e) {
       console.error("Submit exception:", e);
@@ -433,160 +451,137 @@ export default function AnalyzePage() {
     return () => document.removeEventListener("keydown", onKey);
   }, [handleNext]);
 
+  const [openIdx, setOpenIdx] = useState<number>(0);
+
+  const allFilled = answers.every(a => a.trim().length > 0);
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#000000",
-        color: "var(--white)",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <div style={{ position: "fixed", top: "24px", left: "24px", zIndex: 1000 }}>
-        <Link
-          href="/"
-          aria-label="Home"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: "48px",
-            height: "48px",
-            borderRadius: "50%",
-            background: "rgba(171,171,171,0.24)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
-            border: "none",
-            cursor: "pointer",
-            textDecoration: "none",
-          }}
-        >
-          <img
-            src="/images/navbarlogo.png"
-            alt=""
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "50%",
-              objectFit: "cover",
-            }}
-          />
-        </Link>
+    <div style={{ height: "100vh", background: "#000", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
+      <video autoPlay muted loop playsInline style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.35)", transform: "scale(1.08)", zIndex: 0, pointerEvents: "none" }} src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4" />
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1, pointerEvents: "none" }} />
+      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
+      {/* Navbar */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 32px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}><Link href="/" style={{ textDecoration: "none" }}><img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} /></Link><Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.08)", textDecoration: "none", padding: "0 14px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>{lang === "fr" ? "Brouillon" : "Draft"}</span></Link></div>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>{t.free_note}</span>
       </div>
 
-      <div
-        style={{
-          width: "100%",
-          height: 2,
-          background: "rgba(255,255,255,0.06)",
-          flexShrink: 0,
-        }}
-      >
-        <div
-          id="modalProgress"
-          style={{
-            height: "100%",
-            background: "#fff",
-            transition: "width 0.4s ease",
-            width: `${progressPct}%`,
-          }}
-        />
-      </div>
+      {/* Main content */}
+      <div style={{ flex: 1, display: "flex", gap: 64, padding: "64px 48px", maxWidth: 1100, margin: "0 auto", width: "100%", overflow: "hidden" }}>
 
-      <div id="modalContent" ref={contentRef}>
-        {!isSubmitting ? <div id="qLabel">{q.label}</div> : null}
-        <div id="qText">
-          {isSubmitting ? t.thinking : stepTitle}
-        </div>
-        <div id="qHint">
-          {isSubmitting ? t.thinking_sub : stepSub}
-        </div>
+        {/* Left — title */}
+        <div style={{ width: 320, flexShrink: 0, alignSelf: "flex-start", position: "sticky", top: 0 }}>
 
-        <div style={{ marginBottom: 32 }}>
-          <button
-            type="button"
-            onClick={() => setShowExample(true)}
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: 12,
-              padding: "14px 24px",
-              color: "#ffffff",
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              letterSpacing: "-0.01em",
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
-          >
-            <span style={{ fontSize: 16 }}>👁️</span>
-            {lang === "fr" ? "Voir un exemple de verdict" : "See an example verdict"}
-            <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>→</span>
-          </button>
+          <h1 style={{ fontSize: 42, fontWeight: 500, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1.1, margin: "0 0 16px", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
+            {lang === "fr" ? <><span>Dis-nous tout</span><br /><span style={{ color: "#ffffff" }}>sur ton idée.</span></> : <><span>Tell us everything</span><br /><span style={{ color: "#ffffff" }}>about your idea.</span></>}
+          </h1>
+          <p style={{ fontSize: 14, fontWeight: 300, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", margin: "0 0 32px" }}>
+            {lang === "fr"
+              ? "Sois précis. Plus tu donnes de détails, plus le verdict sera brutal et précis."
+              : "Be specific. The more detail you give, the more brutal and accurate the verdict."}
+          </p>
+
+          {isSubmitting && (
+            <div style={{ background: "#f8f8f8", borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#111", fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>{t.thinking}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", lineHeight: 1.5 }}>{t.thinking_sub}</div>
+            </div>
+          )}
+
+          {submitError && (
+            <div style={{ background: "#fff0f0", borderRadius: 10, padding: "12px 16px", fontSize: 13, color: "#dc2626", fontFamily: "'Inter', sans-serif" }}>
+              ✕ {submitError}
+            </div>
+          )}
         </div>
 
-        <textarea
-          id="qInput"
-          ref={inputRef}
-          rows={4}
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          disabled={isSubmitting}
-          placeholder={stepPlaceholders[current]}
-        />
+        {/* Right — FAQ accordion */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 0, overflowY: "auto", maxHeight: "calc(100vh - 140px)", paddingRight: 4 }}>
+          {stepRows.map(([title, sub], idx) => {
+            const isOpen = openIdx === idx;
+            const isFilled = answers[idx]?.trim().length > 0;
+            return (
+              <div key={idx} style={{ borderRadius: 16, border: "none", marginBottom: 10, overflow: "visible", background: "#1c1c1e", boxShadow: isOpen ? "0 4px 24px rgba(0,0,0,0.5)" : "none" }}>
+                {/* Header */}
+                <button
+                  type="button"
+                  onClick={() => setOpenIdx(isOpen ? -1 : idx)}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+                >
+                  <span style={{ fontSize: 16, fontWeight: 500, color: "#fff", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}>
+                    {isFilled && !isOpen && (
+                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 20, height: 20, borderRadius: "50%", background: "#111111", marginRight: 10 }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      </span>
+                    )}
+                    {title}
+                  </span>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: isOpen ? "#111111" : "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isOpen ? "#fff" : "#111111"} strokeWidth="2.5" style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                </button>
 
-        <div
-          id="qError"
-          className={showInputError || submitError ? "is-visible" : ""}
-        >
-          {submitError ? `✕ ${submitError}` : t.error_empty}
-        </div>
+                {/* Body */}
+                {isOpen && (
+                  <div style={{ padding: "0 24px 24px" }}>
+                    {sub && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", margin: "0 0 14px", lineHeight: 1.5 }}>{sub}</p>}
+                    <textarea
+                      autoFocus
+                      rows={4}
+                      value={answers[idx] ?? ""}
+                      onChange={(e) => {
+                        const next = [...answers];
+                        next[idx] = e.target.value;
+                        setAnswers(next);
+                        saveDraft(next);
+                      }}
+                      placeholder={stepPlaceholders[idx]}
+                      disabled={isSubmitting}
+                      style={{ width: "100%", borderRadius: 10, border: "1px solid #e0e0e0", padding: "14px 16px", fontSize: 14, fontFamily: "'Inter', sans-serif", color: "#fff", background: "#222222", resize: "none", outline: "none", boxSizing: "border-box" as any, lineHeight: 1.6 }}
+                      onFocus={(e) => { e.target.style.borderColor = "#555"; e.target.style.background = "#222222"; }}
+                      onBlur={(e) => { e.target.style.borderColor = "#444"; e.target.style.background = "#222222"; }}
+                    />
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                      {idx < totalQ - 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenIdx(idx + 1)}
+                          disabled={!answers[idx]?.trim()}
+                          style={{ background: "#111111", color: "#fff", border: "none", borderRadius: 100, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: answers[idx]?.trim() ? "pointer" : "not-allowed", opacity: answers[idx]?.trim() ? 1 : 0.4, fontFamily: "'Inter', sans-serif" }}
+                        >
+                          {lang === "fr" ? "Suivant →" : "Next →"}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleNext()}
+                          disabled={isSubmitting || !allFilled}
+                          style={{ background: allFilled ? "#111111" : "#ccc", color: "#fff", border: "none", borderRadius: 100, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: allFilled && !isSubmitting ? "pointer" : "not-allowed", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}
+                        >
+                          {isSubmitting ? t.step_analyzing : t.step_submit}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-        <div id="qCtrlHint">{t.step_hint}</div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <button
-            id="qNext"
-            type="button"
-            onClick={() => void handleNext()}
-            disabled={isSubmitting}
-            style={{ opacity: isSubmitting ? 0.6 : 1 }}
-          >
-            {isSubmitting ? t.step_analyzing : nextLabel}
-          </button>
-
-          <button
-            id="qBack"
-            type="button"
-            className={current > 0 ? "is-visible" : ""}
-            onClick={handlePrev}
-          >
-            {t.step_back}
-          </button>
-        </div>
-      </div>
-
-      <div id="modalFooter">
-        <span id="qCounter">
-          {current + 1} {t.counter_of} {totalQ} {t.counter_questions} ·{" "}
-          {t.free_note}
-        </span>
-        <div id="qDots">
-          {Array.from({ length: totalQ }, (_, i) => (
-            <div
-              key={i}
-              className={
-                "modal-dot " +
-                (i === current ? "active" : i < current ? "done" : "todo")
-              }
-            />
-          ))}
+          {/* Submit button always visible when all filled */}
+          {allFilled && !isSubmitting && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => void handleNext()}
+                style={{ width: "100%", background: "#111111", color: "#fff", border: "none", borderRadius: 14, padding: "16px 24px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}
+              >
+                {t.step_submit}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -694,6 +689,7 @@ export default function AnalyzePage() {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

@@ -486,10 +486,15 @@ export default function AuthPage() {
         style={{
           width: "100%",
           maxWidth: 460,
-          borderRadius: 20,
-          border: "none",
-          background: signupAwaitingEmail ? "transparent" : "#111111",
-          padding: signupAwaitingEmail ? 0 : 28,
+          borderRadius: 28,
+          border: "1px solid rgba(255,255,255,0.07)",
+          background: signupAwaitingEmail ? "transparent" : "#1a1a1a",
+          backgroundImage: signupAwaitingEmail ? "none" : "radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px)",
+          backgroundSize: "20px 20px",
+          padding: signupAwaitingEmail ? 0 : "28px 28px 24px",
+          boxShadow: signupAwaitingEmail ? "none" : "0 32px 80px rgba(0,0,0,0.6)",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
         {signupAwaitingEmail ? (
@@ -572,60 +577,28 @@ export default function AuthPage() {
               alignItems: "center",
             }}
           >
+            {mode === "signup" && (
+              <div style={{ display: "flex", gap: 5, marginBottom: 24, width: "100%" }}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i === 0 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
+                ))}
+              </div>
+            )}
             <img
               src="/images/navbarlogo.png"
               alt="Klayan"
-              style={{
-                width: 60,
-                height: 60,
-                objectFit: "cover",
-                borderRadius: 50,
-                marginBottom: 18,
-              }}
+              style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }}
             />
-
-            <div
-              style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontSize: 32,
-                fontWeight: 700,
-                letterSpacing: "-0.04em",
-                lineHeight: 1.0,
-                marginBottom: 10,
-                textAlign: "center",
-              }}
-            >
+            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
               {mode === "login" ? t.login_title : t.signup_title}
             </div>
-
-            <div
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 300,
-                color: "var(--muted)",
-                lineHeight: 1.6,
-                marginBottom: 18,
-                textAlign: "center",
-              }}
-            >
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 18, textAlign: "center" }}>
               {mode === "login" ? t.login_sub : t.signup_sub}
             </div>
-
             <button
               type="button"
               onClick={toggleMode}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "var(--muted)",
-                cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 300,
-                padding: 0,
-                lineHeight: 1.4,
-              }}
+              style={{ border: "none", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 400, padding: 0, lineHeight: 1.4 }}
             >
               {mode === "login"
                 ? `${t.no_account} ${t.signup_link}`
@@ -635,72 +608,20 @@ export default function AuthPage() {
         ) : null}
 
         {!signupAwaitingEmail && showSignupStep2 ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              marginBottom: 22,
-            }}
-          >
-            <img
-              src="/images/navbarlogo.png"
-              alt="Klayan"
-              style={{
-                width: 60,
-                height: 60,
-                objectFit: "cover",
-                borderRadius: 50,
-                marginBottom: 18,
-              }}
-            />
-            <div
-              style={{
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                fontSize: 32,
-                fontWeight: 700,
-                letterSpacing: "-0.04em",
-                lineHeight: 1.0,
-                marginBottom: 10,
-                textAlign: "center",
-              }}
-            >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
+            {/* Progress bar */}
+            <div style={{ display: "flex", gap: 5, marginBottom: 24, alignSelf: "stretch", justifyContent: "center" }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i === 1 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
+              ))}
+            </div>
+            <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }} />
+            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
               One last thing.
             </div>
-            <div
-              style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 300,
-                color: "var(--muted)",
-                lineHeight: 1.6,
-                marginBottom: 8,
-                textAlign: "center",
-              }}
-            >
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, textAlign: "center" }}>
               Choose your username.
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSignupStep(1);
-                setUsernameError(null);
-                setError(null);
-              }}
-              style={{
-                border: "none",
-                background: "transparent",
-                color: "var(--muted)",
-                cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 14,
-                fontWeight: 300,
-                padding: 0,
-                marginTop: 4,
-              }}
-            >
-              ← Back
-            </button>
           </div>
         ) : null}
 
@@ -1010,49 +931,18 @@ export default function AuthPage() {
 
         {!signupAwaitingEmail && showSignupStep3 ? (
           <div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginBottom: 22,
-              }}
-            >
-              <img
-                src="/images/navbarlogo.png"
-                alt="Klayan"
-                style={{
-                  width: 60,
-                  height: 60,
-                  objectFit: "cover",
-                  borderRadius: 50,
-                  marginBottom: 18,
-                }}
-              />
-              <div
-                style={{
-                  fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  fontSize: 32,
-                  fontWeight: 700,
-                  letterSpacing: "-0.04em",
-                  lineHeight: 1.0,
-                  marginBottom: 10,
-                  textAlign: "center",
-                }}
-              >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
+              {/* Progress bar */}
+              <div style={{ display: "flex", gap: 5, marginBottom: 24, alignSelf: "stretch", justifyContent: "center" }}>
+                {[0,1,2].map(i => (
+                  <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i <= 2 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
+                ))}
+              </div>
+              <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }} />
+              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
                 Add a photo.
               </div>
-              <div
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 16,
-                  fontWeight: 300,
-                  color: "var(--muted)",
-                  lineHeight: 1.6,
-                  marginBottom: 20,
-                  textAlign: "center",
-                }}
-              >
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, textAlign: "center" }}>
                 Put a face to your ideas.
               </div>
             </div>
