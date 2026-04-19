@@ -962,8 +962,14 @@ export default function DashboardPage() {
   const userPlan = profile?.plan ?? "free";
 
   const shell = {
+<<<<<<< HEAD
     fontFamily: "'DM Sans', 'Europa Grotesk No 2 SH', sans-serif",
     fontWeight: 600,
+=======
+    fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+    fontWeight: 900,
+    fontStretch: "semi-condensed",
+>>>>>>> parent of 03fcb91 (fix: bolder text stroke on dashboard font)
     color: "#fff" as const,
   };
 
