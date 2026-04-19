@@ -470,7 +470,7 @@ export default function DashboardPage() {
         if (data) setNotifications(data);
       });
     }).subscribe();
-    return () => { void sb.removeChannel(channel); };
+    return () => { void supabase!.removeChannel(channel); };
   }, [supabase]);
 
   useEffect(() => {
