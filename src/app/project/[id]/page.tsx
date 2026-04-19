@@ -1401,12 +1401,6 @@ export default function ProjectPage() {
   );
 
   if (!mounted) return <div style={{ background: "#0d0d0d", minHeight: "100vh" }} />;
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
-    check();
-    window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
-  }, []);
 
   if (loading) return <div style={{ background: th.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: th.textMuted, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>Loading...</div>;
   if (!project) return null;
