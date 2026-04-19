@@ -271,7 +271,6 @@ export default function DashboardPage() {
       payment_desc: "Manage your payment method via the Stripe customer portal.",
       cancel_desc: "You will lose access to premium features at the end of your billing period.",
       billing_desc2: "Manage your subscription and payment methods.",
-      ideas_analyzed: "Ideas Analyzed",
       total_analyses: "Total analyses run",
       all_time: "All time",
       verdicts_title: "Verdicts",
