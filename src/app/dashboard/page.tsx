@@ -517,7 +517,7 @@ export default function DashboardPage() {
     try {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
+      } = await supabase!.auth.getSession();
 
       if (!session) {
         router.push("/auth");
@@ -766,7 +766,7 @@ export default function DashboardPage() {
     try {
       const {
         data: { user: authUser },
-      } = await supabase.auth.getUser();
+      } = await supabase!.auth.getUser();
       if (!authUser) return;
 
       const parts = file.name.split(".");
@@ -776,7 +776,7 @@ export default function DashboardPage() {
           : "jpg";
       const filePath = `${authUser.id}/avatar.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase!.storage
         .from("avatars")
         .upload(filePath, file, { upsert: true });
 
@@ -790,7 +790,7 @@ export default function DashboardPage() {
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      } = supabase!.storage.from("avatars").getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
         .from("profiles")
@@ -844,14 +844,14 @@ export default function DashboardPage() {
         return;
       }
 
-      const { data: folderFiles, error: listError } = await supabase.storage
+      const { data: folderFiles, error: listError } = await supabase!.storage
         .from("avatars")
         .list(user.id);
 
       if (listError) {
         console.warn("Dashboard: avatar storage list", listError);
       } else if (folderFiles?.length) {
-        const { error: removeError } = await supabase.storage
+        const { error: removeError } = await supabase!.storage
           .from("avatars")
           .remove(folderFiles.map((f) => `${user.id}/${f.name}`));
 
@@ -894,7 +894,7 @@ export default function DashboardPage() {
 
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!confirm("Delete this workspace? This cannot be undone.")) return;
-    await supabase.from("projects").delete().eq("id", projectId);
+    await supabase!.from("projects").delete().eq("id", projectId);
     setProjects((prev) => prev.filter((p) => p.id !== projectId));
   }, [supabase]);
 
@@ -923,7 +923,7 @@ export default function DashboardPage() {
 
   const renameProject = useCallback(async (projectId: string, newName: string) => {
     if (!supabase || !newName.trim()) return;
-    await supabase.from("projects").update({ idea_name: newName.trim() }).eq("id", projectId);
+    await supabase!.from("projects").update({ idea_name: newName.trim() }).eq("id", projectId);
     setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, idea_name: newName.trim() } : p));
     setRenamingProjectId(null);
     setRenameValue("");
@@ -1422,7 +1422,7 @@ export default function DashboardPage() {
                         <button type="button" onClick={async () => {
                           if (!user) return;
                           await Promise.all(notifications.filter(n => !n.read_by.includes(user.id)).map(n =>
-                            supabase.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id)
+                            supabase!.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id)
                           ));
                           setNotifications(prev => prev.map(n => ({ ...n, read_by: n.read_by.includes(user.id) ? n.read_by : [...n.read_by, user.id] })));
                         }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
@@ -1437,7 +1437,7 @@ export default function DashboardPage() {
                       return (
                         <div key={n.id} onClick={async () => {
                           if (!user || isRead) return;
-                          await supabase.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id);
+                          await supabase!.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id);
                           setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read_by: [...x.read_by, user.id] } : x));
                         }} style={{ padding: "12px 16px", borderBottom: `1px solid ${theme.divider}`, cursor: isRead ? "default" : "pointer", background: isRead ? "transparent" : "#fafafa" }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = isRead ? "transparent" : (darkMode ? "#1a1a1c" : "#fafafa"); }}>
@@ -1562,7 +1562,7 @@ export default function DashboardPage() {
                         if (!supabase) return;
                         if (!confirm("Delete this idea? This cannot be undone.")) return;
                         const deleted = rows.find(r => r.id === row.id);
-                        await supabase.from("analyses").delete().eq("id", row.id);
+                        await supabase!.from("analyses").delete().eq("id", row.id);
                         setRows(prev => prev.filter(r => r.id !== row.id));
                         if (deleted) setDeletedRows(prev => [deleted, ...prev]);
                       }} style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 6, border: `1px solid ${theme.cardBorder}`, background: "transparent", cursor: "pointer", color: "#ef4444", padding: 0 }}
@@ -1607,7 +1607,7 @@ export default function DashboardPage() {
                         <span style={{ fontSize: 12, color: theme.textMuted }}>{new Date(row.created_at).toLocaleDateString(undefined, { dateStyle: "medium" })}</span>
                         <button type="button" onClick={async () => {
                           if (!supabase) return;
-                          await supabase.from("analyses").insert(row);
+                          await supabase!.from("analyses").insert(row);
                           setRows(prev => [row, ...prev]);
                           setDeletedRows(prev => prev.filter(r => r.id !== row.id));
                         }} style={{ fontSize: 12, fontWeight: 600, color: "#16a34a", background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.25)", borderRadius: 6, padding: "5px 12px", cursor: "pointer", width: "fit-content" }}>Restore</button>
@@ -1715,7 +1715,7 @@ export default function DashboardPage() {
                         setSelectedLang(val as "en" | "fr");
                         window.dispatchEvent(new CustomEvent("klayan_lang_change", { detail: val }));
                         if (!user) return;
-                        await supabase.from("profiles").update({ language: val }).eq("id", user.id);
+                        await supabase!.from("profiles").update({ language: val }).eq("id", user.id);
                       }}
                       style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, border: selectedLang === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: selectedLang === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: selectedLang === val ? 600 : 500, color: selectedLang === val ? "#fff" : "#111" }}>
                       {label}
@@ -1823,7 +1823,7 @@ export default function DashboardPage() {
                 <button type="button" onClick={async () => {
                   const val = (document.getElementById("profile-username-input") as HTMLInputElement)?.value?.trim();
                   if (!val || !user) return;
-                  await supabase.from("profiles").update({ username: val }).eq("id", user.id);
+                  await supabase!.from("profiles").update({ username: val }).eq("id", user.id);
                   setProfileUsername(val);
                 }}
                   style={{ marginTop: 10, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
@@ -1841,7 +1841,7 @@ export default function DashboardPage() {
               <div style={{ padding: "20px 24px", border: "1px solid #fecaca", borderRadius: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.sign_out}</div>
                 <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.sign_out_desc}</div>
-                <button type="button" onClick={() => { void supabase.auth.signOut().then(() => router.push("/auth")); }}
+                <button type="button" onClick={() => { void supabase!.auth.signOut().then(() => router.push("/auth")); }}
                   style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                   Sign out
                 </button>
