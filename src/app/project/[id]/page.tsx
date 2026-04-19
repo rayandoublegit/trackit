@@ -1686,7 +1686,7 @@ export default function ProjectPage() {
                       <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 600, whiteSpace: "nowrap" }}>✓ {lang === "fr" ? "Atteint" : "Achieved"}</div>
                     ) : (
                       <button type="button" onClick={() => void claimMilestone(m.type)} disabled={claiming}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: claiming ? "not-allowed" : "pointer", opacity: claiming ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: claiming ? "not-allowed" : "pointer", opacity: claiming ? 0.6 : 1, whiteSpace: "nowrap" }}>
                         {claiming ? t.milestone_claiming : t.milestone_claim}
                       </button>
                     )}
