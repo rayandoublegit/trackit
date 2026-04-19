@@ -251,7 +251,6 @@ export default function DashboardPage() {
       language_desc: "Choose the language for verdicts and analysis reports.",
       delete_account: "Delete account",
       delete_account_desc: "Permanently delete your account and all data. This cannot be undone.",
-      save: "Save",
       recent_ideas: "Recent Ideas",
       settings_title: "Settings",
       settings_desc: "Customize your Klayan experience.",
