@@ -413,6 +413,13 @@ export default function DashboardPage() {
     setMounted(true);
 
   }, []);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   const [notifications, setNotifications] = useState<{id: string; title: string; body: string; created_at: string; read_by: string[]}[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -1389,14 +1396,14 @@ export default function DashboardPage() {
             </Link>
             <img src="/images/navbarlogo.png" alt="Klayan" style={{ height: 28, objectFit: "contain" }} />
           </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", marginBottom: 16, gap: isMobile ? 12 : 0 }}>
             <div>
               <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 4 }}>{t.dashboard}</div>
               <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{t.welcome_back}</h1>
               <h1 style={{ fontSize: 28, fontWeight: 700, color: theme.text, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{profileUsername?.trim() || user?.email?.split("@")[0] || "Founder"} 👋</h1>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: theme.inputBg, border: `1px solid ${theme.inputBorder}`, borderRadius: 8, padding: "7px 14px", minWidth: 220 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: theme.inputBg, border: `1px solid ${theme.inputBorder}`, borderRadius: 8, padding: "7px 14px", minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : "auto" }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t.search} style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }} />
@@ -1491,7 +1498,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Tab nav */}
-          <div style={{ display: "flex", gap: 0 }}>
+          <div style={{ display: "flex", gap: 0, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" as any, scrollbarWidth: "none" as any }}>
             {[{key: "home", label: t.overview}, {key: "ideas", label: t.ideas_tab}, {key: "workspaces", label: t.workspaces}, {key: "settings", label: t.settings_tab}, {key: "profile", label: t.profile_tab}, {key: "billing", label: t.billing_tab}].map(({key, label}) => (
               <button key={key} type="button" onClick={() => setActiveTab(key as any)}
                 style={{ padding: "10px 18px", background: "transparent", border: "none", borderBottom: activeTab === key ? `2px solid ${theme.tabActive}` : "2px solid transparent", cursor: "pointer", fontSize: 14, fontWeight: activeTab === key ? 600 : 400, color: activeTab === key ? theme.tabActive : theme.tabInactive, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", marginBottom: -1, whiteSpace: "nowrap" }}>
@@ -1516,7 +1523,7 @@ export default function DashboardPage() {
                   {t.new_analysis}
                 </Link>
               </div>
-              <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
+              <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: isMobile ? "auto" : "hidden" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 100px 48px", padding: "10px 20px", borderBottom: `1px solid ${theme.divider}`, background: D ? "#1a1a1d" : "#f9f9f9" }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Idea</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: theme.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>Verdict</span>
