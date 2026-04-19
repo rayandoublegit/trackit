@@ -1410,7 +1410,7 @@ export default function DashboardPage() {
                 {searchQuery ? (
                   <button type="button" onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
                 ) : (
-                  <span style={{ fontSize: 11, color: "#bbb", background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>⌘ F</span>
+                  !isMobile && <span style={{ fontSize: 11, color: "#bbb", background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 4, padding: "1px 6px", whiteSpace: "nowrap" }}>⌘ F</span>
                 )}
               </div>
               <div ref={notifRef} style={{ position: "relative" }}>
