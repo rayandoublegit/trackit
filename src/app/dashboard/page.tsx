@@ -1369,7 +1369,7 @@ export default function DashboardPage() {
               {t.homepage}
             </Link>
             </div>
-            <img src="/images/navbarlogo.png" alt="Klayan" style={{ height: 28, objectFit: "contain" }} />
+            <img src={D ? "/images/navbarlogo.png" : "/images/klayanblack.png"} alt="Klayan" style={{ height: 40, objectFit: "contain" }} />
           </div>
           <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", flexDirection: isMobile ? "column" : "row", justifyContent: "space-between", marginBottom: 16, gap: isMobile ? 12 : 0 }}>
             <div>
