@@ -1090,16 +1090,6 @@ export default function DashboardPage() {
       ) : null}
 
 
-      {/* Mobile icon rail */}
-      {isMobile && (
-        <div style={{ position: "fixed", left: 0, top: 0, bottom: 0, width: 56, background: D ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.92)", borderRight: `1px solid ${theme.sidebarBorder}`, display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 12, paddingBottom: 16, gap: 8, zIndex: 98, backdropFilter: "blur(8px)" }}>
-          <img src="/images/klayanblack.png" alt="Klayan" style={{ width: 32, height: 32, objectFit: "contain", marginBottom: 8 }} />
-          <button type="button" onClick={() => { setActiveTab("home"); setSidebarOpen(false); }}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 10, border: "none", background: activeTab === "home" ? theme.activeNav : "transparent", cursor: "pointer", padding: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </button>
-        </div>
-      )}
       {/* Left sidebar */}
       <aside
         suppressHydrationWarning
