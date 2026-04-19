@@ -1267,7 +1267,7 @@ export default function DashboardPage() {
                   style={{ position: "relative", display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 10px", borderRadius: 8, background: hoveredRowId === row.id ? "#ebebeb" : "transparent" }}>
                   <Link href={`/verdict/${row.id}`} onClick={() => { if (isMobile) setSidebarOpen(false); }}
                     style={{ display: "flex", alignItems: "flex-start", gap: 8, flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
-                    <VerdictPill kind={kind} />
+                    <VerdictPill kind={kind} labelBuilding="BUILD" labelPivoting="FLIP" labelKilled="KILL" />
                     <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.4, color: theme.text, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                       {(() => { const pid = projectByAnalysisId[row.id]; const proj = pid ? projects.find((p) => p.id === pid) : null; const name = proj?.idea_name ?? row.idea; return name.length > 50 ? name.slice(0, 47) + "..." : name; })()}
                     </span>
