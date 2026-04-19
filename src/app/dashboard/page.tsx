@@ -283,7 +283,6 @@ export default function DashboardPage() {
       active_projects: "active projects",
       eight_active: "8 active projects",
       view: "View →",
-      open_workspace: "Ouvrir l'espace",
     },
     fr: {
       workspaces: "Espaces de travail",
