@@ -447,6 +447,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!supabase) return;
     void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
       if (data) setNotifications(data);
     });
