@@ -1362,7 +1362,7 @@ export default function DashboardPage() {
             {isMobile && (
               <button type="button" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle sidebar"
                 style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", padding: 0, flexShrink: 0 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><rect x="3" y="3" width="7" height="18" rx="1"/><path d="M14 3h7M14 8h7M14 13h7M14 18h7"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M9 3v18"/><path d="M13 8h5M13 12h5M13 16h5"/></svg>
               </button>
             )}
             <Link href="/" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: theme.textMuted, textDecoration: "none", padding: "6px 10px", borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.card }}>
