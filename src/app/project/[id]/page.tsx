@@ -1887,10 +1887,10 @@ export default function ProjectPage() {
                   </div>
                   <div style={{ borderTop: `1px solid ${th.cardBorder}`, padding: "16px 24px", display: "flex", gap: 12 }}>
                     <input value={chatInput} onChange={e => setChatInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) void sendCofounderMessage(); }}
+                      onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) void sendMessage(); }}
                       placeholder={lang === "fr" ? "Demande quelque chose..." : "Ask something..."}
                       style={{ flex: 1, background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none" }} />
-                    <button type="button" onClick={() => void sendCofounderMessage()} disabled={chatLoading || !chatInput.trim()}
+                    <button type="button" onClick={() => void sendMessage()} disabled={chatLoading || !chatInput.trim()}
                       style={{ background: th.text, color: th.bg, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", opacity: chatLoading || !chatInput.trim() ? 0.5 : 1 }}>
                       {chatLoading ? "..." : "→"}
                     </button>
