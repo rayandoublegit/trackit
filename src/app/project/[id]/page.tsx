@@ -1578,7 +1578,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.checkin_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Ton bilan hebdomadaire avec ton co-fondateur IA" : "Your weekly review with your AI co-founder"}</div>
                   <button type="button" onClick={() => setShowCheckin(!showCheckin)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: "pointer" }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em" }}>
                     {t.checkin_new}
                   </button>
                 </div>
