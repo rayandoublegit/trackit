@@ -467,10 +467,10 @@ export default function AnalyzePage() {
       </div>
 
       {/* Main content */}
-      <div style={{ flex: 1, display: "flex", gap: 64, padding: "64px 48px", maxWidth: 1100, margin: "0 auto", width: "100%", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 32 : 64, padding: isMobile ? "32px 20px" : "64px 48px", maxWidth: 1100, margin: "0 auto", width: "100%", overflow: isMobile ? "auto" : "hidden" }}>
 
         {/* Left — title */}
-        <div style={{ width: 320, flexShrink: 0, alignSelf: "flex-start", position: "sticky", top: 0 }}>
+        <div style={{ width: isMobile ? "100%" : 320, flexShrink: 0, alignSelf: "flex-start", position: isMobile ? "static" : "sticky", top: 0 }}>
 
           <h1 style={{ fontSize: 42, fontWeight: 500, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1.1, margin: "0 0 16px", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
             {lang === "fr" ? <><span>Dis-nous tout</span><br /><span style={{ color: "#ffffff" }}>sur ton idée.</span></> : <><span>Tell us everything</span><br /><span style={{ color: "#ffffff" }}>about your idea.</span></>}
@@ -524,7 +524,7 @@ export default function AnalyzePage() {
         </div>
 
         {/* Right — FAQ accordion */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 0, overflowY: "auto", maxHeight: "calc(100vh - 140px)", paddingRight: 4 }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 0, overflowY: isMobile ? "visible" : "auto", maxHeight: isMobile ? "none" : "calc(100vh - 140px)", paddingRight: isMobile ? 0 : 4 }}>
           {stepRows.map(([title, sub], idx) => {
             const isOpen = openIdx === idx;
             const isFilled = answers[idx]?.trim().length > 0;
