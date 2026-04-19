@@ -963,6 +963,7 @@ export default function DashboardPage() {
 
   const shell = {
     fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
+    fontWeight: 600,
     color: "#fff" as const,
   };
 
