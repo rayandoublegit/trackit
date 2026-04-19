@@ -1089,7 +1089,6 @@ export default function DashboardPage() {
         />
       ) : null}
 
-      null
 
       {/* Left sidebar */}
       <aside
