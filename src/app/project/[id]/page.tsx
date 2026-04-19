@@ -1704,7 +1704,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.market_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{t.market_sub}</div>
                   <button type="button" onClick={() => void runMarketWatch()} disabled={runningMarketWatch}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketWatch ? "not-allowed" : "pointer", opacity: runningMarketWatch ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketWatch ? "not-allowed" : "pointer", opacity: runningMarketWatch ? 0.6 : 1 }}>
                     {runningMarketWatch ? (lang === "fr" ? "Analyse..." : "Scanning...") : (lang === "fr" ? "Lancer l'analyse →" : "Run scan →")}
                   </button>
                 </div>
@@ -1729,7 +1729,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.competitor_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Analyse approfondie de tes concurrents" : "Deep competitor analysis"}</div>
                   <button type="button" onClick={() => void runCompetitorTracker()} disabled={runningCompetitor}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningCompetitor ? "not-allowed" : "pointer", opacity: runningCompetitor ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningCompetitor ? "not-allowed" : "pointer", opacity: runningCompetitor ? 0.6 : 1 }}>
                     {runningCompetitor ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
                   </button>
                 </div>
@@ -1752,7 +1752,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.pivot_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Détecte les signaux de pivot" : "Detect pivot signals"}</div>
                   <button type="button" onClick={() => void runPivotRadar()} disabled={runningPivot}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPivot ? "not-allowed" : "pointer", opacity: runningPivot ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPivot ? "not-allowed" : "pointer", opacity: runningPivot ? 0.6 : 1 }}>
                     {runningPivot ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
                   </button>
                 </div>
@@ -1775,7 +1775,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.marketing_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie marketing IA personnalisée" : "AI-powered marketing strategy"}</div>
                   <button type="button" onClick={() => void runMarketingEngine()} disabled={runningMarketing}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketing ? "not-allowed" : "pointer", opacity: runningMarketing ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketing ? "not-allowed" : "pointer", opacity: runningMarketing ? 0.6 : 1 }}>
                     {runningMarketing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1798,7 +1798,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.outreach_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Messages de prospection personnalisés" : "Personalized outreach messages"}</div>
                   <button type="button" onClick={() => void runOutreachEngine()} disabled={runningOutreach}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningOutreach ? "not-allowed" : "pointer", opacity: runningOutreach ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningOutreach ? "not-allowed" : "pointer", opacity: runningOutreach ? 0.6 : 1 }}>
                     {runningOutreach ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1826,7 +1826,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.pricing_strategy_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie de prix optimale pour ton marché" : "Optimal pricing strategy for your market"}</div>
                   <button type="button" onClick={() => void runPricingStrategy()} disabled={runningPricing}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPricing ? "not-allowed" : "pointer", opacity: runningPricing ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPricing ? "not-allowed" : "pointer", opacity: runningPricing ? 0.6 : 1 }}>
                     {runningPricing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1849,7 +1849,7 @@ export default function ProjectPage() {
                   <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.revenue_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Roadmap vers ton premier $10K MRR" : "Roadmap to your first $10K MRR"}</div>
                   <button type="button" onClick={() => void runRevenueRoadmap()} disabled={runningRevenue}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningRevenue ? "not-allowed" : "pointer", opacity: runningRevenue ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningRevenue ? "not-allowed" : "pointer", opacity: runningRevenue ? 0.6 : 1 }}>
                     {runningRevenue ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
