@@ -215,7 +215,7 @@ export default function LandingPage() {
       hero_title: "From Idea to",
       hero_italic: "10K MRR.",
       hero_sub:
-        "Drowning in ideas but no idea which one to build? Klayan pulls you out. Brutal verdict in 10 minutes — real competitors, real market data, real next steps. Then stays with you every week until you hit $10K MRR.",
+        "You're diving in. You just don't know if it's the right pool. Klayan analyses your idea in 10 minutes with real data — and stays with you every week until 10K MRR.",
       hero_cta: "Analyze my idea",
       hero_note: "Free to start · No credit card required",
       familiar_title: "Sounds familiar ?",
@@ -348,7 +348,7 @@ export default function LandingPage() {
       hero_title: "De l'Idée au",
       hero_italic: "10K MRR.",
       hero_sub:
-        "Tu te noies sous les idées mais tu sais pas laquelle construire ? Klayan te sort la tête de l'eau. Verdict brutal en 10 minutes — vrais concurrents, vraies données, vrais prochains pas. Puis reste avec toi chaque semaine jusqu'à 10K MRR.",
+        "Tu plonges. Mais tu sais pas si c'est la bonne piscine. Klayan analyse ton idée en 10 minutes avec de vraies données — et reste avec toi chaque semaine jusqu'à 10K MRR.",
       hero_cta: "Analyser mon idée",
       hero_note: "Gratuit pour commencer · Pas de carte bancaire",
       familiar_title: "Ça te parle ?",

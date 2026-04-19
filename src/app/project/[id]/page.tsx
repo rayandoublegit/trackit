@@ -516,13 +516,13 @@ function ReportDisplay({ text }: { text: string }) {
         if (isVerdict) return <div key={i} style={{ fontSize: 18, fontWeight: 800, color: "#ffffff", letterSpacing: "-0.02em", margin: "16px 0", textAlign: "center" }}>{trimmed}</div>;
         if (isHeader) return (
           <div key={i} style={{ marginTop: 24, marginBottom: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.4)", textTransform: "uppercase" }}>{trimmed}</span>
+            <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", color: "rgba(255,255,255,0.9)", textTransform: "uppercase", fontFamily: "'Atyp Text', 'Europa Grotesk No 2 SH', sans-serif" }}>{trimmed}</span>
           </div>
         );
         if (isNumbered) return (
           <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, marginTop: 4 }}>
             <span style={{ color: "rgba(255,255,255,0.3)", flexShrink: 0, fontSize: 13 }}>›</span>
-            <span style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.8)" }}>{trimmed.replace(/^[›]?\s*\d{2}\s*—\s*/, "")}</span>
+            <span style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.6)", fontWeight: 300 }}>{trimmed.replace(/^[›]?\s*\d{2}\s*—\s*/, "")}</span>
           </div>
         );
         if (!trimmed) {
@@ -531,7 +531,7 @@ function ReportDisplay({ text }: { text: string }) {
           if (!prevLine) return null;
           return <div key={i} style={{ height: 8 }} />;
         }
-        return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.75)", marginBottom: 6 }}>{trimmed}</div>;
+        return <div key={i} style={{ fontSize: 13, lineHeight: 1.7, color: "rgba(255,255,255,0.55)", marginBottom: 6, fontWeight: 300 }}>{trimmed}</div>;
       })}
     </div>
   );
@@ -576,7 +576,7 @@ function EditableTitle({
             border: "none",
             borderBottom: "1px solid rgba(255,255,255,0.3)",
             color: "#fff",
-            fontFamily: "'Inter', sans-serif",
+            fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
             fontSize: "clamp(24px, 4vw, 40px)",
             fontWeight: 700,
             letterSpacing: "-0.03em",
@@ -1393,18 +1393,18 @@ export default function ProjectPage() {
   );
 
   const ReportDisplay = ({ report }: { report: string }) => (
-    <div style={{ fontSize: 14, lineHeight: 1.8, color: th.text, whiteSpace: "pre-wrap", fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ fontSize: 14, lineHeight: 1.8, color: D ? "rgba(255,255,255,0.75)" : "rgba(0,0,0,0.75)", whiteSpace: "pre-wrap", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
       {report.replace(/\*\*/g, "").replace(/^#+\s/gm, "").replace(/^\*\s/gm, "").replace(/^-\s/gm, "").trim()}
     </div>
   );
 
   if (!mounted) return <div style={{ background: "#0d0d0d", minHeight: "100vh" }} />;
-  if (loading) return <div style={{ background: th.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: th.textMuted, fontFamily: "'Inter', sans-serif" }}>Loading...</div>;
+  if (loading) return <div style={{ background: th.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: th.textMuted, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>Loading...</div>;
   if (!project) return null;
 
 
   return (
-    <div suppressHydrationWarning style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: th.bg, fontFamily: "'Inter', sans-serif", color: th.text }}>
+    <div suppressHydrationWarning style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: th.bg, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", color: th.text }}>
 
       {/* TOP BAR — spans full width */}
       <div style={{ display: "flex", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid ${th.sidebarBorder}`, background: th.sidebar, flexShrink: 0 }}>
@@ -1488,7 +1488,7 @@ export default function ProjectPage() {
               placeholder={lang === "fr" ? "Rechercher..." : "Search..."}
               value={sidebarSearch}
               onChange={e => setSidebarSearch(e.target.value)}
-              style={{ width: "100%", background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "8px 10px 8px 30px", fontSize: 12, color: th.text, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }}
+              style={{ width: "100%", background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "8px 10px 8px 30px", fontSize: 12, color: th.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none", boxSizing: "border-box" as any }}
             />
           </div>
         </div>
@@ -1505,7 +1505,7 @@ export default function ProjectPage() {
                   const active = activeTab === item.id;
                   return (
                     <button key={item.id} type="button" onClick={() => setActiveTab(item.id)}
-                      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", marginBottom: 2, borderRadius: 8, border: "none", background: active ? th.activeNav : "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: active ? 600 : 400, color: locked ? th.textMuted : th.text, textAlign: "left", boxSizing: "border-box" }}>
+                      style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "8px 10px", marginBottom: 2, borderRadius: 8, border: "none", background: active ? th.activeNav : "transparent", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontSize: 13, fontWeight: active ? 600 : 400, color: locked ? th.textMuted : th.text, textAlign: "left", boxSizing: "border-box" }}>
                       <span style={{ opacity: locked ? 0.4 : 1, display: "flex", alignItems: "center" }} dangerouslySetInnerHTML={{ __html: item.icon }} />
                       <span style={{ flex: 1, opacity: locked ? 0.5 : 1 }}>{item.label}</span>
                       {locked && <span style={{ fontSize: 10, color: th.textMuted, background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 4, padding: "1px 5px", fontWeight: 600 }}>{item.plan.toUpperCase()}</span>}
@@ -1526,7 +1526,7 @@ export default function ProjectPage() {
           </div>
           <button type="button"
             onClick={() => setShowResetConfirm(true)}
-            style={{ width: "100%", background: "transparent", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "rgba(248,113,113,0.6)", cursor: "pointer", fontFamily: "'Inter', sans-serif", textAlign: "left" }}
+            style={{ width: "100%", background: "transparent", border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 500, color: "rgba(248,113,113,0.6)", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", textAlign: "left" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.6)"; e.currentTarget.style.color = "#f87171"; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(248,113,113,0.2)"; e.currentTarget.style.color = "rgba(248,113,113,0.6)"; }}>
             {lang === "fr" ? "Réinitialiser le workspace" : "Reset workspace"}
@@ -1556,7 +1556,7 @@ export default function ProjectPage() {
                 const { error } = await supabase.from("projects").update({ idea_name: newName.trim() }).eq("id", project.id);
                 if (!error) setProject((prev) => prev ? { ...prev, idea_name: newName.trim() } : prev);
               }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 100, border: "1.5px dashed #22c55e", background: "transparent", cursor: "pointer", fontFamily: "'Inter', sans-serif", color: "#22c55e", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 11px", borderRadius: 100, border: "1.5px dashed #22c55e", background: "transparent", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", color: "#22c55e", fontSize: 11, fontWeight: 500, whiteSpace: "nowrap" }}>
               <span style={{ width: 16, height: 16, borderRadius: "50%", background: D ? "#1a1a1a" : "#f0fdf4", border: "1px solid #22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#22c55e", flexShrink: 0 }}>+</span>
               {lang === "fr" ? "Renommer" : "Add Name"}
             </button>
@@ -1575,10 +1575,10 @@ export default function ProjectPage() {
             canAccess("spark") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.checkin_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.checkin_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Ton bilan hebdomadaire avec ton co-fondateur IA" : "Your weekly review with your AI co-founder"}</div>
                   <button type="button" onClick={() => setShowCheckin(!showCheckin)}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: "pointer" }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: "pointer" }}>
                     {t.checkin_new}
                   </button>
                 </div>
@@ -1591,7 +1591,7 @@ export default function ProjectPage() {
                       <div style={{ display: "flex", gap: 8 }}>
                         {[true, false].map(val => (
                           <button key={String(val)} type="button" onClick={() => setCheckinForm(p => ({ ...p, talked_to_users: val }))}
-                            style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${checkinForm.talked_to_users === val ? th.text : th.cardBorder}`, background: checkinForm.talked_to_users === val ? th.text : "transparent", color: checkinForm.talked_to_users === val ? th.bg : th.textMuted, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'Inter', sans-serif" }}>
+                            style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${checkinForm.talked_to_users === val ? th.text : th.cardBorder}`, background: checkinForm.talked_to_users === val ? th.text : "transparent", color: checkinForm.talked_to_users === val ? th.bg : th.textMuted, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                             {val ? t.checkin_yes : t.checkin_no}
                           </button>
                         ))}
@@ -1601,7 +1601,7 @@ export default function ProjectPage() {
                       <div style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{t.checkin_how_many}</div>
                         <input type="number" value={checkinForm.users_count} onChange={e => setCheckinForm(p => ({ ...p, users_count: Number(e.target.value) }))}
-                          style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 120, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                          style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 120, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
                       </div>
                     )}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -1609,7 +1609,7 @@ export default function ProjectPage() {
                         <div key={key}>
                           <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{label}</div>
                           <input type="number" value={(checkinForm as any)[key]} onChange={e => setCheckinForm(p => ({ ...p, [key]: Number(e.target.value) }))}
-                            style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                            style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
                         </div>
                       ))}
                     </div>
@@ -1618,11 +1618,11 @@ export default function ProjectPage() {
                       <textarea value={checkinForm.notes} onChange={e => setCheckinForm(p => ({ ...p, notes: e.target.value }))}
                         onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submitCheckin(); }}
                         placeholder={t.checkin_placeholder} rows={4}
-                        style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "12px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" as any }} />
+                        style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "12px 14px", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none", resize: "vertical", boxSizing: "border-box" as any }} />
                       <div style={{ fontSize: 11, color: th.textMuted, marginTop: 4 }}>{t.checkin_hint}</div>
                     </div>
                     <button type="button" onClick={() => void submitCheckin()} disabled={submittingCheckin}
-                      style={{ background: "#4ade80", color: "#000", border: "none", borderRadius: 100, padding: "12px 24px", fontSize: 13, fontWeight: 700, cursor: submittingCheckin ? "not-allowed" : "pointer", opacity: submittingCheckin ? 0.7 : 1, fontFamily: "'Inter', sans-serif" }}>
+                      style={{ background: "#4ade80", color: "#000", border: "none", borderRadius: 100, padding: "12px 24px", fontSize: 13, fontWeight: 700, cursor: submittingCheckin ? "not-allowed" : "pointer", opacity: submittingCheckin ? 0.7 : 1, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                       {submittingCheckin ? t.checkin_submitting : t.checkin_submit}
                     </button>
                   </div>
@@ -1660,7 +1660,7 @@ export default function ProjectPage() {
           {/* MILESTONES TAB */}
           {activeTab === "milestones" && (
             <div>
-              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.milestones_title}</div>
+              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.milestones_title}</div>
               <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Célèbre tes victoires et reçois un playbook IA" : "Celebrate wins and get an AI playbook"}</div>
               {[
                 { type: "first_user", label: t.milestone_first_user, desc: t.milestone_first_user_desc, icon: "👤" },
@@ -1686,7 +1686,7 @@ export default function ProjectPage() {
                       <div style={{ fontSize: 12, color: "#4ade80", fontWeight: 600, whiteSpace: "nowrap" }}>✓ {lang === "fr" ? "Atteint" : "Achieved"}</div>
                     ) : (
                       <button type="button" onClick={() => void claimMilestone(m.type)} disabled={claiming}
-                        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: claiming ? "not-allowed" : "pointer", opacity: claiming ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                        style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: claiming ? "not-allowed" : "pointer", opacity: claiming ? 0.6 : 1, whiteSpace: "nowrap" }}>
                         {claiming ? t.milestone_claiming : t.milestone_claim}
                       </button>
                     )}
@@ -1701,10 +1701,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.market_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.market_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{t.market_sub}</div>
                   <button type="button" onClick={() => void runMarketWatch()} disabled={runningMarketWatch}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketWatch ? "not-allowed" : "pointer", opacity: runningMarketWatch ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketWatch ? "not-allowed" : "pointer", opacity: runningMarketWatch ? 0.6 : 1 }}>
                     {runningMarketWatch ? (lang === "fr" ? "Analyse..." : "Scanning...") : (lang === "fr" ? "Lancer l'analyse →" : "Run scan →")}
                   </button>
                 </div>
@@ -1726,10 +1726,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.competitor_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.competitor_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Analyse approfondie de tes concurrents" : "Deep competitor analysis"}</div>
                   <button type="button" onClick={() => void runCompetitorTracker()} disabled={runningCompetitor}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningCompetitor ? "not-allowed" : "pointer", opacity: runningCompetitor ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningCompetitor ? "not-allowed" : "pointer", opacity: runningCompetitor ? 0.6 : 1 }}>
                     {runningCompetitor ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
                   </button>
                 </div>
@@ -1749,10 +1749,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.pivot_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.pivot_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Détecte les signaux de pivot" : "Detect pivot signals"}</div>
                   <button type="button" onClick={() => void runPivotRadar()} disabled={runningPivot}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPivot ? "not-allowed" : "pointer", opacity: runningPivot ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPivot ? "not-allowed" : "pointer", opacity: runningPivot ? 0.6 : 1 }}>
                     {runningPivot ? (lang === "fr" ? "Analyse..." : "Analyzing...") : (lang === "fr" ? "Analyser →" : "Analyze →")}
                   </button>
                 </div>
@@ -1772,10 +1772,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.marketing_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.marketing_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie marketing IA personnalisée" : "AI-powered marketing strategy"}</div>
                   <button type="button" onClick={() => void runMarketingEngine()} disabled={runningMarketing}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketing ? "not-allowed" : "pointer", opacity: runningMarketing ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningMarketing ? "not-allowed" : "pointer", opacity: runningMarketing ? 0.6 : 1 }}>
                     {runningMarketing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1795,17 +1795,17 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.outreach_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.outreach_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Messages de prospection personnalisés" : "Personalized outreach messages"}</div>
                   <button type="button" onClick={() => void runOutreachEngine()} disabled={runningOutreach}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningOutreach ? "not-allowed" : "pointer", opacity: runningOutreach ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningOutreach ? "not-allowed" : "pointer", opacity: runningOutreach ? 0.6 : 1 }}>
                     {runningOutreach ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 8 }}>{lang === "fr" ? "Cible" : "Target"}</div>
                   <input value={outreachTarget} onChange={e => setOutreachTarget(e.target.value)}
-                    style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 300, fontFamily: "'Inter', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
+                    style={{ background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, width: 300, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none", boxSizing: "border-box" as any }} />
                 </div>
                 {outreachReport ? (
                   <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}><div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: collapsedReports["outreach"] ? "none" : `1px solid ${th.cardBorder}`, cursor: "pointer" }} onClick={() => setCollapsedReports(p => ({ ...p, "outreach": !p["outreach"] }))}><div style={{ fontSize: 12, fontWeight: 600, color: th.textMuted }}>{lang === "fr" ? "Résultat" : "Output"}</div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><button type="button" onClick={e => { e.stopPropagation(); void deleteReport("outreach"); }} style={{ background: "none", border: "none", color: th.textMuted, cursor: "pointer", padding: "2px 4px" }} onMouseEnter={e => e.currentTarget.style.color = "#f87171"} onMouseLeave={e => e.currentTarget.style.color = th.textMuted}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button><span style={{ fontSize: 11, color: th.textMuted }}>{collapsedReports["outreach"] ? "▼" : "▲"}</span></div></div>{!collapsedReports["outreach"] && <div style={{ padding: "20px" }}><ReportDisplay report={outreachReport} /></div>}</div>
@@ -1823,10 +1823,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.pricing_strategy_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.pricing_strategy_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Stratégie de prix optimale pour ton marché" : "Optimal pricing strategy for your market"}</div>
                   <button type="button" onClick={() => void runPricingStrategy()} disabled={runningPricing}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPricing ? "not-allowed" : "pointer", opacity: runningPricing ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningPricing ? "not-allowed" : "pointer", opacity: runningPricing ? 0.6 : 1 }}>
                     {runningPricing ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1846,10 +1846,10 @@ export default function ProjectPage() {
             canAccess("build") ? (
               <div>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.revenue_title}</div>
+                  <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.revenue_title}</div>
                   <div style={{ fontSize: 14, color: th.textMuted, marginBottom: 16 }}>{lang === "fr" ? "Roadmap vers ton premier $10K MRR" : "Roadmap to your first $10K MRR"}</div>
                   <button type="button" onClick={() => void runRevenueRoadmap()} disabled={runningRevenue}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Inter', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningRevenue ? "not-allowed" : "pointer", opacity: runningRevenue ? 0.6 : 1 }}>
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, background: D ? "#fff" : "#f5f5f5", color: "#000", border: "none", borderRadius: 100, padding: "14px 28px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", boxShadow: "0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.8)", letterSpacing: "-0.01em", cursor: runningRevenue ? "not-allowed" : "pointer", opacity: runningRevenue ? 0.6 : 1 }}>
                     {runningRevenue ? (lang === "fr" ? "Génération..." : "Generating...") : (lang === "fr" ? "Générer →" : "Generate →")}
                   </button>
                 </div>
@@ -1868,7 +1868,7 @@ export default function ProjectPage() {
           {activeTab === "cofounder" && (
             canAccess("scale") ? (
               <div>
-                <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.cofounder_title}</div>
+                <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.cofounder_title}</div>
                 <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Ton co-fondateur IA avec accès au web en temps réel" : "Your AI co-founder with real-time web access"}</div>
                 <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
                   <div style={{ padding: "20px 24px", minHeight: 300, maxHeight: 500, overflowY: "auto" }}>
@@ -1889,9 +1889,9 @@ export default function ProjectPage() {
                     <input value={chatInput} onChange={e => setChatInput(e.target.value)}
                       onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) void sendCofounderMessage(); }}
                       placeholder={lang === "fr" ? "Demande quelque chose..." : "Ask something..."}
-                      style={{ flex: 1, background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, fontFamily: "'Inter', sans-serif", outline: "none" }} />
+                      style={{ flex: 1, background: th.inputBg, border: `1px solid ${th.cardBorder}`, borderRadius: 8, padding: "10px 14px", fontSize: 13, color: th.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", outline: "none" }} />
                     <button type="button" onClick={() => void sendCofounderMessage()} disabled={chatLoading || !chatInput.trim()}
-                      style={{ background: th.text, color: th.bg, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter', sans-serif", opacity: chatLoading || !chatInput.trim() ? 0.5 : 1 }}>
+                      style={{ background: th.text, color: th.bg, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", opacity: chatLoading || !chatInput.trim() ? 0.5 : 1 }}>
                       {chatLoading ? "..." : "→"}
                     </button>
                   </div>
@@ -1903,17 +1903,17 @@ export default function ProjectPage() {
           {/* NOTES TAB */}
           {activeTab === "notes" && (
             <div>
-              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Inter', sans-serif", letterSpacing: "-0.03em" }}>{t.notes_title}</div>
+              <div style={{ fontSize: 26, fontWeight: 600, color: th.text, marginBottom: 6, fontFamily: "'Neue Haas Grotesk Display Pro', 'Plus Jakarta Sans', 'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "-0.03em" }}>{t.notes_title}</div>
               <div style={{ fontSize: 13, color: th.textMuted, marginBottom: 24 }}>{lang === "fr" ? "Tes notes privées pour ce projet" : "Your private notes for this project"}</div>
               <div style={{ background: th.cardBg, border: `1px solid ${th.cardBorder}`, borderRadius: 12, padding: "20px", marginBottom: 16 }}>
                 <textarea value={newNote} onChange={e => setNewNote(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void addNote(); }}
                   placeholder={lang === "fr" ? "Nouvelle note... (⌘ + Entrée pour sauvegarder)" : "New note... (⌘ + Enter to save)"}
                   rows={3}
-                  style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Inter', sans-serif", resize: "none", boxSizing: "border-box" as any }} />
+                  style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: th.text, width: "100%", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", resize: "none", boxSizing: "border-box" as any }} />
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
                   <button type="button" onClick={() => void addNote()} disabled={savingNote || !newNote.trim()}
-                    style={{ background: th.text, color: th.bg, border: "none", borderRadius: 100, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: savingNote || !newNote.trim() ? 0.5 : 1, fontFamily: "'Inter', sans-serif" }}>
+                    style={{ background: th.text, color: th.bg, border: "none", borderRadius: 100, padding: "8px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", opacity: savingNote || !newNote.trim() ? 0.5 : 1, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                     {savingNote ? "..." : (lang === "fr" ? "Sauvegarder" : "Save")}
                   </button>
                 </div>

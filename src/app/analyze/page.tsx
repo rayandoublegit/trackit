@@ -475,11 +475,39 @@ export default function AnalyzePage() {
           <h1 style={{ fontSize: 42, fontWeight: 500, color: "#fff", letterSpacing: "-0.04em", lineHeight: 1.1, margin: "0 0 16px", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
             {lang === "fr" ? <><span>Dis-nous tout</span><br /><span style={{ color: "#ffffff" }}>sur ton idée.</span></> : <><span>Tell us everything</span><br /><span style={{ color: "#ffffff" }}>about your idea.</span></>}
           </h1>
-          <p style={{ fontSize: 14, fontWeight: 300, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", margin: "0 0 32px" }}>
+          <p style={{ fontSize: 14, fontWeight: 300, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", margin: "0 0 20px" }}>
             {lang === "fr"
               ? "Sois précis. Plus tu donnes de détails, plus le verdict sera brutal et précis."
               : "Be specific. The more detail you give, the more brutal and accurate the verdict."}
           </p>
+
+          {/* Example verdict */}
+          <details style={{ marginBottom: 32 }}>
+            <summary style={{ cursor: "pointer", fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.45)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", listStyle: "none", display: "flex", alignItems: "center", gap: 6, userSelect: "none" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {lang === "fr" ? "Voir un exemple de verdict" : "See an example verdict"}
+            </summary>
+            <div style={{ marginTop: 14, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "16px 18px" }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#4ade80", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>BUILD IT</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", lineHeight: 1.6, marginBottom: 12 }}>
+                {lang === "fr"
+                  ? "Un outil IA pour aider les founders solo à valider leur SaaS avant de construire. Le marché est réel — 35% des startups échouent par manque de besoin marché. Mais tes concurrents ont 300k+ utilisateurs. Ton ouverture : les outils existants donnent des scores feel-good. Klayan donne des verdicts brutaux. Repositionne-toi en co-fondateur IA qui te fait économiser 6 mois de travail inutile."
+                  : "An AI tool helping solo founders validate their SaaS before building. Market is real — 35% of startups fail from no market need. But competitors have 300k+ users. Your opening: existing tools give feel-good scores. Klayan gives brutal verdicts. Reposition as the AI co-founder that saves you 6 months of wasted work."}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {[
+                  lang === "fr" ? "Cible les founders qui ont déjà brûlé de l'argent sur une mauvaise idée" : "Target founders who already burned money on the wrong idea",
+                  lang === "fr" ? "Le verdict Kill est votre différenciateur — aucun concurrent ne l'offre" : "The Kill verdict is your differentiator — no competitor offers it",
+                  lang === "fr" ? "Prouve ça avec 10 analyses publiques sur Reddit cette semaine" : "Prove it with 10 public analyses on Reddit this week"
+                ].map((point, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <div style={{ width: 5, height: 5, borderRadius: "50%", background: "#4ade80", marginTop: 6, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", lineHeight: 1.5 }}>{point}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
 
           {isSubmitting && (
             <div style={{ background: "#f8f8f8", borderRadius: 12, padding: 20 }}>
