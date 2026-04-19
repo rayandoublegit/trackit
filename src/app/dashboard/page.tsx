@@ -1031,7 +1031,7 @@ export default function DashboardPage() {
     hover: D ? "#222" : "#ebebeb",
     ctaBg: "#fff",
     ctaText: "#000",
-    activeNav: D ? "#2b2d31" : "#efefef",
+    activeNav: D ? "#2b2d31" : "#e0e0e0",
     tabActive: D ? "#fff" : "#111",
     tabActiveBorder: D ? "#fff" : "#111",
     tabInactive: D ? "#666" : "#888",
