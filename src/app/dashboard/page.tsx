@@ -1089,39 +1089,7 @@ export default function DashboardPage() {
         />
       ) : null}
 
-      {isMobile ? (
-        <button
-          type="button"
-          aria-expanded={sidebarOpen}
-          aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
-          onClick={() => setSidebarOpen((o) => !o)}
-          style={{
-            position: "fixed",
-            left: 0,
-            top: "50%",
-            transform: "translateY(-50%)",
-            zIndex: 101,
-            width: 32,
-            height: 80,
-            background: "#111",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderLeft: "none",
-            borderRadius: "0 12px 12px 0",
-            color: "rgba(255,255,255,0.85)",
-            fontSize: 22,
-            fontWeight: 300,
-            lineHeight: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            padding: 0,
-            fontFamily: "system-ui, sans-serif",
-          }}
-        >
-          {sidebarOpen ? "‹" : "›"}
-        </button>
-      ) : null}
+      null
 
       {/* Left sidebar */}
       <aside
