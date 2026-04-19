@@ -470,7 +470,7 @@ export default function AnalyzePage() {
       {/* Navbar */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 32px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}><Link href="/" style={{ textDecoration: "none" }}><img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} /></Link><Link href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, height: 36, borderRadius: 10, background: "rgba(255,255,255,0.08)", textDecoration: "none", padding: "0 14px" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>{lang === "fr" ? "Brouillon" : "Draft"}</span></Link></div>
-        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>{t.free_note}</span>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", marginLeft: isMobile ? 16 : 0, textAlign: isMobile ? "right" as const : "left" as const, flexShrink: 1, minWidth: 0 }}>{t.free_note}</span>
       </div>
 
       {/* Main content */}
