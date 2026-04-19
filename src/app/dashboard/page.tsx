@@ -1906,7 +1906,6 @@ export default function DashboardPage() {
           {/* Recent Ideas */}
           <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "16px 24px", borderBottom: `1px solid ${theme.divider}`, display: "flex", alignItems: "center", gap: 8 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.textSub} strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               <span style={{ fontSize: 15, fontWeight: 600, color: theme.text }}>{t.recent_ideas}</span>
               <span style={{ fontSize: 13, color: theme.textMuted, marginLeft: 4 }}>({stats.total})</span>
             </div>
