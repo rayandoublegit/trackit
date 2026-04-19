@@ -964,6 +964,7 @@ export default function DashboardPage() {
   const shell = {
     fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
     fontWeight: 800,
+    fontStretch: "semi-condensed",
     color: "#fff" as const,
   };
 
