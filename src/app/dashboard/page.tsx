@@ -1824,7 +1824,7 @@ export default function DashboardPage() {
                   const val = (document.getElementById("profile-username-input") as HTMLInputElement)?.value?.trim();
                   if (!val || !user) return;
                   await supabase!.from("profiles").update({ username: val }).eq("id", user.id);
-                  setProfileUsername(val);
+                  setProfile(prev => prev ? { ...prev, username: val } : prev);
                 }}
                   style={{ marginTop: 10, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                   Save
