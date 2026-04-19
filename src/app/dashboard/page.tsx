@@ -448,11 +448,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!supabase) return;
-    void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+    const sb = supabase;
+    void sb.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
       if (data) setNotifications(data);
     });
-    const channel = supabase.channel("notifications").on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
-      void supabase.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+    const channel = sb.channel("notifications").on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, () => {
+      void sb.from("notifications").select("*").order("created_at", { ascending: false }).then(({ data }) => {
         if (data) setNotifications(data);
       });
     }).subscribe();
