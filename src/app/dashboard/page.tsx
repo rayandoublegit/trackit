@@ -457,7 +457,7 @@ export default function DashboardPage() {
         if (data) setNotifications(data);
       });
     }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { void sb.removeChannel(channel); };
   }, [supabase]);
 
   useEffect(() => {
@@ -469,7 +469,7 @@ export default function DashboardPage() {
         if (data) setNotifications(data);
       });
     }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
+    return () => { void sb.removeChannel(channel); };
   }, [supabase]);
 
   useEffect(() => {
