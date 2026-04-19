@@ -361,6 +361,13 @@ export default function VerdictPage() {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     try {
@@ -792,8 +799,8 @@ export default function VerdictPage() {
           </h1>
 
           {/* Metadata row + CTA */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 32 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 32 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", width: isMobile ? "100%" : "auto" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#93c5fd", borderRadius: 6, padding: "5px 10px" }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span style={{ fontSize: 12, color: "#111", fontFamily: europaLight }}>
@@ -814,7 +821,7 @@ export default function VerdictPage() {
               </div>
             </div>
             {projectId && (
-              <Link href={`/project/${projectId}`} style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: 260, minHeight: 110, background: "#2563eb", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any }}>
+              <Link href={`/project/${projectId}`} style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: isMobile ? "100%" : 260, minHeight: 110, background: "#2563eb", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: europaBold, letterSpacing: "-0.02em", lineHeight: 1.25 }}>
                   {lang === "fr" ? "Suivre cette idée aujourd'hui." : "Start tracking this idea today."}
                 </span>
