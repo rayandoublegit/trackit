@@ -364,8 +364,6 @@ export default function DashboardPage() {
       payment_desc: "Gérez votre méthode de paiement via le portail Stripe.",
       cancel_desc: "Vous perdrez l'accès aux fonctionnalités premium à la fin de votre période de facturation.",
       billing_desc2: "Gérez votre abonnement et vos méthodes de paiement.",
-      upgrade_build: "Passer à Build",
-      ideas_analyzed: "Idées analysées",
       total_analyses: "Total des analyses",
       all_time: "Depuis toujours",
       verdicts_title: "Verdicts",
