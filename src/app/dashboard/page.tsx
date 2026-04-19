@@ -982,7 +982,7 @@ export default function DashboardPage() {
           type="button"
           onClick={() => void loadDashboard()}
           style={{
-            background: theme.card,
+            background: "#ffffff",
             color: "#000",
             border: "none",
             borderRadius: 10,
