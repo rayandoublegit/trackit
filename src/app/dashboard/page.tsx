@@ -1388,7 +1388,7 @@ export default function DashboardPage() {
       <main suppressHydrationWarning style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
 
         {/* Top bar */}
-        <div style={{ padding: "20px 32px 0", borderBottom: `1px solid ${theme.divider}` }}>
+        <div style={{ padding: isMobile ? "16px 16px 0" : "20px 32px 0", borderBottom: `1px solid ${theme.divider}` }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, paddingBottom: 12, borderBottom: `1px solid ${theme.divider}` }}>
             <Link href="/" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: theme.textMuted, textDecoration: "none", padding: "6px 10px", borderRadius: 7, border: `1px solid ${theme.cardBorder}`, background: theme.card }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -1878,9 +1878,9 @@ export default function DashboardPage() {
           )}
 
           {/* Stats cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: isMobile ? 8 : 16, marginBottom: 28 }}>
             {/* Card 1 */}
-            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: isMobile ? "12px 10px" : "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.ideas_analyzed}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
@@ -1894,7 +1894,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Card 2 */}
-            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: isMobile ? "12px 10px" : "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.verdicts_title}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
@@ -1914,7 +1914,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Card 3 */}
-            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: "20px 24px" }}>
+            <div style={{ border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: isMobile ? "12px 10px" : "20px 24px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <span style={{ fontSize: 12, color: theme.textMuted, fontWeight: 500 }}>{t.your_plan}</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
