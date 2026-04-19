@@ -965,7 +965,6 @@ export default function DashboardPage() {
     fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
     fontWeight: 900,
     fontStretch: "semi-condensed",
-    WebkitTextStroke: "0.5px currentColor",
     color: "#fff" as const,
   };
 
