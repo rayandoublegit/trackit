@@ -177,7 +177,7 @@ function VerdictPill({
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: verdictBadgeColor(kind), display: "inline-block", flexShrink: 0 }} />
-      <span style={{ fontSize: 13, fontWeight: 500, color: "#aaa", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+      <span style={{ fontSize: 13, fontWeight: 500, color: "#aaa", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
         {kind === "BUILD" ? labelBuilding : kind === "FLIP" ? labelPivoting : labelKilled}
       </span>
     </span>
@@ -962,7 +962,7 @@ export default function DashboardPage() {
   const userPlan = profile?.plan ?? "free";
 
   const shell = {
-    fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+    fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
     color: "#fff" as const,
   };
 
@@ -997,7 +997,7 @@ export default function DashboardPage() {
             fontWeight: 600,
             fontSize: 14,
             cursor: "pointer",
-            fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+            fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
           }}
         >
           Try again
@@ -1101,7 +1101,7 @@ export default function DashboardPage() {
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
-          fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+          fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
           ...(isMobile
             ? {
                 position: "fixed",
@@ -1130,7 +1130,7 @@ export default function DashboardPage() {
                 {avatarUrl ? (
                   <img key={avatarImgKey} src={avatarUrl} alt="" style={{ width: 40, height: 40, objectFit: "cover", display: "block" }} />
                 ) : (
-                  <span style={{ color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                  <span style={{ color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                     {(profileUsername?.trim() || user?.email?.split("@")[0] || "K")[0].toUpperCase()}
                   </span>
                 )}
@@ -1156,15 +1156,15 @@ export default function DashboardPage() {
                 <div role="menu" style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200, minWidth: 180, background: theme.card, border: `1px solid ${theme.cardBorder}`, borderRadius: 12, padding: 6, boxShadow: "0 8px 24px rgba(0,0,0,0.1)" }}>
                   {avatarUrl ? (
                     <>
-                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
                         <CameraIcon /> Change photo
                       </button>
-                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => void removeAvatar()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#ef4444", fontSize: 13, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                      <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => void removeAvatar()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: "#ef4444", fontSize: 13, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
                         <TrashIcon /> Remove photo
                       </button>
                     </>
                   ) : (
-                    <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
+                    <button type="button" role="menuitem" disabled={avatarBusy} onClick={() => openAvatarFilePicker()} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 10px", border: "none", borderRadius: 8, background: "transparent", color: theme.text, fontSize: 13, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, cursor: avatarBusy ? "wait" : "pointer", textAlign: "left" }}>
                       <CameraIcon /> Add photo
                     </button>
                   )}
@@ -1178,20 +1178,20 @@ export default function DashboardPage() {
         {/* Nav */}
         <div style={{ padding: "12px" }}>
           <button type="button" onClick={() => { setActiveTab("workspaces"); if (isMobile) setSidebarOpen(false); }}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "workspaces" ? theme.activeNav : "transparent", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "workspaces" ? theme.activeNav : "transparent", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             {t.workspaces}
           </button>
 
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "16px 0 4px 12px", textTransform: "uppercase" }}>{t.main_menu}</div>
           <button type="button" onClick={() => setActiveTab("home")}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "home" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box", cursor: "pointer" }} className="kly-nav-btn">
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 4, background: activeTab === "home" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box", cursor: "pointer" }} className="kly-nav-btn">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
             {t.home}
           </button>
 
           <button type="button" onClick={() => { setActiveTab("ideas"); }}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: activeTab === "ideas" ? theme.activeNav : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "10px 12px", background: activeTab === "ideas" ? theme.activeNav : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
             className="kly-nav-btn">
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               
@@ -1199,7 +1199,7 @@ export default function DashboardPage() {
             </div>
           </button>
           <Link href="/analyze?resume=1"
-              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginTop: 2, background: "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginTop: 2, background: "transparent", border: "none", borderRadius: 8, textDecoration: "none", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
               className="kly-nav-btn">
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
@@ -1209,13 +1209,13 @@ export default function DashboardPage() {
             </Link>
 
           <Link href="/analyze"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 2, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", marginBottom: 2, background: "transparent", borderRadius: 8, textDecoration: "none", fontSize: 14, fontWeight: 500, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
             className="kly-nav-btn">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><path d="M12 5v14M5 12h14"/></svg>
             {t.new_analysis}
           </Link>
           <button type="button" onClick={() => setActiveTab("trash" as any)}
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginBottom: 8, background: (activeTab as string) === "trash" ? theme.activeNav : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", padding: "9px 12px", marginBottom: 8, background: (activeTab as string) === "trash" ? theme.activeNav : "transparent", border: "none", cursor: "pointer", borderRadius: 8, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", boxSizing: "border-box" }}
             className="kly-nav-btn">
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.7"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -1293,17 +1293,17 @@ export default function DashboardPage() {
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>{t.others}</div>
           <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
           <button type="button" onClick={() => setActiveTab("settings" as any)}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: activeTab === "settings" ? theme.activeNav : "transparent", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, border: "none", background: activeTab === "settings" ? theme.activeNav : "transparent", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", cursor: "pointer", textAlign: "left", boxSizing: "border-box" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
             {t.settings_tab}
           </button>
           <a href="https://discord.gg/nHVEPB2yXb" target="_blank" rel="noopener noreferrer"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" style={{ color: "#5865f2" }}><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
             Discord
           </a>
           <a href="mailto:support@klayan.app"
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", borderRadius: 8, textDecoration: "none", color: theme.text, fontSize: 14, fontWeight: 500, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             Support
           </a>
@@ -1313,13 +1313,13 @@ export default function DashboardPage() {
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", color: theme.textMuted, margin: "8px 0 4px 12px", textTransform: "uppercase" }}>{t.account}</div>
           <div style={{ height: 1, background: theme.divider, margin: "4px 0 6px" }} />
           <button type="button" onClick={() => setActiveTab("profile" as any)}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "profile" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", textAlign: "left", boxSizing: "border-box" }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "profile" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", textAlign: "left", boxSizing: "border-box" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "profile" ? "#ebebeb" : "transparent"; }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             {t.profile_tab}
           </button>
           <button type="button" onClick={() => setActiveTab("billing" as any)}
-            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "billing" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", textAlign: "left", boxSizing: "border-box" }}
+            style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "9px 12px", background: activeTab === "billing" ? theme.activeNav : "transparent", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 400, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", textAlign: "left", boxSizing: "border-box" }}
             onMouseLeave={(e) => { e.currentTarget.style.background = activeTab === "billing" ? "#ebebeb" : "transparent"; }}>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={theme.text} strokeWidth="1.8"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             {t.billing_tab}
@@ -1342,7 +1342,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 12, color: theme.textMuted, marginBottom: 12, lineHeight: 1.4 }}>{t.upgrade_desc}</div>
                 <button type="button"
                   onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
-                  style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, background: "#111", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                  style={{ display: "block", width: "100%", textAlign: "center", padding: "9px 14px", borderRadius: 8, border: "none", color: "#fff", fontSize: 13, fontWeight: 700, background: "#111", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                   {t.upgrade_now}
                 </button>
               </>
@@ -1352,7 +1352,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <main suppressHydrationWarning style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+      <main suppressHydrationWarning style={{ flex: 1, minWidth: 0, background: theme.main, display: "flex", flexDirection: "column", minHeight: "100vh", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
 
         {/* Top bar */}
         <div style={{ padding: isMobile ? "16px 16px 0" : "20px 32px 0", borderBottom: `1px solid ${theme.divider}` }}>
@@ -1381,7 +1381,7 @@ export default function DashboardPage() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: theme.inputBg, border: `1px solid ${theme.inputBorder}`, borderRadius: 8, padding: "7px 14px", minWidth: isMobile ? 0 : 220, width: isMobile ? "100%" : "auto" }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 <input ref={searchInputRef} type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t.search} style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }} />
+                  placeholder={t.search} style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: theme.text, width: "100%", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }} />
                 {searchQuery ? (
                   <button type="button" onClick={() => setSearchQuery("")} style={{ background: "transparent", border: "none", cursor: "pointer", color: theme.textMuted, padding: 0, fontSize: 16, lineHeight: 1 }}>×</button>
                 ) : (
@@ -1407,7 +1407,7 @@ export default function DashboardPage() {
                             supabase!.from("notifications").update({ read_by: [...n.read_by, user.id] }).eq("id", n.id)
                           ));
                           setNotifications(prev => prev.map(n => ({ ...n, read_by: n.read_by.includes(user.id) ? n.read_by : [...n.read_by, user.id] })));
-                        }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                        }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                           Mark all read
                         </button>
                       )}
@@ -1437,7 +1437,7 @@ export default function DashboardPage() {
               </div>
               <div ref={statusMenuRef} style={{ position: "relative" }}>
                 <button type="button" onClick={() => { setShowStatusMenu(v => !v); setShowSortMenu(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                   Status: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 4 }}>{statusFilter === "all" ? "All" : statusFilter === "BUILD" ? t.building : statusFilter === "FLIP" ? t.pivoting : t.killed}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
@@ -1445,7 +1445,7 @@ export default function DashboardPage() {
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 140, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
                     {[{val: "all", label: t.all}, {val: "BUILD", label: t.building}, {val: "FLIP", label: t.pivoting}, {val: "KILL", label: t.killed}].map(({val, label}) => (
                       <button key={val} type="button" onClick={() => { setStatusFilter(val as any); setShowStatusMenu(false); }}
-                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: statusFilter === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: statusFilter === val ? 600 : 400, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", textAlign: "left" }}>
+                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: statusFilter === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: statusFilter === val ? 600 : 400, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", textAlign: "left" }}>
                         {label}
                       </button>
                     ))}
@@ -1454,7 +1454,7 @@ export default function DashboardPage() {
               </div>
               <div ref={sortMenuRef} style={{ position: "relative" }}>
                 <button type="button" onClick={() => { setShowSortMenu(v => !v); setShowStatusMenu(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                  style={{ display: "flex", alignItems: "center", gap: 6, border: `1px solid ${theme.cardBorder}`, borderRadius: 8, padding: "7px 14px", cursor: "pointer", fontSize: 13, color: theme.textSub, background: theme.card, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
                   Sort: <span style={{ fontWeight: 600, color: theme.text, marginLeft: 2 }}>{sortOrder === "newest" ? t.newest : sortOrder === "oldest" ? t.oldest : "A→Z"}</span>
                 </button>
@@ -1462,7 +1462,7 @@ export default function DashboardPage() {
                   <div style={{ position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 100, background: theme.dropdownBg, border: `1px solid ${theme.dropdownBorder}`, borderRadius: 10, padding: 6, minWidth: 130, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
                     {[{val: "newest", label: "Newest first"}, {val: "oldest", label: "Oldest first"}, {val: "az", label: "A → Z"}].map(({val, label}) => (
                       <button key={val} type="button" onClick={() => { setSortOrder(val as any); setShowSortMenu(false); }}
-                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: sortOrder === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sortOrder === val ? 600 : 400, color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", textAlign: "left" }}>
+                        style={{ display: "block", width: "100%", padding: "8px 12px", border: "none", borderRadius: 7, background: sortOrder === val ? theme.hover : "transparent", cursor: "pointer", fontSize: 13, fontWeight: sortOrder === val ? 600 : 400, color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", textAlign: "left" }}>
                         {label}
                       </button>
                     ))}
@@ -1476,7 +1476,7 @@ export default function DashboardPage() {
           <div style={{ display: "flex", gap: 0, overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" as any, scrollbarWidth: "none" as any }}>
             {[{key: "home", label: t.overview}, {key: "ideas", label: t.ideas_tab}, {key: "workspaces", label: t.workspaces}, {key: "settings", label: t.settings_tab}, {key: "profile", label: t.profile_tab}, {key: "billing", label: t.billing_tab}].map(({key, label}) => (
               <button key={key} type="button" onClick={() => setActiveTab(key as any)}
-                style={{ padding: "10px 18px", background: "transparent", border: "none", borderBottom: activeTab === key ? `2px solid ${theme.tabActive}` : "2px solid transparent", cursor: "pointer", fontSize: 14, fontWeight: activeTab === key ? 600 : 400, color: activeTab === key ? theme.tabActive : theme.tabInactive, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", marginBottom: -1, whiteSpace: "nowrap" }}>
+                style={{ padding: "10px 18px", background: "transparent", border: "none", borderBottom: activeTab === key ? `2px solid ${theme.tabActive}` : "2px solid transparent", cursor: "pointer", fontSize: 14, fontWeight: activeTab === key ? 600 : 400, color: activeTab === key ? theme.tabActive : theme.tabInactive, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", marginBottom: -1, whiteSpace: "nowrap" }}>
                 {label}
               </button>
             ))}
@@ -1640,7 +1640,7 @@ export default function DashboardPage() {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <div style={{ width: 10, height: 10, borderRadius: "50%", background: project.status === "building" ? "#4ade80" : project.status === "pivoting" ? "#f5c842" : "#f87171", flexShrink: 0 }} />
-                          <span style={{ fontSize: 13, fontWeight: 400, color: theme.textSub, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>{project.status === "building" ? "Building" : project.status === "pivoting" ? "Pivoting" : "Killed"}</span>
+                          <span style={{ fontSize: 13, fontWeight: 400, color: theme.textSub, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>{project.status === "building" ? "Building" : project.status === "pivoting" ? "Pivoting" : "Killed"}</span>
                         </div>
                         <button type="button" onClick={(e) => { e.stopPropagation(); void handleDeleteProject(project.id); }}
                           style={{ background: "transparent", border: "none", cursor: "pointer", color: "#ccc", padding: 4, borderRadius: 6, display: "flex", alignItems: "center" }}
@@ -1678,7 +1678,7 @@ export default function DashboardPage() {
                     <button key={String(val)} type="button" onClick={() => {
                       setDarkMode(val);
                       localStorage.setItem("klayan_dark", val ? "1" : "0");
-                    }} style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, border: darkMode === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: darkMode === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: darkMode === val ? 600 : 500, color: darkMode === val ? "#fff" : "#111" }}>
+                    }} style={{ fontSize: 13, padding: "8px 20px", borderRadius: 8, border: darkMode === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: darkMode === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: darkMode === val ? 600 : 500, color: darkMode === val ? "#fff" : "#111" }}>
                       {label}
                     </button>
                   ))}
@@ -1699,7 +1699,7 @@ export default function DashboardPage() {
                         if (!user) return;
                         await supabase!.from("profiles").update({ language: val }).eq("id", user.id);
                       }}
-                      style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, border: selectedLang === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: selectedLang === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: selectedLang === val ? 600 : 500, color: selectedLang === val ? "#fff" : "#111" }}>
+                      style={{ fontSize: 13, padding: "8px 16px", borderRadius: 8, border: selectedLang === val ? "2px solid #111" : `1px solid ${theme.cardBorder}`, background: selectedLang === val ? "#111" : "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: selectedLang === val ? 600 : 500, color: selectedLang === val ? "#fff" : "#111" }}>
                       {label}
                     </button>
                   ))}
@@ -1710,7 +1710,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.delete_account}</div>
                 <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.delete_account_desc}</div>
                 <button type="button"
-                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}
                   onClick={() => { if (confirm("Are you sure? This will permanently delete your account.")) alert("Contact support to delete your account."); }}>
                   Delete account
                 </button>
@@ -1734,7 +1734,7 @@ export default function DashboardPage() {
                 </div>
                 {userPlan !== "scale" && (
                   <button type="button" onClick={() => { const priceId = getPriceIdForUpgrade(userPlan); if (!priceId) return; void handleUpgrade(priceId).catch(() => {}); }}
-                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
+                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                     Upgrade plan →
                   </button>
                 )}
@@ -1745,7 +1745,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.payment_method}</div>
                 <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.payment_desc}</div>
                 <button type="button" onClick={async () => { const res = await fetch("/api/billing-portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user?.id }) }); const data = await res.json(); if (data.url) window.open(data.url, "_blank"); }}
-                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, color: theme.text }}>
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 500, color: theme.text }}>
                   Manage billing →
                 </button>
               </div>
@@ -1756,7 +1756,7 @@ export default function DashboardPage() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.cancel_subscription}</div>
                   <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.cancel_desc}</div>
                   <button type="button" onClick={async () => { const res = await fetch("/api/billing-portal", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user?.id }) }); const data = await res.json(); if (data.url) window.open(data.url, "_blank"); }}
-                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
+                    style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                     Cancel plan
                   </button>
                 </div>
@@ -1784,12 +1784,12 @@ export default function DashboardPage() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>Profile photo</div>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button type="button" onClick={() => openAvatarFilePicker()}
-                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", color: theme.text, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: `1px solid ${theme.cardBorder}`, background: theme.card, cursor: "pointer", color: theme.text, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                       {avatarUrl ? "Change" : "Upload"}
                     </button>
                     {avatarUrl && (
                       <button type="button" onClick={() => void removeAvatar()}
-                        style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: "1px solid #fecaca", background: theme.card, cursor: "pointer", color: "#ef4444", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif" }}>
+                        style={{ fontSize: 13, padding: "6px 14px", borderRadius: 8, border: "1px solid #fecaca", background: theme.card, cursor: "pointer", color: "#ef4444", fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
                         Remove
                       </button>
                     )}
@@ -1801,14 +1801,14 @@ export default function DashboardPage() {
               <div style={{ padding: "20px 24px", border: `1px solid ${theme.cardBorder}`, borderRadius: 12, marginBottom: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 8 }}>{t.username}</div>
                 <input type="text" defaultValue={profileUsername ?? ""} id="profile-username-input"
-                  style={{ width: "100%", padding: "9px 12px", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", color: theme.text, background: theme.inputBg, outline: "none", boxSizing: "border-box" }} />
+                  style={{ width: "100%", padding: "9px 12px", border: `1px solid ${theme.cardBorder}`, borderRadius: 8, fontSize: 14, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", color: theme.text, background: theme.inputBg, outline: "none", boxSizing: "border-box" }} />
                 <button type="button" onClick={async () => {
                   const val = (document.getElementById("profile-username-input") as HTMLInputElement)?.value?.trim();
                   if (!val || !user) return;
                   await supabase!.from("profiles").update({ username: val }).eq("id", user.id);
                   setProfile(prev => prev ? { ...prev, username: val } : prev);
                 }}
-                  style={{ marginTop: 10, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
+                  style={{ marginTop: 10, fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: theme.ctaBg, color: theme.ctaText, cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                   Save
                 </button>
               </div>
@@ -1824,7 +1824,7 @@ export default function DashboardPage() {
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text, marginBottom: 4 }}>{t.sign_out}</div>
                 <div style={{ fontSize: 13, color: theme.textMuted, marginBottom: 12 }}>{t.sign_out_desc}</div>
                 <button type="button" onClick={() => { void supabase!.auth.signOut().then(() => router.push("/auth")); }}
-                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
+                  style={{ fontSize: 13, padding: "8px 18px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", cursor: "pointer", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", fontWeight: 600 }}>
                   Sign out
                 </button>
               </div>
@@ -1993,7 +1993,7 @@ export default function DashboardPage() {
                 borderRadius: 10,
                 padding: "12px 16px",
                 color: "#fff",
-                fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+                fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
                 fontSize: 14,
                 outline: "none",
                 boxSizing: "border-box",
@@ -2035,7 +2035,7 @@ export default function DashboardPage() {
             padding: "10px 18px",
             fontSize: 14,
             fontWeight: 600,
-            fontFamily: "'Britanica Semi Condensed', 'Europa Grotesk No 2 SH', sans-serif",
+            fontFamily: "'Europa Grotesk No 2 SH', sans-serif",
             color: "#fff",
             boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
           }}
