@@ -791,6 +791,12 @@ export default function ProjectPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
   const [pivotReport, setPivotReport] = useState<string | null>(null);
   const [runningPivot, setRunningPivot] = useState(false);
   const [marketingReport, setMarketingReport] = useState<string | null>(null);
@@ -1410,7 +1416,13 @@ export default function ProjectPage() {
     <div suppressHydrationWarning style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: th.bg, fontFamily: "'Europa Grotesk No 2 SH', sans-serif", color: th.text }}>
 
       {/* TOP BAR — spans full width */}
-      <div style={{ display: "flex", alignItems: "center", padding: "13px 20px", borderBottom: `1px solid ${th.sidebarBorder}`, background: th.sidebar, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderBottom: `1px solid ${th.sidebarBorder}`, background: th.sidebar, flexShrink: 0 }}>
+        {isMobile && (
+          <button type="button" onClick={() => setMobileSidebarOpen(o => !o)}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, border: `1px solid ${th.cardBorder}`, background: "transparent", cursor: "pointer", padding: 0, flexShrink: 0 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={th.text} strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M9 3v18"/><path d="M13 8h5M13 12h5M13 16h5"/></svg>
+          </button>
+        )}
         <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 40, height: 40, objectFit: "contain" }} />
       </div>
 
@@ -1418,7 +1430,10 @@ export default function ProjectPage() {
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
 
       {/* SIDEBAR */}
-      <aside suppressHydrationWarning style={{ width: 260, flexShrink: 0, borderRight: `1px solid ${th.sidebarBorder}`, background: th.sidebar, display: "flex", flexDirection: "column", position: "sticky", top: 0, height: "100vh", overflowY: "auto", boxSizing: "border-box" }}>
+      {isMobile && mobileSidebarOpen && (
+        <div onClick={() => setMobileSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 199 }} />
+      )}
+      <aside suppressHydrationWarning style={{ ...(isMobile ? { position: "fixed" as any, left: mobileSidebarOpen ? 0 : -280, top: 0, bottom: 0, zIndex: 200, transition: "left 0.25s ease" } : { position: "sticky" as any, top: 0, height: "100vh" }), width: 260, flexShrink: 0, borderRight: `1px solid ${th.sidebarBorder}`, background: th.sidebar, display: "flex", flexDirection: "column", overflowY: "auto", boxSizing: "border-box" }}>
 
         {/* Top */}
         <div style={{ padding: "20px 20px 16px" }}>
