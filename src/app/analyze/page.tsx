@@ -370,6 +370,7 @@ export default function AnalyzePage() {
         existing_solutions: nextAnswers[3],
         market_conversations: nextAnswers[4],
         unfair_advantage: nextAnswers[5],
+        why_right_person: nextAnswers[5],
         biggest_fear: nextAnswers[6],
         email: userEmail,
         status: "pending",
