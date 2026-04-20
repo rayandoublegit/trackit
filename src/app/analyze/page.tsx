@@ -399,7 +399,7 @@ export default function AnalyzePage() {
 
       const planRaw =
         (profileRow?.plan as string | undefined)?.toLowerCase() ?? "spark";
-      const isSpark = planRaw !== "build" && planRaw !== "scale";
+      const isFree = planRaw === "free" || planRaw === "";
 
       const { count, error: countError } = await supabase
         .from("analyses")
@@ -412,6 +412,11 @@ export default function AnalyzePage() {
 
       const FREE_ANALYSES = 1;
       const analysisCount = count ?? 0;
+
+      if (isFree && analysisCount > FREE_ANALYSES) {
+        window.location.href = `/pricing?analysisId=${analysisId}`;
+        return;
+      }
 
 
 
