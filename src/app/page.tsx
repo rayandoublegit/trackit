@@ -1205,15 +1205,13 @@ export default function LandingPage() {
             <div className="hero-content">
               <div className="hero-title">
                 <span className="hero-title-main">
-                  {lang === "fr" ? "De l'Idée" : "From Idea"}
-                </span>
-                <br />
-                <span className="hero-title-italic">
-                  {lang === "fr" ? "au " : "to "}
-                  {"10K MRR."}
+                  {lang === "fr" ? "De l'Idée au 10K MRR." : "From Idea to 10K MRR."}
                 </span>
               </div>
               <p className="hero-sub">{t.hero_sub}</p>
+              <div className="hero-orb">
+                <div className="hero-orb-inner" />
+              </div>
               <div className="hero-cta-row">
                 <a href="/analyze" className="hero-btn">
                   {t.hero_cta}
