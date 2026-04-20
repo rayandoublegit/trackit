@@ -413,10 +413,7 @@ export default function AnalyzePage() {
       const FREE_ANALYSES = 1;
       const analysisCount = count ?? 0;
 
-      if (isSpark && analysisCount > FREE_ANALYSES) {
-        window.location.href = `/pricing?analysisId=${analysisId}`;
-        return;
-      }
+
 
       // Verdict page mounts and calls /api/analyze while this tab stays on that URL
       playVerdictSound();
