@@ -181,6 +181,7 @@ nav {
   line-height: 0.95;
   letter-spacing: -0.05em;
   margin-bottom: 0;
+  color: #000;
 }
 
 .hero-title-main {
@@ -202,7 +203,7 @@ nav {
   font-family: 'Inter', sans-serif;
   font-size: 18px;
   font-weight: 300;
-  color: var(--muted);
+  color: #000;
   max-width: 520px;
   line-height: 1.4;
   letter-spacing: -0.02em;
