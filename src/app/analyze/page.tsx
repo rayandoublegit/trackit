@@ -595,7 +595,7 @@ export default function AnalyzePage() {
                           disabled={isSubmitting || !allFilled}
                           style={{ background: allFilled ? "#111111" : "#ccc", color: "#fff", border: "none", borderRadius: 100, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: allFilled && !isSubmitting ? "pointer" : "not-allowed", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}
                         >
-                          {isSubmitting ? t.step_analyzing : t.step_submit}
+                          {isSubmitting ? t.step_analyzing : (lang === "fr" ? "Suivant →" : "Next →")}
                         </button>
                       )}
                     </div>
