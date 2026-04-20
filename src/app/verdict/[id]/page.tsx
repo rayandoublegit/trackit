@@ -729,10 +729,20 @@ export default function VerdictPage() {
   if (showLoadingShell) {
     return (
       <div style={{ minHeight: "100vh", background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 760, maxWidth: "calc(100vw - 48px)", background: theme.card, borderRadius: 16, boxShadow: theme.shadow, padding: "48px 56px" }}>
-          {[180, 120, 240, 160, 200].map((w, i) => (
-            <div key={i} style={{ height: i === 0 ? 28 : 14, width: w, background: "#e8e8e8", borderRadius: 4, marginBottom: i === 0 ? 32 : 12, animation: "pulse 1.5s ease-in-out infinite" }} />
-          ))}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 28, letterSpacing: "-0.04em", color: theme.text, marginBottom: 12 }}>
+              {lang === "fr" ? "Klayan écrit votre verdict" : "Klayan is writing your verdict"}
+            </div>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 15, color: theme.textMuted }}>
+              {lang === "fr" ? "Ça prend environ 30 secondes." : "This should take about 30 seconds."}
+            </div>
+          </div>
+          <div style={{ width: 480, maxWidth: "calc(100vw - 48px)", background: theme.card, borderRadius: 16, boxShadow: theme.shadow, padding: "32px 40px" }}>
+            {[180, 120, 240, 160, 200].map((w, i) => (
+              <div key={i} style={{ height: i === 0 ? 22 : 12, width: w, background: "#e8e8e8", borderRadius: 4, marginBottom: i === 0 ? 24 : 10, animation: "pulse 1.5s ease-in-out infinite" }} />
+            ))}
+          </div>
         </div>
         <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
       </div>
