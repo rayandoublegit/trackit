@@ -607,19 +607,6 @@ export default function AnalyzePage() {
               </div>
             );
           })}
-
-          {/* Submit button always visible when all filled */}
-          {allFilled && !isSubmitting && (
-            <div style={{ marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={() => void handleNext()}
-                style={{ width: "100%", background: "#111111", color: "#fff", border: "none", borderRadius: 14, padding: "16px 24px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}
-              >
-                {isSubmitting ? t.step_analyzing : t.step_submit}
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
