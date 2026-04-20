@@ -373,9 +373,9 @@ nav {
 .how-section { padding: 100px 64px; }
 
 .section-title {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', sans-serif !important;
   font-size: 32px;
-  font-weight: 800;
+  font-weight: 800 !important;
   letter-spacing: -0.06em;
   line-height: 1.0;
   margin-bottom: 8px;
