@@ -18,6 +18,7 @@ const QUESTION_META: QuestionMeta[] = [
   { label: "04 →" },
   { label: "05 →" },
   { label: "06 →" },
+  { label: "07 →" },
 ];
 
 export default function AnalyzePage() {
