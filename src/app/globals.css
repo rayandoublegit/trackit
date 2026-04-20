@@ -499,9 +499,9 @@ nav {
 .honest-section { padding: 100px 64px; }
 
 .honest-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Inter', sans-serif !important;
   font-size: 32px;
-  font-weight: 600;
+  font-weight: 800 !important;
   letter-spacing: -0.06em;
   line-height: 1.0;
   margin-bottom: 48px;
