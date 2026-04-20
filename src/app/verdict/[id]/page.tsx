@@ -731,6 +731,7 @@ export default function VerdictPage() {
       <div style={{ minHeight: "100vh", background: theme.bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 32 }}>
           <img src={darkMode ? "/images/navbarlogo.png" : "/images/klayanblack.png"} alt="Klayan" style={{ height: 32, marginBottom: 8 }} />
+          <img src={darkMode ? "/images/navbarlogo.png" : "/images/klayanblack.png"} alt="Klayan" style={{ height: 32, marginBottom: 8 }} />
           <div style={{ textAlign: "center" }}>
             <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 28, letterSpacing: "-0.04em", color: theme.text, marginBottom: 12 }}>
               {lang === "fr" ? "Klayan écrit votre verdict" : "Klayan is writing your verdict"}
