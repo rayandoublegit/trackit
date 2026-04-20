@@ -593,8 +593,8 @@ export default function AnalyzePage() {
                         <button
                           type="button"
                           onClick={() => void handleNext()}
-                          disabled={isSubmitting || !allFilled}
-                          style={{ background: allFilled ? "#111111" : "#ccc", color: "#fff", border: "none", borderRadius: 100, padding: "12px 28px", fontSize: 14, fontWeight: 700, cursor: allFilled && !isSubmitting ? "pointer" : "not-allowed", fontFamily: "'Inter', sans-serif", letterSpacing: "-0.01em" }}
+                          disabled={isSubmitting || !answers[idx]?.trim()}
+                          style={{ background: "#111111", color: "#fff", border: "none", borderRadius: 100, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: answers[idx]?.trim() ? "pointer" : "not-allowed", opacity: answers[idx]?.trim() ? 1 : 0.4, fontFamily: "'Inter', sans-serif" }}
                         >
                           {isSubmitting ? t.step_analyzing : (lang === "fr" ? "Suivant →" : "Next →")}
                         </button>
