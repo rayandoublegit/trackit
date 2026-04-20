@@ -311,7 +311,7 @@ export default function AnalyzePage() {
   const handleNext = useCallback(async () => {
     if (isSubmitting) return;
 
-    if (!answers.every(a => a.trim())) {
+    if (!answers.slice(0, totalQ).every(a => a.trim())) {
       setSubmitError(lang === "fr" ? "Réponds à toutes les questions." : "Please answer all questions.");
       return;
     }
