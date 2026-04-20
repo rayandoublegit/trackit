@@ -1445,3 +1445,19 @@ footer {
 .kly-ws-card { transition: background 0.1s; }
 .kly-ws-card:hover { background: transparent !important; }
 [data-dark="true"] .kly-ws-card:hover { background: transparent !important; }
+
+/* Light mode scrollbar */
+[data-dark="false"] ::-webkit-scrollbar,
+html:not([data-dark="true"]) ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+[data-dark="false"] ::-webkit-scrollbar-track,
+html:not([data-dark="true"]) ::-webkit-scrollbar-track {
+  background: #f0f0f0;
+}
+[data-dark="false"] ::-webkit-scrollbar-thumb,
+html:not([data-dark="true"]) ::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
