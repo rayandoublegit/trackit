@@ -130,7 +130,7 @@ nav {
   border-radius: 28px;
   overflow: hidden;
   position: relative;
-  background: url('/images/bluepattern.png') center center / cover no-repeat /* LANDING_BG */;
+  background: url('/images/landing.jpg') center center / cover no-repeat /* LANDING_BG */;
   width: 100%;
   max-width: 1600px;
   height: 92vh;
@@ -617,7 +617,7 @@ nav {
 .pricing-card { background: #161616; border-radius: 20px; padding: 36px 32px; position: relative; }
 .pricing-card.featured { background: var(--white); color: var(--black); }
 .pricing-card.scale {
-  background: url('/images/bluepattern.png') center center / cover no-repeat /* LANDING_BG */;
+  background: url('/images/landing.jpg') center center / cover no-repeat /* LANDING_BG */;
   border-radius: 20px; padding: 36px 40px; max-width: 800px; position: relative; overflow: hidden;
 }
 
@@ -828,16 +828,23 @@ footer {
   nav { padding: 0 16px; max-width: 100%; top: 16px; }
   .nav-links { display: none; }
   .nav-logo { width: 44px; height: 44px; }
-  .hero-outer { padding: 16px 12px 32px; }
-  .hero-box { border-radius: 18px; min-height: 600px; height: 85vh; padding-top: 40px; }
-  .hero { padding: 0 28px 60px 28px; padding-top: 80px; }
-  .hero-title, .hero-title-italic { font-size: 64px; letter-spacing: -0.04em; }
-  .hero-title-main, .hero-title-italic { font-size: 77px; }
-  .hero-sub { font-size: 15px; max-width: 100%; }
-  .hero-cta-row { flex-wrap: wrap; gap: 16px; }
+  .hero-outer { padding: 16px 12px 48px; }
+  .hero-box {
+    border-radius: 18px;
+    min-height: 640px;
+    height: auto;
+    max-height: none;
+    padding-top: 40px;
+    padding-bottom: 32px;
+  }
+  .hero { padding: 0 28px 72px 28px; padding-top: 80px; }
+  .hero-title, .hero-title-italic { font-size: 84px; letter-spacing: -0.04em; }
+  .hero-title-main, .hero-title-italic { font-size: 98px; }
+  .hero-sub { font-size: 18px; max-width: 100%; }
+  .hero-cta-row { flex-wrap: wrap; gap: 20px; row-gap: 22px; }
   .hero-divider { display: none; }
-  .hero-note { font-size: 12px; }
-  .hero-btn { font-size: 16px; padding: 12px 22px; }
+  .hero-note { font-size: 15px; margin-top: 4px; }
+  .hero-btn { font-size: 18px; padding: 12px 22px; }
   .how-section, .honest-section, .why-section, .pricing-section, .story-section, .faq-section, .cta-section { padding-left: 20px; padding-right: 20px; }
   .familiar-left { padding: 48px 20px 24px; }
   .familiar-right { padding: 0 20px 64px; }
@@ -867,15 +874,22 @@ footer {
 }
 
 @media (max-width: 480px) {
-  .hero-title, .hero-title-italic { font-size: 48px; letter-spacing: -0.03em; }
-  .hero-title-main, .hero-title-italic { font-size: 58px; }
-  .hero-sub { font-size: 14px; }
-  .hero { padding: 0 20px 48px 20px; padding-top: 80px; }
-  .hero-box { min-height: 520px; height: 80vh; border-radius: 14px; padding-top: 40px; }
-  .hero-outer { padding: 12px 8px 24px; }
-  .hero-btn { font-size: 15px; padding: 12px 20px; width: 100%; text-align: center; }
-  .hero-cta-row { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .hero-note { font-size: 11px; }
+  .hero-title, .hero-title-italic { font-size: 70px; letter-spacing: -0.035em; }
+  .hero-title-main, .hero-title-italic { font-size: 84px; }
+  .hero-sub { font-size: 17px; }
+  .hero { padding: 0 20px 64px 20px; padding-top: 80px; }
+  .hero-box {
+    min-height: 580px;
+    height: auto;
+    max-height: none;
+    border-radius: 14px;
+    padding-top: 40px;
+    padding-bottom: 36px;
+  }
+  .hero-outer { padding: 12px 8px 40px; }
+  .hero-btn { font-size: 17px; padding: 12px 20px; width: 100%; text-align: center; }
+  .hero-cta-row { flex-direction: column; align-items: flex-start; gap: 22px; }
+  .hero-note { font-size: 14px; margin-top: 6px; }
   .hero-divider { display: none; }
   .nav-right { padding: 5px 5px 5px 5px; }
   .nav-cta { font-size: 14px; padding: 8px 14px; }
