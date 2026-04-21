@@ -130,7 +130,7 @@ nav {
   border-radius: 28px;
   overflow: hidden;
   position: relative;
-  background: url('/images/fluid-2.jpg') center center / cover no-repeat /* LANDING_BG */;
+  background: url('/images/blackpattern.jpg') center center / cover no-repeat /* LANDING_BG */;
   width: 100%;
   max-width: 1600px;
   height: 92vh;
@@ -617,7 +617,7 @@ nav {
 .pricing-card { background: #161616; border-radius: 20px; padding: 36px 32px; position: relative; }
 .pricing-card.featured { background: var(--white); color: var(--black); }
 .pricing-card.scale {
-  background: url('/images/fluid-2.jpg') center center / cover no-repeat /* LANDING_BG */;
+  background: url('/images/blackpattern.jpg') center center / cover no-repeat /* LANDING_BG */;
   border-radius: 20px; padding: 36px 40px; max-width: 800px; position: relative; overflow: hidden;
 }
 
