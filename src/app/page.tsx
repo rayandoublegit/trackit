@@ -215,7 +215,7 @@ export default function LandingPage() {
       hero_title: "From Idea to",
       hero_italic: "10K MRR.",
       hero_sub:
-        "You're diving in. You just don't know if it's the right pool. Klayan analyses your idea in 10 minutes with real data — and stays with you every week until 10K MRR.",
+        "Your idea feels right. Feelings have killed more startups than bad code. Get the brutal truth in 10 minutes — then Klayan stays with you every week until 10K MRR.",
       hero_cta: "Analyze my idea",
       hero_note: "Free to start · No credit card required",
       familiar_title: "Sounds familiar ?",
