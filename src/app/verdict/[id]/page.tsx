@@ -106,7 +106,7 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
 
     if (label.startsWith("KLAYAN ANALYSIS")) continue;
 
-    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS") {
+    if (label === "HARD TRUTHS" || label === "NEXT 48 HOURS" || label === "VÉRITÉS BRUTALES") {
       sections.push({
         label,
         kind: "numbered",
@@ -890,6 +890,46 @@ export default function VerdictPage() {
                   <div style={{ fontSize: 17, color: D ? "#ffffff" : "#111", lineHeight: 1.65, fontFamily: europaBold, fontWeight: 500, fontStyle: "italic" }}>{section.text}</div>
                 </div>
               );
+            }
+
+            // AVOCAT DU DIABLE — amber left border
+            if (section.label === "AVOCAT DU DIABLE") {
+              return (
+                <div key={idx} style={{ marginBottom: 36, padding: "24px 28px", background: D ? "rgba(251,191,36,0.08)" : "#fffbeb", borderRadius: 6, borderLeft: "3px solid #f59e0b" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f59e0b", marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
+                  <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.85)" : "#444", lineHeight: 1.75, fontFamily: europaLight, fontWeight: 300, whiteSpace: "pre-wrap" }}>{section.text}</div>
+                </div>
+              );
+            }
+
+            // HARD TRUTHS / VÉRITÉS BRUTALES — parse RISK tags
+            if (section.label === "HARD TRUTHS" || section.label === "VÉRITÉS BRUTALES") {
+              const riskLines = (section.text || "").split("\n").filter((l: string) => l.trim());
+              const hasRiskTags = riskLines.some((l: string) => l.startsWith("RISK ["));
+              if (hasRiskTags) {
+                return (
+                  <div key={idx} style={{ marginBottom: 36 }}>
+                    <h2 style={{ fontSize: 18, fontWeight: 600, color: D ? "#ffffff" : "#111", letterSpacing: "-0.02em", fontFamily: europaBold, margin: "0 0 16px" }}>{section.label}</h2>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {riskLines.map((line: string, i: number) => {
+                        const isHigh = line.startsWith("RISK [HIGH]");
+                        const isMed = line.startsWith("RISK [MEDIUM]");
+                        const isLow = line.startsWith("RISK [LOW]");
+                        const borderColor = isHigh ? "#dc2626" : isMed ? "#f97316" : "#9ca3af";
+                        const labelColor = isHigh ? "#dc2626" : isMed ? "#f97316" : "#9ca3af";
+                        const severityLabel = isHigh ? "HIGH" : isMed ? "MEDIUM" : "LOW";
+                        const text = line.replace(/^RISK \[(HIGH|MEDIUM|LOW)\] — /, "").trim();
+                        return (
+                          <div key={i} style={{ position: "relative", padding: "14px 16px 14px 16px", borderRadius: 6, borderLeft: `3px solid ${borderColor}`, background: D ? "rgba(255,255,255,0.04)" : "#fafaf8" }}>
+                            <div style={{ position: "absolute", top: 10, right: 12, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: labelColor, fontFamily: europaBold }}>{severityLabel}</div>
+                            <div style={{ fontSize: 14, color: D ? "rgba(255,255,255,0.8)" : "#444", lineHeight: 1.65, fontFamily: europaLight, fontWeight: 300, paddingRight: 48 }}>{text}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
             }
 
             return (
