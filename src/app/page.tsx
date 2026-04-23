@@ -927,7 +927,7 @@ export default function LandingPage() {
               <button
                 type="button"
                 onClick={() => setFeaturesOpen(o => !o)}
-                style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", fontWeight: "inherit", color: "inherit", letterSpacing: "inherit", opacity: "inherit", display: "flex", alignItems: "center", gap: 4, padding: 0 }}
+                className="nav-links-btn" style={{ display: "flex", alignItems: "center", gap: 4 }}
               >
                 {lang === "fr" ? "Fonctionnalités" : "Features"}
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transition: "transform 0.2s", transform: featuresOpen ? "rotate(180deg)" : "rotate(0deg)" }}>

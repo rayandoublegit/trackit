@@ -97,6 +97,8 @@ nav {
 }
 
 .nav-links a:hover { opacity: 0.5; }
+.nav-links-btn { background: none; border: none; cursor: pointer; font-family: inherit; font-size: inherit; font-weight: inherit; color: inherit; letter-spacing: inherit; padding: 0; opacity: 1; }
+.nav-links-btn:hover { opacity: 0.5; }
 
 .nav-cta {
   font-family: 'Inter', sans-serif;
