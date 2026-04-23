@@ -36,11 +36,11 @@ SITUATION
 HARD TRUTHS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-01 — [Hard truth with real data point from web]
-02 — [Hard truth with real data point from web]
-03 — [Hard truth with real data point from web]
-04 — [Hard truth with real data point from web]
-05 — [Hard truth with real data point from web]
+RISK [HIGH] — [most critical threat with real data]
+RISK [HIGH] — [second critical threat with real data]
+RISK [MEDIUM] — [significant but manageable risk with data]
+RISK [MEDIUM] — [another medium risk with data]
+RISK [LOW] — [minor risk with data]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 COMPETITOR BREAKDOWN
@@ -67,6 +67,12 @@ NEXT 48 HOURS
 01 — [Exact action to take today]
 02 — [Exact action to take today]
 03 — [Exact action to take today]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AVOCAT DU DIABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[Only output this section if verdict is BUILD IT. One paragraph. The single strongest reason this idea could still fail even with a BUILD IT verdict. Brutal. No softening. No hope. No "however". Make the founder feel the weight of the risk.]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 THE QUESTION THAT MATTERS
@@ -155,9 +161,9 @@ MARCHÉ
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 VÉRITÉS BRUTALES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-01 — [Brutal truth with real evidence. No softening.]
-02 — [Brutal truth with real evidence. No softening.]
-03 — [Brutal truth with real evidence. No softening.]
+RISK [HIGH] — [most critical brutal truth with real evidence]
+RISK [MEDIUM] — [significant truth with real evidence]
+RISK [LOW] — [notable truth with real evidence]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 —— VERDICT ——
@@ -193,6 +199,7 @@ function buildUserPrompt(
     existing_solutions: string;
     unfair_advantage: string;
     market_conversations: string;
+    existing_revenue: string;
   },
   plan: string
 ) {
@@ -211,6 +218,10 @@ function buildUserPrompt(
     `5) UNFAIR ADVANTAGE\n${analysis.unfair_advantage}`,
     "",
     `6) MARKET CONVERSATIONS\n${analysis.market_conversations}`,
+    "",
+    `7) EXISTING REVENUE\n${analysis.existing_revenue || "None / not disclosed"}`,
+    "",
+    "REVENUE RULE: If the founder mentions existing revenue with real numbers, you MUST acknowledge it explicitly in the SITUATION section and factor it into the score. An idea generating real revenue cannot score below 50/100 without a specific explanation of why that revenue is not sustainable.",
     "",
     "OUTPUT FORMAT RULES",
     "Return plain text only in exactly this section order.",
@@ -340,7 +351,7 @@ export async function POST(request: Request) {
     const { data: analysis, error: fetchError } = await supabaseAdmin
       .from("analyses")
       .select(
-        "id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations"
+        "id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,biggest_fear,why_right_person"
       )
       .eq("id", analysisId)
       .eq("user_id", userId)
@@ -392,6 +403,8 @@ export async function POST(request: Request) {
       analysis.existing_solutions,
       analysis.unfair_advantage,
       analysis.market_conversations,
+      // existing_revenue from biggest_fear field temporarily
+
     ].join("\n");
     const detectedLang = /[àâäéèêëîïôùûüçæœ]/i.test(combinedInput) ? "French" : "English";
     const userContent =
@@ -438,6 +451,15 @@ export async function POST(request: Request) {
       .update({
         verdict,
         status: "complete",
+        raw_inputs: JSON.stringify({
+          idea: analysis.idea,
+          target_customer: analysis.target_customer,
+          why_problem: analysis.why_problem,
+          existing_solutions: analysis.existing_solutions,
+          unfair_advantage: analysis.unfair_advantage,
+          market_conversations: analysis.market_conversations,
+          existing_revenue: analysis.existing_revenue || "",
+        }),
       })
       .eq("id", analysisId)
       .eq("user_id", userId);
