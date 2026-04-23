@@ -1313,7 +1313,7 @@ export default function LandingPage() {
           {/* Video — no top bar, just raw content */}
           <div style={{ position: "relative", lineHeight: 0 }}>
             <video
-              src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4"
+              src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776977283/newdemoblack_mawbuf.mp4"
               autoPlay
               muted
               loop
