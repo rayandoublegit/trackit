@@ -395,7 +395,7 @@ export async function POST(request: Request) {
     }
 
     const systemPrompt = buildSystemPrompt(plan);
-    const userPrompt = buildUserPrompt(analysis, plan);
+    const userPrompt = buildUserPrompt({ ...analysis, existing_revenue: (analysis as any).biggest_fear ?? "" }, plan);
     const combinedInput = [
       analysis.idea,
       analysis.target_customer,
