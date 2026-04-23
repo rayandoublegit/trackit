@@ -458,7 +458,7 @@ export async function POST(request: Request) {
           existing_solutions: analysis.existing_solutions,
           unfair_advantage: analysis.unfair_advantage,
           market_conversations: analysis.market_conversations,
-          existing_revenue: analysis.existing_revenue || "",
+          existing_revenue: (analysis as any).biggest_fear || "",
         }),
       })
       .eq("id", analysisId)
