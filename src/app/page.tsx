@@ -1464,32 +1464,28 @@ export default function LandingPage() {
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             </div>
             <span className="t-label">HARD TRUTHS</span>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                01 — Your ICP is too broad. Marketing agencies is not a customer.
-              </span>
-            </div>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                02 — Market more saturated than you think. GHL already does this.
-              </span>
-            </div>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                03 — No clear distribution channel exists for this ICP.
-              </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "8px 0" }}>
+              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #dc2626", background: "rgba(220,38,38,0.06)" }}>
+                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#dc2626", letterSpacing: "0.08em" }}>HIGH</div>
+                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 36 }}>Your ICP is too broad. Marketing agencies is not a customer.</div>
+              </div>
+              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #f97316", background: "rgba(249,115,22,0.06)" }}>
+                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em" }}>MEDIUM</div>
+                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 44 }}>Market more saturated than you think. GHL already does this.</div>
+              </div>
+              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #9ca3af", background: "rgba(156,163,175,0.06)" }}>
+                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>LOW</div>
+                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 36 }}>No clear distribution channel exists for this ICP.</div>
+              </div>
             </div>
             <div className="t-divider">
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             </div>
             <span className="t-label">VERDICT</span>
-            <div className="t-verdict">—— FLIP IT ——</div>
-            <div className="t-content">
-              Core insight is right. Market is wrong. Pivot to performance agencies
-              running paid lead gen for local services.
+            <div style={{ margin: "10px 0 16px", padding: "20px 24px", background: "#fffbeb", borderRadius: 6, border: "1px solid #fde68a" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#d97706", marginBottom: 8, textTransform: "uppercase" }}>VERDICT</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706", letterSpacing: "-0.02em", marginBottom: 10 }}>FLIP IT</div>
+              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.65 }}>Core insight is right. Market is wrong. Pivot to performance agencies running paid lead gen for local services.</div>
             </div>
             <div className="t-divider">
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
