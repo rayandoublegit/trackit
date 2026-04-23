@@ -937,18 +937,18 @@ export default function LandingPage() {
               {featuresOpen && (
                 <div style={{ position: "absolute", top: "calc(100% + 16px)", left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", padding: 16, zIndex: 9999, width: 560, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {[
-                    { icon: "🎯", title: lang === "fr" ? "Verdict Kill/Build" : "Kill/Build Verdict", desc: lang === "fr" ? "Une réponse honnête sur votre idée." : "An honest answer on your idea." },
-                    { icon: "🔍", title: lang === "fr" ? "Recherche marché" : "Market Research", desc: lang === "fr" ? "Données web en temps réel." : "Live web data, not stale training data." },
-                    { icon: "⚡", title: lang === "fr" ? "Analyse en 5 min" : "5-min Analysis", desc: lang === "fr" ? "Résultats rapides, pas de blabla." : "Fast results, no fluff." },
-                    { icon: "🏆", title: lang === "fr" ? "Analyse concurrents" : "Competitor Scan", desc: lang === "fr" ? "Qui d'autre est sur ce marché." : "Who else is on this market." },
-                    { icon: "💡", title: lang === "fr" ? "Opportunités" : "Opportunities", desc: lang === "fr" ? "Ce que vous pourriez faire différemment." : "What you could do differently." },
-                    { icon: "📊", title: lang === "fr" ? "Workspace & Notes" : "Workspace & Notes", desc: lang === "fr" ? "Suivez vos idées dans le temps." : "Track your ideas over time." },
+                    { icon: null, title: lang === "fr" ? "Verdict Kill/Build" : "Kill/Build Verdict", desc: lang === "fr" ? "Une réponse honnête sur votre idée." : "An honest answer on your idea." },
+                    { icon: null, title: lang === "fr" ? "Recherche marché" : "Market Research", desc: lang === "fr" ? "Données web en temps réel." : "Live web data, not stale training data." },
+                    { icon: null, title: lang === "fr" ? "Analyse en 5 min" : "5-min Analysis", desc: lang === "fr" ? "Résultats rapides, pas de blabla." : "Fast results, no fluff." },
+                    { icon: null, title: lang === "fr" ? "Analyse concurrents" : "Competitor Scan", desc: lang === "fr" ? "Qui d'autre est sur ce marché." : "Who else is on this market." },
+                    { icon: null, title: lang === "fr" ? "Opportunités" : "Opportunities", desc: lang === "fr" ? "Ce que vous pourriez faire différemment." : "What you could do differently." },
+                    { icon: null, title: lang === "fr" ? "Workspace & Notes" : "Workspace & Notes", desc: lang === "fr" ? "Suivez vos idées dans le temps." : "Track your ideas over time." },
                   ].map(({ icon, title, desc }) => (
                     <a key={title} href="/analyze" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid #f0f0f0", textDecoration: "none", background: "#fff", transition: "background 0.15s", cursor: "pointer" }}
                       onMouseEnter={e => (e.currentTarget.style.background = "#f8f8f8")}
                       onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
                     >
-                      <div style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, background: "#f8f8f8" }} />
                       <div>
                         <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#111", letterSpacing: "-0.02em", marginBottom: 2 }}>{title}</div>
                         <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 13, color: "#888", lineHeight: 1.4 }}>{desc}</div>
