@@ -774,7 +774,7 @@ export default function LandingPage() {
   const progressPct = ((current + 1) / totalQ) * 100;
 
   const [featuresOpen, setFeaturesOpen] = useState(false);
-  const featuresRef = React.useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
