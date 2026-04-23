@@ -468,7 +468,7 @@ export default function AnalyzePage() {
 
   return (
     <div style={{ height: "100vh", background: "#000", color: "#fff", display: "flex", flexDirection: "column", position: "relative", overflow: "hidden" }}>
-      <video autoPlay muted loop playsInline style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.35)", transform: "scale(1.08)", zIndex: 0, pointerEvents: "none" }} src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4" />
+      <video autoPlay muted loop playsInline style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", filter: "blur(18px) brightness(0.35)", transform: "scale(1.08)", zIndex: 0, pointerEvents: "none" }} src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776977283/newdemoblack_mawbuf.mp4" />
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1, pointerEvents: "none" }} />
       <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden" }}>
       {/* Navbar */}

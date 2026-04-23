@@ -478,7 +478,7 @@ export default function AuthPage() {
           zIndex: 0,
           pointerEvents: "none",
         }}
-        src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776312898/landing_pchifo.mp4"
+        src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776977283/newdemoblack_mawbuf.mp4"
       />
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1, pointerEvents: "none" }} />
       <div style={{ position: "relative", zIndex: 2, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
