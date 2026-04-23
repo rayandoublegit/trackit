@@ -959,6 +959,9 @@ export default function LandingPage() {
               )}
             </li>
             <li>
+              <a href="#services">{t.nav_services}</a>
+            </li>
+            <li>
               <a href="#pricing">{t.nav_pricing}</a>
             </li>
           </ul>
