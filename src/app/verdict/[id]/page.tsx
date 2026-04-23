@@ -423,6 +423,15 @@ export default function VerdictPage() {
   const analysisSelectColumns =
     "id,user_id,idea,target_customer,why_problem,existing_solutions,unfair_advantage,market_conversations,email,status,verdict,created_at";
 
+
+  const shortTitle = (idea: string) => {
+    if (!idea) return "";
+    const cleaned = idea.trim().replace(/[.!?].*$/, "").trim();
+    const words = cleaned.split(/\s+/);
+    if (words.length <= 6) return cleaned;
+    return words.slice(0, 6).join(" ");
+  };
+
   const showLoadingShell =
     !analysisError &&
     ((analysisLoading && !analysis) ||
@@ -806,7 +815,7 @@ export default function VerdictPage() {
 
           {/* Big title */}
           <h1 style={{ fontSize: 36, fontWeight: 600, color: D ? "#ffffff" : "#111", letterSpacing: "-0.03em", fontFamily: europaBold, margin: "0 0 28px", lineHeight: 1.15 }}>
-            {analysis?.idea ?? ""}
+            {shortTitle(analysis?.idea ?? "")}
           </h1>
 
           {/* Metadata row + CTA */}
