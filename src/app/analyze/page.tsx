@@ -117,7 +117,7 @@ export default function AnalyzePage() {
       step4_eg: "e.g. $29/month subscription, or $9 per invoice sent.",
       step5_eg: "e.g. Yes — 8 freelancers. 6 out of 8 said invoicing is their biggest admin pain.",
       step6_eg: "e.g. I'm a freelancer myself, I've felt this pain daily for 3 years.",
-      step7_eg: "e.g. That people won't pay for it because they think spreadsheets are good enough.",
+      step7_eg: "e.g. No revenue yet. / Yes — $500/month from 3 early customers.",
     },
     fr: {
       title: "C'est quoi ton idée ?",
@@ -157,7 +157,7 @@ export default function AnalyzePage() {
       step4_eg: "ex. Abonnement à 29€/mois, ou 9€ par facture envoyée.",
       step5_eg: "ex. Oui — 8 freelances. 6 sur 8 ont dit que la facturation est leur plus grande douleur admin.",
       step6_eg: "ex. Je suis moi-même freelance, j'ai vécu cette douleur chaque jour pendant 3 ans.",
-      step7_eg: "ex. Que les gens ne voudront pas payer parce qu'ils pensent que les tableurs suffisent.",
+      step7_eg: "ex. Pas encore de revenus. / Oui — 500€/mois avec 3 premiers clients.",
     },
   }[lang];
 
