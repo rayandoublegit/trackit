@@ -935,7 +935,7 @@ export default function LandingPage() {
                 </svg>
               </button>
               {featuresOpen && (
-                <div style={{ position: "absolute", top: "calc(100% + 16px)", left: "50%", transform: "translateX(-50%)", background: "#111", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", padding: 16, zIndex: 9999, width: 580, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, border: "1px solid rgba(255,255,255,0.08)", left: "50%", transform: "translateX(-50%)" }}>
+                <div style={{ position: "absolute", top: "calc(100% + 16px)", left: "50%", transform: "translateX(-50%)", background: "#111", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", padding: 16, zIndex: 9999, width: 580, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, border: "1px solid rgba(255,255,255,0.08)" }}>
                   {[
                     { icon: "🎯", title: lang === "fr" ? "Verdict Kill/Build" : "Kill/Build Verdict", desc: lang === "fr" ? "Une réponse honnête sur votre idée." : "An honest answer on your idea." },
                     { icon: "🔍", title: lang === "fr" ? "Recherche marché" : "Market Research", desc: lang === "fr" ? "Données web en temps réel." : "Live web data, not stale training data." },
