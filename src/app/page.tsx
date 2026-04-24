@@ -1462,29 +1462,29 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-          <div style={{ height: 1, background: "#e8e6e1" }} />
+          <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
           {/* Body */}
           <div style={{ padding: "28px 40px 36px", display: "flex", flexDirection: "column", gap: 28 }}>
             {/* SITUATION */}
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Situation</h3>
-              <p style={{ fontSize: 14, color: "#444", lineHeight: 1.7, margin: 0, fontFamily: "'Inter', sans-serif", fontWeight: 400 }}>You built an AI SMS tool targeting marketing agencies. Weeks of outreach. Zero paying customers. End of March deadline.</p>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#999", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Situation</h3>
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.7)", lineHeight: 1.7, margin: 0, fontFamily: "'Inter', sans-serif", fontWeight: 400 }}>You built an AI SMS tool targeting marketing agencies. Weeks of outreach. Zero paying customers. End of March deadline.</p>
             </div>
             {/* HARD TRUTHS */}
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Hard Truths</h3>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#999", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Hard Truths</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #dc2626", background: "#fef2f2" }}>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #dc2626", background: "rgba(220,38,38,0.08)" }}>
                   <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#dc2626", letterSpacing: "0.08em" }}>HIGH</div>
-                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 40, fontFamily: "'Inter', sans-serif" }}>Your ICP is too broad. Marketing agencies is not a customer.</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.55, paddingRight: 40, fontFamily: "'Inter', sans-serif" }}>Your ICP is too broad. Marketing agencies is not a customer.</div>
                 </div>
-                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #f97316", background: "#fff7ed" }}>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #f97316", background: "rgba(249,115,22,0.08)" }}>
                   <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em" }}>MEDIUM</div>
-                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 52, fontFamily: "'Inter', sans-serif" }}>Market more saturated than you think. GHL already does this.</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.55, paddingRight: 52, fontFamily: "'Inter', sans-serif" }}>Market more saturated than you think. GHL already does this.</div>
                 </div>
-                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #9ca3af", background: "#f9fafb" }}>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #9ca3af", background: "rgba(156,163,175,0.08)" }}>
                   <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#6b7280", letterSpacing: "0.08em" }}>LOW</div>
-                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 36, fontFamily: "'Inter', sans-serif" }}>No clear distribution channel exists for this ICP.</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)", lineHeight: 1.55, paddingRight: 36, fontFamily: "'Inter', sans-serif" }}>No clear distribution channel exists for this ICP.</div>
                 </div>
               </div>
             </div>
@@ -1501,7 +1501,7 @@ export default function LandingPage() {
                 {[["01", "Search Facebook ads agency HVAC. DM 10 agencies today."], ["02", "Run one free 2-week pilot. Document every number."], ["03", "Rewrite pitch around ROI not features."]].map(([num, text]) => (
                   <div key={num} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                     <span style={{ fontSize: 11, fontWeight: 700, color: "#999", minWidth: 20, paddingTop: 2, fontFamily: "'Inter', sans-serif" }}>{num}</span>
-                    <span style={{ fontSize: 13, color: "#444", lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>{text}</span>
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>{text}</span>
                   </div>
                 ))}
               </div>
