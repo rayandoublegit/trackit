@@ -1443,10 +1443,10 @@ export default function LandingPage() {
 
       <section className="honest-section">
         <h2 className="honest-title reveal">{t.honest_title}</h2>
-        <div className="reveal" style={{ background: "#fff", borderRadius: 16, boxShadow: "0 4px 40px rgba(0,0,0,0.10)", overflow: "hidden", maxWidth: 720, margin: "0 auto" }}>
+        <div className="reveal" style={{ background: "#111", borderRadius: 16, boxShadow: "0 4px 40px rgba(0,0,0,0.4)", overflow: "hidden", maxWidth: 720, margin: "0 auto" }}>
           {/* Header */}
           <div style={{ padding: "32px 40px 24px" }}>
-            <h2 style={{ fontSize: 26, fontWeight: 700, color: "#111", letterSpacing: "-0.03em", fontFamily: "'Inter', sans-serif", margin: "0 0 20px", lineHeight: 1.2 }}>AI SMS tool for marketing agencies</h2>
+            <h2 style={{ fontSize: 26, fontWeight: 700, color: "#fff", letterSpacing: "-0.03em", fontFamily: "'Inter', sans-serif", margin: "0 0 20px", lineHeight: 1.2 }}>AI SMS tool for marketing agencies</h2>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#93c5fd", borderRadius: 6, padding: "5px 10px" }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
