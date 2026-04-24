@@ -1443,7 +1443,7 @@ export default function LandingPage() {
 
       <section className="honest-section">
         <h2 className="honest-title reveal">{t.honest_title}</h2>
-        <div className="reveal" style={{ background: "#111", borderRadius: 16, boxShadow: "0 4px 40px rgba(0,0,0,0.4)", overflow: "hidden", maxWidth: 720, margin: "0 auto" }}>
+        <div className="reveal" style={{ background: "#111", borderRadius: 16, boxShadow: "0 4px 40px rgba(0,0,0,0.4)", overflow: "hidden", maxWidth: 720, margin: "0" }}>
           {/* Header */}
           <div style={{ padding: "32px 40px 24px" }}>
             <h2 style={{ fontSize: 26, fontWeight: 700, color: "#fff", letterSpacing: "-0.03em", fontFamily: "'Inter', sans-serif", margin: "0 0 20px", lineHeight: 1.2 }}>AI SMS tool for marketing agencies</h2>
