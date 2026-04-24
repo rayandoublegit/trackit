@@ -1507,7 +1507,7 @@ export default function LandingPage() {
               </div>
             </div>
             {/* THE QUESTION */}
-            <div style={{ padding: "16px 20px", background: "rgba(255,255,255,0.05)", borderRadius: 6, borderLeft: "3px solid rgba(255,255,255,0.3)" }}>
+            <div style={{ padding: "16px 0 16px 20px", background: "none", borderLeft: "3px solid rgba(255,255,255,0.3)" }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>The Question That Matters</div>
               <div style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", lineHeight: 1.6, fontFamily: "'Inter', sans-serif", fontWeight: 500, fontStyle: "italic" }}>Can you find one person who says that&apos;s exactly what kills us — not that&apos;s interesting? Find them in 48 hours.</div>
             </div>
