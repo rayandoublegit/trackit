@@ -1489,14 +1489,14 @@ export default function LandingPage() {
               </div>
             </div>
             {/* VERDICT */}
-            <div style={{ padding: "20px 24px", background: "#111", borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#d97706", marginBottom: 8, textTransform: "uppercase", fontFamily: "'Inter', sans-serif" }}>Verdict</div>
+            <div style={{ padding: "0", background: "none" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", color: "#999", marginBottom: 8, textTransform: "uppercase", fontFamily: "'Inter', sans-serif" }}>Verdict</div>
               <div style={{ fontSize: 24, fontWeight: 700, color: "#d97706", letterSpacing: "-0.02em", marginBottom: 10, fontFamily: "'Inter', sans-serif", textAlign: "left" }}>FLIP IT</div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.65, fontFamily: "'Inter', sans-serif" }}>Core insight is right. Market is wrong. Pivot to performance agencies running paid lead gen for local services.</div>
             </div>
             {/* NEXT 48 HOURS */}
             <div>
-              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Next 48 Hours</h3>
+              <h3 style={{ fontSize: 11, fontWeight: 700, color: "#999", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Next 48 Hours</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {[["01", "Search Facebook ads agency HVAC. DM 10 agencies today."], ["02", "Run one free 2-week pilot. Document every number."], ["03", "Rewrite pitch around ROI not features."]].map(([num, text]) => (
                   <div key={num} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
