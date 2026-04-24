@@ -935,7 +935,7 @@ export default function LandingPage() {
                 </svg>
               </button>
               {featuresOpen && (
-                <div style={{ position: "absolute", top: "calc(100% + 16px)", left: "50%", transform: "translateX(-50%)", background: "#fff", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.12)", padding: 16, zIndex: 9999, width: 560, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <div style={{ position: "absolute", top: "calc(100% + 16px)", left: "50%", transform: "translateX(-50%)", background: "#111", borderRadius: 16, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", padding: 16, zIndex: 9999, width: 560, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, border: "1px solid rgba(255,255,255,0.08)" }}>
                   {[
                     { icon: "🎯", title: lang === "fr" ? "Verdict Kill/Build" : "Kill/Build Verdict", desc: lang === "fr" ? "Une réponse honnête sur votre idée." : "An honest answer on your idea." },
                     { icon: "🔍", title: lang === "fr" ? "Recherche marché" : "Market Research", desc: lang === "fr" ? "Données web en temps réel." : "Live web data, not stale training data." },
@@ -944,14 +944,14 @@ export default function LandingPage() {
                     { icon: "💡", title: lang === "fr" ? "Opportunités" : "Opportunities", desc: lang === "fr" ? "Ce que vous pourriez faire différemment." : "What you could do differently." },
                     { icon: "📊", title: lang === "fr" ? "Workspace & Notes" : "Workspace & Notes", desc: lang === "fr" ? "Suivez vos idées dans le temps." : "Track your ideas over time." },
                   ].map(({ icon, title, desc }) => (
-                    <a key={title} href="/analyze" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid #f0f0f0", textDecoration: "none", background: "#fff", transition: "background 0.15s", cursor: "pointer" }}
-                      onMouseEnter={e => (e.currentTarget.style.background = "#f8f8f8")}
-                      onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+                    <a key={title} href="/analyze" style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", textDecoration: "none", background: "rgba(255,255,255,0.04)", transition: "background 0.15s", cursor: "pointer" }}
+                      onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.10)")}
+                      onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
                     >
-                      <div style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid #e8e8e8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{icon}</div>
                       <div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#111", letterSpacing: "-0.02em", marginBottom: 2 }}>{title}</div>
-                        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 13, color: "#888", lineHeight: 1.4 }}>{desc}</div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, fontSize: 14, color: "#fff", letterSpacing: "-0.02em", marginBottom: 2 }}>{title}</div>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 13, color: "rgba(255,255,255,0.5)", lineHeight: 1.4 }}>{desc}</div>
                       </div>
                     </a>
                   ))}
@@ -1443,79 +1443,73 @@ export default function LandingPage() {
 
       <section className="honest-section">
         <h2 className="honest-title reveal">{t.honest_title}</h2>
-        <div className="terminal-wrap reveal">
-          <div className="terminal-bar">
-            <div className="t-dot t-dot-a" />
-            <div className="t-dot t-dot-b" />
-            <div className="t-dot t-dot-c" />
-            <div className="t-title">klayan_analysis.log</div>
+        <div className="reveal" style={{ background: "#fff", borderRadius: 16, boxShadow: "0 4px 40px rgba(0,0,0,0.10)", overflow: "hidden", maxWidth: 720, margin: "0 auto" }}>
+          {/* Header */}
+          <div style={{ padding: "32px 40px 24px" }}>
+            <h2 style={{ fontSize: 26, fontWeight: 700, color: "#111", letterSpacing: "-0.03em", fontFamily: "'Inter', sans-serif", margin: "0 0 20px", lineHeight: 1.2 }}>AI SMS tool for marketing agencies</h2>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#93c5fd", borderRadius: 6, padding: "5px 10px" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span style={{ fontSize: 11, color: "#111", fontFamily: "'Inter', sans-serif" }}>Created <strong>April 2026</strong></span>
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#c4b5fd", borderRadius: 6, padding: "5px 10px" }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6d28d9" strokeWidth="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                <span style={{ fontSize: 11, color: "#111", fontFamily: "'Inter', sans-serif" }}>Source <strong>Live web data · Klayan AI</strong></span>
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#f9a8d4", borderRadius: 6, padding: "5px 10px" }}>
+                <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 12, height: 12, borderRadius: "50%", objectFit: "cover" }} />
+                <span style={{ fontSize: 11, color: "#111", fontFamily: "'Inter', sans-serif" }}>Analyzed by <strong>Klayan · 2026</strong></span>
+              </div>
+            </div>
           </div>
-          <div className="terminal-body">
-            <div className="t-header">KLAYAN ANALYSIS — YOUR IDEA</div>
-            <div className="t-divider">
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          <div style={{ height: 1, background: "#e8e6e1" }} />
+          {/* Body */}
+          <div style={{ padding: "28px 40px 36px", display: "flex", flexDirection: "column", gap: 28 }}>
+            {/* SITUATION */}
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Situation</h3>
+              <p style={{ fontSize: 14, color: "#444", lineHeight: 1.7, margin: 0, fontFamily: "'Inter', sans-serif", fontWeight: 400 }}>You built an AI SMS tool targeting marketing agencies. Weeks of outreach. Zero paying customers. End of March deadline.</p>
             </div>
-            <span className="t-label">SITUATION</span>
-            <div className="t-content">
-              You built an AI SMS tool targeting marketing agencies. Weeks of
-              outreach. Zero paying customers. End of March deadline.
-            </div>
-            <div className="t-divider">
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            </div>
-            <span className="t-label">HARD TRUTHS</span>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "8px 0" }}>
-              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #dc2626", background: "rgba(220,38,38,0.06)" }}>
-                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#dc2626", letterSpacing: "0.08em" }}>HIGH</div>
-                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 36 }}>Your ICP is too broad. Marketing agencies is not a customer.</div>
-              </div>
-              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #f97316", background: "rgba(249,115,22,0.06)" }}>
-                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em" }}>MEDIUM</div>
-                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 44 }}>Market more saturated than you think. GHL already does this.</div>
-              </div>
-              <div style={{ position: "relative", padding: "10px 12px", borderRadius: 4, borderLeft: "3px solid #9ca3af", background: "rgba(156,163,175,0.06)" }}>
-                <div style={{ position: "absolute", top: 8, right: 10, fontSize: 9, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.08em" }}>LOW</div>
-                <div style={{ fontSize: 12, color: "#ccc", lineHeight: 1.5, paddingRight: 36 }}>No clear distribution channel exists for this ICP.</div>
+            {/* HARD TRUTHS */}
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Hard Truths</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #dc2626", background: "#fef2f2" }}>
+                  <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#dc2626", letterSpacing: "0.08em" }}>HIGH</div>
+                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 40, fontFamily: "'Inter', sans-serif" }}>Your ICP is too broad. Marketing agencies is not a customer.</div>
+                </div>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #f97316", background: "#fff7ed" }}>
+                  <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#f97316", letterSpacing: "0.08em" }}>MEDIUM</div>
+                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 52, fontFamily: "'Inter', sans-serif" }}>Market more saturated than you think. GHL already does this.</div>
+                </div>
+                <div style={{ position: "relative", padding: "12px 14px", borderRadius: 6, borderLeft: "3px solid #9ca3af", background: "#f9fafb" }}>
+                  <div style={{ position: "absolute", top: 10, right: 12, fontSize: 9, fontWeight: 700, color: "#6b7280", letterSpacing: "0.08em" }}>LOW</div>
+                  <div style={{ fontSize: 13, color: "#333", lineHeight: 1.55, paddingRight: 36, fontFamily: "'Inter', sans-serif" }}>No clear distribution channel exists for this ICP.</div>
+                </div>
               </div>
             </div>
-            <div className="t-divider">
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            {/* VERDICT */}
+            <div style={{ padding: "20px 24px", background: "#fffbeb", borderRadius: 6, border: "1px solid #fde68a" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#d97706", marginBottom: 8, textTransform: "uppercase", fontFamily: "'Inter', sans-serif" }}>Verdict</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#d97706", letterSpacing: "-0.02em", marginBottom: 10, fontFamily: "'Inter', sans-serif" }}>FLIP IT</div>
+              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.65, fontFamily: "'Inter', sans-serif" }}>Core insight is right. Market is wrong. Pivot to performance agencies running paid lead gen for local services.</div>
             </div>
-            <span className="t-label">VERDICT</span>
-            <div style={{ margin: "10px 0 16px", padding: "20px 24px", background: "#fffbeb", borderRadius: 6, border: "1px solid #fde68a" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "#d97706", marginBottom: 8, textTransform: "uppercase" }}>VERDICT</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: "#d97706", letterSpacing: "-0.02em", marginBottom: 10 }}>FLIP IT</div>
-              <div style={{ fontSize: 13, color: "#555", lineHeight: 1.65 }}>Core insight is right. Market is wrong. Pivot to performance agencies running paid lead gen for local services.</div>
+            {/* NEXT 48 HOURS */}
+            <div>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: "#111", letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "'Inter', sans-serif", margin: "0 0 10px" }}>Next 48 Hours</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[["01", "Search Facebook ads agency HVAC. DM 10 agencies today."], ["02", "Run one free 2-week pilot. Document every number."], ["03", "Rewrite pitch around ROI not features."]].map(([num, text]) => (
+                  <div key={num} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "#999", minWidth: 20, paddingTop: 2, fontFamily: "'Inter', sans-serif" }}>{num}</span>
+                    <span style={{ fontSize: 13, color: "#444", lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>{text}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="t-divider">
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            </div>
-            <span className="t-label">NEXT 48 HOURS</span>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                01 — Search Facebook ads agency HVAC. DM 10 agencies today.
-              </span>
-            </div>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                02 — Run one free 2-week pilot. Document every number.
-              </span>
-            </div>
-            <div className="t-numbered">
-              <span className="t-arrow">›</span>
-              <span className="t-num-text">
-                03 — Rewrite pitch around ROI not features.
-              </span>
-            </div>
-            <div className="t-divider">
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            </div>
-            <span className="t-label">THE QUESTION THAT MATTERS</span>
-            <div className="t-highlight">
-              Can you find one person who says that&apos;s exactly what kills us —
-              not that&apos;s interesting? Find them in 48 hours.
+            {/* THE QUESTION */}
+            <div style={{ padding: "16px 20px", background: "#fafaf8", borderRadius: 6, borderLeft: "3px solid #111" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#999", marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>The Question That Matters</div>
+              <div style={{ fontSize: 14, color: "#111", lineHeight: 1.6, fontFamily: "'Inter', sans-serif", fontWeight: 500, fontStyle: "italic" }}>Can you find one person who says that&apos;s exactly what kills us — not that&apos;s interesting? Find them in 48 hours.</div>
             </div>
           </div>
         </div>
