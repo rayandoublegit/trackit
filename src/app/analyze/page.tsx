@@ -1,4 +1,5 @@
-"use client";
+"use client"
+import { useSearchParams } from "next/navigation";;
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -402,7 +403,8 @@ export default function AnalyzePage() {
 
       const planRaw =
         (profileRow?.plan as string | undefined)?.toLowerCase() ?? "spark";
-      const isFree = planRaw === "free" || planRaw === "";
+      const isOneShot = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("oneshot") === "true";
+      const isFree = !isOneShot && (planRaw === "free" || planRaw === "");
 
       const { count, error: countError } = await supabase
         .from("analyses")

@@ -50,14 +50,19 @@ export async function POST(request: Request) {
         ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
         : `${base}/dashboard?upgraded=true`;
 
+    const sparkPriceId = process.env.STRIPE_SPARK_PRICE_ID?.trim();
+    const isSpark = sparkPriceId && priceId === sparkPriceId;
+    const isOneShot = priceId === "price_1TQu5BJzxOGBKznpUE0DnCNM";
+    const oneShotSuccessUrl = `${base}/analyze?oneshot=true`;
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      mode: "subscription",
-
+      mode: isOneShot ? "payment" : "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
       metadata: userId ? { userId: String(userId) } : {},
-      success_url: successUrl,
+      ...(!isOneShot && isSpark ? { subscription_data: { trial_period_days: 7 } } : {}),
+      success_url: isOneShot ? oneShotSuccessUrl : successUrl,
       cancel_url: cancelUrl ?? `${base}`,
     });
 

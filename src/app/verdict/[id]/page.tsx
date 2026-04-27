@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation"
+import { useSearchParams } from "next/navigation";;
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -358,8 +359,10 @@ export default function VerdictPage() {
 
   const [copied, setCopied] = useState(false);
   const [userPlan, setUserPlan] = useState<string | null>(null);
-  const [projectId, setProjectId] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [isOneShot, setIsOneShot] = useState(false);
+  useEffect(() => { setIsOneShot(new URLSearchParams(window.location.search).get("oneshot") === "true"); }, []);
   const [darkMode, setDarkMode] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -942,9 +945,20 @@ export default function VerdictPage() {
 
 
 
+          {/* Spark upsell for one-shot users */}
+          {isOneShot && <div style={{ height: 1, background: theme.divider, margin: "48px 0 32px" }} />}
+          {isOneShot && <div style={{ background: "#0f0f0f", borderRadius: 16, padding: "40px 40px 36px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 80% 20%, rgba(37,99,235,0.15) 0%, transparent 60%)", pointerEvents: "none" }} />
+            <div style={{ position: "relative", zIndex: 1 }}>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: "-0.02em", marginBottom: 10, fontFamily: europaBold }}>Want to validate more ideas?</div>
+              <div style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, fontFamily: europaLight, marginBottom: 24 }}>{lang === "fr" ? "Spark vous donne 3 analyses par mois, un workspace pour suivre vos idées, et 7 jours gratuits pour tester." : "Spark gives you 3 analyses per month, a workspace to track your ideas, and a 7-day free trial."}</div>
+              <button type="button" style={{ background: "#2563eb", color: "#fff", border: "none", borderRadius: 10, padding: "14px 28px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: europaBold }} onClick={() => { void (async () => { const { handleUpgrade } = await import("@/lib/checkout"); void handleUpgrade(process.env.NEXT_PUBLIC_STRIPE_SPARK_PRICE_ID ?? "").catch(() => { window.location.href = "/pricing"; }); })(); }}>{lang === "fr" ? "Essayer Spark — 7 jours gratuits →" : "Try Spark — 7-day free trial →"}</button>
+            </div>
+          </div>}
+          {/* Spark upsell for one-shot users */}
           {/* Paywall — free users only */}
-          {userPlan !== "scale" && <div style={{ height: 1, background: theme.divider, margin: "48px 0 32px" }} />}
-          {userPlan !== "scale" && <div style={{ background: "#0f0f0f", borderRadius: 16, padding: "40px 40px 36px", position: "relative", overflow: "hidden" }}>
+          {userPlan !== "scale" && !isOneShot && <div style={{ height: 1, background: theme.divider, margin: "48px 0 32px" }} />}
+          {userPlan !== "scale" && !isOneShot && <div style={{ background: "#0f0f0f", borderRadius: 16, padding: "40px 40px 36px", position: "relative", overflow: "hidden" }}>
             {/* subtle grid texture */}
             <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 80% 20%, rgba(37,99,235,0.15) 0%, transparent 60%)", pointerEvents: "none" }} />
 

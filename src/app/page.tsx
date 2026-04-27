@@ -277,6 +277,15 @@ export default function LandingPage() {
       reason6_desc:
         "ChatGPT is a one-time conversation. Klayan follows you from raw idea to first paying customer — adapting as your signals come in, never starting over.",
       pricing_label: "Simple. Honest. Revenue-led.",
+      pricing_oneshot: "One Shot",
+      price_oneshot: "$9",
+      pricing_oneshot_badge: "One-time payment",
+      pricing_oneshot_desc: "Just need one validation? Get the full report once, no subscription.",
+      pricing_oneshot_f1: "1 full analysis",
+      pricing_oneshot_f2: "Kill/Build/Flip verdict",
+      pricing_oneshot_f3: "Market research & competitor scan",
+      pricing_oneshot_f4: "Hard Truths + Next 48 hours",
+      pricing_oneshot_cta: "Get my report",
       pricing_spark: "Spark",
       pricing_build: "Build",
       pricing_scale: "Scale",
@@ -409,6 +418,15 @@ export default function LandingPage() {
       reason6_desc:
         "ChatGPT est une conversation unique. Klayan te suit de l'idée brute au premier client payant — s'adaptant au fur et à mesure que tes signaux arrivent, sans jamais repartir de zéro.",
       pricing_label: "Simple. Honnête. Orienté revenus.",
+      pricing_oneshot: "One Shot",
+      price_oneshot: "$9",
+      pricing_oneshot_badge: "Paiement unique",
+      pricing_oneshot_desc: "Just need one validation? Get the full report once, no subscription.",
+      pricing_oneshot_f1: "1 analyse complète",
+      pricing_oneshot_f2: "Verdict Kill/Build/Flip",
+      pricing_oneshot_f3: "Recherche de marché & scan concurrents",
+      pricing_oneshot_f4: "Vérités difficiles + Prochaines 48h",
+      pricing_oneshot_cta: "Obtenir mon rapport",
       pricing_spark: "Spark",
       pricing_build: "Build",
       pricing_scale: "Scale",
@@ -1559,6 +1577,21 @@ export default function LandingPage() {
         <p className="pricing-label reveal">{t.pricing_label}</p>
         <div className="pricing-grid reveal">
           <div className="pricing-card">
+            <div style={{ display: "inline-flex", alignItems: "center", background: "#f3f4f6", borderRadius: 100, padding: "4px 10px", marginBottom: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.02em" }}>{lang === "fr" ? t.pricing_oneshot_badge : t.pricing_oneshot_badge}</span></div>
+            <div className="pricing-card-name">{t.pricing_oneshot}</div>
+            <div className="pricing-price">{t.price_oneshot}</div>
+            <div style={{ fontSize: 12, color: "#aaa", marginTop: -8, marginBottom: 4 }}>{lang === "fr" ? "paiement unique" : "one-time payment"}</div>
+            <button type="button" className="pricing-btn pricing-btn-dark" onClick={() => { void fetch("/api/create-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priceId: "price_1TQu5BJzxOGBKznpUE0DnCNM" }) }).then(r => r.json()).then(d => { if (d.url) window.location.href = d.url; }).catch(() => { window.location.href = "/auth"; }); }}>{t.pricing_oneshot_cta}</button>
+            <div className="pricing-divider" />
+            <ul className="pricing-features">
+              <li><span className="feat-dot" /> {t.pricing_oneshot_f1}</li>
+              <li><span className="feat-dot" /> {t.pricing_oneshot_f2}</li>
+              <li><span className="feat-dot" /> {t.pricing_oneshot_f3}</li>
+              <li><span className="feat-dot" /> {t.pricing_oneshot_f4}</li>
+            </ul>
+          </div>
+          <div className="pricing-card">
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#dcfce7", borderRadius: 100, padding: "4px 10px", marginBottom: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", letterSpacing: "0.02em" }}>✦ {lang === "fr" ? "7 jours gratuits" : "7-day free trial"}</span></div>
             <div className="pricing-card-name">{t.pricing_spark}</div>
             <div className="pricing-price">{t.price_spark}{lang === "fr" ? "/mois" : "/mo"}</div>
             {renderPricingCta("spark", false)}
