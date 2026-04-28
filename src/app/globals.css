@@ -1452,7 +1452,7 @@ footer {
 
 /* Klayan dashboard - clean hovers */
 .kly-nav-btn { border-radius: 8px; transition: background 0.1s; }
-.kly-nav-btn:hover { background: #ebebeb !important; }
+.kly-nav-btn:hover { background: #f0f0f0 !important; }
 [data-dark="true"] .kly-nav-btn:hover { background: #2d2d31 !important; }
 
 .kly-row { transition: background 0.1s; }
