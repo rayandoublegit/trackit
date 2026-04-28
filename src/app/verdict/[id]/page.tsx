@@ -130,7 +130,8 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
         .split("\n")
         .map((l) => l.trim())
         .filter(Boolean);
-      const verdictLine = contentLines[0] ?? "";
+      const rawVerdictLine = contentLines[0] ?? "";
+      const verdictLine = rawVerdictLine.replace(/[-—–]+/g, "").trim();
       const explanation = contentLines.slice(1).join("\n").trim();
       sections.push({
         label,
@@ -157,10 +158,10 @@ function parseVerdictSections(verdictText: string): ParsedSection[] {
     if (verdictKind) {
       const verdictLine =
         verdictKind === "build"
-          ? "—— BUILD IT ——"
+          ? "BUILD IT"
           : verdictKind === "kill"
-            ? "—— KILL IT ——"
-            : "—— FLIP IT ——";
+            ? "KILL IT"
+            : "FLIP IT";
       sections.unshift({
         label: "VERDICT",
         kind: "verdict",
@@ -695,7 +696,7 @@ export default function VerdictPage() {
 
   const verdictColor =
     verdictType === "BUILD IT" ? "#16a34a" :
-    verdictType === "FLIP IT" ? "#d97706" :
+    verdictType === "FLIP IT" ? "#eab308" :
     verdictType === "KILL IT" ? "#dc2626" : "#111";
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -865,10 +866,10 @@ export default function VerdictPage() {
           {orderedSections?.map((section, idx) => {
             if (section.kind === "verdict") {
               return (
-                <div key={idx} style={{ marginBottom: 40, padding: "28px 32px", background: verdictColor === "#16a34a" ? "#f0fdf4" : verdictColor === "#dc2626" ? "#fef2f2" : "#fffbeb", borderRadius: 6, border: `1px solid ${verdictColor === "#16a34a" ? "#bbf7d0" : verdictColor === "#dc2626" ? "#fecaca" : "#fde68a"}` }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: verdictColor, marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: verdictColor, letterSpacing: "-0.02em", fontFamily: europaBold, marginBottom: section.explanation ? 12 : 0 }}>{section.verdictLine}</div>
-                  {section.explanation && <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.85)" : "#444", lineHeight: 1.7, fontFamily: europaLight, fontWeight: 300 }}>{section.explanation}</div>}
+                <div key={idx} style={{ marginBottom: 40, padding: "24px 28px", background: D ? "#1a1a1a" : "#fafaf8", borderRadius: 6, borderLeft: `3px solid ${D ? "#fff" : "#111"}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: D ? "#ffffff" : "#999", marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
+                  <div style={{ fontSize: 26, fontWeight: 700, color: verdictColor, letterSpacing: "-0.02em", fontFamily: europaBold, marginBottom: section.explanation ? 12 : 0 }}>{verdictType === "BUILD IT" ? "BUILD IT" : verdictType === "KILL IT" ? "KILL IT" : verdictType === "FLIP IT" ? "FLIP IT" : section.verdictLine}</div>
+                  {section.explanation && <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.75)" : "#444", lineHeight: 1.7, fontFamily: europaLight, fontWeight: 300 }}>{section.explanation}</div>}
                 </div>
               );
             }
@@ -891,7 +892,7 @@ export default function VerdictPage() {
 
             if (section.kind === "question") {
               return (
-                <div key={idx} style={{ marginBottom: 36, padding: "24px 28px", background: "#fafaf8", borderRadius: 6, borderLeft: "3px solid #111" }}>
+                <div key={idx} style={{ marginBottom: 36, padding: "24px 28px", background: D ? "#1a1a1a" : "#fafaf8", borderRadius: 6, borderLeft: `3px solid ${D ? "#fff" : "#111"}` }}>
                   <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: D ? "#ffffff" : "#999", marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
                   <div style={{ fontSize: 17, color: D ? "#ffffff" : "#111", lineHeight: 1.65, fontFamily: europaBold, fontWeight: 500, fontStyle: "italic" }}>{section.text}</div>
                 </div>
