@@ -419,7 +419,7 @@ export default function LandingPage() {
         "ChatGPT est une conversation unique. Klayan te suit de l'idée brute au premier client payant — s'adaptant au fur et à mesure que tes signaux arrivent, sans jamais repartir de zéro.",
       pricing_label: "Simple. Honnête. Orienté revenus.",
       pricing_oneshot: "One Shot",
-      price_oneshot: "$9",
+      price_oneshot: "9€",
       pricing_oneshot_badge: "Paiement unique",
       pricing_oneshot_desc: "Just need one validation? Get the full report once, no subscription.",
       pricing_oneshot_f1: "1 analyse complète",
