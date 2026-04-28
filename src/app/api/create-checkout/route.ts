@@ -52,8 +52,7 @@ export async function POST(request: Request) {
 
     const sparkPriceId = process.env.STRIPE_SPARK_PRICE_ID?.trim();
     const isSpark = sparkPriceId && priceId === sparkPriceId;
-    const oneShotPriceId = process.env.NEXT_PUBLIC_STRIPE_ONESHOT_PRICE_ID ?? "price_1TQu5BJzxOGBKznpUE0DnCNM";
-    const isOneShot = priceId === oneShotPriceId;
+    const isOneShot = priceId === "price_1TQpbsFC3qsxzaqxoSrnD9Ce";
     const oneShotSuccessUrl = `${base}/analyze?oneshot=true`;
 
     const session = await stripe.checkout.sessions.create({
