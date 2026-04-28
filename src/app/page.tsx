@@ -1581,7 +1581,7 @@ export default function LandingPage() {
             <div className="pricing-card-name">{t.pricing_oneshot}</div>
             <div className="pricing-price">{t.price_oneshot}</div>
             <div style={{ fontSize: 12, color: "#aaa", marginTop: -8, marginBottom: 4 }}>{lang === "fr" ? "paiement unique" : "one-time payment"}</div>
-            <button type="button" className="pricing-btn pricing-btn-dark" onClick={() => { void fetch("/api/create-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priceId: "price_1TQu5BJzxOGBKznpUE0DnCNM" }) }).then(r => r.json()).then(d => { if (d.url) window.location.href = d.url; }).catch(() => { window.location.href = "/auth"; }); }}>{t.pricing_oneshot_cta}</button>
+            <button type="button" className="pricing-btn pricing-btn-dark" onClick={() => { void fetch("/api/create-checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ priceId: process.env.NEXT_PUBLIC_STRIPE_ONESHOT_PRICE_ID ?? "price_1TQu5BJzxOGBKznpUE0DnCNM" }) }).then(r => r.json()).then(d => { if (d.url) window.location.href = d.url; }).catch(() => { window.location.href = "/auth"; }); }}>{t.pricing_oneshot_cta}</button>
             <div className="pricing-divider" />
             <ul className="pricing-features">
               <li><span className="feat-dot" /> {t.pricing_oneshot_f1}</li>
