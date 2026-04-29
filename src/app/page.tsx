@@ -1269,6 +1269,13 @@ export default function LandingPage() {
         <div className="hero-box">
           <section className="hero" id="hero">
             <div className="hero-content">
+              <div suppressHydrationWarning style={{ display: "flex", justifyContent: "flex-start", marginBottom: 24 }}>
+                <a href="/v2" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none", background: "transparent", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 100, padding: "9px 18px", fontSize: 15, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
+                  <span style={{ fontWeight: 700, color: "#fff", marginRight: 10 }}>{lang === "fr" ? "Découvrir Klayan V2" : "Discover Klayan V2"}</span>
+                  <span style={{ color: "rgba(255,255,255,0.6)", fontWeight: 400, marginRight: 8 }}>{lang === "fr" ? "En savoir plus" : "Discover More"}</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+              </div>
               <div className="hero-title">
                 <span className="hero-title-main">
                   {lang === "fr" ? "De l'Idée" : "From Idea"}
@@ -1279,20 +1286,6 @@ export default function LandingPage() {
                   {"10K MRR."}
                 </span>
               </div>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 0, background: "#fff", border: "1px solid #e5e5e5", borderRadius: 100, padding: "8px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", fontSize: 14, fontFamily: "'Europa Grotesk No 2 SH', sans-serif" }}>
-
-                  <span style={{ fontWeight: 700, color: "#111", marginRight: 10 }}>{lang === "fr" ? "Découvrir Klayan V2" : "Discover Klayan V2"}</span>
-
-                  <span style={{ color: "#888", fontWeight: 400, marginRight: 8 }}>{lang === "fr" ? "En savoir plus" : "Discover More"}</span>
-
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-
-                </div>
-
-              </div>
-
               <p className="hero-sub">{t.hero_sub}</p>
               <div className="hero-cta-row">
                 <a href="/analyze" className="hero-btn">
