@@ -23,7 +23,7 @@ export default function V2Page() {
           <img
             src={lang === "fr" ? "/images/titlefrench.png" : "/images/titleusa.png"}
             alt="Title"
-            style={{ width: "100%", height: "auto", marginTop: lang === "fr" ? -30 : -60, display: "block" }}
+            style={{ width: "100%", height: "auto", marginTop: lang === "fr" ? -30 : -40, display: "block" }}
           />
         </div>
         <img
