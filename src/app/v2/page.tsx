@@ -19,17 +19,17 @@ export default function V2Page() {
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-        <div style={{ overflow: "hidden", maxWidth: "50%", marginLeft: "5%" }}>
+        <div style={{ overflow: "hidden", maxWidth: "min(65%, 90vw)", marginLeft: "5%" }}>
           <img
             src={lang === "fr" ? "/images/titlefrench.png" : "/images/titleusa.png"}
             alt="Title"
-            style={{ width: "100%", height: "auto", marginTop: lang === "fr" ? -60 : -100, display: "block" }}
+            style={{ width: "100%", height: "auto", marginTop: lang === "fr" ? -30 : -60, display: "block" }}
           />
         </div>
         <img
           src={lang === "fr" ? "/images/uifrench.png" : "/images/uienglish.png"}
           alt="UI Preview"
-          style={{ maxWidth: "80%", height: "auto", marginTop: -40 }}
+          style={{ maxWidth: "80%", height: "auto", marginTop: 20 }}
         />
         <img
           src={lang === "fr" ? "/images/newtitlefrench.png" : "/images/newtitleenglish.png"}
