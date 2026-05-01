@@ -163,6 +163,11 @@ export default function LandingPage() {
   >([]);
 
   useEffect(() => {
+    const refParam = new URLSearchParams(window.location.search).get("ref");
+    if (refParam) localStorage.setItem("referral_source", refParam);
+  }, []);
+
+  useEffect(() => {
     const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
     if (saved) {
       setLang(saved);
