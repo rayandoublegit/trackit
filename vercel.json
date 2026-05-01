@@ -3,5 +3,11 @@
     "src/app/api/analyze/route.ts": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/weekly-reminder",
+      "schedule": "0 9 * * 1"
+    }
+  ]
 }
