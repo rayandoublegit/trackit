@@ -22,8 +22,7 @@ export async function POST(request: Request) {
   // Get all projects with verdict "build" joined with user email
   const { data: projects, error } = await supabaseAdmin
     .from("projects")
-    .select("id, idea_name, user_id, verdict")
-    .eq("verdict", "build");
+    .select("id, idea_name, user_id");
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
