@@ -1580,6 +1580,22 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section style={{ padding: "80px 24px", maxWidth: 900, margin: "0 auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+          {[
+            { name: "Thomas R.", title: lang === "fr" ? "Fondateur solo, SaaS B2B" : "Solo founder, B2B SaaS", quote: lang === "fr" ? "Klayan m'a évité 4 mois de build sur une idée que personne ne voulait." : "Klayan saved me 4 months building something nobody wanted." },
+            { name: "Camille D.", title: lang === "fr" ? "Ex-consultante, first-time founder" : "Ex-consultant, first-time founder", quote: lang === "fr" ? "Le verdict Kill m'a fait mal, mais il avait raison. J'ai pivoté et trouvé mes premiers clients." : "The Kill verdict hurt, but it was right. I pivoted and found my first customers." },
+            { name: "Youssef M.", title: lang === "fr" ? "Développeur indie" : "Indie developer", quote: lang === "fr" ? "C'est le seul outil qui m'a dit la vérité sur mon marché sans me ménager." : "It's the only tool that told me the truth about my market without sugarcoating it." },
+          ].map((q, i) => (
+            <div key={i} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 16, padding: "28px", background: "rgba(255,255,255,0.04)", fontFamily: "'Europa Grotesk No 2 SH', sans-serif", backdropFilter: "blur(8px)" }}>
+              <p style={{ fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,0.8)", margin: "0 0 16px" }}>"{q.quote}"</p>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{q.name}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>{q.title}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="pricing-section" id="pricing">
         <p className="pricing-label reveal">{t.pricing_label}</p>
         <div className="pricing-grid reveal">
