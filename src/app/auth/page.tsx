@@ -372,6 +372,7 @@ export default function AuthPage() {
 
       if (!existingProfile) {
         const referralSource = localStorage.getItem("referral_source") ?? null;
+        console.log("REFERRAL DEBUG:", referralSource, "existingProfile:", existingProfile);
         await supabase.from("profiles").insert({
           id: user.id,
           username: username.trim() || user.email?.split("@")[0] || "founder",
