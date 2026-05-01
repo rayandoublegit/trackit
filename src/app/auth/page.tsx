@@ -155,6 +155,8 @@ export default function AuthPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    const refParam = params.get("ref");
+    if (refParam) localStorage.setItem("referral_source", refParam);
     if (params.get("error") === "confirmation_failed") {
       setError("Email confirmation failed. Please try again or sign up with a new link.");
       setMode("login");
@@ -369,12 +371,15 @@ export default function AuthPage() {
         .maybeSingle();
 
       if (!existingProfile) {
+        const referralSource = localStorage.getItem("referral_source") ?? null;
         await supabase.from("profiles").insert({
           id: user.id,
           username: username.trim() || user.email?.split("@")[0] || "founder",
           plan: "free",
           subscription_status: "inactive",
+          ...(referralSource ? { referral_source: referralSource } : {}),
         });
+        if (referralSource) localStorage.removeItem("referral_source");
       }
 
       skipAuthRedirectForAvatarRef.current = false;
