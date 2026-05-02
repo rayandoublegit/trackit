@@ -171,7 +171,12 @@ export default function SettingsPage() {
     })();
   }, [router]);
 
+  const avatarFileRef = React.useRef(avatarFile);
+  React.useEffect(() => { avatarFileRef.current = avatarFile; }, [avatarFile]);
+
   const saveProfile = useCallback(async () => {
+    const avatarFile = avatarFileRef.current;
+    console.log("SAVE called, avatarFile:", avatarFile);
     if (!supabase || !user) return;
     setSaving(true);
     setMessage(null);
@@ -184,6 +189,8 @@ export default function SettingsPage() {
         .from("avatars")
         .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
 
+      console.log("UPLOAD RESULT:", uploadError, "path:", `${user.id}/avatar`);
+      console.log("UPLOAD RESULT:", uploadError, "path:", `${user.id}/avatar`);
       if (uploadError) {
         setMessage({ text: "Failed to upload photo.", type: "error" });
         setSaving(false);
@@ -191,7 +198,7 @@ export default function SettingsPage() {
       }
 
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      newAvatarUrl = pub.publicUrl;
+      newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
     }
 
     const { error } = await supabase

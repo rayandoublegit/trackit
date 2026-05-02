@@ -370,18 +370,15 @@ export default function AuthPage() {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (!existingProfile) {
-        const referralSource = localStorage.getItem("referral_source") ?? null;
-        console.log("REFERRAL DEBUG:", referralSource, "existingProfile:", existingProfile);
-        await supabase.from("profiles").insert({
-          id: user.id,
-          username: username.trim() || user.email?.split("@")[0] || "founder",
-          plan: "free",
-          subscription_status: "inactive",
-          ...(referralSource ? { referral_source: referralSource } : {}),
-        });
-        if (referralSource) localStorage.removeItem("referral_source");
-      }
+      const referralSource = localStorage.getItem("referral_source") ?? null;
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        username: username.trim() || user.email?.split("@")[0] || "founder",
+        plan: existingProfile ? undefined : "free",
+        subscription_status: existingProfile ? undefined : "inactive",
+        ...(referralSource ? { referral_source: referralSource } : {}),
+      }, { onConflict: "id", ignoreDuplicates: false });
+      if (referralSource) localStorage.removeItem("referral_source");
 
       skipAuthRedirectForAvatarRef.current = false;
       router.replace("/analyze");

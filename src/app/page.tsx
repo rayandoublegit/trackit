@@ -215,13 +215,13 @@ export default function LandingPage() {
     en: {
       nav_services: "Services",
       nav_pricing: "Pricing",
-      nav_analyze: "Analyze",
+      nav_analyze: "Open klayan.app",
       nav_signin: "Sign In",
       hero_title: "From Idea to",
       hero_italic: "10K MRR.",
       hero_sub:
         "Your idea feels right. Feelings have killed more startups than bad code. Get the brutal truth in 10 minutes — then Klayan stays with you every week until 10K MRR.",
-      hero_cta: "Launch my idea",
+      hero_cta: "Get Started For Free",
       hero_note: "Free to start · No credit card required",
       familiar_title: "Sounds familiar ?",
       pain1_title: "You built something nobody wanted",
@@ -285,12 +285,13 @@ export default function LandingPage() {
       pricing_oneshot: "One Shot",
       price_oneshot: "$9",
       pricing_oneshot_badge: "One-time payment",
-      pricing_oneshot_desc: "Just need one validation? Get the full report once, no subscription.",
-      pricing_oneshot_f1: "1 full analysis",
-      pricing_oneshot_f2: "Kill/Build/Flip verdict",
-      pricing_oneshot_f3: "Market research & competitor scan",
-      pricing_oneshot_f4: "Hard Truths + Next 48 hours",
-      pricing_oneshot_cta: "Get my report",
+      pricing_oneshot_desc: "One full verdict. No subscription.",
+      pricing_oneshot_f1: "1 full Scale analysis",
+      pricing_oneshot_f2: "Score /100",
+      pricing_oneshot_f3: "HIGH/MEDIUM/LOW risk breakdown",
+      pricing_oneshot_f4: "Exact pivot + 48h action plan",
+      pricing_oneshot_f5: "Devil's advocate included",
+      pricing_oneshot_cta: "Get my verdict →",
       pricing_spark: "Spark",
       pricing_build: "Build",
       pricing_scale: "Scale",
@@ -299,28 +300,32 @@ export default function LandingPage() {
       price_spark: "$19",
       price_build: "$69",
       price_scale: "$149",
+      pricing_spark_desc: "Validate all your ideas. Launch the best one.",
       pricing_spark_f1: "Unlimited analyses",
-      pricing_spark_f2: "Kill or Build verdict",
-      pricing_spark_f3: "Market research & competitor scan",
-      pricing_spark_f4: "Hard Truths + Opportunity analysis",
+      pricing_spark_f2: "Full verdict with score /100",
+      pricing_spark_f3: "Live web research",
+      pricing_spark_f4: "Exact pivot + 48h action plan",
       pricing_spark_f5: "Workspace + Notes",
-      pricing_build_f1: "Unlimited analyses",
-      pricing_build_f2: "Everything in Spark",
-      pricing_build_f3: "Weekly Check-in + AI report",
-      pricing_build_f4: "Milestone Engine & Playbooks (Important Steps)",
-      pricing_build_f5: "Market Watch (monthly)",
-      pricing_build_f6: "Pivot Radar",
-      pricing_build_f7: "Marketing Engine",
-      pricing_build_f8: "Outreach Engine",
-      pricing_build_f9: "Competitor Tracker",
-      pricing_build_f10: "Pricing Strategy",
-      pricing_scale_badge: "Get the best out of Klayan!",
-      pricing_scale_f1: "Unlimited analyses",
-      pricing_scale_f2: "Everything in Build",
-      pricing_scale_f3: "Co-Founder Mode (unlimited sessions)",
-      pricing_scale_f4: "Market Watch (unlimited)",
-      pricing_scale_f5: "Revenue Roadmap",
-      pricing_scale_f6: "Priority support",
+      pricing_spark_f6: "Weekly check-ins",
+      pricing_spark_cta: "Start for free →",
+      pricing_build_desc: "Everything you need to go from idea to first paying customer.",
+      pricing_build_f1: "Everything in Spark",
+      pricing_build_f2: "Milestone Engine + Playbooks",
+      pricing_build_f3: "Market Watch (monthly)",
+      pricing_build_f4: "Pivot Radar",
+      pricing_build_f5: "Marketing Engine",
+      pricing_build_f6: "Outreach Engine",
+      pricing_build_f7: "Competitor Tracker",
+      pricing_build_f8: "Pricing Strategy",
+      pricing_build_cta: "Start my sprint →",
+      pricing_scale_badge: "For founders who build seriously.",
+      pricing_scale_desc: "For founders who build seriously.",
+      pricing_scale_f1: "Everything in Build",
+      pricing_scale_f2: "Co-Founder Mode (unlimited)",
+      pricing_scale_f3: "Market Watch (unlimited)",
+      pricing_scale_f4: "Revenue Roadmap",
+      pricing_scale_f5: "Priority support",
+      pricing_scale_cta: "Switch to Scale →",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Business Structure",
@@ -350,20 +355,20 @@ export default function LandingPage() {
         "Yes. Your ideas are stored securely and never shared, sold, or used to train AI models. What you submit stays yours.",
       cta_title: "Your next idea deserves more than a gut feeling.",
       cta_sub: "Join founders who validate first and build second.",
-      cta_btn: "Launch my idea",
+      cta_btn: "Get Started For Free",
       cta_note: "Free to start · No credit card · Cancel anytime",
       footer: "© 2026 Klayan — Built by founders, for founders.",
     },
     fr: {
       nav_services: "Services",
       nav_pricing: "Tarifs",
-      nav_analyze: "Analyser",
+      nav_analyze: "Ouvrir klayan.app",
       nav_signin: "Connexion",
       hero_title: "De l'Idée au",
       hero_italic: "10K MRR.",
       hero_sub:
         "Ton idée te semble juste. Les sentiments ont tué plus de startups que le mauvais code. Obtiens la vérité brutale en 10 minutes — puis Klayan reste avec toi chaque semaine jusqu'à 10K MRR.",
-      hero_cta: "Lance mon idée",
+      hero_cta: "Commencer Gratuitement",
       hero_note: "Gratuit pour commencer · Pas de carte bancaire",
       familiar_title: "Ça te parle ?",
       pain1_title: "Tu as construit quelque chose que personne ne voulait",
@@ -426,12 +431,13 @@ export default function LandingPage() {
       pricing_oneshot: "One Shot",
       price_oneshot: "10€",
       pricing_oneshot_badge: "Paiement unique",
-      pricing_oneshot_desc: "Just need one validation? Get the full report once, no subscription.",
-      pricing_oneshot_f1: "1 analyse complète",
-      pricing_oneshot_f2: "Verdict Kill/Build/Flip",
-      pricing_oneshot_f3: "Recherche de marché & scan concurrents",
-      pricing_oneshot_f4: "Vérités difficiles + Prochaines 48h",
-      pricing_oneshot_cta: "Obtenir mon rapport",
+      pricing_oneshot_desc: "Un verdict complet. Sans abonnement.",
+      pricing_oneshot_f1: "1 analyse Scale complète",
+      pricing_oneshot_f2: "Score /100",
+      pricing_oneshot_f3: "Risques HIGH/MEDIUM/LOW",
+      pricing_oneshot_f4: "Pivot exact + plan d'action 48h",
+      pricing_oneshot_f5: "Avocat du diable inclus",
+      pricing_oneshot_cta: "Obtenir mon verdict →",
       pricing_spark: "Spark",
       pricing_build: "Build",
       pricing_scale: "Scale",
@@ -440,28 +446,32 @@ export default function LandingPage() {
       price_spark: "19€",
       price_build: "69€",
       price_scale: "149€",
+      pricing_spark_desc: "Valide toutes tes idées. Lance la meilleure.",
       pricing_spark_f1: "Analyses illimitées",
-      pricing_spark_f2: "Verdict Kill or Build",
-      pricing_spark_f3: "Recherche de marché & scan des concurrents",
-      pricing_spark_f4: "Vérités difficiles + analyse des opportunités",
-      pricing_spark_f5: "Espace de travail + Notes",
-      pricing_build_f1: "Analyses illimitées",
-      pricing_build_f2: "Tout ce qui est dans Spark",
-      pricing_build_f3: "Check-in hebdomadaire + rapport IA",
-      pricing_build_f4: "Machine d'Étapes Importantes & Playbook",
-      pricing_build_f5: "Market Watch (mensuel)",
-      pricing_build_f6: "Pivot Radar",
-      pricing_build_f7: "Moteur Marketing",
-      pricing_build_f8: "Moteur de Prospection",
-      pricing_build_f9: "Suivi des Concurrents",
-      pricing_build_f10: "Stratégie de Prix",
-      pricing_scale_badge: "Tire le meilleur de Klayan !",
-      pricing_scale_f1: "Analyses illimitées",
-      pricing_scale_f2: "Tout ce qui est dans Build",
-      pricing_scale_f3: "Mode Co-Fondateur (sessions illimitées)",
-      pricing_scale_f4: "Market Watch (illimité)",
-      pricing_scale_f5: "Roadmap des Revenus",
-      pricing_scale_f6: "Support prioritaire",
+      pricing_spark_f2: "Verdict complet avec score /100",
+      pricing_spark_f3: "Recherche web en temps réel",
+      pricing_spark_f4: "Pivot exact + plan d'action 48h",
+      pricing_spark_f5: "Workspace + Notes",
+      pricing_spark_f6: "Check-ins hebdomadaires",
+      pricing_spark_cta: "Commencer gratuitement →",
+      pricing_build_desc: "Tout ce qu'il faut pour aller de l'idée au premier client.",
+      pricing_build_f1: "Tout Spark",
+      pricing_build_f2: "Milestone Engine + Playbooks",
+      pricing_build_f3: "Market Watch mensuel",
+      pricing_build_f4: "Pivot Radar",
+      pricing_build_f5: "Marketing Engine",
+      pricing_build_f6: "Outreach Engine",
+      pricing_build_f7: "Competitor Tracker",
+      pricing_build_f8: "Pricing Strategy",
+      pricing_build_cta: "Commencer mon sprint →",
+      pricing_scale_badge: "Pour les fondateurs qui buildent sérieusement.",
+      pricing_scale_desc: "Pour les fondateurs qui buildent sérieusement.",
+      pricing_scale_f1: "Tout Build",
+      pricing_scale_f2: "Co-Founder Mode illimité",
+      pricing_scale_f3: "Market Watch illimité",
+      pricing_scale_f4: "Revenue Roadmap",
+      pricing_scale_f5: "Support prioritaire",
+      pricing_scale_cta: "Passer à Scale →",
       pricing_locked_signal: "Signal Sprint",
       pricing_locked_flip: "Flip Engine",
       pricing_locked_structure: "Structure Business",
@@ -491,7 +501,7 @@ export default function LandingPage() {
         "Oui. Tes idées sont stockées en sécurité et ne sont jamais partagées, vendues ou utilisées pour entraîner des modèles IA. Ce que tu soumets reste le tien.",
       cta_title: "Ta prochaine idée mérite mieux qu'une intuition.",
       cta_sub: "Rejoins les founders qui valident d'abord et buildent ensuite.",
-      cta_btn: "Lance mon idée",
+      cta_btn: "Commencer Gratuitement",
       cta_note: "Gratuit · Pas de carte bancaire · Résiliable à tout moment",
       footer: "© 2026 Klayan — Construit par des founders, pour des founders.",
     },
@@ -988,9 +998,7 @@ export default function LandingPage() {
               <a href="#pricing">{t.nav_pricing}</a>
             </li>
           </ul>
-          <a href="/analyze" className="nav-cta">
-            {t.nav_analyze}
-          </a>
+          <a href={user ? "/dashboard" : "/auth"} className="nav-cta">{t.nav_analyze}</a>
           {user ? (
             <div
               ref={profileMenuRef}
@@ -1150,48 +1158,7 @@ export default function LandingPage() {
                 </div>
               ) : null}
             </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = "/auth";
-              }}
-              style={{
-                marginLeft: 10,
-                flexShrink: 0,
-                border: "none",
-                cursor: "pointer",
-                background: "rgba(171,171,171,0.24)",
-                backdropFilter: "blur(8px)",
-                WebkitBackdropFilter: "blur(8px)",
-                borderRadius: 100,
-                padding: "8px 16px",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                color: "#fff",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 14,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-              }}
-            >
-              <img
-                src="/images/navbarlogo.png"
-                alt=""
-                width={24}
-                height={24}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  display: "block",
-                }}
-              />
-              {t.nav_signin}
-            </button>
-          )}
+          ) : null}
           <div style={{ position: "relative", marginLeft: 8 }}>
             <button
               type="button"
@@ -1603,6 +1570,7 @@ export default function LandingPage() {
 
       <section className="pricing-section" id="pricing">
         <p className="pricing-label reveal">{t.pricing_label}</p>
+        <p style={{ fontSize: 13, color: "#888", marginBottom: 24, marginTop: -8 }}>{lang === "fr" ? "Satisfait ou remboursé sous 7 jours. Aucune question posée." : "7-day money-back guarantee. No questions asked."}</p>
         <div className="pricing-grid reveal">
           <div className="pricing-card">
             <div style={{ display: "inline-flex", alignItems: "center", background: "#f3f4f6", borderRadius: 100, padding: "4px 10px", marginBottom: 10 }}><span style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.02em" }}>{lang === "fr" ? t.pricing_oneshot_badge : t.pricing_oneshot_badge}</span></div>
@@ -1695,12 +1663,6 @@ export default function LandingPage() {
               <li>
                 <span className="feat-dot" /> {t.pricing_build_f8}
               </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f9}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f10}
-              </li>
             </ul>
           </div>
         </div>
@@ -1733,11 +1695,9 @@ export default function LandingPage() {
             <li>
               <span className="feat-dot" /> {t.pricing_scale_f5}
             </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f6}
-            </li>
           </ul>
         </div>
+        <p style={{ textAlign: "center", fontSize: 12, color: "#aaa", marginTop: 24 }}>{lang === "fr" ? "Prix HT. Résiliable à tout moment." : "Prices exclude tax. Cancel anytime."}</p>
       </section>
 
       <section className="story-section">
