@@ -1844,7 +1844,7 @@ export default function DashboardPage() {
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button type="button" onClick={() => { localStorage.removeItem("klayan_analyze_draft"); setDashHasDraft(false); }} style={{ fontSize: 12, color: theme.textMuted, background: "none", border: "none", cursor: "pointer", padding: "6px 10px" }}>Discard</button>
-                <a href="/analyze?resume=1" style={{ fontSize: 13, fontWeight: 600, color: "#fff", background: theme.text, borderRadius: 8, padding: "7px 14px", textDecoration: "none" }}>Resume →</a>
+                <a href="/analyze?resume=1" style={{ fontSize: 13, fontWeight: 600, color: theme.bg, background: theme.text, borderRadius: 8, padding: "7px 14px", textDecoration: "none" }}>Resume →</a>
               </div>
             </div>
           )}
