@@ -916,7 +916,7 @@ export default function VerdictPage() {
             if (section.label === "AVOCAT DU DIABLE") {
               return (
                 <div key={idx} style={{ marginBottom: 36, padding: "24px 28px", background: D ? "rgba(251,191,36,0.08)" : "#fffbeb", borderRadius: 6, borderLeft: "3px solid #f59e0b" }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f59e0b", marginBottom: 10, fontFamily: europaBold }}>{section.label}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f59e0b", marginBottom: 10, fontFamily: europaBold }}>{lang === "fr" ? "AVOCAT DU DIABLE" : "DEVIL'S ADVOCATE"}</div>
                   <div style={{ fontSize: 15, color: D ? "rgba(255,255,255,0.85)" : "#444", lineHeight: 1.75, fontFamily: europaLight, fontWeight: 300, whiteSpace: "pre-wrap" }}>{section.text}</div>
                 </div>
               );
