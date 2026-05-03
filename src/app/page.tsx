@@ -1315,6 +1315,8 @@ export default function LandingPage() {
               muted
               loop
               playsInline
+              crossOrigin="anonymous"
+              preload="auto"
               style={{ width: "100%", display: "block", borderRadius: 0 }}
             />
           </div>
