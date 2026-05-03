@@ -237,6 +237,47 @@ function PricingPageInner() {
 
       <section className="pricing-section pricing-page-section">
         <div className="pricing-grid">
+
+          {/* One Shot */}
+          <div className="pricing-card">
+            <div style={{ display: "inline-flex", alignItems: "center", background: "rgba(255,255,255,0.12)", borderRadius: 100, padding: "4px 10px", marginBottom: 10 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.02em" }}>{lang === "fr" ? "Paiement unique" : "One-time payment"}</span>
+            </div>
+            <div className="pricing-card-name">One Shot</div>
+            <div className="pricing-price">{currency === "€" ? "9€" : "$9"}</div>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", marginBottom: 16, marginTop: 4 }}>{lang === "fr" ? "Un verdict complet. Sans abonnement." : "One full verdict. No subscription."}</p>
+            <button
+              type="button"
+              className="pricing-btn pricing-btn-dark"
+              onClick={() => {
+                void fetch("/api/create-checkout", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    priceId: "price_1TQzvsFC3qsxzaqxr3ydKYDS",
+                    analysisId: analysisId || undefined,
+                    currency: lang === "fr" ? "eur" : "usd",
+                    cancelUrl: window.location.href,
+                  }),
+                })
+                  .then(r => r.json())
+                  .then((d: { url?: string }) => { if (d.url) window.location.href = d.url; })
+                  .catch(() => { window.location.href = "/auth"; });
+              }}
+            >
+              {lang === "fr" ? "Obtenir mon verdict →" : "Get my verdict →"}
+            </button>
+            <div className="pricing-divider" />
+            <ul className="pricing-features">
+              <li><span className="feat-dot" /> {lang === "fr" ? "1 analyse Scale complète" : "1 full Scale analysis"}</li>
+              <li><span className="feat-dot" /> {lang === "fr" ? "Score /100" : "Score /100"}</li>
+              <li><span className="feat-dot" /> {lang === "fr" ? "Risques HIGH/MEDIUM/LOW" : "HIGH/MEDIUM/LOW risk breakdown"}</li>
+              <li><span className="feat-dot" /> {lang === "fr" ? "Pivot exact + plan d'action 48h" : "Exact pivot + 48h action plan"}</li>
+              <li><span className="feat-dot" /> {lang === "fr" ? "Avocat du diable inclus" : "Devil's advocate included"}</li>
+            </ul>
+          </div>
+
+          {/* Spark */}
           <div className="pricing-card">
             <div className="pricing-card-name">Spark</div>
             <div className="pricing-price">{`${currency}19${t.per_month}`}</div>
@@ -250,47 +291,19 @@ function PricingPageInner() {
             </button>
             <div className="pricing-divider" />
             <ul className="pricing-features">
-              <li>
-                <span className="feat-dot" /> {t.pricing_spark_f1}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_spark_f2}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_spark_f3}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_spark_f4}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_spark_f5}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_signal}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_flip}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_structure}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_roadmap}
-              </li>
-              <li className="locked">
-                <span className="feat-x">✗</span> {t.pricing_locked_marketing}
-              </li>
+              <li><span className="feat-dot" /> {t.pricing_spark_f1}</li>
+              <li><span className="feat-dot" /> {t.pricing_spark_f2}</li>
+              <li><span className="feat-dot" /> {t.pricing_spark_f3}</li>
+              <li><span className="feat-dot" /> {t.pricing_spark_f4}</li>
+              <li><span className="feat-dot" /> {t.pricing_spark_f5}</li>
             </ul>
           </div>
 
+          {/* Build */}
           <div className="pricing-card featured">
             <div className="pricing-popular-badge">
               {t.popular}{" "}
-              <img
-                src="/images/navbarlogo.png"
-                alt=""
-                className="pricing-inline-logo"
-              />
+              <img src="/images/navbarlogo.png" alt="" className="pricing-inline-logo" />
             </div>
             <div className="pricing-card-name">Build</div>
             <div className="pricing-price pricing-price-black">{`${currency}69${t.per_month}`}</div>
@@ -304,37 +317,23 @@ function PricingPageInner() {
             </button>
             <div className="pricing-divider" />
             <ul className="pricing-features">
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f1}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f2}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f3}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f4}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f5}
-              </li>
-              <li>
-                <span className="feat-dot" /> {t.pricing_build_f6}
-              </li>
+              <li><span className="feat-dot" /> {t.pricing_build_f1}</li>
+              <li><span className="feat-dot" /> {t.pricing_build_f2}</li>
+              <li><span className="feat-dot" /> {t.pricing_build_f3}</li>
+              <li><span className="feat-dot" /> {t.pricing_build_f4}</li>
+              <li><span className="feat-dot" /> {t.pricing_build_f5}</li>
+              <li><span className="feat-dot" /> {t.pricing_build_f6}</li>
+
             </ul>
           </div>
         </div>
 
+        {/* Scale */}
         <div className="pricing-card scale reveal visible pricing-card-scale-max">
           <div className="pricing-card-name">Scale</div>
           <div className="scale-badge">
             {t.scale_badge}{" "}
-            <img
-              src="/images/navbarlogo.png"
-              alt=""
-              className="pricing-inline-logo"
-            />
+            <img src="/images/navbarlogo.png" alt="" className="pricing-inline-logo" />
           </div>
           <div className="pricing-price">{`${currency}149${t.per_month}`}</div>
           <button
@@ -347,26 +346,16 @@ function PricingPageInner() {
           </button>
           <div className="pricing-divider pricing-divider-mt" />
           <ul className="pricing-features">
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f1}
-            </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f2}
-            </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f3}
-            </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f4}
-            </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f5}
-            </li>
-            <li>
-              <span className="feat-dot" /> {t.pricing_scale_f6}
-            </li>
+            <li><span className="feat-dot" /> {t.pricing_scale_f1}</li>
+            <li><span className="feat-dot" /> {t.pricing_scale_f2}</li>
+            <li><span className="feat-dot" /> {t.pricing_scale_f3}</li>
+            <li><span className="feat-dot" /> {t.pricing_scale_f4}</li>
+            <li><span className="feat-dot" /> {t.pricing_scale_f5}</li>
           </ul>
         </div>
+        <p style={{ textAlign: "center", fontSize: 12, color: "#aaa", marginTop: 24 }}>
+          {lang === "fr" ? "Prix HT. Résiliable à tout moment." : "Prices exclude tax. Cancel anytime."}
+        </p>
       </section>
     </div>
   );
