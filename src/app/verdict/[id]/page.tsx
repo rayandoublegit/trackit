@@ -844,8 +844,20 @@ export default function VerdictPage() {
                 </span>
               </div>
             </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, width: isMobile ? "100%" : 260 }}>
+            <Link href="/analyze" style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: "100%", minHeight: 110, background: "#111", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any, border: "1px solid rgba(255,255,255,0.12)" }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{lang === "fr" ? "Nouvelle analyse" : "New analysis"}</div>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: europaBold, letterSpacing: "-0.02em", lineHeight: 1.25 }}>
+                    {lang === "fr" ? "Valider une autre idée." : "Validate another idea."}
+                  </span>
+                </div>
+                <div style={{ flexShrink: 0, width: 36, height: 36, background: "#fff", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+              </Link>
             {projectId && (
-              <Link href={`/project/${projectId}`} style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: isMobile ? "100%" : 260, minHeight: 110, background: "#2563eb", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any }}>
+              <Link href={`/project/${projectId}`} style={{ flexShrink: 0, display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, width: "100%", minHeight: 110, background: "#2563eb", borderRadius: 16, padding: "20px 20px 18px 24px", textDecoration: "none", boxSizing: "border-box" as any }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>{lang === "fr" ? "Espace de travail" : "Workspace"}</div>
                   <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", fontFamily: europaBold, letterSpacing: "-0.02em", lineHeight: 1.25 }}>
@@ -857,6 +869,7 @@ export default function VerdictPage() {
                 </div>
               </Link>
             )}
+            </div>
           </div>
 
           {/* Separator */}
