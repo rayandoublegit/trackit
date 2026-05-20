@@ -1,0 +1,1048 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type CreatorStatus = "active" | "pending" | "contacted" | "declined";
+type CreatorsTab = "all" | "active" | "pending";
+type SortKey = "followers" | "engagement" | "addedDate";
+
+type ManagedCreator = {
+  id: string;
+  username: string;
+  displayName: string;
+  platform: string;
+  followers: number;
+  engagement: number;
+  niche: string;
+  status: CreatorStatus;
+  addedDate: string;
+  age: number;
+  email: string;
+  location: string;
+  notes: string;
+  avatarUrl?: string;
+  campaignIds: string[];
+};
+
+const INITIAL_CREATORS: ManagedCreator[] = [
+  { id: "1", username: "fashionwithemma", displayName: "Emma Laurent", platform: "tiktok", followers: 245000, engagement: 4.2, niche: "Fashion", status: "active", addedDate: "2026-01-15", age: 24, email: "emma@creator.com", location: "Paris, France", notes: "", campaignIds: ["c1", "c2"] },
+  { id: "2", username: "fitnessbysarah", displayName: "Sarah Martin", platform: "instagram", followers: 89000, engagement: 6.8, niche: "Fitness", status: "pending", addedDate: "2026-02-03", age: 28, email: "sarah@creator.com", location: "Lyon, France", notes: "", campaignIds: ["c2"] },
+  { id: "3", username: "techreviewspro", displayName: "Marc Dubois", platform: "youtube", followers: 520000, engagement: 3.1, niche: "Tech", status: "active", addedDate: "2026-01-28", age: 31, email: "marc@creator.com", location: "London, UK", notes: "", campaignIds: ["c1", "c3"] },
+  { id: "4", username: "beautybyjulie", displayName: "Julie Chen", platform: "tiktok", followers: 167000, engagement: 5.4, niche: "Beauty", status: "contacted", addedDate: "2026-03-10", age: 26, email: "julie@creator.com", location: "Bordeaux, France", notes: "", campaignIds: ["c3"] },
+  { id: "5", username: "foodieparadise", displayName: "Thomas Bernard", platform: "instagram", followers: 98000, engagement: 7.2, niche: "Food", status: "active", addedDate: "2026-02-20", age: 29, email: "thomas@creator.com", location: "Marseille, France", notes: "", campaignIds: ["c1"] },
+  { id: "6", username: "travelwithleo", displayName: "Leo Moreau", platform: "tiktok", followers: 312000, engagement: 4.9, niche: "Travel", status: "pending", addedDate: "2026-03-05", age: 27, email: "leo@creator.com", location: "Nice, France", notes: "", campaignIds: [] },
+];
+
+const MOCK_CAMPAIGNS = [
+  { id: "c1", name: "Summer Launch 2026", platform: "TikTok + Instagram" },
+  { id: "c2", name: "Protein Push Q2", platform: "TikTok" },
+  { id: "c3", name: "Brand Awareness", platform: "All platforms" },
+];
+
+const btnPrimary: React.CSSProperties = {
+  background: "#0047FF",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 10,
+  padding: "10px 18px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const btnSecondary: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#1A1A1A",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "10px 16px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const btnBlack: React.CSSProperties = {
+  background: "#1A1A1A",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 10,
+  padding: "10px 18px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "10px 12px",
+  borderRadius: 10,
+  border: "1px solid #E5E5E5",
+  fontSize: 14,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  letterSpacing: "-0.02em",
+  background: "#FFFFFF",
+};
+
+function formatCount(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+function avatarUrlFor(username: string, custom?: string) {
+  return custom ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+}
+
+function statusBadgeStyle(status: CreatorStatus): React.CSSProperties {
+  const map: Record<CreatorStatus, { bg: string; fg: string }> = {
+    active: { bg: "rgba(31,181,103,0.12)", fg: "#1FB567" },
+    pending: { bg: "rgba(234,179,8,0.15)", fg: "#B45309" },
+    contacted: { bg: "rgba(0,71,255,0.1)", fg: "#0047FF" },
+    declined: { bg: "rgba(220,38,38,0.1)", fg: "#DC2626" },
+  };
+  const s = map[status];
+  return {
+    fontSize: 11,
+    fontWeight: 600,
+    color: s.fg,
+    background: s.bg,
+    padding: "4px 10px",
+    borderRadius: 999,
+    textTransform: "capitalize",
+    letterSpacing: "-0.01em",
+  };
+}
+
+function discountCodeFor(username: string) {
+  const base = username.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "CREATOR";
+  return `${base}15`;
+}
+
+function referralSlug(username: string) {
+  const base = username.toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
+  return `${base}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function Toast({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 24,
+        right: 24,
+        background: "#1A1A1A",
+        color: "#FFFFFF",
+        padding: "12px 18px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 500,
+        zIndex: 1200,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        fontFamily: "inherit",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
+function ModalShell({
+  children,
+  onClose,
+  maxWidth = 560,
+}: {
+  children: React.ReactNode;
+  onClose: () => void;
+  maxWidth?: number;
+}) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          padding: 32,
+          maxWidth,
+          width: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          position: "relative",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.15)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: 16,
+            right: 16,
+            background: "#FAFAFA",
+            border: "1px solid #EFEFEF",
+            borderRadius: 8,
+            width: 32,
+            height: 32,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ImportCsvModal({ onClose }: { onClose: () => void }) {
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={520}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px", paddingRight: 40 }}>Import CSV</h2>
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>Bulk import creators from a spreadsheet.</p>
+      <div
+        style={{
+          border: "2px dashed #E5E5E5",
+          borderRadius: 12,
+          padding: 40,
+          textAlign: "center",
+          marginBottom: 16,
+          background: "#FAFAFA",
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if (f) setFileName(f.name);
+        }}
+      >
+        <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 8px" }}>Drag and drop your CSV here</p>
+        <label style={{ fontSize: 13, color: "#0047FF", cursor: "pointer" }}>
+          or browse files
+          <input
+            type="file"
+            accept=".csv"
+            style={{ display: "none" }}
+            onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+          />
+        </label>
+        {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
+      </div>
+      <button type="button" style={{ ...btnSecondary, width: "100%", marginBottom: 16 }} onClick={() => {}}>
+        Download CSV template
+      </button>
+      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 8px" }}>Required columns:</p>
+      <p style={{ fontSize: 12, color: "#7A7A7A", margin: "0 0 16px" }}>name, username, platform, followers, engagement, niche, email</p>
+      <p style={{ fontSize: 12, color: "#B45309", margin: "0 0 16px", background: "#FFFBEB", padding: 12, borderRadius: 8 }}>
+        Coming soon — CSV import will be available in the next update
+      </p>
+      <button type="button" disabled style={{ ...btnSecondary, width: "100%", opacity: 0.45, cursor: "not-allowed" }}>
+        Import
+      </button>
+    </ModalShell>
+  );
+}
+
+function AddCreatorModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (c: ManagedCreator) => void;
+}) {
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [platform, setPlatform] = useState("tiktok");
+  const [niche, setNiche] = useState("");
+  const [followers, setFollowers] = useState("");
+  const [engagement, setEngagement] = useState("");
+  const [age, setAge] = useState("");
+  const [email, setEmail] = useState("");
+  const [location, setLocation] = useState("");
+  const [status, setStatus] = useState<CreatorStatus>("pending");
+  const [notes, setNotes] = useState("");
+
+  const canSubmit = fullName.trim() && username.trim();
+
+  const handleSubmit = () => {
+    if (!canSubmit) return;
+    const handle = username.trim().replace(/^@/, "");
+    onAdd({
+      id: `new_${Date.now()}`,
+      username: handle,
+      displayName: fullName.trim(),
+      platform,
+      followers: parseInt(followers, 10) || 0,
+      engagement: parseFloat(engagement) || 0,
+      niche: niche.trim() || "General",
+      status,
+      addedDate: new Date().toISOString().slice(0, 10),
+      age: parseInt(age, 10) || 0,
+      email: email.trim(),
+      location: location.trim(),
+      notes: notes.trim(),
+      avatarUrl: avatarPreview ?? undefined,
+      campaignIds: [],
+    });
+  };
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={520}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 20px", paddingRight: 40 }}>Add Creator</h2>
+      <label style={{ display: "block", marginBottom: 16, cursor: "pointer", width: "fit-content" }}>
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            background: "#F0F0F0",
+            border: "2px dashed #E5E5E5",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 12,
+            color: "#9A9A9A",
+          }}
+        >
+          {avatarPreview ? (
+            <img src={avatarPreview} alt="" width={72} height={72} style={{ objectFit: "cover" }} />
+          ) : (
+            "Upload"
+          )}
+        </div>
+        <input
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) setAvatarPreview(URL.createObjectURL(f));
+          }}
+        />
+      </label>
+      <Field label="Full name *">
+        <input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} />
+      </Field>
+      <Field label="Username / handle *">
+        <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@creator" style={inputStyle} />
+      </Field>
+      <Field label="Platform">
+        <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
+          <option value="tiktok">TikTok</option>
+          <option value="instagram">Instagram</option>
+          <option value="youtube">YouTube</option>
+        </select>
+      </Field>
+      <Field label="Niche">
+        <input value={niche} onChange={(e) => setNiche(e.target.value)} style={inputStyle} />
+      </Field>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Followers">
+          <input type="number" value={followers} onChange={(e) => setFollowers(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="Engagement (%)">
+          <input type="number" step="0.1" value={engagement} onChange={(e) => setEngagement(e.target.value)} style={inputStyle} />
+        </Field>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <Field label="Age">
+          <input type="number" value={age} onChange={(e) => setAge(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="Status">
+          <select value={status} onChange={(e) => setStatus(e.target.value as CreatorStatus)} style={inputStyle}>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="contacted">Contacted</option>
+            <option value="declined">Declined</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="Email">
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+      </Field>
+      <Field label="Location">
+        <input value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle} />
+      </Field>
+      <Field label="Notes">
+        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+      </Field>
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <button type="button" onClick={onClose} style={{ ...btnSecondary, flex: 1 }}>
+          Cancel
+        </button>
+        <button type="button" onClick={handleSubmit} disabled={!canSubmit} style={{ ...btnBlack, flex: 1, opacity: canSubmit ? 1 : 0.45 }}>
+          Add Creator →
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function CreatorOutreachModal({ creator, onClose }: { creator: ManagedCreator; onClose: () => void }) {
+  const [product, setProduct] = useState("");
+  const [message, setMessage] = useState("");
+  const [generating, setGenerating] = useState(false);
+
+  const generate = () => {
+    setGenerating(true);
+    setTimeout(() => {
+      const first = creator.displayName.split(" ")[0];
+      setMessage(
+        `Hey ${first} 👋\n\nI've been following your content and I love how authentic your ${creator.niche} posts are. Your engagement rate is seriously impressive.\n\nI run ${product.trim() || "our brand"} and I think your audience would genuinely love what we do. We're looking for creators like you for a paid partnership — no scripts, just honest content in your style.\n\nWould you be open to a quick chat?\n\n— You`
+      );
+      setGenerating(false);
+    }, 1500);
+  };
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={640}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 6px", paddingRight: 40 }}>Generate outreach</h2>
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>
+        To @{creator.username} · {creator.platform}
+      </p>
+      <Field label="What are you selling?">
+        <input value={product} onChange={(e) => setProduct(e.target.value)} style={inputStyle} />
+      </Field>
+      <button type="button" onClick={generate} disabled={generating} style={{ ...btnBlack, width: "100%", marginBottom: 16 }}>
+        Generate outreach →
+      </button>
+      {generating && <p style={{ textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>Generating personalized message...</p>}
+      {message && !generating && (
+        <>
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={10} style={{ ...inputStyle, lineHeight: 1.55, marginBottom: 12 }} />
+          <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(message)}>
+            Copy message
+          </button>
+        </>
+      )}
+    </ModalShell>
+  );
+}
+
+function CreatorDetailModal({
+  creator,
+  onClose,
+  onUpdate,
+  onRemove,
+  onRunCampaign,
+  onGenerateOutreach,
+}: {
+  creator: ManagedCreator;
+  onClose: () => void;
+  onUpdate: (c: ManagedCreator) => void;
+  onRemove: () => void;
+  onRunCampaign: () => void;
+  onGenerateOutreach: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(creator);
+
+  const avgViews = Math.floor(creator.followers * 0.08);
+
+  const saveEdit = () => {
+    onUpdate(draft);
+    setEditing(false);
+  };
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={600}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, paddingRight: 32 }}>
+        <img src={avatarUrlFor(creator.username, creator.avatarUrl)} alt="" width={80} height={80} style={{ borderRadius: "50%", background: "#F0F0F0" }} />
+        <div style={{ flex: 1 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px" }}>{creator.displayName}</h2>
+          <div style={{ fontSize: 15, color: "#0047FF", marginBottom: 8 }}>@{creator.username}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, background: "#F0F0F0", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>{creator.platform}</span>
+            <span style={statusBadgeStyle(creator.status)}>{creator.status}</span>
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+        {[
+          { label: "Followers", value: formatCount(creator.followers) },
+          { label: "Engagement", value: `${creator.engagement}%` },
+          { label: "Avg Views", value: formatCount(avgViews) },
+          { label: "Niche", value: creator.niche },
+          { label: "Location", value: creator.location },
+          { label: "Age", value: String(creator.age) },
+        ].map((s) => (
+          <div key={s.label} style={{ background: "#FAFAFA", borderRadius: 10, padding: 12, textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 4 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>
+        <strong style={{ color: "#1A1A1A" }}>Email:</strong> {creator.email}
+      </div>
+      <Field label="Notes">
+        <textarea
+          value={editing ? draft.notes : creator.notes}
+          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+          readOnly={!editing}
+          rows={4}
+          style={{ ...inputStyle, lineHeight: 1.5 }}
+        />
+      </Field>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
+        {editing ? (
+          <>
+            <button type="button" style={btnSecondary} onClick={() => { setDraft(creator); setEditing(false); }}>
+              Cancel edit
+            </button>
+            <button type="button" style={btnPrimary} onClick={saveEdit}>
+              Save notes
+            </button>
+          </>
+        ) : (
+          <button type="button" style={btnSecondary} onClick={() => setEditing(true)}>
+            Edit creator
+          </button>
+        )}
+        <button type="button" style={btnBlack} onClick={onRunCampaign}>
+          Run campaign →
+        </button>
+        <button type="button" style={btnSecondary} onClick={onGenerateOutreach}>
+          Generate outreach →
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={onRemove}
+        style={{ background: "none", border: "none", color: "#DC2626", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+      >
+        Remove creator
+      </button>
+    </ModalShell>
+  );
+}
+
+function RunCampaignModal({
+  creator,
+  onClose,
+  onLaunch,
+}: {
+  creator: ManagedCreator;
+  onClose: () => void;
+  onLaunch: (campaignId: string) => void;
+}) {
+  const [step, setStep] = useState(1);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [commissionType, setCommissionType] = useState<"percentage" | "fixed">("percentage");
+  const [commissionRate, setCommissionRate] = useState("15");
+  const [autoPayout, setAutoPayout] = useState(true);
+  const [minPayout, setMinPayout] = useState("50");
+  const code = discountCodeFor(creator.username);
+  const [refLink] = useState(`trackit.app/r/${referralSlug(creator.username)}`);
+
+  return (
+    <ModalShell onClose={onClose} maxWidth={560}>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 6px", paddingRight: 40 }}>Run campaign</h2>
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>Assign {creator.displayName} to a campaign</p>
+
+      {step === 1 && (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 1 — Select campaign</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+            {MOCK_CAMPAIGNS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedCampaign(c.id)}
+                style={{
+                  textAlign: "left",
+                  padding: 14,
+                  borderRadius: 12,
+                  border: `1px solid ${selectedCampaign === c.id ? "#0047FF" : "#EFEFEF"}`,
+                  background: selectedCampaign === c.id ? "rgba(0,71,255,0.06)" : "#FAFAFA",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: "#9A9A9A" }}>{c.platform}</div>
+              </button>
+            ))}
+            <button type="button" style={{ ...btnSecondary, borderStyle: "dashed" }}>
+              Create new campaign +
+            </button>
+          </div>
+          <button type="button" disabled={!selectedCampaign} style={{ ...btnBlack, width: "100%", opacity: selectedCampaign ? 1 : 0.45 }} onClick={() => setStep(2)}>
+            Continue →
+          </button>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 2 — Commission</p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+            {(["percentage", "fixed"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setCommissionType(t)}
+                style={{
+                  ...btnSecondary,
+                  flex: 1,
+                  background: commissionType === t ? "#1A1A1A" : "#FFF",
+                  color: commissionType === t ? "#FFF" : "#1A1A1A",
+                }}
+              >
+                {t === "percentage" ? "Percentage" : "Fixed amount"}
+              </button>
+            ))}
+          </div>
+          <Field label={commissionType === "percentage" ? "Commission rate (%)" : "Fixed amount ($)"}>
+            <input value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
+          </Field>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ fontSize: 14 }}>Auto payout</span>
+            <button
+              type="button"
+              onClick={() => setAutoPayout(!autoPayout)}
+              style={{
+                width: 44,
+                height: 24,
+                borderRadius: 999,
+                border: "none",
+                background: autoPayout ? "#0047FF" : "#E5E5E5",
+                cursor: "pointer",
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: 3,
+                  left: autoPayout ? 23 : 3,
+                  width: 18,
+                  height: 18,
+                  borderRadius: "50%",
+                  background: "#FFF",
+                  transition: "left 0.2s",
+                }}
+              />
+            </button>
+          </div>
+          <Field label="Minimum payout threshold ($)">
+            <input value={minPayout} onChange={(e) => setMinPayout(e.target.value)} style={inputStyle} />
+          </Field>
+          <button type="button" style={{ ...btnBlack, width: "100%" }} onClick={() => setStep(3)}>
+            Continue →
+          </button>
+        </>
+      )}
+
+      {step === 3 && (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 3 — Referral assets</p>
+          <Field label="Discount code">
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={code} style={{ ...inputStyle, fontFamily: "monospace", fontWeight: 600 }} />
+              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(code)}>
+                Copy
+              </button>
+            </div>
+          </Field>
+          <Field label="Referral link">
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={refLink} style={{ ...inputStyle, fontFamily: "monospace", fontSize: 12 }} />
+              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(refLink)}>
+                Copy
+              </button>
+            </div>
+          </Field>
+          <button
+            type="button"
+            style={{ ...btnBlack, width: "100%", marginTop: 8 }}
+            onClick={() => selectedCampaign && onLaunch(selectedCampaign)}
+          >
+            Launch campaign →
+          </button>
+        </>
+      )}
+    </ModalShell>
+  );
+}
+
+export function CreatorsView() {
+  const [creators, setCreators] = useState<ManagedCreator[]>(INITIAL_CREATORS);
+  const [tab, setTab] = useState<CreatorsTab>("all");
+  const [search, setSearch] = useState("");
+  const [platformFilter, setPlatformFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<SortKey>("followers");
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [detailCreator, setDetailCreator] = useState<ManagedCreator | null>(null);
+  const [campaignCreator, setCampaignCreator] = useState<ManagedCreator | null>(null);
+  const [outreachCreator, setOutreachCreator] = useState<ManagedCreator | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const uniqueCampaigns = useMemo(() => {
+    const ids = new Set<string>();
+    creators.forEach((c) => c.campaignIds.forEach((id) => ids.add(id)));
+    return ids.size;
+  }, [creators]);
+
+  const activeCount = creators.filter((c) => c.status === "active").length;
+  const avgEngagement = creators.length
+    ? creators.reduce((s, c) => s + c.engagement, 0) / creators.length
+    : 0;
+
+  const filtered = useMemo(() => {
+    let list = [...creators];
+    if (tab === "active") list = list.filter((c) => c.status === "active");
+    if (tab === "pending") list = list.filter((c) => c.status === "pending");
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (c) =>
+          c.displayName.toLowerCase().includes(q) ||
+          c.username.toLowerCase().includes(q) ||
+          c.niche.toLowerCase().includes(q)
+      );
+    }
+    if (platformFilter !== "all") list = list.filter((c) => c.platform === platformFilter);
+    list.sort((a, b) => {
+      if (sortBy === "followers") return b.followers - a.followers;
+      if (sortBy === "engagement") return b.engagement - a.engagement;
+      return b.addedDate.localeCompare(a.addedDate);
+    });
+    return list;
+  }, [creators, tab, search, platformFilter, sortBy]);
+
+  const updateCreator = (updated: ManagedCreator) => {
+    setCreators((list) => list.map((c) => (c.id === updated.id ? updated : c)));
+    setDetailCreator((d) => (d?.id === updated.id ? updated : d));
+  };
+
+  const removeCreator = (id: string) => {
+    setCreators((list) => list.filter((c) => c.id !== id));
+    setDetailCreator(null);
+  };
+
+  const btnActionPrimary: React.CSSProperties = {
+    ...btnBlack,
+    fontSize: 13,
+    fontWeight: 600,
+    padding: "10px 16px",
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+    lineHeight: 1.2,
+  };
+
+  const btnActionSecondary: React.CSSProperties = {
+    ...btnSecondary,
+    fontSize: 13,
+    fontWeight: 600,
+    padding: "10px 16px",
+    borderRadius: 999,
+    whiteSpace: "nowrap",
+    lineHeight: 1.2,
+  };
+
+  const iconBtnAction: React.CSSProperties = {
+    background: "#FFFFFF",
+    border: "1px solid #E5E5E5",
+    borderRadius: 10,
+    width: 38,
+    height: 38,
+    padding: 0,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+
+  return (
+    <>
+      <div style={{ padding: "32px 40px 24px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>Creators</h1>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>Manage your creator relationships.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" style={btnSecondary} onClick={() => setImportOpen(true)}>
+              Import CSV
+            </button>
+            <button type="button" style={btnBlack} onClick={() => setAddOpen(true)}>
+              + Add Creator
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: "24px 40px 40px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+          {[
+            { label: "Total Creators", value: String(creators.length) },
+            { label: "Active Partners", value: String(activeCount) },
+            { label: "Avg Engagement", value: `${avgEngagement.toFixed(1)}%` },
+            { label: "Total Campaigns", value: String(uniqueCampaigns) },
+          ].map((kpi) => (
+            <div key={kpi.label} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 14, padding: 20 }}>
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>{kpi.label}</div>
+              <div style={{ fontSize: 26, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{kpi.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #EFEFEF", marginBottom: 20 }}>
+          {(
+            [
+              { id: "all" as const, label: "All Creators" },
+              { id: "active" as const, label: "Active" },
+              { id: "pending" as const, label: "Pending" },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              style={{
+                background: "transparent",
+                border: "none",
+                borderBottom: tab === t.id ? "2px solid #0047FF" : "2px solid transparent",
+                padding: "10px 4px 14px",
+                marginRight: 16,
+                fontSize: 14,
+                fontWeight: tab === t.id ? 600 : 400,
+                color: tab === t.id ? "#1A1A1A" : "#7A7A7A",
+                fontFamily: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 200,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              background: "#FFFFFF",
+              border: "1px solid #EFEFEF",
+              borderRadius: 10,
+              padding: "8px 12px",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, handle, niche..."
+              style={{ border: "none", outline: "none", flex: 1, fontSize: 13, fontFamily: "inherit" }}
+            />
+          </div>
+          <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
+            <option value="all">All platforms</option>
+            <option value="tiktok">TikTok</option>
+            <option value="instagram">Instagram</option>
+            <option value="youtube">YouTube</option>
+          </select>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
+            <option value="followers">Followers</option>
+            <option value="engagement">Engagement</option>
+            <option value="addedDate">Added date</option>
+          </select>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 0.9fr 0.8fr 0.7fr 0.8fr 0.8fr 0.9fr 3fr",
+              gap: 12,
+              padding: "14px 20px",
+              background: "#FAFAFA",
+              borderBottom: "1px solid #EFEFEF",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#9A9A9A",
+            }}
+          >
+            {["Creator", "Platform", "Followers", "Engagement", "Niche", "Status", "Added", "Actions"].map((h) => (
+              <div key={h}>{h}</div>
+            ))}
+          </div>
+          {filtered.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+          ) : (
+            filtered.map((c, i) => (
+              <div
+                key={c.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 0.9fr 0.8fr 0.7fr 0.8fr 0.8fr 0.9fr 3fr",
+                  gap: 12,
+                  padding: "18px 20px",
+                  alignItems: "center",
+                  borderBottom: i < filtered.length - 1 ? "1px solid #F5F5F5" : "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <img src={avatarUrlFor(c.username, c.avatarUrl)} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.displayName}</div>
+                    <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, textTransform: "capitalize" }}>{c.platform}</div>
+                <div style={{ fontSize: 13 }}>{formatCount(c.followers)}</div>
+                <div style={{ fontSize: 13 }}>{c.engagement}%</div>
+                <div style={{ fontSize: 13 }}>{c.niche}</div>
+                <div><span style={statusBadgeStyle(c.status)}>{c.status}</span></div>
+                <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    <button type="button" style={btnActionPrimary} onClick={() => setCampaignCreator(c)}>
+                      Run campaign →
+                    </button>
+                    <button type="button" style={btnActionSecondary} onClick={() => setOutreachCreator(c)}>
+                      Generate outreach
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <button type="button" title="View profile" style={iconBtnAction} onClick={() => setDetailCreator(c)}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="3" stroke="#7A7A7A" strokeWidth="1.7" />
+                        <path d="M12 5c-3.5 0-6 2.2-6 5s2.5 5 6 5 6-2.2 6-5-2.5-5-6-5z" stroke="#7A7A7A" strokeWidth="1.7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      title="Remove"
+                      style={iconBtnAction}
+                      onClick={() => removeCreator(c.id)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#FECACA";
+                        e.currentTarget.style.background = "#FEF2F2";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#E5E5E5";
+                        e.currentTarget.style.background = "#FFFFFF";
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1-2h10l1 2M9 7V5h6v2" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {importOpen && <ImportCsvModal onClose={() => setImportOpen(false)} />}
+      {addOpen && (
+        <AddCreatorModal
+          onClose={() => setAddOpen(false)}
+          onAdd={(c) => {
+            setCreators((list) => [c, ...list]);
+            setAddOpen(false);
+            setToast("Creator added ✓");
+          }}
+        />
+      )}
+      {detailCreator && (
+        <CreatorDetailModal
+          creator={detailCreator}
+          onClose={() => setDetailCreator(null)}
+          onUpdate={updateCreator}
+          onRemove={() => removeCreator(detailCreator.id)}
+          onRunCampaign={() => {
+            setCampaignCreator(detailCreator);
+            setDetailCreator(null);
+          }}
+          onGenerateOutreach={() => {
+            setOutreachCreator(detailCreator);
+            setDetailCreator(null);
+          }}
+        />
+      )}
+      {campaignCreator && (
+        <RunCampaignModal
+          creator={campaignCreator}
+          onClose={() => setCampaignCreator(null)}
+          onLaunch={(campaignId) => {
+            setCreators((list) =>
+              list.map((c) =>
+                c.id === campaignCreator.id
+                  ? {
+                      ...c,
+                      status: "active" as const,
+                      campaignIds: c.campaignIds.includes(campaignId) ? c.campaignIds : [...c.campaignIds, campaignId],
+                    }
+                  : c
+              )
+            );
+            setCampaignCreator(null);
+            setToast("Campaign launched ✓");
+          }}
+        />
+      )}
+      {outreachCreator && <CreatorOutreachModal creator={outreachCreator} onClose={() => setOutreachCreator(null)} />}
+      {toast && <Toast message={toast} />}
+    </>
+  );
+}

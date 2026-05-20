@@ -1,432 +1,73 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { AuthError } from "@supabase/supabase-js";
-
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { useLang } from "@/lib/useLang";
+import { getAuthRedirectPath } from "@/lib/auth-destination";
+import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
 
-type Mode = "login" | "signup";
-
-function getErrorMessage(err: AuthError | null) {
-  if (!err) return null;
-  return err.message ?? "Something went wrong.";
-}
-
-function EyeOpenIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function EyeClosedIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-const eyeBtnStyle: CSSProperties = {
-  position: "absolute",
-  right: 0,
-  top: "50%",
-  transform: "translateY(-50%)",
-  background: "none",
-  border: "none",
-  padding: 6,
-  cursor: "pointer",
-  color: "#fff",
-  opacity: 0.4,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  lineHeight: 0,
-};
-
-const inputBase: CSSProperties = {
-  width: "100%",
-  background: "transparent",
-  border: "none",
-  borderBottom: "1px solid #ffffff",
-  color: "#fff",
-  fontFamily: "'Inter', sans-serif",
-  fontSize: 16,
-  fontWeight: 300,
-  padding: "12px 40px 12px 0",
-  outline: "none",
-  boxSizing: "border-box",
-};
-
-export default function AuthPage() {
+function AuthPageContent() {
   const router = useRouter();
-  const lang = useLang();
-
-  const t = {
-    en: {
-      login_title: "Welcome back.",
-      login_sub: "Sign in to your Klayan account.",
-      signup_title: "Create your account.",
-      signup_sub: "Start validating your ideas with Klayan.",
-      email: "Email",
-      password: "Password",
-      username: "Username",
-      signin_btn: "Sign in →",
-      signup_btn: "Create account →",
-      no_account: "Don't have an account?",
-      has_account: "Already have an account?",
-      signup_link: "Sign up",
-      signin_link: "Sign in",
-      check_email: "Check your email.",
-      check_email_sub:
-        "We sent you a confirmation link. Click it to activate your account.",
-      confirmed_btn: "Already confirmed? Log in →",
-    },
-    fr: {
-      login_title: "Bon retour.",
-      login_sub: "Connecte-toi à ton compte Klayan.",
-      signup_title: "Crée ton compte.",
-      signup_sub: "Commence à valider tes idées avec Klayan.",
-      email: "Email",
-      password: "Mot de passe",
-      username: "Nom d'utilisateur",
-      signin_btn: "Se connecter →",
-      signup_btn: "Créer un compte →",
-      no_account: "Pas encore de compte ?",
-      has_account: "Déjà un compte ?",
-      signup_link: "S'inscrire",
-      signin_link: "Se connecter",
-      check_email: "Vérifie tes emails.",
-      check_email_sub:
-        "On t'a envoyé un lien de confirmation. Clique dessus pour activer ton compte.",
-      confirmed_btn: "Déjà confirmé ? Se connecter →",
-    },
-  }[lang];
-
-  const skipAuthRedirectForAvatarRef = useRef(false);
-  const avatarFileInputRef = useRef<HTMLInputElement>(null);
-  const [mode, setMode] = useState<Mode>("signup");
-  const [signupStep, setSignupStep] = useState<1 | 2 | 3>(1);
-
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [username, setUsername] = useState("");
-
-  const [loginPwVisible, setLoginPwVisible] = useState(false);
-  const [signupPwVisible, setSignupPwVisible] = useState(false);
-  const [confirmPwVisible, setConfirmPwVisible] = useState(false);
-
+  const [pwVisible, setPwVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [signupAwaitingEmail, setSignupAwaitingEmail] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
-  const [usernameError, setUsernameError] = useState<string | null>(null);
-
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [signupAwaitingEmail, setSignupAwaitingEmail] = useState(false);
 
   useEffect(() => {
-    return () => {
-      if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
-    };
-  }, [avatarPreviewUrl]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const refParam = params.get("ref");
-    if (refParam) localStorage.setItem("referral_source", refParam);
-    if (params.get("error") === "confirmation_failed") {
-      setError("Email confirmation failed. Please try again or sign up with a new link.");
-      setMode("login");
-      window.history.replaceState(null, "", "/auth");
+    if (!supabase) {
+      setCheckingSession(false);
+      return;
     }
-  }, []);
-
-  useEffect(() => {
-    if (!signupAwaitingEmail) return;
-    const client = supabase;
-    if (!client) return;
-
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" && session?.user?.email_confirmed_at) {
-        subscription.unsubscribe();
-        router.push("/analyze");
+    void (async () => {
+      const redirectParam = searchParams.get("redirectTo");
+      const fallback = await tryAutoAuth(supabase);
+      if (fallback) {
+        router.replace(redirectParam && redirectParam.startsWith("/") ? redirectParam : fallback);
+        return;
       }
-    });
+      setCheckingSession(false);
+    })();
+  }, [router, searchParams]);
 
-    const interval = setInterval(() => {
-      void client.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user?.email_confirmed_at) {
-          clearInterval(interval);
-          router.push("/analyze");
-        }
-      });
-    }, 2000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(interval);
-    };
-  }, [signupAwaitingEmail, router]);
-
-  const validateEmail = (value: string) => {
-    const basic = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!basic.test(value)) return false;
-    const domain = value.split("@")[1] ?? "";
-    const parts = domain.split(".");
-    const tld = parts[parts.length - 1] ?? "";
-    return /^[A-Za-z]{2,}$/.test(tld);
-  };
-
-  const validateUsername = (value: string) => {
-    if (value.length < 3 || value.length > 20) return false;
-    return /^[a-zA-Z0-9_]+$/.test(value);
-  };
-
-  const resetFieldErrors = () => {
-    setEmailError(null);
-    setPasswordError(null);
-    setConfirmPasswordError(null);
-    setUsernameError(null);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
-  };
-
-  const handleSignupContinue = (e: React.FormEvent) => {
-    e.preventDefault();
-    resetFieldErrors();
-
-    if (!validateEmail(email.trim())) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
-    if (password.length < 12) {
-      setPasswordError("At least 12 characters required");
-      return;
-    }
-    if (!/[A-Z]/.test(password)) {
-      setPasswordError("At least one uppercase letter required");
-      return;
-    }
-    if (!/[!@#$%^&*]/.test(password)) {
-      setPasswordError("At least one symbol required (!@#$%^&*)");
-      return;
-    }
-    if (confirmPassword !== password) {
-      setConfirmPasswordError("Passwords do not match");
-      return;
-    }
-
-    setSignupStep(2);
-  };
-
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
     if (!supabase) {
       setError("Supabase is not configured yet.");
       return;
     }
-
-    resetFieldErrors();
-
-    const u = username.trim();
-    if (!validateUsername(u)) {
-      setUsernameError(
-        "3–20 characters: letters, numbers, and underscores only"
-      );
-      return;
-    }
-
-    setLoading(true);
-    skipAuthRedirectForAvatarRef.current = true;
-    try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: { username: u },
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
-        },
-      });
-
-      const msg = getErrorMessage(signUpError);
-      if (msg) {
-        skipAuthRedirectForAvatarRef.current = false;
-        setError(msg);
-        return;
-      }
-
-      const user = data.user;
-      if (!user) {
-        skipAuthRedirectForAvatarRef.current = false;
-        setError("Could not create account. Please try again.");
-        return;
-      }
-
-      if (data.session) {
-        setSignupStep(3);
-      } else {
-        skipAuthRedirectForAvatarRef.current = false;
-        router.replace("/analyze");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f || !f.type.startsWith("image/")) return;
-    setAvatarFile(f);
-    setAvatarPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(f);
-    });
-  };
-
-  const completeSignupWithOptionalAvatar = async (opts: { skipUpload: boolean }) => {
-    if (!supabase) {
-      setError("Supabase is not configured yet.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setError("Session expired. Please sign in again.");
-        skipAuthRedirectForAvatarRef.current = false;
-        return;
-      }
-
-      const shouldUpload = !opts.skipUpload && avatarFile !== null;
-
-      if (shouldUpload && avatarFile) {
-        const path = `${user.id}/avatar`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(path, avatarFile, {
-            upsert: true,
-            contentType: avatarFile.type || "image/jpeg",
-          });
-
-        if (uploadError) {
-          setError(uploadError.message);
-          return;
-        }
-
-        const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-        const publicUrl = pub.publicUrl;
-
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (existingProfile) {
-          const { error: profileUpdateError } = await supabase
-            .from("profiles")
-            .update({ avatar_url: publicUrl })
-            .eq("id", user.id);
-
-          if (profileUpdateError) {
-            setError(profileUpdateError.message);
-            return;
-          }
-        }
-      }
-
-      // Create profile if it doesn't exist yet
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      const referralSource = localStorage.getItem("referral_source") ?? null;
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        username: username.trim() || user.email?.split("@")[0] || "founder",
-        plan: existingProfile ? undefined : "free",
-        subscription_status: existingProfile ? undefined : "inactive",
-        ...(referralSource ? { referral_source: referralSource } : {}),
-      }, { onConflict: "id", ignoreDuplicates: false });
-      if (referralSource) localStorage.removeItem("referral_source");
-
-      skipAuthRedirectForAvatarRef.current = false;
-      router.replace("/analyze");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase) {
-      setError("Supabase is not configured yet.");
-      return;
-    }
-
-    resetFieldErrors();
-
-    if (!validateEmail(email.trim())) {
-      setEmailError("Please enter a valid email address");
-      return;
-    }
-
     setLoading(true);
     try {
-      const { error: signErr } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      const msg = getErrorMessage(signErr);
-      if (msg) {
-        setError(msg);
-      } else {
-        const {
-          data: { user: signedInUser },
-        } = await supabase.auth.getUser();
-        if (!signedInUser) {
-          router.replace("/auth");
-          return;
-        }
-        const { data: profileRow } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", signedInUser.id)
-          .maybeSingle();
-        if (!profileRow) {
-          router.replace("/analyze");
+      if (mode === "login") {
+        const { error: signErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (signErr) {
+          setError(signErr.message);
         } else {
-          router.replace("/dashboard");
+          await recordLoginIp();
+          const redirectParam = searchParams.get("redirectTo");
+          const destination = supabase
+            ? await getAuthRedirectPath(supabase, (await supabase.auth.getUser()).data.user!.id)
+            : "/dashboard";
+          router.replace(redirectParam && redirectParam.startsWith("/") ? redirectParam : destination);
+        }
+      } else {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
+        });
+        if (signUpError) {
+          setError(signUpError.message);
+        } else if (data.session) {
+          await recordLoginIp();
+          router.replace("/onboarding");
+        } else {
+          setSignupAwaitingEmail(true);
         }
       }
     } finally {
@@ -434,652 +75,119 @@ export default function AuthPage() {
     }
   };
 
-  const toggleMode = () => {
-    setMode((m) => (m === "login" ? "signup" : "login"));
-    setSignupStep(1);
-    setSignupAwaitingEmail(false);
-    setAvatarFile(null);
-    setAvatarPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
+  const handleOAuth = async (provider: "google" | "apple") => {
+    if (!supabase) return;
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${window.location.origin}/auth/confirm` },
     });
-    setError(null);
-    resetFieldErrors();
   };
 
-  const showSignupStep1Fields = mode === "signup" && signupStep === 1;
-  const showSignupStep2 = mode === "signup" && signupStep === 2;
-  const showSignupStep3 = mode === "signup" && signupStep === 3;
-  const showWelcomeHeader =
-    mode === "login" || (mode === "signup" && signupStep === 1);
+  if (checkingSession) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Signing you in...</p>
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        color: "var(--white)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      {/* Blurred landing video background */}
-      <video
-        autoPlay
-        muted
-        loop
-        playsInline
-        style={{
-          position: "fixed",
-          top: 0, left: 0, width: "100%", height: "100%",
-          objectFit: "cover",
-          filter: "blur(18px) brightness(0.35)",
-          transform: "scale(1.08)",
-          zIndex: 0,
-          pointerEvents: "none",
-        }}
-        src="https://res.cloudinary.com/dv1nagsve/video/upload/v1776977283/newdemoblack_mawbuf.mp4"
-      />
-      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1, pointerEvents: "none" }} />
-      <div style={{ position: "relative", zIndex: 2, width: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          borderRadius: 28,
-          border: "1px solid rgba(255,255,255,0.07)",
-          background: signupAwaitingEmail ? "transparent" : "#1a1a1a",
-          backgroundImage: signupAwaitingEmail ? "none" : "radial-gradient(circle, rgba(255,255,255,0.025) 1px, transparent 1px)",
-          backgroundSize: "20px 20px",
-          padding: signupAwaitingEmail ? 0 : "28px 28px 24px",
-          boxShadow: signupAwaitingEmail ? "none" : "0 32px 80px rgba(0,0,0,0.6)",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", marginTop: -80 }}>
+      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 48px 8px" }}>
+        <a href="/" style={{ display: "flex", alignItems: "center" }}>
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 130, width: "auto", display: "block" }} />
+        </a>
+        <button
+          type="button"
+          className="hero-cta"
+          onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); setSignupAwaitingEmail(false); }}
+          style={{ marginTop: 0, border: "none", cursor: "pointer" }}
+        >
+          {mode === "login" ? "Create an account" : "Sign in"}
+        </button>
+      </header>
+
+      <main style={{ maxWidth: 560, margin: "-48px auto 0", padding: "0 24px" }}>
         {signupAwaitingEmail ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "100%",
-            }}
-          >
-            <img
-              src="/images/navbarlogo.png"
-              alt="Klayan"
-              style={{
-                width: 60,
-                height: 60,
-                objectFit: "cover",
-                borderRadius: 50,
-                marginBottom: 24,
-              }}
-            />
-            <div
-              style={{
-                width: "100%",
-                maxWidth: 420,
-                background: "#ffffff",
-                color: "#000000",
-                borderRadius: 16,
-                padding: "28px 24px",
-                textAlign: "center",
-                boxSizing: "border-box",
-              }}
-            >
-              <p
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 16,
-                  fontWeight: 500,
-                  lineHeight: 1.55,
-                  margin: 0,
-                  whiteSpace: "pre-line",
-                }}
-              >
-                {`${t.check_email}\n${t.check_email_sub}`}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setSignupAwaitingEmail(false);
-                  setMode("login");
-                }}
-                style={{
-                  marginTop: 20,
-                  background: "#000000",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "12px 24px",
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  letterSpacing: "-0.02em",
-                  width: "100%",
-                }}
-              >
-                {t.confirmed_btn}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {!signupAwaitingEmail && showWelcomeHeader ? (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-            }}
-          >
-            {mode === "signup" && (
-              <div style={{ display: "flex", gap: 5, marginBottom: 24, width: "100%" }}>
-                {[0,1,2].map(i => (
-                  <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i === 0 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
-                ))}
-              </div>
-            )}
-            <img
-              src="/images/navbarlogo.png"
-              alt="Klayan"
-              style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }}
-            />
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
-              {mode === "login" ? t.login_title : t.signup_title}
-            </div>
-            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, marginBottom: 18, textAlign: "center" }}>
-              {mode === "login" ? t.login_sub : t.signup_sub}
-            </div>
-            <button
-              type="button"
-              onClick={toggleMode}
-              style={{ border: "none", background: "transparent", color: "rgba(255,255,255,0.4)", cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 400, padding: 0, lineHeight: 1.4 }}
-            >
-              {mode === "login"
-                ? `${t.no_account} ${t.signup_link}`
-                : `${t.has_account} ${t.signin_link}`}
-            </button>
-          </div>
-        ) : null}
-
-        {!signupAwaitingEmail && showSignupStep2 ? (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
-            {/* Progress bar */}
-            <div style={{ display: "flex", gap: 5, marginBottom: 24, alignSelf: "stretch", justifyContent: "center" }}>
-              {[0,1,2].map(i => (
-                <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i === 1 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
-              ))}
-            </div>
-            <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }} />
-            <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
-              One last thing.
-            </div>
-            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, textAlign: "center" }}>
-              Choose your username.
-            </div>
-          </div>
-        ) : null}
-
-        {!signupAwaitingEmail && mode === "login" ? (
-          <form onSubmit={(e) => void handleLogin(e)}>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder={t.email}
-              autoComplete="email"
-              disabled={!isSupabaseConfigured || loading}
-              style={{
-                ...inputBase,
-                padding: "12px 0",
-                marginBottom: emailError ? 6 : 16,
-              }}
-            />
-            {emailError ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  padding: "0 0 8px 0",
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {emailError}
-              </div>
-            ) : null}
-
-            <div style={{ position: "relative", marginBottom: 16 }}>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type={loginPwVisible ? "text" : "password"}
-                placeholder={t.password}
-                autoComplete="current-password"
-                disabled={!isSupabaseConfigured || loading}
-                style={{ ...inputBase, marginBottom: 0 }}
-              />
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={loginPwVisible ? "Hide password" : "Show password"}
-                onClick={() => setLoginPwVisible((v) => !v)}
-                style={eyeBtnStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = "0.4";
-                }}
-              >
-                {loginPwVisible ? <EyeClosedIcon /> : <EyeOpenIcon />}
-              </button>
-            </div>
-            {error ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  border: "1px solid rgba(255,77,79,0.25)",
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading || !isSupabaseConfigured}
-              style={{
-                width: "100%",
-                textAlign: "center",
-                background: "#ffffff",
-                color: "#000000",
-                border: "none",
-                padding: "14px 0",
-                borderRadius: 10,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? "Please wait..." : t.signin_btn}
-            </button>
-          </form>
-        ) : null}
-
-        {!signupAwaitingEmail && showSignupStep1Fields ? (
-          <form onSubmit={handleSignupContinue}>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              type="email"
-              placeholder={t.email}
-              autoComplete="email"
-              disabled={!isSupabaseConfigured || loading}
-              style={{
-                ...inputBase,
-                padding: "12px 0",
-                marginBottom: emailError ? 6 : 16,
-              }}
-            />
-            {emailError ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  padding: "0 0 8px 0",
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {emailError}
-              </div>
-            ) : null}
-
-            <div style={{ position: "relative", marginBottom: passwordError ? 6 : 16 }}>
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type={signupPwVisible ? "text" : "password"}
-                placeholder={t.password}
-                autoComplete="new-password"
-                disabled={!isSupabaseConfigured || loading}
-                style={{ ...inputBase, marginBottom: 0 }}
-              />
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={signupPwVisible ? "Hide password" : "Show password"}
-                onClick={() => setSignupPwVisible((v) => !v)}
-                style={eyeBtnStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = "0.4";
-                }}
-              >
-                {signupPwVisible ? <EyeClosedIcon /> : <EyeOpenIcon />}
-              </button>
-            </div>
-            {passwordError ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  padding: "0 0 8px 0",
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {passwordError}
-              </div>
-            ) : null}
-
-            <div style={{ position: "relative", marginBottom: confirmPasswordError ? 6 : 16 }}>
-              <input
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                type={confirmPwVisible ? "text" : "password"}
-                placeholder="Confirm your password"
-                autoComplete="new-password"
-                disabled={!isSupabaseConfigured || loading}
-                style={{ ...inputBase, marginBottom: 0 }}
-              />
-              <button
-                type="button"
-                tabIndex={-1}
-                aria-label={confirmPwVisible ? "Hide password" : "Show password"}
-                onClick={() => setConfirmPwVisible((v) => !v)}
-                style={eyeBtnStyle}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.opacity = "1";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.opacity = "0.4";
-                }}
-              >
-                {confirmPwVisible ? <EyeClosedIcon /> : <EyeOpenIcon />}
-              </button>
-            </div>
-            {confirmPasswordError ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  padding: "0 0 8px 0",
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {confirmPasswordError}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading || !isSupabaseConfigured}
-              style={{
-                width: "100%",
-                textAlign: "center",
-                background: "#ffffff",
-                color: "#000000",
-                border: "none",
-                padding: "14px 0",
-                borderRadius: 10,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              Continue
-            </button>
-          </form>
-        ) : null}
-
-        {!signupAwaitingEmail && showSignupStep2 ? (
-          <form onSubmit={(e) => void handleCreateAccount(e)}>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              type="text"
-              placeholder={t.username}
-              autoComplete="username"
-              disabled={!isSupabaseConfigured || loading}
-              style={{
-                ...inputBase,
-                padding: "12px 0",
-                marginBottom: usernameError ? 6 : 16,
-              }}
-            />
-            {usernameError ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  padding: "0 0 8px 0",
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {usernameError}
-              </div>
-            ) : null}
-
-            {error ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  border: "1px solid rgba(255,77,79,0.25)",
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={loading || !isSupabaseConfigured}
-              style={{
-                width: "100%",
-                textAlign: "center",
-                background: "#ffffff",
-                color: "#000000",
-                border: "none",
-                padding: "14px 0",
-                borderRadius: 10,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? "Please wait..." : t.signup_btn}
-            </button>
-          </form>
-        ) : null}
-
-        {!signupAwaitingEmail && showSignupStep3 ? (
           <div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
-              {/* Progress bar */}
-              <div style={{ display: "flex", gap: 5, marginBottom: 24, alignSelf: "stretch", justifyContent: "center" }}>
-                {[0,1,2].map(i => (
-                  <div key={i} style={{ height: 3, flex: 1, borderRadius: 2, background: i <= 2 ? "#22c55e" : "rgba(255,255,255,0.15)" }} />
-                ))}
-              </div>
-              <img src="/images/navbarlogo.png" alt="Klayan" style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 18, marginBottom: 20 }} />
-              <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 8, textAlign: "center", color: "#fff" }}>
-                Add a photo.
-              </div>
-              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,0.45)", lineHeight: 1.5, textAlign: "center" }}>
-                Put a face to your ideas.
-              </div>
-            </div>
-
-            <input
-              ref={avatarFileInputRef}
-              type="file"
-              accept="image/*"
-              aria-hidden
-              tabIndex={-1}
-              style={{ display: "none" }}
-              onChange={handleAvatarFileChange}
-            />
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <button
-                type="button"
-                aria-label="Choose profile photo"
-                onClick={() => avatarFileInputRef.current?.click()}
-                style={{
-                  width: 120,
-                  height: 120,
-                  borderRadius: "50%",
-                  border: "2px dashed rgba(255,255,255,0.2)",
-                  padding: 0,
-                  background: "transparent",
-                  cursor: "pointer",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                {avatarPreviewUrl ? (
-                  <img
-                    src={avatarPreviewUrl}
-                    alt=""
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : null}
-              </button>
-              <div
-                style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: 12,
-                  fontWeight: 300,
-                  color: "var(--muted)",
-                  textAlign: "center",
-                }}
-              >
-                Upload a photo
-              </div>
-            </div>
-
-            {error ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: "#ff4d4f",
-                  border: "1px solid rgba(255,77,79,0.25)",
-                  padding: "10px 14px",
-                  borderRadius: 12,
-                  marginTop: 16,
-                  marginBottom: 16,
-                  letterSpacing: 0.3,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => void completeSignupWithOptionalAvatar({ skipUpload: true })}
-              disabled={loading || !isSupabaseConfigured}
-              style={{
-                display: "block",
-                width: "100%",
-                marginTop: 8,
-                border: "none",
-                background: "transparent",
-                color: "var(--muted)",
-                cursor: "pointer",
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 14,
-                fontWeight: 300,
-                padding: "10px 0",
-              }}
-            >
-              Skip for now
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                void completeSignupWithOptionalAvatar({ skipUpload: false })
-              }
-              disabled={loading || !isSupabaseConfigured}
-              style={{
-                width: "100%",
-                textAlign: "center",
-                background: "#ffffff",
-                color: "#000000",
-                border: "none",
-                padding: "14px 0",
-                borderRadius: 10,
-                fontFamily: "'Inter', sans-serif",
-                fontSize: 16,
-                fontWeight: 600,
-                letterSpacing: "-0.02em",
-                cursor: "pointer",
-                opacity: loading ? 0.7 : 1,
-                marginTop: 8,
-              }}
-            >
-              {loading ? "Please wait..." : "Finish"}
-            </button>
+            <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 12 }}>Check your email.</h1>
+            <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 32 }}>We sent a confirmation link to {email}. Click it to activate your account.</p>
+            <button type="button" onClick={() => { setSignupAwaitingEmail(false); setMode("login"); }} style={{ width: "100%", background: "#000", color: "#fff", border: "none", padding: "18px 0", borderRadius: 14, fontSize: 16, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer", fontFamily: "inherit" }}>Already confirmed? Sign in</button>
           </div>
-        ) : null}
-      </div>
-      </div>
+        ) : (
+          <>
+            <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 10 }}>{mode === "login" ? "Sign in" : "Create your account"}</h1>
+            <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 28 }}>{mode === "login" ? "Access your Trackit workspace" : "Start finding creators in seconds"}</p>
+
+            <form onSubmit={handleSubmit}>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Enter your email address" autoComplete="email" required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
+
+              <div style={{ position: "relative", marginBottom: 16 }}>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} type={pwVisible ? "text" : "password"} placeholder="Password" autoComplete={mode === "login" ? "current-password" : "new-password"} required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 50px 18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box" }} />
+                <button type="button" onClick={() => setPwVisible((v) => !v)} tabIndex={-1} aria-label={pwVisible ? "Hide password" : "Show password"} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", padding: 4, display: "flex" }}>
+                  {pwVisible ? (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                  ) : (
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/></svg>
+                  )}
+                </button>
+              </div>
+
+              {error ? (<div style={{ fontSize: 14, fontWeight: 500, color: "#992323", padding: "10px 14px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 16 }}>{error}</div>) : null}
+
+              <button
+                type="submit"
+                className="hero-cta"
+                disabled={loading || !isSupabaseConfigured}
+                style={{
+                  width: "100%",
+                  display: "block",
+                  marginTop: 0,
+                  marginBottom: 14,
+                  border: "none",
+                  cursor: "pointer",
+                  opacity: loading ? 0.7 : 1,
+                  boxSizing: "border-box",
+                }}
+              >
+                {loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
+              </button>
+
+              {mode === "login" ? (<div style={{ textAlign: "right", marginBottom: 28 }}><a href="#" style={{ fontSize: 14, color: "#1A1A1A", textDecoration: "underline", letterSpacing: "-0.02em" }}>Forgot password?</a></div>) : null}
+
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+                <span style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>or</span>
+                <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
+              </div>
+
+              <button type="button" onClick={() => handleOAuth("google")} style={{ width: "100%", background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", padding: "16px 0", borderRadius: 14, fontSize: 16, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 12 }}>
+                <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                Sign in with Google
+              </button>
+
+              <button type="button" onClick={() => handleOAuth("apple")} style={{ width: "100%", background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", padding: "16px 0", borderRadius: 14, fontSize: 16, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                <svg width="18" height="22" viewBox="0 0 24 24" fill="#1A1A1A"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+                Sign in with Apple
+              </button>
+            </form>
+          </>
+        )}
+      </main>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Loading...</p>
+        </div>
+      }
+    >
+      <AuthPageContent />
+    </Suspense>
   );
 }

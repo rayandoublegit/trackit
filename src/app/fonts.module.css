@@ -1,0 +1,130 @@
+/* Self-hosted Inter Display & Instrument Sans (woff2 preferred, ttf fallback) */
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-SemiBold.woff2') format('woff2'),
+    url('/fonts/InterDisplay-SemiBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-Medium.woff2') format('woff2'),
+    url('/fonts/InterDisplay-Medium.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-Regular.woff2') format('woff2'),
+    url('/fonts/InterDisplay-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-Regular.woff2') format('woff2'),
+    url('/fonts/InterDisplay-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-Bold.woff2') format('woff2'),
+    url('/fonts/InterDisplay-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-MediumItalic.woff2') format('woff2'),
+    url('/fonts/InterDisplay-MediumItalic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InterDisplay';
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src:
+    url('/fonts/InterDisplay-BoldItalic.woff2') format('woff2'),
+    url('/fonts/InterDisplay-BoldItalic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-Regular.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-Medium.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-Medium.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-SemiBold.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-SemiBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-Bold.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-Bold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-Italic.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-Italic.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'InstrumentSans';
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+  src:
+    url('/fonts/InstrumentSans-BoldItalic.woff2') format('woff2'),
+    url('/fonts/InstrumentSans-BoldItalic.ttf') format('truetype');
+}

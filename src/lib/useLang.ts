@@ -1,25 +1,19 @@
-import { useState, useEffect } from "react";
+"use client";
+import { useEffect, useState } from "react";
 
-export function useLang() {
-  const [lang, setLang] = useState<"en" | "fr">("en");
+export type Lang = "en" | "fr";
+
+export function useLang(): Lang {
+  const [lang, setLang] = useState<Lang>("en");
 
   useEffect(() => {
-    const saved = localStorage.getItem("klayan_lang") as "en" | "fr" | null;
-    if (saved) {
-      setLang(saved);
-    } else {
-      const browserLang = navigator.language || (navigator as any).userLanguage || "";
-      const detected = browserLang.toLowerCase().startsWith("fr") ? "fr" : "en";
-      setLang(detected);
-      localStorage.setItem("klayan_lang", detected);
+    const stored = localStorage.getItem("trackit_lang") as Lang | null;
+    if (stored === "en" || stored === "fr") {
+      setLang(stored);
+      return;
     }
-
-    const handler = (e: Event) => {
-      const val = (e as CustomEvent).detail;
-      if (val === "en" || val === "fr") setLang(val);
-    };
-    window.addEventListener("klayan_lang_change", handler);
-    return () => window.removeEventListener("klayan_lang_change", handler);
+    const browser = navigator.language.toLowerCase();
+    setLang(browser.startsWith("fr") ? "fr" : "en");
   }, []);
 
   return lang;
