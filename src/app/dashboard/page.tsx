@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
@@ -10,7 +10,7 @@ import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
 import { OutreachHistorySection } from "./OutreachView";
-import { AddPaymentMethodModal, LiveSalesFeed, PayoutsWorkspacePaymentCard } from "./PayoutsView";
+import { AddPaymentMethodModal, LiveSalesFeed, PayoutsView, PayoutsWorkspacePaymentCard } from "./PayoutsView";
 import { getDefaultPaymentMethod, usePaymentMethods } from "./usePaymentMethods";
 import { FeedbackView } from "./FeedbackView";
 import { HelpCenterView } from "./HelpCenterView";
@@ -19,13 +19,34 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 
 type View = "dashboard" | "discovery" | "creators" | "campaigns" | "affiliates" | "outreach" | "payouts" | "analytics" | "integrations" | "automation" | "settings" | "feedback" | "notifications" | "help";
 
+type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
+
+type SidebarNavEntry = {
+  id: string;
+  label: string;
+  view: View;
+  section: SidebarNavSection;
+  keywords: string[];
+  badge?: string;
+  iconKey: string;
+};
+
+const SIDEBAR_SECTION_LABELS: Record<Exclude<SidebarNavSection, "footer">, string> = {
+  main: "Main Menu",
+  tools: "Tools",
+  workspace: "Workspace",
+};
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarSearch, setSidebarSearch] = useState("");
+  const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
+  const [plan, setPlan] = useState<"free" | "basic" | "pro">("free");
   const [notificationUnread, setNotificationUnread] = useState(getInitialUnreadCount);
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
@@ -54,13 +75,14 @@ export default function DashboardPage() {
       if (!authUser) { router.replace("/auth"); return; }
       const { data: profileData } = await supabase!
         .from("profiles")
-        .select("onboarding_completed, full_name, username, avatar_url, business_name")
+        .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status")
         .eq("id", authUser.id)
         .maybeSingle();
       if (!profileData || profileData.onboarding_completed === false) {
         router.replace("/onboarding");
         return;
       }
+      setPlan((profileData.plan as "free" | "basic" | "pro") || "free");
       setUser(authUser);
       const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
       avatarRetryRef.current = false;
@@ -74,6 +96,23 @@ export default function DashboardPage() {
       setLoading(false);
     });
   }, [router]);
+
+  const handleUpgrade = useCallback(async () => {
+    if (!supabase) return;
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const res = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        priceId: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID,
+        userId: authUser?.id,
+        email: authUser?.email,
+        cancelUrl: window.location.href,
+      }),
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+  }, []);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
@@ -89,6 +128,48 @@ export default function DashboardPage() {
     setAvatarBroken(false);
   }, [profile?.avatar_url]);
 
+  const sidebarNavEntries = useMemo(
+    () => buildSidebarNavEntries(notificationUnread),
+    [notificationUnread]
+  );
+
+  const filteredSidebarNav = useMemo(() => {
+    const q = sidebarSearch.trim().toLowerCase();
+    if (!q) return sidebarNavEntries;
+    return sidebarNavEntries.filter((item) => {
+      const haystack = [
+        item.label,
+        item.section,
+        SIDEBAR_SECTION_LABELS[item.section as Exclude<SidebarNavSection, "footer">] ?? "",
+        ...item.keywords,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [sidebarSearch, sidebarNavEntries]);
+
+  const isSidebarSearching = sidebarSearch.trim().length > 0;
+
+  const goToSidebarItem = (targetView: View) => {
+    setView(targetView);
+    setSidebarSearch("");
+    sidebarSearchRef.current?.blur();
+  };
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSidebarCollapsed(false);
+        sidebarSearchRef.current?.focus();
+        sidebarSearchRef.current?.select();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   if (loading) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA", fontFamily: "'InterDisplay', sans-serif" }}><p style={{ color: "#7A7A7A" }}>Loading...</p></div>;
   }
@@ -96,6 +177,52 @@ export default function DashboardPage() {
   const sidebarWidth = sidebarCollapsed ? 72 : 264;
 
   const storeName = profile?.business_name?.trim() || null;
+
+  const sectionHeaderStyle: React.CSSProperties = {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#9A9A9A",
+    textTransform: "uppercase",
+    letterSpacing: "0.06em",
+    padding: "12px 12px 8px 12px",
+  };
+
+  const renderSidebarNavItems = (items: SidebarNavEntry[], showSectionGap?: boolean) => (
+    <>
+      {showSectionGap && sidebarCollapsed && items.length > 0 && <div style={{ height: 16 }} />}
+      {items.map((item) => (
+        <SidebarItem
+          key={item.id}
+          collapsed={sidebarCollapsed}
+          icon={renderSidebarNavIcon(item.iconKey)}
+          label={item.label}
+          active={view === item.view}
+          badge={item.badge}
+          onClick={() => goToSidebarItem(item.view)}
+        />
+      ))}
+    </>
+  );
+
+  const renderNavSection = (section: Exclude<SidebarNavSection, "footer">, extraTopPadding?: boolean) => {
+    const items = filteredSidebarNav.filter((item) => item.section === section);
+    if (items.length === 0) return null;
+    return (
+      <>
+        {!sidebarCollapsed && (
+          <div
+            style={{
+              ...sectionHeaderStyle,
+              padding: extraTopPadding ? "20px 12px 8px 12px" : sectionHeaderStyle.padding,
+            }}
+          >
+            {SIDEBAR_SECTION_LABELS[section]}
+          </div>
+        )}
+        {renderSidebarNavItems(items, extraTopPadding)}
+      </>
+    );
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex" }}>
@@ -159,40 +286,66 @@ export default function DashboardPage() {
           <div style={{ padding: "14px 12px 6px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F5F5F5", borderRadius: 10, padding: "8px 12px" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-              <input type="text" placeholder="Search" style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#1A1A1A", fontFamily: "inherit", flex: 1, minWidth: 0, letterSpacing: "-0.01em" }} />
-              <span style={{ fontSize: 11, color: "#9A9A9A", background: "#FFFFFF", padding: "2px 6px", borderRadius: 5, border: "1px solid #E5E5E5" }}>⌘K</span>
+              <input
+                ref={sidebarSearchRef}
+                type="search"
+                placeholder="Search menu..."
+                value={sidebarSearch}
+                onChange={(e) => setSidebarSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && filteredSidebarNav.length > 0) {
+                    e.preventDefault();
+                    goToSidebarItem(filteredSidebarNav[0].view);
+                  }
+                  if (e.key === "Escape") {
+                    setSidebarSearch("");
+                    sidebarSearchRef.current?.blur();
+                  }
+                }}
+                style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#1A1A1A", fontFamily: "inherit", flex: 1, minWidth: 0, letterSpacing: "-0.01em" }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setSidebarCollapsed(false);
+                  sidebarSearchRef.current?.focus();
+                }}
+                style={{ fontSize: 11, color: "#9A9A9A", background: "#FFFFFF", padding: "2px 6px", borderRadius: 5, border: "1px solid #E5E5E5", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                ⌘K
+              </button>
             </div>
           </div>
         )}
 
         <nav style={{ flex: 1, padding: "10px 12px", overflowY: "auto" }}>
-          {!sidebarCollapsed && <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", padding: "12px 12px 8px 12px" }}>Main Menu</div>}
-          <SidebarItem collapsed={sidebarCollapsed} icon={<HomeIcon />} label="Dashboard" active={view === "dashboard"} onClick={() => setView("dashboard")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<SearchIcon />} label="Discovery" active={view === "discovery"} onClick={() => setView("discovery")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<CreatorsIcon />} label="Creators" active={view === "creators"} onClick={() => setView("creators")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<CampaignIcon />} label="Campaigns" active={view === "campaigns"} onClick={() => setView("campaigns")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<AffiliateIcon />} label="Affiliates" active={view === "affiliates"} onClick={() => setView("affiliates")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<MessageIcon />} label="Outreach" active={view === "outreach"} onClick={() => setView("outreach")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<PayoutIcon />} label="Payouts" active={view === "payouts"} onClick={() => setView("payouts")} />
-
-          {!sidebarCollapsed && <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", padding: "20px 12px 8px 12px" }}>Tools</div>}
-          {sidebarCollapsed && <div style={{ height: 16 }} />}
-          <SidebarItem collapsed={sidebarCollapsed} icon={<AnalyticsIcon />} label="Analytics" active={view === "analytics"} onClick={() => setView("analytics")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<IntegrationIcon />} label="Integrations" active={view === "integrations"} onClick={() => setView("integrations")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<AutomationIcon />} label="Automation" active={view === "automation"} onClick={() => setView("automation")} />
-
-          {!sidebarCollapsed && <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", padding: "20px 12px 8px 12px" }}>Workspace</div>}
-          {sidebarCollapsed && <div style={{ height: 16 }} />}
-          <SidebarItem collapsed={sidebarCollapsed} icon={<NotificationIcon />} label="Notifications" active={view === "notifications"} badge={notificationUnread > 0 ? String(notificationUnread) : undefined} onClick={() => setView("notifications")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<DotIcon color="#0047FF" />} label="Active Campaigns" badge="5" onClick={() => setView("campaigns")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<DotIcon color="#FF3D8B" />} label="Creator Lists" badge="4" onClick={() => setView("discovery")} />
+          {isSidebarSearching ? (
+            <>
+              {!sidebarCollapsed && <div style={sectionHeaderStyle}>Results</div>}
+              {filteredSidebarNav.length === 0 ? (
+                !sidebarCollapsed && (
+                  <div style={{ padding: "8px 12px", fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                    No menu items found
+                  </div>
+                )
+              ) : (
+                renderSidebarNavItems(filteredSidebarNav)
+              )}
+            </>
+          ) : (
+            <>
+              {renderNavSection("main")}
+              {renderNavSection("tools", true)}
+              {renderNavSection("workspace", true)}
+            </>
+          )}
         </nav>
 
-        <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
-          <SidebarItem collapsed={sidebarCollapsed} icon={<HelpIcon />} label="Help Center" active={view === "help"} onClick={() => setView("help")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<FeedbackIcon />} label="Feedback" active={view === "feedback"} onClick={() => setView("feedback")} />
-          <SidebarItem collapsed={sidebarCollapsed} icon={<SettingsIcon />} label="Settings" active={view === "settings"} onClick={() => setView("settings")} />
-        </div>
+        {!isSidebarSearching && (
+          <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
+            {renderSidebarNavItems(sidebarNavEntries.filter((item) => item.section === "footer"))}
+          </div>
+        )}
 
         <div style={{ padding: "12px 12px 16px 12px" }}>
           <button type="button" style={{ width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 14, padding: sidebarCollapsed ? "12px 0" : "14px 14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarCollapsed ? "center" : "flex-start" }}>
@@ -211,19 +364,19 @@ export default function DashboardPage() {
 
       <main style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
         {view === "dashboard" && <HomeView fullName={profile?.full_name ?? null} username={profile?.username ?? null} />}
-        {view === "discovery" && <DiscoveryView />}
+        {view === "discovery" && <DiscoveryView plan={plan} onUpgrade={handleUpgrade} />}
         {view === "creators" && <CreatorsView />}
-        {view === "campaigns" && <CampaignsView />}
+        {view === "campaigns" && <CampaignsView plan={plan} onUpgrade={handleUpgrade} />}
         {view === "affiliates" && <AffiliatesView />}
-        {view === "outreach" && <OutreachView />}
-        {view === "payouts" && <PayoutsView />}
+        {view === "outreach" && <OutreachView plan={plan} onNavigateToBilling={() => setView("settings")} />}
+        {view === "payouts" && <PayoutsView plan={plan} onUpgrade={handleUpgrade} />}
         {view === "analytics" && <AnalyticsView />}
         {view === "integrations" && <IntegrationsView />}
         {view === "automation" && <AutomationView />}
         {view === "settings" && user && (
           <SettingsView onProfileUpdate={() => void reloadProfile(user.id)} />
         )}
-        {view === "feedback" && <FeedbackView onBackToDashboard={() => setView("dashboard")} />}
+        {view === "feedback" && <FeedbackView />}
         {view === "help" && <HelpCenterView />}
         {view === "notifications" && <NotificationsView onUnreadChange={setNotificationUnread} />}
       </main>
@@ -383,7 +536,13 @@ function OutreachPanelShell({
   );
 }
 
-function OutreachView() {
+function OutreachView({
+  plan,
+  onNavigateToBilling,
+}: {
+  plan: "free" | "basic" | "pro";
+  onNavigateToBilling: () => void;
+}) {
   const [templates, setTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
   const [panel, setPanel] = useState<OutreachPanel>(null);
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
@@ -448,7 +607,7 @@ function OutreachView() {
           </div>
         </div>
 
-        <OutreachHistorySection />
+        <OutreachHistorySection plan={plan} onNavigateToBilling={onNavigateToBilling} />
       </div>
 
       {panel === "import" && (
@@ -881,276 +1040,55 @@ function MassOutreachPanel({
   );
 }
 
-type PayoutPartner = {
-  id: string;
-  name: string;
-  handle: string;
-  owed: string;
-  hasPaymentMethod: boolean;
-  paymentLabel?: string;
-};
+function IntegrationsView() {
+  const [shopDomain, setShopDomain] = useState("");
+  const [shopError, setShopError] = useState("");
+  const [connectedShop, setConnectedShop] = useState<string | null>(null);
 
-const PAYOUT_PARTNERS_SEED: PayoutPartner[] = [
-  { id: "1", name: "Alex Rivera", handle: "@alexcreates", owed: "$124.50", hasPaymentMethod: true, paymentLabel: "PayPal · alex@email.com" },
-  { id: "2", name: "Jordan Lee", handle: "@jordanlee", owed: "$89.00", hasPaymentMethod: false },
-  { id: "3", name: "Sam Taylor", handle: "@samtaylor", owed: "$210.25", hasPaymentMethod: true, paymentLabel: "Bank · •••• 4821" },
-  { id: "4", name: "Morgan Kim", handle: "@morgankim", owed: "$56.75", hasPaymentMethod: false },
-];
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shopify") === "connected") {
+      const shop = params.get("shop") || "";
+      setConnectedShop(shop);
+      window.history.replaceState({}, "", "/dashboard");
+    }
+    if (params.get("shopify") === "error") {
+      setShopError("Connection failed. Please try again.");
+      window.history.replaceState({}, "", "/dashboard");
+    }
+  }, []);
 
-function formatUsd(amount: number) {
-  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function PayoutsView() {
-  const [search, setSearch] = useState("");
-  const [partners, setPartners] = useState<PayoutPartner[]>(PAYOUT_PARTNERS_SEED);
-  const [registeringId, setRegisteringId] = useState<string | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
-  const [methodType, setMethodType] = useState<"paypal" | "bank">("paypal");
-  const [methodValue, setMethodValue] = useState("");
-  const [payMessage, setPayMessage] = useState<string | null>(null);
-  const [balance, setBalance] = useState(0);
-  const { methods: paymentMethods } = usePaymentMethods();
-  const defaultPaymentMethod = getDefaultPaymentMethod(paymentMethods);
-  const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
-  const [addPaymentForFunds, setAddPaymentForFunds] = useState(false);
-  const [fundAmount, setFundAmount] = useState("");
-
-  const q = search.trim().toLowerCase();
-  const filtered = partners.filter(
-    (p) => !q || p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q)
-  );
-  const registering = partners.find((p) => p.id === registeringId) ?? null;
-
-  const handlePayClick = (partner: PayoutPartner) => {
-    setPayMessage(null);
-    if (!partner.hasPaymentMethod) {
-      setRegisteringId(partner.id);
-      setMethodType("paypal");
-      setMethodValue("");
+  const handleShopifyConnect = () => {
+    if (!shopDomain.trim()) {
+      setShopError("Please enter your store name");
       return;
     }
-    setPayingId(partner.id);
-    setTimeout(() => {
-      setPayMessage(`Payment of ${partner.owed} sent to ${partner.name}.`);
-      setPayingId(null);
-    }, 600);
+    setShopError("");
+    let name = shopDomain.trim().toLowerCase();
+    name = name.replace(/^https?:\/\//, "");
+    name = name.replace(/\.myshopify\.com.*/, "");
+    name = name.replace(/\..*/, "");
+    name = name.replace(/[^a-z0-9-]/g, "");
+    const domain = `${name}.myshopify.com`;
+    window.location.href = `/api/shopify/install?shop=${domain}`;
   };
 
-  const handleSavePaymentMethod = () => {
-    if (!registering || !methodValue.trim()) return;
-    const label = methodType === "paypal" ? `PayPal · ${methodValue.trim()}` : `Bank · ${methodValue.trim()}`;
-    setPartners((prev) =>
-      prev.map((p) => (p.id === registering.id ? { ...p, hasPaymentMethod: true, paymentLabel: label } : p))
-    );
-    setRegisteringId(null);
-    setMethodValue("");
-    setPayMessage(`Payment method saved for ${registering.name}. You can pay them now.`);
-  };
-
-  const openAddFunds = () => {
-    setPayMessage(null);
-    setFundAmount("");
-    setPayoutModal("addFunds");
-  };
-
-  const handleAddFunds = () => {
-    const amount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
-    if (!amount || amount <= 0) return;
-    setBalance((b) => b + amount);
-    setFundAmount("");
-    setPayoutModal(null);
-    setPayMessage(`${formatUsd(amount)} added to your balance.`);
-  };
-
-  const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
-  const canAddFunds = defaultPaymentMethod !== null && parsedFundAmount > 0;
-  const chargingLabel = defaultPaymentMethod ? `${defaultPaymentMethod.brand} ···· ${defaultPaymentMethod.last4}` : null;
-
-  return (
-    <>
-      <PageHeader title="Payouts" subtitle="Track commissions and pay creators automatically when Shopify sales come in" />
-      <div style={{ padding: 40 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, marginBottom: 20 }}>
-          <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28 }}>
-            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>Your balance</div>
-            <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatUsd(balance)}</div>
-            <button type="button" onClick={openAddFunds} className="hero-cta-shopify">Add money to balance</button>
-          </div>
-          <PayoutsWorkspacePaymentCard />
-        </div>
-
-        <LiveSalesFeed />
-
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>Automate payouts</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>When a Shopify sale is detected, automatically pay the creator their commission</div>
-          </div>
-          <Toggle on={false} />
-        </div>
-
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
-          <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 14 }}>Pay partners</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search partners by name or handle..."
-                style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
-              />
-            </div>
-          </div>
-
-          {payMessage && (
-            <div style={{ margin: "0 20px", marginTop: 14, padding: "12px 14px", background: "#F0F6FF", border: "1px solid #D6E4FF", borderRadius: 10, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
-              {payMessage}
-            </div>
-          )}
-
-          {registering && (
-            <div style={{ margin: "14px 20px 0", padding: 20, background: "#FFFBF0", border: "1px solid #FFE4A8", borderRadius: 12 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-                Register payment method for {registering.name}
-              </div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 16 }}>
-                This partner has no payout method on file. Add one before you can pay {registering.owed}.
-              </div>
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <button type="button" onClick={() => setMethodType("paypal")} style={{ ...btnSecondary, background: methodType === "paypal" ? "#F5F5F5" : "#FFFFFF", borderColor: methodType === "paypal" ? "#1A1A1A" : "#E5E5E5" }}>PayPal</button>
-                <button type="button" onClick={() => setMethodType("bank")} style={{ ...btnSecondary, background: methodType === "bank" ? "#F5F5F5" : "#FFFFFF", borderColor: methodType === "bank" ? "#1A1A1A" : "#E5E5E5" }}>Bank account</button>
-              </div>
-              <input
-                type="text"
-                value={methodValue}
-                onChange={(e) => setMethodValue(e.target.value)}
-                placeholder={methodType === "paypal" ? "PayPal email" : "Account number or IBAN"}
-                style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", marginBottom: 12, letterSpacing: "-0.02em" }}
-              />
-              <div style={{ display: "flex", gap: 8 }}>
-                <button type="button" onClick={handleSavePaymentMethod} disabled={!methodValue.trim()} style={{ ...btnPrimary, opacity: methodValue.trim() ? 1 : 0.5 }}>Save & continue</button>
-                <button type="button" onClick={() => { setRegisteringId(null); setMethodValue(""); }} style={btnSecondary}>Cancel</button>
-              </div>
-            </div>
-          )}
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding: 40, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>No partners match your search</div>
-            ) : (
-              filtered.map((partner, i) => (
-                <div
-                  key={partner.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: "16px 20px",
-                    borderBottom: i < filtered.length - 1 ? "1px solid #F5F5F5" : "none",
-                  }}
-                >
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#EFEFEF", flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{partner.name}</div>
-                    <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{partner.handle}</div>
-                    {partner.hasPaymentMethod ? (
-                      <div style={{ fontSize: 11, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>{partner.paymentLabel}</div>
-                    ) : (
-                      <div style={{ fontSize: 11, color: "#C45C00", marginTop: 4, letterSpacing: "-0.01em" }}>No payment method</div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginRight: 8 }}>{partner.owed}</div>
-                  <button
-                    type="button"
-                    onClick={() => handlePayClick(partner)}
-                    disabled={payingId === partner.id || registeringId === partner.id}
-                    style={{ ...btnPrimary, minWidth: 72, opacity: payingId === partner.id ? 0.7 : 1 }}
-                  >
-                    {payingId === partner.id ? "Paying…" : "Pay"}
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>Commission tracker</div>
-            <div style={{ display: "flex", gap: 18 }}>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#1A1A1A", fontWeight: 500, cursor: "pointer", borderBottom: "2px solid #1A1A1A", paddingBottom: 4 }}>Active</button>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", paddingBottom: 4 }}>History</button>
-            </div>
-          </div>
-          <div style={{ padding: 60, textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>Connect Shopify to start tracking commissions</div>
-          </div>
-        </div>
-
-      {payoutModal === "addFunds" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
-          <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Add money to balance</h3>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatUsd(balance)}</p>
-            {!defaultPaymentMethod ? (
-              <>
-                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>Add a payment method before you can fund your balance.</p>
-                <button type="button" onClick={() => setAddPaymentForFunds(true)} style={{ ...btnPrimary, width: "100%" }}>Add a payment method</button>
-              </>
-            ) : (
-              <>
-                <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>Charging {chargingLabel}</p>
-                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Amount to add</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>$</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={fundAmount}
-                    onChange={(e) => setFundAmount(e.target.value)}
-                    placeholder="0.00"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 18, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em" }}
-                  />
-                </div>
-                <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                  {[50, 100, 250, 500].map((amt) => (
-                    <button key={amt} type="button" onClick={() => setFundAmount(String(amt))} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>${amt}</button>
-                  ))}
-                </div>
-                <button type="button" onClick={handleAddFunds} disabled={!canAddFunds} style={{ ...btnPrimary, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}>Add funds</button>
-              </>
-            )}
-            <button type="button" onClick={() => setPayoutModal(null)} style={{ ...btnSecondary, width: "100%", marginTop: 10 }}>Cancel</button>
-          </div>
-        </div>
-      )}
-
-      {addPaymentForFunds && (
-        <AddPaymentMethodModal
-          onClose={() => setAddPaymentForFunds(false)}
-          onAdded={() => setPayMessage("Payment method connected. You can add funds now.")}
-        />
-      )}
-
-      </div>
-    </>
-  );
-}
-
-function IntegrationsView() {
   const apps = [
     { name: "Shopify", desc: "Connect your store to track sales", logo: "/shopify-logo.svg", logoH: 39 },
     { name: "Zapier", desc: "Automate workflows with 5000+ apps", logo: "/zapier-logo.svg", logoH: 34 },
     { name: "Notion", desc: "Sync your workspace and docs", logo: "/notion-logo.svg", logoH: 34 },
     { name: "Make", desc: "Advanced visual automation", logo: "/make-logo.svg", logoH: 34 },
   ];
+
   return (
     <>
       <PageHeader title="Integrations" subtitle="Connect Trackit to the tools you already use" />
-      <div style={{ padding: 40 }}>
+      {connectedShop && (
+        <div style={{ margin: "0 40px 16px", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, color: "#15803d", fontSize: 14, fontWeight: 500 }}>
+          ✓ {connectedShop} connected successfully
+        </div>
+      )}
+      <div style={{ padding: "0 40px 40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
           {apps.map((app) => (
             <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
@@ -1160,8 +1098,28 @@ function IntegrationsView() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{app.name}</div>
                 <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{app.desc}</div>
+                {app.name === "Shopify" && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <input
+                        value={shopDomain}
+                        onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
+                        placeholder="yourstore.myshopify.com"
+                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                        onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
+                      />
+                      <button type="button" onClick={handleShopifyConnect} style={{ ...btnPrimary, fontSize: 13, padding: "8px 16px", flexShrink: 0 }}>Connect →</button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                      Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains.
+                    </div>
+                    {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
+                  </div>
+                )}
               </div>
-              <button type="button" style={btnSecondary}>Connect</button>
+              {app.name === "Shopify" ? null : (
+                <button type="button" style={btnSecondary}>Coming soon</button>
+              )}
             </div>
           ))}
         </div>
@@ -1544,6 +1502,74 @@ function Toggle({ on }: { on: boolean }) {
 const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+
+function buildSidebarNavEntries(notificationUnread: number): SidebarNavEntry[] {
+  return [
+    { id: "dashboard", label: "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
+    { id: "discovery", label: "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
+    { id: "creators", label: "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
+    { id: "campaigns", label: "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
+    { id: "affiliates", label: "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
+    { id: "outreach", label: "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
+    { id: "payouts", label: "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
+    { id: "analytics", label: "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
+    { id: "integrations", label: "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
+    { id: "automation", label: "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
+    {
+      id: "notifications",
+      label: "Notifications",
+      view: "notifications",
+      section: "workspace",
+      iconKey: "notifications",
+      keywords: ["alerts", "bell", "updates"],
+      badge: notificationUnread > 0 ? String(notificationUnread) : undefined,
+    },
+    { id: "active-campaigns", label: "Active Campaigns", view: "campaigns", section: "workspace", iconKey: "dot-blue", keywords: ["campaigns", "active", "running"], badge: "5" },
+    { id: "creator-lists", label: "Creator Lists", view: "discovery", section: "workspace", iconKey: "dot-pink", keywords: ["lists", "saved creators", "bookmarks"], badge: "4" },
+    { id: "help", label: "Help Center", view: "help", section: "footer", iconKey: "help", keywords: ["support", "guides", "docs", "faq"] },
+    { id: "feedback", label: "Feedback", view: "feedback", section: "footer", iconKey: "feedback", keywords: ["suggest", "bug", "feature request"] },
+    { id: "settings", label: "Settings", view: "settings", section: "footer", iconKey: "settings", keywords: ["account", "profile", "billing", "team", "preferences"] },
+  ];
+}
+
+function renderSidebarNavIcon(iconKey: string) {
+  switch (iconKey) {
+    case "home":
+      return <HomeIcon />;
+    case "search":
+      return <SearchIcon />;
+    case "creators":
+      return <CreatorsIcon />;
+    case "campaigns":
+      return <CampaignIcon />;
+    case "affiliates":
+      return <AffiliateIcon />;
+    case "outreach":
+      return <MessageIcon />;
+    case "payouts":
+      return <PayoutIcon />;
+    case "analytics":
+      return <AnalyticsIcon />;
+    case "integrations":
+      return <IntegrationIcon />;
+    case "automation":
+      return <AutomationIcon />;
+    case "notifications":
+      return <NotificationIcon />;
+    case "dot-blue":
+      return <DotIcon color="#0047FF" />;
+    case "dot-pink":
+      return <DotIcon color="#FF3D8B" />;
+    case "help":
+      return <HelpIcon />;
+    case "feedback":
+      return <FeedbackIcon />;
+    case "settings":
+      return <SettingsIcon />;
+    default:
+      return <HomeIcon />;
+  }
+}
 
 function SidebarItem({ collapsed, icon, label, active, badge, onClick }: { collapsed: boolean; icon: React.ReactNode; label: string; active?: boolean; badge?: string; onClick?: () => void }) {
   return (

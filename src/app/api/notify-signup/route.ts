@@ -11,11 +11,11 @@ export async function POST(request: Request) {
   const { email } = await request.json();
 
   await resend.emails.send({
-    from: "Klayan <notifications@klayan.app>",
-    replyTo: "klayan.app@gmail.com",
-    to: "klayan.app@gmail.com",
-    subject: `🔥 New signup: ${email}`,
-    html: `<p>New signup from <strong>${email}</strong> — let's go brother 🔥</p>`,
+    from: "Trackit <onboarding@resend.dev>",
+    replyTo: "rayan.vincentsully@gmail.com",
+    to: "rayan.vincentsully@gmail.com",
+    subject: `🔥 New Trackit signup: ${email}`,
+    html: `<p>New signup on <strong>Trackit</strong> from <strong>${email}</strong> 🔥</p>`,
   });
 
   return NextResponse.json({ ok: true });

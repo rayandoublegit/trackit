@@ -77,18 +77,13 @@ export async function POST(request: Request) {
 
     console.log("Webhook: priceId", priceId);
 
-    const sparkId = process.env.STRIPE_SPARK_PRICE_ID;
-    const buildId = process.env.STRIPE_BUILD_PRICE_ID;
-    const scaleId = process.env.STRIPE_SCALE_PRICE_ID;
+    const basicId = process.env.STRIPE_BASIC_PRICE_ID;
+    const proId = process.env.STRIPE_PRO_PRICE_ID;
 
     const plan =
-      priceId && sparkId && priceId === sparkId
-        ? "spark"
-        : priceId && buildId && priceId === buildId
-          ? "build"
-          : priceId && scaleId && priceId === scaleId
-            ? "scale"
-            : "spark";
+      priceId && proId && priceId === proId
+        ? "pro"
+        : "basic";
 
     console.log("Webhook: plan mapped to", plan);
     console.log("Webhook: userId", userId);

@@ -459,10 +459,38 @@ function SaveTemplateModal({
   );
 }
 
+type PlanTier = "free" | "basic" | "pro";
+
+function outreachTodayDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getOutreachGenerationsToday(): number {
+  const storedDate = localStorage.getItem("trackit_outreach_date");
+  if (storedDate !== outreachTodayDateKey()) return 0;
+  return parseInt(localStorage.getItem("trackit_outreach_today") || "0", 10);
+}
+
+function incrementOutreachGenerationsToday() {
+  const today = outreachTodayDateKey();
+  const storedDate = localStorage.getItem("trackit_outreach_date");
+  if (storedDate !== today) {
+    localStorage.setItem("trackit_outreach_date", today);
+    localStorage.setItem("trackit_outreach_today", "1");
+    return;
+  }
+  const count = getOutreachGenerationsToday() + 1;
+  localStorage.setItem("trackit_outreach_today", String(count));
+}
+
 function OutreachAIGeneratePanel({
+  plan,
+  onNavigateToBilling,
   onMarkSent,
   onToast,
 }: {
+  plan: PlanTier;
+  onNavigateToBilling: () => void;
   onMarkSent: (entry: OutreachHistoryEntry) => void | Promise<void>;
   onToast: (msg: string) => void;
 }) {
@@ -506,8 +534,11 @@ function OutreachAIGeneratePanel({
     setCopied(false);
   };
 
+  const outreachLimitReached = plan === "free" && getOutreachGenerationsToday() >= 3;
+
   const handleGenerate = async () => {
     if (!selectedCreator || !brand.trim()) return;
+    if (plan === "free" && getOutreachGenerationsToday() >= 3) return;
     setGenerating(true);
     setMessage("");
     setShowSendFlow(false);
@@ -526,6 +557,7 @@ function OutreachAIGeneratePanel({
       if (!res.ok) throw new Error("Failed");
       setMessage(data.message);
       setShowSendFlow(false);
+      if (plan === "free") incrementOutreachGenerationsToday();
     } catch {
       onToast("Generation failed. Try again.");
     } finally {
@@ -779,14 +811,33 @@ function OutreachAIGeneratePanel({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleGenerate()}
-                disabled={generating || !selectedCreator || !brand.trim()}
-                style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
-              >
-                {generating ? "Generating..." : "Generate message →"}
-              </button>
+              {outreachLimitReached ? (
+                <div
+                  style={{
+                    padding: 16,
+                    background: "#FFFBF0",
+                    border: "1px solid #FFE4A8",
+                    borderRadius: 12,
+                    marginBottom: 20,
+                  }}
+                >
+                  <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
+                    You&apos;ve used your 3 free AI messages today. Upgrade for unlimited.
+                  </p>
+                  <button type="button" onClick={onNavigateToBilling} style={{ ...btnPrimary }}>
+                    Upgrade →
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleGenerate()}
+                  disabled={generating || !selectedCreator || !brand.trim()}
+                  style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
+                >
+                  {generating ? "Generating..." : "Generate message →"}
+                </button>
+              )}
 
               {message && !generating && (
                 <div>
@@ -917,7 +968,13 @@ function MessageViewModal({ message, creator, onClose }: { message: string; crea
   );
 }
 
-export function OutreachHistorySection() {
+export function OutreachHistorySection({
+  plan,
+  onNavigateToBilling,
+}: {
+  plan: PlanTier;
+  onNavigateToBilling: () => void;
+}) {
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>(INITIAL_OUTREACH_HISTORY);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [search, setSearch] = useState("");
@@ -1033,7 +1090,7 @@ export function OutreachHistorySection() {
 
   return (
     <>
-      <OutreachAIGeneratePanel onMarkSent={handleAiMarkSent} onToast={setToast} />
+      <OutreachAIGeneratePanel plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} />
 
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>

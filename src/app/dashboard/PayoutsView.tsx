@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import {
   formatPaymentLabel,
   getDefaultPaymentMethod,
@@ -679,6 +680,400 @@ export function PaymentMethodsBillingSection() {
       )}
       {removeId && <RemovePaymentMethodModal onClose={() => setRemoveId(null)} onConfirm={confirmRemove} />}
       {toast && <PaymentToast message={toast} />}
+    </>
+  );
+}
+
+
+// --- Payouts workspace ---
+
+type PayoutPartner = {
+  id: string;
+  name: string;
+  handle: string;
+  owed: string;
+  hasPaymentMethod: boolean;
+  paymentLabel?: string;
+};
+
+const PAYOUT_PARTNERS_SEED: PayoutPartner[] = [
+  { id: "1", name: "Alex Rivera", handle: "@alexcreates", owed: "$124.50", hasPaymentMethod: true, paymentLabel: "PayPal · alex@email.com" },
+  { id: "2", name: "Jordan Lee", handle: "@jordanlee", owed: "$89.00", hasPaymentMethod: false },
+  { id: "3", name: "Sam Taylor", handle: "@samtaylor", owed: "$210.25", hasPaymentMethod: true, paymentLabel: "Bank · •••• 4821" },
+  { id: "4", name: "Morgan Kim", handle: "@morgankim", owed: "$56.75", hasPaymentMethod: false },
+];
+
+function formatPayoutBalanceUsd(amount: number) {
+  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function mapDbCreatorToPartner(c: {
+  id: string;
+  handle?: string | null;
+  full_name?: string | null;
+  balance?: number | null;
+}): PayoutPartner {
+  const rawHandle = c.handle || "";
+  const handle = rawHandle.startsWith("@") ? rawHandle : rawHandle ? `@${rawHandle}` : "@creator";
+  return {
+    id: c.id,
+    name: c.full_name || c.handle || "Creator",
+    handle,
+    owed: formatPayoutBalanceUsd(Number(c.balance) || 0),
+    hasPaymentMethod: false,
+  };
+}
+
+function PayoutsPageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div style={{ padding: "32px 40px 24px 40px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+      <div>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+        {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+      </div>
+    </div>
+  );
+}
+
+function PayoutsToggle({ on }: { on: boolean }) {
+  return (
+    <div style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
+      <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
+    </div>
+  );
+}
+
+const payoutsBtnPrimary: React.CSSProperties = {
+  background: "#0047FF",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 10,
+  padding: "10px 18px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const payoutsBtnSecondary: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#1A1A1A",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "10px 16px",
+  fontSize: 13,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+export function PayoutsView({
+  plan,
+  onUpgrade,
+}: {
+  plan: "free" | "basic" | "pro";
+  onUpgrade: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [creators, setCreators] = useState<any[]>([]);
+  const [partners, setPartners] = useState<PayoutPartner[]>(PAYOUT_PARTNERS_SEED);
+  const [registeringId, setRegisteringId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [methodType, setMethodType] = useState<"paypal" | "bank">("paypal");
+  const [methodValue, setMethodValue] = useState("");
+  const [payMessage, setPayMessage] = useState<string | null>(null);
+  const [balance, setBalance] = useState(0);
+  const { methods: paymentMethods } = usePaymentMethods();
+  const defaultPaymentMethod = getDefaultPaymentMethod(paymentMethods);
+  const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
+  const [addPaymentForFunds, setAddPaymentForFunds] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("creators")
+        .select("id, handle, full_name, avatar_url, platform, balance, total_earned, total_sales, discount_code")
+        .eq("user_id", user.id)
+        .gt("balance", 0)
+        .order("balance", { ascending: false });
+      if (data && data.length > 0) setCreators(data);
+    };
+    void load();
+  }, []);
+
+  const tablePartners = useMemo(
+    () => (creators.length > 0 ? creators.map(mapDbCreatorToPartner) : partners),
+    [creators, partners]
+  );
+
+  const q = search.trim().toLowerCase();
+  const filtered = tablePartners.filter(
+    (p) => !q || p.name.toLowerCase().includes(q) || p.handle.toLowerCase().includes(q)
+  );
+  const registering = tablePartners.find((p) => p.id === registeringId) ?? partners.find((p) => p.id === registeringId) ?? null;
+
+  const handlePayClick = (partner: PayoutPartner) => {
+    setPayMessage(null);
+    if (!partner.hasPaymentMethod) {
+      setRegisteringId(partner.id);
+      setMethodType("paypal");
+      setMethodValue("");
+      return;
+    }
+    setPayingId(partner.id);
+    setTimeout(() => {
+      setPayMessage(`Payment of ${partner.owed} sent to ${partner.name}.`);
+      setPayingId(null);
+    }, 600);
+  };
+
+  const handleSavePaymentMethod = () => {
+    if (!registering || !methodValue.trim()) return;
+    const label = methodType === "paypal" ? `PayPal · ${methodValue.trim()}` : `Bank · ${methodValue.trim()}`;
+    setPartners((prev) =>
+      prev.map((p) => (p.id === registering.id ? { ...p, hasPaymentMethod: true, paymentLabel: label } : p))
+    );
+    setRegisteringId(null);
+    setMethodValue("");
+    setPayMessage(`Payment method saved for ${registering.name}. You can pay them now.`);
+  };
+
+  const openAddFunds = () => {
+    setPayMessage(null);
+    setFundAmount("");
+    setPayoutModal("addFunds");
+  };
+
+  const handleAddFunds = () => {
+    const amount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+    if (!amount || amount <= 0) return;
+    setBalance((b) => b + amount);
+    setFundAmount("");
+    setPayoutModal(null);
+    setPayMessage(`${formatPayoutBalanceUsd(amount)} added to your balance.`);
+  };
+
+  const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+  const canAddFunds = defaultPaymentMethod !== null && parsedFundAmount > 0;
+  const chargingLabel = defaultPaymentMethod ? `${defaultPaymentMethod.brand} ···· ${defaultPaymentMethod.last4}` : null;
+
+  return (
+    <>
+      <PayoutsPageHeader title="Payouts" subtitle="Track commissions and pay creators automatically when Shopify sales come in" />
+      <div style={{ padding: 40, position: "relative" }}>
+        {plan === "free" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              background: "rgba(255,255,255,0.92)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 16,
+            }}
+          >
+            <div
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFEFEF",
+                borderRadius: 16,
+                padding: 40,
+                maxWidth: 420,
+                textAlign: "center",
+                boxShadow: "0 12px 40px rgba(0,0,0,0.08)",
+              }}
+            >
+              <div style={{ fontSize: 32, marginBottom: 16 }}>🔒</div>
+              <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", letterSpacing: "-0.03em" }}>
+                Payouts available on Basic and Pro
+              </h3>
+              <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                Upgrade to pay creator commissions automatically
+              </p>
+              <button
+                type="button"
+                onClick={() => void onUpgrade()}
+                style={{ ...payoutsBtnPrimary, width: "100%" }}
+              >
+                Upgrade to Basic →
+              </button>
+            </div>
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, marginBottom: 20 }}>
+          <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28 }}>
+            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>Your balance</div>
+            <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatPayoutBalanceUsd(balance)}</div>
+            <button type="button" onClick={openAddFunds} className="hero-cta-shopify">Add money to balance</button>
+          </div>
+          <PayoutsWorkspacePaymentCard />
+        </div>
+
+        <LiveSalesFeed />
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>Automate payouts</div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>When a Shopify sale is detected, automatically pay the creator their commission</div>
+          </div>
+          <PayoutsToggle on={false} />
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
+          <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 14 }}>Pay partners</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search partners by name or handle..."
+                style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
+              />
+            </div>
+          </div>
+
+          {payMessage && (
+            <div style={{ margin: "0 20px", marginTop: 14, padding: "12px 14px", background: "#F0F6FF", border: "1px solid #D6E4FF", borderRadius: 10, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
+              {payMessage}
+            </div>
+          )}
+
+          {registering && (
+            <div style={{ margin: "14px 20px 0", padding: 20, background: "#FFFBF0", border: "1px solid #FFE4A8", borderRadius: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                Register payment method for {registering.name}
+              </div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 16 }}>
+                This partner has no payout method on file. Add one before you can pay {registering.owed}.
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <button type="button" onClick={() => setMethodType("paypal")} style={{ ...payoutsBtnSecondary, background: methodType === "paypal" ? "#F5F5F5" : "#FFFFFF", borderColor: methodType === "paypal" ? "#1A1A1A" : "#E5E5E5" }}>PayPal</button>
+                <button type="button" onClick={() => setMethodType("bank")} style={{ ...payoutsBtnSecondary, background: methodType === "bank" ? "#F5F5F5" : "#FFFFFF", borderColor: methodType === "bank" ? "#1A1A1A" : "#E5E5E5" }}>Bank account</button>
+              </div>
+              <input
+                type="text"
+                value={methodValue}
+                onChange={(e) => setMethodValue(e.target.value)}
+                placeholder={methodType === "paypal" ? "PayPal email" : "Account number or IBAN"}
+                style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", marginBottom: 12, letterSpacing: "-0.02em" }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={handleSavePaymentMethod} disabled={!methodValue.trim()} style={{ ...payoutsBtnPrimary, opacity: methodValue.trim() ? 1 : 0.5 }}>Save & continue</button>
+                <button type="button" onClick={() => { setRegisteringId(null); setMethodValue(""); }} style={payoutsBtnSecondary}>Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: 40, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>No partners match your search</div>
+            ) : (
+              filtered.map((partner, i) => (
+                <div
+                  key={partner.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 14,
+                    padding: "16px 20px",
+                    borderBottom: i < filtered.length - 1 ? "1px solid #F5F5F5" : "none",
+                  }}
+                >
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: "#EFEFEF", flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{partner.name}</div>
+                    <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{partner.handle}</div>
+                    {partner.hasPaymentMethod ? (
+                      <div style={{ fontSize: 11, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>{partner.paymentLabel}</div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: "#C45C00", marginTop: 4, letterSpacing: "-0.01em" }}>No payment method</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginRight: 8 }}>{partner.owed}</div>
+                  <button
+                    type="button"
+                    onClick={() => handlePayClick(partner)}
+                    disabled={payingId === partner.id || registeringId === partner.id}
+                    style={{ ...payoutsBtnPrimary, minWidth: 72, opacity: payingId === partner.id ? 0.7 : 1 }}
+                  >
+                    {payingId === partner.id ? "Paying…" : "Pay"}
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>Commission tracker</div>
+            <div style={{ display: "flex", gap: 18 }}>
+              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#1A1A1A", fontWeight: 500, cursor: "pointer", borderBottom: "2px solid #1A1A1A", paddingBottom: 4 }}>Active</button>
+              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", paddingBottom: 4 }}>History</button>
+            </div>
+          </div>
+          <div style={{ padding: 60, textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>Connect Shopify to start tracking commissions</div>
+          </div>
+        </div>
+
+      {payoutModal === "addFunds" && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
+          <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Add money to balance</h3>
+            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatPayoutBalanceUsd(balance)}</p>
+            {!defaultPaymentMethod ? (
+              <>
+                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>Add a payment method before you can fund your balance.</p>
+                <button type="button" onClick={() => setAddPaymentForFunds(true)} style={{ ...payoutsBtnPrimary, width: "100%" }}>Add a payment method</button>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>Charging {chargingLabel}</p>
+                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Amount to add</label>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>$</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={fundAmount}
+                    onChange={(e) => setFundAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ flex: 1, boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 18, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em" }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                  {[50, 100, 250, 500].map((amt) => (
+                    <button key={amt} type="button" onClick={() => setFundAmount(String(amt))} style={{ ...payoutsBtnSecondary, padding: "6px 12px", fontSize: 12 }}>${amt}</button>
+                  ))}
+                </div>
+                <button type="button" onClick={handleAddFunds} disabled={!canAddFunds} style={{ ...payoutsBtnPrimary, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}>Add funds</button>
+              </>
+            )}
+            <button type="button" onClick={() => setPayoutModal(null)} style={{ ...payoutsBtnSecondary, width: "100%", marginTop: 10 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {addPaymentForFunds && (
+        <AddPaymentMethodModal
+          onClose={() => setAddPaymentForFunds(false)}
+          onAdded={() => setPayMessage("Payment method connected. You can add funds now.")}
+        />
+      )}
+
+      </div>
     </>
   );
 }

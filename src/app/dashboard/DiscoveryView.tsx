@@ -99,7 +99,7 @@ const VIDEO_GRADIENTS = [
 
 function usernameSeed(username: string) {
   let hash = 0;
-  for (let i = 0; i < username.length; i++) hash += username.charCodeAt(i);
+  for (let i = 0; i < (username?.length ?? 0); i++) hash += username?.charCodeAt(i) ?? 0;
   return hash;
 }
 
@@ -305,7 +305,7 @@ function VideoPreviews({ creator, size }: { creator: Creator; size: "card" | "mo
             position: "relative",
             background: video.thumbnail
               ? `url(${video.thumbnail}) center / cover no-repeat`
-              : gradientForVideo(creator.username, i),
+              : gradientForVideo(creator.username ?? "", i),
           }}
         >
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -493,7 +493,7 @@ function CreatorProfileModal({
             <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px 0" }}>
               {creator.displayName}
             </h2>
-            <div style={{ fontSize: 15, color: "#0047FF", letterSpacing: "-0.02em", marginBottom: 8 }}>@{creator.username}</div>
+            <div style={{ fontSize: 15, color: "#0047FF", letterSpacing: "-0.02em", marginBottom: 8 }}>@{creator.username ?? ""}</div>
             <span
               style={{
                 display: "inline-block",
@@ -636,7 +636,7 @@ function CreatorProfileModal({
           <button
             type="button"
             style={{ ...btnSecondary, flex: 1 }}
-            onClick={() => window.open(`https://tiktok.com/@${creator.username}`, "_blank", "noopener,noreferrer")}
+            onClick={() => window.open(`https://tiktok.com/@${creator.username ?? ""}`, "_blank", "noopener,noreferrer")}
           >
             View on TikTok →
           </button>
@@ -666,7 +666,7 @@ function CreatorMiniCard({ creator }: { creator: Creator }) {
       <img src={creator.avatarUrl} alt={creator.displayName} width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{creator.displayName}</div>
-        <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username}</div>
+        <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username ?? ""}</div>
       </div>
       <span
         style={{
@@ -1092,7 +1092,7 @@ function CreatorCardBody({ creator }: { creator: Creator }) {
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{creator.displayName}</div>
-          <div style={{ fontSize: 13, color: "#0047FF", letterSpacing: "-0.01em" }}>@{creator.username}</div>
+          <div style={{ fontSize: 13, color: "#0047FF", letterSpacing: "-0.01em" }}>@{creator.username ?? ""}</div>
           <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4, textTransform: "capitalize" }}>{creator.platform}</div>
         </div>
       </div>
@@ -1225,7 +1225,37 @@ function CreatorCard({
   );
 }
 
-export function DiscoveryView() {
+type PlanTier = "free" | "basic" | "pro";
+
+function todayDateKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getDiscoverySearchCountToday(): number {
+  const storedDate = localStorage.getItem("trackit_searches_date");
+  if (storedDate !== todayDateKey()) return 0;
+  return parseInt(localStorage.getItem("trackit_searches_today") || "0", 10);
+}
+
+function incrementDiscoverySearchCount() {
+  const today = todayDateKey();
+  const storedDate = localStorage.getItem("trackit_searches_date");
+  if (storedDate !== today) {
+    localStorage.setItem("trackit_searches_date", today);
+    localStorage.setItem("trackit_searches_today", "1");
+    return;
+  }
+  const count = getDiscoverySearchCountToday() + 1;
+  localStorage.setItem("trackit_searches_today", String(count));
+}
+
+export function DiscoveryView({
+  plan,
+  onUpgrade,
+}: {
+  plan: PlanTier;
+  onUpgrade: () => void;
+}) {
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
   const [query, setQuery] = useState("");
   const [niche, setNiche] = useState("fitness");
@@ -1245,6 +1275,7 @@ export function DiscoveryView() {
   const [outreachTemplates, setOutreachTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
   const [outreachContacted, setOutreachContacted] = useState<OutreachContact[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const openOutreach = (creator: Creator) => {
     setSelectedCreator(null);
@@ -1264,7 +1295,7 @@ export function DiscoveryView() {
       if (!user) return;
       const saved = await getSavedCreators(user.id);
       setSavedCreators(saved.map(c => ({
-        username: c.username,
+        username: c.username  ?? "",
         displayName: c.display_name,
         avatarUrl: c.avatar_url,
         platform: c.platform,
@@ -1278,14 +1309,14 @@ export function DiscoveryView() {
     void loadSaved();
   }, []);
 
-  const isCreatorSaved = (username: string) => savedCreators.some((c) => c.username === username);
+  const isCreatorSaved = (username: string) => savedCreators.some((c) => (c.username  ?? "") === username);
 
   const handleSaveCreator = async (creator: Creator) => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await saveCreator(user.id, {
-      username: creator.username,
+      username: creator.username ?? "",
       display_name: creator.displayName,
       avatar_url: creator.avatarUrl,
       platform: creator.platform,
@@ -1295,7 +1326,7 @@ export function DiscoveryView() {
       bio: creator.bio,
       niche: creator.niche || ""
     });
-    setSavedCreators(prev => [...prev.filter(c => c.username !== creator.username), creator]);
+    setSavedCreators(prev => [...prev.filter(c => (c.username  ?? "") !== (creator.username ?? "")), creator]);
     setToast("Creator saved ✓");
   };
 
@@ -1304,22 +1335,31 @@ export function DiscoveryView() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await removeCreator(user.id, username);
-    setSavedCreators(prev => prev.filter(c => c.username !== username));
+    setSavedCreators(prev => prev.filter(c => (c.username  ?? "") !== username));
   };
 
   const toggleSaveCreator = (creator: Creator) => {
-    if (isCreatorSaved(creator.username)) {
-      void handleRemoveCreator(creator.username);
+    if (isCreatorSaved(creator.username ?? "")) {
+      void handleRemoveCreator(creator.username ?? "");
     } else {
       void handleSaveCreator(creator);
     }
   };
 
   const search = async () => {
+    if (plan === "free" && getDiscoverySearchCountToday() >= 5) {
+      setUpgradeModalOpen(true);
+      return;
+    }
+
     const nicheTerm = query.trim() || niche;
     setLoading(true);
     setError(null);
     setHasSearched(true);
+
+    if (plan === "free") {
+      incrementDiscoverySearchCount();
+    }
 
     try {
       const res = await fetch("/api/discovery", {
@@ -1564,10 +1604,10 @@ export function DiscoveryView() {
             <div style={creatorsGridStyle}>
               {creators.map((c) => (
                 <CreatorCard
-                  key={c.username}
+                  key={c.username  ?? ""}
                   variant="discover"
                   creator={c}
-                  isSaved={isCreatorSaved(c.username)}
+                  isSaved={isCreatorSaved(c.username  ?? "")}
                   onToggleSave={() => toggleSaveCreator(c)}
                   onViewProfile={() => setSelectedCreator(c)}
                 />
@@ -1594,12 +1634,12 @@ export function DiscoveryView() {
               <div style={creatorsGridStyle}>
                 {savedCreators.map((c) => (
                   <CreatorCard
-                    key={c.username}
+                    key={c.username ?? Math.random().toString()}
                     variant="saved"
                     creator={c}
                     onViewProfile={() => setSelectedCreator(c)}
                     onGenerateOutreach={() => openOutreach(c)}
-                    onRemove={() => void handleRemoveCreator(c.username)}
+                    onRemove={() => void handleRemoveCreator(c.username  ?? "")}
                   />
                 ))}
               </div>
@@ -1624,7 +1664,7 @@ export function DiscoveryView() {
           onDeleteTemplate={(id) => setOutreachTemplates((list) => list.filter((t) => t.id !== id))}
           onMarkSent={() => {
             setOutreachContacted((list) => {
-              if (list.some((c) => c.username === outreachCreator.username)) return list;
+              if (list.some((c) => c.username === (outreachCreator.username))) return list;
               return [
                 ...list,
                 { username: outreachCreator.username, displayName: outreachCreator.displayName, status: "Contacted" },
@@ -1635,6 +1675,59 @@ export function DiscoveryView() {
           }}
           userName="You"
         />
+      )}
+      {upgradeModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: 24,
+          }}
+          onClick={() => setUpgradeModalOpen(false)}
+        >
+          <div
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 16,
+              padding: 32,
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
+              You&apos;ve used your 5 free searches
+            </h3>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              Upgrade to Basic for unlimited creator discovery.
+            </p>
+            <button
+              type="button"
+              onClick={() => void onUpgrade()}
+              style={{
+                background: "#0047FF",
+                color: "#FFFFFF",
+                border: "none",
+                borderRadius: 10,
+                padding: "12px 20px",
+                fontSize: 14,
+                fontWeight: 500,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                width: "100%",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Upgrade to Basic $49/mo →
+            </button>
+          </div>
+        </div>
       )}
       {toast && <SaveToast message={toast} />}
     </>

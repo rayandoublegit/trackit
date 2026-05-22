@@ -611,6 +611,36 @@ function ProfileSettings({
 
 
 function BillingSettings() {
+  const [loading, setLoading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState("free");
+
+  const handleUpgrade = async (plan: "basic" | "pro") => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase!.auth.getUser();
+      const priceId = plan === "basic"
+        ? process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID
+        : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+
+      const res = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          priceId,
+          userId: user?.id,
+          email: user?.email,
+          cancelUrl: window.location.href
+        })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      console.error("Checkout error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const invoices = [
     { date: "Apr 1, 2026", amount: "$49.00", status: "Paid" as const },
     { date: "Mar 1, 2026", amount: "$49.00", status: "Paid" as const },
@@ -627,7 +657,24 @@ function BillingSettings() {
             <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>$49<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
             <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Next billing date: May 1, 2026</div>
           </div>
-          <button type="button" style={btnPrimary}>Upgrade plan →</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => handleUpgrade("basic")}
+              disabled={loading}
+              style={btnPrimary}
+            >
+              {loading ? "Loading..." : "Basic $49/mo →"}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUpgrade("pro")}
+              disabled={loading}
+              style={{ ...btnPrimary, background: "#1A1A1A" }}
+            >
+              {loading ? "Loading..." : "Pro $119/mo →"}
+            </button>
+          </div>
         </div>
         <button type="button" style={{ background: "none", border: "none", padding: 0, marginTop: 14, fontSize: 12, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>Cancel subscription</button>
       </Card>

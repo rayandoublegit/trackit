@@ -17,17 +17,14 @@ export async function saveCreator(userId: string, creator: {
     .from("creators")
     .upsert({
       user_id: userId,
-      username: creator.username,
-      display_name: creator.display_name,
+      handle: creator.username,
+      full_name: creator.display_name,
       avatar_url: creator.avatar_url,
       platform: creator.platform,
-      followers_count: creator.followers_count,
+      followers: creator.followers_count,
       engagement_rate: creator.engagement_rate,
-      avg_views: creator.avg_views,
-      bio: creator.bio,
       niche: creator.niche,
-      status: "saved"
-    }, { onConflict: "user_id,username" })
+    }, { onConflict: "user_id,handle" })
     .select()
     .single();
   if (error) console.error("saveCreator error:", error);

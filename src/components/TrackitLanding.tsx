@@ -16,6 +16,24 @@ export default function TrackitLanding() {
   const heroMoneyRef = useRef<HTMLImageElement>(null);
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
+  const [featuresOpen, setFeaturesOpen] = useState(false);
+
+  const handleCheckout = async (plan: "basic" | "pro") => {
+    const priceId = plan === "basic"
+      ? process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID
+      : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+
+    const res = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        priceId,
+        cancelUrl: window.location.href
+      })
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+  };
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -69,6 +87,17 @@ export default function TrackitLanding() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.features-dropdown-container')) {
+        setFeaturesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   return (
     <main className="relative min-h-screen w-full">
       {/* NAVBAR */}
@@ -87,7 +116,185 @@ export default function TrackitLanding() {
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
         </Link>
         <div className="nav-links">
-          <a href="#features">Features</a>
+          <div className="features-dropdown-container" style={{ position: "relative" }}>
+            <button
+              type="button"
+              className="features-nav-btn"
+              onClick={() => setFeaturesOpen(v => !v)}
+            >
+              Features
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            {featuresOpen && (
+              <div
+                className="features-dropdown-panel"
+                style={{
+                position: "fixed",
+                top: 72,
+                left: "50%",
+                transform: "translateX(-50%)",
+                width: "min(1200px, 97vw)",
+                background: "#fff",
+                borderRadius: 20,
+                boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
+                border: "1px solid #EFEFEF",
+                padding: 24,
+                zIndex: 1000,
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: 14,
+                maxHeight: "80vh",
+                overflowY: "auto"
+              }}
+              >
+                {[
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+                    title: "Creator Discovery",
+                    desc: "Search 250M+ creators by niche, engagement, and location.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {["@fashionwithemma · 245K", "@fitnessbysarah · 89K", "@travelwithleo · 312K"].map((c, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#555" }}>
+                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: ["#FFD6E7","#D6F5E7","#D6E7FF"][i] }} />
+                              {c}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
+                    title: "AI Outreach",
+                    desc: "Personalized messages written by AI for every creator.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
+                          &quot;Hey Emma, your sustainable fashion content is exactly what our brand stands for...&quot;
+                        </div>
+                        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
+                          <div style={{ background: "#0047FF", color: "#fff", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 600 }}>Copy</div>
+                          <div style={{ background: "#F0F6FF", color: "#0047FF", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 600 }}>Regenerate</div>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l16-6v14L3 13v-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M7 13v5l4 1v-5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
+                    title: "Campaign Tracking",
+                    desc: "Every sale attributed automatically via Shopify.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                          <span style={{ fontSize: 10, color: "#9A9A9A" }}>This month</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>$4,820</span>
+                        </div>
+                        <div style={{ height: 4, background: "#E5E5E5", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: "68%", background: "#0047FF", borderRadius: 4 }} />
+                        </div>
+                        <div style={{ fontSize: 10, color: "#0047FF", marginTop: 6 }}>↑ 18% vs last month</div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>,
+                    title: "Auto Payouts",
+                    desc: "Pay creator commissions in one click via Stripe.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {[["@emma", "$482", "green"], ["@sarah", "$124", "green"], ["@leo", "$318", "orange"]].map(([name, amount, color], i) => (
+                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
+                              <span style={{ color: "#555" }}>{name}</span>
+                              <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{amount}</span>
+                              <div style={{ background: color === "green" ? "#D1FAE5" : "#FEF3C7", color: color === "green" ? "#065F46" : "#92400E", borderRadius: 4, padding: "2px 6px", fontSize: 10, fontWeight: 600 }}>
+                                {color === "green" ? "Paid" : "Pending"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 17l6-10M7 8a2 2 0 100-4 2 2 0 000 4zM17 20a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
+                    title: "Affiliate Links",
+                    desc: "Auto-generate unique tracking links for every creator.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ fontSize: 10, color: "#9A9A9A", marginBottom: 4 }}>Referral link</div>
+                        <div style={{ fontSize: 10, color: "#0047FF", fontFamily: "monospace", wordBreak: "break-all" }}>trackit.app/r/emma_a3f9</div>
+                        <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 6 }}>Discount code: <strong style={{ color: "#1A1A1A" }}>EMMA15</strong></div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>,
+                    title: "Analytics",
+                    desc: "See which creators drive the most revenue and why.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
+                          {[30, 50, 35, 70, 45, 80, 60].map((h, i) => (
+                            <div key={i} style={{ flex: 1, height: `${h}%`, background: i === 5 ? "#0047FF" : "#D6E7FF", borderRadius: "3px 3px 0 0" }} />
+                          ))}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                          {["M","T","W","T","F","S","S"].map((d, i) => (
+                            <span key={i} style={{ fontSize: 9, color: "#9A9A9A", flex: 1, textAlign: "center" }}>{d}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+                    title: "CRM",
+                    desc: "Manage all your creator relationships in one place.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {[["Emma Laurent", "Partnered", "#D1FAE5", "#065F46"], ["Marc Dubois", "Contacted", "#DBEAFE", "#1E40AF"], ["Julie Chen", "Pending", "#FEF3C7", "#92400E"]].map(([name, status, bg, color], i) => (
+                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <span style={{ fontSize: 11, color: "#1A1A1A" }}>{name}</span>
+                              <div style={{ background: bg, color, borderRadius: 4, padding: "2px 6px", fontSize: 9, fontWeight: 600 }}>{status}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
+                    title: "Shopify Integration",
+                    desc: "Connect your store. Every sale tracked automatically.",
+                    visual: (
+                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10, display: "flex", alignItems: "center", gap: 10 }}>
+                        <img src="/shopify-logo.svg" alt="Shopify" style={{ width: 28, height: 28 }} />
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A" }}>Store connected</div>
+                          <div style={{ fontSize: 10, color: "#0047FF" }}>● Live tracking active</div>
+                        </div>
+                      </div>
+                    )
+                  }
+                ].map((feature, i) => (
+                  <div key={i} style={{ background: "#FAFAFA", border: "1px solid #F0F0F0", borderRadius: 14, padding: 12, cursor: "default" }}>
+                    <span style={{ display: "flex", alignItems: "center", marginBottom: 8, color: "#9A9A9A", flexShrink: 0 }}>
+                      {feature.icon}
+                    </span>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{feature.title}</div>
+                    <div style={{ fontSize: 11, color: "#7A7A7A", lineHeight: 1.5, letterSpacing: "-0.01em", fontWeight: 400 }}>{feature.desc}</div>
+                    {feature.visual}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <a href="/affiliation">Affiliation</a>
           <a href="#pricing">Pricing</a>
           <a href="#process">Process</a>
           <a href="#features">Trackit</a>
@@ -159,146 +366,6 @@ export default function TrackitLanding() {
         </p>
       </section>
 
-      {/* PAIN POINTS */}
-      <section className="pain-points-stack" id="painContainer">
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                You&apos;ve been doing
-                <br />
-                this the hard way.
-              </h2>
-              <p className="pain-sub">
-                You scroll TikTok and Instagram for hours trying to find creators who actually fit your
-                brand. Most tools give you a giant useless database.
-              </p>
-            </div>
-            <div className="pain-image">
-              <img src="https://i.ibb.co/Xf5f2ZMk/painimage2.jpg" alt="TikTok scrolling" />
-            </div>
-          </div>
-        </div>
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                Commissions tracked
-                <br />
-                in spreadsheets.
-              </h2>
-              <p className="pain-sub">
-                Every month you manually calculate who earned what and send individual PayPal transfers. It
-                takes a full day and you still make mistakes.
-              </p>
-            </div>
-            <div className="pain-image">
-              <img src="https://i.ibb.co/fVCDDDqV/painimage1.jpg" alt="Spreadsheets" />
-            </div>
-          </div>
-        </div>
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                Enterprise tools
-                <br />
-                you can&apos;t afford.
-              </h2>
-              <p className="pain-sub">
-                Modash is $299/month. Aspire is $500/month. You&apos;re a lean brand. You just need
-                something that works without breaking the bank.
-              </p>
-            </div>
-            <div className="pain-image" style={{ overflow: "visible", borderRadius: "16px" }}>
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: "9px",
-                  overflow: "hidden",
-                  background: "#fafafa",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-start",
-                  padding: "20px 0 20px 20px",
-                  gap: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    borderRadius: "10px",
-                    padding: "18px",
-                    width: "60%",
-                    fontFamily: "InterDisplay, sans-serif",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Essentials</div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#666",
-                      lineHeight: 1.4,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    Pour les campagnes avec jusqu&apos;à 100 créateurs.
-                    <br />
-                    Validez le marketing d&apos;influence avant de passer à l&apos;échelle.
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 700, marginBottom: "12px" }}>
-                    $199 <span style={{ fontSize: "10px", fontWeight: 400, color: "#888" }}>Mensuel</span>
-                  </div>
-                  <button
-                    type="button"
-                    style={{
-                      background: "#000",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "8px 12px",
-                      fontSize: "10px",
-                      width: "100%",
-                      fontFamily: "InterDisplay, sans-serif",
-                    }}
-                  >
-                    Essayez gratuitement
-                  </button>
-                </div>
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    borderRadius: "10px",
-                    padding: "18px",
-                    width: "50%",
-                    fontFamily: "InterDisplay, sans-serif",
-                    transform: "translateX(-10%)",
-                  }}
-                >
-                  <div style={{ fontSize: "10px", color: "#999", marginBottom: "4px" }}>Recommended</div>
-                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Performance</div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#666",
-                      lineHeight: 1.4,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    For campaigns.
-                    <br />
-                    Scale your performance.
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 700 }}>$499</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* TRACKIT SECTION */}
       <section className="section" id="features">
         <div className="tagline fade-up">
@@ -315,7 +382,14 @@ export default function TrackitLanding() {
         </p>
 
         <div className="dashboard-wrap fade-up fade-up-delay-3">
-          <img src="https://i.ibb.co/ycz3grqZ/trackitimage.jpg" alt="Trackit dashboard" />
+          <video
+            src="https://res.cloudinary.com/dasl7u0qw/video/upload/v1779393974/0521_2_t1qlql.mov"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-label="Trackit dashboard"
+          />
         </div>
 
         <div className="features-grid">
@@ -455,6 +529,145 @@ export default function TrackitLanding() {
             <div className="feature-desc">
               See exactly what every creator earned. Hit send. Money goes directly to their account. No
               bank transfers. No PayPal drama. No spreadsheet math.
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* PAIN POINTS */}
+      <section className="pain-points-stack" id="painContainer">
+        <div className="pain-point-card" style={{ top: "0px" }}>
+          <div className="pain-row">
+            <div className="pain-text">
+              <h2 className="pain-title">
+                You&apos;ve been doing
+                <br />
+                this the hard way.
+              </h2>
+              <p className="pain-sub">
+                You scroll TikTok and Instagram for hours trying to find creators who actually fit your
+                brand. Most tools give you a giant useless database.
+              </p>
+            </div>
+            <div className="pain-image">
+              <img src="https://i.ibb.co/Xf5f2ZMk/painimage2.jpg" alt="TikTok scrolling" />
+            </div>
+          </div>
+        </div>
+        <div className="pain-point-card" style={{ top: "0px" }}>
+          <div className="pain-row">
+            <div className="pain-text">
+              <h2 className="pain-title">
+                Commissions tracked
+                <br />
+                in spreadsheets.
+              </h2>
+              <p className="pain-sub">
+                Every month you manually calculate who earned what and send individual PayPal transfers. It
+                takes a full day and you still make mistakes.
+              </p>
+            </div>
+            <div className="pain-image">
+              <img src="/images/spreadsheets.png" alt="Spreadsheets" />
+            </div>
+          </div>
+        </div>
+        <div className="pain-point-card" style={{ top: "0px" }}>
+          <div className="pain-row">
+            <div className="pain-text">
+              <h2 className="pain-title">
+                Enterprise tools
+                <br />
+                you can&apos;t afford.
+              </h2>
+              <p className="pain-sub">
+                Modash is $299/month. Aspire is $500/month. You&apos;re a lean brand. You just need
+                something that works without breaking the bank.
+              </p>
+            </div>
+            <div className="pain-image" style={{ overflow: "visible", borderRadius: "16px" }}>
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  borderRadius: "9px",
+                  overflow: "hidden",
+                  background: "#fafafa",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  padding: "20px 0 20px 20px",
+                  gap: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    background: "#f0f0f0",
+                    borderRadius: "10px",
+                    padding: "18px",
+                    width: "60%",
+                    fontFamily: "InterDisplay, sans-serif",
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Essentials</div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: "#666",
+                      lineHeight: 1.4,
+                      marginBottom: "16px",
+                    }}
+                  >
+                    Pour les campagnes avec jusqu&apos;à 100 créateurs.
+                    <br />
+                    Validez le marketing d&apos;influence avant de passer à l&apos;échelle.
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 700, marginBottom: "12px" }}>
+                    $199 <span style={{ fontSize: "10px", fontWeight: 400, color: "#888" }}>Mensuel</span>
+                  </div>
+                  <button
+                    type="button"
+                    style={{
+                      background: "#000",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: "8px 12px",
+                      fontSize: "10px",
+                      width: "100%",
+                      fontFamily: "InterDisplay, sans-serif",
+                    }}
+                  >
+                    Essayez gratuitement
+                  </button>
+                </div>
+                <div
+                  style={{
+                    background: "#f0f0f0",
+                    borderRadius: "10px",
+                    padding: "18px",
+                    width: "50%",
+                    fontFamily: "InterDisplay, sans-serif",
+                    transform: "translateX(-10%)",
+                  }}
+                >
+                  <div style={{ fontSize: "10px", color: "#999", marginBottom: "4px" }}>Recommended</div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Performance</div>
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: "#666",
+                      lineHeight: 1.4,
+                      marginBottom: "16px",
+                    }}
+                  >
+                    For campaigns.
+                    <br />
+                    Scale your performance.
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 700 }}>$499</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -929,7 +1142,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>One click payouts</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Priority support</div>
               </div>
-              <a href="#" className="pricing-cta">Get Started</a>
+              <button type="button" onClick={() => handleCheckout("basic")} className="pricing-cta">Get Started</button>
             </div>
           </div>
 
@@ -968,7 +1181,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Unlimited Shopify stores</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Daily offers on pricing</div>
               </div>
-              <a href="#" className="pricing-cta pricing-cta-dark">Get Started</a>
+              <button type="button" onClick={() => handleCheckout("pro")} className="pricing-cta pricing-cta-dark">Get Started</button>
             </div>
           </div>
 

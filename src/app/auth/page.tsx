@@ -17,6 +17,10 @@ function AuthPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signupAwaitingEmail, setSignupAwaitingEmail] = useState(false);
+  const [resetMode, setResetMode] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -65,6 +69,13 @@ function AuthPageContent() {
           setError(signUpError.message);
         } else if (data.session) {
           await recordLoginIp();
+          try {
+            await fetch("/api/notify-signup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: email.trim() })
+            });
+          } catch {}
           router.replace("/onboarding");
         } else {
           setSignupAwaitingEmail(true);
@@ -85,14 +96,14 @@ function AuthPageContent() {
 
   if (checkingSession) {
     return (
-      <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "80px" }}>
         <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Signing you in...</p>
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", marginTop: -80 }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", marginTop: -80, display: "flex", flexDirection: "column", alignItems: "flex-start", paddingTop: "80px" }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 48px 8px" }}>
         <a href="/" style={{ display: "flex", alignItems: "center" }}>
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 130, width: "auto", display: "block" }} />
@@ -114,6 +125,46 @@ function AuthPageContent() {
             <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 32 }}>We sent a confirmation link to {email}. Click it to activate your account.</p>
             <button type="button" onClick={() => { setSignupAwaitingEmail(false); setMode("login"); }} style={{ width: "100%", background: "#000", color: "#fff", border: "none", padding: "18px 0", borderRadius: 14, fontSize: 16, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer", fontFamily: "inherit" }}>Already confirmed? Sign in</button>
           </div>
+        ) : resetMode ? (
+          <div>
+            {resetSent ? (
+              <div style={{ textAlign: "center", padding: "40px 0" }}>
+                <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
+                <h2>Check your email</h2>
+                <p style={{ color: "#7A7A7A", fontSize: 14 }}>We sent a reset link to {resetEmail}</p>
+                <button type="button" onClick={() => { setResetMode(false); setResetSent(false); }} style={{ marginTop: 16, fontSize: 13, color: "#0047FF", background: "none", border: "none", cursor: "pointer" }}>Back to login</button>
+              </div>
+            ) : (
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Reset your password</h2>
+                <p style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>Enter your email and we'll send you a reset link.</p>
+                <input
+                  value={resetEmail}
+                  onChange={e => setResetEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  type="email"
+                  style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+                />
+                <button
+                  type="button"
+                  disabled={!resetEmail || resetLoading}
+                  onClick={async () => {
+                    if (!supabase || !resetEmail) return;
+                    setResetLoading(true);
+                    await supabase.auth.resetPasswordForEmail(resetEmail, {
+                      redirectTo: `${window.location.origin}/auth/reset`
+                    });
+                    setResetSent(true);
+                    setResetLoading(false);
+                  }}
+                  style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+                >
+                  {resetLoading ? "Sending..." : "Send reset link →"}
+                </button>
+                <button type="button" onClick={() => setResetMode(false)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", fontFamily: "inherit" }}>← Back to login</button>
+              </div>
+            )}
+          </div>
         ) : (
           <>
             <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 10 }}>{mode === "login" ? "Sign in" : "Create your account"}</h1>
@@ -123,15 +174,25 @@ function AuthPageContent() {
               <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Enter your email address" autoComplete="email" required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
 
               <div style={{ position: "relative", marginBottom: 16 }}>
-                <input value={password} onChange={(e) => setPassword(e.target.value)} type={pwVisible ? "text" : "password"} placeholder="Password" autoComplete={mode === "login" ? "current-password" : "new-password"} required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 50px 18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box" }} />
-                <button type="button" onClick={() => setPwVisible((v) => !v)} tabIndex={-1} aria-label={pwVisible ? "Hide password" : "Show password"} style={{ position: "absolute", right: 16, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", padding: 4, display: "flex" }}>
+                <input value={password} onChange={(e) => setPassword(e.target.value)} type={pwVisible ? "text" : "password"} placeholder="Password" autoComplete={mode === "login" ? "current-password" : "new-password"} required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", paddingRight: 44, fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box" }} />
+                <button
+                  type="button"
+                  onClick={() => setPwVisible((v) => !v)}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", padding: 0, display: "flex", alignItems: "center" }}
+                >
                   {pwVisible ? (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22"/></svg>
                   ) : (
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/></svg>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                   )}
                 </button>
               </div>
+
+              {mode === "login" ? (
+                <div style={{ marginBottom: 12 }}>
+                  <button type="button" onClick={() => setResetMode(true)} style={{ background: "none", border: "none", padding: 0, fontSize: 12, color: "#7A7A7A", cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>Forgot password?</button>
+                </div>
+              ) : null}
 
               {error ? (<div style={{ fontSize: 14, fontWeight: 500, color: "#992323", padding: "10px 14px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 16 }}>{error}</div>) : null}
 
@@ -152,8 +213,6 @@ function AuthPageContent() {
               >
                 {loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
               </button>
-
-              {mode === "login" ? (<div style={{ textAlign: "right", marginBottom: 28 }}><a href="#" style={{ fontSize: 14, color: "#1A1A1A", textDecoration: "underline", letterSpacing: "-0.02em" }}>Forgot password?</a></div>) : null}
 
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
                 <div style={{ flex: 1, height: 1, background: "#E5E5E5" }} />
@@ -182,7 +241,7 @@ export default function AuthPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "80px" }}>
           <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Loading...</p>
         </div>
       }

@@ -45,12 +45,29 @@ const inputStyle: React.CSSProperties = {
   letterSpacing: "-0.02em", background: "#FFF",
 };
 
-export function CampaignsView() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>(INITIAL_CAMPAIGNS);
+type PlanTier = "free" | "basic" | "pro";
+
+export function CampaignsView({
+  plan,
+  onUpgrade,
+}: {
+  plan: PlanTier;
+  onUpgrade: () => void;
+}) {
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [filter, setFilter] = useState<CampaignFilter>("all");
   const [search, setSearch] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  const tryOpenNewCampaign = () => {
+    if (plan === "free" && campaigns.length >= 1) {
+      setUpgradeModalOpen(true);
+      return;
+    }
+    setModalOpen(true);
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -91,26 +108,79 @@ export function CampaignsView() {
   if (campaigns.length === 0) {
     return (
       <>
-        <CampaignsHeader onNew={() => setModalOpen(true)} showFilters={false} />
+        <CampaignsHeader onNew={tryOpenNewCampaign} showFilters={false} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>No campaigns yet.</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
             Create your first campaign to start tracking creator performance and commissions.
           </p>
-          <button type="button" style={btnPrimary} onClick={() => setModalOpen(true)}>+ Create your first campaign →</button>
+          <button type="button" style={btnPrimary} onClick={tryOpenNewCampaign}>+ Create your first campaign →</button>
         </div>
         {modalOpen && <NewCampaignModal onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+        {upgradeModalOpen && (
+          <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
+        )}
       </>
     );
   }
 
   return (
     <>
-      <CampaignsHeader onNew={() => setModalOpen(true)} showFilters />
+      <CampaignsHeader onNew={tryOpenNewCampaign} showFilters />
       <CampaignsList campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
       {modalOpen && <NewCampaignModal onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+      {upgradeModalOpen && (
+        <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
+      )}
     </>
+  );
+}
+
+function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onUpgrade: () => void }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1100,
+        padding: 24,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#FFFFFF",
+          borderRadius: 16,
+          padding: 32,
+          maxWidth: 420,
+          width: "100%",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
+          Upgrade to create more campaigns
+        </h3>
+        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          Free plan includes 1 campaign. Upgrade to Basic for unlimited campaigns.
+        </p>
+        <button type="button" onClick={() => void onUpgrade()} style={{ ...btnPrimary, width: "100%" }}>
+          Upgrade to Basic $49/mo →
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ ...btnSecondary, width: "100%", marginTop: 10, background: "#FFFFFF" }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -130,17 +200,19 @@ function CampaignsList({ campaigns, filter, setFilter, search, setSearch, onView
   search: string; setSearch: (s: string) => void; onView: (id: string) => void; onDelete: (id: string) => void;
 }) {
   const filtered = useMemo(() => {
-    let list = campaigns;
+    let list = campaigns ?? [];
     if (filter !== "all") list = list.filter((c) => c.status.toLowerCase() === filter);
     const q = search.trim().toLowerCase();
     if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
     return list;
   }, [campaigns, filter, search]);
 
+  if (!campaigns || campaigns.length === 0) return <div>No campaigns yet.</div>;
+
   const active = campaigns.filter((c) => c.status === "Active").length;
-  const totalCreators = campaigns.reduce((s, c) => s + c.creators, 0);
-  const totalSales = campaigns.reduce((s, c) => s + c.sales, 0);
-  const totalCommission = campaigns.reduce((s, c) => s + c.commission, 0);
+  const totalCreators = campaigns.reduce((s, c) => s + (c.creators ?? 0), 0);
+  const totalSales = campaigns.reduce((s, c) => s + (c.sales ?? 0), 0);
+  const totalCommission = campaigns.reduce((s, c) => s + (c.commission ?? 0), 0);
 
   return (
     <div style={{ padding: "24px 40px 40px" }}>
@@ -173,10 +245,10 @@ function CampaignsList({ campaigns, filter, setFilter, search, setSearch, onView
               {filtered.map((c) => (
                 <tr key={c.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "14px", fontWeight: 500, color: "#1A1A1A" }}>{c.name}</td>
-                  <td style={{ padding: "14px" }}>{c.creators} creators</td>
+                  <td style={{ padding: "14px" }}>{(c.creators ?? 0)} creators</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.platform}</td>
-                  <td style={{ padding: "14px" }}>${c.sales.toLocaleString()}</td>
-                  <td style={{ padding: "14px" }}>${c.commission.toLocaleString()}</td>
+                  <td style={{ padding: "14px" }}>${(c.sales ?? 0).toLocaleString()}</td>
+                  <td style={{ padding: "14px" }}>${(c.commission ?? 0).toLocaleString()}</td>
                   <td style={{ padding: "14px" }}><CampaignBadge status={c.status} /></td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.start}</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.end}</td>
@@ -257,7 +329,7 @@ function CampaignBadge({ status }: { status: CampaignStatus }) {
     Completed: { bg: "#F5F5F5", c: "#9A9A9A" },
     Draft: { bg: "#E3F2FD", c: "#1565C0" },
   };
-  const s = map[status];
+  const s = map[status] ?? { bg: "#F5F5F5", c: "#7A7A7A" };
   return (
     <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{status}</span>
   );
@@ -389,10 +461,10 @@ function CampaignDetail({ campaign, onBack, onUpdate }: { campaign: Campaign; on
     </div>
     <div style={{ padding: "24px 40px 40px" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <Kpi title="Creators" value={String(campaign.creators)} sub="in this campaign" />
-        <Kpi title="Sales" value={`$${campaign.sales.toLocaleString()}`} sub="attributed revenue" />
-        <Kpi title="Commission" value={`$${campaign.commission.toLocaleString()}`} sub="owed to creators" />
-        <Kpi title="Avg per Creator" value={campaign.creators ? `$${Math.round(campaign.sales / campaign.creators).toLocaleString()}` : "$0"} sub="sales driven" />
+        <Kpi title="Creators" value={String(campaign.creators ?? 0)} sub="in this campaign" />
+        <Kpi title="Sales" value={`$${(campaign.sales ?? 0).toLocaleString()}`} sub="attributed revenue" />
+        <Kpi title="Commission" value={`$${(campaign.commission ?? 0).toLocaleString()}`} sub="owed to creators" />
+        <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? `$${Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)).toLocaleString()}` : "$0"} sub="sales driven" />
       </div>
       {tab === "creators" && <CreatorsTab />}
       {tab === "outreach" && <OutreachTab />}

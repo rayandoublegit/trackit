@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { generateDiscountCode } from "@/lib/generate-discount-code";
+import { supabase } from "@/lib/supabase";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -563,7 +565,7 @@ function RunCampaignModal({
 }: {
   creator: ManagedCreator;
   onClose: () => void;
-  onLaunch: (campaignId: string) => void;
+  onLaunch: (campaignId: string, commissionRate: number) => Promise<string | void>;
 }) {
   const [step, setStep] = useState(1);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
@@ -571,6 +573,8 @@ function RunCampaignModal({
   const [commissionRate, setCommissionRate] = useState("15");
   const [autoPayout, setAutoPayout] = useState(true);
   const [minPayout, setMinPayout] = useState("50");
+  const [assignedCode, setAssignedCode] = useState<string | null>(null);
+  const [launching, setLaunching] = useState(false);
   const code = discountCodeFor(creator.username);
   const [refLink] = useState(`trackit.app/r/${referralSlug(creator.username)}`);
 
@@ -695,9 +699,35 @@ function RunCampaignModal({
           <button
             type="button"
             style={{ ...btnBlack, width: "100%", marginTop: 8 }}
-            onClick={() => selectedCampaign && onLaunch(selectedCampaign)}
+            disabled={launching}
+            onClick={async () => {
+              if (!selectedCampaign) return;
+              setLaunching(true);
+              const code = await onLaunch(selectedCampaign, parseFloat(commissionRate) || 10);
+              if (code) setAssignedCode(code);
+              setLaunching(false);
+              setStep(4);
+            }}
           >
-            Launch campaign →
+            {launching ? "Launching..." : "Launch campaign →"}
+          </button>
+        </>
+      )}
+
+      {step === 4 && assignedCode && (
+        <>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Campaign launched</p>
+          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 16px" }}>Share this discount code with {creator.displayName}:</p>
+          <Field label="Discount code">
+            <div style={{ display: "flex", gap: 8 }}>
+              <input readOnly value={assignedCode} style={{ ...inputStyle, fontFamily: "monospace", fontWeight: 600 }} />
+              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(assignedCode)}>
+                Copy
+              </button>
+            </div>
+          </Field>
+          <button type="button" style={{ ...btnBlack, width: "100%", marginTop: 8 }} onClick={onClose}>
+            Done
           </button>
         </>
       )}
@@ -1024,7 +1054,17 @@ export function CreatorsView() {
         <RunCampaignModal
           creator={campaignCreator}
           onClose={() => setCampaignCreator(null)}
-          onLaunch={(campaignId) => {
+          onLaunch={async (campaignId, commissionRate) => {
+            const discountCode = generateDiscountCode(
+              campaignCreator.username || (campaignCreator as ManagedCreator & { handle?: string }).handle || "creator"
+            );
+            await supabase!
+              .from("creators")
+              .update({
+                discount_code: discountCode,
+                commission_rate: commissionRate || 10,
+              })
+              .eq("id", campaignCreator.id);
             setCreators((list) =>
               list.map((c) =>
                 c.id === campaignCreator.id
@@ -1036,8 +1076,8 @@ export function CreatorsView() {
                   : c
               )
             );
-            setCampaignCreator(null);
             setToast("Campaign launched ✓");
+            return discountCode;
           }}
         />
       )}
