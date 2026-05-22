@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLang } from "@/lib/useLang";
 
-const HAS_DATA = false;
+const HAS_DATA = true;
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -39,6 +40,7 @@ const OUTREACH_PLATFORMS = [
 ];
 
 export function AnalyticsView() {
+  const lang = useLang();
   const [range, setRange] = useState<DateRange>("30d");
   const [compare, setCompare] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("sales");
@@ -63,12 +65,12 @@ export function AnalyticsView() {
   if (!HAS_DATA) {
     return (
       <>
-        <AnalyticsHeader range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
+        <AnalyticsHeader lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>No data yet.</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>Connect your Shopify store and start your first campaign to see analytics here.</p>
-          <button type="button" style={btnPrimary}>Connect Shopify →</button>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
+          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
+          <button type="button" style={btnPrimary}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
         </div>
       </>
     );
@@ -76,17 +78,17 @@ export function AnalyticsView() {
 
   return (
     <>
-      <AnalyticsHeader range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
+      <AnalyticsHeader lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
       <div style={{ padding: "24px 40px 40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-          <KpiCard title="Total Revenue from Creators" value="$24,500" sub="vs last period +18% ↑" subColor="#2E7D32" />
-          <KpiCard title="Total Creators Contacted" value="147" sub="vs last period +23 ↑" subColor="#2E7D32" />
-          <KpiCard title="Response Rate" value="34%" sub="vs last period -2% ↓" subColor="#C62828" />
-          <KpiCard title="Total Commissions Paid" value="$1,960" sub="vs last period +9% ↑" subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value="$24,500" sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value="147" sub={lang === "fr" ? "vs période précédente +23 ↑" : "vs last period +23 ↑"} subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value="34%" sub={lang === "fr" ? "vs période précédente -2% ↓" : "vs last period -2% ↓"} subColor="#C62828" />
+          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value="$1,960" sub={lang === "fr" ? "vs période précédente +9% ↑" : "vs last period +9% ↑"} subColor="#2E7D32" />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <ChartCard title="Revenue by Creator Over Time">
+          <ChartCard title={lang === "fr" ? "Revenus par créateur dans le temps" : "Revenue by Creator Over Time"}>
             <LineChart />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, justifyContent: "center" }}>
               {["Mia Chen", "Jordan Lee", "Sam Taylor", "Alex Rivera", "Riley Park"].map((name, i) => (
@@ -97,23 +99,23 @@ export function AnalyticsView() {
               ))}
             </div>
           </ChartCard>
-          <ChartCard title="Outreach Performance">
-            <FunnelBarChart />
+          <ChartCard title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}>
+            <FunnelBarChart lang={lang} />
           </ChartCard>
         </div>
 
-        <ChartCard title="Top Performing Creators This Month" style={{ marginBottom: 20 }}>
+        <ChartCard title={lang === "fr" ? "Meilleurs créateurs ce mois" : "Top Performing Creators This Month"} style={{ marginBottom: 20 }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                  <Th>Rank</Th>
-                  <Th sortable onClick={() => toggleSort("creator")}>Creator</Th>
-                  <Th>Platform</Th>
-                  <Th sortable onClick={() => toggleSort("sales")}>Sales Driven</Th>
-                  <Th sortable onClick={() => toggleSort("commission")}>Commission Paid</Th>
-                  <Th sortable onClick={() => toggleSort("roi")}>ROI</Th>
-                  <Th>Status</Th>
+                  <Th>{lang === "fr" ? "Rang" : "Rank"}</Th>
+                  <Th sortable onClick={() => toggleSort("creator")}>{lang === "fr" ? "Créateur" : "Creator"}</Th>
+                  <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th>
+                  <Th sortable onClick={() => toggleSort("sales")}>{lang === "fr" ? "Ventes générées" : "Sales Driven"}</Th>
+                  <Th sortable onClick={() => toggleSort("commission")}>{lang === "fr" ? "Commission payée" : "Commission Paid"}</Th>
+                  <Th sortable onClick={() => toggleSort("roi")}>{lang === "fr" ? "ROI" : "ROI"}</Th>
+                  <Th>{lang === "fr" ? "Statut" : "Status"}</Th>
                 </tr>
               </thead>
               <tbody>
@@ -125,7 +127,7 @@ export function AnalyticsView() {
                     <td style={{ padding: "12px 8px" }}>${r.sales.toLocaleString()}</td>
                     <td style={{ padding: "12px 8px" }}>${r.commission.toLocaleString()}</td>
                     <td style={{ padding: "12px 8px", fontWeight: 500 }}>{r.roi.toFixed(1)}x</td>
-                    <td style={{ padding: "12px 8px" }}><StatusBadge status={r.status} /></td>
+                    <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -134,21 +136,21 @@ export function AnalyticsView() {
         </ChartCard>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <ChartCard title="Commission vs Revenue Ratio">
-            <DonutChart />
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>Average commission rate: 8%</p>
-            <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>Net revenue after commissions: $22,540</p>
+          <ChartCard title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}>
+            <DonutChart lang={lang} />
+            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? "Taux de commission moyen : 8%" : "Average commission rate: 8%"}</p>
+            <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? "Revenus nets après commissions : 22 540$" : "Net revenue after commissions: $22,540"}</p>
           </ChartCard>
-          <ChartCard title="Platform Breakdown">
+          <ChartCard title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}>
             <PlatformBars />
           </ChartCard>
         </div>
 
-        <ChartCard title="Campaign Performance" style={{ marginBottom: 20 }}>
+        <ChartCard title={lang === "fr" ? "Performance des campagnes" : "Campaign Performance"} style={{ marginBottom: 20 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                <Th>Campaign Name</Th><Th>Creators</Th><Th>Total Sales</Th><Th>Commissions</Th><Th>Avg ROI</Th><Th>Start Date</Th><Th>Status</Th>
+                <Th>{lang === "fr" ? "Nom de la campagne" : "Campaign Name"}</Th><Th>{lang === "fr" ? "Créateurs" : "Creators"}</Th><Th>{lang === "fr" ? "Ventes totales" : "Total Sales"}</Th><Th>{lang === "fr" ? "Commissions" : "Commissions"}</Th><Th>{lang === "fr" ? "ROI moyen" : "Avg ROI"}</Th><Th>{lang === "fr" ? "Date de début" : "Start Date"}</Th><Th>{lang === "fr" ? "Statut" : "Status"}</Th>
               </tr>
             </thead>
             <tbody>
@@ -160,24 +162,24 @@ export function AnalyticsView() {
                   <td style={{ padding: "12px 8px" }}>${c.commissions.toLocaleString()}</td>
                   <td style={{ padding: "12px 8px" }}>{c.roi}</td>
                   <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{c.start}</td>
-                  <td style={{ padding: "12px 8px" }}><CampaignStatus status={c.status} /></td>
+                  <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={c.status} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </ChartCard>
 
-        <ChartCard title="Outreach Breakdown" style={{ marginBottom: 20 }}>
+        <ChartCard title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"} style={{ marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-            <MiniStat label="Total sent" value="147" />
-            <MiniStat label="Open rate" value="68%" />
-            <MiniStat label="Reply rate" value="34%" />
-            <MiniStat label="Conversion to partner" value="12%" />
+            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value="147" />
+            <MiniStat label={lang === "fr" ? "Taux d'ouverture" : "Open rate"} value="68%" />
+            <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value="34%" />
+            <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value="12%" />
           </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                <Th>Platform</Th><Th>Sent</Th><Th>Replied</Th><Th>Converted</Th><Th>Best performing message preview</Th>
+                <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th><Th>{lang === "fr" ? "Envoyé" : "Sent"}</Th><Th>{lang === "fr" ? "Répondu" : "Replied"}</Th><Th>{lang === "fr" ? "Converti" : "Converted"}</Th><Th>{lang === "fr" ? "Aperçu du meilleur message" : "Best performing message preview"}</Th>
               </tr>
             </thead>
             <tbody>
@@ -194,34 +196,35 @@ export function AnalyticsView() {
           </table>
         </ChartCard>
 
-        <ChartCard title="Follow Up Impact">
+        <ChartCard title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-            <MiniStat label="Deals closed from follow up" value="23%" large />
-            <MiniStat label="Average follow ups before reply" value="2.4" large />
+            <MiniStat label={lang === "fr" ? "Deals conclus grâce aux relances" : "Deals closed from follow up"} value="23%" large />
+            <MiniStat label={lang === "fr" ? "Relances moyennes avant réponse" : "Average follow ups before reply"} value="2.4" large />
           </div>
-          <FollowUpLineChart />
+          <FollowUpLineChart lang={lang} />
         </ChartCard>
       </div>
     </>
   );
 }
 
-function AnalyticsHeader({ range, setRange, compare, setCompare }: {
+function AnalyticsHeader({ lang, range, setRange, compare, setCompare }: {
+  lang: "en" | "fr";
   range: DateRange; setRange: (r: DateRange) => void;
   compare: boolean; setCompare: (v: boolean) => void;
 }) {
   const ranges: { id: DateRange; label: string }[] = [
-    { id: "today", label: "Today" },
-    { id: "7d", label: "7 days" },
-    { id: "30d", label: "30 days" },
-    { id: "90d", label: "90 days" },
-    { id: "custom", label: "Custom" },
+    { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
+    { id: "7d", label: lang === "fr" ? "7 derniers jours" : "Last 7 days" },
+    { id: "30d", label: lang === "fr" ? "30 derniers jours" : "Last 30 days" },
+    { id: "90d", label: lang === "fr" ? "90 derniers jours" : "Last 90 days" },
+    { id: "custom", label: lang === "fr" ? "Personnalisé" : "Custom" },
   ];
   return (
     <div style={{ padding: "32px 40px 20px", borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>Analytics</h1>
-        <button type="button" style={btnSecondary}>Export CSV →</button>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
+        <button type="button" style={btnSecondary}>{lang === "fr" ? "Exporter CSV" : "Export CSV"}</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2 }}>
@@ -234,7 +237,7 @@ function AnalyticsHeader({ range, setRange, compare, setCompare }: {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 13, color: "#7A7A7A" }}>Compare to previous period</span>
+          <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to last period"}</span>
           <CompareToggle on={compare} onToggle={() => setCompare(!compare)} />
         </div>
       </div>
@@ -283,19 +286,29 @@ function RankBadge({ rank }: { rank: number }) {
   return <span style={{ fontWeight: 600, color: c }}>#{rank}</span>;
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
   const active = status === "Active";
-  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: active ? "#E8F5E9" : "#F5F5F5", color: active ? "#2E7D32" : "#9A9A9A" }}>{status}</span>;
+  const label =
+    status === "Active"
+      ? lang === "fr"
+        ? "Actif"
+        : "Active"
+      : status === "Inactive"
+        ? lang === "fr"
+          ? "Inactif"
+          : "Inactive"
+        : status;
+  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: active ? "#E8F5E9" : "#F5F5F5", color: active ? "#2E7D32" : "#9A9A9A" }}>{label}</span>;
 }
 
-function CampaignStatus({ status }: { status: string }) {
-  const map: Record<string, { bg: string; c: string }> = {
-    Active: { bg: "#E8F5E9", c: "#2E7D32" },
-    Paused: { bg: "#FFF8E1", c: "#F57F17" },
-    Completed: { bg: "#F5F5F5", c: "#9A9A9A" },
+function CampaignStatus({ lang, status }: { lang: "en" | "fr"; status: string }) {
+  const map: Record<string, { bg: string; c: string; en: string; fr: string }> = {
+    Active: { bg: "#E8F5E9", c: "#2E7D32", en: "Active", fr: "Actif" },
+    Paused: { bg: "#FFF8E1", c: "#F57F17", en: "Paused", fr: "En pause" },
+    Completed: { bg: "#F5F5F5", c: "#9A9A9A", en: "Completed", fr: "Terminé" },
   };
   const s = map[status] ?? map.Completed;
-  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{status}</span>;
+  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{lang === "fr" ? s.fr : s.en}</span>;
 }
 
 function MiniStat({ label, value, large }: { label: string; value: string; large?: boolean }) {
@@ -323,12 +336,12 @@ function LineChart() {
   );
 }
 
-function FunnelBarChart() {
+function FunnelBarChart({ lang }: { lang: "en" | "fr" }) {
   const bars = [
-    { label: "Sent", value: 147, color: "#9A9A9A", h: 100 },
-    { label: "Opened", value: 100, color: "#0047FF", h: 68 },
-    { label: "Replied", value: 50, color: "#95BF47", h: 34 },
-    { label: "Converted", value: 18, color: "#2E7D32", h: 12 },
+    { label: lang === "fr" ? "Envoyé" : "Sent", value: 147, color: "#9A9A9A", h: 100 },
+    { label: lang === "fr" ? "Ouvert" : "Opened", value: 100, color: "#0047FF", h: 68 },
+    { label: lang === "fr" ? "Répondu" : "Replied", value: 50, color: "#95BF47", h: 34 },
+    { label: lang === "fr" ? "Converti" : "Converted", value: 18, color: "#2E7D32", h: 12 },
   ];
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 180, gap: 12, paddingTop: 8 }}>
@@ -343,14 +356,14 @@ function FunnelBarChart() {
   );
 }
 
-function DonutChart() {
+function DonutChart({ lang }: { lang: "en" | "fr" }) {
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <svg width="160" height="160" viewBox="0 0 160 160">
         <circle cx="80" cy="80" r="60" fill="none" stroke="#EFEFEF" strokeWidth="24" />
         <circle cx="80" cy="80" r="60" fill="none" stroke="#0047FF" strokeWidth="24" strokeDasharray="301 377" strokeDashoffset="0" transform="rotate(-90 80 80)" />
         <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">92%</text>
-        <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">Net revenue</text>
+        <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">{lang === "fr" ? "Revenus nets" : "Net revenue"}</text>
       </svg>
     </div>
   );
@@ -379,15 +392,15 @@ function PlatformBars() {
   );
 }
 
-function FollowUpLineChart() {
+function FollowUpLineChart({ lang }: { lang: "en" | "fr" }) {
   return (
     <div>
       <div style={{ display: "flex", gap: 16, marginBottom: 8, justifyContent: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7A7A7A" }}>
-          <span style={{ width: 12, height: 3, background: "#0047FF", borderRadius: 2 }} /> With follow-up
+          <span style={{ width: 12, height: 3, background: "#0047FF", borderRadius: 2 }} /> {lang === "fr" ? "Avec relance" : "With follow-up"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7A7A7A" }}>
-          <span style={{ width: 12, height: 3, background: "#9A9A9A", borderRadius: 2 }} /> Without follow-up
+          <span style={{ width: 12, height: 3, background: "#9A9A9A", borderRadius: 2 }} /> {lang === "fr" ? "Sans relance" : "Without follow-up"}
         </div>
       </div>
       <svg viewBox="0 0 260 100" style={{ width: "100%", height: 140 }}>

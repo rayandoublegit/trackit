@@ -3,6 +3,7 @@
 import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "@/lib/useLang";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -17,6 +18,113 @@ export default function TrackitLanding() {
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
   const [featuresOpen, setFeaturesOpen] = useState(false);
+  const [langOpen, setLangOpen] = useState(false);
+  const lang = useLang();
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
+  const t = {
+  nav_features: lang === "fr" ? "Fonctionnalités" : "Features",
+  nav_affiliation: lang === "fr" ? "Affiliation" : "Affiliation",
+  nav_pricing: lang === "fr" ? "Tarifs" : "Pricing",
+  nav_process: lang === "fr" ? "Processus" : "Process",
+  nav_login: lang === "fr" ? "Se connecter" : "Log in",
+  nav_cta: lang === "fr" ? "Ouvrir thentrack.it" : "Open thentrack.it",
+  hero_badge: lang === "fr" ? "Marketing d'influence, automatisé" : "Influencer marketing, automated",
+  hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
+  hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
+  hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
+  hero_italic: lang === "fr" ? "À un seul endroit." : "All in one place.",
+  hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : "Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No $300/month enterprise tools.",
+  hero_cta: lang === "fr" ? "Commencer gratuitement" : "Get started for Free",
+  hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
+  hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
+  hero_automated: lang === "fr" ? "Automatisé" : "Automated",
+  hero_bank: lang === "fr" ? "0€ de Virements Bancaires Manuels" : "$0 Manual Bank Transfers",
+  hero_trusted: lang === "fr" ? "Fait confiance par plus de 2 000 boutiques Shopify" : "Trusted by over 2,000 of the best Shopify Stores",
+  section_does_everything: lang === "fr" ? "Trackit fait tout." : "Trackit does everything.",
+  section_in_one_place: lang === "fr" ? "Au même endroit." : "In one place.",
+  section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
+  feat_1_title: lang === "fr" ? "Recherche Intelligente de Créateurs" : "Smart Creator Discovery",
+  feat_1_desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs sur TikTok, Instagram et YouTube. Filtrez par niche, taux d'engagement, abonnés et localisation." : "Search 250M+ creators across TikTok, Instagram, and YouTube. Filter by niche, engagement rate, follower count, and location. Find creators whose audience is exactly your customer.",
+  feat_2_title: lang === "fr" ? "Génération de Messages IA" : "AI Outreach Generation",
+  feat_2_desc: lang === "fr" ? "Arrêtez d'envoyer des DMs copiés-collés. Trackit génère un message personnalisé pour chaque créateur." : "Stop sending generic copy-paste DMs. Trackit generates a personalized outreach message for every creator based on their content style and your product. Higher response rates. Less work.",
+  feat_3_title: lang === "fr" ? "Suivi Automatique des Ventes" : "Automatic Sale Tracking",
+  feat_3_desc: lang === "fr" ? "Connectez votre boutique Shopify. Chaque créateur reçoit un lien de suivi unique. Chaque vente attribuée automatiquement." : "Connect your Shopify store. Every creator gets a unique tracking link or discount code. Every sale attributed automatically in real time. No manual tracking. No guessing.",
+  feat_4_title: lang === "fr" ? "Paiement des Commissions en Un Clic" : "One Click Commission Payouts",
+  feat_4_desc: lang === "fr" ? "Voyez exactement ce que chaque créateur a gagné. Cliquez. L'argent va directement sur leur compte." : "See exactly what every creator earned. Hit send. Money goes directly to their account. No bank transfers. No PayPal drama. No spreadsheet math.",
+  pain_title: lang === "fr" ? "Vous faites ça" : "You've been doing",
+  pain_title_2: lang === "fr" ? "à la dure." : "this the hard way.",
+  pain_1_title: lang === "fr" ? "Scroll TikTok pendant des heures." : "TikTok scrolling",
+  pain_1_desc: lang === "fr" ? "Vous faites défiler TikTok et Instagram pendant des heures pour trouver des créateurs. La plupart des outils vous donnent une base de données inutile." : "You scroll TikTok and Instagram for hours trying to find creators who actually fit your brand. Most tools give you a giant useless database.",
+  pain_2_title: lang === "fr" ? "Commissions suivies dans des tableurs." : "Commissions tracked in spreadsheets.",
+  pain_2_desc: lang === "fr" ? "Chaque mois vous calculez manuellement qui a gagné quoi et envoyez des virements PayPal individuels. Ça prend une journée entière." : "Every month you manually calculate who earned what and send individual PayPal transfers. It takes a full day and you still make mistakes.",
+  pain_3_title: lang === "fr" ? "Outils enterprise inabordables." : "Enterprise tools you can't afford.",
+  pain_3_desc: lang === "fr" ? "Modash est à 299€/mois. Aspire à 500€/mois. Vous avez juste besoin de quelque chose qui fonctionne sans ruiner votre budget." : "Modash is $299/month. Aspire is $500/month. You're a lean brand. You just need something that works without breaking the bank.",
+  process_title: lang === "fr" ? "⇄ Processus" : "⇄ Process",
+  process_sub: lang === "fr" ? "De zéro à votre première campagne créateur en 10 minutes." : "From zero to first creator campaign in 10 minutes.",
+  process_sub2: lang === "fr" ? "Quatre étapes simples. Pas d'agence. Pas de contrat enterprise." : "Four simple steps. No agency. No enterprise contract. No complexity.",
+  process_1: lang === "fr" ? "Connectez votre boutique Shopify." : "Connect your Shopify store.",
+  process_1_sub: lang === "fr" ? "60 secondes. Un clic. C'est fait." : "60 seconds. One click. Done.",
+  process_2: lang === "fr" ? "⛶ Trouvez des créateurs dans votre niche." : "⛶ Find creators in your niche.",
+  process_2_sub: lang === "fr" ? "Filtrez par plateforme, engagement et localisation." : "Filter by platform, engagement, location, and audience size.",
+  process_3: lang === "fr" ? "Envoyez des messages IA personnalisés." : "Send AI personalized outreach.",
+  process_3_sub: lang === "fr" ? "Un clic. Message généré. Prêt à envoyer." : "One click. Message generated. Ready to send.",
+  process_4: lang === "fr" ? "Suivez les ventes et payez les commissions." : "Track sales and pay commissions.",
+  process_4_sub: lang === "fr" ? "Chaque vente suivie. Chaque commission payée automatiquement." : "Every sale tracked. Every commission paid automatically.",
+  why_title: lang === "fr" ? "Pourquoi Trackit" : "Why Trackit",
+  why_sub: lang === "fr" ? "Conçu pour les marques comme la vôtre." : "Built for brands like yours.",
+  why_sub2: lang === "fr" ? "Pas pour les entreprises." : "Not for enterprise.",
+  why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : "Every other tool was built for agencies with 10 people and $500/month budgets. Trackit was built for lean Shopify brands who need results not complexity.",
+  pricing_title: lang === "fr" ? "Des tarifs simples. Sans surprises." : "Simple pricing. No surprises.",
+  pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
+  pricing_save: lang === "fr" ? "Économisez 20% avec la facturation annuelle" : "Save 20% with annual billing",
+  pricing_basic_desc: lang === "fr" ? "Pour les marques qui gèrent des campagnes créateurs sérieuses." : "For brands running serious creator campaigns.",
+  pricing_pro_desc: lang === "fr" ? "Pour les fondateurs qui gèrent des campagnes à grande échelle." : "For founders running distribution campaigns at scale.",
+  pricing_free_desc: lang === "fr" ? "Commencez sans engagement." : "Get started with no commitment.",
+  pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
+  pricing_free_cta: lang === "fr" ? "Démarrer gratuitement →" : "Start free →",
+  pricing_month: lang === "fr" ? "/mois" : "/month",
+  pricing_everything_plus: lang === "fr" ? "Tout le plan Basic, plus :" : "Everything in Basic, plus:",
+  feat_unlimited_searches: lang === "fr" ? "Recherches de créateurs illimitées" : "Unlimited creator searches",
+  feat_ai_outreach: lang === "fr" ? "Messages personnalisés IA" : "AI personalized outreach",
+  feat_unlimited_shopify: lang === "fr" ? "Boutiques Shopify illimitées" : "Unlimited Shopify stores",
+  feat_auto_tracking: lang === "fr" ? "Suivi automatique des ventes" : "Automatic sale tracking",
+  feat_one_click_payouts: lang === "fr" ? "Paiements en un clic" : "One click payouts",
+  feat_priority_support: lang === "fr" ? "Support prioritaire" : "Priority support",
+  feat_team: lang === "fr" ? "Accès équipe" : "Team access",
+  feat_white_label: lang === "fr" ? "Rapports en marque blanche" : "White label reports",
+  feat_bulk_export: lang === "fr" ? "Export en masse" : "Bulk outreach export",
+  feat_daily_offers: lang === "fr" ? "Offres quotidiennes sur les prix" : "Daily offers on pricing",
+  feat_5_searches: lang === "fr" ? "5 recherches de créateurs par jour" : "5 creator searches per day",
+  feat_basic_templates: lang === "fr" ? "Templates de messages basiques" : "Basic outreach templates",
+  feat_1_store: lang === "fr" ? "1 boutique Shopify" : "1 Shopify store",
+  footer_tagline: lang === "fr" ? "Une plateforme créée par des fondateurs e-com pour des fondateurs e-com" : "A Platform made by e-com founders to e-com founders",
+  footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
+  traditional_title: lang === "fr" ? "Plateformes Traditionnelles" : "Traditional Platforms",
+  trad_1: lang === "fr" ? "Découverte de créateurs" : "Creator discovery",
+  trad_2: lang === "fr" ? "Génération de messages IA" : "AI outreach generation",
+  trad_3: lang === "fr" ? "Intégration Shopify" : "Shopify integration",
+  trad_4: lang === "fr" ? "Suivi automatique des ventes" : "Automatic sale tracking",
+  trad_5: lang === "fr" ? "Paiements en un clic" : "One click payouts",
+  trad_6: lang === "fr" ? "Prix juste" : "Fair price",
+  trad_7: lang === "fr" ? "Conçu pour les petites marques" : "Built for small brands",
+  trad_8: lang === "fr" ? "Délais de données de 8 heures" : "8-hour data delays",
+  trad_9: lang === "fr" ? "Coûts qui explosent à l'échelle" : "Cost spikes at scale",
+  trad_10: lang === "fr" ? "Données fragmentées" : "Fragmented data lakes",
+  trackit_1: lang === "fr" ? "Suivi des profits en temps réel" : "Real-time profit mapping",
+  trackit_2: lang === "fr" ? "Traitement illimité des événements" : "Unlimited event processing",
+  trackit_3: lang === "fr" ? "IA transparente et explicable" : "Transparent AI reasoning",
+  trackit_4: lang === "fr" ? "Segments auto-optimisés" : "Auto-optimized segments",
+  trackit_5: lang === "fr" ? "Identité respectueuse de la vie privée" : "Privacy-first identity stitching",
+  trackit_6: lang === "fr" ? "Analytiques collaboratives" : "Collaborative analytics playground",
+  trackit_7: lang === "fr" ? "Filtrage des bots par IA" : "AI-powered bot filtering",
+  trackit_8: lang === "fr" ? "Suivi des marges en direct" : "Live margin tracking",
+  trackit_9: lang === "fr" ? "Évolutivité selon l'usage" : "Usage-based scaling",
+  trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
+};
 
   const handleCheckout = async (plan: "basic" | "pro") => {
     const priceId = plan === "basic"
@@ -93,6 +201,9 @@ export default function TrackitLanding() {
       if (!target.closest('.features-dropdown-container')) {
         setFeaturesOpen(false);
       }
+      if (!target.closest('.lang-dropdown-container')) {
+        setLangOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -122,7 +233,7 @@ export default function TrackitLanding() {
               className="features-nav-btn"
               onClick={() => setFeaturesOpen(v => !v)}
             >
-              Features
+              {t.nav_features}
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
             </button>
 
@@ -151,8 +262,8 @@ export default function TrackitLanding() {
                 {[
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
-                    title: "Creator Discovery",
-                    desc: "Search 250M+ creators by niche, engagement, and location.",
+                    title: lang === "fr" ? "Recherche de Créateurs" : "Creator Discovery",
+                    desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs par niche, engagement et localisation." : "Search 250M+ creators by niche, engagement, and location.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -168,8 +279,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: "AI Outreach",
-                    desc: "Personalized messages written by AI for every creator.",
+                    title: lang === "fr" ? "Messages IA" : "AI Outreach",
+                    desc: lang === "fr" ? "Messages personnalisés rédigés par IA pour chaque créateur." : "Personalized messages written by AI for every creator.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
@@ -184,8 +295,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l16-6v14L3 13v-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M7 13v5l4 1v-5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: "Campaign Tracking",
-                    desc: "Every sale attributed automatically via Shopify.",
+                    title: lang === "fr" ? "Suivi des Campagnes" : "Campaign Tracking",
+                    desc: lang === "fr" ? "Chaque vente attribuée automatiquement via Shopify." : "Every sale attributed automatically via Shopify.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
@@ -201,8 +312,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>,
-                    title: "Auto Payouts",
-                    desc: "Pay creator commissions in one click via Stripe.",
+                    title: lang === "fr" ? "Paiements Automatiques" : "Auto Payouts",
+                    desc: lang === "fr" ? "Payez les commissions en un clic via Stripe." : "Pay creator commissions in one click via Stripe.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -211,7 +322,7 @@ export default function TrackitLanding() {
                               <span style={{ color: "#555" }}>{name}</span>
                               <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{amount}</span>
                               <div style={{ background: color === "green" ? "#D1FAE5" : "#FEF3C7", color: color === "green" ? "#065F46" : "#92400E", borderRadius: 4, padding: "2px 6px", fontSize: 10, fontWeight: 600 }}>
-                                {color === "green" ? "Paid" : "Pending"}
+                                {color === "green" ? (lang === "fr" ? "Payé" : "Paid") : (lang === "fr" ? "En attente" : "Pending")}
                               </div>
                             </div>
                           ))}
@@ -221,8 +332,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 17l6-10M7 8a2 2 0 100-4 2 2 0 000 4zM17 20a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
-                    title: "Affiliate Links",
-                    desc: "Auto-generate unique tracking links for every creator.",
+                    title: lang === "fr" ? "Liens d'Affiliation" : "Affiliate Links",
+                    desc: lang === "fr" ? "Générez des liens de suivi uniques pour chaque créateur." : "Auto-generate unique tracking links for every creator.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ fontSize: 10, color: "#9A9A9A", marginBottom: 4 }}>Referral link</div>
@@ -233,8 +344,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>,
-                    title: "Analytics",
-                    desc: "See which creators drive the most revenue and why.",
+                    title: lang === "fr" ? "Analytiques" : "Analytics",
+                    desc: lang === "fr" ? "Voyez quels créateurs génèrent le plus de revenus et pourquoi." : "See which creators drive the most revenue and why.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
@@ -252,12 +363,12 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-                    title: "CRM",
-                    desc: "Manage all your creator relationships in one place.",
+                    title: lang === "fr" ? "CRM" : "CRM",
+                    desc: lang === "fr" ? "Gérez toutes vos relations créateurs en un seul endroit." : "Manage all your creator relationships in one place.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[["Emma Laurent", "Partnered", "#D1FAE5", "#065F46"], ["Marc Dubois", "Contacted", "#DBEAFE", "#1E40AF"], ["Julie Chen", "Pending", "#FEF3C7", "#92400E"]].map(([name, status, bg, color], i) => (
+                          {[["Emma Laurent", lang === "fr" ? "Partenaire" : "Partnered", "#D1FAE5", "#065F46"], ["Marc Dubois", lang === "fr" ? "Contacté" : "Contacted", "#DBEAFE", "#1E40AF"], ["Julie Chen", lang === "fr" ? "En attente" : "Pending", "#FEF3C7", "#92400E"]].map(([name, status, bg, color], i) => (
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                               <span style={{ fontSize: 11, color: "#1A1A1A" }}>{name}</span>
                               <div style={{ background: bg, color, borderRadius: 4, padding: "2px 6px", fontSize: 9, fontWeight: 600 }}>{status}</div>
@@ -269,8 +380,8 @@ export default function TrackitLanding() {
                   },
                   {
                     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: "Shopify Integration",
-                    desc: "Connect your store. Every sale tracked automatically.",
+                    title: lang === "fr" ? "Intégration Shopify" : "Shopify Integration",
+                    desc: lang === "fr" ? "Connectez votre boutique. Chaque vente suivie automatiquement." : "Connect your store. Every sale tracked automatically.",
                     visual: (
                       <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10, display: "flex", alignItems: "center", gap: 10 }}>
                         <img src="/shopify-logo.svg" alt="Shopify" style={{ width: 28, height: 28 }} />
@@ -294,13 +405,50 @@ export default function TrackitLanding() {
               </div>
             )}
           </div>
-          <a href="/affiliation">Affiliation</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#process">Process</a>
+          <a href="/affiliation">{t.nav_affiliation}</a>
+          <a href="#pricing">{t.nav_pricing}</a>
+          <a href="#process">{t.nav_process}</a>
           <a href="#features">Trackit</a>
         </div>
+        <div className="lang-dropdown-container" style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setLangOpen(v => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'InstrumentSans', sans-serif", color: "#1A1A1A" }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            {lang === "fr" ? "FR" : "EN"}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+
+          {langOpen && (
+            <div style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, background: "#fff", border: "1px solid #EFEFEF", borderRadius: 12, boxShadow: "0 4px 20px rgba(0,0,0,0.1)", overflow: "hidden", zIndex: 1001, minWidth: 140 }}>
+              <button
+                type="button"
+                onClick={() => { localStorage.setItem("trackit_lang", "en"); window.location.reload(); }}
+                style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "en" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "en" ? 600 : 400, color: lang === "en" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20M8 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
+                English
+                {lang === "en" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0047FF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+              </button>
+              <button
+                type="button"
+                onClick={() => { localStorage.setItem("trackit_lang", "fr"); window.location.reload(); }}
+                style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "fr" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "fr" ? 600 : 400, color: lang === "fr" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 4v16M14 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
+                Français
+                {lang === "fr" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0047FF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+              </button>
+            </div>
+          )}
+        </div>
         <a href="/auth" className="nav-cta">
-          Open thentrack.it
+          {t.nav_cta}
         </a>
       </nav>
 
@@ -309,60 +457,56 @@ export default function TrackitLanding() {
         <img
           ref={heroDoodleRef}
           src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-          className="hero-doodle"
+          className={lang === "fr" ? "hero-doodle hero-doodle--fr" : "hero-doodle"}
           alt=""
         />
         <img
           ref={heroCursorRef}
           src="https://i.ibb.co/G4SvBCXp/cursortransparent.png"
-          className="hero-cursor"
+          className={lang === "fr" ? "hero-cursor hero-cursor--fr" : "hero-cursor"}
           alt=""
         />
         <img
           ref={heroMoneyRef}
           src="https://i.ibb.co/ZznDLJMC/moneytransparent.png"
-          className="hero-money"
+          className={lang === "fr" ? "hero-money hero-money--fr" : "hero-money"}
           alt=""
         />
         <h1 className="hero-headline">
-          <span className="hero-line-wrap fade-up">Find creators.</span>
-          <span className="hero-line-wrap fade-up fade-up-delay-1">Track sales.</span>
-          <span className="hero-line-wrap fade-up fade-up-delay-2">Pay commissions.</span>
+          <span className="hero-line-wrap fade-up">{t.hero_title_1}</span>
+          <span className="hero-line-wrap fade-up fade-up-delay-1">{t.hero_title_2}</span>
+          <span className={`hero-line-wrap fade-up fade-up-delay-2${lang === "fr" ? " hero-line-wrap--fr" : ""}`}>{t.hero_title_3}</span>
           <span
             className={`hero-italic fade-up fade-up-delay-3 ${instrumentSerif.className}`}
           >
-            All in one place.
+            {t.hero_italic}
           </span>
         </h1>
 
         <p className="hero-sub fade-up fade-up-delay-4">
-          &quot;Stop spending hours searching TikTok manually. Trackit finds the right creators for your
-          brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No
-          $300/month enterprise tools.
+          {t.hero_sub}
         </p>
 
         <a href="/auth" className="hero-cta fade-up fade-up-delay-5">
-          Get started for Free
+          {t.hero_cta}
         </a>
 
         <div className="hero-badges fade-up fade-up-delay-5">
           <div className="badge">
             <span className="badge-text">
-              Commission Tracking
+              {t.hero_commission}
               <br />
-              Automated
+              {t.hero_automated}
             </span>
           </div>
           <div className="badge">
             <span className="badge-text">
-              $0 Manual Bank
-              <br />
-              Transfers
+              {t.hero_bank}
             </span>
           </div>
         </div>
         <p className="hero-trusted fade-up fade-up-delay-5">
-          Trusted by over 2,000 of the best Shopify Stores
+          {t.hero_trusted}
         </p>
       </section>
 
@@ -372,13 +516,12 @@ export default function TrackitLanding() {
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /> Trackit
         </div>
         <h2 className="section-title fade-up fade-up-delay-1">
-          Trackit does everything.
+          {t.section_does_everything}
           <br />
-          In one place.
+          {t.section_in_one_place}
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
-          From finding the perfect creator to paying their commission automatically. Built for Shopify
-          brands who are serious about creator marketing.
+          {t.section_sub}
         </p>
 
         <div className="dashboard-wrap fade-up fade-up-delay-3">
@@ -409,11 +552,10 @@ export default function TrackitLanding() {
                   <line x1="3" y1="12" x2="21" y2="12" stroke="black" strokeWidth="1.6" />
                 </svg>
               </span>
-              Smart Creator Discovery
+              {t.feat_1_title}
             </div>
             <div className="feature-desc">
-              Search 250M+ creators across TikTok, Instagram, and YouTube. Filter by niche, engagement
-              rate, follower count, and location. Find creators whose audience is exactly your customer.
+              {t.feat_1_desc}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-1">
@@ -437,12 +579,10 @@ export default function TrackitLanding() {
                   />
                 </svg>
               </span>
-              AI Outreach Generation
+              {t.feat_2_title}
             </div>
             <div className="feature-desc">
-              Stop sending generic copy-paste DMs. Trackit generates a personalized outreach message for
-              every creator based on their content style and your product. Higher response rates. Less
-              work.
+              {t.feat_2_desc}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-2">
@@ -490,11 +630,10 @@ export default function TrackitLanding() {
                   />
                 </svg>
               </span>
-              Automatic Sale Tracking
+              {t.feat_3_title}
             </div>
             <div className="feature-desc">
-              Connect your Shopify store. Every creator gets a unique tracking link or discount code.
-              Every sale attributed automatically in real time. No manual tracking. No guessing.
+              {t.feat_3_desc}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-3">
@@ -524,11 +663,10 @@ export default function TrackitLanding() {
                   />
                 </svg>
               </span>
-              One Click Commission Payouts
+              {t.feat_4_title}
             </div>
             <div className="feature-desc">
-              See exactly what every creator earned. Hit send. Money goes directly to their account. No
-              bank transfers. No PayPal drama. No spreadsheet math.
+              {t.feat_4_desc}
             </div>
           </div>
         </div>
@@ -539,13 +677,12 @@ export default function TrackitLanding() {
           <div className="pain-row">
             <div className="pain-text">
               <h2 className="pain-title">
-                You&apos;ve been doing
+                {t.pain_title}
                 <br />
-                this the hard way.
+                {t.pain_title_2}
               </h2>
               <p className="pain-sub">
-                You scroll TikTok and Instagram for hours trying to find creators who actually fit your
-                brand. Most tools give you a giant useless database.
+                {t.pain_1_desc}
               </p>
             </div>
             <div className="pain-image">
@@ -557,13 +694,10 @@ export default function TrackitLanding() {
           <div className="pain-row">
             <div className="pain-text">
               <h2 className="pain-title">
-                Commissions tracked
-                <br />
-                in spreadsheets.
+                {t.pain_2_title}
               </h2>
               <p className="pain-sub">
-                Every month you manually calculate who earned what and send individual PayPal transfers. It
-                takes a full day and you still make mistakes.
+                {t.pain_2_desc}
               </p>
             </div>
             <div className="pain-image">
@@ -575,13 +709,10 @@ export default function TrackitLanding() {
           <div className="pain-row">
             <div className="pain-text">
               <h2 className="pain-title">
-                Enterprise tools
-                <br />
-                you can&apos;t afford.
+                {t.pain_3_title}
               </h2>
               <p className="pain-sub">
-                Modash is $299/month. Aspire is $500/month. You&apos;re a lean brand. You just need
-                something that works without breaking the bank.
+                {t.pain_3_desc}
               </p>
             </div>
             <div className="pain-image" style={{ overflow: "visible", borderRadius: "16px" }}>
@@ -675,14 +806,12 @@ export default function TrackitLanding() {
 
       {/* PROCESS */}
       <section className="section" id="process">
-        <div className="tagline fade-up">⇄ Process</div>
+        <div className="tagline fade-up">{t.process_title}</div>
         <h2 className="section-title fade-up fade-up-delay-1">
-          From zero to first creator
-          <br />
-          campaign in 10 minutes.
+          {t.process_sub}
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
-          Four simple steps. No agency. No enterprise contract. No complexity.
+          {t.process_sub2}
         </p>
 
         <div className="process-grid">
@@ -831,9 +960,9 @@ export default function TrackitLanding() {
               <span className="process-icon" aria-hidden="true">
                 ⊕
               </span>
-              Connect your Shopify store.
+              {t.process_1}
             </div>
-            <div className="process-card-desc" style={{ marginTop: '4px', paddingLeft: '8px' }}>60 seconds. One click. Done.</div>
+            <div className="process-card-desc" style={{ marginTop: '4px', paddingLeft: '8px' }}>{t.process_1_sub}</div>
           </div>
 
           <div className="process-card fade-up fade-up-delay-1">
@@ -863,9 +992,9 @@ export default function TrackitLanding() {
                 <div className="inf-btn">See Profiles →</div>
               </div>
             </div>
-            <div className="process-card-title">⛶ Find creators in your niche.</div>
+            <div className="process-card-title">{t.process_2}</div>
             <div className="process-card-desc">
-              Filter by platform, engagement, location, and audience size.
+              {t.process_2_sub}
             </div>
           </div>
 
@@ -921,9 +1050,9 @@ export default function TrackitLanding() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Send AI personalized outreach.
+              {t.process_3}
             </div>
-            <div className="process-card-desc">One click. Message generated. Ready to send.</div>
+            <div className="process-card-desc">{t.process_3_sub}</div>
           </div>
 
           <div className="process-card fade-up fade-up-delay-3">
@@ -998,9 +1127,9 @@ export default function TrackitLanding() {
                   strokeLinecap="round"
                 />
               </svg>
-              Track sales and pay commissions.
+              {t.process_4}
             </div>
-            <div className="process-card-desc">Every sale tracked. Every commission paid automatically.</div>
+            <div className="process-card-desc">{t.process_4_sub}</div>
           </div>
         </div>
       </section>
@@ -1015,46 +1144,41 @@ export default function TrackitLanding() {
                 <circle cx="12" cy="18" r="1.3" fill="white"/>
               </svg>
             </span>
-            Why Trackit
+            {t.why_title}
           </div>
           <h2 className="section-title fade-up fade-up-delay-1">
-            Built for brands like yours.
+            {t.why_sub}
             <br />
-            Not for enterprise.
+            {t.why_sub2}
           </h2>
           <p className="section-sub fade-up fade-up-delay-2">
-            Every other tool was built for agencies with 10 people and $500/month budgets. Trackit was
-            built for lean Shopify brands who need results not complexity.
+            {t.why_desc}
           </p>
         </div>
 
         <div className="why-grid">
           <div className="why-col fade-up fade-up-delay-3">
-            <h3>
-              Traditional
-              <br />
-              Platforms
-            </h3>
+            <h3>{t.traditional_title}</h3>
             <ul className="why-list">
               {[
-                "Creator discovery",
-                "AI outreach generation",
-                "Shopify integration",
-                "Automatic sale tracking",
-                "One click payouts",
-                "Fair price",
-                "Built for small brands",
-                "8-hour data delays",
-                "Cost spikes at scale",
-                "Fragmented data lakes",
-              ].map((t) => (
-                <li key={t}>
+                t.trad_1,
+                t.trad_2,
+                t.trad_3,
+                t.trad_4,
+                t.trad_5,
+                t.trad_6,
+                t.trad_7,
+                t.trad_8,
+                t.trad_9,
+                t.trad_10,
+              ].map((item) => (
+                <li key={String(item)}>
                   <span className="wcheck">
                     <svg viewBox="0 0 10 10">
                       <path d="M2 5 L4 7 L8 3" />
                     </svg>
                   </span>
-                  {t}
+                  {item}
                 </li>
               ))}
             </ul>
@@ -1063,24 +1187,24 @@ export default function TrackitLanding() {
             <h3>Trackit</h3>
             <ul className="why-list">
               {[
-                "Real-time profit mapping",
-                "Unlimited event processing",
-                "Transparent AI reasoning",
-                "Auto-optimized segments",
-                "Privacy-first identity stitching",
-                "Collaborative analytics playground",
-                "AI-powered bot filtering",
-                "Live margin tracking",
-                "Usage-based scaling",
-                "Unified data lakehouse",
-              ].map((t) => (
-                <li key={t}>
+                t.trackit_1,
+                t.trackit_2,
+                t.trackit_3,
+                t.trackit_4,
+                t.trackit_5,
+                t.trackit_6,
+                t.trackit_7,
+                t.trackit_8,
+                t.trackit_9,
+                t.trackit_10,
+              ].map((item) => (
+                <li key={String(item)}>
                   <span className="wcheck">
                     <svg viewBox="0 0 10 10">
                       <path d="M2 5 L4 7 L8 3" />
                     </svg>
                   </span>
-                  {t}
+                  {item}
                 </li>
               ))}
             </ul>
@@ -1098,12 +1222,11 @@ export default function TrackitLanding() {
               <rect x="3" y="9" width="18" height="15" rx="2.5" fill="#0047FF"/>
             </svg>
           </span>
-          Pricing
+          {t.nav_pricing}
         </div>
-        <h2 className="section-title fade-up fade-up-delay-1">Simple pricing. No surprises.</h2>
+        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}</h2>
         <p className="section-sub fade-up fade-up-delay-2">
-          Start free. Upgrade when you&apos;re ready. Cancel anytime. No hidden fees. No annual contracts
-          forced on you.
+          {t.pricing_sub}
         </p>
 
         <div className="pricing-grid">
@@ -1121,28 +1244,28 @@ export default function TrackitLanding() {
                 </button>
                 <span className="toggle-label">Annually</span>
               </div>
-              <div className="pricing-toggle-pill">Save 20% with annual billing</div>
+              <div className="pricing-toggle-pill">{t.pricing_save}</div>
             </div>
             <div className="pricing-card">
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Basic</div>
-                <div className="pricing-desc">For brands running serious creator campaigns.</div>
+                <div className="pricing-desc">{t.pricing_basic_desc}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">{basicAnnual ? "$499" : "$49"}</span>
-                  <span className="pricing-period">/month</span>
+                  <span className="pricing-period">{t.pricing_month}</span>
                 </div>
               </div>
               <div className="pricing-divider"></div>
               <div className="pricing-features">
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Unlimited creator searches</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>AI personalized outreach</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Unlimited Shopify stores</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Automatic sale tracking</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>One click payouts</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Priority support</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_unlimited_searches}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_ai_outreach}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_unlimited_shopify}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_auto_tracking}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_one_click_payouts}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_priority_support}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("basic")} className="pricing-cta">Get Started</button>
+              <button type="button" onClick={() => handleCheckout("basic")} className="pricing-cta">{t.pricing_cta}</button>
             </div>
           </div>
 
@@ -1160,28 +1283,28 @@ export default function TrackitLanding() {
                 </button>
                 <span className="toggle-label">Annually</span>
               </div>
-              <div className="pricing-toggle-pill">Priority support</div>
+              <div className="pricing-toggle-pill">{t.feat_priority_support}</div>
             </div>
             <div className="pricing-card">
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Pro</div>
-                <div className="pricing-desc">For founders running distribution campaigns at scale.</div>
+                <div className="pricing-desc">{t.pricing_pro_desc}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">{proAnnual ? "$1190" : "$119"}</span>
-                  <span className="pricing-period">/month</span>
+                  <span className="pricing-period">{t.pricing_month}</span>
                 </div>
               </div>
               <div className="pricing-divider"></div>
               <div className="pricing-features">
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Everything in Basic, plus:</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Team access</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>White label reports</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Bulk outreach export</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Unlimited Shopify stores</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Daily offers on pricing</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.pricing_everything_plus}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_team}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_white_label}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_bulk_export}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_unlimited_shopify}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_daily_offers}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("pro")} className="pricing-cta pricing-cta-dark">Get Started</button>
+              <button type="button" onClick={() => handleCheckout("pro")} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
             </div>
           </div>
 
@@ -1198,19 +1321,19 @@ export default function TrackitLanding() {
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Free</div>
-                <div className="pricing-desc">Get started with no commitment.</div>
+                <div className="pricing-desc">{t.pricing_free_desc}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">$0</span>
-                  <span className="pricing-period">/month</span>
+                  <span className="pricing-period">{t.pricing_month}</span>
                 </div>
               </div>
               <div className="pricing-divider"></div>
               <div className="pricing-features">
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>5 creator searches per day</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>Basic outreach templates</div>
-                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>1 Shopify store</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_5_searches}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_basic_templates}</div>
+                <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_1_store}</div>
               </div>
-              <a href="#" className="pricing-cta">Start free →</a>
+              <a href="#" className="pricing-cta">{t.pricing_free_cta}</a>
             </div>
           </div>
         </div>
@@ -1225,7 +1348,7 @@ export default function TrackitLanding() {
               <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
               <span className="footer-name">Trackit.</span>
             </div>
-            <div className="footer-tag">A Platform made by e-com founders to e-com founders</div>
+            <div className="footer-tag">{t.footer_tagline}</div>
           </div>
           <div className="footer-socials">
             <a href="#" aria-label="LinkedIn">
@@ -1266,7 +1389,7 @@ export default function TrackitLanding() {
           </div>
         </div>
         <div className="footer-bottom">
-          <div>Copyright © Trackit.Inc All rights reserved</div>
+          <div>Copyright © Trackit.Inc {t.footer_rights}</div>
           <div className="footer-links">
             <a href="#">Terms &amp; Conditions</a>
             <a href="#">Privacy Policy</a>
