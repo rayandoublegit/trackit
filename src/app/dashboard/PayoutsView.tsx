@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 import {
   formatPaymentLabel,
   getDefaultPaymentMethod,
@@ -62,13 +63,13 @@ function splitShares(amount: number, commissionRate: number) {
   return { creatorShare, brandShare };
 }
 
-function formatRelativeTime(minutesAgo: number) {
+function formatRelativeTime(minutesAgo: number, lang: "en" | "fr") {
   if (minutesAgo < 1) return "Just now";
-  if (minutesAgo === 1) return "1 minute ago";
-  if (minutesAgo < 60) return `${minutesAgo} minutes ago`;
+  if (minutesAgo === 1) return lang === "fr" ? "il y a 1 minute" : "1 minute ago";
+  if (minutesAgo < 60) return lang === "fr" ? `il y a ${minutesAgo} minutes` : `${minutesAgo} minutes ago`;
   const hours = Math.floor(minutesAgo / 60);
-  if (hours === 1) return "1 hour ago";
-  return `${hours} hours ago`;
+  if (hours === 1) return lang === "fr" ? "il y a 1 heure" : "1 hour ago";
+  return lang === "fr" ? `il y a ${hours} heures` : `${hours} hours ago`;
 }
 
 function platformLabel(platform: SalePlatform) {
@@ -86,6 +87,7 @@ function seedNotifications(): SaleNotification[] {
 }
 
 export function LiveSalesFeed() {
+  const lang = useLang();
   const [notifications, setNotifications] = useState<SaleNotification[]>(seedNotifications);
   const [paused, setPaused] = useState(false);
 
@@ -132,8 +134,8 @@ export function LiveSalesFeed() {
       <div style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
           <div>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px" }}>Live Sales Feed</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>Every sale tracked from your creators in real time.</p>
+            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px" }}>{lang === "fr" ? "Flux des ventes en direct" : "Live sales feed"}</h2>
+            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Chaque vente suivie depuis vos créateurs en temps réel." : "Every sale tracked from your creators in real time."}</p>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
             <button
@@ -145,10 +147,10 @@ export function LiveSalesFeed() {
                 color: paused ? "#7A7A7A" : "#1A1A1A",
               }}
             >
-              {paused ? "Resume feed" : "Pause feed"}
+              {paused ? "Resume feed" : lang === "fr" ? "Mettre en pause" : "Pause feed"}
             </button>
             <button type="button" onClick={simulateSale} disabled={paused} style={{ ...btnOutline, opacity: paused ? 0.45 : 1, cursor: paused ? "not-allowed" : "pointer" }}>
-              Simulate sale
+              {lang === "fr" ? "Simuler une vente" : "Simulate sale"}
             </button>
             <button
               type="button"
@@ -161,7 +163,7 @@ export function LiveSalesFeed() {
                 cursor: list.length === 0 ? "not-allowed" : "pointer",
               }}
             >
-              Remove notifications
+              {lang === "fr" ? "Supprimer les notifications" : "Remove notifications"}
             </button>
           </div>
         </div>
@@ -196,6 +198,7 @@ export function LiveSalesFeed() {
                 return (
                   <SaleNotificationCard
                     key={sale.id}
+                    lang={lang}
                     sale={sale}
                     creatorShare={creatorShare}
                     brandShare={brandShare}
@@ -213,12 +216,14 @@ export function LiveSalesFeed() {
 }
 
 function SaleNotificationCard({
+  lang,
   sale,
   creatorShare,
   brandShare,
   animateIn,
   onRemove,
 }: {
+  lang: "en" | "fr";
   sale: SaleNotification;
   creatorShare: number;
   brandShare: number;
@@ -261,13 +266,13 @@ function SaleNotificationCard({
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-          A sale of {formatUsd(sale.amount)} just dropped
+          {lang === "fr" ? "Une vente de" : "A sale of"} {formatUsd(sale.amount)} {lang === "fr" ? "vient d'arriver" : "just dropped"}
         </div>
         <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 8, lineHeight: 1.45 }}>
-          Split: {formatUsd(creatorShare)} for @{sale.creatorHandle} · {formatUsd(brandShare)} kept
+          {lang === "fr" ? "Répartition :" : "Split:"} {formatUsd(creatorShare)} {lang === "fr" ? "pour" : "for"} @{sale.creatorHandle} · {formatUsd(brandShare)} {lang === "fr" ? "conservé" : "kept"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: "#9A9A9A" }}>{formatRelativeTime(sale.minutesAgo)}</span>
+          <span style={{ fontSize: 11, color: "#9A9A9A" }}>{formatRelativeTime(sale.minutesAgo, lang)}</span>
           <span
             style={{
               fontSize: 10,
@@ -298,7 +303,7 @@ function SaleNotificationCard({
             letterSpacing: "-0.01em",
           }}
         >
-          View order
+          {lang === "fr" ? "Voir la commande" : "View order"}
         </button>
         <button
           type="button"
@@ -321,7 +326,7 @@ function SaleNotificationCard({
             e.currentTarget.style.color = "#9A9A9A";
           }}
         >
-          Remove notification
+          {lang === "fr" ? "Supprimer la notification" : "Remove notification"}
         </button>
       </div>
     </div>
@@ -581,6 +586,7 @@ function PaymentMethodCardItem({
   onSetDefault: () => void;
   onRemove: () => void;
 }) {
+  const lang = useLang();
   return (
     <div
       style={{
@@ -597,7 +603,7 @@ function PaymentMethodCardItem({
       <CardBrandIcon brand={method.brand} />
       <div style={{ flex: 1, minWidth: 160 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
-          {method.brand} ending in {method.last4}
+          {method.brand} {lang === "fr" ? "se terminant par" : "ending in"} {method.last4}
         </div>
         <div style={{ fontSize: 12, color: "#7A7A7A" }}>Expiry: {method.expiry}</div>
       </div>
@@ -633,7 +639,7 @@ function PaymentMethodCardItem({
             padding: "8px 4px",
           }}
         >
-          Remove
+          {lang === "fr" ? "Supprimer" : "Remove"}
         </button>
       </div>
     </div>
@@ -712,12 +718,12 @@ function mapDbCreatorToPartner(c: {
   handle?: string | null;
   full_name?: string | null;
   balance?: number | null;
-}): PayoutPartner {
+}, lang: "en" | "fr"): PayoutPartner {
   const rawHandle = c.handle || "";
   const handle = rawHandle.startsWith("@") ? rawHandle : rawHandle ? `@${rawHandle}` : "@creator";
   return {
     id: c.id,
-    name: c.full_name || c.handle || "Creator",
+    name: c.full_name || c.handle || (lang === "fr" ? "Créateur" : "Creator"),
     handle,
     owed: formatPayoutBalanceUsd(Number(c.balance) || 0),
     hasPaymentMethod: false,
@@ -776,6 +782,7 @@ export function PayoutsView({
   plan: "free" | "basic" | "pro";
   onUpgrade: () => void;
 }) {
+  const lang = useLang();
   const [search, setSearch] = useState("");
   const [creators, setCreators] = useState<any[]>([]);
   const [partners, setPartners] = useState<PayoutPartner[]>(PAYOUT_PARTNERS_SEED);
@@ -808,8 +815,8 @@ export function PayoutsView({
   }, []);
 
   const tablePartners = useMemo(
-    () => (creators.length > 0 ? creators.map(mapDbCreatorToPartner) : partners),
-    [creators, partners]
+    () => (creators.length > 0 ? creators.map((c) => mapDbCreatorToPartner(c, lang)) : partners),
+    [creators, partners, lang]
   );
 
   const q = search.trim().toLowerCase();
@@ -865,7 +872,7 @@ export function PayoutsView({
 
   return (
     <>
-      <PayoutsPageHeader title="Payouts" subtitle="Track commissions and pay creators automatically when Shopify sales come in" />
+      <PayoutsPageHeader title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Suivez les commissions et payez les créateurs automatiquement lors des ventes Shopify" : "Track commissions and pay creators automatically when Shopify sales come in"} />
       <div style={{ padding: 40, position: "relative" }}>
         {plan === "free" && (
           <div
@@ -894,26 +901,26 @@ export function PayoutsView({
             >
               <div style={{ fontSize: 32, marginBottom: 16 }}>🔒</div>
               <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", letterSpacing: "-0.03em" }}>
-                Payouts available on Basic and Pro
+                {lang === "fr" ? "Paiements disponibles sur Basic et Pro" : "Payouts available on Basic and Pro"}
               </h3>
               <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-                Upgrade to pay creator commissions automatically
+                {lang === "fr" ? "Passez à l'offre supérieure pour payer les commissions automatiquement" : "Upgrade to pay creator commissions automatically"}
               </p>
               <button
                 type="button"
                 onClick={() => void onUpgrade()}
                 style={{ ...payoutsBtnPrimary, width: "100%" }}
               >
-                Upgrade to Basic →
+                {lang === "fr" ? "Passer à Basic →" : "Upgrade to Basic →"}
               </button>
             </div>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, marginBottom: 20 }}>
           <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28 }}>
-            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>Your balance</div>
+            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Votre solde" : "Your balance"}</div>
             <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatPayoutBalanceUsd(balance)}</div>
-            <button type="button" onClick={openAddFunds} className="hero-cta-shopify">Add money to balance</button>
+            <button type="button" onClick={openAddFunds} className="hero-cta-shopify">{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</button>
           </div>
           <PayoutsWorkspacePaymentCard />
         </div>
@@ -922,15 +929,15 @@ export function PayoutsView({
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>Automate payouts</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>When a Shopify sale is detected, automatically pay the creator their commission</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Automatiser les paiements" : "Automate payouts"}</div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Quand une vente Shopify est détectée, payez automatiquement la commission au créateur" : "When a Shopify sale is detected, automatically pay the creator their commission"}</div>
           </div>
           <PayoutsToggle on={false} />
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
           <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 14 }}>Pay partners</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 14 }}>{lang === "fr" ? "Payer les partenaires" : "Pay partners"}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
               <input
@@ -1007,7 +1014,7 @@ export function PayoutsView({
                     disabled={payingId === partner.id || registeringId === partner.id}
                     style={{ ...payoutsBtnPrimary, minWidth: 72, opacity: payingId === partner.id ? 0.7 : 1 }}
                   >
-                    {payingId === partner.id ? "Paying…" : "Pay"}
+                    {payingId === partner.id ? "Paying…" : lang === "fr" ? "Payer" : "Pay"}
                   </button>
                 </div>
               ))
@@ -1017,21 +1024,21 @@ export function PayoutsView({
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>Commission tracker</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Suivi des commissions" : "Commission tracker"}</div>
             <div style={{ display: "flex", gap: 18 }}>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#1A1A1A", fontWeight: 500, cursor: "pointer", borderBottom: "2px solid #1A1A1A", paddingBottom: 4 }}>Active</button>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", paddingBottom: 4 }}>History</button>
+              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#1A1A1A", fontWeight: 500, cursor: "pointer", borderBottom: "2px solid #1A1A1A", paddingBottom: 4 }}>{lang === "fr" ? "Actif" : "Active"}</button>
+              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", paddingBottom: 4 }}>{lang === "fr" ? "Historique" : "History"}</button>
             </div>
           </div>
           <div style={{ padding: 60, textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>Connect Shopify to start tracking commissions</div>
+            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Connectez Shopify pour commencer à suivre les commissions" : "Connect Shopify to start tracking commissions"}</div>
           </div>
         </div>
 
       {payoutModal === "addFunds" && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
           <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Add money to balance</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</h3>
             <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatPayoutBalanceUsd(balance)}</p>
             {!defaultPaymentMethod ? (
               <>
@@ -1079,6 +1086,7 @@ export function PayoutsView({
 }
 
 export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPayment?: () => void }) {
+  const lang = useLang();
   const { methods, removeMethod } = usePaymentMethods();
   const defaultMethod = getDefaultPaymentMethod(methods);
   const [addOpen, setAddOpen] = useState(false);
@@ -1100,7 +1108,7 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
   return (
     <>
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-        <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>Your payment method</div>
+        <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>{lang === "fr" ? "Votre méthode de paiement" : "Your payment method"}</div>
         {!defaultMethod ? (
           <>
             <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>No card connected</div>
@@ -1116,12 +1124,12 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
                 <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
                   {formatPaymentLabel(defaultMethod)}
                 </div>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 2 }}>Expires {defaultMethod.expiry}</div>
+                <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}</div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" onClick={openAdd} style={{ ...pmBtnSecondary, flex: 1 }}>
-                Update payment method
+                {lang === "fr" ? "Mettre à jour" : "Update payment method"}
               </button>
               <button
                 type="button"
@@ -1137,7 +1145,7 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
                   padding: "10px 8px",
                 }}
               >
-                Remove
+                {lang === "fr" ? "Supprimer" : "Remove"}
               </button>
             </div>
           </>

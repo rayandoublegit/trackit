@@ -16,6 +16,7 @@ import { FeedbackView } from "./FeedbackView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
+import { useLang } from "@/lib/useLang";
 
 type View = "dashboard" | "discovery" | "creators" | "campaigns" | "affiliates" | "outreach" | "payouts" | "analytics" | "integrations" | "automation" | "settings" | "feedback" | "notifications" | "help";
 
@@ -31,14 +32,17 @@ type SidebarNavEntry = {
   iconKey: string;
 };
 
-const SIDEBAR_SECTION_LABELS: Record<Exclude<SidebarNavSection, "footer">, string> = {
-  main: "Main Menu",
-  tools: "Tools",
-  workspace: "Workspace",
-};
+function getSidebarSectionLabels(lang: "en" | "fr"): Record<Exclude<SidebarNavSection, "footer">, string> {
+  return {
+    main: lang === "fr" ? "MENU PRINCIPAL" : "MAIN MENU",
+    tools: lang === "fr" ? "OUTILS" : "TOOLS",
+    workspace: lang === "fr" ? "ESPACE DE TRAVAIL" : "WORKSPACE",
+  };
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+  const lang = useLang();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,9 +133,11 @@ export default function DashboardPage() {
   }, [profile?.avatar_url]);
 
   const sidebarNavEntries = useMemo(
-    () => buildSidebarNavEntries(notificationUnread),
-    [notificationUnread]
+    () => buildSidebarNavEntries(notificationUnread, lang),
+    [notificationUnread, lang]
   );
+
+  const sidebarSectionLabels = useMemo(() => getSidebarSectionLabels(lang), [lang]);
 
   const filteredSidebarNav = useMemo(() => {
     const q = sidebarSearch.trim().toLowerCase();
@@ -140,14 +146,14 @@ export default function DashboardPage() {
       const haystack = [
         item.label,
         item.section,
-        SIDEBAR_SECTION_LABELS[item.section as Exclude<SidebarNavSection, "footer">] ?? "",
+        sidebarSectionLabels[item.section as Exclude<SidebarNavSection, "footer">] ?? "",
         ...item.keywords,
       ]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [sidebarSearch, sidebarNavEntries]);
+  }, [sidebarSearch, sidebarNavEntries, sidebarSectionLabels]);
 
   const isSidebarSearching = sidebarSearch.trim().length > 0;
 
@@ -216,7 +222,7 @@ export default function DashboardPage() {
               padding: extraTopPadding ? "20px 12px 8px 12px" : sectionHeaderStyle.padding,
             }}
           >
-            {SIDEBAR_SECTION_LABELS[section]}
+            {sidebarSectionLabels[section]}
           </div>
         )}
         {renderSidebarNavItems(items, extraTopPadding)}
@@ -399,31 +405,33 @@ function PageHeader({ title, subtitle, right }: { title: string; subtitle?: stri
 }
 
 function HomeView({ fullName, username }: { fullName: string | null; username: string | null }) {
+  const lang = useLang();
   const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
+  const welcomeGreeting = lang === "fr" ? "Bon retour" : "Welcome back";
   return (
     <>
-      <PageHeader title={`Welcome back${displayName ? ", " + displayName : ""}.`} subtitle="Connect your Shopify store to get started." />
+      <PageHeader title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
       <div style={{ padding: 40 }}>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: 60, textAlign: "center", marginBottom: 24 }}>
           <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
             <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>Connect your Shopify store</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>Sync products, orders, and customers in real time. We&apos;ll automatically track every sale your creators drive.</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Connectez votre boutique Shopify" : "Connect your Shopify store"}</h2>
+          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Synchronisez vos produits, commandes et clients en temps réel. Nous suivrons automatiquement chaque vente générée par vos créateurs." : "Sync products, orders, and customers in real time. We'll automatically track every sale your creators drive."}</p>
           <button type="button" className="hero-cta-shopify">
             <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
-            Connect Shopify
+            {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
           </button>
-          <p style={{ fontSize: 12, color: "#9A9A9A", marginTop: 14 }}>Shopify integration not connected yet</p>
+          <p style={{ fontSize: 12, color: "#9A9A9A", marginTop: 14 }}>{lang === "fr" ? "Intégration Shopify non connectée" : "Shopify integration not connected yet"}</p>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 16 }}>Getting started</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 16 }}>{lang === "fr" ? "Pour commencer" : "Getting started"}</h3>
           {[
-            { label: "Connect Shopify store", done: false },
-            { label: "Find your first creators", done: false },
-            { label: "Send first outreach", done: false },
-            { label: "Track first sale", done: false },
+            { label: lang === "fr" ? "Connecter la boutique Shopify" : "Connect Shopify store", done: false },
+            { label: lang === "fr" ? "Trouver vos premiers créateurs" : "Find your first creators", done: false },
+            { label: lang === "fr" ? "Envoyer votre premier message" : "Send first outreach", done: false },
+            { label: lang === "fr" ? "Suivre votre première vente" : "Track first sale", done: false },
           ].map((step, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: i < 3 ? "1px solid #F5F5F5" : "none" }}>
               <div style={{ width: 22, height: 22, borderRadius: "50%", border: "1.5px solid #E5E5E5", background: step.done ? "#0047FF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -543,6 +551,7 @@ function OutreachView({
   plan: "free" | "basic" | "pro";
   onNavigateToBilling: () => void;
 }) {
+  const lang = useLang();
   const [templates, setTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
   const [panel, setPanel] = useState<OutreachPanel>(null);
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
@@ -566,13 +575,13 @@ function OutreachView({
 
   return (
     <>
-      <PageHeader title="Outreach" subtitle="Send personalized messages and manage follow-ups automatically" right={
+      <PageHeader title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("seeTemplates")}>See templates</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("import")}>Import template</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("create")}>Create template</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("mass")}>Mass outreach</button>
-          <button type="button" style={btnPrimary} onClick={() => { setSendTemplateId(null); setPanel("send"); }}>Send outreach</button>
+          <button type="button" style={btnSecondary} onClick={() => setPanel("seeTemplates")}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
+          <button type="button" style={btnSecondary} onClick={() => setPanel("import")}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
+          <button type="button" style={btnSecondary} onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
+          <button type="button" style={btnSecondary} onClick={() => setPanel("mass")}>{lang === "fr" ? "Envoi en masse" : "Mass outreach"}</button>
+          <button type="button" style={btnPrimary} onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
         </div>
       } />
       <div style={{ padding: 40 }}>
@@ -585,19 +594,19 @@ function OutreachView({
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>Automated follow-up</h3>
-              <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>Your next follow-up is in 3 days</p>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>{lang === "fr" ? "Relance automatique" : "Automated follow-up"}</h3>
+              <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>{lang === "fr" ? "Votre prochaine relance est dans 3 jours" : "Your next follow-up is in 3 days"}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="button" style={btnSecondary}>Review follow-up</button>
+              <button type="button" style={btnSecondary}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
               <Toggle on />
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             {[
-              { day: "Day 1", label: "Initial message" },
-              { day: "Day 3", label: "Soft follow-up" },
-              { day: "Day 7", label: "Final follow-up" },
+              { day: lang === "fr" ? "JOUR 1" : "DAY 1", label: lang === "fr" ? "Message initial" : "Initial message" },
+              { day: lang === "fr" ? "JOUR 3" : "DAY 3", label: lang === "fr" ? "Relance douce" : "Soft follow-up" },
+              { day: lang === "fr" ? "JOUR 7" : "DAY 7", label: lang === "fr" ? "Relance finale" : "Final follow-up" },
             ].map((step, i) => (
               <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>{step.day}</div>
@@ -826,6 +835,7 @@ function InfluencerPicker({
   selected: string[];
   onChange: (handles: string[]) => void;
 }) {
+  const lang = useLang();
   const toggle = (handle: string) => {
     onChange(selected.includes(handle) ? selected.filter((h) => h !== handle) : [...selected, handle]);
   };
@@ -833,13 +843,13 @@ function InfluencerPicker({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>Influencers</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Influenceurs" : "Influencers"}</span>
         <button
           type="button"
           style={{ fontSize: 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
           onClick={() => onChange(selected.length === OUTREACH_INFLUENCERS.length ? [] : OUTREACH_INFLUENCERS.map((i) => i.handle))}
         >
-          {selected.length === OUTREACH_INFLUENCERS.length ? "Clear all" : "Select all"}
+          {selected.length === OUTREACH_INFLUENCERS.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
         </button>
       </div>
       {OUTREACH_INFLUENCERS.map((inf) => {
@@ -889,19 +899,22 @@ function TemplateSelect({
   onChange: (id: string) => void;
   onCreateNew?: () => void;
 }) {
+  const lang = useLang();
   const applyTemplate = (id: string) => onChange(id);
+  const templateDisplayName = (name: string) =>
+    name === "Collab intro" ? (lang === "fr" ? "Intro collaboration" : "Collab intro") : name;
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Template</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Modèle" : "Template"}</label>
       <select
         value={value}
         onChange={(e) => applyTemplate(e.target.value)}
         style={{ ...panelInputStyle, cursor: "pointer", marginBottom: 8 }}
       >
-        <option value="">No template — write from scratch</option>
+        <option value="">{lang === "fr" ? "Aucun modèle — écrire depuis zéro" : "No template — write from scratch"}</option>
         {templates.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
+          <option key={t.id} value={t.id}>{templateDisplayName(t.name)}</option>
         ))}
       </select>
       {onCreateNew && (
@@ -924,6 +937,7 @@ function SendOutreachPanel({
   onClose: () => void;
   onSent: (count: number) => void;
 }) {
+  const lang = useLang();
   const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>([]);
   const [dmPlatform, setDmPlatform] = useState<(typeof OUTREACH_DM_PLATFORMS)[number]>("Instagram");
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
@@ -954,19 +968,40 @@ function SendOutreachPanel({
 
   const canSend = selectedInfluencers.length > 0 && (opening.trim() || body.trim());
 
+  const sendViaLabel =
+    dmPlatform === "Instagram"
+      ? lang === "fr"
+        ? "Envoyer via Instagram"
+        : "Send via Instagram"
+      : dmPlatform === "TikTok"
+        ? lang === "fr"
+          ? "Envoyer via TikTok"
+          : "Send via TikTok"
+        : dmPlatform === "YouTube"
+          ? lang === "fr"
+            ? "Envoyer via YouTube"
+            : "Send via YouTube"
+          : dmPlatform === "Twitter"
+            ? lang === "fr"
+              ? "Envoyer via Twitter"
+              : "Send via Twitter"
+            : lang === "fr"
+              ? `Envoyer via ${dmPlatform}`
+              : `Send via ${dmPlatform}`;
+
   return (
     <OutreachPanelShell
-      title="Send outreach"
-      subtitle="Choose where to send the DM, pick influencers, then edit your message."
+      title={lang === "fr" ? "Envoyer un message" : "Send outreach"}
+      subtitle={lang === "fr" ? "Choisissez où envoyer le DM, sélectionnez des influenceurs, puis modifiez votre message." : "Choose where to send the DM, pick influencers, then edit your message."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => onSent(selectedInfluencers.length)}>Send via {dmPlatform}</button>
-          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>Cancel</button>
+          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => onSent(selectedInfluencers.length)}>{sendViaLabel}</button>
+          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       }
     >
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Send DM on</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Envoyer un DM sur" : "Send DM on"}</label>
       <select
         value={dmPlatform}
         onChange={(e) => setDmPlatform(e.target.value as (typeof OUTREACH_DM_PLATFORMS)[number])}
@@ -979,13 +1014,13 @@ function SendOutreachPanel({
 
       <InfluencerPicker selected={selectedInfluencers} onChange={setSelectedInfluencers} />
       <TemplateSelect templates={templates} value={templateId} onChange={applyTemplateById} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Subject</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Sujet" : "Subject"}</label>
       <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ ...panelInputStyle, marginBottom: 14 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Opening</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
       <textarea value={opening} onChange={(e) => setOpening(e.target.value)} rows={2} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 14, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Main message</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 14, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Call to action</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
       <textarea value={cta} onChange={(e) => setCta(e.target.value)} rows={2} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 16, lineHeight: 1.5 }} />
       {fullPreview && (
         <div style={{ padding: 14, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
@@ -1234,7 +1269,16 @@ const affiliateInputStyle: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
+function affiliateStatusLabel(status: string, lang: "en" | "fr"): string {
+  const labels: Record<string, { en: string; fr: string }> = {
+    Active: { en: "Active", fr: "Actif" },
+    Paused: { en: "Paused", fr: "En pause" },
+  };
+  return labels[status]?.[lang] ?? labels[status]?.en ?? status;
+}
+
 function AffiliatesView() {
+  const lang = useLang();
   const [affiliates, setAffiliates] = useState<AffiliateRow[]>(INITIAL_AFFILIATES);
   const [panelOpen, setPanelOpen] = useState(false);
   const statusColor = (s: string) => s === "Active" ? { bg: "rgba(31,181,103,0.1)", fg: "#1FB567" } : { bg: "rgba(122,122,122,0.1)", fg: "#7A7A7A" };
@@ -1249,16 +1293,16 @@ function AffiliatesView() {
 
   return (
     <>
-      <PageHeader title="Affiliates" subtitle="Every creator gets a unique referral link and discount code. Sales tracked automatically." right={
-        <button type="button" style={btnPrimary} onClick={() => setPanelOpen(true)}>+ Add affiliate</button>
+      <PageHeader title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
+        <button type="button" style={btnPrimary} onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
       } />
       <div style={{ padding: 40 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
           {[
-            { label: "Active affiliates", value: "12" },
-            { label: "Total clicks", value: "4,847" },
-            { label: "Total conversions", value: "234" },
-            { label: "Conversion rate", value: "4.8%" },
+            { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: "12" },
+            { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: "4,847" },
+            { label: lang === "fr" ? "Conversions totales" : "Total conversions", value: "234" },
+            { label: lang === "fr" ? "Taux de conversion" : "Conversion rate", value: "4.8%" },
           ].map((kpi) => (
             <div key={kpi.label} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 14, padding: 20 }}>
               <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>{kpi.label}</div>
@@ -1269,7 +1313,17 @@ function AffiliatesView() {
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA" }}>
-            {["Creator", "Referral link", "Discount", "Clicks", "Conv.", "Sales", "Commission", "Status", "Action"].map((h) => (
+            {[
+              lang === "fr" ? "Créateur" : "Creator",
+              lang === "fr" ? "Lien de parrainage" : "Referral link",
+              lang === "fr" ? "Réduction" : "Discount",
+              lang === "fr" ? "Clics" : "Clicks",
+              lang === "fr" ? "Conv." : "Conv.",
+              lang === "fr" ? "Ventes" : "Sales",
+              lang === "fr" ? "Commission" : "Commission",
+              lang === "fr" ? "Statut" : "Status",
+              lang === "fr" ? "Action" : "Action",
+            ].map((h) => (
               <div key={h} style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{h}</div>
             ))}
           </div>
@@ -1290,7 +1344,7 @@ function AffiliatesView() {
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>{a.conversions}</div>
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.sales.toLocaleString()}</div>
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.commission}</div>
-                <div><span style={{ fontSize: 11, fontWeight: 500, color: sc.fg, background: sc.bg, padding: "4px 10px", borderRadius: 999 }}>{a.status}</span></div>
+                <div><span style={{ fontSize: 11, fontWeight: 500, color: sc.fg, background: sc.bg, padding: "4px 10px", borderRadius: 999 }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button type="button" title="Copy link" style={iconBtn}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1" stroke="#7A7A7A" strokeWidth="1.7" strokeLinecap="round"/></svg></button>
                   <button type="button" title="Copy code" style={iconBtn}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg></button>
@@ -1319,6 +1373,7 @@ function AddAffiliatePanel({
   onClose: () => void;
   onAdd: (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => void;
 }) {
+  const lang = useLang();
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState("Instagram");
   const [discount, setDiscount] = useState("15");
@@ -1374,8 +1429,8 @@ function AddAffiliatePanel({
       >
         <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #EFEFEF", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>New affiliate</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>Add an influencer and generate their referral link and discount code.</p>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Nouvel affilié" : "New affiliate"}</h2>
+            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>{lang === "fr" ? "Ajoutez un influenceur et générez son lien de parrainage et son code de réduction." : "Add an influencer and generate their referral link and discount code."}</p>
           </div>
           <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
@@ -1388,11 +1443,11 @@ function AddAffiliatePanel({
             type="text"
             value={handle}
             onChange={(e) => { setHandle(e.target.value); setGenerated(null); }}
-            placeholder="@creator"
+            placeholder={lang === "fr" ? "Pseudo de l'influenceur" : "Influencer handle"}
             style={{ ...affiliateInputStyle, marginBottom: 16 }}
           />
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Platform</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
           <select
             value={platform}
             onChange={(e) => setPlatform(e.target.value)}
@@ -1403,7 +1458,7 @@ function AddAffiliatePanel({
             ))}
           </select>
 
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Discount on code (%)</label>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Remise sur le code (%)" : "Discount on code (%)"}</label>
           <input
             type="text"
             inputMode="numeric"
@@ -1419,7 +1474,7 @@ function AddAffiliatePanel({
             disabled={!canGenerate}
             style={{ ...btnPrimary, width: "100%", opacity: canGenerate ? 1 : 0.45 }}
           >
-            Generate
+            {lang === "fr" ? "Générer" : "Generate"}
           </button>
 
           {generated && (
@@ -1470,9 +1525,9 @@ function AddAffiliatePanel({
             }}
             style={{ ...btnPrimary, width: "100%", opacity: canAdd ? 1 : 0.45 }}
           >
-            Add to affiliates
+            {lang === "fr" ? "Ajouter aux affiliés" : "Add to affiliates"}
           </button>
-          <button type="button" onClick={onClose} style={{ ...btnSecondary, width: "100%" }}>Cancel</button>
+          <button type="button" onClick={onClose} style={{ ...btnSecondary, width: "100%" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       </aside>
     </>
@@ -1503,32 +1558,32 @@ const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF
 const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
-function buildSidebarNavEntries(notificationUnread: number): SidebarNavEntry[] {
+function buildSidebarNavEntries(notificationUnread: number, lang: "en" | "fr"): SidebarNavEntry[] {
   return [
-    { id: "dashboard", label: "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
-    { id: "discovery", label: "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
-    { id: "creators", label: "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
-    { id: "campaigns", label: "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
-    { id: "affiliates", label: "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
-    { id: "outreach", label: "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
-    { id: "payouts", label: "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
-    { id: "analytics", label: "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
-    { id: "integrations", label: "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
-    { id: "automation", label: "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
+    { id: "dashboard", label: lang === "fr" ? "Tableau de bord" : "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
+    { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
+    { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
+    { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
+    { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
+    { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
+    { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
+    { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
+    { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
+    { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {
       id: "notifications",
-      label: "Notifications",
+      label: lang === "fr" ? "Notifications" : "Notifications",
       view: "notifications",
       section: "workspace",
       iconKey: "notifications",
       keywords: ["alerts", "bell", "updates"],
       badge: notificationUnread > 0 ? String(notificationUnread) : undefined,
     },
-    { id: "active-campaigns", label: "Active Campaigns", view: "campaigns", section: "workspace", iconKey: "dot-blue", keywords: ["campaigns", "active", "running"], badge: "5" },
-    { id: "creator-lists", label: "Creator Lists", view: "discovery", section: "workspace", iconKey: "dot-pink", keywords: ["lists", "saved creators", "bookmarks"], badge: "4" },
-    { id: "help", label: "Help Center", view: "help", section: "footer", iconKey: "help", keywords: ["support", "guides", "docs", "faq"] },
-    { id: "feedback", label: "Feedback", view: "feedback", section: "footer", iconKey: "feedback", keywords: ["suggest", "bug", "feature request"] },
-    { id: "settings", label: "Settings", view: "settings", section: "footer", iconKey: "settings", keywords: ["account", "profile", "billing", "team", "preferences"] },
+    { id: "active-campaigns", label: lang === "fr" ? "Campagnes actives" : "Active Campaigns", view: "campaigns", section: "workspace", iconKey: "dot-blue", keywords: ["campaigns", "active", "running"], badge: "5" },
+    { id: "creator-lists", label: lang === "fr" ? "Listes de créateurs" : "Creator Lists", view: "discovery", section: "workspace", iconKey: "dot-pink", keywords: ["lists", "saved creators", "bookmarks"], badge: "4" },
+    { id: "help", label: lang === "fr" ? "Centre d'aide" : "Help Center", view: "help", section: "footer", iconKey: "help", keywords: ["support", "guides", "docs", "faq"] },
+    { id: "feedback", label: lang === "fr" ? "Avis" : "Feedback", view: "feedback", section: "footer", iconKey: "feedback", keywords: ["suggest", "bug", "feature request"] },
+    { id: "settings", label: lang === "fr" ? "Paramètres" : "Settings", view: "settings", section: "footer", iconKey: "settings", keywords: ["account", "profile", "billing", "team", "preferences"] },
   ];
 }
 

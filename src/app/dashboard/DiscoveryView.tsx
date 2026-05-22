@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 
 type DiscoveryTab = "discover" | "saved";
 
@@ -170,24 +171,26 @@ function formatCount(n: number) {
   return String(n);
 }
 
-function DiscoveryHeader() {
+function DiscoveryHeader({ lang }: { lang: "en" | "fr" }) {
   return (
     <div style={{ padding: "32px 40px 0 40px", background: "#FFFFFF" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>
-        Discovery
+        {lang === "fr" ? "Recherche" : "Discovery"}
       </h1>
       <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-        Search 250M+ creators across every major platform
+        {lang === "fr" ? "Recherchez parmi 250M+ créateurs sur toutes les grandes plateformes" : "Search 250M+ creators across every major platform"}
       </p>
     </div>
   );
 }
 
 function DiscoveryTabs({
+  lang,
   activeTab,
   savedCount,
   onTabChange,
 }: {
+  lang: "en" | "fr";
   activeTab: DiscoveryTab;
   savedCount: number;
   onTabChange: (tab: DiscoveryTab) => void;
@@ -204,8 +207,8 @@ function DiscoveryTabs({
     >
       {(
         [
-          { id: "discover" as const, label: "Discover" },
-          { id: "saved" as const, label: "Saved Creators", badge: savedCount },
+          { id: "discover" as const, label: lang === "fr" ? "Découvrir" : "Discover" },
+          { id: "saved" as const, label: lang === "fr" ? "Créateurs sauvegardés" : "Saved Creators", badge: savedCount },
         ] as const
       ).map((tab) => {
         const active = activeTab === tab.id;
@@ -1256,6 +1259,7 @@ export function DiscoveryView({
   plan: PlanTier;
   onUpgrade: () => void;
 }) {
+  const lang = useLang();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
   const [query, setQuery] = useState("");
   const [niche, setNiche] = useState("fitness");
@@ -1390,8 +1394,8 @@ export function DiscoveryView({
 
   return (
     <>
-      <DiscoveryHeader />
-      <DiscoveryTabs activeTab={activeTab} savedCount={savedCreators.length} onTabChange={setActiveTab} />
+      <DiscoveryHeader lang={lang} />
+      <DiscoveryTabs lang={lang} activeTab={activeTab} savedCount={savedCreators.length} onTabChange={setActiveTab} />
       <div style={{ padding: 40 }}>
         {activeTab === "discover" && (
           <>
@@ -1417,7 +1421,7 @@ export function DiscoveryView({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && void search()}
-              placeholder="Search by name, handle, or keyword..."
+              placeholder={lang === "fr" ? "Rechercher des créateurs" : "Search creators"}
               style={{
                 background: "transparent",
                 border: "none",
@@ -1447,26 +1451,26 @@ export function DiscoveryView({
                 opacity: loading ? 0.7 : 1,
               }}
             >
-              {loading ? "Searching..." : "Search creators"}
+              {loading ? "Searching..." : lang === "fr" ? "Rechercher des créateurs" : "Search creators"}
             </button>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
             <FilterSelect
-              label="Niche"
+              label={lang === "fr" ? "Niche" : "Niche"}
               value={niche}
               onChange={setNiche}
               options={[
-                { value: "fitness", label: "Fitness" },
-                { value: "fashion", label: "Fashion" },
-                { value: "beauty", label: "Beauty" },
-                { value: "tech", label: "Tech" },
-                { value: "food", label: "Food" },
-                { value: "travel", label: "Travel" },
+                { value: "fitness", label: lang === "fr" ? "Fitness" : "Fitness" },
+                { value: "fashion", label: lang === "fr" ? "Mode" : "Fashion" },
+                { value: "beauty", label: lang === "fr" ? "Beauté" : "Beauty" },
+                { value: "tech", label: lang === "fr" ? "Tech" : "Tech" },
+                { value: "food", label: lang === "fr" ? "Cuisine" : "Food" },
+                { value: "travel", label: lang === "fr" ? "Voyage" : "Travel" },
               ]}
             />
             <FilterSelect
-              label="Platform"
+              label={lang === "fr" ? "Plateforme" : "Platform"}
               value={platform}
               onChange={setPlatform}
               options={[
@@ -1477,7 +1481,7 @@ export function DiscoveryView({
               ]}
             />
             <FilterSelect
-              label="Followers"
+              label={lang === "fr" ? "Abonnés" : "Followers"}
               value={followers}
               onChange={setFollowers}
               options={[
@@ -1489,7 +1493,7 @@ export function DiscoveryView({
               ]}
             />
             <FilterSelect
-              label="Engagement"
+              label={lang === "fr" ? "Engagement" : "Engagement"}
               value={engagement}
               onChange={setEngagement}
               options={[
@@ -1500,26 +1504,26 @@ export function DiscoveryView({
               ]}
             />
             <FilterSelect
-              label="Location"
+              label={lang === "fr" ? "Localisation" : "Location"}
               value={location}
               onChange={setLocation}
               options={[
-                { value: "US", label: "United States" },
-                { value: "UK", label: "United Kingdom" },
-                { value: "FR", label: "France" },
-                { value: "DE", label: "Germany" },
-                { value: "CA", label: "Canada" },
+                { value: "US", label: lang === "fr" ? "États-Unis" : "United States" },
+                { value: "UK", label: lang === "fr" ? "Royaume-Uni" : "United Kingdom" },
+                { value: "FR", label: lang === "fr" ? "France" : "France" },
+                { value: "DE", label: lang === "fr" ? "Allemagne" : "Germany" },
+                { value: "CA", label: lang === "fr" ? "Canada" : "Canada" },
               ]}
             />
             <FilterSelect
-              label="Language"
+              label={lang === "fr" ? "Langue" : "Language"}
               value={language}
               onChange={setLanguage}
               options={[
-                { value: "english", label: "English" },
-                { value: "french", label: "French" },
-                { value: "spanish", label: "Spanish" },
-                { value: "german", label: "German" },
+                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
+                { value: "french", label: lang === "fr" ? "Français" : "French" },
+                { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
+                { value: "german", label: lang === "fr" ? "Allemand" : "German" },
               ]}
             />
           </div>
@@ -1579,10 +1583,10 @@ export function DiscoveryView({
               </svg>
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>
-              No search yet
+              {lang === "fr" ? "Aucune recherche" : "No search yet"}
             </h3>
             <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-              Enter your niche above to find creators
+              {lang === "fr" ? "Entrez votre niche ci-dessus pour trouver des créateurs" : "Enter your niche above to find creators"}
             </p>
           </div>
         )}
@@ -1624,10 +1628,10 @@ export function DiscoveryView({
               <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 60, textAlign: "center" }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🔖</div>
                 <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>
-                  No saved creators yet
+                  {lang === "fr" ? "Aucun créateur sauvegardé" : "No saved creators yet"}
                 </h3>
                 <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-                  Search for creators and save the ones you want to work with.
+                  {lang === "fr" ? "Recherchez des créateurs et sauvegardez ceux avec qui vous souhaitez collaborer." : "Search for creators and save the ones you want to work with."}
                 </p>
               </div>
             ) : (
