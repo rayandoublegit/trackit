@@ -332,18 +332,6 @@ function GeneralSettings({
   niche: string;
   onSaved: (patch: Partial<ProfileRow>) => void;
 }) {
-  const [lang, setLang] = useState<"en" | "fr">("en");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("trackit_lang") as "en" | "fr" | null;
-    if (stored === "en" || stored === "fr") setLang(stored);
-  }, []);
-
-  const handleLangChange = (l: "en" | "fr") => {
-    setLang(l);
-    localStorage.setItem("trackit_lang", l);
-  };
-
   const [currency, setCurrency] = useState("EUR");
   const [language, setLanguage] = useState("EN");
   const [storeName, setStoreName] = useState(initialBusinessName);
@@ -401,26 +389,6 @@ function GeneralSettings({
 
   return (
     <Card>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Language</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => handleLangChange("en")}
-            style={{ padding: "8px 16px", borderRadius: 8, border: lang === "en" ? "2px solid #0047FF" : "1px solid #E5E5E5", background: lang === "en" ? "#F0F6FF" : "#fff", color: lang === "en" ? "#0047FF" : "#1A1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            🇬🇧 English
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLangChange("fr")}
-            style={{ padding: "8px 16px", borderRadius: 8, border: lang === "fr" ? "2px solid #0047FF" : "1px solid #E5E5E5", background: lang === "fr" ? "#F0F6FF" : "#fff", color: lang === "fr" ? "#0047FF" : "#1A1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            🇫🇷 Français
-          </button>
-        </div>
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>Changes the language of the entire platform.</div>
-      </div>
       <Field label="Store name">
         <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Acme Co." style={inputStyle} />
       </Field>

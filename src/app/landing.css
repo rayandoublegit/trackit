@@ -367,9 +367,6 @@ body { padding-top: 80px; }
   white-space: nowrap;
   margin-bottom: 0;
 }
-.hero-line-wrap--fr {
-  white-space: normal;
-}
 .hero-italic {
   font-style: italic;
   font-weight: 400;
@@ -390,9 +387,6 @@ body { padding-top: 80px; }
   pointer-events: none;
   z-index: 2;
 }
-.hero-doodle--fr {
-  margin-left: -495px;
-}
 .hero-cursor {
   position: absolute;
   width: 150px;
@@ -402,9 +396,6 @@ body { padding-top: 80px; }
   margin-left: 130px;
   pointer-events: none;
   z-index: 2;
-}
-.hero-cursor--fr {
-  margin-left: 295px;
 }
 .hero-money {
   position: absolute;
@@ -416,11 +407,6 @@ body { padding-top: 80px; }
   transform: rotate(-10deg);
   pointer-events: none;
   z-index: 2;
-}
-.hero-money--fr {
-  width: 68px;
-  top: 176px;
-  margin-left: 355px;
 }
 .hero-sub {
   font-family: 'InstrumentSans', sans-serif;

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { saveCampaign, getCampaigns } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
-import { useLang } from "@/lib/useLang";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
@@ -48,16 +47,6 @@ const inputStyle: React.CSSProperties = {
 
 type PlanTier = "free" | "basic" | "pro";
 
-function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
-  const labels: Record<string, { en: string; fr: string }> = {
-    Active: { en: "Active", fr: "Actif" },
-    Paused: { en: "Paused", fr: "En pause" },
-    Completed: { en: "Completed", fr: "Terminé" },
-    Draft: { en: "Draft", fr: "Brouillon" },
-  };
-  return labels[status]?.[lang] ?? labels[status]?.en ?? status;
-}
-
 export function CampaignsView({
   plan,
   onUpgrade,
@@ -65,7 +54,6 @@ export function CampaignsView({
   plan: PlanTier;
   onUpgrade: () => void;
 }) {
-  const lang = useLang();
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [filter, setFilter] = useState<CampaignFilter>("all");
   const [search, setSearch] = useState("");
@@ -114,22 +102,22 @@ export function CampaignsView({
   const selected = campaigns.find((c) => c.id === detailId) ?? null;
 
   if (selected) {
-    return <CampaignDetail lang={lang} campaign={selected} onBack={() => setDetailId(null)} onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))} />;
+    return <CampaignDetail campaign={selected} onBack={() => setDetailId(null)} onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))} />;
   }
 
   if (campaigns.length === 0) {
     return (
       <>
-        <CampaignsHeader lang={lang} onNew={tryOpenNewCampaign} showFilters={false} />
+        <CampaignsHeader onNew={tryOpenNewCampaign} showFilters={false} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucune campagne pour l'instant." : "No campaigns yet."}</h2>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>No campaigns yet.</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
-            {lang === "fr" ? "Créez votre première campagne pour commencer à suivre les performances et les commissions." : "Create your first campaign to start tracking creator performance and commissions."}
+            Create your first campaign to start tracking creator performance and commissions.
           </p>
-          <button type="button" style={btnPrimary} onClick={tryOpenNewCampaign}>{lang === "fr" ? "+ Créer votre première campagne →" : "+ Create your first campaign →"}</button>
+          <button type="button" style={btnPrimary} onClick={tryOpenNewCampaign}>+ Create your first campaign →</button>
         </div>
-        {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+        {modalOpen && <NewCampaignModal onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
         {upgradeModalOpen && (
           <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
         )}
@@ -139,9 +127,9 @@ export function CampaignsView({
 
   return (
     <>
-      <CampaignsHeader lang={lang} onNew={tryOpenNewCampaign} showFilters />
-      <CampaignsList lang={lang} campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
-      {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+      <CampaignsHeader onNew={tryOpenNewCampaign} showFilters />
+      <CampaignsList campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
+      {modalOpen && <NewCampaignModal onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
       {upgradeModalOpen && (
         <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
       )}
@@ -196,19 +184,18 @@ function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onU
   );
 }
 
-function CampaignsHeader({ lang, onNew, showFilters }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean }) {
+function CampaignsHeader({ onNew, showFilters }: { onNew: () => void; showFilters?: boolean }) {
   return (
     <div style={{ padding: "32px 40px 20px", borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
-        <button type="button" style={btnPrimary} onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>Campaigns</h1>
+        <button type="button" style={btnPrimary} onClick={onNew}>+ New Campaign</button>
       </div>
     </div>
   );
 }
 
-function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, onView, onDelete }: {
-  lang: "en" | "fr";
+function CampaignsList({ campaigns, filter, setFilter, search, setSearch, onView, onDelete }: {
   campaigns: Campaign[]; filter: CampaignFilter; setFilter: (f: CampaignFilter) => void;
   search: string; setSearch: (s: string) => void; onView: (id: string) => void; onDelete: (id: string) => void;
 }) {
@@ -230,7 +217,7 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
   return (
     <div style={{ padding: "24px 40px 40px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
-        <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
+        <FilterPills filter={filter} setFilter={setFilter} />
         <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search campaigns..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", flex: 1, color: "#1A1A1A" }} />
@@ -238,10 +225,10 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-        <Kpi title={lang === "fr" ? "Campagnes actives" : "Active Campaigns"} value={String(active)} sub={lang === "fr" ? "2 se terminent ce mois" : "2 ending this month"} />
-        <Kpi title={lang === "fr" ? "Créateurs total" : "Total Creators"} value={String(totalCreators)} sub={lang === "fr" ? "sur toutes les campagnes" : "across all campaigns"} />
-        <Kpi title={lang === "fr" ? "Ventes totales générées" : "Total Sales Driven"} value={`$${totalSales.toLocaleString()}`} sub={lang === "fr" ? "vs mois dernier +18% ↑" : "vs last month +18% ↑"} subColor="#2E7D32" />
-        <Kpi title={lang === "fr" ? "Commissions dues" : "Total Commissions Owed"} value={`$${totalCommission.toLocaleString()}`} sub={lang === "fr" ? "12 paiements en attente" : "12 pending payouts"} />
+        <Kpi title="Active Campaigns" value={String(active)} sub="2 ending this month" />
+        <Kpi title="Total Creators" value={String(totalCreators)} sub="across all campaigns" />
+        <Kpi title="Total Sales Driven" value={`$${totalSales.toLocaleString()}`} sub="vs last month +18% ↑" subColor="#2E7D32" />
+        <Kpi title="Total Commissions Owed" value={`$${totalCommission.toLocaleString()}`} sub="12 pending payouts" />
       </div>
 
       <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
@@ -249,17 +236,7 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left", background: "#FAFAFA" }}>
-                {[
-                  lang === "fr" ? "Nom de la campagne" : "Campaign Name",
-                  lang === "fr" ? "Créateurs" : "Creators",
-                  lang === "fr" ? "Plateforme" : "Platform",
-                  lang === "fr" ? "Ventes" : "Sales",
-                  lang === "fr" ? "Commission" : "Commission",
-                  lang === "fr" ? "Statut" : "Status",
-                  lang === "fr" ? "Date de début" : "Start Date",
-                  lang === "fr" ? "Date de fin" : "End Date",
-                  lang === "fr" ? "Action" : "Action",
-                ].map((h) => (
+                {["Campaign Name", "Creators", "Platform", "Sales", "Commission", "Status", "Start Date", "End Date", "Action"].map((h) => (
                   <th key={h} style={{ padding: "12px 14px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -268,19 +245,19 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
               {filtered.map((c) => (
                 <tr key={c.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "14px", fontWeight: 500, color: "#1A1A1A" }}>{c.name}</td>
-                  <td style={{ padding: "14px" }}>{(c.creators ?? 0)} {lang === "fr" ? "créateurs" : "creators"}</td>
+                  <td style={{ padding: "14px" }}>{(c.creators ?? 0)} creators</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.platform}</td>
                   <td style={{ padding: "14px" }}>${(c.sales ?? 0).toLocaleString()}</td>
                   <td style={{ padding: "14px" }}>${(c.commission ?? 0).toLocaleString()}</td>
-                  <td style={{ padding: "14px" }}><CampaignBadge lang={lang} status={c.status} /></td>
+                  <td style={{ padding: "14px" }}><CampaignBadge status={c.status} /></td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.start}</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.end}</td>
                   <td style={{ padding: "14px" }}>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button type="button" onClick={() => onView(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>{lang === "fr" ? "Voir →" : "View →"}</button>
-                      <button type="button" style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>{lang === "fr" ? "Modifier" : "Edit"}</button>
+                      <button type="button" onClick={() => onView(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>View →</button>
+                      <button type="button" style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>Edit</button>
                       {c.status === "Active" && <button type="button" style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>Pause</button>}
-                      <button type="button" onClick={() => onDelete(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>{lang === "fr" ? "Supprimer" : "Delete"}</button>
+                      <button type="button" onClick={() => onDelete(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -289,10 +266,10 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
           </table>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #EFEFEF", fontSize: 13, color: "#7A7A7A" }}>
-          <span>{lang === "fr" ? "Affichage" : "Showing"} {filtered.length} {lang === "fr" ? "sur" : "of"} {campaigns.length} {lang === "fr" ? "campagnes" : "campaigns"}</span>
+          <span>Showing {filtered.length} of {campaigns.length} campaigns</span>
           <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }} disabled>{lang === "fr" ? "Précédent" : "Previous"}</button>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Suivant" : "Next"}</button>
+            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }} disabled>Previous</button>
+            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>Next</button>
           </div>
         </div>
       </div>
@@ -301,12 +278,12 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
 }
 
 
-function FilterPills({ lang, filter, setFilter }: { lang: "en" | "fr"; filter: CampaignFilter; setFilter: (f: CampaignFilter) => void }) {
+function FilterPills({ filter, setFilter }: { filter: CampaignFilter; setFilter: (f: CampaignFilter) => void }) {
   const pills: { id: CampaignFilter; label: string }[] = [
-    { id: "all", label: lang === "fr" ? "Tout" : "All" },
-    { id: "active", label: lang === "fr" ? "Actif" : "Active" },
-    { id: "paused", label: lang === "fr" ? "En pause" : "Paused" },
-    { id: "completed", label: lang === "fr" ? "Terminé" : "Completed" },
+    { id: "all", label: "All" },
+    { id: "active", label: "Active" },
+    { id: "paused", label: "Paused" },
+    { id: "completed", label: "Completed" },
   ];
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -345,7 +322,7 @@ function Kpi({ title, value, sub, subColor }: { title: string; value: string; su
   );
 }
 
-function CampaignBadge({ lang, status }: { lang: "en" | "fr"; status: CampaignStatus }) {
+function CampaignBadge({ status }: { status: CampaignStatus }) {
   const map: Record<CampaignStatus, { bg: string; c: string }> = {
     Active: { bg: "#E8F5E9", c: "#2E7D32" },
     Paused: { bg: "#FFF8E1", c: "#F57F17" },
@@ -354,7 +331,7 @@ function CampaignBadge({ lang, status }: { lang: "en" | "fr"; status: CampaignSt
   };
   const s = map[status] ?? { bg: "#F5F5F5", c: "#7A7A7A" };
   return (
-    <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{campaignStatusLabel(status, lang)}</span>
+    <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{status}</span>
   );
 }
 
@@ -434,7 +411,7 @@ const DETAIL_TABS: { id: DetailTab; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
-function CampaignDetail({ lang, campaign, onBack, onUpdate }: { lang: "en" | "fr"; campaign: Campaign; onBack: () => void; onUpdate: (c: Campaign) => void }) {
+function CampaignDetail({ campaign, onBack, onUpdate }: { campaign: Campaign; onBack: () => void; onUpdate: (c: Campaign) => void }) {
   const [tab, setTab] = useState<DetailTab>("creators");
 
   return (
@@ -445,7 +422,7 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate }: { lang: "en" | "fr
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.04em" }}>{campaign.name}</h1>
           <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", fontSize: 13, color: "#7A7A7A" }}>
-            <CampaignBadge lang={lang} status={campaign.status} />
+            <CampaignBadge status={campaign.status} />
             <span>{campaign.platform}</span>
             <span>{campaign.start} – {campaign.end}</span>
           </div>
@@ -653,7 +630,7 @@ function SettingsTab({ campaign, onUpdate }: { campaign: Campaign; onUpdate: (c:
 
 const MODAL_STEPS = ["Basics", "Commission", "Add creators", "Review & launch"] as const;
 
-function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onClose: () => void; onCreate: (campaignData: any) => void }) {
+function NewCampaignModal({ onClose, onCreate }: { onClose: () => void; onCreate: (campaignData: any) => void }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState("TikTok");
@@ -711,8 +688,8 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
         <div style={{ padding: 24 }}>
           {step === 0 && (
             <>
-              <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Nom de la campagne" : "Campaign name"} style={inputStyle} />
+              <Field label="Campaign name">
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Launch 2026" style={inputStyle} />
               </Field>
               <Field label="Platform">
                 <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
@@ -729,7 +706,7 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
                   <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="Jun 30, 2026" style={inputStyle} />
                 </Field>
               </div>
-              <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
+              <Field label="Description (optional)">
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Campaign goals and notes..." />
               </Field>
             </>
@@ -761,7 +738,7 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
                   ))}
                 </div>
               </Field>
-              <Field label={commissionType === "percent" ? (lang === "fr" ? "Taux de commission (%)" : "Commission rate (%)") : "Flat amount ($)"}>
+              <Field label={commissionType === "percent" ? "Commission rate (%)" : "Flat amount ($)"}>
                 <input type="text" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
               </Field>
               <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>Creators earn {commissionType === "percent" ? `${commissionRate}%` : `$${commissionRate}`} on each attributed sale.</p>
@@ -807,14 +784,14 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
 
         <div style={{ padding: "16px 24px 24px", display: "flex", justifyContent: "space-between", gap: 12, borderTop: "1px solid #EFEFEF" }}>
           <button type="button" style={btnSecondary} onClick={step === 0 ? onClose : () => setStep((s) => s - 1)}>
-            {step === 0 ? (lang === "fr" ? "Annuler" : "Cancel") : "Back"}
+            {step === 0 ? "Cancel" : "Back"}
           </button>
           {step < MODAL_STEPS.length - 1 ? (
             <button type="button" style={btnPrimary} onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !name.trim()}>
               Continue →
             </button>
           ) : (
-            <button type="button" style={btnPrimary} onClick={launch}>{lang === "fr" ? "Lancer la campagne →" : "Launch campaign →"}</button>
+            <button type="button" style={btnPrimary} onClick={launch}>Launch campaign →</button>
           )}
         </div>
       </div>

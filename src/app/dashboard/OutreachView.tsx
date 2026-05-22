@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { saveOutreach, getOutreachHistory } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
-import { useLang } from "@/lib/useLang";
 
 type OutreachHistoryStatus = "sent" | "opened" | "replied" | "no_response" | "converted";
 type HistoryFilter = "all" | OutreachHistoryStatus;
@@ -116,30 +115,18 @@ function formatFollowUpDate(iso: string) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function displayTone(tone: string, lang: "en" | "fr"): string {
-  if (lang === "en") return tone;
-  const fr: Record<string, string> = {
-    Casual: "Décontracté",
-    Professional: "Professionnel",
-    Friendly: "Amical",
-    Direct: "Direct",
-  };
-  return fr[tone] ?? tone;
-}
-
-function outreachStatusBadge(status: OutreachHistoryStatus, lang: "en" | "fr") {
-  const map: Record<OutreachHistoryStatus, { bg: string; fg: string; en: string; fr: string }> = {
-    replied: { bg: "rgba(31,181,103,0.12)", fg: "#1FB567", en: "Replied", fr: "Répondu" },
-    sent: { bg: "rgba(0,71,255,0.1)", fg: "#0047FF", en: "Sent", fr: "Envoyé" },
-    no_response: { bg: "#F0F0F0", fg: "#7A7A7A", en: "No reply", fr: "Pas de réponse" },
-    opened: { bg: "rgba(234,179,8,0.15)", fg: "#B45309", en: "Opened", fr: "Ouvert" },
-    converted: { bg: "rgba(21,128,61,0.15)", fg: "#15803D", en: "Converted ✓", fr: "Converti ✓" },
+function outreachStatusBadge(status: OutreachHistoryStatus) {
+  const map: Record<OutreachHistoryStatus, { bg: string; fg: string; label: string }> = {
+    replied: { bg: "rgba(31,181,103,0.12)", fg: "#1FB567", label: "Replied" },
+    sent: { bg: "rgba(0,71,255,0.1)", fg: "#0047FF", label: "Sent" },
+    no_response: { bg: "#F0F0F0", fg: "#7A7A7A", label: "No Response" },
+    opened: { bg: "rgba(234,179,8,0.15)", fg: "#B45309", label: "Opened" },
+    converted: { bg: "rgba(21,128,61,0.15)", fg: "#15803D", label: "Converted ✓" },
   };
   const s = map[status];
-  const label = lang === "fr" ? s.fr : s.en;
   return (
     <span style={{ fontSize: 11, fontWeight: 600, color: s.fg, background: s.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
-      {label}
+      {s.label}
     </span>
   );
 }
@@ -168,14 +155,12 @@ function Toast({ message }: { message: string }) {
 }
 
 function FollowUpPanel({
-  lang,
   entry,
   slideIn,
   onClose,
   onSend,
   onMarkManual,
 }: {
-  lang: "en" | "fr";
   entry: OutreachHistoryEntry;
   slideIn: boolean;
   onClose: () => void;
@@ -324,7 +309,7 @@ function FollowUpPanel({
                   borderColor: tone === t ? "#1A1A1A" : "#E5E5E5",
                 }}
               >
-                {displayTone(t, lang)}
+                {t}
               </button>
             ))}
           </div>
@@ -334,7 +319,7 @@ function FollowUpPanel({
             onClick={() => void handleRegenerate()}
             disabled={regenerating}
           >
-            {regenerating ? (lang === "fr" ? "Génération..." : "Generating...") : "Regenerate with AI →"}
+            {regenerating ? "Generating..." : "Regenerate with AI →"}
           </button>
 
           <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>Review before sending</h3>
@@ -443,12 +428,10 @@ function nextHistoryId() {
 }
 
 function SaveTemplateModal({
-  lang,
   defaultName,
   onClose,
   onSave,
 }: {
-  lang: "en" | "fr";
   defaultName: string;
   onClose: () => void;
   onSave: (name: string) => void;
@@ -460,7 +443,7 @@ function SaveTemplateModal({
       onClick={onClose}
     >
       <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>{lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>Save as template</h3>
         <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Template name</label>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
         <div style={{ display: "flex", gap: 8 }}>
@@ -501,13 +484,11 @@ function incrementOutreachGenerationsToday() {
 }
 
 function OutreachAIGeneratePanel({
-  lang,
   plan,
   onNavigateToBilling,
   onMarkSent,
   onToast,
 }: {
-  lang: "en" | "fr";
   plan: PlanTier;
   onNavigateToBilling: () => void;
   onMarkSent: (entry: OutreachHistoryEntry) => void | Promise<void>;
@@ -608,7 +589,7 @@ function OutreachAIGeneratePanel({
       status: "sent",
       followUpDate: followUpIn3Days(),
     });
-    onToast(lang === "fr" ? "Message envoyé ✓" : "Outreach sent ✓");
+    onToast("Outreach sent ✓");
     resetPanel();
   };
 
@@ -631,14 +612,14 @@ function OutreachAIGeneratePanel({
             <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
-                {lang === "fr" ? "Générer un message avec Trackit IA" : "Generate outreach with Trackit AI"}
+                Generate outreach with Trackit AI
               </div>
               <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un message personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized message, you edit and send"}
+                Select a creator, AI writes a personalized message, you edit and send
               </div>
             </div>
             <button type="button" style={btnPrimary} onClick={() => setExpanded(true)}>
-              {lang === "fr" ? "Essayer maintenant" : "Try now"}
+              Try now
             </button>
           </div>
         ) : (
@@ -653,7 +634,7 @@ function OutreachAIGeneratePanel({
               }}
             >
               <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
-                {lang === "fr" ? "Générer un message avec Trackit IA" : "Generate outreach with Trackit AI"}
+                Generate outreach with Trackit AI
               </h3>
               <button
                 type="button"
@@ -683,7 +664,7 @@ function OutreachAIGeneratePanel({
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   Step 1 — Select creator
                 </label>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "À qui souhaitez-vous vous adresser ?" : "Who are you reaching out to?"}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>Who are you reaching out to?</div>
                 <div style={{ position: "relative" }}>
                   <input
                     type="text"
@@ -768,12 +749,12 @@ function OutreachAIGeneratePanel({
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   Step 2 — Your brand
                 </label>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "Que vendez-vous ?" : "What are you selling?"}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>What are you selling?</div>
                 <input
                   type="text"
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  placeholder={lang === "fr" ? "ex. vêtements de sport durables pour femmes" : "e.g. sustainable activewear for women"}
+                  placeholder="e.g. sustainable activewear for women"
                   style={inputStyle}
                 />
               </div>
@@ -784,7 +765,7 @@ function OutreachAIGeneratePanel({
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Ton" : "Tone"}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>Tone</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {tones.map((t) => (
                         <button
@@ -800,7 +781,7 @@ function OutreachAIGeneratePanel({
                             borderColor: tone === t ? "#1A1A1A" : "#E5E5E5",
                           }}
                         >
-                          {displayTone(t, lang)}
+                          {t}
                         </button>
                       ))}
                     </div>
@@ -854,7 +835,7 @@ function OutreachAIGeneratePanel({
                   disabled={generating || !selectedCreator || !brand.trim()}
                   style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
                 >
-                  {generating ? (lang === "fr" ? "Génération..." : "Generating...") : lang === "fr" ? "Générer le message →" : "Generate message →"}
+                  {generating ? "Generating..." : "Generate message →"}
                 </button>
               )}
 
@@ -869,14 +850,14 @@ function OutreachAIGeneratePanel({
                   <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 16 }}>{message.length} characters</div>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                     <button type="button" onClick={() => void handleCopy()} style={{ ...btnSecondary, flex: 1, minWidth: 120 }}>
-                      {copied ? (lang === "fr" ? "Copié ✓" : "Copied ✓") : lang === "fr" ? "Copier le message" : "Copy message"}
+                      {copied ? "Copied ✓" : "Copy message"}
                     </button>
                     <button
                       type="button"
                       onClick={() => setSaveTemplateOpen(true)}
                       style={{ ...btnSecondary, flex: 1, minWidth: 120 }}
                     >
-                      {lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}
+                      Save as template
                     </button>
                     <button type="button" onClick={() => setShowSendFlow(true)} style={{ ...btnBlack, flex: 1, minWidth: 140 }}>
                       Send on {platform} →
@@ -896,7 +877,7 @@ function OutreachAIGeneratePanel({
                             Open TikTok DMs →
                           </a>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
-                            {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
+                            Mark as sent
                           </button>
                         </div>
                       )}
@@ -911,7 +892,7 @@ function OutreachAIGeneratePanel({
                             Open Instagram DMs →
                           </a>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
-                            {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
+                            Mark as sent
                           </button>
                         </div>
                       )}
@@ -928,7 +909,7 @@ function OutreachAIGeneratePanel({
                             Send email → (coming soon)
                           </button>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
-                            {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
+                            Mark as sent
                           </button>
                         </div>
                       )}
@@ -943,7 +924,6 @@ function OutreachAIGeneratePanel({
 
       {saveTemplateOpen && selectedCreator && (
         <SaveTemplateModal
-          lang={lang}
           defaultName={`Outreach — ${selectedCreator.displayName}`}
           onClose={() => setSaveTemplateOpen(false)}
           onSave={(name) => {
@@ -960,7 +940,7 @@ function OutreachAIGeneratePanel({
   );
 }
 
-function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "fr"; message: string; creator: string; onClose: () => void }) {
+function MessageViewModal({ message, creator, onClose }: { message: string; creator: string; onClose: () => void }) {
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1002, padding: 24 }}
@@ -978,10 +958,10 @@ function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "f
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" /></svg>
         </button>
-        <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 6px", paddingRight: 32 }}>{lang === "fr" ? `Message à ${creator}` : `Message to ${creator}`}</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 6px", paddingRight: 32 }}>Message to {creator}</h3>
         <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{message}</p>
         <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(message)}>
-          {lang === "fr" ? "Copier le message" : "Copy message"}
+          Copy message
         </button>
       </div>
     </div>
@@ -995,7 +975,6 @@ export function OutreachHistorySection({
   plan: PlanTier;
   onNavigateToBilling: () => void;
 }) {
-  const lang = useLang();
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>(INITIAL_OUTREACH_HISTORY);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [search, setSearch] = useState("");
@@ -1085,12 +1064,12 @@ export function OutreachHistorySection({
   };
 
   const filterTabs: { id: HistoryFilter; label: string }[] = [
-    { id: "all", label: lang === "fr" ? "Tous" : "All" },
-    { id: "sent", label: lang === "fr" ? "Envoyé" : "Sent" },
-    { id: "opened", label: lang === "fr" ? "Ouvert" : "Opened" },
-    { id: "replied", label: lang === "fr" ? "Répondu" : "Replied" },
-    { id: "no_response", label: lang === "fr" ? "Pas de réponse" : "No reply" },
-    { id: "converted", label: lang === "fr" ? "Converti" : "Converted" },
+    { id: "all", label: "All" },
+    { id: "sent", label: "Sent" },
+    { id: "opened", label: "Opened" },
+    { id: "replied", label: "Replied" },
+    { id: "no_response", label: "No Response" },
+    { id: "converted", label: "Converted" },
   ];
 
   const handleAiMarkSent = async (entry: OutreachHistoryEntry) => {
@@ -1111,11 +1090,11 @@ export function OutreachHistorySection({
 
   return (
     <>
-      <OutreachAIGeneratePanel lang={lang} plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} />
+      <OutreachAIGeneratePanel plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} />
 
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>{lang === "fr" ? "Historique des messages" : "Outreach history"}</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>Outreach History</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px", minWidth: 220 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
@@ -1157,10 +1136,10 @@ export function OutreachHistorySection({
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
           {[
-            { label: lang === "fr" ? "Total envoyé" : "Total sent", value: "5" },
-            { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: "20%" },
-            { label: lang === "fr" ? "Temps de réponse moyen" : "Avg response time", value: lang === "fr" ? "2,4 jours" : "2.4 days" },
-            { label: lang === "fr" ? "Converti" : "Converted", value: "1" },
+            { label: "Total sent", value: "5" },
+            { label: "Reply rate", value: "20%" },
+            { label: "Avg response time", value: "2.4 days" },
+            { label: "Converted", value: "1" },
           ].map((kpi) => (
             <div key={kpi.label} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 6 }}>{kpi.label}</div>
@@ -1182,15 +1161,7 @@ export function OutreachHistorySection({
               color: "#9A9A9A",
             }}
           >
-            {[
-              lang === "fr" ? "Créateur" : "Creator",
-              lang === "fr" ? "Plateforme" : "Platform",
-              lang === "fr" ? "Aperçu du message" : "Message preview",
-              lang === "fr" ? "Date d'envoi" : "Sent date",
-              lang === "fr" ? "Statut" : "Status",
-              lang === "fr" ? "Relance" : "Follow up",
-              lang === "fr" ? "Actions" : "Actions",
-            ].map((h) => (
+            {["Creator", "Platform", "Message preview", "Sent date", "Status", "Follow up", "Actions"].map((h) => (
               <div key={h}>{h}</div>
             ))}
           </div>
@@ -1222,13 +1193,13 @@ export function OutreachHistorySection({
                   {row.message.length > 60 ? "…" : ""}
                 </div>
                 <div style={{ fontSize: 12, color: "#7A7A7A" }}>{row.sentDate}</div>
-                <div>{outreachStatusBadge(row.status, lang)}</div>
+                <div>{outreachStatusBadge(row.status)}</div>
                 <div style={{ fontSize: 11, color: "#EA580C" }}>
-                  {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
+                  {row.followUpDate ? `Follow up: ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   <button type="button" style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px" }} onClick={() => setViewMessage(row)}>
-                    {lang === "fr" ? "Voir le message" : "View message"}
+                    View message
                   </button>
                   <button
                     type="button"
@@ -1236,11 +1207,11 @@ export function OutreachHistorySection({
                     onClick={() => !followUpDisabled && setFollowUpEntry(row)}
                     style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
                   >
-                    {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
+                    Send follow up
                   </button>
                   {showMarkReplied && (
                     <button type="button" style={{ ...btnPrimary, fontSize: 11, padding: "6px 10px" }} onClick={() => updateStatus(row.id, "replied")}>
-                      {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
+                      Mark as replied
                     </button>
                   )}
                 </div>
@@ -1251,12 +1222,11 @@ export function OutreachHistorySection({
       </div>
 
       {viewMessage && (
-        <MessageViewModal lang={lang} message={viewMessage.message} creator={viewMessage.creator} onClose={() => setViewMessage(null)} />
+        <MessageViewModal message={viewMessage.message} creator={viewMessage.creator} onClose={() => setViewMessage(null)} />
       )}
 
       {followUpEntry && (
         <FollowUpPanel
-          lang={lang}
           entry={followUpEntry}
           slideIn={followUpSlideIn}
           onClose={closeFollowUp}

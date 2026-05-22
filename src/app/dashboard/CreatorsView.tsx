@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { supabase } from "@/lib/supabase";
-import { useLang } from "@/lib/useLang";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -102,16 +101,6 @@ function formatCount(n: number) {
 
 function avatarUrlFor(username: string, custom?: string) {
   return custom ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-}
-
-function statusLabel(status: CreatorStatus, lang: "en" | "fr"): string {
-  const labels: Record<CreatorStatus, { en: string; fr: string }> = {
-    active: { en: "Active", fr: "Actif" },
-    pending: { en: "Pending", fr: "En attente" },
-    contacted: { en: "Contacted", fr: "Contacté" },
-    declined: { en: "Declined", fr: "Refusé" },
-  };
-  return lang === "fr" ? labels[status].fr : labels[status].en;
 }
 
 function statusBadgeStyle(status: CreatorStatus): React.CSSProperties {
@@ -234,12 +223,12 @@ function ModalShell({
   );
 }
 
-function ImportCsvModal({ lang, onClose }: { lang: "en" | "fr"; onClose: () => void }) {
+function ImportCsvModal({ onClose }: { onClose: () => void }) {
   const [fileName, setFileName] = useState<string | null>(null);
 
   return (
     <ModalShell onClose={onClose} maxWidth={520}>
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px", paddingRight: 40 }}>{lang === "fr" ? "Importer un CSV" : "Import CSV"}</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px", paddingRight: 40 }}>Import CSV</h2>
       <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>Bulk import creators from a spreadsheet.</p>
       <div
         style={{
@@ -285,11 +274,9 @@ function ImportCsvModal({ lang, onClose }: { lang: "en" | "fr"; onClose: () => v
 }
 
 function AddCreatorModal({
-  lang,
   onClose,
   onAdd,
 }: {
-  lang: "en" | "fr";
   onClose: () => void;
   onAdd: (c: ManagedCreator) => void;
 }) {
@@ -332,7 +319,7 @@ function AddCreatorModal({
 
   return (
     <ModalShell onClose={onClose} maxWidth={520}>
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 20px", paddingRight: 40 }}>{lang === "fr" ? "Ajouter un créateur" : "Add Creator"}</h2>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 20px", paddingRight: 40 }}>Add Creator</h2>
       <label style={{ display: "block", marginBottom: 16, cursor: "pointer", width: "fit-content" }}>
         <div
           style={{
@@ -352,7 +339,7 @@ function AddCreatorModal({
           {avatarPreview ? (
             <img src={avatarPreview} alt="" width={72} height={72} style={{ objectFit: "cover" }} />
           ) : (
-            lang === "fr" ? "Importer" : "Upload"
+            "Upload"
           )}
         </div>
         <input
@@ -365,58 +352,58 @@ function AddCreatorModal({
           }}
         />
       </label>
-      <Field label={lang === "fr" ? "Nom complet *" : "Full name *"}>
+      <Field label="Full name *">
         <input value={fullName} onChange={(e) => setFullName(e.target.value)} style={inputStyle} />
       </Field>
-      <Field label={lang === "fr" ? "Nom d'utilisateur / pseudo *" : "Username / handle *"}>
+      <Field label="Username / handle *">
         <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="@creator" style={inputStyle} />
       </Field>
-      <Field label={lang === "fr" ? "Plateforme" : "Platform"}>
+      <Field label="Platform">
         <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
           <option value="tiktok">TikTok</option>
           <option value="instagram">Instagram</option>
           <option value="youtube">YouTube</option>
         </select>
       </Field>
-      <Field label={lang === "fr" ? "Niche" : "Niche"}>
+      <Field label="Niche">
         <input value={niche} onChange={(e) => setNiche(e.target.value)} style={inputStyle} />
       </Field>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label={lang === "fr" ? "Abonnés" : "Followers"}>
+        <Field label="Followers">
           <input type="number" value={followers} onChange={(e) => setFollowers(e.target.value)} style={inputStyle} />
         </Field>
-        <Field label={lang === "fr" ? "Engagement (%)" : "Engagement (%)"}>
+        <Field label="Engagement (%)">
           <input type="number" step="0.1" value={engagement} onChange={(e) => setEngagement(e.target.value)} style={inputStyle} />
         </Field>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <Field label={lang === "fr" ? "Âge" : "Age"}>
+        <Field label="Age">
           <input type="number" value={age} onChange={(e) => setAge(e.target.value)} style={inputStyle} />
         </Field>
-        <Field label={lang === "fr" ? "Statut" : "Status"}>
+        <Field label="Status">
           <select value={status} onChange={(e) => setStatus(e.target.value as CreatorStatus)} style={inputStyle}>
-            <option value="active">{statusLabel("active", lang)}</option>
-            <option value="pending">{statusLabel("pending", lang)}</option>
-            <option value="contacted">{statusLabel("contacted", lang)}</option>
-            <option value="declined">{statusLabel("declined", lang)}</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="contacted">Contacted</option>
+            <option value="declined">Declined</option>
           </select>
         </Field>
       </div>
-      <Field label={lang === "fr" ? "E-mail" : "Email"}>
+      <Field label="Email">
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
       </Field>
-      <Field label={lang === "fr" ? "Localisation" : "Location"}>
+      <Field label="Location">
         <input value={location} onChange={(e) => setLocation(e.target.value)} style={inputStyle} />
       </Field>
-      <Field label={lang === "fr" ? "Notes" : "Notes"}>
+      <Field label="Notes">
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
       </Field>
       <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
         <button type="button" onClick={onClose} style={{ ...btnSecondary, flex: 1 }}>
-          {lang === "fr" ? "Annuler" : "Cancel"}
+          Cancel
         </button>
         <button type="button" onClick={handleSubmit} disabled={!canSubmit} style={{ ...btnBlack, flex: 1, opacity: canSubmit ? 1 : 0.45 }}>
-          {lang === "fr" ? "Ajouter un créateur →" : "Add Creator →"}
+          Add Creator →
         </button>
       </div>
     </ModalShell>
@@ -749,7 +736,6 @@ function RunCampaignModal({
 }
 
 export function CreatorsView() {
-  const lang = useLang();
   const [creators, setCreators] = useState<ManagedCreator[]>(INITIAL_CREATORS);
   const [tab, setTab] = useState<CreatorsTab>("all");
   const [search, setSearch] = useState("");
@@ -851,15 +837,15 @@ export function CreatorsView() {
       <div style={{ padding: "32px 40px 24px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Créateurs" : "Creators"}</h1>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>{lang === "fr" ? "Gérez vos relations avec les créateurs." : "Manage your creator relationships."}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>Creators</h1>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>Manage your creator relationships.</p>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button type="button" style={btnSecondary} onClick={() => setImportOpen(true)}>
-              {lang === "fr" ? "Importer un CSV" : "Import CSV"}
+              Import CSV
             </button>
             <button type="button" style={btnBlack} onClick={() => setAddOpen(true)}>
-              {lang === "fr" ? "+ Ajouter un créateur" : "+ Add Creator"}
+              + Add Creator
             </button>
           </div>
         </div>
@@ -868,10 +854,10 @@ export function CreatorsView() {
       <div style={{ padding: "24px 40px 40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
           {[
-            { label: lang === "fr" ? "Total créateurs" : "Total Creators", value: String(creators.length) },
-            { label: lang === "fr" ? "Partenaires actifs" : "Active Partners", value: String(activeCount) },
-            { label: lang === "fr" ? "Engagement moyen" : "Avg Engagement", value: `${avgEngagement.toFixed(1)}%` },
-            { label: lang === "fr" ? "Total campagnes" : "Total Campaigns", value: String(uniqueCampaigns) },
+            { label: "Total Creators", value: String(creators.length) },
+            { label: "Active Partners", value: String(activeCount) },
+            { label: "Avg Engagement", value: `${avgEngagement.toFixed(1)}%` },
+            { label: "Total Campaigns", value: String(uniqueCampaigns) },
           ].map((kpi) => (
             <div key={kpi.label} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 14, padding: 20 }}>
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>{kpi.label}</div>
@@ -883,9 +869,9 @@ export function CreatorsView() {
         <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #EFEFEF", marginBottom: 20 }}>
           {(
             [
-              { id: "all" as const, label: lang === "fr" ? "Tous les créateurs" : "All Creators" },
-              { id: "active" as const, label: lang === "fr" ? "Actifs" : "Active" },
-              { id: "pending" as const, label: lang === "fr" ? "En attente" : "Pending" },
+              { id: "all" as const, label: "All Creators" },
+              { id: "active" as const, label: "Active" },
+              { id: "pending" as const, label: "Pending" },
             ] as const
           ).map((t) => (
             <button
@@ -963,16 +949,7 @@ export function CreatorsView() {
               color: "#9A9A9A",
             }}
           >
-            {[
-              lang === "fr" ? "Créateur" : "Creator",
-              lang === "fr" ? "Plateforme" : "Platform",
-              lang === "fr" ? "Abonnés" : "Followers",
-              lang === "fr" ? "Engagement" : "Engagement",
-              lang === "fr" ? "Niche" : "Niche",
-              lang === "fr" ? "Statut" : "Status",
-              lang === "fr" ? "Ajouté" : "Added",
-              lang === "fr" ? "Actions" : "Actions",
-            ].map((h) => (
+            {["Creator", "Platform", "Followers", "Engagement", "Niche", "Status", "Added", "Actions"].map((h) => (
               <div key={h}>{h}</div>
             ))}
           </div>
@@ -1002,15 +979,15 @@ export function CreatorsView() {
                 <div style={{ fontSize: 13 }}>{formatCount(c.followers)}</div>
                 <div style={{ fontSize: 13 }}>{c.engagement}%</div>
                 <div style={{ fontSize: 13 }}>{c.niche}</div>
-                <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
+                <div><span style={statusBadgeStyle(c.status)}>{c.status}</span></div>
                 <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
                     <button type="button" style={btnActionPrimary} onClick={() => setCampaignCreator(c)}>
-                      {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
+                      Run campaign →
                     </button>
                     <button type="button" style={btnActionSecondary} onClick={() => setOutreachCreator(c)}>
-                      {lang === "fr" ? "Générer un message" : "Generate outreach"}
+                      Generate outreach
                     </button>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1046,10 +1023,9 @@ export function CreatorsView() {
         </div>
       </div>
 
-      {importOpen && <ImportCsvModal lang={lang} onClose={() => setImportOpen(false)} />}
+      {importOpen && <ImportCsvModal onClose={() => setImportOpen(false)} />}
       {addOpen && (
         <AddCreatorModal
-          lang={lang}
           onClose={() => setAddOpen(false)}
           onAdd={(c) => {
             setCreators((list) => [c, ...list]);
