@@ -116,7 +116,7 @@ async function scrapeProfileBatch(usernames: string[]): Promise<any[]> {
 }
 
 async function seedNiche(niche: string): Promise<number> {
-  const hashtags = NICHE_HASHTAGS[niche] || [niche];
+  const hashtags = (NICHE_HASHTAGS[niche] || [niche]).slice(0, 5);
   const allUsernames = new Set<string>();
 
   // Search each hashtag sequentially, collect unique authors
@@ -125,7 +125,7 @@ async function seedNiche(niche: string): Promise<number> {
     usernames.forEach(u => allUsernames.add(u));
     console.log(`  #${hashtag}: ${usernames.length} creators, total: ${allUsernames.size}`);
     // Stop early if we have enough
-    if (allUsernames.size >= 100) break;
+    if (allUsernames.size >= 50) break;
   }
 
   if (allUsernames.size === 0) return 0;
