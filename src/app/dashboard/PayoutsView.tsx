@@ -697,12 +697,7 @@ type PayoutPartner = {
   paymentLabel?: string;
 };
 
-const PAYOUT_PARTNERS_SEED: PayoutPartner[] = [
-  { id: "1", name: "Alex Rivera", handle: "@alexcreates", owed: 124.5, hasPaymentMethod: true, paymentLabel: "PayPal · alex@email.com" },
-  { id: "2", name: "Jordan Lee", handle: "@jordanlee", owed: 89, hasPaymentMethod: false },
-  { id: "3", name: "Sam Taylor", handle: "@samtaylor", owed: 210.25, hasPaymentMethod: true, paymentLabel: "Bank · •••• 4821" },
-  { id: "4", name: "Morgan Kim", handle: "@morgankim", owed: 56.75, hasPaymentMethod: false },
-];
+const PAYOUT_PARTNERS_SEED: PayoutPartner[] = [];
 
 function mapDbCreatorToPartner(c: {
   id: string;
@@ -816,7 +811,7 @@ export function PayoutsView({
   }, [userId]);
 
   const tablePartners = useMemo(
-    () => (creators.length > 0 ? creators.map((c) => mapDbCreatorToPartner(c, lang)) : partners),
+    () => creators.map((c) => mapDbCreatorToPartner(c, lang)),
     [creators, partners, lang]
   );
 
@@ -1084,6 +1079,10 @@ export function PayoutsView({
                   <button
                     type="button"
                     onClick={() => {
+                      if (plan === "free") {
+                        alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                        return;
+                      }
                       const amount = creator.balance;
                       if (!amount || amount <= 0) {
                         alert(lang === "fr" ? "Solde insuffisant" : "No balance to pay");
@@ -1295,6 +1294,10 @@ export function PayoutsView({
               type="button"
               disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0}
               onClick={() => {
+                if (plan === "free") {
+                  alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                  return;
+                }
                 const amount = selectedCreatorPayout.balance;
                 const creator = selectedCreatorPayout;
                 if (!amount || amount <= 0) {

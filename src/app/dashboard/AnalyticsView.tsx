@@ -38,7 +38,7 @@ const OUTREACH_PLATFORMS = [
   { platform: "YouTube", sent: 27, replied: 7, converted: 2, preview: "Partnership opportunity for your audience" },
 ];
 
-export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: string; isMobile?: boolean; lang?: string }) {
+export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string }) {
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -53,6 +53,13 @@ export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: s
       setLoadingData(false);
       return;
     }
+    if (shopifyStore && userId) {
+      fetch("/api/shopify/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      }).catch(() => {});
+    }
     fetch(`/api/analytics?userId=${userId}`)
       .then((r) => r.json())
       .then((data) => {
@@ -60,7 +67,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: s
         setLoadingData(false);
       })
       .catch(() => setLoadingData(false));
-  }, [userId]);
+  }, [userId, shopifyStore]);
 
   const HAS_DATA = !loadingData && (analyticsData?.hasData ?? false);
 
@@ -83,7 +90,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: s
   if (!loadingData && !HAS_DATA) {
     return (
       <>
-        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
@@ -96,7 +103,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: s
 
   return (
     <>
-      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
+      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
           <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={analyticsData?.totalRevenue ? formatCurrency(analyticsData.totalRevenue, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
@@ -230,12 +237,13 @@ export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: s
   );
 }
 
-function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData }: {
+function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData, plan }: {
   lang: "en" | "fr";
   range: DateRange; setRange: (r: DateRange) => void;
   compare: boolean; setCompare: (v: boolean) => void;
   isMobile?: boolean;
   analyticsData?: any;
+  plan?: "free" | "basic" | "pro";
 }) {
   const ranges: { id: DateRange; label: string }[] = [
     { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
@@ -253,6 +261,10 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
           className="hero-cta-shopify-light hero-cta-compact"
           style={{ marginTop: 8 }}
           onClick={() => {
+            if (plan !== "pro") {
+              alert(lang === "fr" ? "L'export CSV est disponible sur le plan Pro." : "CSV export is available on the Pro plan.");
+              return;
+            }
             if (!analyticsData) return;
 
             const rows = [

@@ -1284,6 +1284,7 @@ export function DiscoveryView({
   const [engagement, setEngagement] = useState("3+");
   const [location, setLocation] = useState("US");
   const [language, setLanguage] = useState("english");
+  const [gender, setGender] = useState("");
 
   const [creators, setCreators] = useState<Creator[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1296,6 +1297,7 @@ export function DiscoveryView({
   const [outreachContacted, setOutreachContacted] = useState<OutreachContact[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [searchCount, setSearchCount] = useState(0);
 
   const openOutreach = (creator: Creator) => {
     setSelectedCreator(null);
@@ -1307,6 +1309,11 @@ export function DiscoveryView({
     const timer = setTimeout(() => setToast(null), 2000);
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("trackit_search_" + new Date().toDateString());
+    if (saved) setSearchCount(parseInt(saved));
+  }, []);
 
   useEffect(() => {
     const loadSaved = async () => {
@@ -1367,8 +1374,12 @@ export function DiscoveryView({
   };
 
   const search = async () => {
-    if (plan === "free" && getDiscoverySearchCountToday() >= 5) {
-      setUpgradeModalOpen(true);
+    if (plan === "free" && searchCount >= 5) {
+      alert(
+        lang === "fr"
+          ? "Limite de 5 recherches par jour atteinte. Passez à Basic pour des recherches illimitées."
+          : "Daily limit of 5 searches reached. Upgrade to Basic for unlimited searches."
+      );
       return;
     }
 
@@ -1377,15 +1388,30 @@ export function DiscoveryView({
     setError(null);
     setHasSearched(true);
 
-    if (plan === "free") {
-      incrementDiscoverySearchCount();
-    }
-
     try {
+      const followerBounds: Record<string, { min: number; max?: number }> = {
+        "1-10k": { min: 1000, max: 10000 },
+        "10-20k": { min: 10000, max: 20000 },
+        "20-50k": { min: 20000, max: 50000 },
+        "50-100k": { min: 50000, max: 100000 },
+        "100k+": { min: 100000 },
+      };
+      const { min: minFollowers, max: maxFollowers } = followerBounds[followers] ?? { min: 0 };
+      const minEngagement = parseInt(engagement, 10) || 0;
+
       const res = await fetch("/api/discovery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ niche: nicheTerm, platform }),
+        body: JSON.stringify({
+          niche: nicheTerm,
+          platform,
+          minFollowers,
+          maxFollowers,
+          minEngagement,
+          location,
+          language,
+          gender,
+        }),
       });
 
       if (!res.ok) {
@@ -1394,6 +1420,9 @@ export function DiscoveryView({
 
       const data = (await res.json()) as { creators: Creator[] };
       setCreators(data.creators ?? []);
+      const newCount = searchCount + 1;
+      setSearchCount(newCount);
+      localStorage.setItem("trackit_search_" + new Date().toDateString(), String(newCount));
     } catch (e) {
       setCreators([]);
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -1450,6 +1479,13 @@ export function DiscoveryView({
                 letterSpacing: "-0.02em",
               }}
             />
+            {plan === "free" && (
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>
+                {lang === "fr"
+                  ? `${5 - searchCount} recherche(s) restante(s) aujourd'hui`
+                  : `${5 - searchCount} search(es) remaining today`}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void search()}
@@ -1525,17 +1561,33 @@ export function DiscoveryView({
                 { value: "CA", label: lang === "fr" ? "Canada" : "Canada" },
               ]}
             />
-            <FilterSelect
-              label={lang === "fr" ? "Langue" : "Language"}
-              value={language}
-              onChange={setLanguage}
-              options={[
-                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
-                { value: "french", label: lang === "fr" ? "Français" : "French" },
-                { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
-                { value: "german", label: lang === "fr" ? "Allemand" : "German" },
-              ]}
-            />
+            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <FilterSelect
+                label={lang === "fr" ? "Langue" : "Language"}
+                value={language}
+                onChange={setLanguage}
+                options={[
+                  { value: "english", label: lang === "fr" ? "Anglais" : "English" },
+                  { value: "french", label: lang === "fr" ? "Français" : "French" },
+                  { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
+                  { value: "german", label: lang === "fr" ? "Allemand" : "German" },
+                ]}
+              />
+              <div>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                  {lang === "fr" ? "Genre" : "Gender"}
+                </div>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  style={filterSelectStyle}
+                >
+                  <option value="">{lang === "fr" ? "Tous" : "All"}</option>
+                  <option value="female">{lang === "fr" ? "Femme" : "Female"}</option>
+                  <option value="male">{lang === "fr" ? "Homme" : "Male"}</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 

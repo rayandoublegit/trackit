@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const lang = useLang();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -53,11 +53,13 @@ export default function DashboardPage() {
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
   const [plan, setPlan] = useState<"free" | "basic" | "pro">("free");
+  const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const [notificationUnread, setNotificationUnread] = useState(getInitialUnreadCount);
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
     shopify: false,
+    shopifyStore: null as string | null,
     creators: false,
     outreach: false,
     sales: false,
@@ -73,12 +75,13 @@ export default function DashboardPage() {
     if (!profileData) return;
     const avatar_url = await resolveAvatarUrl(supabase, userId, profileData.avatar_url);
     setAvatarBroken(false);
-    setProfile({
+    setProfile((prev) => ({
       full_name: profileData.full_name,
       username: profileData.username,
       avatar_url,
       business_name: profileData.business_name,
-    });
+      shopify_store: prev?.shopify_store ?? null,
+    }));
   }, []);
 
   useEffect(() => {
@@ -94,7 +97,7 @@ export default function DashboardPage() {
       if (!authUser) { router.replace("/auth"); return; }
       const { data: profileData } = await supabase!
         .from("profiles")
-        .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status")
+        .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
         .eq("id", authUser.id)
         .maybeSingle();
       if (!profileData || profileData.onboarding_completed === false) {
@@ -102,6 +105,7 @@ export default function DashboardPage() {
         return;
       }
       setPlan((profileData.plan as "free" | "basic" | "pro") || "free");
+      setShopifyStore(profileData.shopify_store || null);
       setUser(authUser);
       const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
       avatarRetryRef.current = false;
@@ -111,6 +115,7 @@ export default function DashboardPage() {
         username: profileData.username,
         avatar_url,
         business_name: profileData.business_name,
+        shopify_store: profileData.shopify_store ?? null,
       });
       setLoading(false);
     });
@@ -146,6 +151,7 @@ export default function DashboardPage() {
 
       setGettingStarted({
         shopify: shopifyConnected,
+        shopifyStore: profile?.shopify_store || null,
         creators: (creatorsCount || 0) > 0,
         outreach: (outreachCount || 0) > 0,
         sales: (salesCount || 0) > 0,
@@ -481,15 +487,15 @@ export default function DashboardPage() {
       </aside>
 
       <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
-        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} />}
+        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} />}
         {view === "discovery" && <DiscoveryView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
         {view === "creators" && <CreatorsView isMobile={isMobile} />}
         {view === "campaigns" && <CampaignsView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
         {view === "affiliates" && <AffiliatesView isMobile={isMobile} />}
         {view === "outreach" && <OutreachView isMobile={isMobile} plan={plan} onNavigateToBilling={() => setView("settings")} />}
         {view === "payouts" && user && <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "analytics" && user && <AnalyticsView userId={user.id} isMobile={isMobile} />}
-        {view === "integrations" && <IntegrationsView isMobile={isMobile} />}
+        {view === "analytics" && user && <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore || undefined} />}
+        {view === "integrations" && <IntegrationsView isMobile={isMobile} user={user} />}
         {view === "automation" && <AutomationView isMobile={isMobile} />}
         {view === "settings" && user && (
           <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
@@ -516,8 +522,76 @@ function PageHeader({ title, subtitle, right, isMobile }: { title: string; subti
   );
 }
 
-function HomeView({ fullName, username, isMobile, gettingStarted }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; creators: boolean; outreach: boolean; sales: boolean } }) {
+function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; userId?: string; lang: "en" | "fr" }) {
+  const [shopDomain, setShopDomain] = useState("");
+  const [shopError, setShopError] = useState("");
+
+  const handleConnect = () => {
+    if (!shopDomain.trim()) {
+      setShopError(lang === "fr" ? "Entrez le nom de votre boutique" : "Please enter your store name");
+      return;
+    }
+    setShopError("");
+    let name = shopDomain.trim().toLowerCase();
+    name = name.replace(/^https?:\/\//, "");
+    name = name.replace(/\.myshopify\.com.*/, "");
+    name = name.replace(/\..*/, "");
+    name = name.replace(/[^a-z0-9-]/g, "");
+    const domain = `${name}.myshopify.com`;
+    window.location.href = `/api/shopify/install?shop=${domain}&user_id=${userId || ""}`;
+  };
+
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 24 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: "#FFFFFF", borderRadius: 16, padding: 32, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
+          <img src="/shopify-logo.svg" alt="Shopify" width={44} height={50} style={{ display: "block" }} />
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "#7A7A7A", lineHeight: 1 }}>×</button>
+        </div>
+        <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+          {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
+        </h3>
+        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          {lang === "fr"
+            ? "Entrez l'URL de votre boutique .myshopify.com pour autoriser Trackit."
+            : "Enter your .myshopify.com store URL to authorize Trackit."}
+        </p>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "URL de la boutique" : "Store URL"}
+        </label>
+        <input
+          type="text"
+          value={shopDomain}
+          onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
+          placeholder="yourstore.myshopify.com"
+          onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 8 }}
+          autoFocus
+        />
+        <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 16px", lineHeight: 1.45 }}>
+          {lang === "fr"
+            ? "Trouvez-la dans Shopify Admin → Paramètres → Domaines."
+            : "Find it in Shopify Admin → Settings → Domains."}
+        </p>
+        {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
+        <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} style={{ width: "100%", justifyContent: "center" }}>
+          <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
+          {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HomeView({ fullName, username, isMobile, gettingStarted, user }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean }; user?: User | null }) {
   const lang = useLang();
+  const [shopifyModalOpen, setShopifyModalOpen] = useState(false);
   const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
   const welcomeGreeting = lang === "fr" ? "Bon retour" : "Welcome back";
   const checklistSteps = [
@@ -534,13 +608,25 @@ function HomeView({ fullName, username, isMobile, gettingStarted }: { fullName: 
           <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
             <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
           </div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Connectez votre boutique Shopify" : "Connect your Shopify store"}</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Synchronisez vos produits, commandes et clients en temps réel. Nous suivrons automatiquement chaque vente générée par vos créateurs." : "Sync products, orders, and customers in real time. We'll automatically track every sale your creators drive."}</p>
-          <button type="button" className="hero-cta-shopify-dark">
-            <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
-            {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
-          </button>
-          <p style={{ fontSize: 12, color: "#9A9A9A", marginTop: 14 }}>{lang === "fr" ? "Intégration Shopify non connectée" : "Shopify integration not connected yet"}</p>
+          {gettingStarted.shopify ? (
+            <>
+              <h2 style={{ fontSize: 22, fontWeight: 600, color: "#22C55E", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Boutique Shopify connectée ✓" : "Shopify store connected ✓"}</h2>
+              <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Vos commandes sont synchronisées. Les ventes de vos créateurs sont suivies automatiquement." : "Your orders are synced. Creator sales are tracked automatically."}</p>
+              {gettingStarted.shopifyStore && (
+                <p style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginTop: 16, marginBottom: 0, letterSpacing: "-0.01em" }}>{gettingStarted.shopifyStore}</p>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Connectez votre boutique Shopify" : "Connect your Shopify store"}</h2>
+              <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Synchronisez vos produits, commandes et clients en temps réel. Nous suivrons automatiquement chaque vente générée par vos créateurs." : "Sync products, orders, and customers in real time. We'll automatically track every sale your creators drive."}</p>
+              <button type="button" className="hero-cta-shopify-dark" onClick={() => setShopifyModalOpen(true)}>
+                <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
+                {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
+              </button>
+              <p style={{ fontSize: 12, color: "#9A9A9A", marginTop: 14 }}>{lang === "fr" ? "Intégration Shopify non connectée" : "Shopify integration not connected yet"}</p>
+            </>
+          )}
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
@@ -564,6 +650,9 @@ function HomeView({ fullName, username, isMobile, gettingStarted }: { fullName: 
           ))}
         </div>
       </div>
+      {shopifyModalOpen && (
+        <ShopifyConnectModal lang={lang} userId={user?.id} onClose={() => setShopifyModalOpen(false)} />
+      )}
     </>
   );
 }
@@ -1175,7 +1264,7 @@ function SendOutreachPanel({
 }
 
 
-function IntegrationsView({ isMobile }: { isMobile?: boolean }) {
+function IntegrationsView({ isMobile, user }: { isMobile?: boolean; user?: User | null }) {
   const lang = useLang();
   const [shopDomain, setShopDomain] = useState("");
   const [shopError, setShopError] = useState("");
@@ -1206,7 +1295,7 @@ function IntegrationsView({ isMobile }: { isMobile?: boolean }) {
     name = name.replace(/\..*/, "");
     name = name.replace(/[^a-z0-9-]/g, "");
     const domain = `${name}.myshopify.com`;
-    window.location.href = `/api/shopify/install?shop=${domain}`;
+    window.location.href = `/api/shopify/install?shop=${domain}&user_id=${user?.id || ""}`;
   };
 
   const apps = [

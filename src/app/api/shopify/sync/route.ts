@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+
+export const dynamic = "force-dynamic";
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+export async function POST(request: NextRequest) {
+  const { userId } = await request.json();
+  if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
+
+  // Get user's shopify store
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("shopify_store, shopify_access_token")
+    .eq("id", userId)
+    .single();
+
+  if (!profile?.shopify_store || !profile?.shopify_access_token) {
+    return NextResponse.json({ error: "No Shopify store connected" }, { status: 400 });
+  }
+
+  // Get creators with discount codes for this user
+  const { data: creators } = await supabaseAdmin
+    .from("creators")
+    .select("id, discount_code, commission_rate")
+    .eq("user_id", userId)
+    .not("discount_code", "is", null);
+
+  const discountMap = new Map(
+    (creators || []).map(c => [c.discount_code?.toUpperCase(), c])
+  );
+
+  if (discountMap.size === 0) {
+    return NextResponse.json({ synced: 0, message: "No creators with discount codes" });
+  }
+
+  // Pull last 250 orders from Shopify
+  const ordersRes = await fetch(
+    `https://${profile.shopify_store}/admin/api/2024-01/orders.json?status=any&limit=250`,
+    { headers: { "X-Shopify-Access-Token": profile.shopify_access_token } }
+  );
+  const { orders } = await ordersRes.json();
+  if (!orders) return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 });
+
+  let synced = 0;
+  for (const order of orders) {
+    const codes: string[] = order.discount_codes?.map((d: any) => d.code.toUpperCase()) || [];
+    for (const code of codes) {
+      const creator = discountMap.get(code);
+      if (!creator) continue;
+
+      const orderAmount = parseFloat(order.total_price || "0");
+      const commissionRate = creator.commission_rate || 10;
+      const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
+
+      // Upsert to avoid duplicates
+      const { error } = await supabaseAdmin.from("sales").upsert({
+        creator_id: creator.id,
+        user_id: userId,
+        shopify_order_id: String(order.id),
+        order_amount: orderAmount,
+        commission_amount: commissionAmount,
+        discount_code_used: code,
+        shop_domain: profile.shopify_store,
+        status: order.financial_status === "paid" ? "paid" : "pending",
+        created_at: order.created_at,
+      }, { onConflict: "shopify_order_id" });
+
+      if (!error) synced++;
+    }
+  }
+
+  // Also register webhook if not done yet
+  await fetch(
+    `https://${profile.shopify_store}/admin/api/2024-01/webhooks.json`,
+    {
+      method: "POST",
+      headers: {
+        "X-Shopify-Access-Token": profile.shopify_access_token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        webhook: {
+          topic: "orders/create",
+          address: `${process.env.NEXT_PUBLIC_APP_URL}/api/shopify/orders`,
+          format: "json",
+        },
+      }),
+    }
+  );
+
+  return NextResponse.json({ synced, orders: orders.length });
+}

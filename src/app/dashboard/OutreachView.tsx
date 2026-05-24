@@ -559,8 +559,11 @@ function OutreachAIGeneratePanel({
   const outreachLimitReached = plan === "free" && getOutreachGenerationsToday() >= 3;
 
   const handleGenerate = async () => {
+    if (plan === "free") {
+      alert(lang === "fr" ? "Disponible à partir du plan Basic." : "Available on Basic plan and above.");
+      return;
+    }
     if (!selectedCreator || !brand.trim()) return;
-    if (plan === "free" && getOutreachGenerationsToday() >= 3) return;
     setGenerating(true);
     setMessage("");
     setShowSendFlow(false);
@@ -580,7 +583,6 @@ function OutreachAIGeneratePanel({
       if (!res.ok) throw new Error("Failed");
       setMessage(data.message);
       setShowSendFlow(false);
-      if (plan === "free") incrementOutreachGenerationsToday();
     } catch {
       onToast("Generation failed. Try again.");
     } finally {

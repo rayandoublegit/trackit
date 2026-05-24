@@ -77,8 +77,8 @@ export function CampaignsView({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const tryOpenNewCampaign = () => {
-    if (plan === "free" && campaigns.length >= 1) {
-      setUpgradeModalOpen(true);
+    if (plan === "free") {
+      alert(lang === "fr" ? "Les campagnes sont disponibles à partir du plan Basic." : "Campaigns are available on Basic plan and above.");
       return;
     }
     setModalOpen(true);
