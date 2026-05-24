@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useLang } from "@/lib/useLang";
 
 export type NotificationKind = "payout" | "campaign" | "outreach" | "team" | "system";
 
@@ -13,59 +14,8 @@ export type NotificationItem = {
   read: boolean;
 };
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "1",
-    kind: "payout",
-    title: "Payout sent to Jordan Lee",
-    body: "$240.00 commission was paid successfully from your balance.",
-    time: "12 min ago",
-    read: false,
-  },
-  {
-    id: "2",
-    kind: "campaign",
-    title: "Summer Launch hit 50 sales",
-    body: "Your campaign reached its first milestone. Review performance in Campaigns.",
-    time: "2 hours ago",
-    read: false,
-  },
-  {
-    id: "3",
-    kind: "outreach",
-    title: "3 creators replied to outreach",
-    body: "Sam Taylor, Morgan Kim, and Alex Rivera responded. Open Outreach to follow up.",
-    time: "5 hours ago",
-    read: false,
-  },
-  {
-    id: "4",
-    kind: "team",
-    title: "Jordan Lee joined your workspace",
-    body: "They accepted your invite as Admin. Manage roles in Settings → Team.",
-    time: "Yesterday",
-    read: true,
-  },
-  {
-    id: "5",
-    kind: "system",
-    title: "Shopify connected",
-    body: "Trackit is now receiving order webhooks from your store.",
-    time: "2 days ago",
-    read: true,
-  },
-  {
-    id: "6",
-    kind: "payout",
-    title: "Low balance warning",
-    body: "Your payout balance is below $100. Add funds to avoid failed creator payments.",
-    time: "3 days ago",
-    read: true,
-  },
-];
-
 export function getInitialUnreadCount() {
-  return INITIAL_NOTIFICATIONS.filter((n) => !n.read).length;
+  return 3;
 }
 
 const btnSecondary: React.CSSProperties = {
@@ -91,9 +41,67 @@ const KIND_STYLES: Record<NotificationKind, { bg: string; color: string; icon: s
 
 type FilterTab = "all" | "unread";
 
-export function NotificationsView({ onUnreadChange }: { onUnreadChange?: (count: number) => void }) {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange?: (count: number) => void; isMobile?: boolean }) {
+  const lang = useLang();
+  const NOTIFICATIONS: NotificationItem[] = useMemo(
+    () => [
+      {
+        id: "1",
+        kind: "payout",
+        title: lang === "fr" ? "Paiement envoyé à Jordan Lee" : "Payout sent to Jordan Lee",
+        body: lang === "fr" ? "Une commission de 240,00$ a été payée avec succès depuis votre solde." : "$240.00 commission was paid successfully from your balance.",
+        time: "12 min ago",
+        read: false,
+      },
+      {
+        id: "2",
+        kind: "campaign",
+        title: lang === "fr" ? "Summer Launch a atteint 50 ventes" : "Summer Launch hit 50 sales",
+        body: lang === "fr" ? "Votre campagne a atteint son premier jalon. Consultez les performances dans Campagnes." : "Your campaign reached its first milestone. Review performance in Campaigns.",
+        time: lang === "fr" ? "Il y a 2 heures" : "2 hours ago",
+        read: false,
+      },
+      {
+        id: "3",
+        kind: "outreach",
+        title: lang === "fr" ? "3 créateurs ont répondu à votre message" : "3 creators replied to outreach",
+        body: lang === "fr" ? "Sam Taylor, Morgan Kim et Alex Rivera ont répondu. Ouvrez Messages pour faire un suivi." : "Sam Taylor, Morgan Kim, and Alex Rivera responded. Open Outreach to follow up.",
+        time: lang === "fr" ? "Il y a 5 heures" : "5 hours ago",
+        read: false,
+      },
+      {
+        id: "4",
+        kind: "team",
+        title: lang === "fr" ? "Jordan Lee a rejoint votre espace" : "Jordan Lee joined your workspace",
+        body: lang === "fr" ? "Il a accepté votre invitation en tant qu'Admin. Gérez les rôles dans Paramètres → Équipe." : "They accepted your invite as Admin. Manage roles in Settings → Team.",
+        time: lang === "fr" ? "Hier" : "Yesterday",
+        read: true,
+      },
+      {
+        id: "5",
+        kind: "system",
+        title: lang === "fr" ? "Shopify connecté" : "Shopify connected",
+        body: lang === "fr" ? "Trackit reçoit maintenant les webhooks de commandes de votre boutique." : "Trackit is now receiving order webhooks from your store.",
+        time: lang === "fr" ? "Il y a 2 jours" : "2 days ago",
+        read: true,
+      },
+      {
+        id: "6",
+        kind: "payout",
+        title: lang === "fr" ? "Alerte solde faible" : "Low balance warning",
+        body: lang === "fr" ? "Votre solde de paiement est inférieur à 100$. Ajoutez des fonds pour éviter les échecs de paiement." : "Your payout balance is below $100. Add funds to avoid failed creator payments.",
+        time: lang === "fr" ? "Il y a 3 jours" : "3 days ago",
+        read: true,
+      },
+    ],
+    [lang]
+  );
+  const [notifications, setNotifications] = useState<NotificationItem[]>(NOTIFICATIONS);
   const [filter, setFilter] = useState<FilterTab>("all");
+
+  useEffect(() => {
+    setNotifications(NOTIFICATIONS);
+  }, [NOTIFICATIONS]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -118,17 +126,17 @@ export function NotificationsView({ onUnreadChange }: { onUnreadChange?: (count:
 
   return (
     <>
-      <div style={{ padding: "32px 40px 24px 40px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>Notifications</h1>
+            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Notifications" : "Notifications"}</h1>
             <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-              {unreadCount > 0 ? `${unreadCount} unread` : "You're all caught up"}
+              {unreadCount > 0 ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}` : "You're all caught up"}
             </p>
           </div>
           {unreadCount > 0 && (
-            <button type="button" onClick={markAllRead} style={btnSecondary}>
-              Mark all as read
+            <button type="button" onClick={markAllRead} className="hero-cta-shopify-light hero-cta-compact" style={{ marginTop: 8 }}>
+              {lang === "fr" ? "Tout marquer comme lu" : "Mark all as read"}
             </button>
           )}
         </div>
@@ -151,13 +159,13 @@ export function NotificationsView({ onUnreadChange }: { onUnreadChange?: (count:
                 letterSpacing: "-0.02em",
               }}
             >
-              {tab === "all" ? "All" : `Unread${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
+              {tab === "all" ? (lang === "fr" ? "Tout" : "All") : `${lang === "fr" ? "Non lues" : "Unread"}${unreadCount > 0 ? ` (${unreadCount})` : ""}`}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: 40 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {visible.length === 0 ? (
           <div
             style={{

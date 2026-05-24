@@ -24,6 +24,9 @@ type ManagedCreator = {
   location: string;
   notes: string;
   avatarUrl?: string;
+  paypal_link?: string;
+  revolut_link?: string;
+  iban?: string;
   campaignIds: string[];
 };
 
@@ -488,6 +491,7 @@ function CreatorDetailModal({
   onRunCampaign: () => void;
   onGenerateOutreach: () => void;
 }) {
+  const lang = useLang();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(creator);
 
@@ -528,6 +532,65 @@ function CreatorDetailModal({
       </div>
       <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>
         <strong style={{ color: "#1A1A1A" }}>Email:</strong> {creator.email}
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+          {lang === "fr" ? "Lien PayPal.me" : "PayPal.me link"}
+        </label>
+        <input
+          type="text"
+          placeholder="paypal.me/yourname"
+          value={creator.paypal_link || ""}
+          onChange={async (e) => {
+            const { supabase } = await import("@/lib/supabase");
+            if (!supabase) return;
+            const val = e.target.value;
+            await supabase.from("creators").update({ paypal_link: val }).eq("id", creator.id);
+            onUpdate({ ...creator, paypal_link: val });
+          }}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
+        />
+        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
+          {lang === "fr" ? "Ex: paypal.me/emmalauren" : "e.g. paypal.me/emmalauren"}
+        </div>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+          {lang === "fr" ? "Lien Revolut.me" : "Revolut.me link"}
+        </label>
+        <input
+          type="text"
+          placeholder="revolut.me/yourname"
+          value={creator.revolut_link || ""}
+          onChange={async (e) => {
+            const { supabase } = await import("@/lib/supabase");
+            if (!supabase) return;
+            await supabase.from("creators").update({ revolut_link: e.target.value }).eq("id", creator.id);
+          }}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
+        />
+        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
+          {lang === "fr" ? "Ex: revolut.me/emmalauren" : "e.g. revolut.me/emmalauren"}
+        </div>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+          {lang === "fr" ? "IBAN" : "IBAN"}
+        </label>
+        <input
+          type="text"
+          placeholder="FR76 3000 6000 0112 3456 7890 189"
+          value={creator.iban || ""}
+          onChange={async (e) => {
+            const { supabase } = await import("@/lib/supabase");
+            if (!supabase) return;
+            await supabase.from("creators").update({ iban: e.target.value }).eq("id", creator.id);
+          }}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
+        />
+        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
+          {lang === "fr" ? "Virement bancaire manuel — l'IBAN sera copié automatiquement" : "Manual bank transfer — IBAN will be auto-copied"}
+        </div>
       </div>
       <Field label="Notes">
         <textarea
@@ -580,6 +643,7 @@ function RunCampaignModal({
   onClose: () => void;
   onLaunch: (campaignId: string, commissionRate: number) => Promise<string | void>;
 }) {
+  const lang = useLang();
   const [step, setStep] = useState(1);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [commissionType, setCommissionType] = useState<"percentage" | "fixed">("percentage");
@@ -593,12 +657,12 @@ function RunCampaignModal({
 
   return (
     <ModalShell onClose={onClose} maxWidth={560}>
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 6px", paddingRight: 40 }}>Run campaign</h2>
-      <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>Assign {creator.displayName} to a campaign</p>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 6px", paddingRight: 40 }}>{lang === "fr" ? "Lancer une campagne" : "Run campaign"}</h2>
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>{lang === "fr" ? `Assigner ${creator.displayName} à une campagne` : `Assign ${creator.displayName} to a campaign`}</p>
 
       {step === 1 && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 1 — Select campaign</p>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>{lang === "fr" ? "ÉTAPE 1 — SÉLECTIONNER UNE CAMPAGNE" : "STEP 1 — SELECT CAMPAIGN"}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
             {MOCK_CAMPAIGNS.map((c) => (
               <button
@@ -620,18 +684,18 @@ function RunCampaignModal({
               </button>
             ))}
             <button type="button" style={{ ...btnSecondary, borderStyle: "dashed" }}>
-              Create new campaign +
+              {lang === "fr" ? "Créer une nouvelle campagne +" : "Create new campaign +"}
             </button>
           </div>
           <button type="button" disabled={!selectedCampaign} style={{ ...btnBlack, width: "100%", opacity: selectedCampaign ? 1 : 0.45 }} onClick={() => setStep(2)}>
-            Continue →
+            {lang === "fr" ? "Continuer →" : "Continue →"}
           </button>
         </>
       )}
 
       {step === 2 && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 2 — Commission</p>
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>{lang === "fr" ? "ÉTAPE 2 — COMMISSION" : "STEP 2 — COMMISSION"}</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
             {(["percentage", "fixed"] as const).map((t) => (
               <button
@@ -645,15 +709,15 @@ function RunCampaignModal({
                   color: commissionType === t ? "#FFF" : "#1A1A1A",
                 }}
               >
-                {t === "percentage" ? "Percentage" : "Fixed amount"}
+                {t === "percentage" ? (lang === "fr" ? "Pourcentage" : "Percentage") : lang === "fr" ? "Montant fixe" : "Fixed amount"}
               </button>
             ))}
           </div>
-          <Field label={commissionType === "percentage" ? "Commission rate (%)" : "Fixed amount ($)"}>
+          <Field label={commissionType === "percentage" ? (lang === "fr" ? "Taux de commission (%)" : "Commission rate (%)") : lang === "fr" ? "Montant fixe (€)" : "Fixed amount ($)"}>
             <input value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
           </Field>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-            <span style={{ fontSize: 14 }}>Auto payout</span>
+            <span style={{ fontSize: 14 }}>{lang === "fr" ? "Paiement automatique" : "Auto payout"}</span>
             <button
               type="button"
               onClick={() => setAutoPayout(!autoPayout)}
@@ -681,11 +745,11 @@ function RunCampaignModal({
               />
             </button>
           </div>
-          <Field label="Minimum payout threshold ($)">
+          <Field label={lang === "fr" ? "Seuil minimum de paiement (€)" : "Minimum payout threshold ($)"}>
             <input value={minPayout} onChange={(e) => setMinPayout(e.target.value)} style={inputStyle} />
           </Field>
           <button type="button" style={{ ...btnBlack, width: "100%" }} onClick={() => setStep(3)}>
-            Continue →
+            {lang === "fr" ? "Continuer →" : "Continue →"}
           </button>
         </>
       )}
@@ -748,7 +812,7 @@ function RunCampaignModal({
   );
 }
 
-export function CreatorsView() {
+export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
   const lang = useLang();
   const [creators, setCreators] = useState<ManagedCreator[]>(INITIAL_CREATORS);
   const [tab, setTab] = useState<CreatorsTab>("all");
@@ -812,26 +876,6 @@ export function CreatorsView() {
     setDetailCreator(null);
   };
 
-  const btnActionPrimary: React.CSSProperties = {
-    ...btnBlack,
-    fontSize: 13,
-    fontWeight: 600,
-    padding: "10px 16px",
-    borderRadius: 999,
-    whiteSpace: "nowrap",
-    lineHeight: 1.2,
-  };
-
-  const btnActionSecondary: React.CSSProperties = {
-    ...btnSecondary,
-    fontSize: 13,
-    fontWeight: 600,
-    padding: "10px 16px",
-    borderRadius: 999,
-    whiteSpace: "nowrap",
-    lineHeight: 1.2,
-  };
-
   const iconBtnAction: React.CSSProperties = {
     background: "#FFFFFF",
     border: "1px solid #E5E5E5",
@@ -848,25 +892,25 @@ export function CreatorsView() {
 
   return (
     <>
-      <div style={{ padding: "32px 40px 24px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Créateurs" : "Creators"}</h1>
             <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>{lang === "fr" ? "Gérez vos relations avec les créateurs." : "Manage your creator relationships."}</p>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" style={btnSecondary} onClick={() => setImportOpen(true)}>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <button type="button" className="hero-cta-shopify-light" style={{ padding: "10px 16px", fontSize: 13 }} onClick={() => setImportOpen(true)}>
               {lang === "fr" ? "Importer un CSV" : "Import CSV"}
             </button>
-            <button type="button" style={btnBlack} onClick={() => setAddOpen(true)}>
+            <button type="button" className="hero-cta-shopify" style={{ padding: "10px 16px", fontSize: 13 }} onClick={() => setAddOpen(true)}>
               {lang === "fr" ? "+ Ajouter un créateur" : "+ Add Creator"}
             </button>
           </div>
         </div>
       </div>
 
-      <div style={{ padding: "24px 40px 40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 12 : 16, marginBottom: 24 }}>
           {[
             { label: lang === "fr" ? "Total créateurs" : "Total Creators", value: String(creators.length) },
             { label: lang === "fr" ? "Partenaires actifs" : "Active Partners", value: String(activeCount) },
@@ -932,7 +976,7 @@ export function CreatorsView() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, handle, niche..."
+              placeholder={lang === "fr" ? "Rechercher par nom, pseudo, niche..." : "Search by name, handle, niche..."}
               style={{ border: "none", outline: "none", flex: 1, fontSize: 13, fontFamily: "inherit" }}
             />
           </div>
@@ -950,98 +994,145 @@ export function CreatorsView() {
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "2fr 0.9fr 0.8fr 0.7fr 0.8fr 0.8fr 0.9fr 3fr",
-              gap: 12,
-              padding: "14px 20px",
-              background: "#FAFAFA",
-              borderBottom: "1px solid #EFEFEF",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#9A9A9A",
-            }}
-          >
-            {[
-              lang === "fr" ? "Créateur" : "Creator",
-              lang === "fr" ? "Plateforme" : "Platform",
-              lang === "fr" ? "Abonnés" : "Followers",
-              lang === "fr" ? "Engagement" : "Engagement",
-              lang === "fr" ? "Niche" : "Niche",
-              lang === "fr" ? "Statut" : "Status",
-              lang === "fr" ? "Ajouté" : "Added",
-              lang === "fr" ? "Actions" : "Actions",
-            ].map((h) => (
-              <div key={h}>{h}</div>
-            ))}
-          </div>
-          {filtered.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+          {isMobile ? (
+            filtered.length === 0 ? (
+              <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
+                {filtered.map((creator) => (
+                  <div key={creator.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                      <img
+                        src={avatarUrlFor(creator.username, creator.avatarUrl)}
+                        alt=""
+                        style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                      />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{creator.displayName}</div>
+                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username}</div>
+                        <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>{creator.platform}</div>
+                      </div>
+                      <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+                        <span style={statusBadgeStyle(creator.status)}>{statusLabel(creator.status, lang)}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+                      <div style={{ textAlign: "center", background: "#F8F8F8", borderRadius: 8, padding: "8px 4px" }}>
+                        <div style={{ fontSize: 11, color: "#9A9A9A" }}>{lang === "fr" ? "Abonnés" : "Followers"}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{formatCount(creator.followers)}</div>
+                      </div>
+                      <div style={{ textAlign: "center", background: "#F8F8F8", borderRadius: 8, padding: "8px 4px" }}>
+                        <div style={{ fontSize: 11, color: "#9A9A9A" }}>{lang === "fr" ? "Engagement" : "Engagement"}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{creator.engagement}%</div>
+                      </div>
+                      <div style={{ textAlign: "center", background: "#F8F8F8", borderRadius: 8, padding: "8px 4px" }}>
+                        <div style={{ fontSize: 11, color: "#9A9A9A" }}>Niche</div>
+                        <div style={{ fontWeight: 600, fontSize: 12 }}>{creator.niche || "—"}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => setDetailCreator(creator)}
+                        style={{ flex: 1, padding: "8px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#1A1A1A" }}
+                      >
+                        {lang === "fr" ? "Voir" : "View"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOutreachCreator(creator)}
+                        style={{ flex: 1, padding: "8px", background: "#0047FF", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        {lang === "fr" ? "Message" : "Outreach"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
-            filtered.map((c, i) => (
+            <>
               <div
-                key={c.id}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "2fr 0.9fr 0.8fr 0.7fr 0.8fr 0.8fr 0.9fr 3fr",
                   gap: 12,
-                  padding: "18px 20px",
-                  alignItems: "center",
-                  borderBottom: i < filtered.length - 1 ? "1px solid #F5F5F5" : "none",
+                  padding: "14px 20px",
+                  background: "#FAFAFA",
+                  borderBottom: "1px solid #EFEFEF",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#9A9A9A",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <img src={avatarUrlFor(c.username, c.avatarUrl)} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.displayName}</div>
-                    <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 13, textTransform: "capitalize" }}>{c.platform}</div>
-                <div style={{ fontSize: 13 }}>{formatCount(c.followers)}</div>
-                <div style={{ fontSize: 13 }}>{c.engagement}%</div>
-                <div style={{ fontSize: 13 }}>{c.niche}</div>
-                <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
-                <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "flex-start" }}>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                    <button type="button" style={btnActionPrimary} onClick={() => setCampaignCreator(c)}>
-                      {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
-                    </button>
-                    <button type="button" style={btnActionSecondary} onClick={() => setOutreachCreator(c)}>
-                      {lang === "fr" ? "Générer un message" : "Generate outreach"}
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <button type="button" title="View profile" style={iconBtnAction} onClick={() => setDetailCreator(c)}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="3" stroke="#7A7A7A" strokeWidth="1.7" />
-                        <path d="M12 5c-3.5 0-6 2.2-6 5s2.5 5 6 5 6-2.2 6-5-2.5-5-6-5z" stroke="#7A7A7A" strokeWidth="1.7" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      title="Remove"
-                      style={iconBtnAction}
-                      onClick={() => removeCreator(c.id)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#FECACA";
-                        e.currentTarget.style.background = "#FEF2F2";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "#E5E5E5";
-                        e.currentTarget.style.background = "#FFFFFF";
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1-2h10l1 2M9 7V5h6v2" stroke="#DC2626" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
+                {[
+                  lang === "fr" ? "Créateur" : "Creator",
+                  lang === "fr" ? "Plateforme" : "Platform",
+                  lang === "fr" ? "Abonnés" : "Followers",
+                  lang === "fr" ? "Engagement" : "Engagement",
+                  lang === "fr" ? "Niche" : "Niche",
+                  lang === "fr" ? "Statut" : "Status",
+                  lang === "fr" ? "Ajouté" : "Added",
+                  lang === "fr" ? "Actions" : "Actions",
+                ].map((h) => (
+                  <div key={h}>{h}</div>
+                ))}
               </div>
-            ))
+              {filtered.length === 0 ? (
+                <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+              ) : (
+                filtered.map((c, i) => (
+                  <div
+                    key={c.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "2fr 0.9fr 0.8fr 0.7fr 0.8fr 0.8fr 0.9fr 3fr",
+                      gap: 12,
+                      padding: "18px 20px",
+                      alignItems: "center",
+                      borderBottom: i < filtered.length - 1 ? "1px solid #F5F5F5" : "none",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <img src={avatarUrlFor(c.username, c.avatarUrl)} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.displayName}</div>
+                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, textTransform: "capitalize" }}>{c.platform}</div>
+                    <div style={{ fontSize: 13 }}>{formatCount(c.followers)}</div>
+                    <div style={{ fontSize: 13 }}>{c.engagement}%</div>
+                    <div style={{ fontSize: 13 }}>{c.niche}</div>
+                    <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
+                    <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setCampaignCreator(c)}>
+                          {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
+                        </button>
+                        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setOutreachCreator(c)}>
+                          {lang === "fr" ? "Générer un message" : "Generate outreach"}
+                        </button>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setDetailCreator(c)}>
+                          {lang === "fr" ? "Voir le profil" : "View profile"}
+                        </button>
+                        <button
+                          type="button"
+                          className="hero-cta-shopify-light hero-cta-compact"
+                          style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2" }}
+                          onClick={() => removeCreator(c.id)}
+                        >
+                          {lang === "fr" ? "Supprimer" : "Remove"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </>
           )}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { saveCampaign, getCampaigns } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
@@ -61,9 +62,11 @@ function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
 export function CampaignsView({
   plan,
   onUpgrade,
+  isMobile,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
+  isMobile?: boolean;
 }) {
   const lang = useLang();
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -114,13 +117,13 @@ export function CampaignsView({
   const selected = campaigns.find((c) => c.id === detailId) ?? null;
 
   if (selected) {
-    return <CampaignDetail lang={lang} campaign={selected} onBack={() => setDetailId(null)} onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))} />;
+    return <CampaignDetail isMobile={isMobile} lang={lang} campaign={selected} onBack={() => setDetailId(null)} onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))} />;
   }
 
   if (campaigns.length === 0) {
     return (
       <>
-        <CampaignsHeader lang={lang} onNew={tryOpenNewCampaign} showFilters={false} />
+        <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucune campagne pour l'instant." : "No campaigns yet."}</h2>
@@ -139,8 +142,8 @@ export function CampaignsView({
 
   return (
     <>
-      <CampaignsHeader lang={lang} onNew={tryOpenNewCampaign} showFilters />
-      <CampaignsList lang={lang} campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
+      <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters />
+      <CampaignsList isMobile={isMobile} lang={lang} campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
       {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
       {upgradeModalOpen && (
         <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
@@ -150,6 +153,7 @@ export function CampaignsView({
 }
 
 function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onUpgrade: () => void }) {
+  const lang = useLang();
   return (
     <div
       style={{
@@ -182,7 +186,7 @@ function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onU
           Free plan includes 1 campaign. Upgrade to Basic for unlimited campaigns.
         </p>
         <button type="button" onClick={() => void onUpgrade()} style={{ ...btnPrimary, width: "100%" }}>
-          Upgrade to Basic $49/mo →
+          {lang === "fr" ? `Passer à Basic ${formatCurrency(49, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(49, lang)}/mo →`}
         </button>
         <button
           type="button"
@@ -196,21 +200,22 @@ function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onU
   );
 }
 
-function CampaignsHeader({ lang, onNew, showFilters }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean }) {
+function CampaignsHeader({ lang, onNew, showFilters, isMobile }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean; isMobile?: boolean }) {
   return (
-    <div style={{ padding: "32px 40px 20px", borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
-        <button type="button" style={btnPrimary} onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
+        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
       </div>
     </div>
   );
 }
 
-function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, onView, onDelete }: {
+function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, onView, onDelete, isMobile }: {
   lang: "en" | "fr";
   campaigns: Campaign[]; filter: CampaignFilter; setFilter: (f: CampaignFilter) => void;
   search: string; setSearch: (s: string) => void; onView: (id: string) => void; onDelete: (id: string) => void;
+  isMobile?: boolean;
 }) {
   const filtered = useMemo(() => {
     let list = campaigns ?? [];
@@ -228,7 +233,7 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
   const totalCommission = campaigns.reduce((s, c) => s + (c.commission ?? 0), 0);
 
   return (
-    <div style={{ padding: "24px 40px 40px" }}>
+    <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
         <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
         <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
@@ -237,16 +242,16 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
         <Kpi title={lang === "fr" ? "Campagnes actives" : "Active Campaigns"} value={String(active)} sub={lang === "fr" ? "2 se terminent ce mois" : "2 ending this month"} />
         <Kpi title={lang === "fr" ? "Créateurs total" : "Total Creators"} value={String(totalCreators)} sub={lang === "fr" ? "sur toutes les campagnes" : "across all campaigns"} />
-        <Kpi title={lang === "fr" ? "Ventes totales générées" : "Total Sales Driven"} value={`$${totalSales.toLocaleString()}`} sub={lang === "fr" ? "vs mois dernier +18% ↑" : "vs last month +18% ↑"} subColor="#2E7D32" />
-        <Kpi title={lang === "fr" ? "Commissions dues" : "Total Commissions Owed"} value={`$${totalCommission.toLocaleString()}`} sub={lang === "fr" ? "12 paiements en attente" : "12 pending payouts"} />
+        <Kpi title={lang === "fr" ? "Ventes totales générées" : "Total Sales Driven"} value={formatCurrency(totalSales, lang)} sub={lang === "fr" ? "vs mois dernier +18% ↑" : "vs last month +18% ↑"} subColor="#2E7D32" />
+        <Kpi title={lang === "fr" ? "Commissions dues" : "Total Commissions Owed"} value={formatCurrency(totalCommission, lang)} sub={lang === "fr" ? "12 paiements en attente" : "12 pending payouts"} />
       </div>
 
       <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 700 : undefined }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left", background: "#FAFAFA" }}>
                 {[
@@ -270,8 +275,8 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
                   <td style={{ padding: "14px", fontWeight: 500, color: "#1A1A1A" }}>{c.name}</td>
                   <td style={{ padding: "14px" }}>{(c.creators ?? 0)} {lang === "fr" ? "créateurs" : "creators"}</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.platform}</td>
-                  <td style={{ padding: "14px" }}>${(c.sales ?? 0).toLocaleString()}</td>
-                  <td style={{ padding: "14px" }}>${(c.commission ?? 0).toLocaleString()}</td>
+                  <td style={{ padding: "14px" }}>{formatCurrency(c.sales ?? 0, lang)}</td>
+                  <td style={{ padding: "14px" }}>{formatCurrency(c.commission ?? 0, lang)}</td>
                   <td style={{ padding: "14px" }}><CampaignBadge lang={lang} status={c.status} /></td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.start}</td>
                   <td style={{ padding: "14px", color: "#7A7A7A" }}>{c.end}</td>
@@ -426,21 +431,20 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-const DETAIL_TABS: { id: DetailTab; label: string }[] = [
-  { id: "creators", label: "Creators" },
-  { id: "outreach", label: "Outreach" },
-  { id: "sales", label: "Sales" },
-  { id: "payouts", label: "Payouts" },
-  { id: "settings", label: "Settings" },
-];
-
-function CampaignDetail({ lang, campaign, onBack, onUpdate }: { lang: "en" | "fr"; campaign: Campaign; onBack: () => void; onUpdate: (c: Campaign) => void }) {
+function CampaignDetail({ lang, campaign, onBack, onUpdate, isMobile }: { lang: "en" | "fr"; campaign: Campaign; onBack: () => void; onUpdate: (c: Campaign) => void; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>("creators");
+  const detailTabs: { id: DetailTab; label: string }[] = [
+    { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
+    { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach" },
+    { id: "sales", label: lang === "fr" ? "Ventes" : "Sales" },
+    { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts" },
+    { id: "settings", label: lang === "fr" ? "Paramètres" : "Settings" },
+  ];
 
   return (
   <>
-    <div style={{ padding: "32px 40px 0", borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
-      <button type="button" onClick={onBack} style={{ ...btnSecondary, marginBottom: 16, padding: "8px 12px", fontSize: 12 }}>← Back to campaigns</button>
+    <div style={{ padding: isMobile ? "16px" : "32px 40px 0", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
+      <button type="button" onClick={onBack} style={{ ...btnSecondary, marginBottom: 16, padding: "8px 12px", fontSize: 12 }}>{lang === "fr" ? "← Retour aux campagnes" : "← Back to campaigns"}</button>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.04em" }}>{campaign.name}</h1>
@@ -453,11 +457,11 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate }: { lang: "en" | "fr
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {campaign.status === "Active" && <BtnSm onClick={() => onUpdate({ ...campaign, status: "Paused" })}>Pause</BtnSm>}
           {campaign.status === "Paused" && <BtnSm onClick={() => onUpdate({ ...campaign, status: "Active" })}>Resume</BtnSm>}
-          <BtnSm>Edit</BtnSm>
+          <BtnSm>{lang === "fr" ? "Modifier" : "Edit"}</BtnSm>
         </div>
       </div>
       <div style={{ display: "flex", gap: 28, overflowX: "auto", marginTop: 20 }}>
-        {DETAIL_TABS.map((t) => (
+        {detailTabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -482,18 +486,18 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate }: { lang: "en" | "fr
         ))}
       </div>
     </div>
-    <div style={{ padding: "24px 40px 40px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <Kpi title="Creators" value={String(campaign.creators ?? 0)} sub="in this campaign" />
-        <Kpi title="Sales" value={`$${(campaign.sales ?? 0).toLocaleString()}`} sub="attributed revenue" />
-        <Kpi title="Commission" value={`$${(campaign.commission ?? 0).toLocaleString()}`} sub="owed to creators" />
-        <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? `$${Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)).toLocaleString()}` : "$0"} sub="sales driven" />
+    <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? undefined : undefined }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        <Kpi title={lang === "fr" ? "Créateurs" : "Creators"} value={String(campaign.creators ?? 0)} sub={lang === "fr" ? "dans cette campagne" : "in this campaign"} />
+        <Kpi title={lang === "fr" ? "Ventes" : "Sales"} value={formatCurrency(campaign.sales ?? 0, lang)} sub={lang === "fr" ? "revenus attribués" : "attributed revenue"} />
+        <Kpi title={lang === "fr" ? "Commission" : "Commission"} value={formatCurrency(campaign.commission ?? 0, lang)} sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"} />
+        <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? formatCurrency(Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)), lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "ventes générées" : "sales driven"} />
       </div>
-      {tab === "creators" && <CreatorsTab />}
-      {tab === "outreach" && <OutreachTab />}
-      {tab === "sales" && <SalesTab />}
-      {tab === "payouts" && <PayoutsTab />}
-      {tab === "settings" && <SettingsTab campaign={campaign} onUpdate={onUpdate} />}
+      {tab === "creators" && <CreatorsTab lang={lang} />}
+      {tab === "outreach" && <OutreachTab lang={lang} />}
+      {tab === "sales" && <SalesTab lang={lang} />}
+      {tab === "payouts" && <PayoutsTab lang={lang} />}
+      {tab === "settings" && <SettingsTab lang={lang} campaign={campaign} onUpdate={onUpdate} />}
     </div>
   </>
   );
@@ -506,28 +510,28 @@ const MOCK_CREATORS = [
   { id: "c4", name: "Alex Rivera", handle: "@alexr", platform: "TikTok", sales: 900, commission: 72, status: "Inactive" },
 ];
 
-function CreatorsTab() {
+function CreatorsTab({ lang }: { lang: "en" | "fr" }) {
   return (
-    <Card title="Campaign creators">
-      <Table headers={["Creator", "Handle", "Platform", "Sales", "Commission", "Status", "Action"]}>
+    <Card title={lang === "fr" ? "Créateurs de la campagne" : "Campaign creators"}>
+      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Pseudo" : "Handle", lang === "fr" ? "Plateforme" : "Platform", "Sales", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Action" : "Action"]}>
         {MOCK_CREATORS.map((cr) => (
           <tr key={cr.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px", fontWeight: 500, color: "#1A1A1A" }}>{cr.name}</td>
             <td style={{ padding: "14px", color: "#7A7A7A" }}>{cr.handle}</td>
             <td style={{ padding: "14px" }}>{cr.platform}</td>
-            <td style={{ padding: "14px" }}>${cr.sales.toLocaleString()}</td>
-            <td style={{ padding: "14px" }}>${cr.commission.toLocaleString()}</td>
+            <td style={{ padding: "14px" }}>{formatCurrency(cr.sales, lang)}</td>
+            <td style={{ padding: "14px" }}>{formatCurrency(cr.commission, lang)}</td>
             <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: cr.status === "Active" ? "#E8F5E9" : "#F5F5F5", color: cr.status === "Active" ? "#2E7D32" : "#9A9A9A" }}>{cr.status}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: cr.status === "Active" ? "#E8F5E9" : "#F5F5F5", color: cr.status === "Active" ? "#2E7D32" : "#9A9A9A" }}>{cr.status === "Active" ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Inactif" : "Inactive"}</span>
             </td>
             <td style={{ padding: "14px" }}>
-              <BtnSm>View</BtnSm>
+              <BtnSm>{lang === "fr" ? "Voir" : "View"}</BtnSm>
             </td>
           </tr>
         ))}
       </Table>
       <div style={{ marginTop: 16 }}>
-        <BtnSm>+ Add creator</BtnSm>
+        <BtnSm>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
       </div>
     </Card>
   );
@@ -539,20 +543,27 @@ const MOCK_OUTREACH = [
   { id: "o3", creator: "Drew Morgan", platform: "YouTube", status: "Converted", sent: "May 5, 2026", preview: "Partnership opportunity for your audience" },
 ];
 
-function OutreachTab() {
+function outreachStatusLabel(status: string, lang: "en" | "fr") {
+  if (status === "Sent") return lang === "fr" ? "Envoyé" : "Sent";
+  if (status === "Replied") return lang === "fr" ? "Répondu" : "Replied";
+  if (status === "Converted") return lang === "fr" ? "Converti" : "Converted";
+  return status;
+}
+
+function OutreachTab({ lang }: { lang: "en" | "fr" }) {
   return (
-    <Card title="Outreach messages">
-      <Table headers={["Creator", "Platform", "Status", "Sent", "Preview", "Action"]}>
+    <Card title={lang === "fr" ? "Messages envoyés" : "Outreach messages"}>
+      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Plateforme" : "Platform", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Envoyé" : "Sent", lang === "fr" ? "Aperçu" : "Preview", lang === "fr" ? "Action" : "Action"]}>
         {MOCK_OUTREACH.map((row) => (
           <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px", fontWeight: 500 }}>{row.creator}</td>
             <td style={{ padding: "14px" }}>{row.platform}</td>
             <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Converted" ? "#E8F5E9" : row.status === "Replied" ? "#E3F2FD" : "#F5F5F5", color: row.status === "Converted" ? "#2E7D32" : row.status === "Replied" ? "#1565C0" : "#9A9A9A" }}>{row.status}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Converted" ? "#E8F5E9" : row.status === "Replied" ? "#E3F2FD" : "#F5F5F5", color: row.status === "Converted" ? "#2E7D32" : row.status === "Replied" ? "#1565C0" : "#9A9A9A" }}>{outreachStatusLabel(row.status, lang)}</span>
             </td>
             <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.sent}</td>
             <td style={{ padding: "14px", color: "#7A7A7A", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.preview}</td>
-            <td style={{ padding: "14px" }}><BtnSm>View</BtnSm></td>
+            <td style={{ padding: "14px" }}><BtnSm>{lang === "fr" ? "Voir" : "View"}</BtnSm></td>
           </tr>
         ))}
       </Table>
@@ -567,17 +578,17 @@ const MOCK_SALES: { orderId: string; creator: string; product: string; amount: n
   { orderId: "#1024", creator: "Sam Taylor", product: "Protein Powder — Chocolate", amount: 89.99, commission: 7.2, date: "May 9, 2026" },
 ];
 
-function SalesTab() {
+function SalesTab({ lang }: { lang: "en" | "fr" }) {
   return (
-    <Card title="Attributed sales">
-      <Table headers={["Order ID", "Creator", "Product", "Amount", "Commission", "Date"]}>
+    <Card title={lang === "fr" ? "Ventes attribuées" : "Attributed sales"}>
+      <Table headers={[lang === "fr" ? "N° commande" : "Order ID", lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Produit" : "Product", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Date" : "Date"]}>
         {MOCK_SALES.map((row) => (
           <tr key={row.orderId} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px", fontWeight: 500, color: "#0047FF" }}>{row.orderId}</td>
             <td style={{ padding: "14px" }}>{row.creator}</td>
             <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.product}</td>
-            <td style={{ padding: "14px" }}>${row.amount.toFixed(2)}</td>
-            <td style={{ padding: "14px" }}>${row.commission.toFixed(2)}</td>
+            <td style={{ padding: "14px" }}>{formatCurrency(row.amount, lang)}</td>
+            <td style={{ padding: "14px" }}>{formatCurrency(row.commission, lang)}</td>
             <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.date}</td>
           </tr>
         ))}
@@ -592,20 +603,20 @@ const MOCK_PAYOUTS = [
   { id: "p3", creator: "Sam Taylor", amount: 144, status: "Pending", due: "May 15, 2026" },
 ];
 
-function PayoutsTab() {
+function PayoutsTab({ lang }: { lang: "en" | "fr" }) {
   return (
-    <Card title="Creator payouts">
-      <Table headers={["Creator", "Amount", "Status", "Due Date", "Action"]}>
+    <Card title={lang === "fr" ? "Paiements créateurs" : "Creator payouts"}>
+      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Date d'échéance" : "Due Date", lang === "fr" ? "Action" : "Action"]}>
         {MOCK_PAYOUTS.map((row) => (
           <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px", fontWeight: 500 }}>{row.creator}</td>
-            <td style={{ padding: "14px" }}>${row.amount.toLocaleString()}</td>
+            <td style={{ padding: "14px" }}>{formatCurrency(row.amount, lang)}</td>
             <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Paid" ? "#E8F5E9" : "#FFF8E1", color: row.status === "Paid" ? "#2E7D32" : "#F57F17" }}>{row.status}</span>
+              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Paid" ? "#E8F5E9" : "#FFF8E1", color: row.status === "Paid" ? "#2E7D32" : "#F57F17" }}>{row.status === "Paid" ? (lang === "fr" ? "Payé" : "Paid") : lang === "fr" ? "En attente" : "Pending"}</span>
             </td>
             <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.due}</td>
             <td style={{ padding: "14px" }}>
-              {row.status === "Pending" ? <BtnSm>Pay now</BtnSm> : <BtnSm>Receipt</BtnSm>}
+              {row.status === "Pending" ? <BtnSm>{lang === "fr" ? "Payer maintenant" : "Pay now"}</BtnSm> : <BtnSm>{lang === "fr" ? "Reçu" : "Receipt"}</BtnSm>}
             </td>
           </tr>
         ))}
@@ -614,20 +625,20 @@ function PayoutsTab() {
   );
 }
 
-function SettingsTab({ campaign, onUpdate }: { campaign: Campaign; onUpdate: (c: Campaign) => void }) {
+function SettingsTab({ lang, campaign, onUpdate }: { lang: "en" | "fr"; campaign: Campaign; onUpdate: (c: Campaign) => void }) {
   const [autoPayout, setAutoPayout] = useState(true);
   const [trackClicks, setTrackClicks] = useState(true);
 
   return (
     <>
-      <Card title="Campaign details">
-        <Field label="Campaign name">
+      <Card title={lang === "fr" ? "Détails de la campagne" : "Campaign details"}>
+        <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
           <input type="text" defaultValue={campaign.name} style={inputStyle} onBlur={(e) => onUpdate({ ...campaign, name: e.target.value })} />
         </Field>
         <Field label="Platform">
           <input type="text" defaultValue={campaign.platform} style={inputStyle} onBlur={(e) => onUpdate({ ...campaign, platform: e.target.value })} />
         </Field>
-        <Field label="Description">
+        <Field label={lang === "fr" ? "Description" : "Description"}>
           <textarea defaultValue={campaign.description ?? ""} rows={3} style={{ ...inputStyle, resize: "vertical" }} onBlur={(e) => onUpdate({ ...campaign, description: e.target.value })} />
         </Field>
       </Card>
@@ -764,7 +775,7 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
               <Field label={commissionType === "percent" ? (lang === "fr" ? "Taux de commission (%)" : "Commission rate (%)") : "Flat amount ($)"}>
                 <input type="text" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
               </Field>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>Creators earn {commissionType === "percent" ? `${commissionRate}%` : `$${commissionRate}`} on each attributed sale.</p>
+              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>Creators earn {commissionType === "percent" ? `${commissionRate}%` : formatCurrency(Number(commissionRate) || 0, lang)} on each attributed sale.</p>
             </>
           )}
 
@@ -798,7 +809,7 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
                 <div style={{ marginBottom: 8 }}><strong>Name:</strong> {name || "Untitled Campaign"}</div>
                 <div style={{ marginBottom: 8 }}><strong>Platform:</strong> {platform}</div>
                 <div style={{ marginBottom: 8 }}><strong>Dates:</strong> {start || "—"} – {end || "—"}</div>
-                <div style={{ marginBottom: 8 }}><strong>Commission:</strong> {commissionType === "percent" ? `${commissionRate}%` : `$${commissionRate} flat`}</div>
+                <div style={{ marginBottom: 8 }}><strong>Commission:</strong> {commissionType === "percent" ? `${commissionRate}%` : `${formatCurrency(Number(commissionRate) || 0, lang)} flat`}</div>
                 <div><strong>Creators:</strong> {creators.length ? creators.join(", ") : "None yet"}</div>
               </div>
             </div>

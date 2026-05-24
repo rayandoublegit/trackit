@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: Request) {
-  const { creator, brand, tone, platform } = await request.json();
+  const { creator, brand, tone, platform, lang } = await request.json();
 
   const toneMap: Record<string, string> = {
     casual: "casual and friendly, like a real person not a marketer",
@@ -42,6 +42,7 @@ Write a short personalized outreach message (max 150 words).
 - Do NOT use generic phrases like "I love your content"
 - Sound like a real founder, not a marketing team
 - No hashtags, no emojis unless tone is casual
+- Write the message in ${lang === "fr" ? "French" : "English"}.
 
 Output only the message text, nothing else.`
       }

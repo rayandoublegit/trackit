@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 
-export function FeedbackView() {
+export function FeedbackView({ isMobile }: { isMobile?: boolean }) {
+  const lang = useLang();
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [message, setMessage] = useState("");
@@ -58,13 +60,13 @@ export function FeedbackView() {
     setSaving(false);
   };
 
-  if (loading) return <div style={{ padding: 40, color: "#7A7A7A", fontSize: 14 }}>Loading...</div>;
+  if (loading) return <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, color: "#7A7A7A", fontSize: 14 }}>Loading...</div>;
 
   if (existing && !editing) {
     return (
-      <div style={{ padding: 40, maxWidth: 520 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px" }}>Your review</h1>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 32px" }}>Thanks for your feedback.</p>
+      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, maxWidth: 520 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px" }}>{lang === "fr" ? "Votre avis" : "Your review"}</h1>
+        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 32px" }}>{lang === "fr" ? "Merci pour votre avis." : "Thanks for your feedback."}</p>
         <div style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 16, padding: 28, display: "flex", flexDirection: "column", gap: 20 }}>
           <div style={{ display: "flex", gap: 4 }}>
             {[1,2,3,4,5].map(s => (
@@ -79,7 +81,7 @@ export function FeedbackView() {
             onClick={() => { setEditing(true); setSubmitted(false); }}
             style={{ background: "none", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", color: "#1A1A1A", letterSpacing: "-0.02em", alignSelf: "flex-start" }}
           >
-            Change my review →
+            {lang === "fr" ? "Modifier mon avis →" : "Change my review →"}
           </button>
         </div>
       </div>
@@ -88,25 +90,25 @@ export function FeedbackView() {
 
   if (submitted) {
     return (
-      <div style={{ padding: 40, maxWidth: 520 }}>
+      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, maxWidth: 520 }}>
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: "0 0 8px" }}>Thank you.</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>Your feedback helps us build a better product.</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: "0 0 8px" }}>{lang === "fr" ? "Merci pour votre avis !" : "Thank you for your feedback!"}</h2>
+          <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Votre avis a été soumis." : "Your review has been submitted."}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 40, maxWidth: 520 }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, maxWidth: 520 }}>
       <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px" }}>
-        {editing ? "Update your review" : "Leave a review"}
+        {editing ? "Update your review" : lang === "fr" ? "Laisser un avis" : "Leave a review"}
       </h1>
-      <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 32px" }}>How is Trackit working for you?</p>
+      <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 32px" }}>{lang === "fr" ? "Comment Trackit fonctionne-t-il pour vous ?" : "How is Trackit working for you?"}</p>
       <div style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 16, padding: 28, display: "flex", flexDirection: "column", gap: 24 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>Your rating</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>{lang === "fr" ? "Votre note" : "Your rating"}</div>
           <div style={{ display: "flex", gap: 8 }}>
             {[1,2,3,4,5].map((star) => (
               <button
@@ -121,11 +123,11 @@ export function FeedbackView() {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Tell us more (optional)</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "Dites-nous en plus (optionnel)" : "Tell us more (optional)"}</div>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="What's working? What could be better?"
+            placeholder={lang === "fr" ? "Dites-nous en plus (optionnel)" : "Tell us more (optional)"}
             rows={4}
             style={{ width: "100%", padding: "12px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", color: "#1A1A1A" }}
           />
@@ -144,7 +146,7 @@ export function FeedbackView() {
             disabled={!rating || saving}
             style={{ background: rating ? "#0047FF" : "#E5E5E5", color: rating ? "#fff" : "#9A9A9A", border: "none", borderRadius: 10, padding: "12px 20px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: rating ? "pointer" : "not-allowed", letterSpacing: "-0.02em" }}
           >
-            {saving ? "Saving..." : "Submit review →"}
+            {saving ? "Saving..." : lang === "fr" ? "Soumettre l'avis →" : "Submit review →"}
           </button>
         </div>
       </div>

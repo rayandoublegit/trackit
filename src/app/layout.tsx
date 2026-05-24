@@ -12,9 +12,29 @@ export const viewport = {
   initialScale: 1,
 };
 
+const PRELOAD_FONTS = [
+  "/fonts/InterDisplay-SemiBold.ttf",
+  "/fonts/InterDisplay-Medium.ttf",
+  "/fonts/InterDisplay-Regular.ttf",
+  "/fonts/InterDisplay-Bold.ttf",
+  "/fonts/InterDisplay-MediumItalic.ttf",
+  "/fonts/InterDisplay-BoldItalic.ttf",
+  "/fonts/InstrumentSans-Regular.ttf",
+  "/fonts/InstrumentSans-Medium.ttf",
+  "/fonts/InstrumentSans-SemiBold.ttf",
+  "/fonts/InstrumentSans-Bold.ttf",
+  "/fonts/InstrumentSans-Italic.ttf",
+  "/fonts/InstrumentSans-BoldItalic.ttf",
+] as const;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {PRELOAD_FONTS.map((href) => (
+          <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
+        ))}
+      </head>
       <body>{children}</body>
     </html>
   );

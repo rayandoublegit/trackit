@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: Request) {
-  const { creator, originalMessage, brand, daysSince, tone } = await request.json();
+  const { creator, originalMessage, brand, daysSince, tone, lang } = await request.json();
 
   const message = await getAnthropic().messages.create({
     model: "claude-sonnet-4-20250514",
@@ -29,6 +29,7 @@ Write a short follow up (max 80 words).
 - Add a small new hook or value proposition
 - Keep it even shorter than the original
 - Sound human, not automated
+- Write the message in ${lang === "fr" ? "French" : "English"}.
 
 Output only the follow up message text, nothing else.`
       }

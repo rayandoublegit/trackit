@@ -5,16 +5,26 @@ export type Lang = "en" | "fr";
 
 export function useLang(): Lang {
   const [lang, setLang] = useState<Lang>("en");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("trackit_lang") as Lang | null;
-    if (stored === "en" || stored === "fr") {
-      setLang(stored);
-      return;
-    }
-    const browser = navigator.language.toLowerCase();
-    setLang(browser.startsWith("fr") ? "fr" : "en");
+    const get = (): Lang => {
+      const stored = localStorage.getItem("trackit_lang") as Lang | null;
+      if (stored === "en" || stored === "fr") return stored;
+      const browser = navigator.language.toLowerCase();
+      const detected = browser.startsWith("fr") ? "fr" : "en";
+      localStorage.setItem("trackit_lang", detected);
+      return detected;
+    };
+    setLang(get());
+    setMounted(true);
+
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "trackit_lang") setLang(get());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  return lang;
+  return mounted ? lang : "en";
 }

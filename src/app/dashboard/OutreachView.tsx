@@ -210,6 +210,7 @@ function FollowUpPanel({
           brand: "Trackit",
           daysSince: 3,
           tone: tone.toLowerCase(),
+          lang,
         }),
       });
       const data = await res.json();
@@ -506,12 +507,14 @@ function OutreachAIGeneratePanel({
   onNavigateToBilling,
   onMarkSent,
   onToast,
+  isMobile,
 }: {
   lang: "en" | "fr";
   plan: PlanTier;
   onNavigateToBilling: () => void;
   onMarkSent: (entry: OutreachHistoryEntry) => void | Promise<void>;
   onToast: (msg: string) => void;
+  isMobile?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [creatorSearch, setCreatorSearch] = useState("");
@@ -570,6 +573,7 @@ function OutreachAIGeneratePanel({
           brand: brand.trim(),
           tone: tone.toLowerCase(),
           platform,
+          lang,
         }),
       });
       const data = await res.json();
@@ -594,6 +598,38 @@ function OutreachAIGeneratePanel({
       /* ignore */
     }
   };
+
+  const handleSend = async () => {
+    if (!selectedCreator || !message) return;
+    const generatedMessage = message;
+    const handle = selectedCreator.username.replace(/^@/, "");
+    try {
+      await navigator.clipboard.writeText(generatedMessage);
+    } catch {
+      /* clipboard may be unavailable */
+    }
+    if (platform === "Instagram DM") {
+      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
+    } else if (platform === "TikTok DM") {
+      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
+    } else if (platform === "Email") {
+      window.open(`mailto:${creatorEmail.trim() || handle}?body=${encodeURIComponent(generatedMessage)}`, "_blank");
+    }
+    onToast(lang === "fr" ? "Message copié — collez dans le DM ✓" : "Message copied — paste in the DM ✓");
+  };
+
+  const sendViaLabel =
+    platform === "Instagram DM"
+      ? lang === "fr"
+        ? "Envoyer via Instagram"
+        : "Send via Instagram"
+      : platform === "TikTok DM"
+        ? lang === "fr"
+          ? "Envoyer via TikTok"
+          : "Send via TikTok"
+        : lang === "fr"
+          ? "Envoyer via Email"
+          : "Send via Email";
 
   const handleMarkSentClick = async () => {
     if (!selectedCreator || !message) return;
@@ -627,20 +663,37 @@ function OutreachAIGeneratePanel({
         }}
       >
         {!expanded ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
-                {lang === "fr" ? "Générer un message avec Trackit IA" : "Generate outreach with Trackit AI"}
+          isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0, alignSelf: "flex-start" }} />
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+                  {lang === "fr" ? "Générer un message avec Trackit IA" : "Generate outreach with Trackit AI"}
+                </div>
+                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+                  {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un message personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized message, you edit and send"}
+                </div>
               </div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un message personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized message, you edit and send"}
-              </div>
+              <button type="button" className="hero-cta-shopify hero-cta-compact" style={{ alignSelf: "flex-start" }} onClick={() => setExpanded(true)}>
+                {lang === "fr" ? "Essayer maintenant" : "Try now"}
+              </button>
             </div>
-            <button type="button" style={btnPrimary} onClick={() => setExpanded(true)}>
-              {lang === "fr" ? "Essayer maintenant" : "Try now"}
-            </button>
-          </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
+                  {lang === "fr" ? "Générer un message avec Trackit IA" : "Generate outreach with Trackit AI"}
+                </div>
+                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                  {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un message personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized message, you edit and send"}
+                </div>
+              </div>
+              <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setExpanded(true)}>
+                {lang === "fr" ? "Essayer maintenant" : "Try now"}
+              </button>
+            </div>
+          )
         ) : (
           <>
             <div
@@ -681,7 +734,7 @@ function OutreachAIGeneratePanel({
             <div style={{ padding: 24 }}>
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                  Step 1 — Select creator
+                  {lang === "fr" ? "ÉTAPE 1 — SÉLECTIONNER UN CRÉATEUR" : "STEP 1 — SELECT CREATOR"}
                 </label>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "À qui souhaitez-vous vous adresser ?" : "Who are you reaching out to?"}</div>
                 <div style={{ position: "relative" }}>
@@ -694,7 +747,7 @@ function OutreachAIGeneratePanel({
                       setDropdownOpen(true);
                     }}
                     onFocus={() => setDropdownOpen(true)}
-                    placeholder="Search creators..."
+                    placeholder={lang === "fr" ? "Rechercher des créateurs..." : "Search creators..."}
                     style={inputStyle}
                   />
                   {dropdownOpen && !selectedCreator && (
@@ -766,7 +819,7 @@ function OutreachAIGeneratePanel({
 
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                  Step 2 — Your brand
+                  {lang === "fr" ? "ÉTAPE 2 — VOTRE MARQUE" : "STEP 2 — YOUR BRAND"}
                 </label>
                 <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", marginBottom: 8 }}>{lang === "fr" ? "Que vendez-vous ?" : "What are you selling?"}</div>
                 <input
@@ -780,7 +833,7 @@ function OutreachAIGeneratePanel({
 
               <div style={{ marginBottom: 24 }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                  Step 3 — Tone and platform
+                  {lang === "fr" ? "ÉTAPE 3 — TON ET PLATEFORME" : "STEP 3 — TONE AND PLATFORM"}
                 </label>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                   <div>
@@ -806,7 +859,7 @@ function OutreachAIGeneratePanel({
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>Platform</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Plateforme" : "Platform"}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {platforms.map((p) => (
                         <button
@@ -867,6 +920,10 @@ function OutreachAIGeneratePanel({
                     style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
                   />
                   <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 16 }}>{message.length} characters</div>
+                  <div style={{ background: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#7B5800", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>⚡</span>
+                    <span>{lang === "fr" ? "Le message sera copié automatiquement. Collez-le (Cmd+V) dans le DM et envoyez." : "Message will be auto-copied. Just paste it (Cmd+V) in the DM and hit send."}</span>
+                  </div>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                     <button type="button" onClick={() => void handleCopy()} style={{ ...btnSecondary, flex: 1, minWidth: 120 }}>
                       {copied ? (lang === "fr" ? "Copié ✓" : "Copied ✓") : lang === "fr" ? "Copier le message" : "Copy message"}
@@ -878,8 +935,8 @@ function OutreachAIGeneratePanel({
                     >
                       {lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}
                     </button>
-                    <button type="button" onClick={() => setShowSendFlow(true)} style={{ ...btnBlack, flex: 1, minWidth: 140 }}>
-                      Send on {platform} →
+                    <button type="button" onClick={() => void handleSend()} style={{ ...btnBlack, flex: 1, minWidth: 140 }}>
+                      {sendViaLabel} →
                     </button>
                   </div>
 
@@ -991,15 +1048,17 @@ function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "f
 export function OutreachHistorySection({
   plan,
   onNavigateToBilling,
+  isMobile,
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
+  isMobile?: boolean;
 }) {
   const lang = useLang();
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>(INITIAL_OUTREACH_HISTORY);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [search, setSearch] = useState("");
-  const [viewMessage, setViewMessage] = useState<OutreachHistoryEntry | null>(null);
+  const [viewingMessage, setViewingMessage] = useState<string | null>(null);
   const [followUpEntry, setFollowUpEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpSlideIn, setFollowUpSlideIn] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -1111,7 +1170,7 @@ export function OutreachHistorySection({
 
   return (
     <>
-      <OutreachAIGeneratePanel lang={lang} plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} />
+      <OutreachAIGeneratePanel lang={lang} plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} isMobile={isMobile} />
 
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
@@ -1131,7 +1190,7 @@ export function OutreachHistorySection({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 20, borderBottom: "1px solid #EFEFEF" }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : undefined, paddingBottom: isMobile ? 4 : undefined, marginBottom: 20, borderBottom: "1px solid #EFEFEF" }}>
           {filterTabs.map((t) => (
             <button
               key={t.id}
@@ -1155,7 +1214,7 @@ export function OutreachHistorySection({
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
           {[
             { label: lang === "fr" ? "Total envoyé" : "Total sent", value: "5" },
             { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: "20%" },
@@ -1170,88 +1229,241 @@ export function OutreachHistorySection({
         </div>
 
         <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, overflow: "hidden" }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.8fr",
-              gap: 10,
-              padding: "12px 16px",
-              background: "#FAFAFA",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#9A9A9A",
-            }}
-          >
-            {[
-              lang === "fr" ? "Créateur" : "Creator",
-              lang === "fr" ? "Plateforme" : "Platform",
-              lang === "fr" ? "Aperçu du message" : "Message preview",
-              lang === "fr" ? "Date d'envoi" : "Sent date",
-              lang === "fr" ? "Statut" : "Status",
-              lang === "fr" ? "Relance" : "Follow up",
-              lang === "fr" ? "Actions" : "Actions",
-            ].map((h) => (
-              <div key={h}>{h}</div>
-            ))}
-          </div>
-          {filtered.map((row, i) => {
-            const followUpDisabled = row.status === "replied" || row.status === "converted";
-            const showMarkReplied = row.status === "sent" || row.status === "opened" || row.status === "no_response";
-            return (
+          {isMobile ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
+              {filtered.map((item) => {
+                const followUpDisabled = item.status === "replied" || item.status === "converted";
+                const showMarkReplied = item.status === "sent" || item.status === "opened" || item.status === "no_response";
+                return (
+                  <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <img
+                        src={item.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.handle}`}
+                        alt=""
+                        style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
+                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
+                        <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>
+                          {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString() : "—"}
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0 }}>{outreachStatusBadge(item.status, lang)}</div>
+                    </div>
+                    {item.message && (
+                      <div style={{ fontSize: 12, color: "#5A5A5A", background: "#F8F8F8", borderRadius: 8, padding: "8px 12px", marginBottom: 10, lineHeight: 1.4 }}>
+                        {item.message.slice(0, 80)}
+                        {item.message.length > 80 ? "..." : ""}
+                      </div>
+                    )}
+                    {item.followUpDate && (
+                      <div style={{ fontSize: 11, color: "#F57F17", marginBottom: 10 }}>
+                        {lang === "fr" ? "Relance :" : "Follow up:"} {formatFollowUpDate(item.followUpDate)}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => setViewingMessage(item.message || "")}
+                        style={{ flex: 1, minWidth: 100, padding: "8px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#1A1A1A" }}
+                      >
+                        {lang === "fr" ? "Voir le message" : "View message"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={followUpDisabled}
+                        onClick={async () => {
+                          const res = await fetch("/api/generate-follow-up", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              creatorHandle: item.handle,
+                              platform: item.platform,
+                              originalMessage: item.message,
+                              lang,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.followUp || data.message) {
+                            await navigator.clipboard.writeText(data.followUp || data.message);
+                            alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
+                            const { supabase } = await import("@/lib/supabase");
+                            if (supabase) await supabase
+                              .from("outreach_history")
+                              .update({ follow_up_sent: true })
+                              .eq("id", item.id);
+                          }
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: 100,
+                          padding: "8px",
+                          background: "#F5F5F5",
+                          border: "none",
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 500,
+                          cursor: followUpDisabled ? "not-allowed" : "pointer",
+                          fontFamily: "inherit",
+                          color: "#1A1A1A",
+                          opacity: followUpDisabled ? 0.4 : 1,
+                        }}
+                      >
+                        {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
+                      </button>
+                      {showMarkReplied && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const { supabase } = await import("@/lib/supabase");
+                            if (supabase) await supabase
+                              .from("outreach_history")
+                              .update({ status: "replied" })
+                              .eq("id", item.id);
+                            window.location.reload();
+                          }}
+                          style={{ flex: 1, minWidth: 100, padding: "8px", background: "#0047FF", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
               <div
-                key={row.id}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.8fr",
                   gap: 10,
-                  padding: "14px 16px",
-                  alignItems: "center",
-                  borderTop: i === 0 ? "none" : "1px solid #F5F5F5",
+                  padding: "12px 16px",
+                  background: "#FAFAFA",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#9A9A9A",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <img src={row.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
-                    <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>
-                  </div>
-                </div>
-                <div style={{ fontSize: 13, textTransform: "capitalize" }}>{row.platform}</div>
-                <div style={{ fontSize: 12, color: "#7A7A7A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {row.message.slice(0, 60)}
-                  {row.message.length > 60 ? "…" : ""}
-                </div>
-                <div style={{ fontSize: 12, color: "#7A7A7A" }}>{row.sentDate}</div>
-                <div>{outreachStatusBadge(row.status, lang)}</div>
-                <div style={{ fontSize: 11, color: "#EA580C" }}>
-                  {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <button type="button" style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px" }} onClick={() => setViewMessage(row)}>
-                    {lang === "fr" ? "Voir le message" : "View message"}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={followUpDisabled}
-                    onClick={() => !followUpDisabled && setFollowUpEntry(row)}
-                    style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
-                  >
-                    {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
-                  </button>
-                  {showMarkReplied && (
-                    <button type="button" style={{ ...btnPrimary, fontSize: 11, padding: "6px 10px" }} onClick={() => updateStatus(row.id, "replied")}>
-                      {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
-                    </button>
-                  )}
-                </div>
+                {[
+                  lang === "fr" ? "Créateur" : "Creator",
+                  lang === "fr" ? "Plateforme" : "Platform",
+                  lang === "fr" ? "Aperçu du message" : "Message preview",
+                  lang === "fr" ? "Date d'envoi" : "Sent date",
+                  lang === "fr" ? "Statut" : "Status",
+                  lang === "fr" ? "Relance" : "Follow up",
+                  lang === "fr" ? "Actions" : "Actions",
+                ].map((h) => (
+                  <div key={h}>{h}</div>
+                ))}
               </div>
-            );
-          })}
+              {filtered.map((row, i) => {
+                const followUpDisabled = row.status === "replied" || row.status === "converted";
+                const showMarkReplied = row.status === "sent" || row.status === "opened" || row.status === "no_response";
+                return (
+                  <div
+                    key={row.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.8fr",
+                      gap: 10,
+                      padding: "14px 16px",
+                      alignItems: "center",
+                      borderTop: i === 0 ? "none" : "1px solid #F5F5F5",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                      <img src={row.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
+                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, textTransform: "capitalize" }}>{row.platform}</div>
+                    <div style={{ fontSize: 12, color: "#7A7A7A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {row.message.slice(0, 60)}
+                      {row.message.length > 60 ? "…" : ""}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#7A7A7A" }}>{row.sentDate}</div>
+                    <div>{outreachStatusBadge(row.status, lang)}</div>
+                    <div style={{ fontSize: 11, color: "#EA580C" }}>
+                      {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      <button type="button" style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px" }} onClick={() => setViewingMessage(row.message || "")}>
+                        {lang === "fr" ? "Voir le message" : "View message"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={followUpDisabled}
+                        onClick={async () => {
+                          const res = await fetch("/api/generate-follow-up", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              creatorHandle: row.handle,
+                              platform: row.platform,
+                              originalMessage: row.message,
+                              lang,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.followUp || data.message) {
+                            await navigator.clipboard.writeText(data.followUp || data.message);
+                            alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
+                            const { supabase } = await import("@/lib/supabase");
+                            if (supabase) await supabase
+                              .from("outreach_history")
+                              .update({ follow_up_sent: true })
+                              .eq("id", row.id);
+                          }
+                        }}
+                        style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
+                      >
+                        {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
+                      </button>
+                      {showMarkReplied && (
+                        <button
+                          type="button"
+                          style={{ ...btnPrimary, fontSize: 11, padding: "6px 10px" }}
+                          onClick={async () => {
+                            const { supabase } = await import("@/lib/supabase");
+                            if (supabase) await supabase
+                              .from("outreach_history")
+                              .update({ status: "replied" })
+                              .eq("id", row.id);
+                            window.location.reload();
+                          }}
+                        >
+                          {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
       </div>
 
-      {viewMessage && (
-        <MessageViewModal lang={lang} message={viewMessage.message} creator={viewMessage.creator} onClose={() => setViewMessage(null)} />
+      {viewingMessage && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewingMessage(null)}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 500, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>{lang === "fr" ? "Message envoyé" : "Sent message"}</div>
+            <p style={{ fontSize: 14, lineHeight: 1.6, color: "#1A1A1A", whiteSpace: "pre-wrap" }}>{viewingMessage}</p>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button type="button" onClick={() => { navigator.clipboard.writeText(viewingMessage); }} style={{ flex: 1, padding: "10px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                {lang === "fr" ? "Copier" : "Copy"}
+              </button>
+              <button type="button" onClick={() => setViewingMessage(null)} style={{ flex: 1, padding: "10px", background: "#1A1A1A", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                {lang === "fr" ? "Fermer" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {followUpEntry && (

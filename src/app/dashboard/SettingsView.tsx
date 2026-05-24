@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
+import { useLang, type Lang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
 
 type SettingsTab = "general" | "profile" | "team" | "billing" | "notifications" | "security" | "api";
 
@@ -21,31 +23,79 @@ type TeamMember = {
   isYou?: boolean;
 };
 
-const ROLE_LABELS: Record<TeamRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  editor: "Editor",
-  viewer: "Viewer",
-  billing: "Billing",
-};
+function roleLabel(role: TeamRole, lang: Lang): string {
+  const labels: Record<TeamRole, { en: string; fr: string }> = {
+    owner: { en: "Owner", fr: "Propriétaire" },
+    admin: { en: "Admin", fr: "Admin" },
+    editor: { en: "Editor", fr: "Éditeur" },
+    viewer: { en: "Viewer", fr: "Observateur" },
+    billing: { en: "Billing", fr: "Facturation" },
+  };
+  return lang === "fr" ? labels[role].fr : labels[role].en;
+}
 
-const ROLE_DESCRIPTIONS: Record<TeamRole, string> = {
-  owner: "Full access including billing, team, and account deletion.",
-  admin: "Manage campaigns, creators, payouts, settings, and invite members.",
-  editor: "Create and edit campaigns, outreach, and discovery. No billing or team admin.",
-  viewer: "View-only access to dashboards, campaigns, and reports.",
-  billing: "View analytics and manage billing, invoices, and payouts only.",
-};
+function roleDescription(role: TeamRole, lang: Lang): string {
+  const descriptions: Record<TeamRole, { en: string; fr: string }> = {
+    owner: {
+      en: "Full access including billing, team, and account deletion.",
+      fr: "Accès complet incluant la facturation, l'équipe et la suppression du compte.",
+    },
+    admin: {
+      en: "Manage campaigns, creators, payouts, settings, and invite members.",
+      fr: "Gérez les campagnes, créateurs, paiements, paramètres et invitez des membres.",
+    },
+    editor: {
+      en: "Create and edit campaigns, outreach, and discovery. No billing or team admin.",
+      fr: "Créez et modifiez des campagnes, messages et recherches. Pas de facturation ou d'admin équipe.",
+    },
+    viewer: {
+      en: "View-only access to dashboards, campaigns, and reports.",
+      fr: "Accès en lecture seule aux tableaux de bord, campagnes et rapports.",
+    },
+    billing: {
+      en: "View analytics and manage billing, invoices, and payouts only.",
+      fr: "Consultez les analytiques et gérez uniquement la facturation, les factures et les paiements.",
+    },
+  };
+  return lang === "fr" ? descriptions[role].fr : descriptions[role].en;
+}
 
-const TABS: { id: SettingsTab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "profile", label: "Profile" },
-  { id: "team", label: "Team" },
-  { id: "billing", label: "Billing" },
-  { id: "notifications", label: "Notifications" },
-  { id: "security", label: "Security" },
-  { id: "api", label: "API" },
-];
+function businessTypeLabel(value: string, lang: Lang): string {
+  const map: Record<string, { en: string; fr: string }> = {
+    Ecommerce: { en: "Ecommerce", fr: "E-commerce" },
+    Infopreneur: { en: "Infopreneur", fr: "Infopreneur" },
+    Agency: { en: "Agency", fr: "Agence" },
+    Other: { en: "Other", fr: "Autre" },
+  };
+  return lang === "fr" ? map[value]?.fr ?? value : map[value]?.en ?? value;
+}
+
+function emailNotifLabel(key: string, lang: Lang): string {
+  const map: Record<string, { en: string; fr: string }> = {
+    "New creator replied to outreach": { en: "New creator replied to outreach", fr: "Un créateur a répondu à votre message" },
+    "Sale tracked from creator": { en: "Sale tracked from creator", fr: "Vente suivie depuis un créateur" },
+    "Commission threshold reached": { en: "Commission threshold reached", fr: "Seuil de commission atteint" },
+    "Follow up reminder": { en: "Follow up reminder", fr: "Rappel de relance" },
+    "Weekly performance report": { en: "Weekly performance report", fr: "Rapport de performance hebdomadaire" },
+    "New team member joined": { en: "New team member joined", fr: "Nouveau membre a rejoint l'équipe" },
+  };
+  return lang === "fr" ? map[key]?.fr ?? key : map[key]?.en ?? key;
+}
+
+function formatLastActive(text: string | undefined, lang: Lang): string {
+  if (!text) return "—";
+  if (text === "Active now") return lang === "fr" ? "Actif maintenant" : "Active now";
+  if (text === "2 hours ago") return lang === "fr" ? "il y a quelques heures" : "2 hours ago";
+  if (text === "Yesterday") return lang === "fr" ? "Hier" : "Yesterday";
+  if (text === "3 days ago") return lang === "fr" ? "il y a quelques jours" : "3 days ago";
+  return text;
+}
+
+function invoiceStatusLabel(status: "Paid" | "Failed" | "Pending", lang: Lang): string {
+  if (status === "Paid") return lang === "fr" ? "Payé" : "Paid";
+  if (status === "Failed") return lang === "fr" ? "Échoué" : "Failed";
+  return lang === "fr" ? "En attente" : "Pending";
+}
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF",
@@ -110,8 +160,18 @@ const LABEL_TO_BUSINESS_TYPE: Record<string, string> = {
   Other: "other",
 };
 
-export function SettingsView({ onProfileUpdate }: { onProfileUpdate?: () => void }) {
+export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: () => void; isMobile?: boolean }) {
+  const lang = useLang();
   const [tab, setTab] = useState<SettingsTab>("general");
+  const tabs: { id: SettingsTab; label: string }[] = [
+    { id: "general", label: lang === "fr" ? "Général" : "General" },
+    { id: "profile", label: lang === "fr" ? "Profil" : "Profile" },
+    { id: "team", label: lang === "fr" ? "Équipe" : "Team" },
+    { id: "billing", label: lang === "fr" ? "Facturation" : "Billing" },
+    { id: "notifications", label: lang === "fr" ? "Notifications" : "Notifications" },
+    { id: "security", label: lang === "fr" ? "Sécurité" : "Security" },
+    { id: "api", label: lang === "fr" ? "API" : "API" },
+  ];
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [twoFa, setTwoFa] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -145,10 +205,10 @@ export function SettingsView({ onProfileUpdate }: { onProfileUpdate?: () => void
 
   return (
     <>
-      <div style={{ padding: "32px 40px 0 40px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 20 }}>Settings</h1>
-        <div style={{ display: "flex", gap: 28, overflowX: "auto" }}>
-          {TABS.map((t) => (
+      <div style={{ padding: isMobile ? "16px" : "32px 40px 0 40px", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 20 }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
+        <div style={{ display: "flex", gap: 28, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
+          {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
@@ -174,7 +234,7 @@ export function SettingsView({ onProfileUpdate }: { onProfileUpdate?: () => void
         </div>
       </div>
 
-      <div style={{ padding: 40 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {loading ? (
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Loading settings...</p>
         ) : (
@@ -205,8 +265,8 @@ export function SettingsView({ onProfileUpdate }: { onProfileUpdate?: () => void
                 }}
               />
             )}
-            {tab === "team" && <TeamSettings />}
-            {tab === "billing" && <BillingSettings />}
+            {tab === "team" && <TeamSettings isMobile={isMobile} />}
+            {tab === "billing" && <BillingSettings isMobile={isMobile} />}
             {tab === "notifications" && <NotificationsSettings />}
             {tab === "security" && <SecuritySettings twoFa={twoFa} setTwoFa={setTwoFa} onDeleteAccount={() => setDeleteModalOpen(true)} />}
             {tab === "api" && <ApiSettings />}
@@ -303,7 +363,7 @@ function SettingsToggle({ on, onToggle }: { on: boolean; onToggle: () => void })
   );
 }
 
-function StatusBadge({ status }: { status: "Paid" | "Failed" | "Pending" }) {
+function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
   const styles: Record<string, { bg: string; color: string }> = {
     Paid: { bg: "#E8F5E9", color: "#2E7D32" },
     Failed: { bg: "#FFEBEE", color: "#C62828" },
@@ -312,7 +372,7 @@ function StatusBadge({ status }: { status: "Paid" | "Failed" | "Pending" }) {
   const s = styles[status];
   return (
     <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.color, letterSpacing: "-0.01em" }}>
-      {status}
+      {invoiceStatusLabel(status, lang)}
     </span>
   );
 }
@@ -332,20 +392,8 @@ function GeneralSettings({
   niche: string;
   onSaved: (patch: Partial<ProfileRow>) => void;
 }) {
-  const [lang, setLang] = useState<"en" | "fr">("en");
-
-  useEffect(() => {
-    const stored = localStorage.getItem("trackit_lang") as "en" | "fr" | null;
-    if (stored === "en" || stored === "fr") setLang(stored);
-  }, []);
-
-  const handleLangChange = (l: "en" | "fr") => {
-    setLang(l);
-    localStorage.setItem("trackit_lang", l);
-  };
-
+  const lang = useLang();
   const [currency, setCurrency] = useState("EUR");
-  const [language, setLanguage] = useState("EN");
   const [storeName, setStoreName] = useState(initialBusinessName);
   const [websiteUrl, setWebsiteUrl] = useState(initialShopifyUrl);
   const [niche, setNiche] = useState(initialNiche);
@@ -401,50 +449,39 @@ function GeneralSettings({
 
   return (
     <Card>
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Language</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => handleLangChange("en")}
-            style={{ padding: "8px 16px", borderRadius: 8, border: lang === "en" ? "2px solid #0047FF" : "1px solid #E5E5E5", background: lang === "en" ? "#F0F6FF" : "#fff", color: lang === "en" ? "#0047FF" : "#1A1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            🇬🇧 English
-          </button>
-          <button
-            type="button"
-            onClick={() => handleLangChange("fr")}
-            style={{ padding: "8px 16px", borderRadius: 8, border: lang === "fr" ? "2px solid #0047FF" : "1px solid #E5E5E5", background: lang === "fr" ? "#F0F6FF" : "#fff", color: lang === "fr" ? "#0047FF" : "#1A1A1A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            🇫🇷 Français
-          </button>
-        </div>
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>Changes the language of the entire platform.</div>
-      </div>
-      <Field label="Store name">
+      <Field label={lang === "fr" ? "Nom de la boutique" : "Store name"}>
         <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Acme Co." style={inputStyle} />
       </Field>
-      <Field label="Shopify store URL">
+      <Field label={lang === "fr" ? "URL de la boutique Shopify" : "Shopify store URL"}>
         <input type="text" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="yourstore.myshopify.com" style={inputStyle} />
       </Field>
-      <Field label="Your niche">
+      <Field label={lang === "fr" ? "Votre niche" : "Your niche"}>
         <input type="text" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Fashion, fitness, beauty..." style={inputStyle} />
       </Field>
-      <Field label="Business type">
+      <Field label={lang === "fr" ? "Type d'activité" : "Business type"}>
         <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={inputStyle}>
-          <option>Ecommerce</option>
-          <option>Infopreneur</option>
-          <option>Agency</option>
-          <option>Other</option>
+          <option value="Ecommerce">{businessTypeLabel("Ecommerce", lang)}</option>
+          <option value="Infopreneur">{businessTypeLabel("Infopreneur", lang)}</option>
+          <option value="Agency">{businessTypeLabel("Agency", lang)}</option>
+          <option value="Other">{businessTypeLabel("Other", lang)}</option>
         </select>
       </Field>
-      <Field label="Default currency">
+      <Field label={lang === "fr" ? "Devise par défaut" : "Default currency"}>
         <SegmentedToggle options={["EUR", "USD"]} value={currency} onChange={setCurrency} />
       </Field>
-      <Field label="Default language">
-        <SegmentedToggle options={["EN", "FR"]} value={language} onChange={setLanguage} />
+      <Field label={lang === "fr" ? "Langue par défaut" : "Default language"}>
+        <SegmentedToggle
+          options={["EN", "FR"]}
+          value={lang === "fr" ? "FR" : "EN"}
+          onChange={(v) => {
+            const next = v === "FR" ? "fr" : "en";
+            if (next === lang) return;
+            localStorage.setItem("trackit_lang", next);
+            window.location.reload();
+          }}
+        />
       </Field>
-      <Field label="Timezone">
+      <Field label={lang === "fr" ? "Fuseau horaire" : "Timezone"}>
         <select defaultValue="Europe/Paris" style={inputStyle}>
           <option>Europe/Paris (GMT+1)</option>
           <option>America/New_York (GMT-5)</option>
@@ -456,13 +493,13 @@ function GeneralSettings({
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>
       )}
       <button type="button" onClick={() => void save()} disabled={saving || signingOut} style={{ ...btnPrimary, marginTop: 8, opacity: saving || signingOut ? 0.7 : 1 }}>
-        {saving ? "Saving..." : "Save changes"}
+        {saving ? "Saving..." : lang === "fr" ? "Sauvegarder" : "Save changes"}
       </button>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid #EFEFEF" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>Account</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
         <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
-          Sign out and disconnect this device from your Trackit account.
+          {lang === "fr" ? "Déconnectez-vous et dissociez cet appareil de votre compte Trackit." : "Sign out and disconnect this device from your Trackit account."}
         </p>
         <button
           type="button"
@@ -475,7 +512,7 @@ function GeneralSettings({
             opacity: signingOut ? 0.6 : 1,
           }}
         >
-          {signingOut ? "Disconnecting..." : "Disconnect"}
+          {signingOut ? "Disconnecting..." : lang === "fr" ? "Déconnecter" : "Disconnect"}
         </button>
       </div>
     </Card>
@@ -497,6 +534,7 @@ function ProfileSettings({
   avatarUrl: string | null;
   onSaved: (patch: Partial<ProfileRow>) => void;
 }) {
+  const lang = useLang();
   const [fullName, setFullName] = useState(initialFullName);
   const [username, setUsername] = useState(initialUsername);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
@@ -598,7 +636,7 @@ function ProfileSettings({
 
   return (
     <Card>
-      <Field label="Profile photo">
+      <Field label={lang === "fr" ? "Photo de profil" : "Profile photo"}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#E8EEFC", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {displayAvatar ? (
@@ -608,18 +646,18 @@ function ProfileSettings({
             )}
           </div>
           <label style={{ cursor: "pointer" }}>
-            <span style={btnSecondary}>Upload photo</span>
+            <span style={btnSecondary}>{lang === "fr" ? "Télécharger une photo" : "Upload photo"}</span>
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} />
           </label>
         </div>
       </Field>
-      <Field label="Full name">
+      <Field label={lang === "fr" ? "Nom complet" : "Full name"}>
         <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Smith" style={inputStyle} />
       </Field>
-      <Field label="Email">
+      <Field label={lang === "fr" ? "Email" : "Email"}>
         <input type="email" value={email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
       </Field>
-      <Field label="Username">
+      <Field label={lang === "fr" ? "Nom d'utilisateur" : "Username"}>
         <div style={{ position: "relative" }}>
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A9A9A", fontSize: 14 }}>@</span>
           <input
@@ -635,14 +673,15 @@ function ProfileSettings({
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>
       )}
       <button type="button" onClick={() => void save()} disabled={saving} style={{ ...btnPrimary, marginTop: 8, opacity: saving ? 0.7 : 1 }}>
-        {saving ? "Saving..." : "Save changes"}
+        {saving ? "Saving..." : lang === "fr" ? "Sauvegarder" : "Save changes"}
       </button>
     </Card>
   );
 }
 
 
-function BillingSettings() {
+function BillingSettings({ isMobile }: { isMobile?: boolean }) {
+  const lang = useLang();
   const [loading, setLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState("free");
 
@@ -674,29 +713,29 @@ function BillingSettings() {
   };
 
   const invoices = [
-    { date: "Apr 1, 2026", amount: "$49.00", status: "Paid" as const },
-    { date: "Mar 1, 2026", amount: "$49.00", status: "Paid" as const },
-    { date: "Feb 1, 2026", amount: "$49.00", status: "Pending" as const },
-    { date: "Jan 1, 2026", amount: "$49.00", status: "Failed" as const },
+    { date: "Apr 1, 2026", amount: 49, status: "Paid" as const },
+    { date: "Mar 1, 2026", amount: 49, status: "Paid" as const },
+    { date: "Feb 1, 2026", amount: 49, status: "Pending" as const },
+    { date: "Jan 1, 2026", amount: 49, status: "Failed" as const },
   ];
 
   return (
     <>
-      <Card title="Current plan">
+      <Card title={lang === "fr" ? "Plan actuel" : "Current plan"}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>Basic</span>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>$49<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Next billing date: May 1, 2026</div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>{formatCurrency(49, lang)}<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"} May 1, 2026</div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
             <button
               type="button"
               onClick={() => handleUpgrade("basic")}
               disabled={loading}
               style={btnPrimary}
             >
-              {loading ? "Loading..." : "Basic $49/mo →"}
+              {loading ? "Loading..." : `Basic ${formatCurrency(49, lang)}/mo →`}
             </button>
             <button
               type="button"
@@ -704,25 +743,25 @@ function BillingSettings() {
               disabled={loading}
               style={{ ...btnPrimary, background: "#1A1A1A" }}
             >
-              {loading ? "Loading..." : "Pro $119/mo →"}
+              {loading ? "Loading..." : `Pro ${formatCurrency(119, lang)}/mo →`}
             </button>
           </div>
         </div>
-        <button type="button" style={{ background: "none", border: "none", padding: 0, marginTop: 14, fontSize: 12, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>Cancel subscription</button>
+        <button type="button" style={{ background: "none", border: "none", padding: 0, marginTop: 14, fontSize: 12, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Annuler l'abonnement" : "Cancel subscription"}</button>
       </Card>
 
-      <Card title="Payment method">
+      <Card title={lang === "fr" ? "Méthode de paiement" : "Payment method"}>
         <PaymentMethodsBillingSection />
       </Card>
 
-      <Card title="Invoice history">
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <Card title={lang === "fr" ? "Historique des factures" : "Invoice history"}>
+        <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>Date</th>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>Amount</th>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>Status</th>
+                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Date" : "Date"}</th>
+                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
+                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Statut" : "Status"}</th>
                 <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}></th>
               </tr>
             </thead>
@@ -730,10 +769,10 @@ function BillingSettings() {
               {invoices.map((inv) => (
                 <tr key={inv.date} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{inv.date}</td>
-                  <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{inv.amount}</td>
-                  <td style={{ padding: "12px 8px" }}><StatusBadge status={inv.status} /></td>
+                  <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{formatCurrency(inv.amount, lang)}</td>
+                  <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={inv.status} /></td>
                   <td style={{ padding: "12px 8px", textAlign: "right" }}>
-                    <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>Download PDF</button>
+                    <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Télécharger PDF" : "Download PDF"}</button>
                   </td>
                 </tr>
               ))}
@@ -755,6 +794,7 @@ const EMAIL_NOTIFS = [
 ];
 
 function NotificationsSettings() {
+  const lang = useLang();
   const [emailToggles, setEmailToggles] = useState<Record<string, boolean>>(
     Object.fromEntries(EMAIL_NOTIFS.map((l, i) => [l, i % 2 === 0]))
   );
@@ -764,21 +804,21 @@ function NotificationsSettings() {
 
   return (
     <>
-      <Card title="Email notifications">
+      <Card title={lang === "fr" ? "Notifications email" : "Email notifications"}>
         {EMAIL_NOTIFS.map((label) => (
           <ToggleRow
             key={`email-${label}`}
-            label={label}
+            label={emailNotifLabel(label, lang)}
             on={emailToggles[label]}
             onToggle={() => setEmailToggles((t) => ({ ...t, [label]: !t[label] }))}
           />
         ))}
       </Card>
-      <Card title="Push notifications">
+      <Card title={lang === "fr" ? "Notifications push" : "Push notifications"}>
         {EMAIL_NOTIFS.map((label) => (
           <ToggleRow
             key={`push-${label}`}
-            label={label}
+            label={emailNotifLabel(label, lang)}
             on={pushToggles[label]}
             onToggle={() => setPushToggles((t) => ({ ...t, [label]: !t[label] }))}
           />
@@ -800,7 +840,8 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
   );
 }
 
-function TeamSettings() {
+function TeamSettings({ isMobile }: { isMobile?: boolean }) {
+  const lang = useLang();
   const [members, setMembers] = useState<TeamMember[]>([
     { id: "0", name: "You", email: "alex@trackit.app", role: "owner", status: "active", lastActive: "Active now", isYou: true },
     { id: "1", name: "Jordan Lee", email: "jordan@company.com", role: "admin", status: "active", lastActive: "2 hours ago" },
@@ -838,13 +879,13 @@ function TeamSettings() {
 
   return (
     <>
-      <Card title="Invite team member">
+      <Card title={lang === "fr" ? "Inviter un membre" : "Invite team member"}>
         <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>
-          Add colleagues to your workspace. They will receive an email invite to join.
+          {lang === "fr" ? "Ajoutez des collègues à votre espace de travail. Ils recevront une invitation par email." : "Add colleagues to your workspace. They will receive an email invite to join."}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
           <div style={{ flex: "1 1 200px" }}>
-            <Field label="Email address">
+            <Field label={lang === "fr" ? "Adresse email" : "Email address"}>
               <input
                 type="email"
                 value={inviteEmail}
@@ -855,30 +896,42 @@ function TeamSettings() {
             </Field>
           </div>
           <div style={{ flex: "0 1 160px" }}>
-            <Field label="Role">
+            <Field label={lang === "fr" ? "Rôle" : "Role"}>
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as TeamRole)}
                 style={inputStyle}
               >
                 {assignableRoles.map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                  <option key={r} value={r}>{roleLabel(r, lang)}</option>
                 ))}
               </select>
             </Field>
           </div>
           <button type="button" style={{ ...btnPrimary, marginBottom: 16 }} onClick={sendInvite}>
-            Send invite
+            {lang === "fr" ? "Envoyer l'invitation" : "Send invite"}
           </button>
         </div>
       </Card>
 
-      <Card title={`Team members (${activeCount} active${pendingCount ? `, ${pendingCount} pending` : ""})`}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <Card
+        title={
+          lang === "fr"
+            ? `Membres de l'équipe (${activeCount} ${activeCount === 1 ? "actif" : "actifs"}${pendingCount ? `, ${pendingCount} en attente` : ""})`
+            : `Team members (${activeCount} active${pendingCount ? `, ${pendingCount} pending` : ""})`
+        }
+      >
+        <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                {["Member", "Role", "Status", "Last active", ""].map((h) => (
+                {[
+                  lang === "fr" ? "Membre" : "Member",
+                  lang === "fr" ? "Rôle" : "Role",
+                  lang === "fr" ? "Statut" : "Status",
+                  lang === "fr" ? "Dernière activité" : "Last active",
+                  "",
+                ].map((h) => (
                   <th key={h || "actions"} style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
@@ -909,7 +962,7 @@ function TeamSettings() {
                         <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>
                           {m.isYou ? "You" : m.name}
                           {m.isYou && (
-                            <span style={{ marginLeft: 6, fontSize: 11, color: "#9A9A9A", fontWeight: 400 }}>(account owner)</span>
+                            <span style={{ marginLeft: 6, fontSize: 11, color: "#9A9A9A", fontWeight: 400 }}>({lang === "fr" ? "propriétaire du compte" : "account owner"})</span>
                           )}
                         </div>
                         <div style={{ fontSize: 12, color: "#9A9A9A" }}>{m.email}</div>
@@ -918,7 +971,7 @@ function TeamSettings() {
                   </td>
                   <td style={{ padding: "14px 8px" }}>
                     {m.isYou || m.role === "owner" ? (
-                      <RoleBadge role={m.role} />
+                      <RoleBadge lang={lang} role={m.role} />
                     ) : (
                       <select
                         value={m.role}
@@ -926,7 +979,7 @@ function TeamSettings() {
                         style={{ ...inputStyle, padding: "6px 10px", fontSize: 13, minWidth: 110 }}
                       >
                         {assignableRoles.map((r) => (
-                          <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+                          <option key={r} value={r}>{roleLabel(r, lang)}</option>
                         ))}
                       </select>
                     )}
@@ -942,10 +995,10 @@ function TeamSettings() {
                         color: m.status === "active" ? "#2E7D32" : "#F57F17",
                       }}
                     >
-                      {m.status === "active" ? "Active" : "Pending invite"}
+                      {m.status === "active" ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Invitation en attente" : "Pending invite"}
                     </span>
                   </td>
-                  <td style={{ padding: "14px 8px", color: "#7A7A7A", fontSize: 12 }}>{m.lastActive ?? "—"}</td>
+                  <td style={{ padding: "14px 8px", color: "#7A7A7A", fontSize: 12 }}>{formatLastActive(m.lastActive, lang)}</td>
                   <td style={{ padding: "14px 8px", textAlign: "right" }}>
                     {!m.isYou && m.role !== "owner" && (
                       <button
@@ -953,7 +1006,7 @@ function TeamSettings() {
                         onClick={() => removeMember(m.id)}
                         style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}
                       >
-                        {m.status === "pending" ? "Cancel invite" : "Remove"}
+                        {m.status === "pending" ? (lang === "fr" ? "Annuler l'invitation" : "Cancel invite") : lang === "fr" ? "Supprimer" : "Remove"}
                       </button>
                     )}
                   </td>
@@ -964,13 +1017,13 @@ function TeamSettings() {
         </div>
       </Card>
 
-      <Card title="Role permissions">
+      <Card title={lang === "fr" ? "Permissions des rôles" : "Role permissions"}>
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {(Object.keys(ROLE_LABELS) as TeamRole[]).map((role) => (
+          {(["owner", "admin", "editor", "viewer", "billing"] as TeamRole[]).map((role) => (
             <div key={role} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <RoleBadge role={role} />
+              <RoleBadge lang={lang} role={role} />
               <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45, paddingTop: 2 }}>
-                {ROLE_DESCRIPTIONS[role]}
+                {roleDescription(role, lang)}
               </div>
             </div>
           ))}
@@ -980,7 +1033,7 @@ function TeamSettings() {
   );
 }
 
-function RoleBadge({ role }: { role: TeamRole }) {
+function RoleBadge({ lang, role }: { lang: Lang; role: TeamRole }) {
   const styles: Record<TeamRole, { bg: string; color: string }> = {
     owner: { bg: "#1A1A1A", color: "#FFFFFF" },
     admin: { bg: "#F0F6FF", color: "#0047FF" },
@@ -1003,12 +1056,13 @@ function RoleBadge({ role }: { role: TeamRole }) {
         flexShrink: 0,
       }}
     >
-      {ROLE_LABELS[role]}
+      {roleLabel(role, lang)}
     </span>
   );
 }
 
 function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean; setTwoFa: (v: boolean) => void; onDeleteAccount: () => void }) {
+  const lang = useLang();
   const sessions = [
     { device: "MacBook Pro · Chrome", location: "Paris, FR", last: "Active now" },
     { device: "iPhone 15 · Safari", location: "Paris, FR", last: "2 hours ago" },
@@ -1017,18 +1071,18 @@ function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean
 
   return (
     <>
-      <Card title="Change password">
-        <Field label="Current password"><input type="password" style={inputStyle} /></Field>
-        <Field label="New password"><input type="password" style={inputStyle} /></Field>
-        <Field label="Confirm new password"><input type="password" style={inputStyle} /></Field>
-        <button type="button" style={btnPrimary}>Save</button>
+      <Card title={lang === "fr" ? "Changer le mot de passe" : "Change password"}>
+        <Field label={lang === "fr" ? "Mot de passe actuel" : "Current password"}><input type="password" style={inputStyle} /></Field>
+        <Field label={lang === "fr" ? "Nouveau mot de passe" : "New password"}><input type="password" style={inputStyle} /></Field>
+        <Field label={lang === "fr" ? "Confirmer le nouveau mot de passe" : "Confirm new password"}><input type="password" style={inputStyle} /></Field>
+        <button type="button" style={btnPrimary}>{lang === "fr" ? "Sauvegarder" : "Save"}</button>
       </Card>
 
-      <Card title="Two factor authentication">
+      <Card title={lang === "fr" ? "Authentification à deux facteurs" : "Two factor authentication"}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: twoFa ? 20 : 0 }}>
           <div>
-            <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>Enable 2FA</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Add an extra layer of security to your account</div>
+            <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{lang === "fr" ? "Activer 2FA" : "Enable 2FA"}</div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Ajoutez une couche de sécurité supplémentaire à votre compte" : "Add an extra layer of security to your account"}</div>
           </div>
           <SettingsToggle on={twoFa} onToggle={() => setTwoFa(!twoFa)} />
         </div>
@@ -1045,28 +1099,29 @@ function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean
         )}
       </Card>
 
-      <Card title="Active sessions">
+      <Card title={lang === "fr" ? "Sessions actives" : "Active sessions"}>
         {sessions.map((s) => (
           <div key={s.device} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid #F5F5F5", gap: 12 }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{s.device}</div>
-              <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{s.location} · {s.last}</div>
+              <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{s.location} · {formatLastActive(s.last, lang)}</div>
             </div>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>Revoke</button>
+            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Révoquer" : "Revoke"}</button>
           </div>
         ))}
-        <button type="button" style={{ ...btnSecondary, marginTop: 16, width: "100%" }}>Revoke all sessions</button>
+        <button type="button" style={{ ...btnSecondary, marginTop: 16, width: "100%" }}>{lang === "fr" ? "Révoquer toutes les sessions" : "Revoke all sessions"}</button>
       </Card>
 
-      <Card title="Danger zone">
-        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>Permanently delete your account and all associated data. This cannot be undone.</p>
-        <button type="button" onClick={onDeleteAccount} style={{ background: "#FFFFFF", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>Delete account</button>
+      <Card title={lang === "fr" ? "Zone dangereuse" : "Danger zone"}>
+        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>{lang === "fr" ? "Supprimez définitivement votre compte et toutes les données associées. Cette action est irréversible." : "Permanently delete your account and all associated data. This cannot be undone."}</p>
+        <button type="button" onClick={onDeleteAccount} style={{ background: "#FFFFFF", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Supprimer le compte" : "Delete account"}</button>
       </Card>
     </>
   );
 }
 
 function ApiSettings() {
+  const lang = useLang();
   const [webhooks, setWebhooks] = useState(["https://api.mystore.com/webhooks/trackit"]);
   const [webhookInput, setWebhookInput] = useState("");
   const apiCalls = 2847;
@@ -1074,51 +1129,52 @@ function ApiSettings() {
 
   return (
     <>
-      <Card title="Your API key">
+      <Card>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 18px 0", display: "flex", alignItems: "center" }}>
+          {lang === "fr" ? "Votre clé API" : "Your API key"}
+          <span style={{ fontSize: 11, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "2px 8px", borderRadius: 20, marginLeft: 8, letterSpacing: "0.02em" }}>
+            {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
+          </span>
+        </h3>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
           <code style={{ flex: 1, minWidth: 200, padding: "12px 14px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, fontSize: 13, color: "#1A1A1A", letterSpacing: "0.02em" }}>tr_live_••••••••••••••••4f2a</code>
-          <button type="button" style={btnSecondary}>Copy key</button>
-          <button type="button" style={btnSecondary}>Regenerate key</button>
+          <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Copier la clé" : "Copy key"}</button>
+          <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Régénérer la clé" : "Regenerate key"}</button>
         </div>
-        <p style={{ fontSize: 12, color: "#C45C00", margin: 0, letterSpacing: "-0.01em" }}>Regenerating will break existing integrations</p>
+        <p style={{ fontSize: 12, color: "#C45C00", margin: 0, letterSpacing: "-0.01em" }}>{lang === "fr" ? "La régénération cassera les intégrations existantes" : "Regenerating will break existing integrations"}</p>
       </Card>
 
       <Card>
-        <a href="#" style={{ fontSize: 14, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>View API docs →</a>
+        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 14, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Voir la doc API →" : "View API docs →"}</a>
       </Card>
 
-      <Card title="Webhook URL">
+      <Card title={lang === "fr" ? "URL Webhook" : "Webhook URL"}>
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
           <input type="url" value={webhookInput} onChange={(e) => setWebhookInput(e.target.value)} placeholder="https://your-app.com/webhook" style={{ ...inputStyle, flex: 1 }} />
           <button
             type="button"
             style={btnPrimary}
-            onClick={() => {
-              if (webhookInput.trim()) {
-                setWebhooks((w) => [...w, webhookInput.trim()]);
-                setWebhookInput("");
-              }
-            }}
+            onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}
           >
-            Add webhook endpoint
+            {lang === "fr" ? "Ajouter un endpoint webhook" : "Add webhook endpoint"}
           </button>
         </div>
         {webhooks.map((url) => (
           <div key={url} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F5F5", gap: 12 }}>
             <span style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis" }}>{url}</span>
-            <button type="button" onClick={() => setWebhooks((w) => w.filter((x) => x !== url))} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>Delete</button>
+            <button type="button" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>Delete</button>
           </div>
         ))}
       </Card>
 
-      <Card title="Usage this month">
+      <Card title={lang === "fr" ? "Utilisation ce mois" : "Usage this month"}>
         <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 10 }}>
           API calls made: <strong>{apiCalls.toLocaleString()}</strong> / {apiLimit.toLocaleString()}
         </div>
         <div style={{ height: 8, background: "#EFEFEF", borderRadius: 999, overflow: "hidden", marginBottom: 14 }}>
           <div style={{ width: `${(apiCalls / apiLimit) * 100}%`, height: "100%", background: "#0047FF", borderRadius: 999 }} />
         </div>
-        <a href="#" style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>Upgrade for unlimited API calls →</a>
+        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Passer à Pro pour des appels API illimités →" : "Upgrade for unlimited API calls →"}</a>
       </Card>
     </>
   );

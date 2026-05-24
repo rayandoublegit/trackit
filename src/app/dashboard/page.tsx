@@ -47,6 +47,8 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
@@ -54,6 +56,12 @@ export default function DashboardPage() {
   const [notificationUnread, setNotificationUnread] = useState(getInitialUnreadCount);
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
+  const [gettingStarted, setGettingStarted] = useState({
+    shopify: false,
+    creators: false,
+    outreach: false,
+    sales: false,
+  });
 
   const reloadProfile = useCallback(async (userId: string) => {
     if (!supabase) return;
@@ -71,6 +79,13 @@ export default function DashboardPage() {
       avatar_url,
       business_name: profileData.business_name,
     });
+  }, []);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   useEffect(() => {
@@ -100,6 +115,44 @@ export default function DashboardPage() {
       setLoading(false);
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const check = async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("shopify_store, shopify_access_token")
+        .eq("id", user.id)
+        .single();
+      const shopifyConnected = !!(profile?.shopify_store && profile?.shopify_access_token);
+
+      const { count: creatorsCount } = await supabase
+        .from("creators")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const { count: outreachCount } = await supabase
+        .from("outreach_history")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      const { count: salesCount } = await supabase
+        .from("sales")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      setGettingStarted({
+        shopify: shopifyConnected,
+        creators: (creatorsCount || 0) > 0,
+        outreach: (outreachCount || 0) > 0,
+        sales: (salesCount || 0) > 0,
+      });
+    };
+    check();
+  }, [user?.id]);
 
   const handleUpgrade = useCallback(async () => {
     if (!supabase) return;
@@ -161,6 +214,7 @@ export default function DashboardPage() {
     setView(targetView);
     setSidebarSearch("");
     sidebarSearchRef.current?.blur();
+    if (isMobile) setMobileSidebarOpen(false);
   };
 
   useEffect(() => {
@@ -181,6 +235,37 @@ export default function DashboardPage() {
   }
 
   const sidebarWidth = sidebarCollapsed ? 72 : 264;
+
+  const asideStyle: React.CSSProperties = isMobile
+    ? {
+        width: 280,
+        minWidth: 280,
+        background: "#FFFFFF",
+        borderRight: "1px solid #EFEFEF",
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        position: "fixed",
+        left: 0,
+        top: 0,
+        zIndex: 300,
+        transform: mobileSidebarOpen ? "translateX(0)" : "translateX(-100%)",
+        transition: "transform 0.25s ease",
+        overflow: "hidden",
+      }
+    : {
+        width: sidebarWidth,
+        minWidth: sidebarWidth,
+        background: "#FFFFFF",
+        borderRight: "1px solid #EFEFEF",
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        position: "sticky",
+        top: 0,
+        transition: "width 0.2s ease",
+        overflow: "hidden",
+      };
 
   const storeName = profile?.business_name?.trim() || null;
 
@@ -232,7 +317,22 @@ export default function DashboardPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex" }}>
-      <aside style={{ width: sidebarWidth, minWidth: sidebarWidth, background: "#FFFFFF", borderRight: "1px solid #EFEFEF", display: "flex", flexDirection: "column", height: "100vh", position: "sticky", top: 0, transition: "width 0.2s ease", overflow: "hidden" }}>
+      {isMobile && mobileSidebarOpen && (
+        <div
+          onClick={() => setMobileSidebarOpen(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 299 }}
+        />
+      )}
+      {isMobile && (
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(true)}
+          style={{ position: "fixed", top: 14, left: 14, zIndex: 200, background: "#fff", border: "1px solid #EFEFEF", borderRadius: 10, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      )}
+      <aside style={asideStyle}>
         <div style={{ padding: sidebarCollapsed ? "12px 8px" : "12px 16px", borderBottom: "1px solid #F5F5F5", display: "flex", justifyContent: sidebarCollapsed ? "center" : "flex-start", alignItems: "center", gap: 10 }}>
           <img
             src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
@@ -274,7 +374,19 @@ export default function DashboardPage() {
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {profile?.username ? `@${profile.username}` : "Account"}
                 </span>
-                <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>Free Plan</span>
+                <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                  {lang === "fr"
+                    ? plan === "pro"
+                      ? "Plan Pro"
+                      : plan === "basic"
+                        ? "Plan Basic"
+                        : "Plan gratuit"
+                    : plan === "pro"
+                      ? "Pro Plan"
+                      : plan === "basic"
+                        ? "Basic Plan"
+                        : "Free Plan"}
+                </span>
                 {storeName && (
                   <span style={{ fontSize: 12, color: "#0047FF", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {storeName}
@@ -368,57 +480,63 @@ export default function DashboardPage() {
         </div>
       </aside>
 
-      <main style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
-        {view === "dashboard" && <HomeView fullName={profile?.full_name ?? null} username={profile?.username ?? null} />}
-        {view === "discovery" && <DiscoveryView plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "creators" && <CreatorsView />}
-        {view === "campaigns" && <CampaignsView plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "affiliates" && <AffiliatesView />}
-        {view === "outreach" && <OutreachView plan={plan} onNavigateToBilling={() => setView("settings")} />}
-        {view === "payouts" && <PayoutsView plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "analytics" && <AnalyticsView />}
-        {view === "integrations" && <IntegrationsView />}
-        {view === "automation" && <AutomationView />}
+      <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
+        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} />}
+        {view === "discovery" && <DiscoveryView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
+        {view === "creators" && <CreatorsView isMobile={isMobile} />}
+        {view === "campaigns" && <CampaignsView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
+        {view === "affiliates" && <AffiliatesView isMobile={isMobile} />}
+        {view === "outreach" && <OutreachView isMobile={isMobile} plan={plan} onNavigateToBilling={() => setView("settings")} />}
+        {view === "payouts" && user && <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
+        {view === "analytics" && user && <AnalyticsView userId={user.id} isMobile={isMobile} />}
+        {view === "integrations" && <IntegrationsView isMobile={isMobile} />}
+        {view === "automation" && <AutomationView isMobile={isMobile} />}
         {view === "settings" && user && (
-          <SettingsView onProfileUpdate={() => void reloadProfile(user.id)} />
+          <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
         )}
-        {view === "feedback" && <FeedbackView />}
-        {view === "help" && <HelpCenterView />}
-        {view === "notifications" && <NotificationsView onUnreadChange={setNotificationUnread} />}
+        {view === "feedback" && <FeedbackView isMobile={isMobile} />}
+        {view === "help" && <HelpCenterView isMobile={isMobile} />}
+        {view === "notifications" && <NotificationsView isMobile={isMobile} onUnreadChange={setNotificationUnread} />}
       </main>
     </div>
   );
 }
 
-function PageHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: React.ReactNode }) {
+function PageHeader({ title, subtitle, right, isMobile }: { title: string; subtitle?: string; right?: React.ReactNode; isMobile?: boolean }) {
   return (
-    <div style={{ padding: "32px 40px 24px 40px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
           {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
         </div>
-        {right}
+        {right && <div style={{ marginTop: 8, flexShrink: 0 }}>{right}</div>}
       </div>
     </div>
   );
 }
 
-function HomeView({ fullName, username }: { fullName: string | null; username: string | null }) {
+function HomeView({ fullName, username, isMobile, gettingStarted }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; creators: boolean; outreach: boolean; sales: boolean } }) {
   const lang = useLang();
   const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
   const welcomeGreeting = lang === "fr" ? "Bon retour" : "Welcome back";
+  const checklistSteps = [
+    { label: lang === "fr" ? "Connecter la boutique Shopify" : "Connect Shopify store", completed: gettingStarted.shopify },
+    { label: lang === "fr" ? "Trouver vos premiers créateurs" : "Find your first creators", completed: gettingStarted.creators },
+    { label: lang === "fr" ? "Envoyer votre premier message" : "Send first outreach", completed: gettingStarted.outreach },
+    { label: lang === "fr" ? "Suivre votre première vente" : "Track first sale", completed: gettingStarted.sales },
+  ];
   return (
     <>
-      <PageHeader title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
-      <div style={{ padding: 40 }}>
+      <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: 60, textAlign: "center", marginBottom: 24 }}>
           <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
             <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
           </div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Connectez votre boutique Shopify" : "Connect your Shopify store"}</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Synchronisez vos produits, commandes et clients en temps réel. Nous suivrons automatiquement chaque vente générée par vos créateurs." : "Sync products, orders, and customers in real time. We'll automatically track every sale your creators drive."}</p>
-          <button type="button" className="hero-cta-shopify">
+          <button type="button" className="hero-cta-shopify-dark">
             <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
             {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
           </button>
@@ -427,18 +545,21 @@ function HomeView({ fullName, username }: { fullName: string | null; username: s
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
           <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 16 }}>{lang === "fr" ? "Pour commencer" : "Getting started"}</h3>
-          {[
-            { label: lang === "fr" ? "Connecter la boutique Shopify" : "Connect Shopify store", done: false },
-            { label: lang === "fr" ? "Trouver vos premiers créateurs" : "Find your first creators", done: false },
-            { label: lang === "fr" ? "Envoyer votre premier message" : "Send first outreach", done: false },
-            { label: lang === "fr" ? "Suivre votre première vente" : "Track first sale", done: false },
-          ].map((step, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: i < 3 ? "1px solid #F5F5F5" : "none" }}>
-              <div style={{ width: 22, height: 22, borderRadius: "50%", border: "1.5px solid #E5E5E5", background: step.done ? "#0047FF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                {step.done && <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          {checklistSteps.map((step, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < checklistSteps.length - 1 ? "1px solid #F5F5F5" : "none" }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: "50%",
+                background: step.completed ? "#0047FF" : "transparent",
+                border: step.completed ? "none" : "2px solid #DCDCDC",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexShrink: 0,
+                transition: "all 0.2s ease"
+              }}>
+                {step.completed && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
               </div>
-              <span style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", flex: 1 }}>{step.label}</span>
-              <span style={{ fontSize: 12, color: "#9A9A9A" }}>—</span>
+              <span style={{ fontSize: 14, color: step.completed ? "#9A9A9A" : "#1A1A1A", textDecoration: step.completed ? "line-through" : "none", opacity: step.completed ? 0.6 : 1, transition: "all 0.2s ease" }}>
+                {step.label}
+              </span>
             </div>
           ))}
         </div>
@@ -447,7 +568,7 @@ function HomeView({ fullName, username }: { fullName: string | null; username: s
   );
 }
 
-type OutreachPanel = "import" | "create" | "mass" | "send" | "seeTemplates" | null;
+type OutreachPanel = "import" | "create" | "send" | "seeTemplates" | null;
 
 type OutreachTemplate = {
   id: string;
@@ -547,9 +668,11 @@ function OutreachPanelShell({
 function OutreachView({
   plan,
   onNavigateToBilling,
+  isMobile,
 }: {
   plan: "free" | "basic" | "pro";
   onNavigateToBilling: () => void;
+  isMobile?: boolean;
 }) {
   const lang = useLang();
   const [templates, setTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
@@ -575,16 +698,15 @@ function OutreachView({
 
   return (
     <>
-      <PageHeader title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
+      <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("seeTemplates")}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("import")}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
-          <button type="button" style={btnSecondary} onClick={() => setPanel("mass")}>{lang === "fr" ? "Envoi en masse" : "Mass outreach"}</button>
-          <button type="button" style={btnPrimary} onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("seeTemplates")}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("import")}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
+          <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
         </div>
       } />
-      <div style={{ padding: 40 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {toast && (
           <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
             {toast}
@@ -592,14 +714,14 @@ function OutreachView({
         )}
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: isMobile ? "wrap" : undefined, gap: isMobile ? 8 : undefined }}>
             <div>
               <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>{lang === "fr" ? "Relance automatique" : "Automated follow-up"}</h3>
               <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>{lang === "fr" ? "Votre prochaine relance est dans 3 jours" : "Your next follow-up is in 3 days"}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="button" style={btnSecondary}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
-              <Toggle on />
+              <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
+              <Toggle on onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -608,7 +730,7 @@ function OutreachView({
               { day: lang === "fr" ? "JOUR 3" : "DAY 3", label: lang === "fr" ? "Relance douce" : "Soft follow-up" },
               { day: lang === "fr" ? "JOUR 7" : "DAY 7", label: lang === "fr" ? "Relance finale" : "Final follow-up" },
             ].map((step, i) => (
-              <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
+              <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16, opacity: 0.6, cursor: "default" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>{step.day}</div>
                 <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{step.label}</div>
               </div>
@@ -616,7 +738,7 @@ function OutreachView({
           </div>
         </div>
 
-        <OutreachHistorySection plan={plan} onNavigateToBilling={onNavigateToBilling} />
+        <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} />
       </div>
 
       {panel === "import" && (
@@ -647,23 +769,13 @@ function OutreachView({
           onCreate={() => setPanel("create")}
         />
       )}
-      {panel === "mass" && (
-        <MassOutreachPanel
-          templates={templates}
-          onClose={closePanel}
-          onSent={(count) => {
-            showToast(`Mass outreach queued for ${count} influencer${count === 1 ? "" : "s"}`);
-            closePanel();
-          }}
-        />
-      )}
       {panel === "send" && (
         <SendOutreachPanel
           templates={templates}
           initialTemplateId={sendTemplateId}
           onClose={closePanel}
-          onSent={(count) => {
-            showToast(`Outreach sent to ${count} influencer${count === 1 ? "" : "s"}`);
+          onSent={() => {
+            showToast(lang === "fr" ? "Message copié — collez-le dans le DM ✓" : "Message copied — paste it in the DM ✓");
             closePanel();
           }}
         />
@@ -673,6 +785,7 @@ function OutreachView({
 }
 
 function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImport: (t: Omit<OutreachTemplate, "id" | "imported">) => void }) {
+  const lang = useLang();
   const [raw, setRaw] = useState("");
   const [pasteHint, setPasteHint] = useState<string | null>(null);
 
@@ -719,21 +832,21 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
 
   return (
     <OutreachPanelShell
-      title="Import template"
-      subtitle="Paste your message from anywhere — we'll turn it into a reusable template."
+      title={lang === "fr" ? "Importer un modèle" : "Import template"}
+      subtitle={lang === "fr" ? "Collez votre message depuis n'importe où — nous le transformerons en modèle réutilisable." : "Paste your message from anywhere — we'll turn it into a reusable template."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: raw.trim() ? 1 : 0.45 }} disabled={!raw.trim()} onClick={parseAndImport}>Import template</button>
-          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>Cancel</button>
+          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: raw.trim() ? 1 : 0.45 }} disabled={!raw.trim()} onClick={parseAndImport}>{lang === "fr" ? "Importer le modèle" : "Import template"}</button>
+          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>Message</label>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Message" : "Message"}</label>
         <button type="button" onClick={() => void handlePaste()} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" strokeWidth="1.7"/></svg>
-          Paste
+          {lang === "fr" ? "Coller" : "Paste"}
         </button>
       </div>
       {pasteHint && <div style={{ fontSize: 11, color: pasteHint.includes("Pasted") ? "#1FB567" : "#7A7A7A", marginBottom: 8 }}>{pasteHint}</div>}
@@ -750,6 +863,7 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
 }
 
 function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave: (t: Omit<OutreachTemplate, "id" | "imported">) => void }) {
+  const lang = useLang();
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [opening, setOpening] = useState("Hey {{name}},");
@@ -758,8 +872,8 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
 
   return (
     <OutreachPanelShell
-      title="Create template"
-      subtitle="Build reusable blocks. Use {{name}} and {{brand}} for personalization."
+      title={lang === "fr" ? "Créer un modèle" : "Create template"}
+      subtitle={lang === "fr" ? "Créez des blocs réutilisables. Utilisez {{name}} et {{brand}} pour la personnalisation." : "Build reusable blocks. Use {{name}} and {{brand}} for personalization."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -769,21 +883,21 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
             disabled={!name.trim() || (!body.trim() && !opening.trim())}
             onClick={() => onSave({ name: name.trim(), subject: subject.trim(), opening: opening.trim(), body: body.trim(), cta: cta.trim() })}
           >
-            Save template
+            {lang === "fr" ? "Sauvegarder le modèle" : "Save template"}
           </button>
-          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>Cancel</button>
+          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       }
     >
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Template name</label>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Collab intro" style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Subject line</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Intro collaboration" : "Collab intro"} style={{ ...panelInputStyle, marginBottom: 16 }} />
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Ligne d'objet" : "Subject line"}</label>
       <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Partnership with {{brand}}" style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Opening</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
       <input type="text" value={opening} onChange={(e) => setOpening(e.target.value)} style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Main message</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Your pitch..." style={{ ...panelInputStyle, resize: "vertical", marginBottom: 16, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>Call to action</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
       <input type="text" value={cta} onChange={(e) => setCta(e.target.value)} placeholder="Would you be open to a quick chat?" style={panelInputStyle} />
     </OutreachPanelShell>
   );
@@ -800,8 +914,12 @@ function SeeTemplatesPanel({
   onUse: (id: string) => void;
   onCreate: () => void;
 }) {
+  const lang = useLang();
+  const templateDisplayName = (name: string) =>
+    name === "Collab intro" ? (lang === "fr" ? "Intro collaboration" : "Collab intro") : name;
+
   return (
-    <OutreachPanelShell title="Templates" subtitle="Your saved and imported outreach templates." onClose={onClose}>
+    <OutreachPanelShell title={lang === "fr" ? "Modèles" : "Templates"} subtitle={lang === "fr" ? "Vos modèles de messages sauvegardés et importés." : "Your saved and imported outreach templates."} onClose={onClose}>
       {templates.length === 0 ? (
         <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>No templates yet. Create or import one to get started.</p>
       ) : (
@@ -810,10 +928,10 @@ function SeeTemplatesPanel({
             <div key={t.id} style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 14, background: "#FAFAFA" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{t.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{templateDisplayName(t.name)}</div>
                   {t.imported && <span style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2, display: "block" }}>Imported</span>}
                 </div>
-                <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>Use</button>
+                <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
               </div>
               {t.subject && <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 4 }}><strong>Subject:</strong> {t.subject}</div>}
               <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden" }}>
@@ -823,7 +941,7 @@ function SeeTemplatesPanel({
           ))}
         </div>
       )}
-      <button type="button" style={{ ...btnSecondary, width: "100%", marginTop: 20 }} onClick={onCreate}>+ Create template</button>
+      <button type="button" style={{ ...btnSecondary, width: "100%", marginTop: 20 }} onClick={onCreate}>{lang === "fr" ? "+ Créer un modèle" : "+ Create template"}</button>
     </OutreachPanelShell>
   );
 }
@@ -968,6 +1086,29 @@ function SendOutreachPanel({
 
   const canSend = selectedInfluencers.length > 0 && (opening.trim() || body.trim());
 
+  const handleSend = async () => {
+    if (!canSend) return;
+    const messageText = fullPreview;
+    const handle = selectedInfluencers[0].replace(/^@/, "");
+    try {
+      await navigator.clipboard.writeText(messageText);
+    } catch {
+      /* clipboard may be unavailable */
+    }
+    if (dmPlatform === "Instagram") {
+      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
+    } else if (dmPlatform === "TikTok") {
+      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
+    } else if (dmPlatform === "YouTube") {
+      window.open(`https://www.youtube.com/@${handle}`, "_blank");
+    } else if (dmPlatform === "Twitter") {
+      window.open(`https://twitter.com/messages/compose?recipient_id=${handle}`, "_blank");
+    } else if (dmPlatform === "Email") {
+      window.open(`mailto:${handle}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`, "_blank");
+    }
+    onSent(selectedInfluencers.length);
+  };
+
   const sendViaLabel =
     dmPlatform === "Instagram"
       ? lang === "fr"
@@ -996,7 +1137,7 @@ function SendOutreachPanel({
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => onSent(selectedInfluencers.length)}>{sendViaLabel}</button>
+          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => void handleSend()}>{sendViaLabel}</button>
           <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       }
@@ -1033,49 +1174,9 @@ function SendOutreachPanel({
   );
 }
 
-function MassOutreachPanel({
-  templates,
-  onClose,
-  onSent,
-}: {
-  templates: OutreachTemplate[];
-  onClose: () => void;
-  onSent: (count: number) => void;
-}) {
-  const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>(OUTREACH_INFLUENCERS.map((i) => i.handle));
-  const [templateId, setTemplateId] = useState(templates[0]?.id ?? "");
 
-  const t = templates.find((x) => x.id === templateId);
-  const canSend = selectedInfluencers.length > 0 && !!t;
-
-  return (
-    <OutreachPanelShell
-      title="Mass outreach"
-      subtitle="Send the same template to multiple influencers at once."
-      onClose={onClose}
-      footer={
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => onSent(selectedInfluencers.length)}>Send to {selectedInfluencers.length} influencers</button>
-          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>Cancel</button>
-        </div>
-      }
-    >
-      <TemplateSelect templates={templates} value={templateId} onChange={setTemplateId} />
-      {!templates.length && (
-        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>Create or import a template first.</p>
-      )}
-      <InfluencerPicker selected={selectedInfluencers} onChange={setSelectedInfluencers} />
-      {t && (
-        <div style={{ marginTop: 16, padding: 14, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Template preview</div>
-          <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.5 }}>{[t.opening, t.body, t.cta].filter(Boolean).join(" ")}</div>
-        </div>
-      )}
-    </OutreachPanelShell>
-  );
-}
-
-function IntegrationsView() {
+function IntegrationsView({ isMobile }: { isMobile?: boolean }) {
+  const lang = useLang();
   const [shopDomain, setShopDomain] = useState("");
   const [shopError, setShopError] = useState("");
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
@@ -1117,14 +1218,14 @@ function IntegrationsView() {
 
   return (
     <>
-      <PageHeader title="Integrations" subtitle="Connect Trackit to the tools you already use" />
+      <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
       {connectedShop && (
-        <div style={{ margin: "0 40px 16px", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, color: "#15803d", fontSize: 14, fontWeight: 500 }}>
+        <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, color: "#15803d", fontSize: 14, fontWeight: 500 }}>
           ✓ {connectedShop} connected successfully
         </div>
       )}
-      <div style={{ padding: "0 40px 40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16 }}>
+      <div style={{ padding: isMobile ? 16 : "0 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 16 }}>
           {apps.map((app) => (
             <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ width: 52, height: 52, borderRadius: 12, background: "#FFFFFF", border: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1132,7 +1233,23 @@ function IntegrationsView() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{app.name}</div>
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{app.desc}</div>
+                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                  {app.name === "Shopify"
+                    ? lang === "fr"
+                      ? "Connectez votre boutique pour suivre les ventes"
+                      : "Connect your store to track sales"
+                    : app.name === "Zapier"
+                      ? lang === "fr"
+                        ? "Automatisez vos workflows avec 5000+ applications"
+                        : "Automate workflows with 5000+ apps"
+                      : app.name === "Notion"
+                        ? lang === "fr"
+                          ? "Synchronisez votre espace de travail et vos documents"
+                          : "Sync your workspace and docs"
+                        : lang === "fr"
+                          ? "Automatisation visuelle avancée"
+                          : "Advanced visual automation"}
+                </div>
                 {app.name === "Shopify" && (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -1143,17 +1260,17 @@ function IntegrationsView() {
                         style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
                         onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
                       />
-                      <button type="button" onClick={handleShopifyConnect} style={{ ...btnPrimary, fontSize: 13, padding: "8px 16px", flexShrink: 0 }}>Connect →</button>
+                      <button type="button" onClick={handleShopifyConnect} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0 }}>{lang === "fr" ? "Connecter →" : "Connect →"}</button>
                     </div>
                     <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
-                      Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains.
+                      {lang === "fr" ? "Utilisez votre URL .myshopify.com. Trouvez-la dans Shopify Admin → Paramètres → Domaines." : "Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains."}
                     </div>
                     {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
                   </div>
                 )}
               </div>
               {app.name === "Shopify" ? null : (
-                <button type="button" style={btnSecondary}>Coming soon</button>
+                <button type="button" style={btnSecondary}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
               )}
             </div>
           ))}
@@ -1163,16 +1280,27 @@ function IntegrationsView() {
   );
 }
 
-function AutomationView() {
+function AutomationView({ isMobile }: { isMobile?: boolean }) {
+  const lang = useLang();
   return (
     <>
-      <PageHeader title="Automation" subtitle="Build agents that run your creator marketing on autopilot" />
-      <div style={{ padding: 40 }}>
+      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+        <div>
+          <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
+            {lang === "fr" ? "Automatisation" : "Automation"}
+            <span style={{ fontSize: 13, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
+              {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
+            </span>
+          </h1>
+          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
+        </div>
+      </div>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ background: "linear-gradient(135deg, #0047FF 0%, #003BD6 100%)", color: "#FFFFFF", borderRadius: 18, padding: 32, marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Make an automation agent</h2>
-            <p style={{ fontSize: 14, opacity: 0.9, letterSpacing: "-0.01em", margin: 0, marginBottom: 18 }}>Assemble triggers, actions, and conditions like puzzle pieces. No code required.</p>
-            <button type="button" style={{ background: "#FFFFFF", color: "#0047FF", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>Build an agent</button>
+            <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Créer un agent d'automatisation" : "Make an automation agent"}</h2>
+            <p style={{ fontSize: 14, opacity: 0.9, letterSpacing: "-0.01em", margin: 0, marginBottom: 18 }}>{lang === "fr" ? "Assemblez des déclencheurs, des actions et des conditions comme des pièces de puzzle. Aucun code requis." : "Assemble triggers, actions, and conditions like puzzle pieces. No code required."}</p>
+            <button type="button" className="hero-cta-inverse hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Créer un agent" : "Build an agent"}</button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 36px)", gap: 6, flexShrink: 0 }}>
             {[0,1,2,3,4,5,6,7,8].map((i) => (
@@ -1182,38 +1310,38 @@ function AutomationView() {
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 14 }}>Pre-built automations</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 14 }}>{lang === "fr" ? "Automatisations préconstruites" : "Pre-built automations"}</h3>
           {[
-            "When creator posts → notify me",
-            "When sale detected → add to commission tracker",
-            "When commission threshold reached → auto payout",
-            "When no reply after 3 days → send follow-up",
+            lang === "fr" ? "Quand un créateur publie → me notifier" : "When creator posts → notify me",
+            lang === "fr" ? "Quand une vente est détectée → ajouter au suivi des commissions" : "When sale detected → add to commission tracker",
+            lang === "fr" ? "Quand le seuil de commission est atteint → paiement automatique" : "When commission threshold reached → auto payout",
+            lang === "fr" ? "Quand pas de réponse après 3 jours → envoyer une relance" : "When no reply after 3 days → send follow-up",
           ].map((row, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < 3 ? "1px solid #F5F5F5" : "none" }}>
               <span style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{row}</span>
-              <Toggle on={false} />
+              <Toggle on={false} onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
             </div>
           ))}
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>Import from code</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Paste a webhook URL or import an automation from JSON</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Importer depuis le code" : "Import from code"}</div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Collez une URL webhook ou importez une automatisation depuis JSON" : "Paste a webhook URL or import an automation from JSON"}</div>
           </div>
-          <button type="button" style={btnSecondary}>Import</button>
-          <button type="button" style={btnSecondary}>Test</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Import</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Test</button>
         </div>
       </div>
     </>
   );
 }
 
-function LockedView({ title, subtitle }: { title: string; subtitle: string }) {
+function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: string; isMobile?: boolean }) {
   return (
     <>
-      <PageHeader title={title} subtitle={subtitle} />
-      <div style={{ padding: 40 }}>
+      <PageHeader isMobile={isMobile} title={title} subtitle={subtitle} />
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 80, textAlign: "center" }}>
           <div style={{ width: 64, height: 64, borderRadius: 16, background: "#F5F5F5", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#9A9A9A" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round"/></svg>
@@ -1277,7 +1405,7 @@ function affiliateStatusLabel(status: string, lang: "en" | "fr"): string {
   return labels[status]?.[lang] ?? labels[status]?.en ?? status;
 }
 
-function AffiliatesView() {
+function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
   const lang = useLang();
   const [affiliates, setAffiliates] = useState<AffiliateRow[]>(INITIAL_AFFILIATES);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -1293,11 +1421,11 @@ function AffiliatesView() {
 
   return (
     <>
-      <PageHeader title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
-        <button type="button" style={btnPrimary} onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
+      <PageHeader isMobile={isMobile} title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
+        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
       } />
-      <div style={{ padding: 40 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
           {[
             { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: "12" },
             { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: "4,847" },
@@ -1312,7 +1440,8 @@ function AffiliatesView() {
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA" }}>
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA", minWidth: isMobile ? 700 : undefined }}>
             {[
               lang === "fr" ? "Créateur" : "Creator",
               lang === "fr" ? "Lien de parrainage" : "Referral link",
@@ -1353,6 +1482,7 @@ function AffiliatesView() {
               </div>
             );
           })}
+          </div>
         </div>
       </div>
 
@@ -1546,12 +1676,21 @@ function FilterDropdown({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Toggle({ on }: { on: boolean }) {
-  return (
+function Toggle({ on, onChange }: { on: boolean; onChange?: () => void }) {
+  const track = (
     <div style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
       <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
     </div>
   );
+  if (onChange) {
+    return (
+      <label style={{ cursor: "pointer", display: "inline-flex" }}>
+        <input type="checkbox" checked={on} onChange={onChange} style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
+        {track}
+      </label>
+    );
+  }
+  return track;
 }
 
 const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };

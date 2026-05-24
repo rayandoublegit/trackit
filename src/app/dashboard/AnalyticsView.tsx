@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
-
-const HAS_DATA = true;
+import { formatCurrency } from "@/lib/useCurrency";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -39,12 +38,31 @@ const OUTREACH_PLATFORMS = [
   { platform: "YouTube", sent: 27, replied: 7, converted: 2, preview: "Partnership opportunity for your audience" },
 ];
 
-export function AnalyticsView() {
-  const lang = useLang();
+export function AnalyticsView({ userId, isMobile, lang: langProp }: { userId?: string; isMobile?: boolean; lang?: string }) {
+  const langHook = useLang();
+  const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [loadingData, setLoadingData] = useState(true);
   const [range, setRange] = useState<DateRange>("30d");
   const [compare, setCompare] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("sales");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    if (!userId) {
+      setLoadingData(false);
+      return;
+    }
+    fetch(`/api/analytics?userId=${userId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setAnalyticsData(data);
+        setLoadingData(false);
+      })
+      .catch(() => setLoadingData(false));
+  }, [userId]);
+
+  const HAS_DATA = !loadingData && (analyticsData?.hasData ?? false);
 
   const sortedCreators = useMemo(() => {
     const rows = TOP_CREATORS.map((r) => ({ ...r, roi: r.sales / r.commission }));
@@ -62,10 +80,10 @@ export function AnalyticsView() {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
-  if (!HAS_DATA) {
+  if (!loadingData && !HAS_DATA) {
     return (
       <>
-        <AnalyticsHeader lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
@@ -78,16 +96,16 @@ export function AnalyticsView() {
 
   return (
     <>
-      <AnalyticsHeader lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} />
-      <div style={{ padding: "24px 40px 40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value="$24,500" sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
-          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value="147" sub={lang === "fr" ? "vs période précédente +23 ↑" : "vs last period +23 ↑"} subColor="#2E7D32" />
-          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value="34%" sub={lang === "fr" ? "vs période précédente -2% ↓" : "vs last period -2% ↓"} subColor="#C62828" />
-          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value="$1,960" sub={lang === "fr" ? "vs période précédente +9% ↑" : "vs last period +9% ↑"} subColor="#2E7D32" />
+      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
+      <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
+          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={analyticsData?.totalRevenue ? formatCurrency(analyticsData.totalRevenue, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value={String(analyticsData?.totalSent || 0)} sub={lang === "fr" ? "vs période précédente +23 ↑" : "vs last period +23 ↑"} subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value={`${analyticsData?.responseRate || 0}%`} sub={lang === "fr" ? "vs période précédente -2% ↓" : "vs last period -2% ↓"} subColor="#C62828" />
+          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value={analyticsData?.totalCommissions ? formatCurrency(analyticsData.totalCommissions, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +9% ↑" : "vs last period +9% ↑"} subColor="#2E7D32" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Revenus par créateur dans le temps" : "Revenue by Creator Over Time"}>
             <LineChart />
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, justifyContent: "center" }}>
@@ -105,8 +123,8 @@ export function AnalyticsView() {
         </div>
 
         <ChartCard title={lang === "fr" ? "Meilleurs créateurs ce mois" : "Top Performing Creators This Month"} style={{ marginBottom: 20 }}>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
                   <Th>{lang === "fr" ? "Rang" : "Rank"}</Th>
@@ -124,8 +142,8 @@ export function AnalyticsView() {
                     <td style={{ padding: "12px 8px" }}><RankBadge rank={r.rank} /></td>
                     <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A" }}>{r.creator}</td>
                     <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{r.platform}</td>
-                    <td style={{ padding: "12px 8px" }}>${r.sales.toLocaleString()}</td>
-                    <td style={{ padding: "12px 8px" }}>${r.commission.toLocaleString()}</td>
+                    <td style={{ padding: "12px 8px" }}>{formatCurrency(r.sales, lang)}</td>
+                    <td style={{ padding: "12px 8px" }}>{formatCurrency(r.commission, lang)}</td>
                     <td style={{ padding: "12px 8px", fontWeight: 500 }}>{r.roi.toFixed(1)}x</td>
                     <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
@@ -135,19 +153,20 @@ export function AnalyticsView() {
           </div>
         </ChartCard>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}>
             <DonutChart lang={lang} />
             <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? "Taux de commission moyen : 8%" : "Average commission rate: 8%"}</p>
-            <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? "Revenus nets après commissions : 22 540$" : "Net revenue after commissions: $22,540"}</p>
+            <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? `Revenus nets après commissions : ${formatCurrency(22540, lang)}` : `Net revenue after commissions: ${formatCurrency(22540, lang)}`}</p>
           </ChartCard>
           <ChartCard title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}>
-            <PlatformBars />
+            <PlatformBars lang={lang} />
           </ChartCard>
         </div>
 
         <ChartCard title={lang === "fr" ? "Performance des campagnes" : "Campaign Performance"} style={{ marginBottom: 20 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
                 <Th>{lang === "fr" ? "Nom de la campagne" : "Campaign Name"}</Th><Th>{lang === "fr" ? "Créateurs" : "Creators"}</Th><Th>{lang === "fr" ? "Ventes totales" : "Total Sales"}</Th><Th>{lang === "fr" ? "Commissions" : "Commissions"}</Th><Th>{lang === "fr" ? "ROI moyen" : "Avg ROI"}</Th><Th>{lang === "fr" ? "Date de début" : "Start Date"}</Th><Th>{lang === "fr" ? "Statut" : "Status"}</Th>
@@ -158,8 +177,8 @@ export function AnalyticsView() {
                 <tr key={c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name}</td>
                   <td style={{ padding: "12px 8px" }}>{c.creators}</td>
-                  <td style={{ padding: "12px 8px" }}>${c.sales.toLocaleString()}</td>
-                  <td style={{ padding: "12px 8px" }}>${c.commissions.toLocaleString()}</td>
+                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.sales, lang)}</td>
+                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.commissions, lang)}</td>
                   <td style={{ padding: "12px 8px" }}>{c.roi}</td>
                   <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{c.start}</td>
                   <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={c.status} /></td>
@@ -167,16 +186,18 @@ export function AnalyticsView() {
               ))}
             </tbody>
           </table>
+          </div>
         </ChartCard>
 
         <ChartCard title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"} style={{ marginBottom: 20 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
             <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value="147" />
             <MiniStat label={lang === "fr" ? "Taux d'ouverture" : "Open rate"} value="68%" />
             <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value="34%" />
             <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value="12%" />
           </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
                 <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th><Th>{lang === "fr" ? "Envoyé" : "Sent"}</Th><Th>{lang === "fr" ? "Répondu" : "Replied"}</Th><Th>{lang === "fr" ? "Converti" : "Converted"}</Th><Th>{lang === "fr" ? "Aperçu du meilleur message" : "Best performing message preview"}</Th>
@@ -194,10 +215,11 @@ export function AnalyticsView() {
               ))}
             </tbody>
           </table>
+          </div>
         </ChartCard>
 
         <ChartCard title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
             <MiniStat label={lang === "fr" ? "Deals conclus grâce aux relances" : "Deals closed from follow up"} value="23%" large />
             <MiniStat label={lang === "fr" ? "Relances moyennes avant réponse" : "Average follow ups before reply"} value="2.4" large />
           </div>
@@ -208,26 +230,70 @@ export function AnalyticsView() {
   );
 }
 
-function AnalyticsHeader({ lang, range, setRange, compare, setCompare }: {
+function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData }: {
   lang: "en" | "fr";
   range: DateRange; setRange: (r: DateRange) => void;
   compare: boolean; setCompare: (v: boolean) => void;
+  isMobile?: boolean;
+  analyticsData?: any;
 }) {
   const ranges: { id: DateRange; label: string }[] = [
     { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
-    { id: "7d", label: lang === "fr" ? "7 derniers jours" : "Last 7 days" },
-    { id: "30d", label: lang === "fr" ? "30 derniers jours" : "Last 30 days" },
-    { id: "90d", label: lang === "fr" ? "90 derniers jours" : "Last 90 days" },
+    { id: "7d", label: lang === "fr" ? "7 jours" : "7 days" },
+    { id: "30d", label: lang === "fr" ? "30 jours" : "30 days" },
+    { id: "90d", label: lang === "fr" ? "90 jours" : "90 days" },
     { id: "custom", label: lang === "fr" ? "Personnalisé" : "Custom" },
   ];
   return (
-    <div style={{ padding: "32px 40px 20px", borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
-        <button type="button" style={btnSecondary}>{lang === "fr" ? "Exporter CSV" : "Export CSV"}</button>
+        <button
+          type="button"
+          className="hero-cta-shopify-light hero-cta-compact"
+          style={{ marginTop: 8 }}
+          onClick={() => {
+            if (!analyticsData) return;
+
+            const rows = [
+              ["Metric", "Value"],
+              ["Total Revenue", analyticsData.totalRevenue || 0],
+              ["Total Commissions", analyticsData.totalCommissions || 0],
+              ["Total Creators Contacted", analyticsData.totalSent || 0],
+              ["Response Rate", `${analyticsData.responseRate || 0}%`],
+              ["Converted", analyticsData.converted || 0],
+              "",
+              ["Creator", "Platform", "Sales", "Commission"],
+              ...(analyticsData.creators || []).map((c: any) => [
+                c.full_name || c.handle,
+                c.platform,
+                c.total_sales || 0,
+                c.total_earned || 0,
+              ]),
+              "",
+              ["Campaign", "Platform", "Status"],
+              ...(analyticsData.campaigns || []).map((c: any) => [
+                c.name,
+                c.platform,
+                c.status,
+              ]),
+            ];
+
+            const csv = rows.map(r => Array.isArray(r) ? r.join(",") : "").join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `trackit-analytics-${new Date().toISOString().split("T")[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          {lang === "fr" ? "Exporter CSV →" : "Export CSV →"}
+        </button>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-        <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2 }}>
+        <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
           {ranges.map((r) => (
             <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
               padding: "8px 14px", borderRadius: 8, border: "none", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
@@ -237,7 +303,7 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare }: {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to last period"}</span>
+          <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to previous period"}</span>
           <CompareToggle on={compare} onToggle={() => setCompare(!compare)} />
         </div>
       </div>
@@ -369,11 +435,11 @@ function DonutChart({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-function PlatformBars() {
+function PlatformBars({ lang }: { lang: "en" | "fr" }) {
   const items = [
-    { name: "TikTok", amount: "$12,400", pct: 51, color: "#1A1A1A" },
-    { name: "Instagram", amount: "$8,200", pct: 33, color: "#E1306C" },
-    { name: "YouTube", amount: "$3,900", pct: 16, color: "#FF0000" },
+    { name: "TikTok", amount: 12400, pct: 51, color: "#1A1A1A" },
+    { name: "Instagram", amount: 8200, pct: 33, color: "#E1306C" },
+    { name: "YouTube", amount: 3900, pct: 16, color: "#FF0000" },
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -381,7 +447,7 @@ function PlatformBars() {
         <div key={i.name}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
             <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{i.name}</span>
-            <span style={{ color: "#7A7A7A" }}>{i.amount} · {i.pct}%</span>
+            <span style={{ color: "#7A7A7A" }}>{formatCurrency(i.amount, lang)} · {i.pct}%</span>
           </div>
           <div style={{ height: 10, background: "#EFEFEF", borderRadius: 999, overflow: "hidden" }}>
             <div style={{ width: `${i.pct}%`, height: "100%", background: i.color, borderRadius: 999 }} />

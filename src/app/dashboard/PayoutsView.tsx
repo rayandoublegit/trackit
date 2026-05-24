@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
 import {
   formatPaymentLabel,
   getDefaultPaymentMethod,
@@ -49,10 +50,6 @@ const btnOutline: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
-function formatUsd(amount: number) {
-  return `$${amount.toFixed(2)}`;
-}
-
 function round2(n: number) {
   return Math.round(n * 100) / 100;
 }
@@ -86,7 +83,7 @@ function seedNotifications(): SaleNotification[] {
   return INITIAL_SALES.map((s, i) => ({ ...s, id: `seed-${i}` }));
 }
 
-export function LiveSalesFeed() {
+export function LiveSalesFeed({ isMobile }: { isMobile?: boolean } = {}) {
   const lang = useLang();
   const [notifications, setNotifications] = useState<SaleNotification[]>(seedNotifications);
   const [paused, setPaused] = useState(false);
@@ -137,7 +134,7 @@ export function LiveSalesFeed() {
             <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px" }}>{lang === "fr" ? "Flux des ventes en direct" : "Live sales feed"}</h2>
             <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Chaque vente suivie depuis vos créateurs en temps réel." : "Every sale tracked from your creators in real time."}</p>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: isMobile ? "wrap" : undefined }}>
             <button
               type="button"
               onClick={() => setPaused((p) => !p)}
@@ -261,15 +258,13 @@ function SaleNotificationCard({
           animation: "salePulse 1.6s ease-in-out infinite",
         }}
       />
-      <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }} aria-hidden>
-        🛍️
-      </span>
+      <img src="/shopify-logo.svg" alt="" width={20} height={20} style={{ display: "block", flexShrink: 0, objectFit: "contain" }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-          {lang === "fr" ? "Une vente de" : "A sale of"} {formatUsd(sale.amount)} {lang === "fr" ? "vient d'arriver" : "just dropped"}
+          {lang === "fr" ? "Une vente de" : "A sale of"} {formatCurrency(sale.amount, lang)} {lang === "fr" ? "vient d'arriver" : "just dropped"}
         </div>
         <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 8, lineHeight: 1.45 }}>
-          {lang === "fr" ? "Répartition :" : "Split:"} {formatUsd(creatorShare)} {lang === "fr" ? "pour" : "for"} @{sale.creatorHandle} · {formatUsd(brandShare)} {lang === "fr" ? "conservé" : "kept"}
+          {lang === "fr" ? "Répartition :" : "Split:"} {formatCurrency(creatorShare, lang)} {lang === "fr" ? "pour" : "for"} @{sale.creatorHandle} · {formatCurrency(brandShare, lang)} {lang === "fr" ? "conservé" : "kept"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, color: "#9A9A9A" }}>{formatRelativeTime(sale.minutesAgo, lang)}</span>
@@ -697,21 +692,17 @@ type PayoutPartner = {
   id: string;
   name: string;
   handle: string;
-  owed: string;
+  owed: number;
   hasPaymentMethod: boolean;
   paymentLabel?: string;
 };
 
 const PAYOUT_PARTNERS_SEED: PayoutPartner[] = [
-  { id: "1", name: "Alex Rivera", handle: "@alexcreates", owed: "$124.50", hasPaymentMethod: true, paymentLabel: "PayPal · alex@email.com" },
-  { id: "2", name: "Jordan Lee", handle: "@jordanlee", owed: "$89.00", hasPaymentMethod: false },
-  { id: "3", name: "Sam Taylor", handle: "@samtaylor", owed: "$210.25", hasPaymentMethod: true, paymentLabel: "Bank · •••• 4821" },
-  { id: "4", name: "Morgan Kim", handle: "@morgankim", owed: "$56.75", hasPaymentMethod: false },
+  { id: "1", name: "Alex Rivera", handle: "@alexcreates", owed: 124.5, hasPaymentMethod: true, paymentLabel: "PayPal · alex@email.com" },
+  { id: "2", name: "Jordan Lee", handle: "@jordanlee", owed: 89, hasPaymentMethod: false },
+  { id: "3", name: "Sam Taylor", handle: "@samtaylor", owed: 210.25, hasPaymentMethod: true, paymentLabel: "Bank · •••• 4821" },
+  { id: "4", name: "Morgan Kim", handle: "@morgankim", owed: 56.75, hasPaymentMethod: false },
 ];
-
-function formatPayoutBalanceUsd(amount: number) {
-  return `$${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function mapDbCreatorToPartner(c: {
   id: string;
@@ -725,14 +716,14 @@ function mapDbCreatorToPartner(c: {
     id: c.id,
     name: c.full_name || c.handle || (lang === "fr" ? "Créateur" : "Creator"),
     handle,
-    owed: formatPayoutBalanceUsd(Number(c.balance) || 0),
+    owed: Number(c.balance) || 0,
     hasPaymentMethod: false,
   };
 }
 
-function PayoutsPageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function PayoutsPageHeader({ title, subtitle, isMobile }: { title: string; subtitle?: string; isMobile?: boolean }) {
   return (
-    <div style={{ padding: "32px 40px 24px 40px", borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
         {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
@@ -778,9 +769,13 @@ const payoutsBtnSecondary: React.CSSProperties = {
 export function PayoutsView({
   plan,
   onUpgrade,
+  isMobile,
+  userId,
 }: {
   plan: "free" | "basic" | "pro";
   onUpgrade: () => void;
+  isMobile?: boolean;
+  userId?: string;
 }) {
   const lang = useLang();
   const [search, setSearch] = useState("");
@@ -797,22 +792,28 @@ export function PayoutsView({
   const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
   const [addPaymentForFunds, setAddPaymentForFunds] = useState(false);
   const [fundAmount, setFundAmount] = useState("");
+  const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
+  const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
+  const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances">("overview");
 
   useEffect(() => {
-    const load = async () => {
+    if (!userId) return;
+    import("@/lib/supabase").then(({ supabase }) => {
       if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("creators")
-        .select("id, handle, full_name, avatar_url, platform, balance, total_earned, total_sales, discount_code")
-        .eq("user_id", user.id)
-        .gt("balance", 0)
-        .order("balance", { ascending: false });
-      if (data && data.length > 0) setCreators(data);
-    };
-    void load();
-  }, []);
+      supabase.from("profiles").select("auto_payout_monthly").eq("id", userId).single()
+        .then(({ data }) => {
+          if (data?.auto_payout_monthly) setAutoPayoutMonthly(true);
+        });
+    });
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/creators-list?userId=${userId}`)
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setCreators(data); })
+      .catch(console.error);
+  }, [userId]);
 
   const tablePartners = useMemo(
     () => (creators.length > 0 ? creators.map((c) => mapDbCreatorToPartner(c, lang)) : partners),
@@ -835,7 +836,7 @@ export function PayoutsView({
     }
     setPayingId(partner.id);
     setTimeout(() => {
-      setPayMessage(`Payment of ${partner.owed} sent to ${partner.name}.`);
+      setPayMessage(`Payment of ${formatCurrency(partner.owed, lang)} sent to ${partner.name}.`);
       setPayingId(null);
     }, 600);
   };
@@ -863,7 +864,7 @@ export function PayoutsView({
     setBalance((b) => b + amount);
     setFundAmount("");
     setPayoutModal(null);
-    setPayMessage(`${formatPayoutBalanceUsd(amount)} added to your balance.`);
+    setPayMessage(`${formatCurrency(amount, lang)} added to your balance.`);
   };
 
   const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
@@ -872,8 +873,37 @@ export function PayoutsView({
 
   return (
     <>
-      <PayoutsPageHeader title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Suivez les commissions et payez les créateurs automatiquement lors des ventes Shopify" : "Track commissions and pay creators automatically when Shopify sales come in"} />
-      <div style={{ padding: 40, position: "relative" }}>
+      <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Suivez les commissions et payez les créateurs automatiquement lors des ventes Shopify" : "Track commissions and pay creators automatically when Shopify sales come in"} />
+      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, background: "#FFFFFF" }}>
+        <div style={{ display: "flex", gap: 4, marginBottom: 0, borderBottom: "1px solid #EFEFEF", paddingBottom: 0 }}>
+          {[
+            { id: "overview", label: lang === "fr" ? "Aperçu" : "Overview" },
+            { id: "balances", label: lang === "fr" ? "Soldes des créateurs" : "Creator Balances" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setPayoutsTab(tab.id as "overview" | "balances")}
+              style={{
+                padding: "10px 16px",
+                background: "none",
+                border: "none",
+                borderBottom: payoutsTab === tab.id ? "2px solid #0047FF" : "2px solid transparent",
+                color: payoutsTab === tab.id ? "#0047FF" : "#7A7A7A",
+                fontWeight: payoutsTab === tab.id ? 600 : 400,
+                fontSize: 14,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                letterSpacing: "-0.02em",
+                marginBottom: -1,
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : 56, position: "relative" }}>
         {plan === "free" && (
           <div
             style={{
@@ -883,8 +913,9 @@ export function PayoutsView({
               background: "rgba(255,255,255,0.92)",
               backdropFilter: "blur(4px)",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "center",
+              paddingTop: isMobile ? 32 : 48,
               borderRadius: 16,
             }}
           >
@@ -916,23 +947,43 @@ export function PayoutsView({
             </div>
           </div>
         )}
-        <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 20, marginBottom: 20 }}>
-          <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28 }}>
+
+        {payoutsTab === "overview" && (
+        <>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20, marginBottom: 20 }}>
+          <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28, flex: isMobile ? undefined : 1.4, width: isMobile ? "100%" : undefined }}>
             <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Votre solde" : "Your balance"}</div>
-            <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatPayoutBalanceUsd(balance)}</div>
-            <button type="button" onClick={openAddFunds} className="hero-cta-shopify">{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</button>
+            <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatCurrency(balance, lang)}</div>
+            <button type="button" onClick={openAddFunds} className="hero-cta-shopify-dark">{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</button>
           </div>
-          <PayoutsWorkspacePaymentCard />
+          <div style={{ width: isMobile ? "100%" : undefined, flex: isMobile ? undefined : 1 }}>
+            <PayoutsWorkspacePaymentCard />
+          </div>
         </div>
 
-        <LiveSalesFeed />
+        <LiveSalesFeed isMobile={isMobile} />
+
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Automatiser les paiements" : "Automate payouts"}</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Quand une vente Shopify est détectée, payez automatiquement la commission au créateur" : "When a Shopify sale is detected, automatically pay the creator their commission"}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Paiement automatique mensuel" : "Monthly auto payout"}</div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement." : "On the 1st of every month, all creators with a positive balance are paid automatically."}</div>
           </div>
-          <PayoutsToggle on={false} />
+          <label style={{ cursor: "pointer", display: "flex" }}>
+            <input
+              type="checkbox"
+              checked={autoPayoutMonthly}
+              onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                const val = e.target.checked;
+                setAutoPayoutMonthly(val);
+                const { supabase } = await import("@/lib/supabase");
+                if (!supabase) return;
+                await supabase.from("profiles").update({ auto_payout_monthly: val }).eq("id", userId);
+              }}
+              style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+            />
+            <PayoutsToggle on={autoPayoutMonthly} />
+          </label>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
@@ -962,7 +1013,7 @@ export function PayoutsView({
                 Register payment method for {registering.name}
               </div>
               <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 16 }}>
-                This partner has no payout method on file. Add one before you can pay {registering.owed}.
+                This partner has no payout method on file. Add one before you can pay {formatCurrency(registering.owed, lang)}.
               </div>
               <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                 <button type="button" onClick={() => setMethodType("paypal")} style={{ ...payoutsBtnSecondary, background: methodType === "paypal" ? "#F5F5F5" : "#FFFFFF", borderColor: methodType === "paypal" ? "#1A1A1A" : "#E5E5E5" }}>PayPal</button>
@@ -982,11 +1033,22 @@ export function PayoutsView({
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <div style={{ display: "flex", flexDirection: "column", minWidth: isMobile ? 500 : undefined }}>
             {filtered.length === 0 ? (
               <div style={{ padding: 40, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>No partners match your search</div>
             ) : (
-              filtered.map((partner, i) => (
+              filtered.map((partner, i) => {
+                const creator = creators.find((c) => c.id === partner.id) ?? {
+                  id: partner.id,
+                  full_name: partner.name,
+                  handle: partner.handle.replace(/^@/, ""),
+                  balance: partner.owed,
+                  paypal_link: null as string | null,
+                  revolut_link: null as string | null,
+                  iban: null as string | null,
+                };
+                return (
                 <div
                   key={partner.id}
                   style={{
@@ -1001,24 +1063,63 @@ export function PayoutsView({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{partner.name}</div>
                     <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{partner.handle}</div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                      {creator.paypal_link ? (
+                        <span style={{ fontSize: 11, background: "#003087", color: "#fff", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>PayPal</span>
+                      ) : creator.revolut_link ? (
+                        <span style={{ fontSize: 11, background: "#7B2FF7", color: "#fff", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>Revolut</span>
+                      ) : creator.iban ? (
+                        <span style={{ fontSize: 11, background: "#059669", color: "#fff", padding: "2px 8px", borderRadius: 4, fontWeight: 600 }}>Bank</span>
+                      ) : (
+                        <span style={{ fontSize: 11, background: "#F5F5F5", color: "#9A9A9A", padding: "2px 8px", borderRadius: 4 }}>{lang === "fr" ? "Aucun moyen de paiement" : "No payment method"}</span>
+                      )}
+                    </div>
                     {partner.hasPaymentMethod ? (
                       <div style={{ fontSize: 11, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>{partner.paymentLabel}</div>
                     ) : (
                       <div style={{ fontSize: 11, color: "#C45C00", marginTop: 4, letterSpacing: "-0.01em" }}>No payment method</div>
                     )}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginRight: 8 }}>{partner.owed}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginRight: 8 }}>{formatCurrency(partner.owed, lang)}</div>
                   <button
                     type="button"
-                    onClick={() => handlePayClick(partner)}
+                    onClick={() => {
+                      const amount = creator.balance;
+                      if (!amount || amount <= 0) {
+                        alert(lang === "fr" ? "Solde insuffisant" : "No balance to pay");
+                        return;
+                      }
+
+                      if (creator.paypal_link) {
+                        const clean = creator.paypal_link.replace("https://paypal.me/", "").replace("paypal.me/", "");
+                        window.open(`https://paypal.me/${clean}/${amount}`, '_blank');
+                      } else if (creator.revolut_link) {
+                        const clean = creator.revolut_link.replace("https://revolut.me/", "").replace("revolut.me/", "");
+                        window.open(`https://revolut.me/${clean}`, '_blank');
+                      } else if (creator.iban) {
+                        navigator.clipboard.writeText(creator.iban);
+                        alert(lang === "fr"
+                          ? `IBAN copié: ${creator.iban}\nMontant à virer: ${amount}€`
+                          : `IBAN copied: ${creator.iban}\nAmount to transfer: $${amount}`
+                        );
+                      } else {
+                        alert(lang === "fr"
+                          ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
+                          : `${creator.full_name || creator.handle} hasn't added their payment details yet.`
+                        );
+                      }
+                    }}
                     disabled={payingId === partner.id || registeringId === partner.id}
-                    style={{ ...payoutsBtnPrimary, minWidth: 72, opacity: payingId === partner.id ? 0.7 : 1 }}
+                    className="hero-cta-shopify hero-cta-compact"
+                    style={{ minWidth: 72, opacity: payingId === partner.id ? 0.7 : 1 }}
                   >
                     {payingId === partner.id ? "Paying…" : lang === "fr" ? "Payer" : "Pay"}
                   </button>
                 </div>
-              ))
+                );
+              })
             )}
+          </div>
           </div>
         </div>
 
@@ -1035,11 +1136,214 @@ export function PayoutsView({
           </div>
         </div>
 
+        </>
+        )}
+
+        {payoutsTab === "balances" && (
+        <>
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.03em" }}>
+            {lang === "fr" ? "Soldes des créateurs" : "Creator balances"}
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {creators.map((creator) => (
+              <div key={creator.id} onClick={() => setSelectedCreatorPayout(creator)} style={{ display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #EFEFEF", borderRadius: 12, padding: "12px 16px", cursor: "pointer", transition: "box-shadow 0.15s" }}>
+                <img src={creator.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${creator.handle}`} alt="" style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover" }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{creator.full_name || creator.handle}</div>
+                  <div style={{ fontSize: 12, color: "#9A9A9A" }}>@{creator.handle || creator.username}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, color: creator.balance > 0 ? "#1A1A1A" : "#9A9A9A" }}>
+                    {creator.balance > 0 ? formatCurrency(creator.balance, lang) : formatCurrency(0, lang)}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 2 }}>
+                    {creator.paypal_link ? <span style={{ background: "#003087", color: "#fff", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>PayPal</span>
+                    : creator.revolut_link ? <span style={{ background: "#7B2FBE", color: "#fff", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>Revolut</span>
+                    : creator.iban ? <span style={{ background: "#1B5E20", color: "#fff", padding: "1px 6px", borderRadius: 4, fontSize: 10, fontWeight: 600 }}>Bank</span>
+                    : <span style={{ background: "#F5F5F5", color: "#9A9A9A", padding: "1px 6px", borderRadius: 4, fontSize: 10 }}>{lang === "fr" ? "Aucun" : "None"}</span>}
+                  </div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      {selectedCreatorPayout && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSelectedCreatorPayout(null)}>
+          <div style={{ background: "#fff", borderRadius: 20, padding: 28, maxWidth: 440, width: "100%", position: "relative" }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 24 }}>
+              <img src={selectedCreatorPayout.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedCreatorPayout.handle}`} alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: "#1A1A1A" }}>{selectedCreatorPayout.full_name || selectedCreatorPayout.handle}</div>
+                <div style={{ fontSize: 13, color: "#9A9A9A" }}>@{selectedCreatorPayout.handle || selectedCreatorPayout.username}</div>
+              </div>
+              <button type="button" onClick={() => setSelectedCreatorPayout(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", fontSize: 20 }}>×</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 24 }}>
+              <div style={{ background: "#F8F8F8", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Solde actuel" : "Current balance"}</div>
+                <div style={{ fontWeight: 700, fontSize: 18, color: "#0047FF" }}>{formatCurrency(selectedCreatorPayout.balance || 0, lang)}</div>
+              </div>
+              <div style={{ background: "#F8F8F8", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Total gagné" : "Total earned"}</div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{formatCurrency(selectedCreatorPayout.total_earned || 0, lang)}</div>
+              </div>
+              <div style={{ background: "#F8F8F8", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Ventes" : "Sales"}</div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{selectedCreatorPayout.total_sales || 0}</div>
+              </div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>{lang === "fr" ? "Méthode de paiement" : "Payment method"}</div>
+              {selectedCreatorPayout.paypal_link ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F0F4FF", borderRadius: 10, padding: "10px 14px" }}>
+                  <span style={{ background: "#003087", color: "#fff", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>PayPal</span>
+                  <span style={{ fontSize: 13, color: "#1A1A1A" }}>{selectedCreatorPayout.paypal_link}</span>
+                </div>
+              ) : selectedCreatorPayout.revolut_link ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F5F0FF", borderRadius: 10, padding: "10px 14px" }}>
+                  <span style={{ background: "#7B2FBE", color: "#fff", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>Revolut</span>
+                  <span style={{ fontSize: 13, color: "#1A1A1A" }}>{selectedCreatorPayout.revolut_link}</span>
+                </div>
+              ) : selectedCreatorPayout.iban ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#F0FFF4", borderRadius: 10, padding: "10px 14px" }}>
+                  <span style={{ background: "#1B5E20", color: "#fff", padding: "2px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600 }}>IBAN</span>
+                  <span style={{ fontSize: 13, color: "#1A1A1A", fontFamily: "monospace" }}>{selectedCreatorPayout.iban}</span>
+                </div>
+              ) : (
+                <div style={{ background: "#F8F8F8", borderRadius: 10, padding: "10px 14px", fontSize: 13, color: "#9A9A9A" }}>
+                  {lang === "fr" ? "Aucune méthode de paiement configurée" : "No payment method configured"}
+                </div>
+              )}
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>{lang === "fr" ? "Réseaux sociaux" : "Social links"}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {selectedCreatorPayout.platform === "Instagram" || selectedCreatorPayout.handle ? (
+                  <a href={`https://www.instagram.com/${selectedCreatorPayout.handle || selectedCreatorPayout.username}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#F5F5F5", borderRadius: 8, fontSize: 12, color: "#1A1A1A", textDecoration: "none", fontWeight: 500 }}>
+                    Instagram →
+                  </a>
+                ) : null}
+                {selectedCreatorPayout.platform === "TikTok" || selectedCreatorPayout.handle ? (
+                  <a href={`https://www.tiktok.com/@${selectedCreatorPayout.handle || selectedCreatorPayout.username}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#F5F5F5", borderRadius: 8, fontSize: 12, color: "#1A1A1A", textDecoration: "none", fontWeight: 500 }}>
+                    TikTok →
+                  </a>
+                ) : null}
+                {selectedCreatorPayout.platform === "YouTube" ? (
+                  <a href={`https://www.youtube.com/@${selectedCreatorPayout.handle || selectedCreatorPayout.username}`} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", background: "#F5F5F5", borderRadius: 8, fontSize: 12, color: "#1A1A1A", textDecoration: "none", fontWeight: 500 }}>
+                    YouTube →
+                  </a>
+                ) : null}
+              </div>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>{lang === "fr" ? "Modifier le moyen de paiement" : "Edit payment method"}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="paypal.me/username"
+                  defaultValue={selectedCreatorPayout.paypal_link || ""}
+                  onBlur={async (e) => {
+                    const { supabase } = await import("@/lib/supabase");
+                    if (!supabase) return;
+                    await supabase.from("creators").update({ paypal_link: e.target.value }).eq("id", selectedCreatorPayout.id);
+                    setSelectedCreatorPayout({ ...selectedCreatorPayout, paypal_link: e.target.value });
+                  }}
+                  style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 13, fontFamily: "inherit", width: "100%" }}
+                />
+                <input
+                  type="text"
+                  placeholder="revolut.me/username"
+                  defaultValue={selectedCreatorPayout.revolut_link || ""}
+                  onBlur={async (e) => {
+                    const { supabase } = await import("@/lib/supabase");
+                    if (!supabase) return;
+                    await supabase.from("creators").update({ revolut_link: e.target.value }).eq("id", selectedCreatorPayout.id);
+                    setSelectedCreatorPayout({ ...selectedCreatorPayout, revolut_link: e.target.value });
+                  }}
+                  style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 13, fontFamily: "inherit", width: "100%" }}
+                />
+                <input
+                  type="text"
+                  placeholder="IBAN (FR76 ...)"
+                  defaultValue={selectedCreatorPayout.iban || ""}
+                  onBlur={async (e) => {
+                    const { supabase } = await import("@/lib/supabase");
+                    if (!supabase) return;
+                    await supabase.from("creators").update({ iban: e.target.value }).eq("id", selectedCreatorPayout.id);
+                    setSelectedCreatorPayout({ ...selectedCreatorPayout, iban: e.target.value });
+                  }}
+                  style={{ padding: "9px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 13, fontFamily: "inherit", width: "100%" }}
+                />
+              </div>
+              <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>{lang === "fr" ? "Cliquez en dehors du champ pour sauvegarder" : "Click outside the field to save"}</div>
+            </div>
+            {selectedCreatorPayout.discount_code && (
+              <div style={{ marginBottom: 20, background: "#F8F8F8", borderRadius: 10, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#9A9A9A" }}>{lang === "fr" ? "Code de réduction" : "Discount code"}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, fontFamily: "monospace" }}>{selectedCreatorPayout.discount_code}</div>
+                </div>
+                <button type="button" onClick={() => navigator.clipboard.writeText(selectedCreatorPayout.discount_code)} style={{ background: "none", border: "1px solid #E5E5E5", borderRadius: 6, padding: "4px 10px", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+                  {lang === "fr" ? "Copier" : "Copy"}
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0}
+              onClick={() => {
+                const amount = selectedCreatorPayout.balance;
+                const creator = selectedCreatorPayout;
+                if (!amount || amount <= 0) {
+                  alert(lang === "fr" ? "Solde insuffisant" : "No balance to pay");
+                  return;
+                }
+                if (creator.paypal_link) {
+                  const clean = creator.paypal_link.replace("https://paypal.me/", "").replace("paypal.me/", "");
+                  window.open(`https://paypal.me/${clean}/${amount}`, '_blank');
+                } else if (creator.revolut_link) {
+                  const clean = creator.revolut_link.replace("https://revolut.me/", "").replace("revolut.me/", "");
+                  window.open(`https://revolut.me/${clean}`, '_blank');
+                } else if (creator.iban) {
+                  navigator.clipboard.writeText(creator.iban);
+                  alert(lang === "fr" ? `IBAN copié ✓\nMontant: ${formatCurrency(amount, lang)}` : `IBAN copied ✓\nAmount: ${formatCurrency(amount, lang)}`);
+                } else {
+                  alert(lang === "fr" ? "Ajoutez d'abord une méthode de paiement" : "Add a payment method first");
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: selectedCreatorPayout.balance > 0 ? "#0047FF" : "#E5E5E5",
+                color: selectedCreatorPayout.balance > 0 ? "#fff" : "#9A9A9A",
+                border: "none",
+                borderRadius: 12,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: selectedCreatorPayout.balance > 0 ? "pointer" : "not-allowed",
+                fontFamily: "inherit",
+                letterSpacing: "-0.02em"
+              }}
+            >
+              {selectedCreatorPayout.balance > 0
+                ? `${lang === "fr" ? "Payer" : "Pay"} ${formatCurrency(selectedCreatorPayout.balance, lang)}`
+                : lang === "fr" ? "Aucun solde à payer" : "No balance to pay"
+              }
+            </button>
+          </div>
+        </div>
+      )}
+        </>
+        )}
+
       {payoutModal === "addFunds" && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
           <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</h3>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatPayoutBalanceUsd(balance)}</p>
+            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatCurrency(balance, lang)}</p>
             {!defaultPaymentMethod ? (
               <>
                 <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>Add a payment method before you can fund your balance.</p>
@@ -1062,7 +1366,7 @@ export function PayoutsView({
                 </div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
                   {[50, 100, 250, 500].map((amt) => (
-                    <button key={amt} type="button" onClick={() => setFundAmount(String(amt))} style={{ ...payoutsBtnSecondary, padding: "6px 12px", fontSize: 12 }}>${amt}</button>
+                    <button key={amt} type="button" onClick={() => setFundAmount(String(amt))} style={{ ...payoutsBtnSecondary, padding: "6px 12px", fontSize: 12 }}>{formatCurrency(amt, lang)}</button>
                   ))}
                 </div>
                 <button type="button" onClick={handleAddFunds} disabled={!canAddFunds} style={{ ...payoutsBtnPrimary, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}>Add funds</button>
@@ -1079,6 +1383,7 @@ export function PayoutsView({
           onAdded={() => setPayMessage("Payment method connected. You can add funds now.")}
         />
       )}
+
 
       </div>
     </>
@@ -1128,7 +1433,7 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
               </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={openAdd} style={{ ...pmBtnSecondary, flex: 1 }}>
+              <button type="button" onClick={openAdd} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ flex: 1 }}>
                 {lang === "fr" ? "Mettre à jour" : "Update payment method"}
               </button>
               <button

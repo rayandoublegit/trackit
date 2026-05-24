@@ -171,9 +171,9 @@ function formatCount(n: number) {
   return String(n);
 }
 
-function DiscoveryHeader({ lang }: { lang: "en" | "fr" }) {
+function DiscoveryHeader({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
   return (
-    <div style={{ padding: "32px 40px 0 40px", background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 0, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>
         {lang === "fr" ? "Recherche" : "Discovery"}
       </h1>
@@ -290,7 +290,7 @@ function getVideoThumbnails(creator: Creator) {
   );
 }
 
-function VideoPreviews({ creator, size }: { creator: Creator; size: "card" | "modal" }) {
+function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card" | "modal"; lang: "en" | "fr" }) {
   const videoThumbnails = getVideoThumbnails(creator);
   const isModal = size === "modal";
 
@@ -342,7 +342,7 @@ function VideoPreviews({ creator, size }: { creator: Creator; size: "card" | "mo
               letterSpacing: "-0.01em",
             }}
           >
-            {formatCount(video.views)} views
+            {formatCount(video.views)} {lang === "fr" ? "vues" : "views"}
           </div>
         </div>
       ))}
@@ -387,10 +387,12 @@ function recommendationBadgeStyle(rec: NonNullable<ParsedAnalysis["recommendatio
 }
 
 function CreatorProfileModal({
+  lang,
   creator,
   onClose,
   onGenerateOutreach,
 }: {
+  lang: "en" | "fr";
   creator: Creator;
   onClose: () => void;
   onGenerateOutreach: () => void;
@@ -519,10 +521,10 @@ function CreatorProfileModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
           {[
-            { label: "Followers", value: formatCount(creator.followersCount) },
-            { label: "Engagement Rate", value: `${creator.engagementRate}%` },
-            { label: "Avg Views", value: formatCount(creator.avgViews) },
-            { label: "Total Likes", value: formatCount(totalLikes) },
+            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
+            { label: lang === "fr" ? "Taux d'engagement" : "Engagement Rate", value: `${creator.engagementRate}%` },
+            { label: lang === "fr" ? "Vues moyennes" : "Avg Views", value: formatCount(creator.avgViews) },
+            { label: lang === "fr" ? "Likes totaux" : "Total Likes", value: formatCount(totalLikes) },
           ].map((stat) => (
             <div key={stat.label} style={{ background: "#FAFAFA", borderRadius: 10, padding: "12px 8px", textAlign: "center" }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A" }}>{stat.value}</div>
@@ -533,16 +535,16 @@ function CreatorProfileModal({
 
         <div style={{ marginBottom: 20, padding: 20, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            AI Analysis
+            {lang === "fr" ? "ANALYSE IA" : "AI ANALYSIS"}
           </div>
           {showBrandInput && (
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>What do you sell?</label>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Que vendez-vous ?" : "What do you sell?"}</label>
               <input
                 type="text"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                placeholder="Your product or brand"
+                placeholder={lang === "fr" ? "Votre produit ou marque" : "Your product or brand"}
                 style={{ ...inputStyle, marginBottom: 0 }}
               />
             </div>
@@ -553,10 +555,10 @@ function CreatorProfileModal({
             disabled={analyzing}
             style={{ ...btnSecondary, width: "100%", opacity: analyzing ? 0.7 : 1 }}
           >
-            Analyze fit for my brand →
+            {lang === "fr" ? "Analyser la compatibilité avec ma marque →" : "Analyze fit for my brand →"}
           </button>
           {analyzing && (
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "12px 0 0", textAlign: "center" }}>Analyzing creator fit...</p>
+            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "12px 0 0", textAlign: "center" }}>{lang === "fr" ? "Analyse en cours..." : "Analyzing..."}</p>
           )}
           {parsed && !analyzing && (
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
@@ -630,9 +632,9 @@ function CreatorProfileModal({
 
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
-            Video previews
+            {lang === "fr" ? "APERÇUS VIDÉO" : "VIDEO PREVIEWS"}
           </div>
-          <VideoPreviews creator={creator} size="modal" />
+          <VideoPreviews creator={creator} size="modal" lang={lang} />
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -641,10 +643,20 @@ function CreatorProfileModal({
             style={{ ...btnSecondary, flex: 1 }}
             onClick={() => window.open(`https://tiktok.com/@${creator.username ?? ""}`, "_blank", "noopener,noreferrer")}
           >
-            View on TikTok →
+            {creator.platform.toLowerCase() === "instagram"
+              ? lang === "fr"
+                ? "Voir sur Instagram →"
+                : "View on Instagram →"
+              : creator.platform.toLowerCase() === "youtube"
+                ? lang === "fr"
+                  ? "Voir sur YouTube →"
+                  : "View on YouTube →"
+                : lang === "fr"
+                  ? "Voir sur TikTok →"
+                  : "View on TikTok →"}
           </button>
           <button type="button" style={{ ...btnBlack, flex: 1 }} onClick={onGenerateOutreach}>
-            Generate outreach →
+            {lang === "fr" ? "Générer un message →" : "Generate outreach →"}
           </button>
         </div>
       </div>
@@ -1082,7 +1094,7 @@ function FilterSelect({
   );
 }
 
-function CreatorCardBody({ creator }: { creator: Creator }) {
+function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr" }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -1115,20 +1127,20 @@ function CreatorCardBody({ creator }: { creator: Creator }) {
         {creator.bio}
       </p>
 
-      <VideoPreviews creator={creator} size="card" />
+      <VideoPreviews creator={creator} size="card" lang={lang} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
         <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{formatCount(creator.followersCount)}</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>Followers</div>
+          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "abonnés" : "followers"}</div>
         </div>
         <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{creator.engagementRate}%</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>Engagement</div>
+          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "engagement" : "engagement"}</div>
         </div>
         <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{formatCount(creator.avgViews)}</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>Avg views</div>
+          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Vues moyennes" : "Avg views"}</div>
         </div>
       </div>
     </>
@@ -1136,6 +1148,7 @@ function CreatorCardBody({ creator }: { creator: Creator }) {
 }
 
 function CreatorCard({
+  lang,
   creator,
   variant,
   isSaved,
@@ -1144,6 +1157,7 @@ function CreatorCard({
   onGenerateOutreach,
   onRemove,
 }: {
+  lang: "en" | "fr";
   creator: Creator;
   variant: "discover" | "saved";
   isSaved?: boolean;
@@ -1165,14 +1179,14 @@ function CreatorCard({
   if (variant === "saved") {
     return (
       <div style={cardStyle}>
-        <CreatorCardBody creator={creator} />
+        <CreatorCardBody creator={creator} lang={lang} />
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" onClick={onViewProfile} style={{ ...btnSecondary, flex: 1, fontSize: 12, padding: "8px 12px" }}>
-              View profile
+            <button type="button" onClick={onViewProfile} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ flex: 1 }}>
+              {lang === "fr" ? "Voir le profil" : "View profile"}
             </button>
-            <button type="button" onClick={onGenerateOutreach} style={{ ...btnBlack, flex: 1, fontSize: 12, padding: "8px 12px" }}>
-              Generate outreach →
+            <button type="button" onClick={onGenerateOutreach} className="hero-cta-shopify hero-cta-compact-sm" style={{ flex: 1 }}>
+              {lang === "fr" ? "Générer un message →" : "Generate outreach →"}
             </button>
           </div>
           <button
@@ -1190,7 +1204,7 @@ function CreatorCard({
               letterSpacing: "-0.01em",
             }}
           >
-            Remove
+            {lang === "fr" ? "Supprimer" : "Remove"}
           </button>
         </div>
       </div>
@@ -1199,10 +1213,10 @@ function CreatorCard({
 
   return (
     <div style={cardStyle}>
-      <CreatorCardBody creator={creator} />
+      <CreatorCardBody creator={creator} lang={lang} />
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" onClick={onViewProfile} style={{ ...btnSecondary, flex: 1, fontSize: 12, padding: "8px 12px" }}>
-          View profile
+        <button type="button" onClick={onViewProfile} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ flex: 1 }}>
+          {lang === "fr" ? "Voir le profil" : "View profile"}
         </button>
         <button
           type="button"
@@ -1221,7 +1235,7 @@ function CreatorCard({
             color: isSaved ? "#5A5A5A" : "#FFFFFF",
           }}
         >
-          {isSaved ? "Saved ✓" : "Save creator"}
+          {isSaved ? (lang === "fr" ? "Sauvegardé" : "Saved") : lang === "fr" ? "Sauvegarder" : "Save creator"}
         </button>
       </div>
     </div>
@@ -1255,9 +1269,11 @@ function incrementDiscoverySearchCount() {
 export function DiscoveryView({
   plan,
   onUpgrade,
+  isMobile,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
+  isMobile?: boolean;
 }) {
   const lang = useLang();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
@@ -1394,16 +1410,17 @@ export function DiscoveryView({
 
   return (
     <>
-      <DiscoveryHeader lang={lang} />
+      <DiscoveryHeader lang={lang} isMobile={isMobile} />
       <DiscoveryTabs lang={lang} activeTab={activeTab} savedCount={savedCreators.length} onTabChange={setActiveTab} />
-      <div style={{ padding: 40 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {activeTab === "discover" && (
           <>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24 }}>
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: isMobile ? "stretch" : "center",
               gap: 10,
               background: "#FAFAFA",
               border: "1px solid #EFEFEF",
@@ -1437,25 +1454,18 @@ export function DiscoveryView({
               type="button"
               onClick={() => void search()}
               disabled={loading}
+              className="hero-cta-shopify hero-cta-compact"
               style={{
-                background: "#0047FF",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: 8,
-                padding: "8px 18px",
-                fontSize: 13,
-                fontWeight: 500,
-                fontFamily: "inherit",
                 cursor: loading ? "wait" : "pointer",
-                letterSpacing: "-0.02em",
                 opacity: loading ? 0.7 : 1,
+                width: isMobile ? "100%" : undefined,
               }}
             >
               {loading ? "Searching..." : lang === "fr" ? "Rechercher des créateurs" : "Search creators"}
             </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             <FilterSelect
               label={lang === "fr" ? "Niche" : "Niche"}
               value={niche}
@@ -1558,7 +1568,7 @@ export function DiscoveryView({
                 animation: "discovery-spin 0.8s linear infinite",
               }}
             />
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>Searching creators...</p>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Chargement des créateurs..." : "Loading creators..."}</p>
             <style>{`@keyframes discovery-spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )}
@@ -1593,8 +1603,8 @@ export function DiscoveryView({
 
         {!loading && hasSearched && creators.length === 0 && !error && (
           <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 60, textAlign: "center" }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>No creators found</h3>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>Try a different niche or platform filter.</p>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucun créateur trouvé" : "No creators found"}</h3>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Essayez d'ajuster vos filtres" : "Try adjusting your filters"}</p>
           </div>
         )}
 
@@ -1602,12 +1612,15 @@ export function DiscoveryView({
           <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, letterSpacing: "-0.02em" }}>
-                {creators.length} creator{creators.length === 1 ? "" : "s"} found
+                {lang === "fr"
+                  ? `${creators.length} ${creators.length === 1 ? "créateur trouvé" : "créateurs trouvés"}`
+                  : `${creators.length} ${creators.length === 1 ? "creator" : "creators"} found`}
               </p>
             </div>
             <div style={creatorsGridStyle}>
               {creators.map((c) => (
                 <CreatorCard
+                  lang={lang}
                   key={c.username  ?? ""}
                   variant="discover"
                   creator={c}
@@ -1631,13 +1644,14 @@ export function DiscoveryView({
                   {lang === "fr" ? "Aucun créateur sauvegardé" : "No saved creators yet"}
                 </h3>
                 <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-                  {lang === "fr" ? "Recherchez des créateurs et sauvegardez ceux avec qui vous souhaitez collaborer." : "Search for creators and save the ones you want to work with."}
+                  {lang === "fr" ? "Sauvegardez des créateurs depuis Recherche pour les voir ici" : "Save creators from Discovery to see them here"}
                 </p>
               </div>
             ) : (
               <div style={creatorsGridStyle}>
                 {savedCreators.map((c) => (
                   <CreatorCard
+                    lang={lang}
                     key={c.username ?? Math.random().toString()}
                     variant="saved"
                     creator={c}
@@ -1654,6 +1668,7 @@ export function DiscoveryView({
 
       {selectedCreator && (
         <CreatorProfileModal
+          lang={lang}
           creator={selectedCreator}
           onClose={() => setSelectedCreator(null)}
           onGenerateOutreach={() => openOutreach(selectedCreator)}

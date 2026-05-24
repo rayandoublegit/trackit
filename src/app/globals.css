@@ -1478,3 +1478,131 @@ html:not([data-dark="true"]) ::-webkit-scrollbar-thumb {
   background: #ccc;
   border-radius: 3px;
 }
+
+@media (max-width: 768px) {
+
+  /* GLOBAL DASHBOARD */
+  .dashboard-main { padding: 16px !important; padding-top: 60px !important; }
+
+  /* DISCOVERY VIEW */
+  .discovery-filters { flex-wrap: wrap; gap: 8px; overflow-x: auto; }
+  .discovery-filter-row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .discovery-search-row { flex-direction: column; gap: 8px; }
+  .discovery-search-row input { width: 100% !important; }
+  .discovery-search-row button { width: 100% !important; font-size: 14px !important; padding: 12px !important; }
+  .discovery-filter-group { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 80px; }
+  .discovery-filter-group select { width: 100%; font-size: 13px; }
+
+  /* CREATOR CARDS */
+  .creator-card { flex-direction: column !important; padding: 16px !important; }
+  .creator-card-actions { flex-direction: row !important; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .creator-card-actions button { flex: 1; min-width: 100px; font-size: 12px; }
+
+  /* CREATORS TABLE */
+  .creators-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .creators-table { min-width: 600px; }
+  .creators-stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow: visible; }
+  .creators-stat-card { padding: 14px !important; }
+
+  /* CAMPAIGNS VIEW */
+  .campaigns-stats { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; overflow: visible !important; }
+  .campaigns-stat-card { padding: 14px !important; min-width: 0 !important; }
+  .campaigns-stat-card h3 { font-size: 11px !important; }
+  .campaigns-stat-card .stat-value { font-size: 24px !important; }
+  .campaigns-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .campaigns-table { min-width: 700px; }
+  .campaigns-header { flex-wrap: wrap; gap: 8px; }
+  .campaigns-header h1 { font-size: 24px !important; }
+  .campaigns-header button { font-size: 13px !important; padding: 10px 14px !important; }
+  .campaigns-filter-row { flex-wrap: wrap; gap: 8px; }
+
+  /* OUTREACH VIEW */
+  .outreach-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .outreach-table { min-width: 700px; }
+  .outreach-stats { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 12px !important; overflow: visible !important; }
+  .outreach-stat-card { padding: 14px !important; min-width: 0 !important; }
+  .outreach-tabs { flex-wrap: wrap; gap: 4px; overflow-x: auto; }
+  .outreach-header { flex-wrap: wrap; gap: 8px; }
+  .outreach-action-buttons { flex-wrap: wrap; gap: 8px; }
+  .outreach-action-buttons button { font-size: 12px !important; padding: 8px 12px !important; }
+
+  /* PAYOUTS VIEW */
+  .payouts-top { flex-direction: column !important; gap: 16px !important; }
+  .payouts-balance-card { width: 100% !important; }
+  .payouts-payment-card { width: 100% !important; }
+  .payouts-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .payouts-table { min-width: 500px; }
+  .payouts-live-feed { padding: 16px !important; }
+  .payouts-feed-controls { flex-wrap: wrap; gap: 8px; }
+  .payouts-feed-controls button { font-size: 12px !important; padding: 8px 10px !important; }
+
+  /* ANALYTICS VIEW */
+  .analytics-kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
+  .analytics-charts-row { grid-template-columns: 1fr !important; }
+  .analytics-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .analytics-table { min-width: 600px; }
+  .analytics-header { flex-wrap: wrap; gap: 8px; }
+  .analytics-date-tabs { flex-wrap: wrap; gap: 4px; overflow-x: auto; }
+  .analytics-bottom-row { grid-template-columns: 1fr !important; }
+
+  /* SETTINGS VIEW */
+  .settings-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .settings-tabs button { white-space: nowrap; font-size: 13px; padding: 8px 12px; }
+  .settings-form { padding: 16px !important; }
+  .settings-team-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .settings-invoice-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .billing-plans { flex-direction: column !important; gap: 12px !important; }
+
+  /* NOTIFICATIONS */
+  .notifications-header { flex-wrap: wrap; gap: 8px; }
+  .notification-item { padding: 14px 16px !important; }
+
+  /* HELP CENTER */
+  .help-contact-row { flex-direction: column !important; gap: 12px !important; }
+  .help-contact-card { width: 100% !important; }
+  .help-guides-grid { grid-template-columns: 1fr !important; }
+  .help-videos-grid { grid-template-columns: 1fr !important; }
+
+  /* INTEGRATIONS */
+  .integrations-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
+
+  /* GENERAL PADDING FIX */
+  [style*="padding: 24px 40px"],
+  [style*="padding: 32px 40px"],
+  [style*="padding: 24px 32px"] {
+    padding: 16px !important;
+    padding-top: 60px !important;
+  }
+
+  /* STAT CARDS HORIZONTAL SCROLL FIX */
+  [style*="display: grid"][style*="repeat(4"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    overflow: visible !important;
+  }
+  [style*="display: grid"][style*="repeat(3"] {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    overflow: visible !important;
+  }
+
+  /* TABLE HORIZONTAL SCROLL */
+  table { min-width: 500px; }
+  .table-container,
+  [style*="overflow"][style*="auto"] { 
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .campaigns-stats { grid-template-columns: 1fr 1fr !important; }
+  .analytics-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .outreach-stats { grid-template-columns: 1fr 1fr !important; }
+  .settings-tabs button { font-size: 12px; padding: 6px 10px; }
+  [style*="padding: 24px 40px"],
+  [style*="padding: 32px 40px"] {
+    padding: 12px !important;
+    padding-top: 56px !important;
+  }
+}

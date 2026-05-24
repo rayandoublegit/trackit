@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useLang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
 
 const FONT = "'InterDisplay', 'Inter Display', sans-serif";
 const BLUE = "#0047FF";
@@ -9,30 +11,8 @@ const TEXT = "#1A1A1A";
 const SUBTEXT = "#7A7A7A";
 const BG = "#fff";
 
-const FAQ_ITEMS = [
-  {
-    q: "How do I get my affiliate link?",
-    a: "Sign up for free, go to Settings → Affiliation, and your unique link is ready to share.",
-  },
-  {
-    q: "When do I get paid?",
-    a: "Commissions are paid monthly via Stripe. Minimum payout is $50.",
-  },
-  {
-    q: "How long does the cookie last?",
-    a: "30 days. If someone clicks your link and signs up within 30 days, the sale is yours.",
-  },
-  {
-    q: "What if they cancel?",
-    a: "You only earn while they're subscribed. If they cancel, the commission stops.",
-  },
-  {
-    q: "Is there an approval process?",
-    a: "No. Anyone can join. Sign up and start sharing immediately.",
-  },
-];
-
 export default function AffiliationPage() {
+  const lang = useLang();
   const [users, setUsers] = useState(10);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -67,6 +47,74 @@ export default function AffiliationPage() {
     formData.why &&
     agreed;
 
+  const FAQ_ITEMS = [
+    {
+      q: lang === "fr" ? "Comment obtenir mon lien affilié ?" : "How do I get my affiliate link?",
+      a:
+        lang === "fr"
+          ? "Inscrivez-vous gratuitement, allez dans Paramètres → Affiliation, et votre lien unique est prêt à être partagé."
+          : "Sign up for free, go to Settings → Affiliation, and your unique link is ready to share.",
+    },
+    {
+      q: lang === "fr" ? "Quand suis-je payé ?" : "When do I get paid?",
+      a:
+        lang === "fr"
+          ? `Les paiements sont traités le 1er de chaque mois pour les gains du mois précédent. Paiement minimum de ${formatCurrency(20, lang)}.`
+          : `Payouts are processed on the 1st of every month for the previous month's earnings. Minimum payout is ${formatCurrency(20, lang)}.`,
+    },
+    {
+      q: lang === "fr" ? "Combien de temps dure le cookie ?" : "How long does the cookie last?",
+      a:
+        lang === "fr"
+          ? "90 jours. Si quelqu'un clique sur votre lien et s'inscrit dans les 90 jours, la vente vous est attribuée."
+          : "90 days. If someone clicks your link and signs up within 90 days, the sale is attributed to you.",
+    },
+    {
+      q: lang === "fr" ? "Et s'ils annulent ?" : "What if they cancel?",
+      a:
+        lang === "fr"
+          ? "Vous arrêtez de gagner quand ils annulent. Mais s'ils se réabonnent, les commissions reprennent automatiquement."
+          : "You stop earning when they cancel. But if they resubscribe, commissions resume automatically.",
+    },
+    {
+      q: lang === "fr" ? "Y a-t-il un processus de validation ?" : "Is there an approval process?",
+      a:
+        lang === "fr"
+          ? "Non. Inscrivez-vous et commencez à partager immédiatement. Pas de taille d'audience minimum, pas de validation."
+          : "No. Sign up and start sharing immediately. No minimum audience size, no application review.",
+    },
+  ];
+
+  const steps = [
+    {
+      step: "1",
+      title: lang === "fr" ? "Partagez votre lien" : "Share your link",
+      desc:
+        lang === "fr"
+          ? "Publiez-le partout. Bio, vidéos, newsletters, posts. Votre lien unique suit chaque inscription que vous générez."
+          : "Post it anywhere. Bio, videos, newsletters, posts. Your unique link tracks every signup you drive.",
+      image: "/images/link.png",
+    },
+    {
+      step: "2",
+      title: lang === "fr" ? "Ils s'inscrivent et paient" : "They sign up and pay",
+      desc:
+        lang === "fr"
+          ? "Votre audience découvre Trackit. Quand ils passent à Basic ou Pro, la vente vous est attribuée."
+          : "Your audience discovers Trackit. When they upgrade to Basic or Pro, the sale is attributed to you.",
+      image: "/images/signupandpay.png",
+    },
+    {
+      step: "3",
+      title: lang === "fr" ? "Vous êtes payé" : "You get paid",
+      desc:
+        lang === "fr"
+          ? "Commission récurrente de 20% déposée chaque mois. Tant qu'ils restent abonnés, vous continuez à gagner."
+          : "20% recurring commission deposited every month. As long as they stay subscribed, you keep earning.",
+      image: "/images/getpaid.png",
+    },
+  ];
+
   return (
     <main
       style={{
@@ -99,7 +147,7 @@ export default function AffiliationPage() {
             fontFamily: FONT,
           }}
         >
-          Back to home
+          {lang === "fr" ? "Retour à l'accueil" : "Back to home"}
         </Link>
       </nav>
 
@@ -129,21 +177,22 @@ export default function AffiliationPage() {
             transform: "translateX(-4px)",
           }}
         >
-          Affiliate
+          {lang === "fr" ? "Affiliation" : "Affiliate"}
         </div>
         <h1
           className="hero-headline"
           style={{ fontSize: "clamp(36px, 5vw, 52px)", marginBottom: 16 }}
         >
-          <span className="hero-line-wrap">Earn 20% on every</span>
+          <span className="hero-line-wrap">{lang === "fr" ? "Gagnez 20% sur chaque" : "Earn 20% on every"}</span>
           <span className="hero-line-wrap">
-            user you bring
+            {lang === "fr" ? "utilisateur que vous apportez" : "user you bring"}
             <span style={{ color: BLUE, fontSize: "1.55em", fontWeight: 600 }}>.</span>
           </span>
         </h1>
         <p className="hero-sub" style={{ marginBottom: 20 }}>
-          Share your unique link. Every time someone signs up and pays, you earn 20% of their subscription.
-          Every month. No cap. No minimum.
+          {lang === "fr"
+            ? "Partagez votre lien unique. Chaque fois que quelqu'un s'inscrit et paie, vous gagnez 20% de son abonnement. Chaque mois. Sans plafond. Sans minimum."
+            : "Share your unique link. Every time someone signs up and pays, you earn 20% of their subscription. Every month. No cap. No minimum."}
         </p>
         <button
           type="button"
@@ -151,10 +200,10 @@ export default function AffiliationPage() {
           onClick={() => setPanelOpen(true)}
           style={{ marginTop: 8, marginBottom: 12, border: "none", cursor: "pointer" }}
         >
-          Start partnering →
+          {lang === "fr" ? "Devenir partenaire →" : "Start partnering →"}
         </button>
         <p style={{ fontSize: 13, color: SUBTEXT, margin: 0, letterSpacing: "-0.01em" }}>
-          Free to join. No approval needed.
+          {lang === "fr" ? "Gratuit. Sans validation requise." : "Free to join. No approval needed."}
         </p>
         </div>
       </section>
@@ -170,7 +219,7 @@ export default function AffiliationPage() {
             letterSpacing: "-0.03em",
           }}
         >
-          How to become an affiliate?
+          {lang === "fr" ? "Comment devenir affilié ?" : "How to become an affiliate?"}
         </h2>
         <div
           style={{
@@ -179,26 +228,7 @@ export default function AffiliationPage() {
             gap: 20,
           }}
         >
-          {[
-            {
-              step: "1",
-              title: "Share your link",
-              desc: "Post it anywhere. Bio, videos, newsletters, posts. Your unique link tracks every signup you drive.",
-              image: "/images/link.png",
-            },
-            {
-              step: "2",
-              title: "They sign up and pay",
-              desc: "Your audience discovers Trackit. When they upgrade to Basic or Pro, the sale is attributed to you.",
-              image: "/images/signupandpay.png",
-            },
-            {
-              step: "3",
-              title: "You get paid",
-              desc: "20% recurring commission deposited every month. As long as they stay subscribed, you keep earning.",
-              image: "/images/getpaid.png",
-            },
-          ].map((item) => (
+          {steps.map((item) => (
             <div
               key={item.step}
               style={{
@@ -218,7 +248,7 @@ export default function AffiliationPage() {
                   letterSpacing: "-0.02em",
                 }}
               >
-                Step {item.step}
+                {lang === "fr" ? `Étape ${item.step}` : `Step ${item.step}`}
               </div>
               <h3 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 8px", letterSpacing: "-0.03em" }}>
                 {item.title}
@@ -249,17 +279,28 @@ export default function AffiliationPage() {
           }}
         >
           <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 6px", letterSpacing: "-0.03em" }}>
-            Calculate your earnings
+            {lang === "fr" ? "Calculez vos gains" : "Calculate your earnings"}
           </h2>
           <p style={{ fontSize: 14, color: SUBTEXT, margin: "0 0 28px", letterSpacing: "-0.01em" }}>
-            Every user you bring earns you 20% of their subscription. Every month.
+            {lang === "fr"
+              ? "Chaque utilisateur que vous apportez vous rapporte 20% de son abonnement. Chaque mois."
+              : "Every user you bring earns you 20% of their subscription. Every month."}
           </p>
 
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-              <span style={{ fontSize: 13, color: "#555", letterSpacing: "-0.01em" }}>Users you refer</span>
+              <span style={{ fontSize: 13, color: "#555", letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Utilisateurs référencés" : "Users you refer"}
+              </span>
               <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
-                {users} users
+                {users}{" "}
+                {lang === "fr"
+                  ? users === 1
+                    ? "utilisateur"
+                    : "utilisateurs"
+                  : users === 1
+                    ? "user"
+                    : "users"}
               </span>
             </div>
             <input
@@ -272,8 +313,12 @@ export default function AffiliationPage() {
               style={{ width: "100%", accentColor: BLUE }}
             />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: "#9A9A9A" }}>1 user</span>
-              <span style={{ fontSize: 11, color: "#9A9A9A" }}>500 users</span>
+              <span style={{ fontSize: 11, color: "#9A9A9A" }}>
+                1 {lang === "fr" ? "utilisateur" : "user"}
+              </span>
+              <span style={{ fontSize: 11, color: "#9A9A9A" }}>
+                500 {lang === "fr" ? "utilisateurs" : "users"}
+              </span>
             </div>
           </div>
 
@@ -287,24 +332,30 @@ export default function AffiliationPage() {
             }}
           >
             <span style={{ fontSize: 13, color: SUBTEXT, letterSpacing: "-0.01em" }}>
-              Your commission (20% of $49/mo per user)
+              {lang === "fr"
+                ? `Votre commission (20% de ${formatCurrency(49, lang)}/mois par utilisateur)`
+                : `Your commission (20% of ${formatCurrency(49, lang)}/mo per user)`}
             </span>
             <span style={{ fontSize: 14, fontWeight: 600, color: BLUE, letterSpacing: "-0.02em" }}>
-              ${earnings.toLocaleString()}/mo
+              {formatCurrency(earnings, lang)}/mo
             </span>
           </div>
 
           <div className="affiliation-earnings-card">
-            <div className="affiliation-earnings-label">Your estimated monthly earnings</div>
-            <div className="affiliation-earnings-amount">${earnings.toLocaleString()}</div>
-            <div className="affiliation-earnings-sub">per month · recurring</div>
+            <div className="affiliation-earnings-label">
+              {lang === "fr" ? "Vos gains mensuels estimés" : "Your estimated monthly earnings"}
+            </div>
+            <div className="affiliation-earnings-amount">{formatCurrency(earnings, lang)}</div>
+            <div className="affiliation-earnings-sub">
+              {lang === "fr" ? "par mois · récurrent" : "per month · recurring"}
+            </div>
             <button
               type="button"
               className="affiliation-earnings-cta"
               onClick={() => setPanelOpen(true)}
               style={{ border: "none", cursor: "pointer" }}
             >
-              Get my affiliate link →
+              {lang === "fr" ? "Obtenir mon lien affilié →" : "Get my affiliate link →"}
             </button>
           </div>
         </div>
@@ -321,7 +372,7 @@ export default function AffiliationPage() {
             letterSpacing: "-0.03em",
           }}
         >
-          Common questions
+          {lang === "fr" ? "Questions fréquentes" : "Common questions"}
         </h2>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {FAQ_ITEMS.map((item, i) => {
@@ -411,7 +462,7 @@ export default function AffiliationPage() {
             letterSpacing: "-0.04em",
           }}
         >
-          Ready to start earning?
+          {lang === "fr" ? "Prêt à commencer à gagner ?" : "Ready to start earning?"}
         </h2>
         <p
           style={{
@@ -423,7 +474,9 @@ export default function AffiliationPage() {
             letterSpacing: "-0.01em",
           }}
         >
-          Join our partner program for free. No approval. No minimum traffic.
+          {lang === "fr"
+            ? "Rejoignez notre programme partenaire gratuitement. Sans validation. Sans trafic minimum."
+            : "Join our partner program for free. No approval. No minimum traffic."}
         </p>
         <button
           type="button"
@@ -431,7 +484,7 @@ export default function AffiliationPage() {
           onClick={() => setPanelOpen(true)}
           style={{ marginTop: 0, border: "none", cursor: "pointer" }}
         >
-          Get my affiliate link →
+          {lang === "fr" ? "Obtenir mon lien affilié →" : "Get my affiliate link →"}
         </button>
       </section>
 

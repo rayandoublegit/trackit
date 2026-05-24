@@ -87,6 +87,42 @@ body.dashboard-page {
 .hero-cta-shopify {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0047ff;
+  color: #fff;
+  padding: 13px 20px;
+  border: none;
+  border-radius: 14px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  line-height: 1.1em;
+  margin-top: 0;
+  box-shadow: 0 8px 24px rgba(0, 71, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.15);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-shopify:hover {
+  transform: scale(1.08);
+}
+
+.hero-cta-shopify:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+.hero-cta-shopify img {
+  flex-shrink: 0;
+}
+
+.hero-cta-shopify-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
   background: #1a1a1a;
   color: #fff;
@@ -105,10 +141,82 @@ body.dashboard-page {
   cursor: pointer;
 }
 
-.hero-cta-shopify:hover {
+.hero-cta-shopify-dark:hover {
   transform: scale(1.08);
 }
 
-.hero-cta-shopify img {
+.hero-cta-shopify-dark:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+.hero-cta-shopify-dark img {
   flex-shrink: 0;
+}
+
+.hero-cta-shopify-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  color: #1a1a1a;
+  padding: 13px 20px;
+  border: 1px solid #e5e5e5;
+  border-radius: 14px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  line-height: 1.1em;
+  margin-top: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-shopify-light:hover {
+  transform: scale(1.08);
+}
+
+.hero-cta-shopify-light:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+.hero-cta-inverse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  color: #0047ff;
+  padding: 13px 20px;
+  border: none;
+  border-radius: 14px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 500;
+  font-size: 16px;
+  letter-spacing: -0.04em;
+  line-height: 1.1em;
+  margin-top: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), inset 0 -3px 0 rgba(0, 0, 0, 0.06);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-inverse:hover {
+  transform: scale(1.08);
+}
+
+.hero-cta-compact {
+  padding: 10px 16px;
+  font-size: 13px;
+}
+
+.hero-cta-compact-sm {
+  padding: 8px 12px;
+  font-size: 12px;
 }
