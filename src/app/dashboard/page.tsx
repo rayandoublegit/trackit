@@ -495,7 +495,7 @@ export default function DashboardPage() {
         {view === "outreach" && <OutreachView isMobile={isMobile} plan={plan} onNavigateToBilling={() => setView("settings")} />}
         {view === "payouts" && user && <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
         {view === "analytics" && user && <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore || undefined} />}
-        {view === "integrations" && <IntegrationsView isMobile={isMobile} user={user} />}
+        {view === "integrations" && <IntegrationsView isMobile={isMobile} user={user} shopifyStore={gettingStarted.shopify ? shopifyStore : null} />}
         {view === "automation" && <AutomationView isMobile={isMobile} />}
         {view === "settings" && user && (
           <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
@@ -1264,24 +1264,29 @@ function SendOutreachPanel({
 }
 
 
-function IntegrationsView({ isMobile, user }: { isMobile?: boolean; user?: User | null }) {
+function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean; user?: User | null; shopifyStore?: string | null }) {
   const lang = useLang();
   const [shopDomain, setShopDomain] = useState("");
   const [shopError, setShopError] = useState("");
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
+  const [changingStore, setChangingStore] = useState(false);
+
+  const activeShop = connectedShop || shopifyStore || null;
+  const isShopifyConnected = !!activeShop && !changingStore;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("shopify") === "connected") {
       const shop = params.get("shop") || "";
       setConnectedShop(shop);
+      setChangingStore(false);
       window.history.replaceState({}, "", "/dashboard");
     }
     if (params.get("shopify") === "error") {
-      setShopError("Connection failed. Please try again.");
+      setShopError(lang === "fr" ? "La connexion a échoué. Réessayez." : "Connection failed. Please try again.");
       window.history.replaceState({}, "", "/dashboard");
     }
-  }, []);
+  }, [lang]);
 
   const handleShopifyConnect = () => {
     if (!shopDomain.trim()) {
@@ -1324,9 +1329,13 @@ function IntegrationsView({ isMobile, user }: { isMobile?: boolean; user?: User 
                 <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{app.name}</div>
                 <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
                   {app.name === "Shopify"
-                    ? lang === "fr"
-                      ? "Connectez votre boutique pour suivre les ventes"
-                      : "Connect your store to track sales"
+                    ? isShopifyConnected
+                      ? lang === "fr"
+                        ? "Shopify est déjà connecté. Vos ventes sont synchronisées."
+                        : "Shopify is already connected. Your sales are synced."
+                      : lang === "fr"
+                        ? "Connectez votre boutique pour suivre les ventes"
+                        : "Connect your store to track sales"
                     : app.name === "Zapier"
                       ? lang === "fr"
                         ? "Automatisez vos workflows avec 5000+ applications"
@@ -1341,20 +1350,53 @@ function IntegrationsView({ isMobile, user }: { isMobile?: boolean; user?: User 
                 </div>
                 {app.name === "Shopify" && (
                   <div style={{ marginTop: 10 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <input
-                        value={shopDomain}
-                        onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
-                        placeholder="yourstore.myshopify.com"
-                        style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
-                        onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
-                      />
-                      <button type="button" onClick={handleShopifyConnect} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0 }}>{lang === "fr" ? "Connecter →" : "Connect →"}</button>
-                    </div>
-                    <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
-                      {lang === "fr" ? "Utilisez votre URL .myshopify.com. Trouvez-la dans Shopify Admin → Paramètres → Domaines." : "Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains."}
-                    </div>
-                    {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
+                    {isShopifyConnected ? (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#22C55E", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                          {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChangingStore(true);
+                            setShopDomain(activeShop?.replace(/\.myshopify\.com$/, "") || "");
+                            setShopError("");
+                          }}
+                          style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
+                        >
+                          {lang === "fr" ? "Changer de boutique" : "Change my store"}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                          <input
+                            value={shopDomain}
+                            onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
+                            placeholder="yourstore.myshopify.com"
+                            style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                            onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
+                          />
+                          <button type="button" onClick={handleShopifyConnect} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0 }}>
+                            {lang === "fr" ? "Connecter →" : "Connect →"}
+                          </button>
+                        </div>
+                        {changingStore && (
+                          <button
+                            type="button"
+                            onClick={() => { setChangingStore(false); setShopDomain(""); setShopError(""); }}
+                            style={{ background: "none", border: "none", fontSize: 12, color: "#7A7A7A", cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "inherit" }}
+                          >
+                            {lang === "fr" ? "Annuler" : "Cancel"}
+                          </button>
+                        )}
+                        <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                          {lang === "fr" ? "Utilisez votre URL .myshopify.com. Trouvez-la dans Shopify Admin → Paramètres → Domaines." : "Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains."}
+                        </div>
+                        {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
