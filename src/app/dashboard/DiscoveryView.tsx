@@ -21,6 +21,7 @@ type Creator = {
   avgViews: number;
   platform: string;
   bio: string;
+  email?: string | null;
   niche: string;
   videoThumbnails?: VideoThumbnail[];
 };
@@ -1143,6 +1144,22 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
           <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Vues moyennes" : "Avg views"}</div>
         </div>
       </div>
+
+      {creator.email && (
+        <div style={{
+          marginTop: 10,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "#F0FDF4",
+          border: "1px solid #BBF7D0",
+          borderRadius: 8,
+          padding: "8px 10px",
+        }}>
+          <span style={{ fontSize: 12 }}>📧</span>
+          <span style={{ fontSize: 12, color: "#15803D", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{creator.email}</span>
+        </div>
+      )}
     </>
   );
 }

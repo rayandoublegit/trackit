@@ -9,6 +9,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function extractEmail(text: string): string | null {
+  if (!text) return null;
+  const match = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  return match ? match[0] : null;
+}
+
 export async function POST(request: Request) {
   const { niche, platform, minFollowers, maxFollowers, minEngagement, location, gender } = await request.json();
   if (!niche) return NextResponse.json({ creators: [] });
@@ -53,6 +59,7 @@ export async function POST(request: Request) {
         avgViews: c.avg_views,
         platform: c.platform,
         bio: c.bio,
+        email: extractEmail(c.bio || ""),
         niche,
         videoThumbnails: c.video_thumbnails || [],
       }));
@@ -146,6 +153,7 @@ export async function POST(request: Request) {
           avgViews: videos.length > 0 ? Math.floor(videos.reduce((s,v) => s + v.views, 0) / videos.length) : Math.floor(followers * 0.08),
           platform: plat,
           bio,
+          email: extractEmail(bio),
           niche,
           videoThumbnails: videos,
         };
