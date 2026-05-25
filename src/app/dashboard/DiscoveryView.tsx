@@ -1452,6 +1452,20 @@ export function DiscoveryView({
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {activeTab === "discover" && (
           <>
+        <div style={{
+          background: "#EEF4FF",
+          border: "1px solid #D4E2FF",
+          borderRadius: 12,
+          padding: "12px 16px",
+          marginBottom: 16,
+          fontSize: 13,
+          color: "#0047FF",
+          letterSpacing: "-0.01em",
+        }}>
+          {lang === "fr"
+            ? "🚧 Nous ajoutons encore des créateurs dans toutes les niches. La base s'enrichit chaque jour — revenez bientôt pour plus de résultats."
+            : "🚧 We're still adding creators across every niche. The database grows daily — check back soon for more results."}
+        </div>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24 }}>
           <div
             style={{
