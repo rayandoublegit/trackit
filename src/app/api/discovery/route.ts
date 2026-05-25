@@ -12,18 +12,21 @@ const supabaseAdmin = createClient(
 export async function POST(request: Request) {
   const { niche, platform, minFollowers, maxFollowers, minEngagement, location, gender } = await request.json();
   if (!niche) return NextResponse.json({ creators: [] });
+  // Normalize niche — strip extra words, lowercase
+  const nicheNorm = niche.toLowerCase().split(" ")[0];
 
   const minF = minFollowers ? Number(minFollowers) : 0;
   const maxF = maxFollowers ? Number(maxFollowers) : 10000000;
   const minE = minEngagement ? Number(minEngagement) : 0;
-  const plat = platform || "TikTok";
+  const platRaw = (platform || "TikTok").toLowerCase();
+  const plat = platRaw === "tiktok" ? "TikTok" : platRaw === "instagram" ? "Instagram" : platRaw === "youtube" ? "YouTube" : (platform || "TikTok");
 
   // Query own DB first
   let query = supabaseAdmin
     .from("creators_index")
     .select("*")
     .eq("platform", plat)
-    .contains("niches", [niche.toLowerCase()])
+    .contains("niches", [nicheNorm])
     .gte("followers", minF)
     .lte("followers", maxF)
     .gte("engagement_rate", minE)

@@ -1277,13 +1277,21 @@ export function DiscoveryView({
 }) {
   const lang = useLang();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
+  useEffect(() => {
+    setFollowers("");
+    setEngagement("");
+    setLocation("");
+    setLanguage("");
+    setGender("");
+  }, []);
+  // FORCE_RESET_FILTERS
   const [query, setQuery] = useState("");
   const [niche, setNiche] = useState("fitness");
   const [platform, setPlatform] = useState("tiktok");
-  const [followers, setFollowers] = useState("10-20k");
-  const [engagement, setEngagement] = useState("3+");
-  const [location, setLocation] = useState("US");
-  const [language, setLanguage] = useState("english");
+  const [followers, setFollowers] = useState("");
+  const [engagement, setEngagement] = useState("");
+  const [location, setLocation] = useState("");
+  const [language, setLanguage] = useState("");
   const [gender, setGender] = useState("");
 
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -1531,6 +1539,7 @@ export function DiscoveryView({
               value={followers}
               onChange={setFollowers}
               options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
                 { value: "1-10k", label: "1–10K" },
                 { value: "10-20k", label: "10–20K" },
                 { value: "20-50k", label: "20–50K" },
@@ -1543,6 +1552,7 @@ export function DiscoveryView({
               value={engagement}
               onChange={setEngagement}
               options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
                 { value: "1+", label: "1%+" },
                 { value: "3+", label: "3%+" },
                 { value: "5+", label: "5%+" },
