@@ -556,11 +556,11 @@ function OutreachAIGeneratePanel({
     setCopied(false);
   };
 
-  const outreachLimitReached = plan === "free" && getOutreachGenerationsToday() >= 3;
+  const outreachLimitReached = plan === "free";
 
   const handleGenerate = async () => {
-    if (outreachLimitReached) {
-      alert(lang === "fr" ? "Limite de 3 générations par jour atteinte. Passez à Basic pour des messages illimités." : "Daily limit of 3 AI messages reached. Upgrade to Basic for unlimited.");
+    if (plan === "free") {
+      alert(lang === "fr" ? "La génération IA est disponible à partir du plan Basic." : "AI generation is available on Basic plan and above.");
       return;
     }
     if (!selectedCreator || !brand.trim()) return;

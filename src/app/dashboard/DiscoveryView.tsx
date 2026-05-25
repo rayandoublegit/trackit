@@ -1521,8 +1521,8 @@ export function DiscoveryView({
             {plan === "free" && (
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>
                 {lang === "fr"
-                  ? `${5 - searchCount} recherche(s) restante(s) aujourd'hui`
-                  : `${5 - searchCount} search(es) remaining today`}
+                  ? `${Math.max(0, 5 - searchCount)}/5 recherches restantes aujourd'hui`
+                  : `${Math.max(0, 5 - searchCount)}/5 searches left today`}
               </div>
             )}
             <button

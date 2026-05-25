@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const lang = useLang();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -52,8 +52,12 @@ export default function DashboardPage() {
   const [sidebarSearch, setSidebarSearch] = useState("");
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
-  const [plan, setPlan] = useState<"free" | "basic" | "pro">("free");
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
+  const plan = profile?.plan || "free";
+  const isFree = plan === "free";
+  const isBasic = plan === "basic";
+  const isPro = plan === "pro";
+  const canUseBasicFeatures = isBasic || isPro;
   const [notificationUnread, setNotificationUnread] = useState(getInitialUnreadCount);
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
@@ -81,6 +85,7 @@ export default function DashboardPage() {
       avatar_url,
       business_name: profileData.business_name,
       shopify_store: prev?.shopify_store ?? null,
+      plan: prev?.plan ?? "free",
     }));
   }, []);
 
@@ -104,7 +109,6 @@ export default function DashboardPage() {
         router.replace("/onboarding");
         return;
       }
-      setPlan((profileData.plan as "free" | "basic" | "pro") || "free");
       setShopifyStore(profileData.shopify_store || null);
       setUser(authUser);
       const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
@@ -116,6 +120,7 @@ export default function DashboardPage() {
         avatar_url,
         business_name: profileData.business_name,
         shopify_store: profileData.shopify_store ?? null,
+        plan: profileData.plan || "free",
       });
       setLoading(false);
     });
@@ -160,14 +165,18 @@ export default function DashboardPage() {
     check();
   }, [user?.id]);
 
-  const handleUpgrade = useCallback(async () => {
+  const handleCheckout = useCallback(async (target: "basic" | "pro") => {
     if (!supabase) return;
     const { data: { user: authUser } } = await supabase.auth.getUser();
+    const priceId =
+      target === "pro"
+        ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
+        : process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID;
     const res = await fetch("/api/create-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        priceId: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID,
+        priceId,
         userId: authUser?.id,
         email: authUser?.email,
         cancelUrl: window.location.href,
@@ -175,7 +184,11 @@ export default function DashboardPage() {
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;
+    else if (data.error) alert(data.error);
   }, []);
+
+  const handleUpgradeBasic = useCallback(() => void handleCheckout("basic"), [handleCheckout]);
+  const handleUpgradePro = useCallback(() => void handleCheckout("pro"), [handleCheckout]);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
@@ -472,7 +485,15 @@ export default function DashboardPage() {
         )}
 
         <div style={{ padding: "12px 12px 16px 12px" }}>
-          <button type="button" style={{ width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 14, padding: sidebarCollapsed ? "12px 0" : "14px 14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarCollapsed ? "center" : "flex-start" }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (plan === "pro") setView("settings");
+              else if (plan === "basic") void handleUpgradePro();
+              else void handleUpgradeBasic();
+            }}
+            style={{ width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 14, padding: sidebarCollapsed ? "12px 0" : "14px 14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarCollapsed ? "center" : "flex-start" }}
+          >
             <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#FFFFFF"/></svg>
             </div>
@@ -488,15 +509,60 @@ export default function DashboardPage() {
 
       <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
         {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} />}
-        {view === "discovery" && <DiscoveryView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
+        {view === "discovery" && (
+          <DiscoveryView
+            isMobile={isMobile}
+            plan={plan as "free" | "basic" | "pro"}
+            onUpgrade={handleUpgradeBasic}
+          />
+        )}
         {view === "creators" && <CreatorsView isMobile={isMobile} />}
-        {view === "campaigns" && <CampaignsView isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "affiliates" && <AffiliatesView isMobile={isMobile} />}
-        {view === "outreach" && <OutreachView isMobile={isMobile} plan={plan} onNavigateToBilling={() => setView("settings")} />}
-        {view === "payouts" && user && <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgrade} />}
-        {view === "analytics" && user && <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore || undefined} />}
+        {view === "campaigns" && (
+          canUseBasicFeatures ? (
+            <CampaignsView isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} onUpgrade={handleUpgradeBasic} />
+          ) : (
+            <UpgradeGate feature="Campaigns" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
+        {view === "affiliates" && (
+          canUseBasicFeatures ? (
+            <AffiliatesView isMobile={isMobile} />
+          ) : (
+            <UpgradeGate feature="Affiliates" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
+        {view === "outreach" && (
+          <OutreachView
+            isMobile={isMobile}
+            plan={plan as "free" | "basic" | "pro"}
+            onNavigateToBilling={() => {
+              if (plan === "free") void handleUpgradeBasic();
+              else setView("settings");
+            }}
+          />
+        )}
+        {view === "payouts" && user && (
+          canUseBasicFeatures ? (
+            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} onUpgrade={handleUpgradeBasic} />
+          ) : (
+            <UpgradeGate feature="Payouts" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
+        {view === "analytics" && user && (
+          canUseBasicFeatures ? (
+            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} shopifyStore={shopifyStore || undefined} onUpgradePro={handleUpgradePro} />
+          ) : (
+            <UpgradeGate feature="Analytics" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
         {view === "integrations" && <IntegrationsView isMobile={isMobile} user={user} shopifyStore={gettingStarted.shopify ? shopifyStore : null} />}
-        {view === "automation" && <AutomationView isMobile={isMobile} />}
+        {view === "automation" && (
+          canUseBasicFeatures ? (
+            <AutomationView isMobile={isMobile} />
+          ) : (
+            <UpgradeGate feature="Automation" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
         {view === "settings" && user && (
           <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
         )}
@@ -1465,6 +1531,34 @@ function AutomationView({ isMobile }: { isMobile?: boolean }) {
           </div>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Import</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Test</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function UpgradeGate({
+  feature,
+  requiredPlan,
+  onUpgrade,
+  isMobile,
+}: {
+  feature: string;
+  requiredPlan: string;
+  onUpgrade: () => void;
+  isMobile?: boolean;
+}) {
+  return (
+    <>
+      <PageHeader isMobile={isMobile} title={feature} subtitle={`${feature} is available on the ${requiredPlan} plan and above`} />
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 80, textAlign: "center" }}>
+          <div style={{ width: 64, height: 64, borderRadius: 16, background: "rgba(0,71,255,0.08)", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#0047FF"/></svg>
+          </div>
+          <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Upgrade to unlock {feature}</h3>
+          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>This feature is part of the {requiredPlan} plan. Upgrade your account to start using {feature.toLowerCase()}.</p>
+          <button type="button" style={btnPrimary} onClick={() => void onUpgrade()}>Upgrade to {requiredPlan}</button>
         </div>
       </div>
     </>

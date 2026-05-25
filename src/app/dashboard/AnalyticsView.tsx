@@ -38,7 +38,7 @@ const OUTREACH_PLATFORMS = [
   { platform: "YouTube", sent: 27, replied: 7, converted: 2, preview: "Partnership opportunity for your audience" },
 ];
 
-export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string }) {
+export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string; onUpgradePro?: () => void }) {
   const isFree = plan === "free";
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
@@ -91,7 +91,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   if (!loadingData && !HAS_DATA) {
     return (
       <>
-        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} />
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
@@ -104,7 +104,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
   return (
     <>
-      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} />
+      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
           <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={analyticsData?.totalRevenue ? formatCurrency(analyticsData.totalRevenue, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
@@ -247,13 +247,14 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   );
 }
 
-function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData, plan }: {
+function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData, plan, onUpgradePro }: {
   lang: "en" | "fr";
   range: DateRange; setRange: (r: DateRange) => void;
   compare: boolean; setCompare: (v: boolean) => void;
   isMobile?: boolean;
   analyticsData?: any;
   plan?: "free" | "basic" | "pro";
+  onUpgradePro?: () => void;
 }) {
   const ranges: { id: DateRange; label: string }[] = [
     { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
@@ -272,7 +273,8 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
           style={{ marginTop: 8 }}
           onClick={() => {
             if (plan !== "pro") {
-              alert(lang === "fr" ? "L'export CSV est disponible sur le plan Pro." : "CSV export is available on the Pro plan.");
+              if (onUpgradePro) void onUpgradePro();
+              else alert(lang === "fr" ? "L'export CSV est disponible sur le plan Pro." : "CSV export is available on the Pro plan.");
               return;
             }
             if (!analyticsData) return;
