@@ -89,6 +89,8 @@ export default function TrackitLanding() {
   pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
   pricing_free_cta: lang === "fr" ? "Démarrer gratuitement →" : "Start free →",
   pricing_month: lang === "fr" ? "/mois" : "/month",
+  pricing_year: lang === "fr" ? "par an" : "/year",
+  pricing_annually: lang === "fr" ? "Annuel" : "Annually",
   pricing_everything_plus: lang === "fr" ? "Tout le plan Basic, plus :" : "Everything in Basic, plus:",
   feat_unlimited_searches: lang === "fr" ? "Recherches de créateurs illimitées" : "Unlimited creator searches",
   feat_ai_outreach: lang === "fr" ? "Messages personnalisés IA" : "AI personalized outreach",
@@ -128,21 +130,54 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
 };
 
-  const handleCheckout = async (plan: "basic" | "pro") => {
-    const priceId = plan === "basic"
-      ? process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID
-      : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+  const handleCheckout = async (plan: "basic" | "pro", annual?: boolean) => {
+    const isEur = lang === "fr";
+    const monthlyIds: Record<string, string | undefined> = isEur ? {
+      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_EUR_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_EUR_PRICE_ID,
+    } : {
+      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+    };
+    const annualIds: Record<string, string | undefined> = isEur ? {
+      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_EUR_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_EUR_PRICE_ID,
+    } : {
+      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID,
+    };
+    const priceId = (annual ? annualIds[plan] : monthlyIds[plan]) ?? monthlyIds[plan];
+
+    if (!priceId) {
+      alert("Pricing not configured. Please contact support.");
+      return;
+    }
+
+    // Get current user so Stripe session is linked to their account
+    let userId: string | undefined;
+    let email: string | undefined;
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+        email = user?.email ?? undefined;
+      }
+    } catch {}
 
     const res = await fetch("/api/create-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         priceId,
-        cancelUrl: window.location.href
+        userId,
+        email,
+        cancelUrl: window.location.href,
       })
     });
     const data = await res.json();
     if (data.url) window.location.href = data.url;
+    else alert(data.error || "Could not start checkout");
   };
 
   useEffect(() => {
@@ -1342,7 +1377,7 @@ export default function TrackitLanding() {
                 >
                   <span className="toggle-thumb"></span>
                 </button>
-                <span className="toggle-label">Annually</span>
+                <span className="toggle-label">{t.pricing_annually}</span>
               </div>
               <div className="pricing-toggle-pill">{t.pricing_save}</div>
             </div>
@@ -1353,7 +1388,7 @@ export default function TrackitLanding() {
                 <div className="pricing-desc">{t.pricing_basic_desc}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">{basicAnnual ? formatCurrency(499, lang) : formatCurrency(49, lang)}</span>
-                  <span className="pricing-period">{t.pricing_month}</span>
+                  <span className="pricing-period">{basicAnnual ? t.pricing_year : t.pricing_month}</span>
                 </div>
               </div>
               <div className="pricing-divider"></div>
@@ -1365,7 +1400,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_one_click_payouts}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_priority_support}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("basic")} className="pricing-cta">{t.pricing_cta}</button>
+              <button type="button" onClick={() => handleCheckout("basic", basicAnnual)} className="pricing-cta">{t.pricing_cta}</button>
             </div>
           </div>
 
@@ -1381,7 +1416,7 @@ export default function TrackitLanding() {
                 >
                   <span className="toggle-thumb"></span>
                 </button>
-                <span className="toggle-label">Annually</span>
+                <span className="toggle-label">{t.pricing_annually}</span>
               </div>
               <div className="pricing-toggle-pill">{t.feat_priority_support}</div>
             </div>
@@ -1392,7 +1427,7 @@ export default function TrackitLanding() {
                 <div className="pricing-desc">{t.pricing_pro_desc}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">{proAnnual ? formatCurrency(1190, lang) : formatCurrency(119, lang)}</span>
-                  <span className="pricing-period">{t.pricing_month}</span>
+                  <span className="pricing-period">{proAnnual ? t.pricing_year : t.pricing_month}</span>
                 </div>
               </div>
               <div className="pricing-divider"></div>
@@ -1404,19 +1439,11 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_unlimited_shopify}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_daily_offers}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("pro")} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
+              <button type="button" onClick={() => handleCheckout("pro", proAnnual)} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
             </div>
           </div>
 
           <div className="pricing-wrap pricing-wrap-full fade-up fade-up-delay-5">
-            <div className="pricing-toggle">
-              <div className="pricing-toggle-left">
-                <button type="button" className="toggle-switch" aria-label="Toggle billing" disabled>
-                  <span className="toggle-thumb"></span>
-                </button>
-                <span className="toggle-label">Annually</span>
-              </div>
-            </div>
             <div className="pricing-card">
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
@@ -1433,7 +1460,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_basic_templates}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_1_store}</div>
               </div>
-              <a href="#" className="pricing-cta">{t.pricing_free_cta}</a>
+              <a href="/auth" className="pricing-cta">{t.pricing_free_cta}</a>
             </div>
           </div>
         </div>
