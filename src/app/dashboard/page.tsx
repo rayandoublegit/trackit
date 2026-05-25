@@ -789,7 +789,10 @@ function OutreachView({
     <>
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("seeTemplates")}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+            if (plan === "free") { alert(lang === "fr" ? "Les modèles sont disponibles à partir du plan Basic." : "Templates are available on Basic plan and above."); return; }
+            setPanel("seeTemplates");
+          }}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("import")}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
           <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>

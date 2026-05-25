@@ -39,6 +39,7 @@ const OUTREACH_PLATFORMS = [
 ];
 
 export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string }) {
+  const isFree = plan === "free";
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -144,17 +145,26 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                 </tr>
               </thead>
               <tbody>
-                {sortedCreators.map((r) => (
-                  <tr key={r.creator} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                    <td style={{ padding: "12px 8px" }}><RankBadge rank={r.rank} /></td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A" }}>{r.creator}</td>
-                    <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{r.platform}</td>
-                    <td style={{ padding: "12px 8px" }}>{formatCurrency(r.sales, lang)}</td>
-                    <td style={{ padding: "12px 8px" }}>{formatCurrency(r.commission, lang)}</td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500 }}>{r.roi.toFixed(1)}x</td>
-                    <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={r.status} /></td>
+                {sortedCreators.map((r, i) => (
+                  <tr key={r.creator} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
+                    <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>{r.creator}</td>
+                    <td style={{ padding: "12px 8px", color: "#7A7A7A", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.platform}</td>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.sales, lang)}</td>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
+                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.roi.toFixed(1)}x</td>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
                 ))}
+                {isFree && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
+                      <span style={{ fontSize: 13, color: "#0047FF", fontWeight: 500 }}>
+                        {lang === "fr" ? "🔒 Passez à Basic pour voir tous vos créateurs →" : "🔒 Upgrade to Basic to unlock all creator data →"}
+                      </span>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

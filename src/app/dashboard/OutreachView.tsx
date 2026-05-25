@@ -559,8 +559,8 @@ function OutreachAIGeneratePanel({
   const outreachLimitReached = plan === "free" && getOutreachGenerationsToday() >= 3;
 
   const handleGenerate = async () => {
-    if (plan === "free") {
-      alert(lang === "fr" ? "Disponible à partir du plan Basic." : "Available on Basic plan and above.");
+    if (outreachLimitReached) {
+      alert(lang === "fr" ? "Limite de 3 générations par jour atteinte. Passez à Basic pour des messages illimités." : "Daily limit of 3 AI messages reached. Upgrade to Basic for unlimited.");
       return;
     }
     if (!selectedCreator || !brand.trim()) return;
