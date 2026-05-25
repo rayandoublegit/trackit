@@ -131,7 +131,7 @@ export default function TrackitLanding() {
 };
 
   const handleCheckout = async (plan: "basic" | "pro", annual?: boolean) => {
-    const isEur = lang === "fr";
+    const isEur = (typeof window !== "undefined" && (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en")) === "fr";
     const monthlyIds: Record<string, string | undefined> = isEur ? {
       basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_EUR_PRICE_ID,
       pro: process.env.NEXT_PUBLIC_STRIPE_PRO_EUR_PRICE_ID,
