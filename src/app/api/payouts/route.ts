@@ -1,3 +1,4 @@
+import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
@@ -9,54 +10,72 @@ const supabaseAdmin = createClient(
 );
 
 export async function POST(request: Request) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
+  }
+  const stripe = new Stripe(stripeKey);
+
   const { userId, creatorId, amount } = await request.json();
-  if (!userId || !creatorId || !amount) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  if (!userId || !creatorId || !amount || amount <= 0) {
+    return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
   }
 
-  // Get user balance
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("balance")
-    .eq("id", userId)
-    .single();
-
-  const currentBalance = profile?.balance || 0;
-  if (currentBalance < amount) {
-    return NextResponse.json({ error: "Insufficient balance" }, { status: 400 });
-  }
-
-  // Deduct from user balance
-  await supabaseAdmin
-    .from("profiles")
-    .update({ balance: currentBalance - amount })
-    .eq("id", userId);
-
-  // Update creator balance
+  // Creator must have a connected, onboarded Stripe account
   const { data: creator } = await supabaseAdmin
     .from("creators")
-    .select("balance, total_earned")
+    .select("id, stripe_account_id, stripe_onboarded, total_earned")
     .eq("id", creatorId)
     .single();
 
+  if (!creator?.stripe_account_id) {
+    return NextResponse.json(
+      { error: "Creator has not connected a bank account yet" },
+      { status: 400 }
+    );
+  }
+
+  // Verify the account can actually receive payouts (live check with Stripe)
+  const account = await stripe.accounts.retrieve(creator.stripe_account_id);
+  if (!account.payouts_enabled) {
+    return NextResponse.json(
+      { error: "Creator's bank account setup is incomplete" },
+      { status: 400 }
+    );
+  }
+
+  // Amount in cents
+  const amountCents = Math.round(Number(amount) * 100);
+
+  // Transfer funds from the platform balance to the connected account
+  let transfer;
+  try {
+    transfer = await stripe.transfers.create({
+      amount: amountCents,
+      currency: "usd",
+      destination: creator.stripe_account_id,
+      metadata: { userId, creatorId },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Transfer failed";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
+
+  // Record the payout
+  await supabaseAdmin.from("payouts").insert({
+    user_id: userId,
+    creator_id: creatorId,
+    amount: Number(amount),
+    status: "paid",
+    stripe_transfer_id: transfer.id,
+    paid_at: new Date().toISOString(),
+  });
+
+  // Update creator lifetime earnings
   await supabaseAdmin
     .from("creators")
-    .update({ 
-      balance: 0,
-      total_earned: (creator?.total_earned || 0) + amount
-    })
+    .update({ total_earned: (creator.total_earned || 0) + Number(amount) })
     .eq("id", creatorId);
 
-  // Record payout
-  await supabaseAdmin
-    .from("sales")
-    .insert({
-      user_id: userId,
-      order_amount: amount,
-      commission_amount: amount,
-      discount_code_used: "MANUAL_PAYOUT",
-      status: "paid"
-    });
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true, transferId: transfer.id });
 }

@@ -1290,6 +1290,106 @@ export function PayoutsView({
                 </button>
               </div>
             )}
+            {/* Stripe Connect: bank transfer option */}
+            {selectedCreatorPayout.stripe_account_id ? (
+              <button
+                type="button"
+                disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0 || payingId === selectedCreatorPayout.id}
+                onClick={async () => {
+                  if (plan === "free") {
+                    alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                    return;
+                  }
+                  const amount = selectedCreatorPayout.balance;
+                  if (!amount || amount <= 0) return;
+                  setPayingId(selectedCreatorPayout.id);
+                  try {
+                    const res = await fetch("/api/payouts", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ userId, creatorId: selectedCreatorPayout.id, amount }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      alert(lang === "fr" ? `Virement envoyé: ${formatCurrency(amount, lang)} ✓` : `Transfer sent: ${formatCurrency(amount, lang)} ✓`);
+                      // refresh creators
+                      const r = await fetch(`/api/creators-list?userId=${userId}`);
+                      const list = await r.json();
+                      if (Array.isArray(list)) setCreators(list);
+                      setSelectedCreatorPayout(null);
+                    } else {
+                      alert(data.error || "Payout failed");
+                    }
+                  } catch {
+                    alert("Payout failed");
+                  } finally {
+                    setPayingId(null);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  background: selectedCreatorPayout.balance > 0 ? "#635BFF" : "#E5E5E5",
+                  color: selectedCreatorPayout.balance > 0 ? "#fff" : "#9A9A9A",
+                  border: "none",
+                  borderRadius: 12,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  cursor: selectedCreatorPayout.balance > 0 ? "pointer" : "not-allowed",
+                  fontFamily: "inherit",
+                  letterSpacing: "-0.02em",
+                  marginBottom: 10,
+                }}
+              >
+                {payingId === selectedCreatorPayout.id
+                  ? (lang === "fr" ? "Virement…" : "Sending…")
+                  : `${lang === "fr" ? "Payer par virement (Stripe)" : "Pay via bank (Stripe)"} ${selectedCreatorPayout.balance > 0 ? formatCurrency(selectedCreatorPayout.balance, lang) : ""}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={registeringId === selectedCreatorPayout.id}
+                onClick={async () => {
+                  setRegisteringId(selectedCreatorPayout.id);
+                  try {
+                    const res = await fetch("/api/payouts/connect", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ creatorId: selectedCreatorPayout.id, email: selectedCreatorPayout.email }),
+                    });
+                    const data = await res.json();
+                    if (data.url) {
+                      window.open(data.url, "_blank");
+                    } else {
+                      alert(data.error || "Could not start bank connection");
+                    }
+                  } catch {
+                    alert("Could not start bank connection");
+                  } finally {
+                    setRegisteringId(null);
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  background: "#fff",
+                  color: "#635BFF",
+                  border: "1px solid #635BFF",
+                  borderRadius: 12,
+                  fontSize: 15,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  letterSpacing: "-0.02em",
+                  marginBottom: 10,
+                }}
+              >
+                {registeringId === selectedCreatorPayout.id
+                  ? (lang === "fr" ? "Ouverture…" : "Opening…")
+                  : (lang === "fr" ? "🏦 Connecter un compte bancaire (Stripe)" : "🏦 Connect bank account (Stripe)")}
+              </button>
+            )}
+
             <button
               type="button"
               disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0}

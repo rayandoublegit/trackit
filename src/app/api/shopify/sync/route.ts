@@ -57,7 +57,15 @@ export async function POST(request: NextRequest) {
       const commissionRate = creator.commission_rate || 10;
       const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
 
-      // Upsert to avoid duplicates
+      // Check if this order was already recorded (avoid double-counting balance)
+      const { data: existing } = await supabaseAdmin
+        .from("sales")
+        .select("id")
+        .eq("shopify_order_id", String(order.id))
+        .maybeSingle();
+      const isNew = !existing;
+
+      // Upsert to avoid duplicate rows
       const { error } = await supabaseAdmin.from("sales").upsert({
         creator_id: creator.id,
         user_id: userId,
@@ -70,7 +78,25 @@ export async function POST(request: NextRequest) {
         created_at: order.created_at,
       }, { onConflict: "shopify_order_id" });
 
-      if (!error) synced++;
+      if (!error) {
+        synced++;
+        // Only credit the creator's balance for genuinely new sales
+        if (isNew) {
+          const { data: cRow } = await supabaseAdmin
+            .from("creators")
+            .select("balance, total_earned, total_sales")
+            .eq("id", creator.id)
+            .single();
+          await supabaseAdmin
+            .from("creators")
+            .update({
+              balance: Number(cRow?.balance || 0) + commissionAmount,
+              total_earned: Number(cRow?.total_earned || 0) + commissionAmount,
+              total_sales: Number(cRow?.total_sales || 0) + 1,
+            })
+            .eq("id", creator.id);
+        }
+      }
     }
   }
 
