@@ -1323,6 +1323,81 @@ export function DiscoveryView({
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [searchCount, setSearchCount] = useState(0);
+  const [discoveriesUsed, setDiscoveriesUsed] = useState(0);
+  const [discoveriesResetAt, setDiscoveriesResetAt] = useState<Date | null>(null);
+  const [showBlur, setShowBlur] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState<string>("");
+
+  // Load discoveries from Supabase on mount
+  useEffect(() => {
+    if (plan !== "free") return;
+    const loadDiscoveries = async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("discoveries_used, discoveries_reset_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!data) return;
+      const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at) : new Date();
+      const now = new Date();
+      if (now >= new Date(resetAt.getTime() + 24 * 60 * 60 * 1000)) {
+        // 24h passed, reset
+        await supabase.from("profiles").update({
+          discoveries_used: 0,
+          discoveries_reset_at: now.toISOString(),
+        }).eq("id", user.id);
+        setDiscoveriesUsed(0);
+        setDiscoveriesResetAt(now);
+        setShowBlur(false);
+      } else {
+        setDiscoveriesUsed(data.discoveries_used || 0);
+        setDiscoveriesResetAt(resetAt);
+        if ((data.discoveries_used || 0) >= 2) setShowBlur(true);
+      }
+    };
+    void loadDiscoveries();
+  }, [plan]);
+
+  // Countdown timer
+  useEffect(() => {
+    if (!discoveriesResetAt || discoveriesUsed < 2) return;
+    const tick = () => {
+      const resetTime = new Date(discoveriesResetAt.getTime() + 24 * 60 * 60 * 1000);
+      const diff = resetTime.getTime() - Date.now();
+      if (diff <= 0) {
+        setDiscoveriesUsed(0);
+        setShowBlur(false);
+        setResetCountdown("");
+        return;
+      }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      setResetCountdown(`${h}h ${m}m`);
+    };
+    tick();
+    const interval = setInterval(tick, 60000);
+    return () => clearInterval(interval);
+  }, [discoveriesResetAt, discoveriesUsed]);
+
+  const incrementDiscoveries = async () => {
+    if (plan !== "free") return;
+    const newCount = discoveriesUsed + 1;
+    setDiscoveriesUsed(newCount);
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const now = new Date();
+    await supabase.from("profiles").update({
+      discoveries_used: newCount,
+      discoveries_reset_at: discoveriesResetAt ? discoveriesResetAt.toISOString() : now.toISOString(),
+    }).eq("id", user.id);
+    if (!discoveriesResetAt) setDiscoveriesResetAt(now);
+  };
 
   const openOutreach = (creator: Creator) => {
     setSelectedCreator(null);
@@ -1399,12 +1474,8 @@ export function DiscoveryView({
   };
 
   const search = async () => {
-    if (plan === "free" && searchCount >= 5) {
-      alert(
-        lang === "fr"
-          ? "Limite de 5 recherches par jour atteinte. Passez à Basic pour des recherches illimitées."
-          : "Daily limit of 5 searches reached. Upgrade to Basic for unlimited searches."
-      );
+    if (plan === "free" && discoveriesUsed >= 2) {
+      setShowBlur(true);
       return;
     }
 
@@ -1446,6 +1517,7 @@ export function DiscoveryView({
       const data = (await res.json()) as { creators: Creator[] };
       setCreators(data.creators ?? []);
       const newCount = searchCount + 1;
+      void incrementDiscoveries();
       setSearchCount(newCount);
       localStorage.setItem("trackit_search_" + new Date().toDateString(), String(newCount));
     } catch (e) {
@@ -1521,8 +1593,8 @@ export function DiscoveryView({
             {plan === "free" && (
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>
                 {lang === "fr"
-                  ? `${Math.max(0, 5 - searchCount)}/5 recherches restantes aujourd'hui`
-                  : `${Math.max(0, 5 - searchCount)}/5 searches left today`}
+                  ? `${discoveriesUsed >= 2 && resetCountdown ? (lang === "fr" ? \`Réinitialisation dans \${resetCountdown}\` : \`Resets in \${resetCountdown}\`) : \`\${Math.max(0, 2 - discoveriesUsed)}/2 découvertes restantes\`}`
+                  : `${discoveriesUsed >= 2 && resetCountdown ? \`Resets in \${resetCountdown}\` : \`\${Math.max(0, 2 - discoveriesUsed)}/2 discoveries left\`}`}
               </div>
             )}
             <button
@@ -1710,18 +1782,50 @@ export function DiscoveryView({
                   : `${creators.length} ${creators.length === 1 ? "creator" : "creators"} found`}
               </p>
             </div>
-            <div style={creatorsGridStyle}>
-              {creators.map((c) => (
-                <CreatorCard
-                  lang={lang}
-                  key={c.username  ?? ""}
-                  variant="discover"
-                  creator={c}
-                  isSaved={isCreatorSaved(c.username  ?? "")}
-                  onToggleSave={() => toggleSaveCreator(c)}
-                  onViewProfile={() => setSelectedCreator(c)}
-                />
-              ))}
+            <div style={{ position: "relative" }}>
+              <div style={{ ...creatorsGridStyle, filter: showBlur ? "blur(6px)" : "none", pointerEvents: showBlur ? "none" : "auto", userSelect: showBlur ? "none" : "auto", transition: "filter 0.3s" }}>
+                {creators.map((c) => (
+                  <CreatorCard
+                    lang={lang}
+                    key={c.username  ?? ""}
+                    variant="discover"
+                    creator={c}
+                    isSaved={isCreatorSaved(c.username  ?? "")}
+                    onToggleSave={() => toggleSaveCreator(c)}
+                    onViewProfile={() => setSelectedCreator(c)}
+                  />
+                ))}
+              </div>
+              {showBlur && (
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 10, padding: 20 }}>
+                  <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 20, padding: "32px 40px", textAlign: "center", maxWidth: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(0,71,255,0.08)", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    </div>
+                    <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
+                      {lang === "fr" ? "Vous avez utilisé vos 2 découvertes" : "You've used your 2 discoveries"}
+                    </h3>
+                    <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
+                      {lang === "fr"
+                        ? "Passez à Basic pour des recherches illimitées."
+                        : "Upgrade to Basic for unlimited creator searches."}
+                    </p>
+                    {resetCountdown && (
+                      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
+                        {lang === "fr" ? `Réinitialisation dans ${resetCountdown}` : `Resets in ${resetCountdown}`}
+                      </p>
+                    )}
+                    {!resetCountdown && <div style={{ marginBottom: 18 }} />}
+                    <button
+                      type="button"
+                      onClick={onUpgrade}
+                      style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
+                    >
+                      {lang === "fr" ? "Débloquer les créateurs illimités →" : "Unlock unlimited creators →"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
