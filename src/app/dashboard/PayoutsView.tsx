@@ -23,20 +23,6 @@ type SaleNotification = {
   isNew?: boolean;
 };
 
-const INITIAL_SALES: Omit<SaleNotification, "id">[] = [
-  { amount: 89.99, creatorHandle: "fashionwithemma", commissionRate: 0.15, platform: "tiktok", minutesAgo: 2 },
-  { amount: 134.5, creatorHandle: "fitnessbysarah", commissionRate: 0.1, platform: "instagram", minutesAgo: 8 },
-  { amount: 249, creatorHandle: "travelwithleo", commissionRate: 0.12, platform: "tiktok", minutesAgo: 23 },
-  { amount: 67, creatorHandle: "beautybyjulie", commissionRate: 0.15, platform: "tiktok", minutesAgo: 45 },
-  { amount: 189.99, creatorHandle: "foodieparadise", commissionRate: 0.1, platform: "instagram", minutesAgo: 67 },
-];
-
-const SIMULATE_CREATORS = INITIAL_SALES.map((s) => ({
-  creatorHandle: s.creatorHandle,
-  commissionRate: s.commissionRate,
-  platform: s.platform,
-}));
-
 const btnOutline: React.CSSProperties = {
   background: "#FFFFFF",
   color: "#1A1A1A",
@@ -75,37 +61,11 @@ function platformLabel(platform: SalePlatform) {
   return "YouTube";
 }
 
-function nextId() {
-  return `sale-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-
-function seedNotifications(): SaleNotification[] {
-  return INITIAL_SALES.map((s, i) => ({ ...s, id: `seed-${i}` }));
-}
 
 export function LiveSalesFeed({ isMobile }: { isMobile?: boolean } = {}) {
   const lang = useLang();
-  const [notifications, setNotifications] = useState<SaleNotification[]>(seedNotifications);
+  const [notifications, setNotifications] = useState<SaleNotification[]>([]);
   const [paused, setPaused] = useState(false);
-
-  const simulateSale = () => {
-    if (paused) return;
-    const creator = SIMULATE_CREATORS[Math.floor(Math.random() * SIMULATE_CREATORS.length)];
-    const amount = round2(20 + Math.random() * 280);
-    const entry: SaleNotification = {
-      id: nextId(),
-      amount,
-      creatorHandle: creator.creatorHandle,
-      commissionRate: creator.commissionRate,
-      platform: creator.platform,
-      minutesAgo: 0,
-      isNew: true,
-    };
-    setNotifications((list) => [entry, ...list]);
-    setTimeout(() => {
-      setNotifications((list) => list.map((n) => (n.id === entry.id ? { ...n, isNew: false } : n)));
-    }, 500);
-  };
 
   const clearNotifications = () => setNotifications([]);
 
@@ -146,9 +106,6 @@ export function LiveSalesFeed({ isMobile }: { isMobile?: boolean } = {}) {
             >
               {paused ? "Resume feed" : lang === "fr" ? "Mettre en pause" : "Pause feed"}
             </button>
-            <button type="button" onClick={simulateSale} disabled={paused} style={{ ...btnOutline, opacity: paused ? 0.45 : 1, cursor: paused ? "not-allowed" : "pointer" }}>
-              {lang === "fr" ? "Simuler une vente" : "Simulate sale"}
-            </button>
             <button
               type="button"
               onClick={clearNotifications}
@@ -187,7 +144,7 @@ export function LiveSalesFeed({ isMobile }: { isMobile?: boolean } = {}) {
           <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: paused ? 0.45 : 1, transition: "opacity 0.2s ease" }}>
             {list.length === 0 ? (
               <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 10, padding: 32, textAlign: "center", fontSize: 13, color: "#9A9A9A" }}>
-                No sale notifications
+                {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
               </div>
             ) : (
               list.map((sale) => {
@@ -990,7 +947,7 @@ export function PayoutsView({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search partners by name or handle..."
+                placeholder={lang === "fr" ? "Rechercher vos partenaires par leur nom ou pseudo..." : "Search partners by name or handle..."}
                 style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
               />
             </div>
@@ -1072,7 +1029,7 @@ export function PayoutsView({
                     {partner.hasPaymentMethod ? (
                       <div style={{ fontSize: 11, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>{partner.paymentLabel}</div>
                     ) : (
-                      <div style={{ fontSize: 11, color: "#C45C00", marginTop: 4, letterSpacing: "-0.01em" }}>No payment method</div>
+                      <div style={{ fontSize: 11, color: "#C45C00", marginTop: 4, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Aucun moyen de paiement" : "No payment method"}</div>
                     )}
                   </div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginRight: 8 }}>{formatCurrency(partner.owed, lang)}</div>

@@ -18,27 +18,15 @@ const btnSecondary: React.CSSProperties = {
 type DateRange = "today" | "7d" | "30d" | "90d" | "custom";
 type SortKey = "sales" | "commission" | "roi" | "creator";
 
-const TOP_CREATORS = [
-  { rank: 1, creator: "Mia Chen", platform: "TikTok", sales: 8400, commission: 672, status: "Active" },
-  { rank: 2, creator: "Jordan Lee", platform: "Instagram", sales: 6200, commission: 496, status: "Active" },
-  { rank: 3, creator: "Sam Taylor", platform: "YouTube", sales: 3900, commission: 312, status: "Active" },
-  { rank: 4, creator: "Alex Rivera", platform: "TikTok", sales: 2800, commission: 224, status: "Inactive" },
-  { rank: 5, creator: "Riley Park", platform: "Instagram", sales: 2100, commission: 168, status: "Active" },
-];
+function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
+  return (
+    <div style={{ padding: "48px 24px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+      {lang === "fr" ? "Pas assez de données pour afficher ce graphique." : "Not enough data to display this chart."}
+    </div>
+  );
+}
 
-const CAMPAIGNS = [
-  { name: "Summer Fitness", creators: 24, sales: 12400, commissions: 992, roi: "12.5x", start: "Mar 1, 2026", status: "Active" },
-  { name: "Protein Launch", creators: 18, sales: 8200, commissions: 656, roi: "10.2x", start: "Feb 14, 2026", status: "Paused" },
-  { name: "Brand Awareness Q1", creators: 42, sales: 3900, commissions: 312, roi: "8.1x", start: "Jan 5, 2026", status: "Completed" },
-];
-
-const OUTREACH_PLATFORMS = [
-  { platform: "TikTok", sent: 68, replied: 24, converted: 8, preview: "Hey! Love your content — want to collab?" },
-  { platform: "Instagram", sent: 52, replied: 19, converted: 6, preview: "We think you'd be perfect for our brand..." },
-  { platform: "YouTube", sent: 27, replied: 7, converted: 2, preview: "Partnership opportunity for your audience" },
-];
-
-export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string; onUpgradePro?: () => void }) {
+export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
   const isFree = plan === "free";
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
@@ -54,41 +42,100 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       setLoadingData(false);
       return;
     }
-    if (shopifyStore && userId) {
-      fetch("/api/shopify/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      }).catch(() => {});
-    }
-    fetch(`/api/analytics?userId=${userId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setAnalyticsData(data);
-        setLoadingData(false);
-      })
-      .catch(() => setLoadingData(false));
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoadingData(true);
+      let data: Record<string, unknown> | null = null;
+
+      const fetchAnalytics = async () => {
+        const res = await fetch(`/api/analytics?userId=${userId}`);
+        return res.json() as Promise<Record<string, unknown>>;
+      };
+
+      try {
+        data = await fetchAnalytics();
+        const shouldSync = !!(shopifyStore || data?.shopifyConnected);
+        if (shouldSync) {
+          try {
+            await fetch("/api/shopify/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId }),
+            });
+            data = await fetchAnalytics();
+          } catch {
+            // Keep first analytics payload if sync fails
+          }
+        }
+        if (!cancelled) setAnalyticsData(data);
+      } catch {
+        if (!cancelled) setAnalyticsData(null);
+      } finally {
+        if (!cancelled) setLoadingData(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [userId, shopifyStore]);
 
-  const HAS_DATA = !loadingData && (analyticsData?.hasData ?? false);
+  const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
+  const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
 
   const sortedCreators = useMemo(() => {
-    const rows = TOP_CREATORS.map((r) => ({ ...r, roi: r.sales / r.commission }));
-    rows.sort((a, b) => {
+    const rows = (analyticsData?.creators || []).map((c: { full_name?: string; handle?: string; username?: string; platform?: string; total_sales?: number; total_earned?: number }, i: number) => {
+      const sales = c.total_sales || 0;
+      const commission = c.total_earned || 0;
+      return {
+        rank: i + 1,
+        creator: c.full_name || c.handle || c.username || "—",
+        platform: c.platform || "—",
+        sales,
+        commission,
+        status: sales > 0 ? "Active" : "Inactive",
+        roi: commission > 0 ? sales / commission : 0,
+      };
+    });
+    rows.sort((a: { creator: string; commission: number; roi: number; sales: number }, b: { creator: string; commission: number; roi: number; sales: number }) => {
       const av = sortKey === "creator" ? a.creator : sortKey === "commission" ? a.commission : sortKey === "roi" ? a.roi : a.sales;
       const bv = sortKey === "creator" ? b.creator : sortKey === "commission" ? b.commission : sortKey === "roi" ? b.roi : b.sales;
       if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
       return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return rows;
-  }, [sortKey, sortDir]);
+  }, [sortKey, sortDir, analyticsData]);
+
+  const campaignRows = analyticsData?.campaigns || [];
+  const totalSent = analyticsData?.totalSent || 0;
+  const responseRate = analyticsData?.responseRate || 0;
+  const converted = analyticsData?.converted || 0;
+  const totalRevenue = analyticsData?.totalRevenue || 0;
+  const totalCommissions = analyticsData?.totalCommissions || 0;
+  const netRevenue = Math.max(0, totalRevenue - totalCommissions);
+  const conversionRate = totalSent > 0 ? Math.round((converted / totalSent) * 100) : 0;
+  const avgCommissionRate = totalRevenue > 0 ? Math.round((totalCommissions / totalRevenue) * 100) : 0;
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("desc"); }
   };
 
-  if (!loadingData && !HAS_DATA) {
+  if (loadingData) {
+    return (
+      <>
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
+        <div style={{ padding: 80, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+          {lang === "fr" ? "Chargement des analytiques…" : "Loading analytics…"}
+        </div>
+      </>
+    );
+  }
+
+  if (!HAS_DATA) {
     return (
       <>
         <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
@@ -96,7 +143,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
-          <button type="button" style={btnPrimary}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
+          <button type="button" style={btnPrimary} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
         </div>
       </>
     );
@@ -107,26 +154,18 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={analyticsData?.totalRevenue ? formatCurrency(analyticsData.totalRevenue, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +18% ↑" : "vs last period +18% ↑"} subColor="#2E7D32" />
-          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value={String(analyticsData?.totalSent || 0)} sub={lang === "fr" ? "vs période précédente +23 ↑" : "vs last period +23 ↑"} subColor="#2E7D32" />
-          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value={`${analyticsData?.responseRate || 0}%`} sub={lang === "fr" ? "vs période précédente -2% ↓" : "vs last period -2% ↓"} subColor="#C62828" />
-          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value={analyticsData?.totalCommissions ? formatCurrency(analyticsData.totalCommissions, lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "vs période précédente +9% ↑" : "vs last period +9% ↑"} subColor="#2E7D32" />
+          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={formatCurrency(totalRevenue, lang)} />
+          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value={String(totalSent)} />
+          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value={`${responseRate}%`} />
+          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value={formatCurrency(totalCommissions, lang)} />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Revenus par créateur dans le temps" : "Revenue by Creator Over Time"}>
-            <LineChart />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12, justifyContent: "center" }}>
-              {["Mia Chen", "Jordan Lee", "Sam Taylor", "Alex Rivera", "Riley Park"].map((name, i) => (
-                <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7A7A7A" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: ["#0047FF", "#FF3D8B", "#95BF47", "#F57F17", "#6D00CC"][i] }} />
-                  {name}
-                </div>
-              ))}
-            </div>
+            <ChartEmpty lang={lang} />
           </ChartCard>
           <ChartCard title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}>
-            <FunnelBarChart lang={lang} />
+            {totalSent > 0 ? <FunnelBarChart lang={lang} totalSent={totalSent} responseRate={responseRate} converted={converted} /> : <ChartEmpty lang={lang} />}
           </ChartCard>
         </div>
 
@@ -145,7 +184,13 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                 </tr>
               </thead>
               <tbody>
-                {sortedCreators.map((r, i) => (
+                {sortedCreators.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                      {lang === "fr" ? "Aucun créateur avec des ventes pour le moment." : "No creators with sales yet."}
+                    </td>
+                  </tr>
+                ) : sortedCreators.map((r: { rank: number; creator: string; platform: string; sales: number; commission: number; roi: number; status: string }, i: number) => (
                   <tr key={r.creator} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
                     <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>{r.creator}</td>
@@ -172,12 +217,18 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}>
-            <DonutChart lang={lang} />
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? "Taux de commission moyen : 8%" : "Average commission rate: 8%"}</p>
-            <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? `Revenus nets après commissions : ${formatCurrency(22540, lang)}` : `Net revenue after commissions: ${formatCurrency(22540, lang)}`}</p>
+            {totalRevenue > 0 ? (
+              <>
+                <DonutChart lang={lang} netPct={Math.round((netRevenue / totalRevenue) * 100)} />
+                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? `Taux de commission moyen : ${avgCommissionRate}%` : `Average commission rate: ${avgCommissionRate}%`}</p>
+                <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? `Revenus nets après commissions : ${formatCurrency(netRevenue, lang)}` : `Net revenue after commissions: ${formatCurrency(netRevenue, lang)}`}</p>
+              </>
+            ) : (
+              <ChartEmpty lang={lang} />
+            )}
           </ChartCard>
           <ChartCard title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}>
-            <PlatformBars lang={lang} />
+            <ChartEmpty lang={lang} />
           </ChartCard>
         </div>
 
@@ -190,15 +241,21 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
               </tr>
             </thead>
             <tbody>
-              {CAMPAIGNS.map((c) => (
-                <tr key={c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name}</td>
-                  <td style={{ padding: "12px 8px" }}>{c.creators}</td>
-                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.sales, lang)}</td>
-                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.commissions, lang)}</td>
-                  <td style={{ padding: "12px 8px" }}>{c.roi}</td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{c.start}</td>
-                  <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={c.status} /></td>
+              {campaignRows.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                    {lang === "fr" ? "Aucune campagne pour le moment." : "No campaigns yet."}
+                  </td>
+                </tr>
+              ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string }) => (
+                <tr key={c.id || c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name || "—"}</td>
+                  <td style={{ padding: "12px 8px" }}>—</td>
+                  <td style={{ padding: "12px 8px" }}>—</td>
+                  <td style={{ padding: "12px 8px" }}>—</td>
+                  <td style={{ padding: "12px 8px" }}>—</td>
+                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{c.created_at?.split("T")[0] ?? "—"}</td>
+                  <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={String(c.status || "Draft")} /></td>
                 </tr>
               ))}
             </tbody>
@@ -208,10 +265,10 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
         <ChartCard title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"} style={{ marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value="147" />
-            <MiniStat label={lang === "fr" ? "Taux d'ouverture" : "Open rate"} value="68%" />
-            <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value="34%" />
-            <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value="12%" />
+            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value={String(totalSent)} />
+            <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value={`${responseRate}%`} />
+            <MiniStat label={lang === "fr" ? "Convertis" : "Converted"} value={String(converted)} />
+            <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value={`${conversionRate}%`} />
           </div>
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
@@ -221,26 +278,18 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
               </tr>
             </thead>
             <tbody>
-              {OUTREACH_PLATFORMS.map((r) => (
-                <tr key={r.platform} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{r.platform}</td>
-                  <td style={{ padding: "12px 8px" }}>{r.sent}</td>
-                  <td style={{ padding: "12px 8px" }}>{r.replied}</td>
-                  <td style={{ padding: "12px 8px" }}>{r.converted}</td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.preview}</td>
-                </tr>
-              ))}
+              <tr>
+                <td colSpan={5} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                  {lang === "fr" ? "Répartition par plateforme non disponible pour le moment." : "Platform breakdown not available yet."}
+                </td>
+              </tr>
             </tbody>
           </table>
           </div>
         </ChartCard>
 
         <ChartCard title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
-            <MiniStat label={lang === "fr" ? "Deals conclus grâce aux relances" : "Deals closed from follow up"} value="23%" large />
-            <MiniStat label={lang === "fr" ? "Relances moyennes avant réponse" : "Average follow ups before reply"} value="2.4" large />
-          </div>
-          <FollowUpLineChart lang={lang} />
+          <ChartEmpty lang={lang} />
         </ChartCard>
       </div>
     </>
@@ -343,12 +392,12 @@ function CompareToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) 
   );
 }
 
-function KpiCard({ title, value, sub, subColor }: { title: string; value: string; sub: string; subColor: string }) {
+function KpiCard({ title, value, sub, subColor }: { title: string; value: string; sub?: string; subColor?: string }) {
   return (
     <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
       <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 6 }}>{value}</div>
-      <div style={{ fontSize: 12, color: subColor, letterSpacing: "-0.01em" }}>{sub}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: sub ? 6 : 0 }}>{value}</div>
+      {sub ? <div style={{ fontSize: 12, color: subColor || "#9A9A9A", letterSpacing: "-0.01em" }}>{sub}</div> : null}
     </div>
   );
 }
@@ -410,28 +459,12 @@ function MiniStat({ label, value, large }: { label: string; value: string; large
   );
 }
 
-function LineChart() {
-  const lines = [
-    { color: "#0047FF", pts: "10,80 40,65 70,50 100,45 130,30 160,25 190,20 220,15 250,10" },
-    { color: "#FF3D8B", pts: "10,90 40,75 70,70 100,55 130,50 160,40 190,35 220,30 250,25" },
-    { color: "#95BF47", pts: "10,95 40,85 70,80 100,75 130,65 160,55 190,50 220,45 250,40" },
-    { color: "#F57F17", pts: "10,100 40,95 70,90 100,85 130,80 160,75 190,70 220,65 250,60" },
-    { color: "#6D00CC", pts: "10,105 40,100 70,95 100,90 130,85 160,80 190,75 220,70 250,65" },
-  ];
-  return (
-    <svg viewBox="0 0 260 100" style={{ width: "100%", height: 180 }}>
-      {[0, 25, 50, 75, 100].map((y) => <line key={y} x1="10" y1={y} x2="250" y2={y} stroke="#F0F0F0" strokeWidth="1" />)}
-      {lines.map((l) => <polyline key={l.color} fill="none" stroke={l.color} strokeWidth="2" points={l.pts} />)}
-    </svg>
-  );
-}
-
-function FunnelBarChart({ lang }: { lang: "en" | "fr" }) {
+function FunnelBarChart({ lang, totalSent, responseRate, converted }: { lang: "en" | "fr"; totalSent: number; responseRate: number; converted: number }) {
+  const replied = Math.round((totalSent * responseRate) / 100);
   const bars = [
-    { label: lang === "fr" ? "Envoyé" : "Sent", value: 147, color: "#9A9A9A", h: 100 },
-    { label: lang === "fr" ? "Ouvert" : "Opened", value: 100, color: "#0047FF", h: 68 },
-    { label: lang === "fr" ? "Répondu" : "Replied", value: 50, color: "#95BF47", h: 34 },
-    { label: lang === "fr" ? "Converti" : "Converted", value: 18, color: "#2E7D32", h: 12 },
+    { label: lang === "fr" ? "Envoyé" : "Sent", value: totalSent, color: "#9A9A9A", h: 100 },
+    { label: lang === "fr" ? "Répondu" : "Replied", value: replied, color: "#95BF47", h: totalSent > 0 ? Math.max(8, Math.round((replied / totalSent) * 100)) : 0 },
+    { label: lang === "fr" ? "Converti" : "Converted", value: converted, color: "#2E7D32", h: totalSent > 0 ? Math.max(8, Math.round((converted / totalSent) * 100)) : 0 },
   ];
   return (
     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 180, gap: 12, paddingTop: 8 }}>
@@ -446,57 +479,16 @@ function FunnelBarChart({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-function DonutChart({ lang }: { lang: "en" | "fr" }) {
+function DonutChart({ lang, netPct }: { lang: "en" | "fr"; netPct: number }) {
+  const circumference = 377;
+  const dash = Math.round((netPct / 100) * circumference);
   return (
     <div style={{ display: "flex", justifyContent: "center" }}>
       <svg width="160" height="160" viewBox="0 0 160 160">
         <circle cx="80" cy="80" r="60" fill="none" stroke="#EFEFEF" strokeWidth="24" />
-        <circle cx="80" cy="80" r="60" fill="none" stroke="#0047FF" strokeWidth="24" strokeDasharray="301 377" strokeDashoffset="0" transform="rotate(-90 80 80)" />
-        <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">92%</text>
+        <circle cx="80" cy="80" r="60" fill="none" stroke="#0047FF" strokeWidth="24" strokeDasharray={`${dash} ${circumference}`} strokeDashoffset="0" transform="rotate(-90 80 80)" />
+        <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">{netPct}%</text>
         <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">{lang === "fr" ? "Revenus nets" : "Net revenue"}</text>
-      </svg>
-    </div>
-  );
-}
-
-function PlatformBars({ lang }: { lang: "en" | "fr" }) {
-  const items = [
-    { name: "TikTok", amount: 12400, pct: 51, color: "#1A1A1A" },
-    { name: "Instagram", amount: 8200, pct: 33, color: "#E1306C" },
-    { name: "YouTube", amount: 3900, pct: 16, color: "#FF0000" },
-  ];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {items.map((i) => (
-        <div key={i.name}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 13 }}>
-            <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{i.name}</span>
-            <span style={{ color: "#7A7A7A" }}>{formatCurrency(i.amount, lang)} · {i.pct}%</span>
-          </div>
-          <div style={{ height: 10, background: "#EFEFEF", borderRadius: 999, overflow: "hidden" }}>
-            <div style={{ width: `${i.pct}%`, height: "100%", background: i.color, borderRadius: 999 }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FollowUpLineChart({ lang }: { lang: "en" | "fr" }) {
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 16, marginBottom: 8, justifyContent: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7A7A7A" }}>
-          <span style={{ width: 12, height: 3, background: "#0047FF", borderRadius: 2 }} /> {lang === "fr" ? "Avec relance" : "With follow-up"}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#7A7A7A" }}>
-          <span style={{ width: 12, height: 3, background: "#9A9A9A", borderRadius: 2 }} /> {lang === "fr" ? "Sans relance" : "Without follow-up"}
-        </div>
-      </div>
-      <svg viewBox="0 0 260 100" style={{ width: "100%", height: 140 }}>
-        {[0, 25, 50, 75, 100].map((y) => <line key={y} x1="10" y1={y} x2="250" y2={y} stroke="#F0F0F0" strokeWidth="1" />)}
-        <polyline fill="none" stroke="#0047FF" strokeWidth="2" points="10,70 50,55 90,45 130,38 170,32 210,28 250,25" />
-        <polyline fill="none" stroke="#9A9A9A" strokeWidth="2" strokeDasharray="4 4" points="10,85 50,78 90,72 130,68 170,65 210,62 250,60" />
       </svg>
     </div>
   );

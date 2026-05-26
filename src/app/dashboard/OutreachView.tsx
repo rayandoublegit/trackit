@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { saveOutreach, getOutreachHistory } from "@/lib/db";
+import { saveOutreach, getOutreachHistory, getSavedCreators } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
@@ -20,13 +20,6 @@ type OutreachHistoryEntry = {
   followUpDate: string | null;
 };
 
-const INITIAL_OUTREACH_HISTORY: OutreachHistoryEntry[] = [
-  { id: "1", creator: "Emma Laurent", handle: "fashionwithemma", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma", message: "Hey Emma 👋 I've been following your content and I love how authentic your fashion posts are...", sentDate: "2026-05-10", status: "replied", followUpDate: null },
-  { id: "2", creator: "Sarah Martin", handle: "fitnessbysarah", platform: "instagram", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah", message: "Hey Sarah, I run a fitness brand and I think your audience would genuinely love what we do...", sentDate: "2026-05-12", status: "sent", followUpDate: "2026-05-15" },
-  { id: "3", creator: "Marc Dubois", handle: "techreviewspro", platform: "youtube", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=marc", message: "Hey Marc, huge fan of your honest tech reviews. I'd love to discuss a potential partnership...", sentDate: "2026-05-08", status: "no_response", followUpDate: "2026-05-15" },
-  { id: "4", creator: "Julie Chen", handle: "beautybyjulie", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=julie", message: "Hey Julie 👋 Your skincare content is exactly the kind of authentic voice our brand needs...", sentDate: "2026-05-14", status: "opened", followUpDate: "2026-05-17" },
-  { id: "5", creator: "Leo Moreau", handle: "travelwithleo", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=leo", message: "Hey Leo, I've been watching your travel content and I think there's a great fit with our brand...", sentDate: "2026-05-15", status: "converted", followUpDate: null },
-];
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF",
@@ -420,14 +413,6 @@ type SavedOutreachTemplate = {
   platform: GeneratePlatform;
 };
 
-const MOCK_OUTREACH_CREATORS: OutreachCreator[] = [
-  { id: "c1", displayName: "Emma Laurent", username: "fashionwithemma", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma", niche: "Fashion", followersCount: 245000, engagementRate: 4.2, bio: "Fashion & lifestyle creator based in Paris." },
-  { id: "c2", displayName: "Sarah Martin", username: "fitnessbysarah", platform: "instagram", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah", niche: "Fitness", followersCount: 89000, engagementRate: 6.8, bio: "Fitness coach helping women build strength." },
-  { id: "c3", displayName: "Marc Dubois", username: "techreviewspro", platform: "youtube", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=marc", niche: "Tech", followersCount: 520000, engagementRate: 3.1, bio: "Honest tech reviews and gadget breakdowns." },
-  { id: "c4", displayName: "Julie Chen", username: "beautybyjulie", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=julie", niche: "Beauty", followersCount: 167000, engagementRate: 5.4, bio: "Skincare routines and honest beauty reviews." },
-  { id: "c5", displayName: "Leo Moreau", username: "travelwithleo", platform: "tiktok", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=leo", niche: "Travel", followersCount: 312000, engagementRate: 4.9, bio: "Budget travel tips and hidden gems worldwide." },
-  { id: "c6", displayName: "Thomas Bernard", username: "foodieparadise", platform: "instagram", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=thomas", niche: "Food", followersCount: 98000, engagementRate: 7.2, bio: "Food reviews and recipe content from Marseille." },
-];
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -501,6 +486,20 @@ function incrementOutreachGenerationsToday() {
   localStorage.setItem("trackit_outreach_today", String(count));
 }
 
+function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: string; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 56, width: "auto", marginBottom: 16 }} />
+        <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.6, margin: "0 0 24px", whiteSpace: "pre-line" }}>{message}</p>
+        <button type="button" onClick={() => { window.location.href = "/#pricing"; }} style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.02em" }}>
+          {lang === "fr" ? "Voir les plans →" : "View plans →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OutreachAIGeneratePanel({
   lang,
   plan,
@@ -530,17 +529,42 @@ function OutreachAIGeneratePanel({
   const [creatorEmail, setCreatorEmail] = useState("");
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [, setSavedTemplates] = useState<SavedOutreachTemplate[]>([]);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [savedCreators, setSavedCreators] = useState<OutreachCreator[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const data = await getSavedCreators(user.id);
+      setSavedCreators(
+        data.map((c) => ({
+          id: c.id,
+          displayName: c.full_name || c.handle || "",
+          username: c.handle || c.username || "",
+          platform: c.platform || "",
+          avatar: c.avatar_url || "",
+          niche: c.niche || "",
+          followersCount: c.followers || 0,
+          engagementRate: c.engagement_rate || 0,
+          bio: c.bio || "",
+        }))
+      );
+    };
+    void load();
+  }, []);
 
   const filteredCreators = useMemo(() => {
     const q = creatorSearch.trim().toLowerCase();
-    if (!q) return MOCK_OUTREACH_CREATORS;
-    return MOCK_OUTREACH_CREATORS.filter(
+    if (!q) return savedCreators;
+    return savedCreators.filter(
       (c) =>
         c.displayName.toLowerCase().includes(q) ||
         c.username.toLowerCase().includes(q) ||
         c.platform.toLowerCase().includes(q)
     );
-  }, [creatorSearch]);
+  }, [creatorSearch, savedCreators]);
 
   const resetPanel = () => {
     setExpanded(false);
@@ -556,12 +580,18 @@ function OutreachAIGeneratePanel({
     setCopied(false);
   };
 
-  const outreachLimitReached = plan === "free";
-
   const handleGenerate = async () => {
     if (plan === "free") {
-      alert(lang === "fr" ? "La génération IA est disponible à partir du plan Basic." : "AI generation is available on Basic plan and above.");
-      return;
+      const today = new Date().toDateString();
+      const key = "trackit_outreach_gen_" + today;
+      const used = parseInt(localStorage.getItem(key) || "0");
+      if (used >= 1) {
+        setUpgradeMsg(lang === "fr"
+          ? "🔒 Votre génération IA gratuite est épuisée.\n\nLes marques qui utilisent Trackit AI envoient 3x plus de messages et closent 2x plus de créateurs.\n\nPassez à Basic → Générations illimitées, suivi des ventes, paiements automatiques."
+          : "🔒 You've used your free AI generation for today.\n\nBrands using Trackit AI send 3x more outreach and close 2x more creators.\n\nUpgrade to Basic → Unlimited AI, sale tracking, automatic payouts.");
+        return;
+      }
+      localStorage.setItem(key, String(used + 1));
     }
     if (!selectedCreator || !brand.trim()) return;
     setGenerating(true);
@@ -885,33 +915,14 @@ function OutreachAIGeneratePanel({
                 </div>
               </div>
 
-              {outreachLimitReached ? (
-                <div
-                  style={{
-                    padding: 16,
-                    background: "#FFFBF0",
-                    border: "1px solid #FFE4A8",
-                    borderRadius: 12,
-                    marginBottom: 20,
-                  }}
-                >
-                  <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
-                    You&apos;ve used your 3 free AI messages today. Upgrade for unlimited.
-                  </p>
-                  <button type="button" onClick={onNavigateToBilling} style={{ ...btnPrimary }}>
-                    Upgrade →
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void handleGenerate()}
-                  disabled={generating || !selectedCreator || !brand.trim()}
-                  style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
-                >
-                  {generating ? (lang === "fr" ? "Génération..." : "Generating...") : lang === "fr" ? "Générer le message →" : "Generate message →"}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => void handleGenerate()}
+                disabled={generating || !selectedCreator || !brand.trim()}
+                style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
+              >
+                {generating ? (lang === "fr" ? "Génération..." : "Generating...") : lang === "fr" ? "Générer le message →" : "Generate message →"}
+              </button>
 
               {message && !generating && (
                 <div>
@@ -932,7 +943,15 @@ function OutreachAIGeneratePanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSaveTemplateOpen(true)}
+                      onClick={() => {
+                        if (plan === "free") {
+                          setUpgradeMsg(lang === "fr"
+                            ? "🔒 Sauvegarde de modèles — Plan Basic requis.\n\nSauvegardez vos messages qui convertissent et construisez une bibliothèque de templates qui travaille pour vous.\n\nPassez à Basic →"
+                            : "🔒 Save templates — Basic plan required.\n\nSave your best-converting messages and build a template library that works for you.\n\nUpgrade to Basic →");
+                          return;
+                        }
+                        setSaveTemplateOpen(true);
+                      }}
                       style={{ ...btnSecondary, flex: 1, minWidth: 120 }}
                     >
                       {lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}
@@ -1015,6 +1034,7 @@ function OutreachAIGeneratePanel({
           }}
         />
       )}
+      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
     </div>
   );
 }
@@ -1057,10 +1077,11 @@ export function OutreachHistorySection({
   isMobile?: boolean;
 }) {
   const lang = useLang();
-  const [entries, setEntries] = useState<OutreachHistoryEntry[]>(INITIAL_OUTREACH_HISTORY);
+  const [entries, setEntries] = useState<OutreachHistoryEntry[]>([]);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [search, setSearch] = useState("");
   const [viewingMessage, setViewingMessage] = useState<string | null>(null);
+  const [manageEntry, setManageEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpEntry, setFollowUpEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpSlideIn, setFollowUpSlideIn] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -1085,19 +1106,17 @@ export function OutreachHistorySection({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const history = await getOutreachHistory(user.id);
-      if (history.length > 0) {
-        setEntries(history.map((o) => ({
-          id: o.id,
-          creator: o.creator_display_name,
-          handle: o.creator_username,
-          platform: o.platform,
-          avatar: o.creator_avatar,
-          message: o.message,
-          sentDate: o.created_at?.split("T")[0] ?? "",
-          status: o.status as OutreachHistoryStatus,
-          followUpDate: o.follow_up_date ?? null,
-        })));
-      }
+      setEntries(history.map((o) => ({
+        id: o.id,
+        creator: o.creator_display_name,
+        handle: o.creator_username,
+        platform: o.platform,
+        avatar: o.creator_avatar,
+        message: o.message,
+        sentDate: o.created_at?.split("T")[0] ?? "",
+        status: o.status as OutreachHistoryStatus,
+        followUpDate: o.follow_up_date ?? null,
+      })));
     };
     void load();
   }, []);
@@ -1131,6 +1150,34 @@ export function OutreachHistorySection({
     );
     closeFollowUp();
     setToast("Follow up sent ✓");
+  };
+
+  const sendFollowUp = async (item: OutreachHistoryEntry) => {
+    const res = await fetch("/api/generate-follow-up", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        creatorHandle: item.handle,
+        platform: item.platform,
+        originalMessage: item.message,
+        lang,
+      }),
+    });
+    const data = await res.json();
+    if (data.followUp || data.message) {
+      await navigator.clipboard.writeText(data.followUp || data.message);
+      alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
+      const { supabase: sb } = await import("@/lib/supabase");
+      if (sb) await sb.from("outreach_history").update({ follow_up_sent: true }).eq("id", item.id);
+      setManageEntry(null);
+    }
+  };
+
+  const markAsReplied = async (item: OutreachHistoryEntry) => {
+    const { supabase: sb } = await import("@/lib/supabase");
+    if (sb) await sb.from("outreach_history").update({ status: "replied" }).eq("id", item.id);
+    setManageEntry(null);
+    window.location.reload();
   };
 
   const filtered = useMemo(() => {
@@ -1234,8 +1281,6 @@ export function OutreachHistorySection({
           {isMobile ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
               {filtered.map((item) => {
-                const followUpDisabled = item.status === "replied" || item.status === "converted";
-                const showMarkReplied = item.status === "sent" || item.status === "opened" || item.status === "no_response";
                 return (
                   <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
@@ -1264,72 +1309,15 @@ export function OutreachHistorySection({
                         {lang === "fr" ? "Relance :" : "Follow up:"} {formatFollowUpDate(item.followUpDate)}
                       </div>
                     )}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
                       <button
                         type="button"
-                        onClick={() => setViewingMessage(item.message || "")}
-                        style={{ flex: 1, minWidth: 100, padding: "8px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#1A1A1A" }}
+                        className="hero-cta-shopify-dark hero-cta-compact"
+                        style={{ flex: 1, width: "100%" }}
+                        onClick={() => setManageEntry(item)}
                       >
-                        {lang === "fr" ? "Voir le message" : "View message"}
+                        {lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}
                       </button>
-                      <button
-                        type="button"
-                        disabled={followUpDisabled}
-                        onClick={async () => {
-                          const res = await fetch("/api/generate-follow-up", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              creatorHandle: item.handle,
-                              platform: item.platform,
-                              originalMessage: item.message,
-                              lang,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.followUp || data.message) {
-                            await navigator.clipboard.writeText(data.followUp || data.message);
-                            alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
-                            const { supabase } = await import("@/lib/supabase");
-                            if (supabase) await supabase
-                              .from("outreach_history")
-                              .update({ follow_up_sent: true })
-                              .eq("id", item.id);
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          minWidth: 100,
-                          padding: "8px",
-                          background: "#F5F5F5",
-                          border: "none",
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 500,
-                          cursor: followUpDisabled ? "not-allowed" : "pointer",
-                          fontFamily: "inherit",
-                          color: "#1A1A1A",
-                          opacity: followUpDisabled ? 0.4 : 1,
-                        }}
-                      >
-                        {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
-                      </button>
-                      {showMarkReplied && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const { supabase } = await import("@/lib/supabase");
-                            if (supabase) await supabase
-                              .from("outreach_history")
-                              .update({ status: "replied" })
-                              .eq("id", item.id);
-                            window.location.reload();
-                          }}
-                          style={{ flex: 1, minWidth: 100, padding: "8px", background: "#0047FF", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                        >
-                          {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -1340,7 +1328,7 @@ export function OutreachHistorySection({
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.8fr",
+                  gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.1fr",
                   gap: 10,
                   padding: "12px 16px",
                   background: "#FAFAFA",
@@ -1362,14 +1350,12 @@ export function OutreachHistorySection({
                 ))}
               </div>
               {filtered.map((row, i) => {
-                const followUpDisabled = row.status === "replied" || row.status === "converted";
-                const showMarkReplied = row.status === "sent" || row.status === "opened" || row.status === "no_response";
                 return (
                   <div
                     key={row.id}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.8fr",
+                      gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.1fr",
                       gap: 10,
                       padding: "14px 16px",
                       alignItems: "center",
@@ -1393,55 +1379,10 @@ export function OutreachHistorySection({
                     <div style={{ fontSize: 11, color: "#EA580C" }}>
                       {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      <button type="button" style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px" }} onClick={() => setViewingMessage(row.message || "")}>
-                        {lang === "fr" ? "Voir le message" : "View message"}
+                    <div>
+                      <button type="button" className="hero-cta-shopify-dark hero-cta-compact" style={{ width: "100%" }} onClick={() => setManageEntry(row)}>
+                        {lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}
                       </button>
-                      <button
-                        type="button"
-                        disabled={followUpDisabled}
-                        onClick={async () => {
-                          const res = await fetch("/api/generate-follow-up", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              creatorHandle: row.handle,
-                              platform: row.platform,
-                              originalMessage: row.message,
-                              lang,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.followUp || data.message) {
-                            await navigator.clipboard.writeText(data.followUp || data.message);
-                            alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
-                            const { supabase } = await import("@/lib/supabase");
-                            if (supabase) await supabase
-                              .from("outreach_history")
-                              .update({ follow_up_sent: true })
-                              .eq("id", row.id);
-                          }
-                        }}
-                        style={{ ...btnSecondary, fontSize: 11, padding: "6px 10px", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
-                      >
-                        {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
-                      </button>
-                      {showMarkReplied && (
-                        <button
-                          type="button"
-                          style={{ ...btnPrimary, fontSize: 11, padding: "6px 10px" }}
-                          onClick={async () => {
-                            const { supabase } = await import("@/lib/supabase");
-                            if (supabase) await supabase
-                              .from("outreach_history")
-                              .update({ status: "replied" })
-                              .eq("id", row.id);
-                            window.location.reload();
-                          }}
-                        >
-                          {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
-                        </button>
-                      )}
                     </div>
                   </div>
                 );
@@ -1450,6 +1391,47 @@ export function OutreachHistorySection({
           )}
         </div>
       </div>
+
+      {manageEntry && (() => {
+        const followUpDisabled = manageEntry.status === "replied" || manageEntry.status === "converted";
+        const showMarkReplied = manageEntry.status === "sent" || manageEntry.status === "opened" || manageEntry.status === "no_response";
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setManageEntry(null)}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}</div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>{manageEntry.creator} · @{manageEntry.handle}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <button
+                  type="button"
+                  style={{ ...btnSecondary, width: "100%" }}
+                  onClick={() => {
+                    setViewingMessage(manageEntry.message || "");
+                    setManageEntry(null);
+                  }}
+                >
+                  {lang === "fr" ? "Voir le message" : "View message"}
+                </button>
+                <button
+                  type="button"
+                  disabled={followUpDisabled}
+                  style={{ ...btnSecondary, width: "100%", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
+                  onClick={() => void sendFollowUp(manageEntry)}
+                >
+                  {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
+                </button>
+                {showMarkReplied && (
+                  <button type="button" style={{ ...btnPrimary, width: "100%" }} onClick={() => void markAsReplied(manageEntry)}>
+                    {lang === "fr" ? "Marquer comme répondu" : "Mark as replied"}
+                  </button>
+                )}
+              </div>
+              <button type="button" onClick={() => setManageEntry(null)} style={{ ...btnSecondary, width: "100%", marginTop: 16 }}>
+                {lang === "fr" ? "Fermer" : "Close"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {viewingMessage && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewingMessage(null)}>

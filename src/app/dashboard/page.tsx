@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getSavedCreators } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
@@ -97,32 +98,37 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) { setLoading(false); router.replace("/auth"); return; }
     void supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
-      if (!authUser) { router.replace("/auth"); return; }
-      const { data: profileData } = await supabase!
-        .from("profiles")
-        .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
-        .eq("id", authUser.id)
-        .maybeSingle();
-      if (!profileData || profileData.onboarding_completed === false) {
-        router.replace("/onboarding");
-        return;
+      try {
+        if (!authUser) { router.replace("/auth"); setLoading(false); return; }
+        const { data: profileData } = await supabase!
+          .from("profiles")
+          .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
+          .eq("id", authUser.id)
+          .maybeSingle();
+        if (!profileData || profileData.onboarding_completed === false) {
+          router.replace("/onboarding");
+          return;
+        }
+        setShopifyStore(profileData.shopify_store || null);
+        setUser(authUser);
+        const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
+        avatarRetryRef.current = false;
+        setAvatarBroken(false);
+        setProfile({
+          full_name: profileData.full_name,
+          username: profileData.username,
+          avatar_url,
+          business_name: profileData.business_name,
+          shopify_store: profileData.shopify_store ?? null,
+          plan: profileData.plan || "free",
+        });
+      } catch (e) {
+        console.error("Dashboard load error:", e);
+      } finally {
+        setLoading(false);
       }
-      setShopifyStore(profileData.shopify_store || null);
-      setUser(authUser);
-      const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
-      avatarRetryRef.current = false;
-      setAvatarBroken(false);
-      setProfile({
-        full_name: profileData.full_name,
-        username: profileData.username,
-        avatar_url,
-        business_name: profileData.business_name,
-        shopify_store: profileData.shopify_store ?? null,
-        plan: profileData.plan || "free",
-      });
-      setLoading(false);
     });
   }, [router]);
 
@@ -250,7 +256,7 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
-    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#FAFAFA", fontFamily: "'InterDisplay', sans-serif" }}><p style={{ color: "#7A7A7A" }}>Loading...</p></div>;
+    return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
   }
 
   const sidebarWidth = sidebarCollapsed ? 72 : 264;
@@ -367,7 +373,8 @@ export default function DashboardPage() {
           />
           {!sidebarCollapsed && (
             <span style={{ fontSize: 14, fontWeight: 600, color: "#000000", letterSpacing: "-0.02em", lineHeight: 1.35, fontFamily: "inherit" }}>
-              Find it, Track it, Pay it.
+              Find it, Track it, Pay it
+              <span style={{ color: "#0047FF", fontSize: 28, lineHeight: 1 }}>.</span>
             </span>
           )}
         </div>
@@ -516,7 +523,7 @@ export default function DashboardPage() {
             onUpgrade={handleUpgradeBasic}
           />
         )}
-        {view === "creators" && <CreatorsView isMobile={isMobile} />}
+        {view === "creators" && <CreatorsView isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} />}
         {view === "campaigns" && (
           canUseBasicFeatures ? (
             <CampaignsView isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} onUpgrade={handleUpgradeBasic} />
@@ -550,7 +557,7 @@ export default function DashboardPage() {
         )}
         {view === "analytics" && user && (
           canUseBasicFeatures ? (
-            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} shopifyStore={shopifyStore || undefined} onUpgradePro={handleUpgradePro} />
+            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
@@ -737,24 +744,8 @@ type OutreachTemplate = {
 
 const OUTREACH_DM_PLATFORMS = ["Instagram", "TikTok", "YouTube", "Twitter", "Email"] as const;
 
-const OUTREACH_INFLUENCERS = [
-  { handle: "@emma.style", platform: "Instagram" },
-  { handle: "@jakefit", platform: "TikTok" },
-  { handle: "@beautybylu", platform: "YouTube" },
-  { handle: "@techwithsam", platform: "TikTok" },
-  { handle: "@alexcreates", platform: "Instagram" },
-];
 
-const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [
-  {
-    id: "seed-1",
-    name: "Collab intro",
-    subject: "Partnership with {{brand}}",
-    opening: "Hey {{name}},",
-    body: "We love your content and think you'd be a great fit for our brand. We're offering {{commission}} commission on every sale through your unique link.",
-    cta: "Would you be open to a quick chat this week?",
-  },
-];
+const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
 
 const panelInputStyle: React.CSSProperties = {
   width: "100%",
@@ -820,6 +811,20 @@ function OutreachPanelShell({
   );
 }
 
+function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: string; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 56, width: "auto", marginBottom: 16 }} />
+        <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.6, margin: "0 0 24px", whiteSpace: "pre-line" }}>{message}</p>
+        <button type="button" onClick={() => { window.location.href = "/#pricing"; }} style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.02em" }}>
+          {lang === "fr" ? "Voir les plans →" : "View plans →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function OutreachView({
   plan,
   onNavigateToBilling,
@@ -834,6 +839,7 @@ function OutreachView({
   const [panel, setPanel] = useState<OutreachPanel>(null);
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   const closePanel = () => setPanel(null);
 
@@ -856,10 +862,23 @@ function OutreachView({
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
-            if (plan === "free") { alert(lang === "fr" ? "Les modèles sont disponibles à partir du plan Basic." : "Templates are available on Basic plan and above."); return; }
+            if (plan === "free") {
+              setUpgradeMsg(lang === "fr"
+                ? "🔒 Modèles — Plan Basic requis.\n\nAccédez à vos meilleurs templates et réutilisez-les sur tous vos créateurs.\n\nPassez à Basic →"
+                : "🔒 Templates — Basic plan required.\n\nAccess your best templates and reuse them across all your creators.\n\nUpgrade to Basic →");
+              return;
+            }
             setPanel("seeTemplates");
           }}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("import")}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+            if (plan === "free") {
+              setUpgradeMsg(lang === "fr"
+                ? "🔒 Import de modèles — Plan Basic requis.\n\nImportez vos meilleurs templates en un clic et réutilisez-les sur tous vos créateurs. Fini de réécrire depuis zéro.\n\nPassez à Basic →"
+                : "🔒 Template import — Basic plan required.\n\nImport your best-performing templates and reuse them across all your creators. Stop writing from scratch.\n\nUpgrade to Basic →");
+              return;
+            }
+            setPanel("import");
+          }}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
           <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
         </div>
@@ -938,6 +957,7 @@ function OutreachView({
           }}
         />
       )}
+      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
     </>
   );
 }
@@ -1112,9 +1132,35 @@ function InfluencerPicker({
   onChange: (handles: string[]) => void;
 }) {
   const lang = useLang();
+  const [influencers, setInfluencers] = useState<{ handle: string; platform: string }[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const data = await getSavedCreators(user.id);
+      setInfluencers(
+        data.map((c) => ({
+          handle: `@${String(c.handle ?? c.username ?? "").replace(/^@/, "")}`,
+          platform: String(c.platform ?? ""),
+        }))
+      );
+    };
+    void load();
+  }, []);
+
   const toggle = (handle: string) => {
     onChange(selected.includes(handle) ? selected.filter((h) => h !== handle) : [...selected, handle]);
   };
+
+  if (influencers.length === 0) {
+    return (
+      <div style={{ padding: 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: 13, color: "#9A9A9A", textAlign: "center" }}>
+        {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis Découverte ou Créateurs." : "No saved creators yet. Add creators from Discovery or Creators."}
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1123,12 +1169,12 @@ function InfluencerPicker({
         <button
           type="button"
           style={{ fontSize: 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-          onClick={() => onChange(selected.length === OUTREACH_INFLUENCERS.length ? [] : OUTREACH_INFLUENCERS.map((i) => i.handle))}
+          onClick={() => onChange(selected.length === influencers.length ? [] : influencers.map((i) => i.handle))}
         >
-          {selected.length === OUTREACH_INFLUENCERS.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
+          {selected.length === influencers.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
         </button>
       </div>
-      {OUTREACH_INFLUENCERS.map((inf) => {
+      {influencers.map((inf) => {
         const on = selected.includes(inf.handle);
         return (
           <button
@@ -1553,9 +1599,7 @@ function UpgradeGate({
       <PageHeader isMobile={isMobile} title={feature} subtitle={`${feature} is available on the ${requiredPlan} plan and above`} />
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 80, textAlign: "center" }}>
-          <div style={{ width: 64, height: 64, borderRadius: 16, background: "rgba(0,71,255,0.08)", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#0047FF"/></svg>
-          </div>
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", margin: "0 auto 18px", display: "block" }} />
           <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Upgrade to unlock {feature}</h3>
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>This feature is part of the {requiredPlan} plan. Upgrade your account to start using {feature.toLowerCase()}.</p>
           <button type="button" style={btnPrimary} onClick={() => void onUpgrade()}>Upgrade to {requiredPlan}</button>
@@ -1595,12 +1639,7 @@ type AffiliateRow = {
   status: string;
 };
 
-const INITIAL_AFFILIATES: AffiliateRow[] = [
-  { creator: "@emma.style", platform: "Instagram", ref: "emma_a3f9k2", code: "EMMA15", clicks: 1240, conversions: 58, sales: 4820, commission: 482, status: "Active" },
-  { creator: "@jakefit", platform: "TikTok", ref: "jake_x7b2m1", code: "JAKE15", clicks: 2100, conversions: 102, sales: 8900, commission: 890, status: "Active" },
-  { creator: "@beautybylu", platform: "YouTube", ref: "lu_k9p4z3", code: "LU15", clicks: 890, conversions: 41, sales: 3200, commission: 320, status: "Active" },
-  { creator: "@techwithsam", platform: "TikTok", ref: "sam_m2n8q5", code: "SAM15", clicks: 617, conversions: 33, sales: 2780, commission: 278, status: "Paused" },
-];
+const INITIAL_AFFILIATES: AffiliateRow[] = [];
 
 function slugFromHandle(handle: string) {
   const base = handle.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
@@ -1639,6 +1678,11 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const statusColor = (s: string) => s === "Active" ? { bg: "rgba(31,181,103,0.1)", fg: "#1FB567" } : { bg: "rgba(122,122,122,0.1)", fg: "#7A7A7A" };
 
+  const activeAffiliateCount = affiliates.filter((a) => a.status === "Active").length;
+  const totalClicks = affiliates.reduce((sum, a) => sum + a.clicks, 0);
+  const totalConversions = affiliates.reduce((sum, a) => sum + a.conversions, 0);
+  const conversionRate = totalClicks > 0 ? `${((totalConversions / totalClicks) * 100).toFixed(1)}%` : "0%";
+
   const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => {
     setAffiliates((list) => [
       { ...row, clicks: 0, conversions: 0, sales: 0, commission: 0, status: "Active" },
@@ -1655,10 +1699,10 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
           {[
-            { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: "12" },
-            { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: "4,847" },
-            { label: lang === "fr" ? "Conversions totales" : "Total conversions", value: "234" },
-            { label: lang === "fr" ? "Taux de conversion" : "Conversion rate", value: "4.8%" },
+            { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: String(activeAffiliateCount) },
+            { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: totalClicks.toLocaleString(lang === "fr" ? "fr-FR" : "en-US") },
+            { label: lang === "fr" ? "Conversions totales" : "Total conversions", value: String(totalConversions) },
+            { label: lang === "fr" ? "Taux de conversion" : "Conversion rate", value: conversionRate },
           ].map((kpi) => (
             <div key={kpi.label} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 14, padding: 20 }}>
               <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>{kpi.label}</div>
@@ -1684,7 +1728,11 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
               <div key={h} style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{h}</div>
             ))}
           </div>
-          {affiliates.map((a, i) => {
+          {affiliates.length === 0 ? (
+            <div style={{ padding: 40, textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              {lang === "fr" ? "Aucun affilié pour le moment." : "No affiliates yet."}
+            </div>
+          ) : affiliates.map((a, i) => {
             const sc = statusColor(a.status);
             return (
               <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>

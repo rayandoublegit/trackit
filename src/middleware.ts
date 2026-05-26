@@ -37,7 +37,6 @@ export async function middleware(request: NextRequest) {
 
   if (requiresAuth && !user) {
     const redirectTo = new URL("/auth", request.url);
-    redirectTo.searchParams.set("redirectTo", pathname + request.nextUrl.search);
     return NextResponse.redirect(redirectTo);
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
+import { getSavedCreators, getCampaigns } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
@@ -30,20 +31,29 @@ type ManagedCreator = {
   campaignIds: string[];
 };
 
-const INITIAL_CREATORS: ManagedCreator[] = [
-  { id: "1", username: "fashionwithemma", displayName: "Emma Laurent", platform: "tiktok", followers: 245000, engagement: 4.2, niche: "Fashion", status: "active", addedDate: "2026-01-15", age: 24, email: "emma@creator.com", location: "Paris, France", notes: "", campaignIds: ["c1", "c2"] },
-  { id: "2", username: "fitnessbysarah", displayName: "Sarah Martin", platform: "instagram", followers: 89000, engagement: 6.8, niche: "Fitness", status: "pending", addedDate: "2026-02-03", age: 28, email: "sarah@creator.com", location: "Lyon, France", notes: "", campaignIds: ["c2"] },
-  { id: "3", username: "techreviewspro", displayName: "Marc Dubois", platform: "youtube", followers: 520000, engagement: 3.1, niche: "Tech", status: "active", addedDate: "2026-01-28", age: 31, email: "marc@creator.com", location: "London, UK", notes: "", campaignIds: ["c1", "c3"] },
-  { id: "4", username: "beautybyjulie", displayName: "Julie Chen", platform: "tiktok", followers: 167000, engagement: 5.4, niche: "Beauty", status: "contacted", addedDate: "2026-03-10", age: 26, email: "julie@creator.com", location: "Bordeaux, France", notes: "", campaignIds: ["c3"] },
-  { id: "5", username: "foodieparadise", displayName: "Thomas Bernard", platform: "instagram", followers: 98000, engagement: 7.2, niche: "Food", status: "active", addedDate: "2026-02-20", age: 29, email: "thomas@creator.com", location: "Marseille, France", notes: "", campaignIds: ["c1"] },
-  { id: "6", username: "travelwithleo", displayName: "Leo Moreau", platform: "tiktok", followers: 312000, engagement: 4.9, niche: "Travel", status: "pending", addedDate: "2026-03-05", age: 27, email: "leo@creator.com", location: "Nice, France", notes: "", campaignIds: [] },
-];
 
-const MOCK_CAMPAIGNS = [
-  { id: "c1", name: "Summer Launch 2026", platform: "TikTok + Instagram" },
-  { id: "c2", name: "Protein Push Q2", platform: "TikTok" },
-  { id: "c3", name: "Brand Awareness", platform: "All platforms" },
-];
+function mapDbCreator(c: Record<string, unknown>): ManagedCreator {
+  return {
+    id: String(c.id ?? ""),
+    username: String(c.handle ?? c.username ?? ""),
+    displayName: String(c.full_name ?? c.handle ?? ""),
+    platform: String(c.platform ?? ""),
+    followers: Number(c.followers ?? 0),
+    engagement: Number(c.engagement_rate ?? 0),
+    niche: String(c.niche ?? ""),
+    status: "pending",
+    addedDate: typeof c.created_at === "string" ? c.created_at.split("T")[0] : "",
+    age: 0,
+    email: "",
+    location: "",
+    notes: "",
+    avatarUrl: typeof c.avatar_url === "string" ? c.avatar_url : undefined,
+    paypal_link: typeof c.paypal_link === "string" ? c.paypal_link : undefined,
+    revolut_link: typeof c.revolut_link === "string" ? c.revolut_link : undefined,
+    iban: typeof c.iban === "string" ? c.iban : undefined,
+    campaignIds: [],
+  };
+}
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF",
@@ -476,6 +486,20 @@ function CreatorOutreachModal({ creator, onClose }: { creator: ManagedCreator; o
   );
 }
 
+function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: string; onClose: () => void }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }} onClick={(e) => e.stopPropagation()}>
+        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 56, width: "auto", marginBottom: 16 }} />
+        <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.6, margin: "0 0 24px", whiteSpace: "pre-line" }}>{message}</p>
+        <button type="button" onClick={() => { window.location.href = "/#pricing"; }} style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.02em" }}>
+          {lang === "fr" ? "Voir les plans →" : "View plans →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CreatorDetailModal({
   creator,
   onClose,
@@ -613,14 +637,14 @@ function CreatorDetailModal({
           </>
         ) : (
           <button type="button" style={btnSecondary} onClick={() => setEditing(true)}>
-            Edit creator
+            {lang === "fr" ? "Modifier ce créateur" : "Edit creator"}
           </button>
         )}
         <button type="button" style={btnBlack} onClick={onRunCampaign}>
-          Run campaign →
+          {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
         </button>
         <button type="button" style={btnSecondary} onClick={onGenerateOutreach}>
-          Generate outreach →
+          {lang === "fr" ? "Générer un outreach →" : "Generate outreach →"}
         </button>
       </div>
       <button
@@ -628,7 +652,7 @@ function CreatorDetailModal({
         onClick={onRemove}
         style={{ background: "none", border: "none", color: "#DC2626", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
       >
-        Remove creator
+        {lang === "fr" ? "Supprimer ce créateur" : "Remove creator"}
       </button>
     </ModalShell>
   );
@@ -652,8 +676,28 @@ function RunCampaignModal({
   const [minPayout, setMinPayout] = useState("50");
   const [assignedCode, setAssignedCode] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string; platform: string }[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const code = discountCodeFor(creator.username);
   const [refLink] = useState(`trackit.app/r/${referralSlug(creator.username)}`);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) {
+        setLoadingCampaigns(false);
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoadingCampaigns(false);
+        return;
+      }
+      const data = await getCampaigns(user.id);
+      setCampaigns(data.map((c) => ({ id: c.id, name: c.name, platform: c.platform })));
+      setLoadingCampaigns(false);
+    };
+    void load();
+  }, []);
 
   return (
     <ModalShell onClose={onClose} maxWidth={560}>
@@ -664,7 +708,14 @@ function RunCampaignModal({
         <>
           <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>{lang === "fr" ? "ÉTAPE 1 — SÉLECTIONNER UNE CAMPAGNE" : "STEP 1 — SELECT CAMPAIGN"}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-            {MOCK_CAMPAIGNS.map((c) => (
+            {loadingCampaigns ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
+            ) : campaigns.length === 0 ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#9A9A9A", fontSize: 13, background: "#FAFAFA", borderRadius: 12, border: "1px solid #EFEFEF" }}>
+                {lang === "fr" ? "Aucune campagne. Créez-en une dans Campagnes." : "No campaigns yet. Create one in Campaigns."}
+              </div>
+            ) : (
+              campaigns.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -682,7 +733,8 @@ function RunCampaignModal({
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{c.name}</div>
                 <div style={{ fontSize: 12, color: "#9A9A9A" }}>{c.platform}</div>
               </button>
-            ))}
+              ))
+            )}
             <button type="button" style={{ ...btnSecondary, borderStyle: "dashed" }}>
               {lang === "fr" ? "Créer une nouvelle campagne +" : "Create new campaign +"}
             </button>
@@ -812,20 +864,32 @@ function RunCampaignModal({
   );
 }
 
-export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
+export function CreatorsView({ isMobile, plan = "free" }: { isMobile?: boolean; plan?: "free" | "basic" | "pro" }) {
   const lang = useLang();
-  const [creators, setCreators] = useState<ManagedCreator[]>(INITIAL_CREATORS);
+  const [creators, setCreators] = useState<ManagedCreator[]>([]);
   const [tab, setTab] = useState<CreatorsTab>("all");
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortKey>("followers");
   const [toast, setToast] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   const [importOpen, setImportOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [detailCreator, setDetailCreator] = useState<ManagedCreator | null>(null);
   const [campaignCreator, setCampaignCreator] = useState<ManagedCreator | null>(null);
   const [outreachCreator, setOutreachCreator] = useState<ManagedCreator | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const data = await getSavedCreators(user.id);
+      setCreators(data.map(mapDbCreator));
+    };
+    void load();
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -996,7 +1060,7 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
           {isMobile ? (
             filtered.length === 0 ? (
-              <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+              <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>{lang === "fr" ? "Aucun créateurs pour le moment" : "No creators match your filters"}</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
                 {filtered.map((creator) => (
@@ -1033,17 +1097,18 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         type="button"
+                        className="hero-cta-shopify-dark hero-cta-compact"
+                        style={{ flex: 1, width: "100%" }}
                         onClick={() => setDetailCreator(creator)}
-                        style={{ flex: 1, padding: "8px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", color: "#1A1A1A" }}
                       >
-                        {lang === "fr" ? "Voir" : "View"}
+                        {lang === "fr" ? "Voir le profil" : "View profile"}
                       </button>
                       <button
                         type="button"
-                        onClick={() => setOutreachCreator(creator)}
-                        style={{ flex: 1, padding: "8px", background: "#0047FF", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
+                        onClick={() => removeCreator(creator.id)}
+                        style={{ flex: 1, padding: "8px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                       >
-                        {lang === "fr" ? "Message" : "Outreach"}
+                        {lang === "fr" ? "Supprimer" : "Remove"}
                       </button>
                     </div>
                   </div>
@@ -1079,7 +1144,7 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
                 ))}
               </div>
               {filtered.length === 0 ? (
-                <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>No creators match your filters</div>
+                <div style={{ padding: 40, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>{lang === "fr" ? "Aucun créateurs pour le moment" : "No creators match your filters"}</div>
               ) : (
                 filtered.map((c, i) => (
                   <div
@@ -1106,17 +1171,8 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
                     <div style={{ fontSize: 13 }}>{c.niche}</div>
                     <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setCampaignCreator(c)}>
-                          {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
-                        </button>
-                        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setOutreachCreator(c)}>
-                          {lang === "fr" ? "Générer un message" : "Generate outreach"}
-                        </button>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setDetailCreator(c)}>
+                    <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
+                        <button type="button" className="hero-cta-shopify-dark hero-cta-compact" onClick={() => setDetailCreator(c)}>
                           {lang === "fr" ? "Voir le profil" : "View profile"}
                         </button>
                         <button
@@ -1127,7 +1183,6 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
                         >
                           {lang === "fr" ? "Supprimer" : "Remove"}
                         </button>
-                      </div>
                     </div>
                   </div>
                 ))
@@ -1156,6 +1211,12 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
           onUpdate={updateCreator}
           onRemove={() => removeCreator(detailCreator.id)}
           onRunCampaign={() => {
+            if (plan === "free") {
+              setUpgradeMsg(lang === "fr"
+                ? "🔒 Lancer une campagne — Plan Basic requis.\n\nAssignez vos créateurs à des campagnes, suivez les ventes et automatisez les commissions.\n\nPassez à Basic →"
+                : "🔒 Run campaigns — Basic plan required.\n\nAssign creators to campaigns, track sales, and automate commissions.\n\nUpgrade to Basic →");
+              return;
+            }
             setCampaignCreator(detailCreator);
             setDetailCreator(null);
           }}
@@ -1197,6 +1258,7 @@ export function CreatorsView({ isMobile }: { isMobile?: boolean }) {
         />
       )}
       {outreachCreator && <CreatorOutreachModal creator={outreachCreator} onClose={() => setOutreachCreator(null)} />}
+      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
       {toast && <Toast message={toast} />}
     </>
   );

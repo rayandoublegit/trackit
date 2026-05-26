@@ -6,9 +6,21 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { getAuthRedirectPath } from "@/lib/auth-destination";
 import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
 
+function useLang(): "en" | "fr" {
+  const [lang, setLang] = useState<"en" | "fr">("en");
+  useEffect(() => {
+    const stored = localStorage.getItem("trackit_lang");
+    if (stored === "fr" || stored === "en") { setLang(stored); return; }
+    const detected = navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+    setLang(detected);
+  }, []);
+  return lang;
+}
+
 function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const lang = useLang();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
@@ -42,7 +54,7 @@ function AuthPageContent() {
     e.preventDefault();
     setError(null);
     if (!supabase) {
-      setError("Supabase is not configured yet.");
+      setError(lang === "fr" ? "Supabase n'est pas encore configuré." : "Supabase is not configured yet.");
       return;
     }
     setLoading(true);
@@ -97,7 +109,7 @@ function AuthPageContent() {
   if (checkingSession) {
     return (
       <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "80px" }}>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Signing you in...</p>
+        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Connexion en cours..." : "Signing you in..."}</p>
       </div>
     );
   }
@@ -114,15 +126,15 @@ function AuthPageContent() {
           onClick={() => { setMode(mode === "login" ? "signup" : "login"); setError(null); setSignupAwaitingEmail(false); }}
           style={{ marginTop: 0, border: "none", cursor: "pointer" }}
         >
-          {mode === "login" ? "Create an account" : "Sign in"}
+          {lang === "fr" ? (mode === "login" ? "Créer un compte" : "Se connecter") : (mode === "login" ? "Create an account" : "Sign in")}
         </button>
       </header>
 
       <main style={{ maxWidth: 560, margin: "-48px auto 0", padding: "0 24px" }}>
         {signupAwaitingEmail ? (
           <div>
-            <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 12 }}>Check your email.</h1>
-            <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 32 }}>We sent a confirmation link to {email}. Click it to activate your account.</p>
+            <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 12 }}>{lang === "fr" ? "Vérifiez vos emails." : "Check your email."}</h1>
+            <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 32 }}>{lang === "fr" ? `Nous avons envoyé un lien de confirmation à ${email}. Cliquez dessus pour activer votre compte.` : `We sent a confirmation link to ${email}. Click it to activate your account.`}</p>
             <button type="button" onClick={() => { setSignupAwaitingEmail(false); setMode("login"); }} style={{ width: "100%", background: "#000", color: "#fff", border: "none", padding: "18px 0", borderRadius: 14, fontSize: 16, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer", fontFamily: "inherit" }}>Already confirmed? Sign in</button>
           </div>
         ) : resetMode ? (
@@ -131,13 +143,13 @@ function AuthPageContent() {
               <div style={{ textAlign: "center", padding: "40px 0" }}>
                 <div style={{ fontSize: 40, marginBottom: 12 }}>📧</div>
                 <h2>Check your email</h2>
-                <p style={{ color: "#7A7A7A", fontSize: 14 }}>We sent a reset link to {resetEmail}</p>
+                <p style={{ color: "#7A7A7A", fontSize: 14 }}>{lang === "fr" ? `Nous avons envoyé un lien à ${resetEmail}` : `We sent a reset link to ${resetEmail}`}</p>
                 <button type="button" onClick={() => { setResetMode(false); setResetSent(false); }} style={{ marginTop: 16, fontSize: 13, color: "#0047FF", background: "none", border: "none", cursor: "pointer" }}>Back to login</button>
               </div>
             ) : (
               <div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Reset your password</h2>
-                <p style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>Enter your email and we'll send you a reset link.</p>
+                <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{lang === "fr" ? "Réinitialiser votre mot de passe" : "Reset your password"}</h2>
+                <p style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>{lang === "fr" ? "Entrez votre email et nous vous enverrons un lien." : "Enter your email and we'll send you a reset link."}</p>
                 <input
                   value={resetEmail}
                   onChange={e => setResetEmail(e.target.value)}
@@ -159,7 +171,7 @@ function AuthPageContent() {
                   }}
                   style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
                 >
-                  {resetLoading ? "Sending..." : "Send reset link →"}
+                  {lang === "fr" ? (resetLoading ? "Envoi..." : "Envoyer le lien →") : (resetLoading ? "Sending..." : "Send reset link →")}
                 </button>
                 <button type="button" onClick={() => setResetMode(false)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", fontFamily: "inherit" }}>← Back to login</button>
               </div>
@@ -167,14 +179,14 @@ function AuthPageContent() {
           </div>
         ) : (
           <>
-            <h1 style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", color: "#1A1A1A", margin: 0, marginBottom: 10 }}>{mode === "login" ? "Sign in" : "Create your account"}</h1>
-            <p style={{ fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 28 }}>{mode === "login" ? "Access your Trackit workspace" : "Start finding creators in seconds"}</p>
+          {lang === "fr" ? (mode === "login" ? "Créer un compte" : "Se connecter") : (mode === "login" ? "Create an account" : "Sign in")}
+          {lang === "fr" ? (mode === "login" ? "Créer un compte" : "Se connecter") : (mode === "login" ? "Create an account" : "Sign in")}
 
             <form onSubmit={handleSubmit}>
-              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Enter your email address" autoComplete="email" required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={lang === "fr" ? "Votre adresse email" : "Enter your email address"} autoComplete="email" required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
 
               <div style={{ position: "relative", marginBottom: 16 }}>
-                <input value={password} onChange={(e) => setPassword(e.target.value)} type={pwVisible ? "text" : "password"} placeholder="Password" autoComplete={mode === "login" ? "current-password" : "new-password"} required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", paddingRight: 44, fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box" }} />
+                <input value={password} onChange={(e) => setPassword(e.target.value)} type={pwVisible ? "text" : "password"} placeholder={lang === "fr" ? "Mot de passe" : "Password"} autoComplete={mode === "login" ? "current-password" : "new-password"} required disabled={!isSupabaseConfigured || loading} style={{ width: "100%", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "18px 22px", paddingRight: 44, fontSize: 16, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em", outline: "none", boxSizing: "border-box" }} />
                 <button
                   type="button"
                   onClick={() => setPwVisible((v) => !v)}
@@ -211,7 +223,7 @@ function AuthPageContent() {
                   boxSizing: "border-box",
                 }}
               >
-                {loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
+                {lang === "fr" ? (loading ? "Veuillez patienter..." : mode === "login" ? "Se connecter" : "Créer un compte") : (loading ? "Please wait..." : mode === "login" ? "Sign in" : "Create account")}
               </button>
 
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>

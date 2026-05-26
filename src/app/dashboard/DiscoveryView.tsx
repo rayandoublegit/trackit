@@ -43,22 +43,7 @@ type OutreachContact = {
   status: "Contacted";
 };
 
-const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [
-  {
-    id: "tpl-casual",
-    name: "Casual collab pitch",
-    platform: "TikTok DM",
-    body:
-      "Hey! I've been following your content and love your vibe. We're looking for creators for a paid collab — no scripts, just your style. Open to chatting?",
-  },
-  {
-    id: "tpl-pro",
-    name: "Professional partnership",
-    platform: "Email",
-    body:
-      "Dear creator,\n\nWe are reaching out regarding a potential brand partnership opportunity. We believe your audience aligns well with our brand values.",
-  },
-];
+const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -1593,8 +1578,8 @@ export function DiscoveryView({
             {plan === "free" && (
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>
                 {lang === "fr"
-                  ? `${discoveriesUsed >= 2 && resetCountdown ? (lang === "fr" ? \`Réinitialisation dans \${resetCountdown}\` : \`Resets in \${resetCountdown}\`) : \`\${Math.max(0, 2 - discoveriesUsed)}/2 découvertes restantes\`}`
-                  : `${discoveriesUsed >= 2 && resetCountdown ? \`Resets in \${resetCountdown}\` : \`\${Math.max(0, 2 - discoveriesUsed)}/2 discoveries left\`}`}
+                  ? (discoveriesUsed >= 2 && resetCountdown ? `Réinitialisation dans ${resetCountdown}` : `${Math.max(0, 2 - discoveriesUsed)}/2 découvertes restantes`)
+                  : (discoveriesUsed >= 2 && resetCountdown ? `Resets in ${resetCountdown}` : `${Math.max(0, 2 - discoveriesUsed)}/2 discoveries left`)}
               </div>
             )}
             <button
@@ -1778,13 +1763,13 @@ export function DiscoveryView({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, letterSpacing: "-0.02em" }}>
                 {lang === "fr"
-                  ? `${creators.length} ${creators.length === 1 ? "créateur trouvé" : "créateurs trouvés"}`
-                  : `${creators.length} ${creators.length === 1 ? "creator" : "creators"} found`}
+                  ? `${plan === "free" ? Math.min(creators.length, 3) : creators.length} ${creators.length === 1 ? "créateur trouvé" : "créateurs trouvés"}${plan === "free" && creators.length > 3 ? " (limité à 3)" : ""}`
+                  : `${plan === "free" ? Math.min(creators.length, 3) : creators.length} ${creators.length === 1 ? "creator" : "creators"} found${plan === "free" && creators.length > 3 ? " (capped at 3)" : ""}`}
               </p>
             </div>
             <div style={{ position: "relative" }}>
               <div style={{ ...creatorsGridStyle, filter: showBlur ? "blur(6px)" : "none", pointerEvents: showBlur ? "none" : "auto", userSelect: showBlur ? "none" : "auto", transition: "filter 0.3s" }}>
-                {creators.map((c) => (
+                {(plan === "free" ? creators.slice(0, 3) : creators).map((c) => (
                   <CreatorCard
                     lang={lang}
                     key={c.username  ?? ""}
@@ -1797,7 +1782,7 @@ export function DiscoveryView({
                 ))}
               </div>
               {showBlur && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 10, padding: 20 }}>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: "160px 20px 20px" }}>
                   <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 20, padding: "32px 40px", textAlign: "center", maxWidth: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(0,71,255,0.08)", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>

@@ -13,6 +13,14 @@ export async function GET(request: Request) {
   const userId = searchParams.get("userId");
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("shopify_store, shopify_access_token")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const shopifyConnected = !!(profile?.shopify_store && profile?.shopify_access_token);
+
   // Total revenue and commissions from sales
   const { data: salesData } = await supabaseAdmin
     .from("sales")
@@ -47,10 +55,17 @@ export async function GET(request: Request) {
     .select("name, platform, status, created_at")
     .eq("user_id", userId);
 
-  const hasData = totalRevenue > 0 || totalSent > 0 || (creatorsData && creatorsData.length > 0);
+  const hasData =
+    shopifyConnected ||
+    totalRevenue > 0 ||
+    totalSent > 0 ||
+    (creatorsData && creatorsData.length > 0) ||
+    (campaignsData && campaignsData.length > 0) ||
+    (salesData && salesData.length > 0);
 
   return NextResponse.json({
     hasData,
+    shopifyConnected,
     totalRevenue,
     totalCommissions,
     totalSent,

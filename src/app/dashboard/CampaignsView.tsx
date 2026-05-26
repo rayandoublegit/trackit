@@ -23,13 +23,15 @@ type Campaign = {
   description?: string;
 };
 
-const INITIAL_CAMPAIGNS: Campaign[] = [
-  { id: "1", name: "Summer Launch 2026", creators: 12, platform: "TikTok + Instagram", sales: 8400, commission: 672, status: "Active", start: "May 1, 2026", end: "Jun 30, 2026" },
-  { id: "2", name: "Protein Push Q2", creators: 8, platform: "TikTok", sales: 5200, commission: 416, status: "Active", start: "Apr 10, 2026", end: "Jul 10, 2026" },
-  { id: "3", name: "Brand Awareness", creators: 18, platform: "All", sales: 3100, commission: 248, status: "Paused", start: "Mar 1, 2026", end: "May 31, 2026" },
-  { id: "4", name: "Holiday Teaser", creators: 5, platform: "Instagram", sales: 0, commission: 0, status: "Draft", start: "—", end: "—" },
-  { id: "5", name: "Winter Collab 2025", creators: 22, platform: "YouTube", sales: 7800, commission: 624, status: "Completed", start: "Nov 1, 2025", end: "Jan 31, 2026" },
-];
+function EmptyTableRow({ lang, colSpan }: { lang: "en" | "fr"; colSpan: number }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+        {lang === "fr" ? "Aucune donnée pour le moment." : "No data yet."}
+      </td>
+    </tr>
+  );
+}
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -503,32 +505,11 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate, isMobile }: { lang: 
   );
 }
 
-const MOCK_CREATORS = [
-  { id: "c1", name: "Mia Chen", handle: "@miachen", platform: "TikTok", sales: 3200, commission: 256, status: "Active" },
-  { id: "c2", name: "Jordan Lee", handle: "@jlee", platform: "Instagram", sales: 2100, commission: 168, status: "Active" },
-  { id: "c3", name: "Sam Taylor", handle: "@samt", platform: "YouTube", sales: 1800, commission: 144, status: "Active" },
-  { id: "c4", name: "Alex Rivera", handle: "@alexr", platform: "TikTok", sales: 900, commission: 72, status: "Inactive" },
-];
-
 function CreatorsTab({ lang }: { lang: "en" | "fr" }) {
   return (
     <Card title={lang === "fr" ? "Créateurs de la campagne" : "Campaign creators"}>
       <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Pseudo" : "Handle", lang === "fr" ? "Plateforme" : "Platform", "Sales", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Action" : "Action"]}>
-        {MOCK_CREATORS.map((cr) => (
-          <tr key={cr.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-            <td style={{ padding: "14px", fontWeight: 500, color: "#1A1A1A" }}>{cr.name}</td>
-            <td style={{ padding: "14px", color: "#7A7A7A" }}>{cr.handle}</td>
-            <td style={{ padding: "14px" }}>{cr.platform}</td>
-            <td style={{ padding: "14px" }}>{formatCurrency(cr.sales, lang)}</td>
-            <td style={{ padding: "14px" }}>{formatCurrency(cr.commission, lang)}</td>
-            <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: cr.status === "Active" ? "#E8F5E9" : "#F5F5F5", color: cr.status === "Active" ? "#2E7D32" : "#9A9A9A" }}>{cr.status === "Active" ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Inactif" : "Inactive"}</span>
-            </td>
-            <td style={{ padding: "14px" }}>
-              <BtnSm>{lang === "fr" ? "Voir" : "View"}</BtnSm>
-            </td>
-          </tr>
-        ))}
+        <EmptyTableRow lang={lang} colSpan={7} />
       </Table>
       <div style={{ marginTop: 16 }}>
         <BtnSm>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
@@ -537,89 +518,31 @@ function CreatorsTab({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-const MOCK_OUTREACH = [
-  { id: "o1", creator: "Riley Park", platform: "Instagram", status: "Replied", sent: "May 10, 2026", preview: "Hey Riley! Love your fitness content..." },
-  { id: "o2", creator: "Casey Kim", platform: "TikTok", status: "Sent", sent: "May 12, 2026", preview: "We'd love to partner on our summer launch..." },
-  { id: "o3", creator: "Drew Morgan", platform: "YouTube", status: "Converted", sent: "May 5, 2026", preview: "Partnership opportunity for your audience" },
-];
-
-function outreachStatusLabel(status: string, lang: "en" | "fr") {
-  if (status === "Sent") return lang === "fr" ? "Envoyé" : "Sent";
-  if (status === "Replied") return lang === "fr" ? "Répondu" : "Replied";
-  if (status === "Converted") return lang === "fr" ? "Converti" : "Converted";
-  return status;
-}
-
 function OutreachTab({ lang }: { lang: "en" | "fr" }) {
   return (
     <Card title={lang === "fr" ? "Messages envoyés" : "Outreach messages"}>
       <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Plateforme" : "Platform", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Envoyé" : "Sent", lang === "fr" ? "Aperçu" : "Preview", lang === "fr" ? "Action" : "Action"]}>
-        {MOCK_OUTREACH.map((row) => (
-          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-            <td style={{ padding: "14px", fontWeight: 500 }}>{row.creator}</td>
-            <td style={{ padding: "14px" }}>{row.platform}</td>
-            <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Converted" ? "#E8F5E9" : row.status === "Replied" ? "#E3F2FD" : "#F5F5F5", color: row.status === "Converted" ? "#2E7D32" : row.status === "Replied" ? "#1565C0" : "#9A9A9A" }}>{outreachStatusLabel(row.status, lang)}</span>
-            </td>
-            <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.sent}</td>
-            <td style={{ padding: "14px", color: "#7A7A7A", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.preview}</td>
-            <td style={{ padding: "14px" }}><BtnSm>{lang === "fr" ? "Voir" : "View"}</BtnSm></td>
-          </tr>
-        ))}
+        <EmptyTableRow lang={lang} colSpan={6} />
       </Table>
     </Card>
   );
 }
-
-const MOCK_SALES: { orderId: string; creator: string; product: string; amount: number; commission: number; date: string }[] = [
-  { orderId: "#1042", creator: "Mia Chen", product: "Protein Powder — Vanilla", amount: 89.99, commission: 7.2, date: "May 12, 2026" },
-  { orderId: "#1038", creator: "Jordan Lee", product: "Shaker Bottle", amount: 24.99, commission: 2.0, date: "May 11, 2026" },
-  { orderId: "#1031", creator: "Mia Chen", product: "BCAA Stack", amount: 54.99, commission: 4.4, date: "May 10, 2026" },
-  { orderId: "#1024", creator: "Sam Taylor", product: "Protein Powder — Chocolate", amount: 89.99, commission: 7.2, date: "May 9, 2026" },
-];
 
 function SalesTab({ lang }: { lang: "en" | "fr" }) {
   return (
     <Card title={lang === "fr" ? "Ventes attribuées" : "Attributed sales"}>
       <Table headers={[lang === "fr" ? "N° commande" : "Order ID", lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Produit" : "Product", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Date" : "Date"]}>
-        {MOCK_SALES.map((row) => (
-          <tr key={row.orderId} style={{ borderBottom: "1px solid #F5F5F5" }}>
-            <td style={{ padding: "14px", fontWeight: 500, color: "#0047FF" }}>{row.orderId}</td>
-            <td style={{ padding: "14px" }}>{row.creator}</td>
-            <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.product}</td>
-            <td style={{ padding: "14px" }}>{formatCurrency(row.amount, lang)}</td>
-            <td style={{ padding: "14px" }}>{formatCurrency(row.commission, lang)}</td>
-            <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.date}</td>
-          </tr>
-        ))}
+        <EmptyTableRow lang={lang} colSpan={6} />
       </Table>
     </Card>
   );
 }
 
-const MOCK_PAYOUTS = [
-  { id: "p1", creator: "Mia Chen", amount: 256, status: "Pending", due: "May 15, 2026" },
-  { id: "p2", creator: "Jordan Lee", amount: 168, status: "Paid", due: "May 1, 2026" },
-  { id: "p3", creator: "Sam Taylor", amount: 144, status: "Pending", due: "May 15, 2026" },
-];
-
 function PayoutsTab({ lang }: { lang: "en" | "fr" }) {
   return (
     <Card title={lang === "fr" ? "Paiements créateurs" : "Creator payouts"}>
       <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Date d'échéance" : "Due Date", lang === "fr" ? "Action" : "Action"]}>
-        {MOCK_PAYOUTS.map((row) => (
-          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-            <td style={{ padding: "14px", fontWeight: 500 }}>{row.creator}</td>
-            <td style={{ padding: "14px" }}>{formatCurrency(row.amount, lang)}</td>
-            <td style={{ padding: "14px" }}>
-              <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: row.status === "Paid" ? "#E8F5E9" : "#FFF8E1", color: row.status === "Paid" ? "#2E7D32" : "#F57F17" }}>{row.status === "Paid" ? (lang === "fr" ? "Payé" : "Paid") : lang === "fr" ? "En attente" : "Pending"}</span>
-            </td>
-            <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.due}</td>
-            <td style={{ padding: "14px" }}>
-              {row.status === "Pending" ? <BtnSm>{lang === "fr" ? "Payer maintenant" : "Pay now"}</BtnSm> : <BtnSm>{lang === "fr" ? "Reçu" : "Receipt"}</BtnSm>}
-            </td>
-          </tr>
-        ))}
+        <EmptyTableRow lang={lang} colSpan={5} />
       </Table>
     </Card>
   );
