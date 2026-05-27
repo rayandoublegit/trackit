@@ -40,7 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
       </head>
-      <body>{children}
+      <body>
+        {children}
         <Analytics />
       </body>
     </html>
