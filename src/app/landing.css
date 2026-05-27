@@ -465,23 +465,23 @@ body { padding-top: 80px; }
   color: #323232;
   line-height: 1.2;
   cursor: default;
-  transition:
-    color 0.25s ease,
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
-    text-shadow 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
   transform-origin: center;
 }
 
 .badge:hover {
-  color: #0047FF;
   transform: scale(1.08);
-  text-shadow: 0 0 24px rgba(0, 71, 255, 0.45);
 }
 
 .badge-text {
   text-align: left;
   font-family: 'InstrumentSans', sans-serif;
   font-weight: 460;
+}
+
+.hero-badges .badge:last-child .badge-text {
+  display: inline-block;
+  max-width: 10.5em;
 }
 .hero-trusted {
   margin-top: 24px;
@@ -605,6 +605,14 @@ body { padding-top: 80px; }
   margin-right: auto;
 }
 
+#why .why-title-line {
+  display: block;
+}
+
+#why .why-title-line--third {
+  margin-top: -0.36em;
+}
+
 #why .section-sub {
   max-width: 560px;
   margin-left: auto;
@@ -622,8 +630,24 @@ body { padding-top: 80px; }
 
 #features .section-title {
   font-size: 36px;
-  line-height: 1.06;
+  line-height: 1;
 }
+
+#features .section-title-line {
+  display: block;
+}
+
+#features .section-title-line--tight {
+  margin-top: -0.36em;
+}
+
+.section-title-dot {
+  color: #0047FF;
+  font-size: 1.55em;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .section-sub {
   font-family: 'InterDisplay', sans-serif;
   font-weight: 300;
@@ -738,8 +762,29 @@ body { padding-top: 80px; }
   max-width: 520px;
   margin-left: auto;
   margin-right: auto;
-  line-height: 1.1;
+  line-height: 1;
   margin-bottom: 8px;
+}
+
+#process .process-title-line {
+  display: block;
+}
+
+#process .process-title-line--tight {
+  margin-top: -0.24em;
+}
+
+#process .process-title--fr .process-title-line--tight {
+  margin-top: -0.08em;
+}
+
+#process .process-title--fr .process-title-line--minutes {
+  display: block;
+  margin-top: -0.52em;
+}
+
+#process .process-title--en .process-title-line--tight {
+  margin-top: -0.34em;
 }
 
 #process .section-sub {
@@ -1631,7 +1676,11 @@ body { padding-top: 80px; }
   }
   #features .section-title {
     font-size: 28px;
-    line-height: 1.05;
+    line-height: 1;
+  }
+
+  #features .section-title-line--tight {
+    margin-top: -0.38em;
   }
   #pricing .section-title {
     font-size: 28px;
@@ -1825,7 +1874,8 @@ body { padding-top: 80px; }
   /* SECTIONS */
   .section { padding: 48px 20px; }
   .section-title { font-size: 30px; letter-spacing: -0.03em; }
-  #features .section-title { font-size: 28px; line-height: 1.05; }
+  #features .section-title { font-size: 28px; line-height: 1; }
+  #features .section-title-line--tight { margin-top: -0.38em; }
   #pricing .section-title { font-size: 28px; line-height: 1.12; }
   .section-sub { font-size: 15px; }
   .tagline { font-size: 28px; }

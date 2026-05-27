@@ -38,7 +38,7 @@ export default function TrackitLanding() {
   hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
   hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
-  hero_italic: lang === "fr" ? "À un seul endroit." : "All in one place.",
+  hero_italic: lang === "fr" ? "A un seul endroit." : "All in one place.",
   hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : `Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No ${formatCurrency(300, lang)}/month enterprise tools.`,
   hero_cta: lang === "fr" ? "Commencer gratuitement" : "Get started for Free",
   hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
@@ -47,7 +47,7 @@ export default function TrackitLanding() {
   hero_bank: lang === "fr" ? "0€ de Virements Bancaires Manuels" : `${formatCurrency(0, lang)} Manual Bank Transfers`,
   hero_trusted: lang === "fr" ? "Fait confiance par plus de 2 000 boutiques Shopify" : "Trusted by over 2,000 of the best Shopify Stores",
   section_does_everything: lang === "fr" ? "Trackit fait tout." : "Trackit does everything.",
-  section_in_one_place: lang === "fr" ? "Au même endroit." : "In one place.",
+  section_in_one_place: lang === "fr" ? "Au même endroit" : "In one place",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
   feat_1_title: lang === "fr" ? "Recherche Intelligente de Créateurs" : "Smart Creator Discovery",
   feat_1_desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs sur TikTok, Instagram et YouTube. Filtrez par niche, taux d'engagement, abonnés et localisation." : "Search 250M+ creators across TikTok, Instagram, and YouTube. Filter by niche, engagement rate, follower count, and location. Find creators whose audience is exactly your customer.",
@@ -66,7 +66,8 @@ export default function TrackitLanding() {
   pain_3_title: lang === "fr" ? "Outils enterprise inabordables." : "Enterprise tools you can't afford.",
   pain_3_desc: lang === "fr" ? "Modash est à 299€/mois. Aspire à 500€/mois. Vous avez juste besoin de quelque chose qui fonctionne sans ruiner votre budget." : `Modash is ${formatCurrency(299, lang)}/month. Aspire is ${formatCurrency(500, lang)}/month. You're a lean brand. You just need something that works without breaking the bank.`,
   process_title: lang === "fr" ? "⇄ Processus" : "⇄ Process",
-  process_sub: lang === "fr" ? "De zéro à votre première campagne créateur en 10 minutes." : "From zero to first creator campaign in 10 minutes.",
+  process_sub_line1: lang === "fr" ? "De zéro à votre première" : "From zero to first creator",
+  process_sub_line2: lang === "fr" ? "campagne créateur en 10" : "campaign in 10 minutes",
   process_sub2: lang === "fr" ? "Quatre étapes simples. Pas d'agence. Pas de contrat enterprise." : "Four simple steps. No agency. No enterprise contract. No complexity.",
   process_1: lang === "fr" ? "Connectez votre boutique Shopify." : "Connect your Shopify store.",
   process_1_sub: lang === "fr" ? "60 secondes. Un clic. C'est fait." : "60 seconds. One click. Done.",
@@ -78,9 +79,9 @@ export default function TrackitLanding() {
   process_4_sub: lang === "fr" ? "Chaque vente suivie. Chaque commission payée automatiquement." : "Every sale tracked. Every commission paid automatically.",
   why_title: lang === "fr" ? "Pourquoi Trackit" : "Why Trackit",
   why_sub: lang === "fr" ? "Conçu pour les marques comme la vôtre." : "Built for brands like yours.",
-  why_sub2: lang === "fr" ? "Pas pour les entreprises." : "Not for enterprise.",
+  why_sub2: lang === "fr" ? "Pas pour les entreprises" : "Not for enterprise",
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : `Every other tool was built for agencies with 10 people and ${formatCurrency(500, lang)}/month budgets. Trackit was built for lean Shopify brands who need results not complexity.`,
-  pricing_title: lang === "fr" ? "Des tarifs simples. Sans surprises." : "Simple pricing. No surprises.",
+  pricing_title: lang === "fr" ? "Des tarifs simples. Sans surprises" : "Simple pricing. No surprises",
   pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
   pricing_save: lang === "fr" ? "Économisez 20% avec la facturation annuelle" : "Save 20% with annual billing",
   pricing_basic_desc: lang === "fr" ? "Pour les marques qui gèrent des campagnes créateurs sérieuses." : "For brands running serious creator campaigns.",
@@ -645,9 +646,11 @@ export default function TrackitLanding() {
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /> Trackit
         </div>
         <h2 className="section-title fade-up fade-up-delay-1">
-          {t.section_does_everything}
-          <br />
-          {t.section_in_one_place}
+          <span className="section-title-line">{t.section_does_everything}</span>
+          <span className="section-title-line section-title-line--tight">
+            {t.section_in_one_place}
+            <span className="section-title-dot">.</span>
+          </span>
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
           {t.section_sub}
@@ -936,8 +939,21 @@ export default function TrackitLanding() {
       {/* PROCESS */}
       <section className="section" id="process">
         <div className="tagline fade-up">{t.process_title}</div>
-        <h2 className="section-title fade-up fade-up-delay-1">
-          {t.process_sub}
+        <h2 className={`section-title fade-up fade-up-delay-1${lang === "en" ? " process-title--en" : " process-title--fr"}`}>
+          {lang === "fr" ? (
+            <>
+              <span className="process-title-line">{t.process_sub_line1}</span>
+              <span className="process-title-line process-title-line--tight">{t.process_sub_line2}</span>
+              <span className="process-title-line process-title-line--minutes">minutes<span className="section-title-dot">.</span></span>
+            </>
+          ) : (
+            <>
+              <span className="process-title-line">{t.process_sub_line1}</span>
+              <span className="process-title-line process-title-line--tight">
+                {t.process_sub_line2}<span className="section-title-dot">.</span>
+              </span>
+            </>
+          )}
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
           {t.process_sub2}
@@ -1283,8 +1299,9 @@ export default function TrackitLanding() {
           </div>
           <h2 className="section-title fade-up fade-up-delay-1">
             {t.why_sub}
-            <br />
-            {t.why_sub2}
+            <span className="why-title-line why-title-line--third">
+              {t.why_sub2}<span className="section-title-dot">.</span>
+            </span>
           </h2>
           <p className="section-sub fade-up fade-up-delay-2">
             {t.why_desc}
@@ -1359,7 +1376,7 @@ export default function TrackitLanding() {
           </span>
           {t.nav_pricing}
         </div>
-        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}</h2>
+        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}<span className="section-title-dot">.</span></h2>
         <p className="section-sub fade-up fade-up-delay-2">
           {t.pricing_sub}
         </p>

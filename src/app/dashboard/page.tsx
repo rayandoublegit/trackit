@@ -1702,8 +1702,8 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
         <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
       } />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginTop: 12, marginBottom: 24 }}>
           {[
             { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: String(activeAffiliateCount) },
             { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: totalClicks.toLocaleString(lang === "fr" ? "fr-FR" : "en-US") },

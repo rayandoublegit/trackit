@@ -46,7 +46,12 @@ function mapDbCreator(c: Record<string, unknown>): ManagedCreator {
     age: 0,
     email: "",
     location: "",
-    notes: "",
+    notes:
+      typeof c.notes === "string"
+        ? c.notes
+        : typeof c.note === "string"
+          ? c.note
+          : "",
     avatarUrl: typeof c.avatar_url === "string" ? c.avatar_url : undefined,
     paypal_link: typeof c.paypal_link === "string" ? c.paypal_link : undefined,
     revolut_link: typeof c.revolut_link === "string" ? c.revolut_link : undefined,
@@ -516,13 +521,24 @@ function CreatorDetailModal({
   onGenerateOutreach: () => void;
 }) {
   const lang = useLang();
-  const [editing, setEditing] = useState(false);
+  // Notes should be writable immediately, with explicit "Save notes" persistence.
+  const [editing, setEditing] = useState(true);
   const [draft, setDraft] = useState(creator);
 
   const avgViews = Math.floor(creator.followers * 0.08);
 
-  const saveEdit = () => {
-    onUpdate(draft);
+  const saveEdit = async () => {
+    if (!supabase) return;
+    const nextNotes = draft.notes.trim();
+
+    const { error } = await supabase.from("creators").update({ notes: nextNotes }).eq("id", creator.id);
+    if (error) {
+      // Keep editing open so the user can retry.
+      console.error("Failed to save creator notes:", error);
+      return;
+    }
+
+    onUpdate({ ...draft, notes: nextNotes });
     setEditing(false);
   };
 
