@@ -35,9 +35,40 @@ export default function OnboardingPage() {
   const [shopifyUrl, setShopifyUrl] = useState("");
 
   useEffect(() => {
-    if (!supabase) return;
-    void supabase.auth.getUser().then(async ({ data: { user } }) => {
+    const s = supabase;
+    if (!s) return;
+    void s.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.replace("/auth"); return; }
+
+      try {
+        // Wait for profile to be created by trigger (race condition on OAuth signup)
+        let profile: { onboarding_completed?: boolean } | null = null;
+        for (let i = 0; i < 5; i++) {
+          const { data } = await s
+            .from("profiles")
+            .select("onboarding_completed")
+            .eq("id", user.id)
+            .maybeSingle();
+          if (data) { profile = data as { onboarding_completed?: boolean }; break; }
+          await new Promise((res) => setTimeout(res, 600));
+        }
+
+        // If onboarding is already complete, don't show the onboarding flow again.
+        if (profile?.onboarding_completed) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        // Pre-fill name from Google/OAuth metadata
+        if (user.user_metadata?.full_name) {
+          setFullName(user.user_metadata.full_name);
+        } else if (user.user_metadata?.name) {
+          setFullName(user.user_metadata.name);
+        }
+      } catch {
+        // Non-blocking: if this fails, we still allow onboarding to render.
+      }
+
       setUser(user);
       try {
         await fetch("/api/auth/record-login", { method: "POST", credentials: "include" });
@@ -328,7 +359,14 @@ function Done({ name, router }: { name: string; router: ReturnType<typeof useRou
       <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, marginBottom: 24 }}>
         {lang === "fr" ? "C'est l'heure de trouver vos premiers créateurs." : "Time to find your first creators."}
       </p>
-      <button type="button" onClick={() => router.replace("/dashboard")} style={primaryBtn}>
+      <button
+        type="button"
+        onClick={() => {
+          sessionStorage.setItem("just_onboarded", "1");
+          router.replace("/dashboard");
+        }}
+        style={primaryBtn}
+      >
         {lang === "fr" ? "Commencer à découvrir des créateurs →" : "Start discovering creators →"}
       </button>
     </div>

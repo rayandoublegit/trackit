@@ -415,8 +415,10 @@ function GeneralSettings({
   const disconnectAccount = async () => {
     if (!supabase) return;
     setSigningOut(true);
-    await supabase.auth.signOut();
-    router.replace("/auth");
+  await supabase.auth.signOut({ scope: "global" });
+  localStorage.clear();
+  sessionStorage.clear();
+  window.location.href = "/auth";
   };
 
   const save = async () => {

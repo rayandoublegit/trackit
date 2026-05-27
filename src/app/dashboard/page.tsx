@@ -102,13 +102,19 @@ export default function DashboardPage() {
     void supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       try {
         if (!authUser) { router.replace("/auth"); setLoading(false); return; }
-        const { data: profileData } = await supabase!
-          .from("profiles")
-          .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
-          .eq("id", authUser.id)
-          .maybeSingle();
-        if (!profileData || profileData.onboarding_completed === false) {
-          router.replace("/onboarding");
+
+        const loadProfile = async () => {
+          const { data } = await supabase!
+            .from("profiles")
+            .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
+            .eq("id", authUser.id)
+            .maybeSingle();
+          return data;
+        };
+
+        const profileData = await loadProfile();
+        if (!profileData) {
+          router.replace("/auth");
           return;
         }
         setShopifyStore(profileData.shopify_store || null);
