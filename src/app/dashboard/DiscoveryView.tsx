@@ -1785,7 +1785,7 @@ export function DiscoveryView({
                 ))}
               </div>
               {showBlur && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: "160px 20px 20px" }}>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: "160px 20px 40px" }}>
                   <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 20, padding: "32px 40px", textAlign: "center", maxWidth: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(0,71,255,0.08)", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>

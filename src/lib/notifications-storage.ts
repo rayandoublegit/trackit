@@ -14,6 +14,21 @@ export type NotificationItem = {
 
 const STORAGE_KEY = "trackit_notifications";
 const RESET_VERSION_KEY = "trackit_notifications_reset_v2";
+const WELCOME_SENT_PREFIX = "trackit_welcome_sent_";
+
+function welcomeSentKey(userId: string) {
+  return `${WELCOME_SENT_PREFIX}${userId}`;
+}
+
+export function hasWelcomeNotificationBeenSent(userId: string): boolean {
+  if (typeof window === "undefined") return true;
+  return localStorage.getItem(welcomeSentKey(userId)) === "1";
+}
+
+function markWelcomeNotificationSent(userId: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(welcomeSentKey(userId), "1");
+}
 
 export const NOTIFICATIONS_UPDATED_EVENT = "trackit-notifications-updated";
 
@@ -181,6 +196,22 @@ export function notifyFundsAdded(lang: "en" | "fr", amount: number) {
         : `${formatCurrency(amount, lang)} was added to your payout balance.`,
     time: formatNotificationTime(lang),
   });
+}
+
+/** Welcome notification — once per user, ever (persisted in localStorage). */
+export function notifyWelcomeIfNeeded(userId: string, lang: "en" | "fr"): boolean {
+  if (hasWelcomeNotificationBeenSent(userId)) return false;
+  markWelcomeNotificationSent(userId);
+  pushNotification({
+    kind: "system",
+    title: lang === "fr" ? "Bienvenue sur Trackit" : "Welcome to Trackit",
+    body:
+      lang === "fr"
+        ? "Vous venez d'entrer dans Trackit. Connectez Shopify et vous êtes prêt à démarrer."
+        : "You just entered Trackit. Connect Shopify and you're ready to go.",
+    time: formatNotificationTime(lang),
+  });
+  return true;
 }
 
 /** Dev helper — fires a sample notification of the given type. */

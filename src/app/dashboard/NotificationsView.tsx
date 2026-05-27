@@ -166,6 +166,7 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
           <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
             {visible.map((n, i) => {
               const style = KIND_STYLES[n.kind];
+              const useTrackitLogo = n.kind === "system" && n.title.toLowerCase().includes("trackit");
               return (
                 <div
                   key={n.id}
@@ -192,8 +193,9 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
                       width: 40,
                       height: 40,
                       borderRadius: 10,
-                      background: style.bg,
+                      background: useTrackitLogo ? "#FFFFFF" : style.bg,
                       color: style.color,
+                      border: useTrackitLogo ? "1px solid #EFEFEF" : "none",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -202,7 +204,11 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
                       flexShrink: 0,
                     }}
                   >
-                    {style.icon}
+                    {useTrackitLogo ? (
+                      <img src="/favicon.png" alt="Trackit" style={{ width: 30, height: 30, objectFit: "contain" }} />
+                    ) : (
+                      style.icon
+                    )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>

@@ -3,6 +3,10 @@ import "./fonts.module.css";
 import "./landing.css";
 
 export const metadata: Metadata = {
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+  },
   title: "Trackit — Find creators. Track sales. Pay commissions.",
   description: "Find creators, track sales, and pay commissions.",
 };

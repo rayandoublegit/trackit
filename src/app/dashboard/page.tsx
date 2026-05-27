@@ -20,8 +20,8 @@ import {
   ensureNotificationsReset,
   getStoredUnreadCount,
   NOTIFICATIONS_UPDATED_EVENT,
-  notifyCreatorPaid,
   notifyShopifyConnected,
+  notifyWelcomeIfNeeded,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
@@ -71,7 +71,6 @@ export default function DashboardPage() {
   const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
-  const autoDemoNotificationRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
     shopify: false,
     shopifyStore: null as string | null,
@@ -143,16 +142,15 @@ export default function DashboardPage() {
     void loadSidebarCounts(user.id);
   }, [user?.id, view, loadSidebarCounts]);
 
-  // Auto demo notification once per dashboard visit (no button click).
+  // Welcome notification once per user (persisted — not on every refresh).
   useEffect(() => {
-    if (loading || !user || autoDemoNotificationRef.current) return;
-    autoDemoNotificationRef.current = true;
+    if (loading || !user?.id) return;
     const timer = window.setTimeout(() => {
       primeNotificationSound();
-      notifyCreatorPaid(lang, "Jordan Lee", 240);
+      notifyWelcomeIfNeeded(user.id, lang);
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [loading, user, lang]);
+  }, [loading, user?.id, lang]);
 
   useEffect(() => {
     if (!supabase) { setLoading(false); router.replace("/auth"); return; }

@@ -6,7 +6,7 @@ function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
   const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Ctx) return null;
-  if (!audioContext) audioContext = new Ctx();
+  if (!audioContext || audioContext.state === "closed") audioContext = new Ctx();
   return audioContext;
 }
 
