@@ -135,7 +135,9 @@ export default function OnboardingPage() {
     try {
       let avatarUrl: string | null = null;
       if (avatarFile) avatarUrl = await uploadAvatar();
-      const { error: updateErr } = await supabase.from("profiles").update({
+      const { error: updateErr } = await supabase.from("profiles").upsert({
+        id: user.id,
+        email: user.email,
         full_name: fullName.trim(),
         username: username.trim(),
         avatar_url: avatarUrl,
@@ -147,7 +149,7 @@ export default function OnboardingPage() {
         shopify_store_url: shopifyUrl.trim() || null,
         onboarding_completed: true,
         updated_at: new Date().toISOString(),
-      }).eq("id", user.id);
+      }, { onConflict: "id" });
       if (updateErr) { setError(updateErr.message); return; }
       setStep(5);
     } finally {
@@ -362,8 +364,7 @@ function Done({ name, router }: { name: string; router: ReturnType<typeof useRou
       <button
         type="button"
         onClick={() => {
-          sessionStorage.setItem("just_onboarded", "1");
-          router.replace("/dashboard");
+          window.location.href = "/dashboard";
         }}
         style={primaryBtn}
       >

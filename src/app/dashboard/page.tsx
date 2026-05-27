@@ -51,6 +51,7 @@ export default function DashboardPage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
@@ -88,6 +89,15 @@ export default function DashboardPage() {
       shopify_store: prev?.shopify_store ?? null,
       plan: prev?.plan ?? "free",
     }));
+  }, []);
+
+  const disconnectAccount = useCallback(async () => {
+    if (!supabase) return;
+    setSigningOut(true);
+    await supabase.auth.signOut({ scope: "global" });
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = "/auth";
   }, []);
 
   useEffect(() => {
@@ -465,6 +475,37 @@ export default function DashboardPage() {
                 ⌘K
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => void disconnectAccount()}
+              disabled={signingOut}
+              style={{
+                marginTop: 8,
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                padding: "8px 12px",
+                background: "transparent",
+                border: "1px solid rgba(0,0,0,0.08)",
+                borderRadius: 10,
+                cursor: signingOut ? "not-allowed" : "pointer",
+                fontFamily: "inherit",
+                fontSize: 13,
+                fontWeight: 500,
+                color: "#9A9A9A",
+                letterSpacing: "-0.01em",
+                opacity: signingOut ? 0.6 : 1,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {signingOut
+                ? (lang === "fr" ? "Déconnexion…" : "Signing out…")
+                : (lang === "fr" ? "Déconnexion" : "Disconnect")}
+            </button>
           </div>
         )}
 
