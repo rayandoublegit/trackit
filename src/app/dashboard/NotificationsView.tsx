@@ -1,35 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import {
+  ensureNotificationsReset,
+  getStoredUnreadCount,
+  loadNotifications,
+  NOTIFICATIONS_UPDATED_EVENT,
+  resetNotifications,
+  saveNotifications,
+  type NotificationItem,
+  type NotificationKind,
+} from "@/lib/notifications-storage";
 
-export type NotificationKind = "payout" | "campaign" | "outreach" | "team" | "system";
-
-export type NotificationItem = {
-  id: string;
-  kind: NotificationKind;
-  title: string;
-  body: string;
-  time: string;
-  read: boolean;
-};
+export type { NotificationItem, NotificationKind };
 
 export function getInitialUnreadCount() {
-  return 3;
+  return getStoredUnreadCount();
 }
-
-const btnSecondary: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
-  borderRadius: 10,
-  padding: "10px 16px",
-  fontSize: 13,
-  fontWeight: 500,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  letterSpacing: "-0.02em",
-};
 
 const KIND_STYLES: Record<NotificationKind, { bg: string; color: string; icon: string }> = {
   payout: { bg: "#F0F6FF", color: "#0047FF", icon: "$" },
@@ -43,71 +31,29 @@ type FilterTab = "all" | "unread";
 
 export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange?: (count: number) => void; isMobile?: boolean }) {
   const lang = useLang();
-  const NOTIFICATIONS: NotificationItem[] = useMemo(
-    () => [
-      {
-        id: "1",
-        kind: "payout",
-        title: lang === "fr" ? "Paiement envoyé à Jordan Lee" : "Payout sent to Jordan Lee",
-        body: lang === "fr" ? "Une commission de 240,00$ a été payée avec succès depuis votre solde." : "$240.00 commission was paid successfully from your balance.",
-        time: "12 min ago",
-        read: false,
-      },
-      {
-        id: "2",
-        kind: "campaign",
-        title: lang === "fr" ? "Summer Launch a atteint 50 ventes" : "Summer Launch hit 50 sales",
-        body: lang === "fr" ? "Votre campagne a atteint son premier jalon. Consultez les performances dans Campagnes." : "Your campaign reached its first milestone. Review performance in Campaigns.",
-        time: lang === "fr" ? "Il y a 2 heures" : "2 hours ago",
-        read: false,
-      },
-      {
-        id: "3",
-        kind: "outreach",
-        title: lang === "fr" ? "3 créateurs ont répondu à votre message" : "3 creators replied to outreach",
-        body: lang === "fr" ? "Sam Taylor, Morgan Kim et Alex Rivera ont répondu. Ouvrez Messages pour faire un suivi." : "Sam Taylor, Morgan Kim, and Alex Rivera responded. Open Outreach to follow up.",
-        time: lang === "fr" ? "Il y a 5 heures" : "5 hours ago",
-        read: false,
-      },
-      {
-        id: "4",
-        kind: "team",
-        title: lang === "fr" ? "Jordan Lee a rejoint votre espace" : "Jordan Lee joined your workspace",
-        body: lang === "fr" ? "Il a accepté votre invitation en tant qu'Admin. Gérez les rôles dans Paramètres → Équipe." : "They accepted your invite as Admin. Manage roles in Settings → Team.",
-        time: lang === "fr" ? "Hier" : "Yesterday",
-        read: true,
-      },
-      {
-        id: "5",
-        kind: "system",
-        title: lang === "fr" ? "Shopify connecté" : "Shopify connected",
-        body: lang === "fr" ? "Trackit reçoit maintenant les webhooks de commandes de votre boutique." : "Trackit is now receiving order webhooks from your store.",
-        time: lang === "fr" ? "Il y a 2 jours" : "2 days ago",
-        read: true,
-      },
-      {
-        id: "6",
-        kind: "payout",
-        title: lang === "fr" ? "Alerte solde faible" : "Low balance warning",
-        body: lang === "fr" ? "Votre solde de paiement est inférieur à 100$. Ajoutez des fonds pour éviter les échecs de paiement." : "Your payout balance is below $100. Add funds to avoid failed creator payments.",
-        time: lang === "fr" ? "Il y a 3 jours" : "3 days ago",
-        read: true,
-      },
-    ],
-    [lang]
-  );
-  const [notifications, setNotifications] = useState<NotificationItem[]>(NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<FilterTab>("all");
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setNotifications(NOTIFICATIONS);
-  }, [NOTIFICATIONS]);
+    ensureNotificationsReset();
+    setNotifications(loadNotifications());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setNotifications(loadNotifications());
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
+  }, []);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   useEffect(() => {
+    if (!hydrated) return;
+    saveNotifications(notifications);
     onUnreadChange?.(unreadCount);
-  }, [unreadCount, onUnreadChange]);
+  }, [notifications, unreadCount, onUnreadChange, hydrated]);
 
   const visible =
     filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
@@ -124,6 +70,12 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
     setNotifications((list) => list.filter((n) => n.id !== id));
   };
 
+  const resetAll = () => {
+    const cleared = resetNotifications();
+    setNotifications(cleared);
+    onUnreadChange?.(0);
+  };
+
   return (
     <>
       <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
@@ -131,14 +83,30 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
           <div>
             <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Notifications" : "Notifications"}</h1>
             <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-              {unreadCount > 0 ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}` : "You're all caught up"}
+              {unreadCount > 0
+                ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
+                : lang === "fr"
+                  ? "Vous êtes à jour"
+                  : "You're all caught up"}
             </p>
           </div>
-          {unreadCount > 0 && (
-            <button type="button" onClick={markAllRead} className="hero-cta-shopify-light hero-cta-compact" style={{ marginTop: 8 }}>
-              {lang === "fr" ? "Tout marquer comme lu" : "Mark all as read"}
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+            {unreadCount > 0 && (
+              <button type="button" onClick={markAllRead} className="hero-cta-shopify-light hero-cta-compact">
+                {lang === "fr" ? "Tout marquer comme lu" : "Mark all as read"}
+              </button>
+            )}
+            {notifications.length > 0 && (
+              <button
+                type="button"
+                onClick={resetAll}
+                className="hero-cta-shopify-light hero-cta-compact"
+                style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2" }}
+              >
+                {lang === "fr" ? "Tout réinitialiser" : "Reset all"}
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
           {(["all", "unread"] as FilterTab[]).map((tab) => (
@@ -165,8 +133,12 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
-        {visible.length === 0 ? (
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+        {!hydrated ? (
+          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 40, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+            {lang === "fr" ? "Chargement…" : "Loading…"}
+          </div>
+        ) : visible.length === 0 ? (
           <div
             style={{
               background: "#FFFFFF",
@@ -177,9 +149,17 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
             }}
           >
             <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>No notifications</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              {lang === "fr" ? "Aucune notification" : "No notifications"}
+            </div>
             <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-              {filter === "unread" ? "You've read everything." : "Updates about payouts, campaigns, and your team will show up here."}
+              {filter === "unread"
+                ? lang === "fr"
+                  ? "Vous avez tout lu."
+                  : "You've read everything."
+                : lang === "fr"
+                  ? "Les mises à jour sur les paiements, campagnes et votre équipe apparaîtront ici."
+                  : "Updates about payouts, campaigns, and your team will show up here."}
             </p>
           </div>
         ) : (

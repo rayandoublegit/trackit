@@ -989,7 +989,7 @@ export function CreatorsView({ isMobile, plan = "free" }: { isMobile?: boolean; 
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: isMobile ? 12 : 16, marginBottom: 24 }}>
           {[
             { label: lang === "fr" ? "Total créateurs" : "Total Creators", value: String(creators.length) },

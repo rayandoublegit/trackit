@@ -1124,7 +1124,7 @@ export function HelpCenterView({ isMobile }: { isMobile?: boolean }) {
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16, marginBottom: 48 }}>
           {supportCards.map((card) => (
             <div

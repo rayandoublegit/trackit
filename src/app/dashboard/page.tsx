@@ -16,6 +16,14 @@ import { getDefaultPaymentMethod, usePaymentMethods } from "./usePaymentMethods"
 import { FeedbackView } from "./FeedbackView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
+import {
+  ensureNotificationsReset,
+  getStoredUnreadCount,
+  NOTIFICATIONS_UPDATED_EVENT,
+  notifyCreatorPaid,
+  notifyShopifyConnected,
+} from "@/lib/notifications-storage";
+import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { useLang } from "@/lib/useLang";
 
@@ -59,9 +67,11 @@ export default function DashboardPage() {
   const isBasic = plan === "basic";
   const isPro = plan === "pro";
   const canUseBasicFeatures = isBasic || isPro;
-  const [notificationUnread, setNotificationUnread] = useState(getInitialUnreadCount);
+  const [notificationUnread, setNotificationUnread] = useState(0);
+  const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
+  const autoDemoNotificationRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
     shopify: false,
     shopifyStore: null as string | null,
@@ -96,6 +106,53 @@ export default function DashboardPage() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  useEffect(() => {
+    ensureNotificationsReset();
+    setNotificationUnread(getInitialUnreadCount());
+    const refreshUnread = () => setNotificationUnread(getStoredUnreadCount());
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
+    const removeSoundUnlock = installNotificationSoundUnlock();
+    return () => {
+      window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
+      removeSoundUnlock();
+    };
+  }, []);
+
+  const loadSidebarCounts = useCallback(async (userId: string) => {
+    if (!supabase) return;
+    const [{ count: activeCampaigns }, { count: savedCreators }] = await Promise.all([
+      supabase
+        .from("campaigns")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .in("status", ["active", "Active"]),
+      supabase
+        .from("creators")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+    ]);
+    setSidebarCounts({
+      activeCampaigns: activeCampaigns ?? 0,
+      savedCreators: savedCreators ?? 0,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void loadSidebarCounts(user.id);
+  }, [user?.id, view, loadSidebarCounts]);
+
+  // Auto demo notification once per dashboard visit (no button click).
+  useEffect(() => {
+    if (loading || !user || autoDemoNotificationRef.current) return;
+    autoDemoNotificationRef.current = true;
+    const timer = window.setTimeout(() => {
+      primeNotificationSound();
+      notifyCreatorPaid(lang, "Jordan Lee", 240);
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [loading, user, lang]);
 
   useEffect(() => {
     if (!supabase) { setLoading(false); router.replace("/auth"); return; }
@@ -217,8 +274,8 @@ export default function DashboardPage() {
   }, [profile?.avatar_url]);
 
   const sidebarNavEntries = useMemo(
-    () => buildSidebarNavEntries(notificationUnread, lang),
-    [notificationUnread, lang]
+    () => buildSidebarNavEntries(notificationUnread, lang, sidebarCounts),
+    [notificationUnread, lang, sidebarCounts]
   );
 
   const sidebarSectionLabels = useMemo(() => getSidebarSectionLabels(lang), [lang]);
@@ -682,7 +739,7 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user }: { full
   return (
     <>
       <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: 60, textAlign: "center", marginBottom: 24 }}>
           <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
             <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
@@ -889,7 +946,7 @@ function OutreachView({
           <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
         </div>
       } />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         {toast && (
           <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
             {toast}
@@ -1402,6 +1459,7 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
       setConnectedShop(shop);
       setChangingStore(false);
       window.history.replaceState({}, "", "/dashboard");
+      notifyShopifyConnected(lang, shop || (lang === "fr" ? "votre boutique" : "your store"));
     }
     if (params.get("shopify") === "error") {
       setShopError(lang === "fr" ? "La connexion a échoué. Réessayez." : "Connection failed. Please try again.");
@@ -1439,7 +1497,7 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
           ✓ {connectedShop} connected successfully
         </div>
       )}
-      <div style={{ padding: isMobile ? 16 : "0 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 16 }}>
           {apps.map((app) => (
             <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
@@ -1547,7 +1605,7 @@ function AutomationView({ isMobile }: { isMobile?: boolean }) {
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
         </div>
       </div>
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         <div style={{ background: "linear-gradient(135deg, #0047FF 0%, #003BD6 100%)", color: "#FFFFFF", borderRadius: 18, padding: 32, marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Créer un agent d'automatisation" : "Make an automation agent"}</h2>
@@ -1979,7 +2037,11 @@ const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF
 const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
-function buildSidebarNavEntries(notificationUnread: number, lang: "en" | "fr"): SidebarNavEntry[] {
+function buildSidebarNavEntries(
+  notificationUnread: number,
+  lang: "en" | "fr",
+  counts: { activeCampaigns: number; savedCreators: number }
+): SidebarNavEntry[] {
   return [
     { id: "dashboard", label: lang === "fr" ? "Tableau de bord" : "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
     { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
@@ -2000,8 +2062,24 @@ function buildSidebarNavEntries(notificationUnread: number, lang: "en" | "fr"): 
       keywords: ["alerts", "bell", "updates"],
       badge: notificationUnread > 0 ? String(notificationUnread) : undefined,
     },
-    { id: "active-campaigns", label: lang === "fr" ? "Campagnes actives" : "Active Campaigns", view: "campaigns", section: "workspace", iconKey: "dot-blue", keywords: ["campaigns", "active", "running"], badge: "5" },
-    { id: "creator-lists", label: lang === "fr" ? "Listes de créateurs" : "Creator Lists", view: "discovery", section: "workspace", iconKey: "dot-pink", keywords: ["lists", "saved creators", "bookmarks"], badge: "4" },
+    {
+      id: "active-campaigns",
+      label: lang === "fr" ? "Campagnes actives" : "Active Campaigns",
+      view: "campaigns",
+      section: "workspace",
+      iconKey: "dot-blue",
+      keywords: ["campaigns", "active", "running"],
+      badge: counts.activeCampaigns > 0 ? String(counts.activeCampaigns) : undefined,
+    },
+    {
+      id: "creator-lists",
+      label: lang === "fr" ? "Listes de créateurs" : "Creator Lists",
+      view: "discovery",
+      section: "workspace",
+      iconKey: "dot-pink",
+      keywords: ["lists", "saved creators", "bookmarks"],
+      badge: counts.savedCreators > 0 ? String(counts.savedCreators) : undefined,
+    },
     { id: "help", label: lang === "fr" ? "Centre d'aide" : "Help Center", view: "help", section: "footer", iconKey: "help", keywords: ["support", "guides", "docs", "faq"] },
     { id: "feedback", label: lang === "fr" ? "Avis" : "Feedback", view: "feedback", section: "footer", iconKey: "feedback", keywords: ["suggest", "bug", "feature request"] },
     { id: "settings", label: lang === "fr" ? "Paramètres" : "Settings", view: "settings", section: "footer", iconKey: "settings", keywords: ["account", "profile", "billing", "team", "preferences"] },

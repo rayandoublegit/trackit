@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
+import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
@@ -1440,6 +1441,7 @@ export function DiscoveryView({
     });
     setSavedCreators(prev => [...prev.filter(c => (c.username  ?? "") !== (creator.username ?? "")), creator]);
     setToast("Creator saved ✓");
+    notifyCreatorSaved(lang, creator.displayName || `@${creator.username ?? "creator"}`);
   };
 
   const handleRemoveCreator = async (username: string) => {
@@ -1523,7 +1525,7 @@ export function DiscoveryView({
     <>
       <DiscoveryHeader lang={lang} isMobile={isMobile} />
       <DiscoveryTabs lang={lang} activeTab={activeTab} savedCount={savedCreators.length} onTabChange={setActiveTab} />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         {activeTab === "discover" && (
           <>
         <div style={{
@@ -1531,6 +1533,7 @@ export function DiscoveryView({
           border: "1px solid #D4E2FF",
           borderRadius: 12,
           padding: "12px 16px",
+          marginTop: 20,
           marginBottom: 16,
           fontSize: 13,
           color: "#0047FF",

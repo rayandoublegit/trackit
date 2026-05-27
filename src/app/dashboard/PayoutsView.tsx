@@ -10,6 +10,7 @@ import {
   usePaymentMethods,
   type PaymentMethod,
 } from "./usePaymentMethods";
+import { notifyCreatorPaid, notifyFundsAdded } from "@/lib/notifications-storage";
 
 type SalePlatform = "tiktok" | "instagram" | "youtube";
 
@@ -789,6 +790,7 @@ export function PayoutsView({
     setPayingId(partner.id);
     setTimeout(() => {
       setPayMessage(`Payment of ${formatCurrency(partner.owed, lang)} sent to ${partner.name}.`);
+      notifyCreatorPaid(lang, partner.name, partner.owed);
       setPayingId(null);
     }, 600);
   };
@@ -817,6 +819,7 @@ export function PayoutsView({
     setFundAmount("");
     setPayoutModal(null);
     setPayMessage(`${formatCurrency(amount, lang)} added to your balance.`);
+    notifyFundsAdded(lang, amount);
   };
 
   const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
@@ -1063,7 +1066,13 @@ export function PayoutsView({
                           ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
                           : `${creator.full_name || creator.handle} hasn't added their payment details yet.`
                         );
+                        return;
                       }
+                      notifyCreatorPaid(
+                        lang,
+                        creator.full_name || creator.handle || "creator",
+                        amount
+                      );
                     }}
                     disabled={payingId === partner.id || registeringId === partner.id}
                     className="hero-cta-shopify hero-cta-compact"
@@ -1269,6 +1278,11 @@ export function PayoutsView({
                     const data = await res.json();
                     if (data.success) {
                       alert(lang === "fr" ? `Virement envoyé: ${formatCurrency(amount, lang)} ✓` : `Transfer sent: ${formatCurrency(amount, lang)} ✓`);
+                      notifyCreatorPaid(
+                        lang,
+                        selectedCreatorPayout.full_name || selectedCreatorPayout.handle || "creator",
+                        amount
+                      );
                       // refresh creators
                       const r = await fetch(`/api/creators-list?userId=${userId}`);
                       const list = await r.json();
@@ -1372,7 +1386,13 @@ export function PayoutsView({
                   alert(lang === "fr" ? `IBAN copié ✓\nMontant: ${formatCurrency(amount, lang)}` : `IBAN copied ✓\nAmount: ${formatCurrency(amount, lang)}`);
                 } else {
                   alert(lang === "fr" ? "Ajoutez d'abord une méthode de paiement" : "Add a payment method first");
+                  return;
                 }
+                notifyCreatorPaid(
+                  lang,
+                  creator.full_name || creator.handle || "creator",
+                  amount
+                );
               }}
               style={{
                 width: "100%",

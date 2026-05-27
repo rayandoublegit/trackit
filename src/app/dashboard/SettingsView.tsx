@@ -234,7 +234,7 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         {loading ? (
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Loading settings...</p>
         ) : (

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { saveCampaign, getCampaigns } from "@/lib/db";
+import { notifyCampaignCreated } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
@@ -112,7 +113,10 @@ export function CampaignsView({
       auto_payout: campaignData.autoPayout || false,
       status: "active",
     });
-    if (saved) setCampaigns((prev) => [saved, ...prev]);
+    if (saved) {
+      setCampaigns((prev) => [saved, ...prev]);
+      notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
+    }
     setModalOpen(false);
   };
 
@@ -235,7 +239,7 @@ function CampaignsList({ lang, campaigns, filter, setFilter, search, setSearch, 
   const totalCommission = campaigns.reduce((s, c) => s + (c.commission ?? 0), 0);
 
   return (
-    <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+    <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
         <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
         <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>

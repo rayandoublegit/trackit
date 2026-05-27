@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { saveOutreach, getOutreachHistory, getSavedCreators } from "@/lib/db";
+import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
@@ -1133,6 +1134,10 @@ export function OutreachHistorySection({
       message: message,
       status: "sent",
     });
+    notifyOutreachSent(
+      lang,
+      creator.displayName || creator.creator || creator.username || creator.handle || "creator"
+    );
   };
 
   const closeFollowUp = () => {
