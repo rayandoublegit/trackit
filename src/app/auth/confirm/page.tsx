@@ -28,6 +28,15 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          if (!profile || profile.onboarding_completed === false) {
+            router.replace("/onboarding");
+          } else {
+            router.replace("/dashboard");
+          }
+        }
         return;
       }
 
@@ -44,6 +53,15 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          if (!profile || profile.onboarding_completed === false) {
+            router.replace("/onboarding");
+          } else {
+            router.replace("/dashboard");
+          }
+        }
         return;
       }
 
@@ -53,6 +71,15 @@ function ConfirmContent() {
       } = await client.auth.getSession();
       if (session) {
         setStatus("success");
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          if (!profile || profile.onboarding_completed === false) {
+            router.replace("/onboarding");
+          } else {
+            router.replace("/dashboard");
+          }
+        }
         return;
       }
 

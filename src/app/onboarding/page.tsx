@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useLang } from "@/lib/useLang";
 import type { User } from "@supabase/supabase-js";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -11,6 +12,7 @@ type Revenue = "starting" | "1k-10k" | "10k-50k" | "50k+";
 type Source = "tiktok" | "reddit" | "twitter" | "friend" | "google" | "other";
 
 export default function OnboardingPage() {
+  const lang = useLang();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [step, setStep] = useState<Step>(1);
@@ -82,15 +84,15 @@ export default function OnboardingPage() {
   const goNext = async () => {
     setError(null);
     if (step === 1) {
-      if (!fullName.trim()) { setError("Please enter your name"); return; }
-      if (usernameStatus !== "available" && username !== "") { setError("Please choose a valid available username"); return; }
-      if (!username.trim()) { setError("Please choose a username"); return; }
+      if (!fullName.trim()) { setError(lang === "fr" ? "Veuillez entrer votre nom" : "Please enter your name"); return; }
+      if (usernameStatus !== "available" && username !== "") { setError(lang === "fr" ? "Choisissez un nom d'utilisateur valide et disponible" : "Please choose a valid available username"); return; }
+      if (!username.trim()) { setError(lang === "fr" ? "Choisissez un nom d'utilisateur" : "Please choose a username"); return; }
     }
     if (step === 2) {
-      if (!businessName.trim() || !businessType || !niche.trim() || !revenue) { setError("Please complete all fields"); return; }
+      if (!businessName.trim() || !businessType || !niche.trim() || !revenue) { setError(lang === "fr" ? "Veuillez remplir tous les champs" : "Please complete all fields"); return; }
     }
     if (step === 3) {
-      if (!source) { setError("Please pick one"); return; }
+      if (!source) { setError(lang === "fr" ? "Veuillez choisir une option" : "Please pick one"); return; }
     }
     setStep((s) => (s + 1) as Step);
   };
@@ -125,66 +127,66 @@ export default function OnboardingPage() {
   if (!user) return <div style={{ minHeight: "100vh", background: "#FFFFFF" }} />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 24px" }}>
-      <div style={{ width: "100%", maxWidth: 600 }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 40 }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "8px 24px 32px" }}>
+      <div style={{ width: "100%", maxWidth: 440 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} style={{ flex: 1, height: 6, borderRadius: 3, background: step >= i ? "#0047FF" : "rgba(0,0,0,0.08)", transition: "background 0.3s" }} />
+            <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= i ? "#0047FF" : "rgba(0,0,0,0.08)", transition: "background 0.3s" }} />
           ))}
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 28, padding: "52px 44px" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 20, padding: "32px 28px" }}>
           {step === 1 && (
             <>
-              <Header step={step} title="Set up your profile" subtitle="Tell us who you are. This is what creators will see when you reach out." />
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 36 }}>
+              <Header step={step} title="Set up your profile" subtitle="Tell us who you are. This is what creators will see when you reach out." titleFr="Configurez votre profil" subtitleFr="Dites-nous qui vous êtes. C'est ce que les créateurs verront quand vous les contactez." />
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
                 <input id="avatar-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} />
-                <label htmlFor="avatar-input" style={{ width: 120, height: 120, borderRadius: "50%", border: "2px dashed rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", background: "rgba(0,0,0,0.02)" }}>
+                <label htmlFor="avatar-input" style={{ width: 88, height: 88, borderRadius: "50%", border: "2px dashed rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", overflow: "hidden", background: "rgba(0,0,0,0.02)" }}>
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="3.5" stroke="rgba(0,0,0,0.3)" strokeWidth="1.7"/><path d="M5 20c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="rgba(0,0,0,0.3)" strokeWidth="1.7" strokeLinecap="round"/></svg>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="9" r="3.5" stroke="rgba(0,0,0,0.3)" strokeWidth="1.7"/><path d="M5 20c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="rgba(0,0,0,0.3)" strokeWidth="1.7" strokeLinecap="round"/></svg>
                   )}
                 </label>
-                <label htmlFor="avatar-input" style={{ marginTop: 14, fontSize: 15, color: "rgba(0,0,0,0.45)", cursor: "pointer" }}>Upload a photo</label>
+                <label htmlFor="avatar-input" style={{ marginTop: 10, fontSize: 13, color: "rgba(0,0,0,0.45)", cursor: "pointer" }}>{lang === "fr" ? "Ajouter une photo" : "Upload a photo"}</label>
               </div>
-              <Input label="Full name" value={fullName} onChange={setFullName} placeholder="Jane Smith" />
+              <Input label="Full name" labelFr="Nom complet" value={fullName} onChange={setFullName} placeholder="Jane Smith" placeholderFr="Jean Dupont" />
               <UsernameInput value={username} onChange={setUsername} status={usernameStatus} />
             </>
           )}
 
           {step === 2 && (
             <>
-              <Header step={step} title="Tell us about your business" subtitle="Helps us personalize creator suggestions and outreach." />
-              <Input label="Business name" value={businessName} onChange={setBusinessName} placeholder="Acme Co." />
-              <div style={{ marginBottom: 28 }}>
-                <Label>Business type</Label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Header step={step} title="Tell us about your business" subtitle="Helps us personalize creator suggestions and outreach." titleFr="Parlez-nous de votre activité" subtitleFr="Cela nous aide à personnaliser les suggestions de créateurs et les messages." />
+              <Input label="Business name" labelFr="Nom de votre entreprise" value={businessName} onChange={setBusinessName} placeholder="Acme Co." placeholderFr="Ma Boutique" />
+              <div style={{ marginBottom: 20 }}>
+                <Label>{lang === "fr" ? "Type d'activité" : "Business type"}</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {[
-                    { key: "ecommerce" as const, label: "Ecommerce store", desc: "Shopify, WooCommerce" },
-                    { key: "infopreneur" as const, label: "Infopreneur", desc: "Courses, coaching" },
-                    { key: "agency" as const, label: "Agency", desc: "Client services" },
-                    { key: "other" as const, label: "Other", desc: "Something else" },
+                    { key: "ecommerce" as const, label: "Ecommerce store", labelFr: "Boutique e-commerce", desc: "Shopify, WooCommerce", descFr: "Shopify, WooCommerce" },
+                    { key: "infopreneur" as const, label: "Infopreneur", labelFr: "Infopreneur", desc: "Courses, coaching", descFr: "Formations, coaching" },
+                    { key: "agency" as const, label: "Agency", labelFr: "Agence", desc: "Client services", descFr: "Services clients" },
+                    { key: "other" as const, label: "Other", labelFr: "Autre", desc: "Something else", descFr: "Autre chose" },
                   ].map((opt) => (
                     <button key={opt.key} type="button" onClick={() => setBusinessType(opt.key)} style={cardStyle(businessType === opt.key)}>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{opt.label}</div>
-                      <div style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginTop: 4 }}>{opt.desc}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
+                      <div style={{ fontSize: 12, color: "rgba(0,0,0,0.5)", marginTop: 4 }}>{lang === "fr" ? opt.descFr : opt.desc}</div>
                     </button>
                   ))}
                 </div>
               </div>
-              <Input label="Your niche" value={niche} onChange={setNiche} placeholder="Fashion, fitness, beauty, tech..." />
-              <div style={{ marginBottom: 28 }}>
-                <Label>Monthly revenue</Label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Input label="Your niche" labelFr="Votre niche" value={niche} onChange={setNiche} placeholder="Fashion, fitness, beauty, tech..." placeholderFr="Mode, fitness, beauté, tech..." />
+              <div style={{ marginBottom: 20 }}>
+                <Label>{lang === "fr" ? "Revenu mensuel" : "Monthly revenue"}</Label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {[
-                    { key: "starting" as const, label: "Just starting" },
-                    { key: "1k-10k" as const, label: "$1K – $10K" },
-                    { key: "10k-50k" as const, label: "$10K – $50K" },
-                    { key: "50k+" as const, label: "$50K+" },
+                    { key: "starting" as const, label: "Just starting", labelFr: "Je débute" },
+                    { key: "1k-10k" as const, label: "$1K – $10K", labelFr: "1K€ – 10K€" },
+                    { key: "10k-50k" as const, label: "$10K – $50K", labelFr: "10K€ – 50K€" },
+                    { key: "50k+" as const, label: "$50K+", labelFr: "50K€+" },
                   ].map((opt) => (
                     <button key={opt.key} type="button" onClick={() => setRevenue(opt.key)} style={cardStyle(revenue === opt.key)}>
-                      <div style={{ fontSize: 16, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{opt.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
                     </button>
                   ))}
                 </div>
@@ -194,18 +196,18 @@ export default function OnboardingPage() {
 
           {step === 3 && (
             <>
-              <Header step={step} title="Where did you hear about us?" subtitle="One quick tap. Helps us know what's working." />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+              <Header step={step} title="Where did you hear about us?" subtitle="One quick tap. Helps us know what's working." titleFr="Comment nous avez-vous connus ?" subtitleFr="Un simple tap. Ça nous aide à savoir ce qui fonctionne." />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                 {[
-                  { key: "tiktok" as const, label: "TikTok" },
-                  { key: "reddit" as const, label: "Reddit" },
-                  { key: "twitter" as const, label: "X (Twitter)" },
-                  { key: "friend" as const, label: "A friend" },
-                  { key: "google" as const, label: "Google" },
-                  { key: "other" as const, label: "Other" },
+                  { key: "tiktok" as const, label: "TikTok", labelFr: "TikTok" },
+                  { key: "reddit" as const, label: "Reddit", labelFr: "Reddit" },
+                  { key: "twitter" as const, label: "X (Twitter)", labelFr: "X (Twitter)" },
+                  { key: "friend" as const, label: "A friend", labelFr: "Un ami" },
+                  { key: "google" as const, label: "Google", labelFr: "Google" },
+                  { key: "other" as const, label: "Other", labelFr: "Autre" },
                 ].map((opt) => (
                   <button key={opt.key} type="button" onClick={() => setSource(opt.key)} style={cardStyle(source === opt.key)}>
-                    <div style={{ fontSize: 16, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{opt.label}</div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
                   </button>
                 ))}
               </div>
@@ -214,13 +216,13 @@ export default function OnboardingPage() {
 
           {step === 4 && (
             <>
-              <Header step={step} title="Connect Shopify" subtitle="Connect your store to track sales and automate commission payouts. You can skip this and connect later." />
-              <Input label="Your Shopify store URL" value={shopifyUrl} onChange={setShopifyUrl} placeholder="yourstore.myshopify.com" />
+              <Header step={step} title="Connect Shopify" subtitle="Connect your store to track sales and automate commission payouts. You can skip this and connect later." titleFr="Connectez Shopify" subtitleFr="Connectez votre boutique pour suivre les ventes et automatiser les commissions. Vous pouvez ignorer cette étape." />
+              <Input label="Your Shopify store URL" labelFr="URL de votre boutique Shopify" value={shopifyUrl} onChange={setShopifyUrl} placeholder="yourstore.myshopify.com" placeholderFr="maboutique.myshopify.com" />
               <button type="button" onClick={handleFinish} disabled={loading} style={{ ...primaryBtn, marginTop: 8, background: "#95BF47" }}>
-                {loading ? "Saving..." : "Connect Shopify →"}
+                {loading ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →")}
               </button>
-              <button type="button" onClick={() => { setShopifyUrl(""); void handleFinish(); }} disabled={loading} style={{ background: "transparent", color: "rgba(0,0,0,0.5)", border: "none", padding: "16px 0", fontSize: 16, fontFamily: "inherit", cursor: "pointer", width: "100%", marginTop: 10, letterSpacing: "-0.01em" }}>
-                Skip for now →
+              <button type="button" onClick={() => { setShopifyUrl(""); void handleFinish(); }} disabled={loading} style={{ background: "transparent", color: "rgba(0,0,0,0.5)", border: "none", padding: "12px 0", fontSize: 14, fontFamily: "inherit", cursor: "pointer", width: "100%", marginTop: 8, letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Ignorer pour l'instant →" : "Skip for now →"}
               </button>
             </>
           )}
@@ -230,12 +232,12 @@ export default function OnboardingPage() {
           )}
 
           {error && step !== 5 && (
-            <div style={{ fontSize: 15, color: "#ff6b6b", padding: "14px 16px", borderRadius: 12, background: "rgba(255,107,107,0.08)", marginTop: 18 }}>{error}</div>
+            <div style={{ fontSize: 14, color: "#ff6b6b", padding: "12px 14px", borderRadius: 12, background: "rgba(255,107,107,0.08)", marginTop: 16 }}>{error}</div>
           )}
 
           {step !== 5 && step !== 4 && (
-            <button type="button" onClick={goNext} disabled={loading} style={{ ...primaryBtn, marginTop: 20 }}>
-              Continue →
+            <button type="button" onClick={goNext} disabled={loading} style={{ ...primaryBtn, marginTop: 16 }}>
+              {lang === "fr" ? "Continuer →" : "Continue →"}
             </button>
           )}
         </div>
@@ -244,12 +246,15 @@ export default function OnboardingPage() {
   );
 }
 
-function Header({ step, title, subtitle }: { step: number; title: string; subtitle: string }) {
+function Header({ step, title, subtitle, titleFr, subtitleFr }: { step: number; title: string; subtitle: string; titleFr: string; subtitleFr: string }) {
+  const lang = useLang();
   return (
-    <div style={{ marginBottom: 36 }}>
-      <div style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 12 }}>Step {step} of 5</div>
-      <h1 style={{ fontSize: 32, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.03em", margin: 0, marginBottom: 12 }}>{title}</h1>
-      <p style={{ fontSize: 16, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.55 }}>{subtitle}</p>
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ fontSize: 11, fontWeight: 500, color: "#0047FF", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
+        {lang === "fr" ? `Étape ${step} sur 5` : `Step ${step} of 5`}
+      </div>
+      <h1 style={{ fontSize: 24, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? titleFr : title}</h1>
+      <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.5 }}>{lang === "fr" ? subtitleFr : subtitle}</p>
     </div>
   );
 }
@@ -258,39 +263,42 @@ function Label({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 14, fontWeight: 500, color: "rgba(0,0,0,0.7)", letterSpacing: "-0.01em", marginBottom: 10 }}>{children}</div>;
 }
 
-function Input({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder: string }) {
+function Input({ label, labelFr, value, onChange, placeholder, placeholderFr }: { label: string; labelFr?: string; value: string; onChange: (v: string) => void; placeholder: string; placeholderFr?: string }) {
+  const lang = useLang();
   return (
-    <div style={{ marginBottom: 24 }}>
-      <Label>{label}</Label>
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} style={inputStyle} />
+    <div style={{ marginBottom: 16 }}>
+      <Label>{lang === "fr" && labelFr ? labelFr : label}</Label>
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={lang === "fr" && placeholderFr ? placeholderFr : placeholder} style={inputStyle} />
     </div>
   );
 }
 
 function UsernameInput({ value, onChange, status }: { value: string; onChange: (v: string) => void; status: string }) {
+  const lang = useLang();
   const message =
-    status === "checking" ? "Checking..." :
-    status === "available" ? "✓ Available" :
-    status === "taken" ? "Username is taken" :
-    status === "invalid" ? "3-20 characters, letters/numbers/underscores only" :
+    status === "checking" ? (lang === "fr" ? "Vérification..." : "Checking...") :
+    status === "available" ? (lang === "fr" ? "✓ Disponible" : "✓ Available") :
+    status === "taken" ? (lang === "fr" ? "Ce nom est déjà pris" : "Username is taken") :
+    status === "invalid" ? (lang === "fr" ? "3-20 caractères, lettres/chiffres/underscores uniquement" : "3-20 characters, letters/numbers/underscores only") :
     "";
   const color =
     status === "available" ? "#1FB567" :
     status === "taken" || status === "invalid" ? "#ff6b6b" :
     "rgba(0,0,0,0.4)";
   return (
-    <div style={{ marginBottom: 24 }}>
-      <Label>Username</Label>
+    <div style={{ marginBottom: 16 }}>
+      <Label>{lang === "fr" ? "Nom d'utilisateur" : "Username"}</Label>
       <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)", color: "rgba(0,0,0,0.4)", fontSize: 17, letterSpacing: "-0.01em" }}>@</span>
-        <input type="text" value={value} onChange={(e) => onChange(e.target.value.toLowerCase())} placeholder="yourname" style={{ ...inputStyle, paddingLeft: 36 }} />
+        <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "rgba(0,0,0,0.4)", fontSize: 15, letterSpacing: "-0.01em" }}>@</span>
+        <input type="text" value={value} onChange={(e) => onChange(e.target.value.toLowerCase())} placeholder={lang === "fr" ? "ton pseudo" : "yourname"} style={{ ...inputStyle, paddingLeft: 38 }} />
       </div>
-      {message && <div style={{ fontSize: 14, color, marginTop: 8, letterSpacing: "-0.01em" }}>{message}</div>}
+      {message && <div style={{ fontSize: 13, color, marginTop: 8, letterSpacing: "-0.01em" }}>{message}</div>}
     </div>
   );
 }
 
 function Done({ name, router }: { name: string; router: ReturnType<typeof useRouter> }) {
+  const lang = useLang();
   useEffect(() => {
     const dots = document.querySelectorAll(".confetti-dot");
     dots.forEach((d, i) => {
@@ -302,32 +310,40 @@ function Done({ name, router }: { name: string; router: ReturnType<typeof useRou
     });
   }, []);
   return (
-    <div style={{ textAlign: "center", padding: "28px 0" }}>
-      <div style={{ position: "relative", width: 96, height: 96, margin: "0 auto 36px" }}>
+    <div style={{ textAlign: "center", padding: "20px 0" }}>
+      <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto 28px" }}>
         <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L20 7" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </div>
         {[...Array(14)].map((_, i) => {
           const colors = ["#0047FF", "#1FB567", "#FFD23F", "#FF6B2C", "#FF3D8B"];
           return <span key={i} className="confetti-dot" style={{ position: "absolute", top: "50%", left: "50%", width: 8, height: 8, borderRadius: 2, background: colors[i % colors.length], transform: "translate(-50%, -50%)", transition: "transform 1.2s cubic-bezier(0.2, 0.7, 0.3, 1), opacity 1.2s ease-out", transitionDelay: `${i * 30}ms` }} />;
         })}
       </div>
-      <h1 style={{ fontSize: 34, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.04em", margin: 0, marginBottom: 14 }}>You&apos;re all set{name ? `, ${name.split(" ")[0]}` : ""}!</h1>
-      <p style={{ fontSize: 17, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, marginBottom: 32 }}>Time to find your first creators.</p>
-      <button type="button" onClick={() => router.replace("/dashboard")} style={primaryBtn}>Start discovering creators →</button>
+      <h1 style={{ fontSize: 26, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.04em", margin: 0, marginBottom: 10 }}>
+        {lang === "fr"
+          ? `C'est parti${name ? `, ${name.split(" ")[0]}` : ""} !`
+          : `You're all set${name ? `, ${name.split(" ")[0]}` : ""}!`}
+      </h1>
+      <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, marginBottom: 24 }}>
+        {lang === "fr" ? "C'est l'heure de trouver vos premiers créateurs." : "Time to find your first creators."}
+      </p>
+      <button type="button" onClick={() => router.replace("/dashboard")} style={primaryBtn}>
+        {lang === "fr" ? "Commencer à découvrir des créateurs →" : "Start discovering creators →"}
+      </button>
     </div>
   );
 }
 
 const inputStyle: React.CSSProperties = {
   width: "100%", background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.12)",
-  borderRadius: 14, padding: "16px 18px", fontSize: 17, fontFamily: "inherit", color: "#0A0A0A",
+  borderRadius: 12, padding: "12px 14px", fontSize: 15, fontFamily: "inherit", color: "#0A0A0A",
   letterSpacing: "-0.01em", outline: "none", boxSizing: "border-box",
 };
 
 const primaryBtn: React.CSSProperties = {
-  width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 14,
-  padding: "18px 0", fontSize: 17, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer",
+  width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 12,
+  padding: "14px 0", fontSize: 15, fontWeight: 500, letterSpacing: "-0.02em", cursor: "pointer",
   fontFamily: "inherit",
 };
 
@@ -335,7 +351,7 @@ function cardStyle(active: boolean): React.CSSProperties {
   return {
     background: active ? "rgba(0,71,255,0.08)" : "#FFFFFF",
     border: active ? "1px solid #0047FF" : "1px solid rgba(0,0,0,0.1)",
-    borderRadius: 14, padding: "18px 20px", cursor: "pointer", textAlign: "left",
+    borderRadius: 12, padding: "14px 16px", cursor: "pointer", textAlign: "left",
     fontFamily: "inherit", transition: "all 0.15s ease",
   };
 }
