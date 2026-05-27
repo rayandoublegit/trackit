@@ -1269,6 +1269,8 @@ function incrementDiscoverySearchCount() {
   localStorage.setItem("trackit_searches_today", String(count));
 }
 
+const DISCOVERY_RESULTS_CACHE_KEY = "trackit_discovery_last_results_v1";
+
 export function DiscoveryView({
   plan,
   onUpgrade,
@@ -1314,36 +1316,47 @@ export function DiscoveryView({
   const [showBlur, setShowBlur] = useState(false);
   const [resetCountdown, setResetCountdown] = useState<string>("");
 
+  const syncDiscoveryGateState = async (): Promise<number | null> => {
+    if (plan !== "free") return null;
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase
+      .from("profiles")
+      .select("discoveries_used, discoveries_reset_at")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!data) return null;
+
+    const now = new Date();
+    const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at) : now;
+    const resetWindowEnd = new Date(resetAt.getTime() + 24 * 60 * 60 * 1000);
+
+    if (now >= resetWindowEnd) {
+      await supabase
+        .from("profiles")
+        .update({ discoveries_used: 0, discoveries_reset_at: now.toISOString() })
+        .eq("id", user.id);
+      setDiscoveriesUsed(0);
+      setDiscoveriesResetAt(now);
+      setShowBlur(false);
+      setResetCountdown("");
+      return 0;
+    }
+
+    const used = data.discoveries_used || 0;
+    setDiscoveriesUsed(used);
+    setDiscoveriesResetAt(resetAt);
+    setShowBlur(used >= 2);
+    return used;
+  };
+
   // Load discoveries from Supabase on mount
   useEffect(() => {
     if (plan !== "free") return;
     const loadDiscoveries = async () => {
-      const { supabase } = await import("@/lib/supabase");
-      if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase
-        .from("profiles")
-        .select("discoveries_used, discoveries_reset_at")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (!data) return;
-      const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at) : new Date();
-      const now = new Date();
-      if (now >= new Date(resetAt.getTime() + 24 * 60 * 60 * 1000)) {
-        // 24h passed, reset
-        await supabase.from("profiles").update({
-          discoveries_used: 0,
-          discoveries_reset_at: now.toISOString(),
-        }).eq("id", user.id);
-        setDiscoveriesUsed(0);
-        setDiscoveriesResetAt(now);
-        setShowBlur(false);
-      } else {
-        setDiscoveriesUsed(data.discoveries_used || 0);
-        setDiscoveriesResetAt(resetAt);
-        if ((data.discoveries_used || 0) >= 2) setShowBlur(true);
-      }
+      await syncDiscoveryGateState();
     };
     void loadDiscoveries();
   }, [plan]);
@@ -1399,6 +1412,20 @@ export function DiscoveryView({
   useEffect(() => {
     const saved = localStorage.getItem("trackit_search_" + new Date().toDateString());
     if (saved) setSearchCount(parseInt(saved));
+  }, []);
+
+  useEffect(() => {
+    const cached = localStorage.getItem(DISCOVERY_RESULTS_CACHE_KEY);
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached) as Creator[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        setCreators(parsed);
+        setHasSearched(true);
+      }
+    } catch {
+      /* ignore malformed cache */
+    }
   }, []);
 
   useEffect(() => {
@@ -1461,9 +1488,13 @@ export function DiscoveryView({
   };
 
   const search = async () => {
-    if (plan === "free" && discoveriesUsed >= 2) {
-      setShowBlur(true);
-      return;
+    if (plan === "free") {
+      const latestUsed = await syncDiscoveryGateState();
+      if ((latestUsed ?? discoveriesUsed) >= 2) {
+        setShowBlur(true);
+        setHasSearched(true);
+        return;
+      }
     }
 
     const nicheTerm = query.trim() || niche;
@@ -1503,6 +1534,7 @@ export function DiscoveryView({
 
       const data = (await res.json()) as { creators: Creator[] };
       setCreators(data.creators ?? []);
+      localStorage.setItem(DISCOVERY_RESULTS_CACHE_KEY, JSON.stringify(data.creators ?? []));
       const newCount = searchCount + 1;
       void incrementDiscoveries();
       setSearchCount(newCount);
@@ -1755,10 +1787,46 @@ export function DiscoveryView({
         )}
 
         {!loading && hasSearched && creators.length === 0 && !error && (
-          <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 60, textAlign: "center" }}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucun créateur trouvé" : "No creators found"}</h3>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Essayez d'ajuster vos filtres" : "Try adjusting your filters"}</p>
-          </div>
+          showBlur ? (
+            <div style={{ position: "relative" }}>
+              <div style={{ ...creatorsGridStyle, filter: "blur(6px)", pointerEvents: "none", userSelect: "none", transition: "filter 0.3s" }}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, minHeight: 260 }} />
+                ))}
+              </div>
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: isMobile ? "100px 16px 60px" : "20px 20px 150px" }}>
+                <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 20, padding: "32px 40px", textAlign: "center", maxWidth: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
+                  <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(0,71,255,0.08)", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  </div>
+                  <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
+                    {lang === "fr" ? "Vous avez utilisé vos 2 découvertes" : "You've used your 2 discoveries"}
+                  </h3>
+                  <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
+                    {lang === "fr" ? "Passez à Basic pour des recherches illimitées." : "Upgrade to Basic for unlimited creator searches."}
+                  </p>
+                  {resetCountdown && (
+                    <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
+                      {lang === "fr" ? `Réinitialisation dans ${resetCountdown}` : `Resets in ${resetCountdown}`}
+                    </p>
+                  )}
+                  {!resetCountdown && <div style={{ marginBottom: 18 }} />}
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
+                  >
+                    {lang === "fr" ? "Débloquer les créateurs illimités →" : "Unlock unlimited creators →"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 60, textAlign: "center" }}>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucun créateur trouvé" : "No creators found"}</h3>
+              <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Essayez d'ajuster vos filtres" : "Try adjusting your filters"}</p>
+            </div>
+          )
         )}
 
         {!loading && creators.length > 0 && (
@@ -1785,7 +1853,7 @@ export function DiscoveryView({
                 ))}
               </div>
               {showBlur && (
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: "160px 20px 40px" }}>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", zIndex: 10, padding: isMobile ? "100px 16px 60px" : "20px 20px 150px" }}>
                   <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 20, padding: "32px 40px", textAlign: "center", maxWidth: 400, boxShadow: "0 8px 40px rgba(0,0,0,0.12)" }}>
                     <div style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(0,71,255,0.08)", margin: "0 auto 16px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./fonts.module.css";
 import "./landing.css";
 
@@ -39,7 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
       </head>
-      <body>{children}</body>
+      <body>{children}
+        <Analytics />
+      </body>
     </html>
   );
 }
