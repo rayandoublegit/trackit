@@ -102,7 +102,7 @@ function AuthPageContent() {
     if (!supabase) return;
     await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
   };
 
