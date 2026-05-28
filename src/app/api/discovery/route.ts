@@ -107,7 +107,7 @@ export async function POST(request: Request) {
     .from("creators_index")
     .select("*")
     .eq("platform", plat)
-    .or(nicheWords.map(w => `niches.cs.{${w}}`).join(","))
+    .or(nicheWords.map((w: string) => `niches.cs.{${w}}`).join(","))
     .gte("followers", minF)
     .lte("followers", maxF)
     .gte("engagement_rate", minE)
