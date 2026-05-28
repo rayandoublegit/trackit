@@ -142,25 +142,25 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
 };
 
-  const handleCheckout = async (plan: "basic" | "trackit" | "pro", annual?: boolean) => {
+  const handleCheckout = async (plan: "growth" | "pro" | "scale", annual?: boolean) => {
     const isEur = (typeof window !== "undefined" && (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en")) === "fr";
     const monthlyIds: Record<string, string | undefined> = isEur ? {
-      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_EUR_PRICE_ID,
-      trackit: process.env.NEXT_PUBLIC_STRIPE_TRACKIT_EUR_PRICE_ID ?? process.env.NEXT_PUBLIC_STRIPE_BASIC_EUR_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_EUR_PRICE_ID,
+      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
+      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID,
     } : {
-      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID,
-      trackit: process.env.NEXT_PUBLIC_STRIPE_TRACKIT_PRICE_ID ?? process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID,
+      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
+      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
     };
     const annualIds: Record<string, string | undefined> = isEur ? {
-      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_EUR_PRICE_ID,
-      trackit: process.env.NEXT_PUBLIC_STRIPE_TRACKIT_ANNUAL_EUR_PRICE_ID ?? process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_EUR_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_EUR_PRICE_ID,
+      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
+      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
     } : {
-      basic: process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_PRICE_ID,
-      trackit: process.env.NEXT_PUBLIC_STRIPE_TRACKIT_ANNUAL_PRICE_ID ?? process.env.NEXT_PUBLIC_STRIPE_BASIC_ANNUAL_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO_ANNUAL_PRICE_ID,
+      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
+      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
+      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
     };
     const priceId = (annual ? annualIds[plan] : monthlyIds[plan]) ?? monthlyIds[plan];
 
@@ -1432,7 +1432,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_one_click_payouts}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_email_support}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("basic", basicAnnual)} className="pricing-cta">{t.pricing_cta}</button>
+              <button type="button" onClick={() => handleCheckout("growth", basicAnnual)} className="pricing-cta">{t.pricing_cta}</button>
             </div>
           </div>
 
@@ -1472,7 +1472,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_analytics}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_priority_support}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("trackit", trackitAnnual)} className="pricing-cta pricing-cta-hero">{t.pricing_cta}</button>
+              <button type="button" onClick={() => handleCheckout("pro", trackitAnnual)} className="pricing-cta pricing-cta-hero">{t.pricing_cta}</button>
             </div>
           </div>
 
@@ -1510,7 +1510,7 @@ export default function TrackitLanding() {
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_white_label_outreach}</div>
                 <div className="pricing-feature"><svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>{t.feat_dedicated_support}</div>
               </div>
-              <button type="button" onClick={() => handleCheckout("pro", proAnnual)} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
+              <button type="button" onClick={() => handleCheckout("scale", proAnnual)} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
             </div>
           </div>
 
