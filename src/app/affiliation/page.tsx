@@ -516,40 +516,60 @@ export default function AffiliationPage() {
             {submitted ? (
               <div style={{ textAlign: "center", paddingTop: 80 }}>
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 8px", color: "#1A1A1A" }}>Application sent!</h2>
-                <p style={{ fontSize: 14, color: "#7A7A7A", lineHeight: 1.6 }}>We'll review your application and send your affiliate link within 24 hours.</p>
+                <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 8px", color: "#1A1A1A" }}>
+                  {lang === "fr" ? "Candidature envoyée !" : "Application sent!"}
+                </h2>
+                <p style={{ fontSize: 14, color: "#7A7A7A", lineHeight: 1.6 }}>
+                  {lang === "fr"
+                    ? "Nous examinerons votre candidature et vous enverrons votre lien affilié sous 24 heures."
+                    : "We'll review your application and send your affiliate link within 24 hours."}
+                </p>
               </div>
             ) : (
               <>
                 <div style={{ marginBottom: 28 }}>
-                  <div style={{ display: "inline-block", background: "#F0F6FF", color: "#0047FF", borderRadius: 8, padding: "4px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 12 }}>PARTNER PROGRAM</div>
-                  <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px", color: "#1A1A1A" }}>Apply to become a partner</h2>
-                  <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>Earn 20% on every user you bring. Takes 2 minutes.</p>
+                  <div style={{ display: "inline-block", background: "#F0F6FF", color: "#0047FF", borderRadius: 8, padding: "4px 12px", fontSize: 11, fontWeight: 700, letterSpacing: "0.05em", marginBottom: 12 }}>
+                    {lang === "fr" ? "PROGRAMME PARTENAIRE" : "PARTNER PROGRAM"}
+                  </div>
+                  <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px", color: "#1A1A1A" }}>
+                    {lang === "fr" ? "Devenir partenaire" : "Apply to become a partner"}
+                  </h2>
+                  <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>
+                    {lang === "fr"
+                      ? "Gagnez 20 % sur chaque utilisateur que vous apportez. 2 minutes suffisent."
+                      : "Earn 20% on every user you bring. Takes 2 minutes."}
+                  </p>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>First name *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "Prénom *" : "First name *"}
+                    </label>
                     <input
                       value={formData.firstName}
                       onChange={e => setFormData(p => ({ ...p, firstName: e.target.value }))}
-                      placeholder="First name"
+                      placeholder={lang === "fr" ? "Prénom" : "First name"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Last name *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "Nom *" : "Last name *"}
+                    </label>
                     <input
                       value={formData.lastName}
                       onChange={e => setFormData(p => ({ ...p, lastName: e.target.value }))}
-                      placeholder="Last name"
+                      placeholder={lang === "fr" ? "Nom" : "Last name"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Email *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "E-mail *" : "Email *"}
+                    </label>
                     <input
                       value={formData.email}
                       onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
@@ -560,27 +580,33 @@ export default function AffiliationPage() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Password *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "Mot de passe *" : "Password *"}
+                    </label>
                     <input
                       value={formData.password}
                       onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
-                      placeholder="Create a password"
+                      placeholder={lang === "fr" ? "Créez un mot de passe" : "Create a password"}
                       type="password"
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Country *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "Pays *" : "Country *"}
+                    </label>
                     <input
                       value={formData.country}
                       onChange={e => setFormData(p => ({ ...p, country: e.target.value }))}
-                      placeholder="Your country"
+                      placeholder={lang === "fr" ? "Votre pays" : "Your country"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
 
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginTop: 4 }}>Your platforms</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginTop: 4 }}>
+                    {lang === "fr" ? "Vos plateformes" : "Your platforms"}
+                  </div>
 
                   <div>
                     <input
@@ -637,18 +663,28 @@ export default function AffiliationPage() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>How would you promote Trackit? *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr" ? "Comment comptez-vous promouvoir Trackit ? *" : "How would you promote Trackit? *"}
+                    </label>
                     <textarea
                       value={formData.why}
                       onChange={e => setFormData(p => ({ ...p, why: e.target.value }))}
-                      placeholder="I will promote Trackit on (YouTube, TikTok, blog, newsletter, community...) I will promote it by (detailed method...) I can bring approximately (how many users)..."
+                      placeholder={
+                        lang === "fr"
+                          ? "Je promouvrai Trackit sur (YouTube, TikTok, blog, newsletter, communauté...) Je le ferai en (méthode détaillée...) Je peux amener environ (nombre d'utilisateurs)..."
+                          : "I will promote Trackit on (YouTube, TikTok, blog, newsletter, community...) I will promote it by (detailed method...) I can bring approximately (how many users)..."
+                      }
                       rows={5}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", resize: "none" }}
                     />
                   </div>
 
                   <div>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>Phone number (include country code e.g. +33, +1) *</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
+                      {lang === "fr"
+                        ? "Numéro de téléphone (indicatif pays, ex. +33, +1) *"
+                        : "Phone number (include country code e.g. +33, +1) *"}
+                    </label>
                     <input
                       value={formData.phone}
                       onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
@@ -665,7 +701,11 @@ export default function AffiliationPage() {
                       onChange={e => setAgreed(e.target.checked)}
                       style={{ marginTop: 2 }}
                     />
-                    <span>By signing up, you agree to the Trackit Partner Agreement</span>
+                    <span>
+                      {lang === "fr"
+                        ? "En vous inscrivant, vous acceptez l'accord partenaire Trackit"
+                        : "By signing up, you agree to the Trackit Partner Agreement"}
+                    </span>
                   </label>
 
                   <button
@@ -713,11 +753,20 @@ export default function AffiliationPage() {
                       marginTop: 4
                     }}
                   >
-                    {submitting ? "Sending..." : "Submit application →"}
+                    {submitting
+                      ? lang === "fr"
+                        ? "Envoi en cours..."
+                        : "Sending..."
+                      : lang === "fr"
+                        ? "Envoyer la candidature →"
+                        : "Submit application →"}
                   </button>
 
                   <p style={{ fontSize: 12, color: "#7A7A7A", textAlign: "center", margin: 0 }}>
-                    Already have an account? <a href="#" style={{ color: "#0047FF", textDecoration: "none" }}>Sign in</a>
+                    {lang === "fr" ? "Vous avez déjà un compte ? " : "Already have an account? "}
+                    <a href="#" style={{ color: "#0047FF", textDecoration: "none" }}>
+                      {lang === "fr" ? "Se connecter" : "Sign in"}
+                    </a>
                   </p>
                 </div>
               </>
