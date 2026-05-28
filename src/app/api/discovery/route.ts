@@ -94,7 +94,8 @@ export async function POST(request: Request) {
   const { niche, platform, minFollowers, maxFollowers, minEngagement, gender } = await request.json();
   if (!niche) return NextResponse.json({ creators: [] });
 
-  const nicheNorm = niche.toLowerCase().split(" ")[0];
+  const nicheNorm = niche.toLowerCase().trim();
+  const nicheWords = nicheNorm.split(" ");
   const minF = minFollowers ? Number(minFollowers) : 0;
   const maxF = maxFollowers ? Number(maxFollowers) : 10000000;
   const minE = minEngagement ? Number(minEngagement) : 0;
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
     .from("creators_index")
     .select("*")
     .eq("platform", plat)
-    .contains("niches", [nicheNorm])
+    .or(nicheWords.map(w => `niches.cs.{${w}}`).join(","))
     .gte("followers", minF)
     .lte("followers", maxF)
     .gte("engagement_rate", minE)

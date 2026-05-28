@@ -984,17 +984,14 @@ export function PayoutsView({
                 : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
             </div>
           </div>
-          <button
-            type="button"
-            className="hero-cta-shopify hero-cta-compact"
-            disabled={!canUseStripeConnectPayouts(plan)}
-            onClick={() => {
-              if (!canUseStripeConnectPayouts(plan)) return;
-              alert(lang === "fr" ? "Connexion Stripe Connect — bientôt disponible." : "Stripe Connect setup — coming soon.");
-            }}
-          >
-            {lang === "fr" ? "Connecter Stripe" : "Connect Stripe"}
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: "#0047FF", borderRadius: 999, padding: "3px 10px", letterSpacing: "0.02em" }}>
+              {lang === "fr" ? "Bientôt" : "Coming Soon"}
+            </span>
+            <span style={{ fontSize: 11, color: "#9A9A9A" }}>
+              {lang === "fr" ? "Scale plan" : "Scale plan"}
+            </span>
+          </div>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>

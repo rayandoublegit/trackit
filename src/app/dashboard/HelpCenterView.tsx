@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { canUseDedicatedSupport, canUsePrioritySupport, type PlanTier } from "@/lib/plan-limits";
 
-const CALENDLY_URL = "https://calendly.com/trackit/15min";
 const SUPPORT_EMAIL = "support@trackit.app";
 
 const btnBlack: React.CSSProperties = {
@@ -963,13 +962,6 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
           : lang === "fr" ? "Envoyez-nous un message détaillé et nous répondrons sous 24h." : "Send us a detailed message and we'll get back within 24h.",
         action: lang === "fr" ? "Envoyer un email →" : "Send email →",
         href: `mailto:${SUPPORT_EMAIL}`,
-      },
-      {
-        icon: "📅",
-        title: lang === "fr" ? "Réserver un appel" : "Book a call",
-        text: lang === "fr" ? "Parlez directement avec le fondateur. 15 minutes, sans fioritures." : "Talk directly with the founder. 15 minutes, no fluff.",
-        action: lang === "fr" ? "Réserver →" : "Book call →",
-        href: CALENDLY_URL,
       },
     ],
     [lang, isDedicated, isPriority]
