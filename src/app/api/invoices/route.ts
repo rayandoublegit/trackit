@@ -35,6 +35,54 @@ function invoicePdfUrl(invoice: Stripe.Invoice): string | null {
   return invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null;
 }
 
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
+  "active",
+  "trialing",
+  "past_due",
+]);
+
+/** Next charge date: subscription period end, open invoice due date, or projected from last paid invoice. */
+async function resolveNextBillingDate(
+  stripe: Stripe,
+  customerId: string,
+  invoices: Stripe.Invoice[]
+): Promise<number | null> {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+  });
+
+  const activeSub = subscriptions.data.find((sub) =>
+    ACTIVE_SUBSCRIPTION_STATUSES.has(sub.status)
+  );
+  const subPeriodEnd = activeSub?.items?.data?.[0]?.current_period_end;
+  if (subPeriodEnd) {
+    return subPeriodEnd;
+  }
+
+  const openInvoice = invoices.find((inv) => inv.status === "open");
+  if (openInvoice?.due_date) return openInvoice.due_date;
+  if (openInvoice?.period_end) return openInvoice.period_end;
+
+  const lastPaid = invoices.find((inv) => inv.status === "paid");
+  if (lastPaid?.period_end && lastPaid.period_start) {
+    const cycleSeconds = lastPaid.period_end - lastPaid.period_start;
+    if (cycleSeconds > 0) {
+      const projected = lastPaid.period_end + cycleSeconds;
+      if (projected * 1000 > Date.now()) return projected;
+    }
+    return lastPaid.period_end;
+  }
+
+  const draftOrPending = invoices.find(
+    (inv) => inv.status === "draft" && (inv.amount_due ?? inv.total ?? 0) > 0
+  );
+  if (draftOrPending?.period_end) return draftOrPending.period_end;
+
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -77,7 +125,10 @@ export async function GET(request: NextRequest) {
     );
 
     if (!customerId) {
-      return NextResponse.json({ invoices: [] as InvoiceListItem[] });
+      return NextResponse.json({
+        invoices: [] as InvoiceListItem[],
+        nextBillingDate: null,
+      });
     }
 
     const all: Stripe.Invoice[] = [];
@@ -106,7 +157,13 @@ export async function GET(request: NextRequest) {
       }))
       .sort((a, b) => b.created - a.created);
 
-    return NextResponse.json({ invoices });
+    const nextBillingDate = await resolveNextBillingDate(
+      stripe,
+      customerId,
+      all
+    );
+
+    return NextResponse.json({ invoices, nextBillingDate });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to load invoices";
     console.error("invoices API:", message, err);

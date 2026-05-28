@@ -721,6 +721,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const [loading, setLoading] = useState<"growth" | "pro" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
+  const [planLoading, setPlanLoading] = useState(true);
   const [invoices, setInvoices] = useState<
     {
       id: string;
@@ -733,6 +734,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   >([]);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
+  const [nextBillingDate, setNextBillingDate] = useState<number | null>(null);
 
   const currency = lang === "fr" ? "eur" : "usd";
 
@@ -746,7 +748,8 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
         .select("plan")
         .eq("id", user.id)
         .maybeSingle();
-      if (data?.plan) setCurrentPlan(normalizePlan(data.plan));
+      setCurrentPlan(normalizePlan(data?.plan));
+      setPlanLoading(false);
     });
   }, []);
 
@@ -758,10 +761,14 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       .then(async (res) => {
         const data = (await res.json()) as {
           invoices?: typeof invoices;
+          nextBillingDate?: number | null;
           error?: string;
         };
         if (!res.ok) throw new Error(data.error ?? "Failed to load invoices");
-        if (!cancelled) setInvoices(data.invoices ?? []);
+        if (!cancelled) {
+          setInvoices(data.invoices ?? []);
+          setNextBillingDate(data.nextBillingDate ?? null);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -769,6 +776,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
             err instanceof Error ? err.message : "Failed to load invoices"
           );
           setInvoices([]);
+          setNextBillingDate(null);
         }
       })
       .finally(() => {
@@ -838,23 +846,49 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       <Card title={lang === "fr" ? "Plan actuel" : "Current plan"}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>{planDisplayName(currentPlan, lang)}</span>
+            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>
+              {planLoading
+                ? "…"
+                : planDisplayName(currentPlan, lang)}
+            </span>
             <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>
-              {currentPlan === "free"
-                ? lang === "fr" ? "Gratuit" : "Free"
-                : <>
-                    {formatCurrency(planMonthlyPrice(currentPlan), lang)}
-                    <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span>
-                  </>}
+              {planLoading ? (
+                <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
+                  {lang === "fr" ? "Chargement..." : "Loading..."}
+                </span>
+              ) : currentPlan === "free" ? (
+                <>
+                  {formatCurrency(0, lang)}
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>{lang === "fr" ? "/mois" : "/month"}</span>
+                </>
+              ) : (
+                <>
+                  {formatCurrency(planMonthlyPrice(currentPlan), lang)}
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>{lang === "fr" ? "/mois" : "/month"}</span>
+                </>
+              )}
             </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"} May 1, 2026</div>
+            {!planLoading && currentPlan !== "free" && (
+              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"}{" "}
+                {invoicesLoading
+                  ? lang === "fr"
+                    ? "Chargement..."
+                    : "Loading..."
+                  : nextBillingDate
+                    ? formatInvoiceDate(nextBillingDate)
+                    : lang === "fr"
+                      ? "—"
+                      : "—"}
+              </div>
+            )}
           </div>
           <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
             <button
               type="button"
               onClick={() => void startCheckout("growth")}
-              disabled={loading !== null || currentPlan === "basic" || currentPlan === "pro" || currentPlan === "scale"}
-              style={{ ...btnPrimary, opacity: currentPlan === "basic" || currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
+              disabled={planLoading || loading !== null || currentPlan !== "free"}
+              style={{ ...btnPrimary, opacity: planLoading || currentPlan !== "free" ? 0.5 : 1 }}
             >
               {loading === "growth"
                 ? lang === "fr" ? "Chargement..." : "Loading..."
@@ -863,8 +897,8 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
             <button
               type="button"
               onClick={() => void startCheckout("pro")}
-              disabled={loading !== null || currentPlan === "pro" || currentPlan === "scale"}
-              style={{ ...btnPrimary, background: "#1A1A1A", opacity: currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
+              disabled={planLoading || loading !== null || currentPlan === "pro" || currentPlan === "scale"}
+              style={{ ...btnPrimary, background: "#1A1A1A", opacity: planLoading || currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
             >
               {loading === "pro"
                 ? lang === "fr" ? "Chargement..." : "Loading..."

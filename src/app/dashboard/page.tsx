@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
@@ -67,7 +67,7 @@ function getSidebarSectionLabels(lang: "en" | "fr"): Record<Exclude<SidebarNavSe
   };
 }
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lang = useLang();
@@ -734,6 +734,14 @@ export default function DashboardPage() {
         {view === "notifications" && <NotificationsView isMobile={isMobile} onUnreadChange={setNotificationUnread} />}
       </main>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#FAFAFA" }} />}>
+      <DashboardPageContent />
+    </Suspense>
   );
 }
 
