@@ -80,7 +80,7 @@ async function scrapeNiche(niche: string, platform: "TikTok" | "Instagram") {
           last_scraped_at: new Date().toISOString(),
         };
       })
-      .filter(Boolean);
+      .filter((u): u is NonNullable<typeof u> => u !== null);
 
     if (upserts.length > 0) {
       await supabaseAdmin
