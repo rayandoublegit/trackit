@@ -107,7 +107,7 @@ export default function TrackitLanding() {
   feat_one_click_payouts: lang === "fr" ? "Paiements en un clic" : "One click payouts",
   feat_priority_support: lang === "fr" ? "Support prioritaire" : "Priority support",
   feat_email_support: lang === "fr" ? "Support par email" : "Email support",
-  feat_3_discoveries_day: lang === "fr" ? "3 découvertes de créateurs/jour" : "3 creator discoveries/day",
+  feat_3_discoveries_day: lang === "fr" ? "5 découvertes de créateurs/jour" : "5 creator discoveries/day",
   feat_1_ai_outreach_day: lang === "fr" ? "1 message IA/jour" : "1 AI outreach/day",
   feat_manual_send_only: lang === "fr" ? "Envoi manuel uniquement" : "Manual send only",
   feat_1_store: lang === "fr" ? "1 boutique Shopify" : "1 Shopify store",
