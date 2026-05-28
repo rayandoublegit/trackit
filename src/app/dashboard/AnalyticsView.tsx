@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
+import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -26,8 +27,9 @@ function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: "free" | "basic" | "pro"; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
+export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
   const isFree = plan === "free";
+  const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -179,7 +181,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                   <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th>
                   <Th sortable onClick={() => toggleSort("sales")}>{lang === "fr" ? "Ventes générées" : "Sales Driven"}</Th>
                   <Th sortable onClick={() => toggleSort("commission")}>{lang === "fr" ? "Commission payée" : "Commission Paid"}</Th>
-                  <Th sortable onClick={() => toggleSort("roi")}>{lang === "fr" ? "ROI" : "ROI"}</Th>
+                  <Th sortable onClick={() => hasAdvancedAnalytics ? toggleSort("roi") : undefined}>{lang === "fr" ? "ROI" : "ROI"}{!hasAdvancedAnalytics ? " 🔒" : ""}</Th>
                   <Th>{lang === "fr" ? "Statut" : "Status"}</Th>
                 </tr>
               </thead>
@@ -197,7 +199,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                     <td style={{ padding: "12px 8px", color: "#7A7A7A", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.platform}</td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.sales, lang)}</td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.roi.toFixed(1)}x</td>
+                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>{hasAdvancedAnalytics ? `${r.roi.toFixed(1)}x` : "—"}</td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
                 ))}
@@ -205,8 +207,17 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                   <tr>
                     <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
                       <span style={{ fontSize: 13, color: "#0047FF", fontWeight: 500 }}>
-                        {lang === "fr" ? "🔒 Passez à Basic pour voir tous vos créateurs →" : "🔒 Upgrade to Basic to unlock all creator data →"}
+                        {lang === "fr" ? "🔒 Passez à Growth pour voir tous vos créateurs →" : "🔒 Upgrade to Growth to unlock all creator data →"}
                       </span>
+                    </td>
+                  </tr>
+                )}
+                {!hasAdvancedAnalytics && !isFree && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
+                      <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", fontSize: 13, color: "#0047FF", fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+                        {lang === "fr" ? "🔒 Passez à Pro pour le suivi ROI et l'export CSV →" : "🔒 Upgrade to Pro for ROI tracking & CSV export →"}
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -217,12 +228,17 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}>
-            {totalRevenue > 0 ? (
+            {hasAdvancedAnalytics && totalRevenue > 0 ? (
               <>
                 <DonutChart lang={lang} netPct={Math.round((netRevenue / totalRevenue) * 100)} />
                 <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? `Taux de commission moyen : ${avgCommissionRate}%` : `Average commission rate: ${avgCommissionRate}%`}</p>
                 <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? `Revenus nets après commissions : ${formatCurrency(netRevenue, lang)}` : `Net revenue after commissions: ${formatCurrency(netRevenue, lang)}`}</p>
               </>
+            ) : !hasAdvancedAnalytics ? (
+              <div style={{ padding: 32, textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>{lang === "fr" ? "Analytiques avancées + ROI — Plan Pro" : "Advanced analytics + ROI — Pro plan"}</p>
+                <button type="button" style={btnPrimary} onClick={() => void onUpgradePro?.()}>{lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}</button>
+              </div>
             ) : (
               <ChartEmpty lang={lang} />
             )}
@@ -302,7 +318,7 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
   compare: boolean; setCompare: (v: boolean) => void;
   isMobile?: boolean;
   analyticsData?: any;
-  plan?: "free" | "basic" | "pro";
+  plan?: PlanTier;
   onUpgradePro?: () => void;
 }) {
   const ranges: { id: DateRange; label: string }[] = [
@@ -321,9 +337,9 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
           className="hero-cta-shopify-light hero-cta-compact"
           style={{ marginTop: 8 }}
           onClick={() => {
-            if (plan !== "pro") {
+            if (!canUseAdvancedAnalytics(plan as PlanTier)) {
               if (onUpgradePro) void onUpgradePro();
-              else alert(lang === "fr" ? "L'export CSV est disponible sur le plan Pro." : "CSV export is available on the Pro plan.");
+              else alert(lang === "fr" ? "L'export CSV et le ROI avancé sont disponibles sur le plan Pro." : "CSV export and advanced ROI are available on the Pro plan.");
               return;
             }
             if (!analyticsData) return;

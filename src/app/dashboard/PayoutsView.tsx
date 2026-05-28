@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  canUseAutoPayouts,
+  canUseManualPayouts,
+  canUseStripeConnectPayouts,
+  type PlanTier,
+} from "@/lib/plan-limits";
 import { formatCurrency } from "@/lib/useCurrency";
 import {
   formatPaymentLabel,
@@ -722,11 +728,15 @@ const payoutsBtnSecondary: React.CSSProperties = {
 export function PayoutsView({
   plan,
   onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
   isMobile,
   userId,
 }: {
-  plan: "free" | "basic" | "pro";
+  plan: PlanTier;
   onUpgrade: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   isMobile?: boolean;
   userId?: string;
 }) {
@@ -859,7 +869,7 @@ export function PayoutsView({
         </div>
       </div>
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : 56, position: "relative" }}>
-        {plan === "free" && (
+        {!canUseManualPayouts(plan as PlanTier) && (
           <div
             style={{
               position: "absolute",
@@ -887,7 +897,7 @@ export function PayoutsView({
             >
               <div style={{ fontSize: 32, marginBottom: 16 }}>🔒</div>
               <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", letterSpacing: "-0.03em" }}>
-                {lang === "fr" ? "Paiements disponibles sur Basic et Pro" : "Payouts available on Basic and Pro"}
+                {lang === "fr" ? "Paiements disponibles sur Growth et Pro" : "Payouts available on Growth and Pro"}
               </h3>
               <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                 {lang === "fr" ? "Passez à l'offre supérieure pour payer les commissions automatiquement" : "Upgrade to pay creator commissions automatically"}
@@ -897,7 +907,7 @@ export function PayoutsView({
                 onClick={() => void onUpgrade()}
                 style={{ ...payoutsBtnPrimary, width: "100%" }}
               >
-                {lang === "fr" ? "Passer à Basic →" : "Upgrade to Basic →"}
+                {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
               </button>
             </div>
           </div>
@@ -919,16 +929,28 @@ export function PayoutsView({
         <LiveSalesFeed isMobile={isMobile} />
 
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ flex: 1 }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+          {!canUseAutoPayouts(plan as PlanTier) && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
+                {lang === "fr" ? "Paiements auto — Plan Pro. " : "Auto payouts — Pro plan. "}
+                <button type="button" onClick={() => void (onUpgradePro ?? onUpgrade)()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                  {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
+                </button>
+              </p>
+            </div>
+          )}
+          <div style={{ flex: 1, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Paiement automatique mensuel" : "Monthly auto payout"}</div>
             <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement." : "On the 1st of every month, all creators with a positive balance are paid automatically."}</div>
           </div>
-          <label style={{ cursor: "pointer", display: "flex" }}>
+          <label style={{ cursor: canUseAutoPayouts(plan as PlanTier) ? "pointer" : "not-allowed", display: "flex", opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
             <input
               type="checkbox"
-              checked={autoPayoutMonthly}
+              checked={autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier)}
+              disabled={!canUseAutoPayouts(plan as PlanTier)}
               onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                if (!canUseAutoPayouts(plan as PlanTier)) return;
                 const val = e.target.checked;
                 setAutoPayoutMonthly(val);
                 const { supabase } = await import("@/lib/supabase");
@@ -937,8 +959,42 @@ export function PayoutsView({
               }}
               style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
             />
-            <PayoutsToggle on={autoPayoutMonthly} />
+            <PayoutsToggle on={autoPayoutMonthly && canUseAutoPayouts(plan)} />
           </label>
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+          {!canUseStripeConnectPayouts(plan) && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
+                {lang === "fr" ? "Paiements auto Stripe Connect — Plan Scale. " : "Stripe Connect auto payouts — Scale plan. "}
+                <button type="button" onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                  {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
+                </button>
+              </p>
+            </div>
+          )}
+          <div style={{ flex: 1, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
+              {lang === "fr" ? "Paiements automatiques (Stripe Connect)" : "Automatic payouts (Stripe Connect)"}
+            </div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+              {lang === "fr"
+                ? "Versez automatiquement vos créateurs via Stripe Connect dès qu'une commission est due."
+                : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="hero-cta-shopify hero-cta-compact"
+            disabled={!canUseStripeConnectPayouts(plan)}
+            onClick={() => {
+              if (!canUseStripeConnectPayouts(plan)) return;
+              alert(lang === "fr" ? "Connexion Stripe Connect — bientôt disponible." : "Stripe Connect setup — coming soon.");
+            }}
+          >
+            {lang === "fr" ? "Connecter Stripe" : "Connect Stripe"}
+          </button>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden" }}>
@@ -1039,8 +1095,8 @@ export function PayoutsView({
                   <button
                     type="button"
                     onClick={() => {
-                      if (plan === "free") {
-                        alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                      if (!canUseManualPayouts(plan as PlanTier)) {
+                        alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on the Growth plan and above.");
                         return;
                       }
                       const amount = creator.balance;

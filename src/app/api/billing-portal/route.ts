@@ -26,9 +26,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No Stripe customer found" }, { status: 404 });
     }
 
+    const configuration =
+      process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID ??
+      "bpc_1T5pKiFC3qsxzaqx37tUdyDM";
+
+    const base = (process.env.NEXT_PUBLIC_APP_URL ?? "https://trackit.app").replace(/\/$/, "");
+
     const session = await getStripe().billingPortal.sessions.create({
       customer: customers.data[0].id,
-      return_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://trackit.app"}/dashboard`,
+      return_url: `${base}/dashboard`,
+      configuration,
     });
 
     return NextResponse.json({ url: session.url });

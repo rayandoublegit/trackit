@@ -5,6 +5,11 @@ import { saveCampaign, getCampaigns } from "@/lib/db";
 import { notifyCampaignCreated } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  getMaxActiveCampaigns,
+  hasReachedCampaignLimit,
+  type PlanTier,
+} from "@/lib/plan-limits";
 import { formatCurrency } from "@/lib/useCurrency";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
@@ -50,8 +55,6 @@ const inputStyle: React.CSSProperties = {
   letterSpacing: "-0.02em", background: "#FFF",
 };
 
-type PlanTier = "free" | "basic" | "pro";
-
 function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
   const labels: Record<string, { en: string; fr: string }> = {
     Active: { en: "Active", fr: "Actif" },
@@ -65,10 +68,14 @@ function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
 export function CampaignsView({
   plan,
   onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
   isMobile,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   isMobile?: boolean;
 }) {
   const lang = useLang();
@@ -81,7 +88,11 @@ export function CampaignsView({
 
   const tryOpenNewCampaign = () => {
     if (plan === "free") {
-      alert(lang === "fr" ? "Les campagnes sont disponibles à partir du plan Basic." : "Campaigns are available on Basic plan and above.");
+      alert(lang === "fr" ? "Les campagnes sont disponibles à partir du plan Growth." : "Campaigns are available on the Growth plan and above.");
+      return;
+    }
+    if (hasReachedCampaignLimit(plan, campaigns.length)) {
+      setUpgradeModalOpen(true);
       return;
     }
     setModalOpen(true);
@@ -140,7 +151,7 @@ export function CampaignsView({
         </div>
         {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
         {upgradeModalOpen && (
-          <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
+          <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
         )}
       </>
     );
@@ -152,14 +163,30 @@ export function CampaignsView({
       <CampaignsList isMobile={isMobile} lang={lang} campaigns={campaigns} filter={filter} setFilter={setFilter} search={search} setSearch={setSearch} onView={setDetailId} onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))} />
       {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
       {upgradeModalOpen && (
-        <CampaignUpgradeModal onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} />
+        <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
       )}
     </>
   );
 }
 
-function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onUpgrade: () => void }) {
-  const lang = useLang();
+function CampaignUpgradeModal({
+  plan,
+  lang,
+  onClose,
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
+}: {
+  plan: PlanTier;
+  lang: "en" | "fr";
+  onClose: () => void;
+  onUpgrade: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
+}) {
+  const max = getMaxActiveCampaigns(plan);
+  const isGrowth = plan === "basic";
+  const isPro = plan === "pro";
   return (
     <div
       style={{
@@ -186,13 +213,43 @@ function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onU
         onClick={(e) => e.stopPropagation()}
       >
         <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-          Upgrade to create more campaigns
+          {isGrowth || isPro
+            ? lang === "fr"
+              ? "Limite de campagnes atteinte"
+              : "Campaign limit reached"
+            : lang === "fr"
+              ? "Créer plus de campagnes"
+              : "Upgrade to create more campaigns"}
         </h3>
         <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-          Free plan includes 1 campaign. Upgrade to Basic for unlimited campaigns.
+          {isPro
+            ? lang === "fr"
+              ? `Le plan Pro inclut ${max} campagnes actives. Passez à Scale pour des campagnes illimitées.`
+              : `Pro includes ${max} active campaigns. Upgrade to Scale for unlimited campaigns.`
+            : isGrowth
+              ? lang === "fr"
+                ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 10 campagnes.`
+                : `Growth includes ${max} active campaigns. Upgrade to Pro for up to 10 campaigns.`
+              : lang === "fr"
+                ? `Le plan gratuit inclut ${max} campagne. Passez à Growth pour jusqu'à 3 campagnes.`
+                : `Free includes ${max} campaign. Upgrade to Growth for up to 3 campaigns.`}
         </p>
-        <button type="button" onClick={() => void onUpgrade()} style={{ ...btnPrimary, width: "100%" }}>
-          {lang === "fr" ? `Passer à Basic ${formatCurrency(19, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(19, lang)}/mo →`}
+        <button
+          type="button"
+          onClick={() => void (isPro && onUpgradeScale ? onUpgradeScale() : isGrowth && onUpgradePro ? onUpgradePro() : onUpgrade())}
+          style={{ ...btnPrimary, width: "100%" }}
+        >
+          {isPro
+            ? lang === "fr"
+              ? `Passer à Scale ${formatCurrency(99, lang)}/mois →`
+              : `Upgrade to Scale ${formatCurrency(99, lang)}/mo →`
+            : isGrowth
+              ? lang === "fr"
+                ? `Passer à Pro ${formatCurrency(39, lang)}/mois →`
+                : `Upgrade to Pro ${formatCurrency(39, lang)}/mo →`
+              : lang === "fr"
+                ? `Passer à Growth ${formatCurrency(19, lang)}/mois →`
+                : `Upgrade to Growth ${formatCurrency(19, lang)}/mo →`}
         </button>
         <button
           type="button"

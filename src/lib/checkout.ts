@@ -1,4 +1,61 @@
 import { supabase } from "@/lib/supabase";
+import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+
+function priceIds(...keys: (string | undefined)[]): string[] {
+  return keys.filter((id): id is string => !!id && id.trim().length > 0);
+}
+
+const GROWTH_PRICE_IDS = () =>
+  priceIds(
+    process.env.STRIPE_GROWTH_PRICE_ID,
+    process.env.STRIPE_GROWTH_EUR_PRICE_ID,
+    process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID,
+    process.env.STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
+    process.env.STRIPE_BASIC_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID
+  );
+
+const PRO_PRICE_IDS = () =>
+  priceIds(
+    process.env.STRIPE_PRO2_PRICE_ID,
+    process.env.STRIPE_PRO2_EUR_PRICE_ID,
+    process.env.STRIPE_PRO2_ANNUAL_PRICE_ID,
+    process.env.STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
+    process.env.STRIPE_PRO_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID
+  );
+
+const SCALE_PRICE_IDS = () =>
+  priceIds(
+    process.env.STRIPE_SCALE_PRICE_ID,
+    process.env.STRIPE_SCALE_EUR_PRICE_ID,
+    process.env.STRIPE_SCALE_ANNUAL_PRICE_ID,
+    process.env.STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID
+  );
+
+/** Resolve Stripe price / checkout metadata to a profiles.plan value. */
+export function resolvePlanFromCheckout(
+  priceId: string | null | undefined,
+  metadataPlan?: string | null
+): PlanTier {
+  const meta = normalizePlan(metadataPlan);
+  if (meta !== "free") return meta;
+  if (!priceId) return "free";
+  if (SCALE_PRICE_IDS().includes(priceId)) return "scale";
+  if (PRO_PRICE_IDS().includes(priceId)) return "pro";
+  if (GROWTH_PRICE_IDS().includes(priceId)) return "basic";
+  return "basic";
+}
 
 // Growth ($19/mo)
 export function getGrowthPriceId(currency: "usd" | "eur" = "usd", annual = false): string {

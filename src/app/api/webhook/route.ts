@@ -1,6 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
+import { resolvePlanFromCheckout } from "@/lib/checkout";
+import {
+  clearSubscription,
+  getSubscriptionIdFromInvoice,
+  planFromSubscription,
+  syncFromStripeSubscription,
+  syncProfileSubscription,
+  resolveUserId,
+} from "@/lib/stripe-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +24,105 @@ const supabaseAdmin =
         process.env.SUPABASE_SERVICE_ROLE_KEY
       )
     : null;
+
+async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+  if (!stripe || !supabaseAdmin) return;
+
+  const userId =
+    session.metadata?.userId ??
+    session.client_reference_id ??
+    null;
+
+  const email =
+    session.customer_email ??
+    session.customer_details?.email ??
+    null;
+
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id ?? null;
+
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id ?? null;
+
+  let plan = resolvePlanFromCheckout(null, session.metadata?.plan);
+  let subscriptionStatus: "active" | "inactive" = "active";
+
+  if (subscriptionId) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (userId && !subscription.metadata?.userId) {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: {
+          ...subscription.metadata,
+          userId: String(userId),
+          plan: session.metadata?.plan ?? subscription.metadata?.plan ?? "",
+        },
+      });
+    }
+    await syncFromStripeSubscription(
+      supabaseAdmin,
+      stripe,
+      subscription,
+      userId
+    );
+    return;
+  }
+
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+    expand: ["data.price"],
+  });
+  const rawPrice = lineItems.data[0]?.price;
+  const priceId =
+    typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? null;
+  plan = resolvePlanFromCheckout(priceId, session.metadata?.plan);
+
+  if (session.mode !== "subscription") {
+    subscriptionStatus = "active";
+  }
+
+  console.log("Webhook: checkout completed", {
+    userId,
+    priceId,
+    plan,
+    mode: session.mode,
+  });
+
+  if (!userId) {
+    console.log("Webhook: checkout skipped — no userId");
+    return;
+  }
+
+  const usernameBase = email?.split("@")[0]?.trim() || "founder";
+
+  const { data: existing } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!existing) {
+    await supabaseAdmin.from("profiles").insert({
+      id: userId,
+      username: usernameBase,
+      plan,
+      subscription_status: subscriptionStatus,
+      subscription_active: plan !== "free",
+      stripe_customer_id: customerId,
+      stripe_subscription_id: subscriptionId,
+    });
+    return;
+  }
+
+  await syncProfileSubscription(supabaseAdmin, userId, {
+    plan,
+    subscriptionStatus,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscriptionId,
+  });
+}
 
 export async function POST(request: Request) {
   if (!stripe || !supabaseAdmin) {
@@ -51,74 +159,73 @@ export async function POST(request: Request) {
 
   console.log("Webhook: event type", event.type);
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    console.log(
-      "Webhook: session",
-      JSON.stringify(session.metadata ?? null)
-    );
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await handleCheckoutCompleted(session);
+        break;
+      }
 
-    const userId = session.metadata?.userId
-      ? String(session.metadata.userId)
-      : null;
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await syncFromStripeSubscription(supabaseAdmin, stripe, subscription);
+        break;
+      }
 
-    const email =
-      session.customer_email ??
-      session.customer_details?.email ??
-      null;
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await clearSubscription(supabaseAdmin, stripe, subscription);
+        break;
+      }
 
-    const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
-      expand: ["data.price"],
-    });
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId = getSubscriptionIdFromInvoice(invoice);
+        if (subId) {
+          const subscription = await stripe.subscriptions.retrieve(subId);
+          await syncFromStripeSubscription(supabaseAdmin, stripe, subscription);
+        }
+        break;
+      }
 
-    const rawPrice = lineItems.data[0]?.price;
-    const priceId =
-      typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? null;
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        const subId = getSubscriptionIdFromInvoice(invoice);
+        if (!subId) break;
+        const subscription = await stripe.subscriptions.retrieve(subId);
+        const userId = await resolveUserId({
+          supabase: supabaseAdmin,
+          stripe,
+          subscription,
+        });
+        if (!userId) break;
+        const plan =
+          subscription.status === "canceled"
+            ? "free"
+            : planFromSubscription(subscription);
+        await syncProfileSubscription(supabaseAdmin, userId, {
+          plan,
+          subscriptionStatus: "past_due",
+          stripeCustomerId:
+            typeof subscription.customer === "string"
+              ? subscription.customer
+              : subscription.customer?.id,
+          stripeSubscriptionId: subscription.id,
+        });
+        break;
+      }
 
-    console.log("Webhook: priceId", priceId);
-
-    const basicId = process.env.STRIPE_BASIC_PRICE_ID;
-    const proId = process.env.STRIPE_PRO_PRICE_ID;
-
-    const plan =
-      priceId && proId && priceId === proId
-        ? "pro"
-        : "basic";
-
-    console.log("Webhook: plan mapped to", plan);
-    console.log("Webhook: userId", userId);
-
-    if (userId) {
-      const usernameBase =
-        email?.split("@")[0]?.trim() || "founder";
-
-      const { data: existing } = await supabaseAdmin
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      const { error: profileError } = existing
-        ? await supabaseAdmin
-            .from("profiles")
-            .update({
-              plan,
-              subscription_status: "active",
-            })
-            .eq("id", userId)
-        : await supabaseAdmin.from("profiles").insert({
-            id: userId,
-            username: usernameBase,
-            plan,
-            subscription_status: "active",
-          });
-
-      console.log("Webhook: profile create/update result", profileError);
-    } else {
-      console.log(
-        "Webhook: upsert skipped — no userId in session.metadata"
-      );
+      default:
+        break;
     }
+  } catch (err) {
+    console.error("Webhook handler error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Webhook handler failed" },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });

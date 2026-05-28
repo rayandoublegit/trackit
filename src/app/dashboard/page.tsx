@@ -11,6 +11,24 @@ import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
 import { OutreachHistorySection } from "./OutreachView";
+import { getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import {
+  canAddAnotherShopifyStore,
+  canBulkImportTemplatesCsv,
+  canChangeShopifyStore,
+  canCreateTemplates,
+  canImportTemplates,
+  canUseAutoFollowUp,
+  canUseAutomationWorkflows,
+  canUseFullAutomationAgent,
+  canUseShopify,
+  canUseWhiteLabelOutreach,
+  isGrowthOrAbove,
+  isScalePlan,
+  maxShopifyStores,
+  normalizePlan,
+  type PlanTier,
+} from "@/lib/plan-limits";
 import { AddPaymentMethodModal, LiveSalesFeed, PayoutsView, PayoutsWorkspacePaymentCard } from "./PayoutsView";
 import { getDefaultPaymentMethod, usePaymentMethods } from "./usePaymentMethods";
 import { FeedbackView } from "./FeedbackView";
@@ -51,6 +69,7 @@ function getSidebarSectionLabels(lang: "en" | "fr"): Record<Exclude<SidebarNavSe
 
 export default function DashboardPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const lang = useLang();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null>(null);
@@ -62,11 +81,12 @@ export default function DashboardPage() {
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
-  const plan = profile?.plan || "free";
+  const plan = normalizePlan(profile?.plan);
   const isFree = plan === "free";
   const isBasic = plan === "basic";
   const isPro = plan === "pro";
-  const canUseBasicFeatures = isBasic || isPro;
+  const isScale = isScalePlan(plan);
+  const canUseBasicFeatures = isGrowthOrAbove(plan);
   const [notificationUnread, setNotificationUnread] = useState(0);
   const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
@@ -183,7 +203,7 @@ export default function DashboardPage() {
           avatar_url,
           business_name: profileData.business_name,
           shopify_store: profileData.shopify_store ?? null,
-          plan: profileData.plan || "free",
+          plan: normalizePlan(profileData.plan),
         });
       } catch (e) {
         console.error("Dashboard load error:", e);
@@ -192,6 +212,39 @@ export default function DashboardPage() {
       }
     });
   }, [router]);
+
+  useEffect(() => {
+    if (!user?.id || loading || searchParams.get("upgraded") !== "true") return;
+    const client = supabase;
+    if (!client) return;
+
+    let cancelled = false;
+    const refreshPlan = async () => {
+      const { data } = await client
+        .from("profiles")
+        .select("plan, subscription_status")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setProfile((prev) =>
+        prev ? { ...prev, plan: normalizePlan(data.plan) } : prev
+      );
+    };
+
+    void refreshPlan();
+    const t1 = window.setTimeout(() => void refreshPlan(), 2000);
+    const t2 = window.setTimeout(() => void refreshPlan(), 5000);
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("upgraded");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [user?.id, loading, searchParams]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -256,6 +309,18 @@ export default function DashboardPage() {
 
   const handleUpgradeBasic = useCallback(() => void handleCheckout("basic"), [handleCheckout]);
   const handleUpgradePro = useCallback(() => void handleCheckout("pro"), [handleCheckout]);
+  const handleUpgradeScale = useCallback(async () => {
+    try {
+      const isEur =
+        (typeof window !== "undefined" &&
+          (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr")
+            ? "fr"
+            : "en")) === "fr";
+      await handleUpgrade(getScalePriceId(isEur ? "eur" : "usd"));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not start checkout");
+    }
+  }, []);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
@@ -463,16 +528,20 @@ export default function DashboardPage() {
                 </span>
                 <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
                   {lang === "fr"
-                    ? plan === "pro"
-                      ? "Plan Pro"
-                      : plan === "basic"
-                        ? "Plan Basic"
-                        : "Plan gratuit"
-                    : plan === "pro"
-                      ? "Pro Plan"
-                      : plan === "basic"
-                        ? "Basic Plan"
-                        : "Free Plan"}
+                    ? isScale
+                      ? "Plan Scale"
+                      : plan === "pro"
+                        ? "Plan Pro"
+                        : plan === "basic"
+                          ? "Plan Growth"
+                          : "Plan gratuit"
+                    : isScale
+                      ? "Scale Plan"
+                      : plan === "pro"
+                        ? "Pro Plan"
+                        : plan === "basic"
+                          ? "Growth Plan"
+                          : "Free Plan"}
                 </span>
                 {storeName && (
                   <span style={{ fontSize: 12, color: "#0047FF", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -556,7 +625,8 @@ export default function DashboardPage() {
           <button
             type="button"
             onClick={() => {
-              if (plan === "pro") setView("settings");
+              if (isScale) setView("settings");
+              else if (plan === "pro") void handleUpgradeScale();
               else if (plan === "basic") void handleUpgradePro();
               else void handleUpgradeBasic();
             }}
@@ -580,17 +650,29 @@ export default function DashboardPage() {
         {view === "discovery" && (
           <DiscoveryView
             isMobile={isMobile}
-            plan={plan as "free" | "basic" | "pro"}
+            plan={plan}
             onUpgrade={handleUpgradeBasic}
+            onUpgradePro={handleUpgradePro}
+            onUpgradeScale={handleUpgradeScale}
           />
         )}
-        {view === "creators" && <CreatorsView isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} />}
+        {view === "creators" && (
+          <CreatorsView
+            isMobile={isMobile}
+            plan={plan}
+            onUpgrade={handleUpgradeBasic}
+            onUpgradePro={handleUpgradePro}
+            onUpgradeScale={handleUpgradeScale}
+          />
+        )}
         {view === "campaigns" && (
-          canUseBasicFeatures ? (
-            <CampaignsView isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} onUpgrade={handleUpgradeBasic} />
-          ) : (
-            <UpgradeGate feature="Campaigns" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
-          )
+          <CampaignsView
+            isMobile={isMobile}
+            plan={plan}
+            onUpgrade={handleUpgradeBasic}
+            onUpgradePro={handleUpgradePro}
+            onUpgradeScale={handleUpgradeScale}
+          />
         )}
         {view === "affiliates" && (
           canUseBasicFeatures ? (
@@ -602,40 +684,53 @@ export default function DashboardPage() {
         {view === "outreach" && (
           <OutreachView
             isMobile={isMobile}
-            plan={plan as "free" | "basic" | "pro"}
+            plan={plan}
+            onUpgradePro={handleUpgradePro}
+            onUpgradeScale={handleUpgradeScale}
             onNavigateToBilling={() => {
               if (plan === "free") void handleUpgradeBasic();
+              else if (plan === "basic") void handleUpgradePro();
               else setView("settings");
             }}
           />
         )}
         {view === "payouts" && user && (
           canUseBasicFeatures ? (
-            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} onUpgrade={handleUpgradeBasic} />
+            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
             <UpgradeGate feature="Payouts" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
         )}
         {view === "analytics" && user && (
           canUseBasicFeatures ? (
-            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan as "free" | "basic" | "pro"} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
+            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
         )}
-        {view === "integrations" && <IntegrationsView isMobile={isMobile} user={user} shopifyStore={gettingStarted.shopify ? shopifyStore : null} />}
+        {view === "integrations" && (
+          <IntegrationsView
+            isMobile={isMobile}
+            user={user}
+            plan={plan}
+            shopifyStore={gettingStarted.shopify ? shopifyStore : null}
+            onUpgrade={handleUpgradeBasic}
+            onUpgradePro={handleUpgradePro}
+            onUpgradeScale={handleUpgradeScale}
+          />
+        )}
         {view === "automation" && (
-          canUseBasicFeatures ? (
-            <AutomationView isMobile={isMobile} />
+          canUseAutomationWorkflows(plan) ? (
+            <AutomationView isMobile={isMobile} plan={plan} onUpgradeScale={handleUpgradeScale} />
           ) : (
-            <UpgradeGate feature="Automation" requiredPlan="Basic" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+            <UpgradeGate feature="Automation" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
           )
         )}
         {view === "settings" && user && (
           <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
         )}
         {view === "feedback" && <FeedbackView isMobile={isMobile} />}
-        {view === "help" && <HelpCenterView isMobile={isMobile} />}
+        {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
         {view === "notifications" && <NotificationsView isMobile={isMobile} onUnreadChange={setNotificationUnread} />}
       </main>
     </div>
@@ -791,7 +886,7 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user }: { full
   );
 }
 
-type OutreachPanel = "import" | "create" | "send" | "seeTemplates" | null;
+type OutreachPanel = "import" | "importCsv" | "create" | "send" | "seeTemplates" | null;
 
 type OutreachTemplate = {
   id: string;
@@ -889,10 +984,14 @@ function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: 
 function OutreachView({
   plan,
   onNavigateToBilling,
+  onUpgradePro,
+  onUpgradeScale,
   isMobile,
 }: {
-  plan: "free" | "basic" | "pro";
+  plan: PlanTier;
   onNavigateToBilling: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   isMobile?: boolean;
 }) {
   const lang = useLang();
@@ -901,6 +1000,7 @@ function OutreachView({
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [whiteLabel, setWhiteLabel] = useState(false);
 
   const closePanel = () => setPanel(null);
 
@@ -923,24 +1023,41 @@ function OutreachView({
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
-            if (plan === "free") {
+            if (!canImportTemplates(plan)) {
               setUpgradeMsg(lang === "fr"
-                ? "🔒 Modèles — Plan Basic requis.\n\nAccédez à vos meilleurs templates et réutilisez-les sur tous vos créateurs.\n\nPassez à Basic →"
-                : "🔒 Templates — Basic plan required.\n\nAccess your best templates and reuse them across all your creators.\n\nUpgrade to Basic →");
+                ? "🔒 Modèles — Plan Growth requis.\n\nAccédez à vos meilleurs templates et réutilisez-les sur tous vos créateurs.\n\nPassez à Growth →"
+                : "🔒 Templates — Growth plan required.\n\nAccess your best templates and reuse them across all your creators.\n\nUpgrade to Growth →");
               return;
             }
             setPanel("seeTemplates");
           }}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
-            if (plan === "free") {
+            if (!canImportTemplates(plan)) {
               setUpgradeMsg(lang === "fr"
-                ? "🔒 Import de modèles — Plan Basic requis.\n\nImportez vos meilleurs templates en un clic et réutilisez-les sur tous vos créateurs. Fini de réécrire depuis zéro.\n\nPassez à Basic →"
-                : "🔒 Template import — Basic plan required.\n\nImport your best-performing templates and reuse them across all your creators. Stop writing from scratch.\n\nUpgrade to Basic →");
+                ? "🔒 Import de modèles — Plan Growth requis.\n\nImportez vos meilleurs templates en un clic.\n\nPassez à Growth →"
+                : "🔒 Template import — Growth plan required.\n\nImport your best-performing templates in one click.\n\nUpgrade to Growth →");
               return;
             }
             setPanel("import");
           }}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanel("create")}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+            if (!canBulkImportTemplatesCsv(plan)) {
+              setUpgradeMsg(lang === "fr"
+                ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez tous vos modèles d'un coup.\n\nPassez à Pro →"
+                : "🔒 Bulk CSV import — Pro plan required.\n\nImport all your templates at once.\n\nUpgrade to Pro →");
+              return;
+            }
+            setPanel("importCsv");
+          }}>{lang === "fr" ? "Import CSV" : "Import CSV"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+            if (!canCreateTemplates(plan)) {
+              setUpgradeMsg(lang === "fr"
+                ? "🔒 Créer un modèle — Plan Growth requis.\n\nPassez à Growth →"
+                : "🔒 Create template — Growth plan required.\n\nUpgrade to Growth →");
+              return;
+            }
+            setPanel("create");
+          }}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
           <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
         </div>
       } />
@@ -951,24 +1068,58 @@ function OutreachView({
           </div>
         )}
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: isMobile ? "wrap" : undefined, gap: isMobile ? 8 : undefined }}>
+        {canUseWhiteLabelOutreach(plan) && (
+          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: isMobile ? "wrap" : undefined }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                {lang === "fr" ? "Outreach white-label" : "White-label outreach"}
+              </div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                {lang === "fr"
+                  ? "Retirez la marque Trackit de vos messages et relances."
+                  : "Remove Trackit branding from your messages and follow-ups."}
+              </div>
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <span style={{ fontSize: 13, color: "#7A7A7A" }}>{whiteLabel ? (lang === "fr" ? "Activé" : "On") : (lang === "fr" ? "Désactivé" : "Off")}</span>
+              <Toggle on={whiteLabel} onChange={() => setWhiteLabel((v) => !v)} />
+            </label>
+          </div>
+        )}
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20, position: "relative" }}>
+          {!canUseAutoFollowUp(plan) && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.88)", backdropFilter: "blur(2px)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+              <div style={{ textAlign: "center", maxWidth: 320 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>
+                  {lang === "fr" ? "Relances automatiques — Pro" : "Automated follow-ups — Pro"}
+                </p>
+                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>
+                  {lang === "fr" ? "Passez à Pro pour programmer des relances automatiques." : "Upgrade to Pro to schedule automatic follow-ups."}
+                </p>
+                <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => void onUpgradePro?.()}>
+                  {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
+                </button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: isMobile ? "wrap" : undefined, gap: isMobile ? 8 : undefined, opacity: canUseAutoFollowUp(plan) ? 1 : 0.5 }}>
             <div>
               <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>{lang === "fr" ? "Relance automatique" : "Automated follow-up"}</h3>
               <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>{lang === "fr" ? "Votre prochaine relance est dans 3 jours" : "Your next follow-up is in 3 days"}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
-              <Toggle on onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
+              <button type="button" style={btnSecondary} disabled={!canUseAutoFollowUp(plan)} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
+              <Toggle on={canUseAutoFollowUp(plan)} onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
             </div>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, opacity: canUseAutoFollowUp(plan) ? 1 : 0.5 }}>
             {[
               { day: lang === "fr" ? "JOUR 1" : "DAY 1", label: lang === "fr" ? "Message initial" : "Initial message" },
               { day: lang === "fr" ? "JOUR 3" : "DAY 3", label: lang === "fr" ? "Relance douce" : "Soft follow-up" },
               { day: lang === "fr" ? "JOUR 7" : "DAY 7", label: lang === "fr" ? "Relance finale" : "Final follow-up" },
             ].map((step, i) => (
-              <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16, opacity: 0.6, cursor: "default" }}>
+              <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16, opacity: canUseAutoFollowUp(plan) ? 0.6 : 0.35, cursor: "default" }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>{step.day}</div>
                 <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{step.label}</div>
               </div>
@@ -985,6 +1136,16 @@ function OutreachView({
           onImport={(t) => {
             addTemplate({ ...t, imported: true });
             showToast(`Imported template "${t.name}"`);
+            closePanel();
+          }}
+        />
+      )}
+      {panel === "importCsv" && (
+        <BulkImportTemplatesPanel
+          onClose={closePanel}
+          onImportMany={(items) => {
+            items.forEach((t) => addTemplate({ ...t, imported: true }));
+            showToast(lang === "fr" ? `${items.length} modèles importés ✓` : `${items.length} templates imported ✓`);
             closePanel();
           }}
         />
@@ -1097,6 +1258,84 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
         readOnly={!raw}
         style={{ ...panelInputStyle, resize: "vertical", minHeight: 280, lineHeight: 1.5, background: raw ? "#FFFFFF" : "#FAFAFA" }}
       />
+    </OutreachPanelShell>
+  );
+}
+
+function BulkImportTemplatesPanel({
+  onClose,
+  onImportMany,
+}: {
+  onClose: () => void;
+  onImportMany: (items: Omit<OutreachTemplate, "id" | "imported">[]) => void;
+}) {
+  const lang = useLang();
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const parseCsv = (text: string): Omit<OutreachTemplate, "id" | "imported">[] => {
+    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const idx = (key: string) => headers.indexOf(key);
+    const nameI = idx("name");
+    const subjectI = idx("subject");
+    const openingI = idx("opening");
+    const bodyI = idx("body");
+    const ctaI = idx("cta");
+    if (bodyI === -1 && openingI === -1) return [];
+    return lines.slice(1).map((line) => {
+      const cols = line.split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+      const name = nameI >= 0 ? cols[nameI] : "";
+      const subject = subjectI >= 0 ? cols[subjectI] : "";
+      const opening = openingI >= 0 ? cols[openingI] : "";
+      const body = bodyI >= 0 ? cols[bodyI] : "";
+      const cta = ctaI >= 0 ? cols[ctaI] : "";
+      const fallbackName = name || subject || opening || body.slice(0, 40) || "Imported template";
+      return { name: fallbackName.slice(0, 48), subject, opening, body, cta };
+    }).filter((t) => t.opening.trim() || t.body.trim());
+  };
+
+  const handleFile = (file: File) => {
+    setFileName(file.name);
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const items = parseCsv(text);
+      if (items.length === 0) {
+        setError(lang === "fr" ? "CSV invalide. Colonnes requises : name, subject, opening, body, cta" : "Invalid CSV. Required columns: name, subject, opening, body, cta");
+        return;
+      }
+      onImportMany(items);
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <OutreachPanelShell
+      title={lang === "fr" ? "Import CSV en masse" : "Bulk CSV import"}
+      subtitle={lang === "fr" ? "Importez plusieurs modèles depuis un fichier CSV." : "Import multiple templates from a CSV file."}
+      onClose={onClose}
+    >
+      <div
+        style={{ border: "2px dashed #E5E5E5", borderRadius: 12, padding: 32, textAlign: "center", background: "#FAFAFA", marginBottom: 12 }}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          const f = e.dataTransfer.files[0];
+          if (f) void handleFile(f);
+        }}
+      >
+        <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Glissez votre CSV ici" : "Drag and drop your CSV"}</p>
+        <label style={{ fontSize: 13, color: "#0047FF", cursor: "pointer" }}>
+          {lang === "fr" ? "ou parcourir" : "or browse"}
+          <input type="file" accept=".csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+        </label>
+        {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
+      </div>
+      <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>Columns: name, subject, opening, body, cta</p>
+      {error && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 8 }}>{error}</p>}
     </OutreachPanelShell>
   );
 }
@@ -1440,15 +1679,48 @@ function SendOutreachPanel({
 }
 
 
-function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean; user?: User | null; shopifyStore?: string | null }) {
+function IntegrationsView({
+  isMobile,
+  user,
+  shopifyStore,
+  plan = "free",
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
+}: {
+  isMobile?: boolean;
+  user?: User | null;
+  shopifyStore?: string | null;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
+}) {
   const lang = useLang();
   const [shopDomain, setShopDomain] = useState("");
   const [shopError, setShopError] = useState("");
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
+  const [connectedStores, setConnectedStores] = useState<string[]>([]);
 
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
+  const storeLimit = maxShopifyStores(plan);
+  const isMultiStore = isScalePlan(plan);
+
+  useEffect(() => {
+    if (!user?.id || !supabase) return;
+    void supabase
+      .from("shopify_stores")
+      .select("shop_domain")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        const domains = (data ?? [])
+          .map((r) => r.shop_domain as string)
+          .filter(Boolean);
+        if (domains.length > 0) setConnectedStores(domains);
+      });
+  }, [user?.id, connectedShop, shopifyStore]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1466,6 +1738,24 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
   }, [lang]);
 
   const handleShopifyConnect = () => {
+    if (!canUseShopify(plan)) {
+      void onUpgrade?.();
+      return;
+    }
+    const storeCount = Math.max(
+      connectedStores.length,
+      activeShop ? 1 : 0
+    );
+    if (!canAddAnotherShopifyStore(plan, storeCount) && !changingStore) {
+      setShopError(
+        lang === "fr"
+          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Scale pour jusqu'à 3 boutiques.`
+          : `Store limit of ${storeLimit} reached. Upgrade to Scale for up to 3 stores.`
+      );
+      if (plan === "pro") void onUpgradeScale?.();
+      else if (plan === "basic") void onUpgradePro?.();
+      return;
+    }
     if (!shopDomain.trim()) {
       setShopError("Please enter your store name");
       return;
@@ -1533,17 +1823,68 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
                           {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
                         </div>
                         <div style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setChangingStore(true);
-                            setShopDomain(activeShop?.replace(/\.myshopify\.com$/, "") || "");
-                            setShopError("");
-                          }}
-                          style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
-                        >
-                          {lang === "fr" ? "Changer de boutique" : "Change my store"}
-                        </button>
+                        {isMultiStore && connectedStores.length > 0 && (
+                          <div style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 6 }}>
+                              {lang === "fr"
+                                ? `${connectedStores.length}/${storeLimit} boutiques connectées`
+                                : `${connectedStores.length}/${storeLimit} stores connected`}
+                            </div>
+                            {connectedStores.map((domain) => (
+                              <div key={domain} style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 4 }}>
+                                {domain}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {canAddAnotherShopifyStore(
+                          plan,
+                          Math.max(connectedStores.length, activeShop ? 1 : 0)
+                        ) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setChangingStore(true);
+                              setShopDomain("");
+                              setShopError("");
+                            }}
+                            style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
+                          >
+                            {isMultiStore
+                              ? lang === "fr"
+                                ? "Ajouter une boutique"
+                                : "Add another store"
+                              : lang === "fr"
+                                ? "Changer de boutique"
+                                : "Change my store"}
+                          </button>
+                        ) : canChangeShopifyStore(plan) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setChangingStore(true);
+                              setShopDomain(activeShop?.replace(/\.myshopify\.com$/, "") || "");
+                              setShopError("");
+                            }}
+                            style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
+                          >
+                            {lang === "fr" ? "Changer de boutique" : "Change my store"}
+                          </button>
+                        ) : plan === "basic" ? (
+                          <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                            {lang === "fr" ? "1 boutique sur Growth. " : "1 store on Growth. "}
+                            <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                              {lang === "fr" ? "Multi-boutiques sur Scale →" : "Multi-store on Scale →"}
+                            </button>
+                          </p>
+                        ) : plan === "pro" ? (
+                          <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                            {lang === "fr" ? "1 boutique sur Pro. " : "1 store on Pro. "}
+                            <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                              {lang === "fr" ? "Jusqu'à 3 boutiques sur Scale →" : "Up to 3 stores on Scale →"}
+                            </button>
+                          </p>
+                        ) : null}
                       </>
                     ) : (
                       <>
@@ -1588,17 +1929,36 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
   );
 }
 
-function AutomationView({ isMobile }: { isMobile?: boolean }) {
+function AutomationView({
+  isMobile,
+  plan = "free",
+  onUpgradeScale,
+}: {
+  isMobile?: boolean;
+  plan?: PlanTier;
+  onUpgradeScale?: () => void;
+}) {
   const lang = useLang();
+  const fullAgent = canUseFullAutomationAgent(plan);
+  const workflows = canUseAutomationWorkflows(plan);
+  const showComingSoon = !workflows;
+
   return (
     <>
       <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
             {lang === "fr" ? "Automatisation" : "Automation"}
-            <span style={{ fontSize: 13, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
-              {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
-            </span>
+            {showComingSoon && (
+              <span style={{ fontSize: 13, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
+                {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
+              </span>
+            )}
+            {fullAgent && (
+              <span style={{ fontSize: 13, fontWeight: 600, background: "#ECFDF5", color: "#15803D", padding: "4px 12px", borderRadius: 20, marginLeft: 10 }}>
+                {lang === "fr" ? "Agent complet" : "Full agent"}
+              </span>
+            )}
           </h1>
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
         </div>
@@ -1608,7 +1968,33 @@ function AutomationView({ isMobile }: { isMobile?: boolean }) {
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Créer un agent d'automatisation" : "Make an automation agent"}</h2>
             <p style={{ fontSize: 14, opacity: 0.9, letterSpacing: "-0.01em", margin: 0, marginBottom: 18 }}>{lang === "fr" ? "Assemblez des déclencheurs, des actions et des conditions comme des pièces de puzzle. Aucun code requis." : "Assemble triggers, actions, and conditions like puzzle pieces. No code required."}</p>
-            <button type="button" className="hero-cta-inverse hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Créer un agent" : "Build an agent"}</button>
+            <button
+              type="button"
+              className="hero-cta-inverse hero-cta-compact"
+              onClick={() => {
+                if (fullAgent) {
+                  alert(lang === "fr" ? "Agent d'automatisation — configuration bientôt disponible." : "Automation agent — setup coming soon.");
+                  return;
+                }
+                if (workflows) {
+                  void onUpgradeScale?.();
+                  return;
+                }
+                alert(lang === "fr" ? "Bientôt disponible" : "Coming soon");
+              }}
+            >
+              {fullAgent
+                ? lang === "fr"
+                  ? "Créer un agent"
+                  : "Build an agent"
+                : workflows
+                  ? lang === "fr"
+                    ? "Débloquer l'agent complet (Scale)"
+                    : "Unlock full agent (Scale)"
+                  : lang === "fr"
+                    ? "Créer un agent"
+                    : "Build an agent"}
+            </button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 36px)", gap: 6, flexShrink: 0 }}>
             {[0,1,2,3,4,5,6,7,8].map((i) => (
@@ -1627,7 +2013,16 @@ function AutomationView({ isMobile }: { isMobile?: boolean }) {
           ].map((row, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i < 3 ? "1px solid #F5F5F5" : "none" }}>
               <span style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{row}</span>
-              <Toggle on={false} onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
+              <Toggle
+                on={false}
+                onChange={() => {
+                  if (workflows) {
+                    alert(lang === "fr" ? "Workflow activé — configuration bientôt disponible." : "Workflow enabled — setup coming soon.");
+                    return;
+                  }
+                  alert(lang === "fr" ? "Bientôt disponible" : "Coming soon");
+                }}
+              />
             </div>
           ))}
         </div>

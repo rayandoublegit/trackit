@@ -8,6 +8,30 @@ import { PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
+import { getGrowthPriceId, getProPriceId, handleUpgrade } from "@/lib/checkout";
+import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+
+const GROWTH_MONTHLY = 19;
+const PRO_MONTHLY = 39;
+const SCALE_MONTHLY = 99;
+
+const STRIPE_BILLING_PORTAL_LOGIN_URL =
+  process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
+  "https://billing.stripe.com/p/login/7sY28r4L0bXp8x67ck0RG00";
+
+function planDisplayName(plan: PlanTier, lang: Lang): string {
+  if (plan === "scale") return "Scale";
+  if (plan === "pro") return "Pro";
+  if (plan === "basic") return "Growth";
+  return lang === "fr" ? "Gratuit" : "Free";
+}
+
+function planMonthlyPrice(plan: PlanTier): number {
+  if (plan === "scale") return SCALE_MONTHLY;
+  if (plan === "pro") return PRO_MONTHLY;
+  if (plan === "basic") return GROWTH_MONTHLY;
+  return 0;
+}
 
 type SettingsTab = "general" | "profile" | "team" | "billing" | "notifications" | "security" | "api";
 
@@ -21,6 +45,7 @@ type TeamMember = {
   status: "active" | "pending";
   lastActive?: string;
   isYou?: boolean;
+  avatarUrl?: string | null;
 };
 
 function roleLabel(role: TeamRole, lang: Lang): string {
@@ -265,7 +290,16 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
                 }}
               />
             )}
-            {tab === "team" && <TeamSettings isMobile={isMobile} />}
+            {tab === "team" && user && (
+              <TeamSettings
+                isMobile={isMobile}
+                userId={user.id}
+                email={user.email ?? ""}
+                fullName={profile?.full_name ?? ""}
+                username={profile?.username ?? ""}
+                avatarUrl={profile?.avatar_url ?? null}
+              />
+            )}
             {tab === "billing" && <BillingSettings isMobile={isMobile} />}
             {tab === "notifications" && <NotificationsSettings />}
             {tab === "security" && <SecuritySettings twoFa={twoFa} setTwoFa={setTwoFa} onDeleteAccount={() => setDeleteModalOpen(true)} />}
@@ -684,72 +718,185 @@ function ProfileSettings({
 
 function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const lang = useLang();
-  const [loading, setLoading] = useState(false);
-  const [currentPlan, setCurrentPlan] = useState("free");
+  const [loading, setLoading] = useState<"growth" | "pro" | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
+  const [invoices, setInvoices] = useState<
+    {
+      id: string;
+      created: number;
+      amount: number;
+      currency: string;
+      status: "Paid" | "Failed" | "Pending";
+      pdfUrl: string | null;
+    }[]
+  >([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [invoicesError, setInvoicesError] = useState<string | null>(null);
 
-  const handleUpgrade = async (plan: "basic" | "pro") => {
-    setLoading(true);
+  const currency = lang === "fr" ? "eur" : "usd";
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+    void client.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data } = await client
+        .from("profiles")
+        .select("plan")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.plan) setCurrentPlan(normalizePlan(data.plan));
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setInvoicesLoading(true);
+    setInvoicesError(null);
+    void fetch("/api/invoices")
+      .then(async (res) => {
+        const data = (await res.json()) as {
+          invoices?: typeof invoices;
+          error?: string;
+        };
+        if (!res.ok) throw new Error(data.error ?? "Failed to load invoices");
+        if (!cancelled) setInvoices(data.invoices ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setInvoicesError(
+            err instanceof Error ? err.message : "Failed to load invoices"
+          );
+          setInvoices([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInvoicesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const formatInvoiceDate = (unixSeconds: number) =>
+    new Date(unixSeconds * 1000).toLocaleDateString(
+      lang === "fr" ? "fr-FR" : "en-US",
+      { year: "numeric", month: "short", day: "numeric" }
+    );
+
+  const openBillingPortal = async () => {
+    const client = supabase;
+    setPortalLoading(true);
     try {
-      const { data: { user } } = await supabase!.auth.getUser();
-      const priceId = plan === "basic"
-        ? process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
-
-      const res = await fetch("/api/create-checkout", {
+      if (!client) {
+        window.location.href = STRIPE_BILLING_PORTAL_LOGIN_URL;
+        return;
+      }
+      const { data: { user } } = await client.auth.getUser();
+      if (!user?.id) {
+        window.location.href = STRIPE_BILLING_PORTAL_LOGIN_URL;
+        return;
+      }
+      const res = await fetch("/api/billing-portal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          priceId,
-          userId: user?.id,
-          email: user?.email,
-          cancelUrl: window.location.href
-        })
+        body: JSON.stringify({ userId: user.id }),
       });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (res.ok && data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      window.location.href = STRIPE_BILLING_PORTAL_LOGIN_URL;
     } catch (err) {
-      console.error("Checkout error:", err);
+      console.error("Billing portal error:", err);
+      window.location.href = STRIPE_BILLING_PORTAL_LOGIN_URL;
     } finally {
-      setLoading(false);
+      setPortalLoading(false);
     }
   };
 
-  const invoices = [
-    { date: "Apr 1, 2026", amount: 19, status: "Paid" as const },
-    { date: "Mar 1, 2026", amount: 19, status: "Paid" as const },
-    { date: "Feb 1, 2026", amount: 19, status: "Pending" as const },
-    { date: "Jan 1, 2026", amount: 19, status: "Failed" as const },
-  ];
+  const startCheckout = async (target: "growth" | "pro") => {
+    setLoading(target);
+    try {
+      const priceId =
+        target === "growth"
+          ? getGrowthPriceId(currency)
+          : getProPriceId(currency);
+      await handleUpgrade(priceId);
+    } catch (err) {
+      console.error("Checkout error:", err);
+      alert(err instanceof Error ? err.message : "Could not start checkout");
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
     <>
       <Card title={lang === "fr" ? "Plan actuel" : "Current plan"}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>Basic</span>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>{formatCurrency(19, lang)}<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
+            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>{planDisplayName(currentPlan, lang)}</span>
+            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>
+              {currentPlan === "free"
+                ? lang === "fr" ? "Gratuit" : "Free"
+                : <>
+                    {formatCurrency(planMonthlyPrice(currentPlan), lang)}
+                    <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span>
+                  </>}
+            </div>
             <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"} May 1, 2026</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
             <button
               type="button"
-              onClick={() => handleUpgrade("basic")}
-              disabled={loading}
-              style={btnPrimary}
+              onClick={() => void startCheckout("growth")}
+              disabled={loading !== null || currentPlan === "basic" || currentPlan === "pro" || currentPlan === "scale"}
+              style={{ ...btnPrimary, opacity: currentPlan === "basic" || currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
             >
-              {loading ? "Loading..." : `Basic ${formatCurrency(19, lang)}/mo →`}
+              {loading === "growth"
+                ? lang === "fr" ? "Chargement..." : "Loading..."
+                : `Growth ${formatCurrency(GROWTH_MONTHLY, lang)}/mo →`}
             </button>
             <button
               type="button"
-              onClick={() => handleUpgrade("pro")}
-              disabled={loading}
-              style={{ ...btnPrimary, background: "#1A1A1A" }}
+              onClick={() => void startCheckout("pro")}
+              disabled={loading !== null || currentPlan === "pro" || currentPlan === "scale"}
+              style={{ ...btnPrimary, background: "#1A1A1A", opacity: currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
             >
-              {loading ? "Loading..." : `Pro ${formatCurrency(99, lang)}/mo →`}
+              {loading === "pro"
+                ? lang === "fr" ? "Chargement..." : "Loading..."
+                : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
             </button>
           </div>
         </div>
-        <button type="button" style={{ background: "none", border: "none", padding: 0, marginTop: 14, fontSize: 12, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Annuler l'abonnement" : "Cancel subscription"}</button>
+        <button
+          type="button"
+          onClick={() => void openBillingPortal()}
+          disabled={portalLoading}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            marginTop: 14,
+            fontSize: 12,
+            color: "#9A9A9A",
+            cursor: portalLoading ? "wait" : "pointer",
+            fontFamily: "inherit",
+            letterSpacing: "-0.01em",
+            opacity: portalLoading ? 0.6 : 1,
+          }}
+        >
+          {portalLoading
+            ? lang === "fr"
+              ? "Ouverture du portail..."
+              : "Opening portal..."
+            : lang === "fr"
+              ? "Annuler l'abonnement"
+              : "Cancel subscription"}
+        </button>
       </Card>
 
       <Card title={lang === "fr" ? "Méthode de paiement" : "Payment method"}>
@@ -757,30 +904,66 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       </Card>
 
       <Card title={lang === "fr" ? "Historique des factures" : "Invoice history"}>
-        <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Date" : "Date"}</th>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Statut" : "Status"}</th>
-                <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((inv) => (
-                <tr key={inv.date} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                  <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{inv.date}</td>
-                  <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{formatCurrency(inv.amount, lang)}</td>
-                  <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={inv.status} /></td>
-                  <td style={{ padding: "12px 8px", textAlign: "right" }}>
-                    <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Télécharger PDF" : "Download PDF"}</button>
-                  </td>
+        {invoicesLoading ? (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+            {lang === "fr" ? "Chargement des factures..." : "Loading invoices..."}
+          </p>
+        ) : invoicesError ? (
+          <p style={{ fontSize: 13, color: "#C62828", margin: 0, letterSpacing: "-0.01em" }}>
+            {invoicesError}
+          </p>
+        ) : invoices.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Aucune facture pour le moment. Elles apparaîtront ici après votre premier paiement."
+              : "No invoices yet. They will appear here after your first payment."}
+          </p>
+        ) : (
+          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Date" : "Date"}</th>
+                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
+                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Statut" : "Status"}</th>
+                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => (
+                  <tr key={inv.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                    <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{formatInvoiceDate(inv.created)}</td>
+                    <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                      {new Intl.NumberFormat(lang === "fr" ? "fr-FR" : "en-US", {
+                        style: "currency",
+                        currency: inv.currency,
+                      }).format(inv.amount)}
+                    </td>
+                    <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={inv.status} /></td>
+                    <td style={{ padding: "12px 8px", textAlign: "right" }}>
+                      <button
+                        type="button"
+                        disabled={!inv.pdfUrl}
+                        onClick={() => {
+                          if (inv.pdfUrl) window.open(inv.pdfUrl, "_blank", "noopener,noreferrer");
+                        }}
+                        style={{
+                          ...btnSecondary,
+                          padding: "6px 12px",
+                          fontSize: 12,
+                          opacity: inv.pdfUrl ? 1 : 0.45,
+                          cursor: inv.pdfUrl ? "pointer" : "not-allowed",
+                        }}
+                      >
+                        {lang === "fr" ? "Télécharger PDF" : "Download PDF"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </>
   );
@@ -842,39 +1025,70 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
   );
 }
 
-function TeamSettings({ isMobile }: { isMobile?: boolean }) {
+function TeamSettings({
+  isMobile,
+  userId,
+  email,
+  fullName,
+  username,
+  avatarUrl,
+}: {
+  isMobile?: boolean;
+  userId: string;
+  email: string;
+  fullName: string;
+  username: string;
+  avatarUrl: string | null;
+}) {
   const lang = useLang();
-  const [members, setMembers] = useState<TeamMember[]>([
-    { id: "0", name: "You", email: "alex@trackit.app", role: "owner", status: "active", lastActive: "Active now", isYou: true },
-    { id: "1", name: "Jordan Lee", email: "jordan@company.com", role: "admin", status: "active", lastActive: "2 hours ago" },
-    { id: "2", name: "Sam Taylor", email: "sam@company.com", role: "editor", status: "active", lastActive: "Yesterday" },
-    { id: "3", name: "Morgan Kim", email: "morgan@company.com", role: "viewer", status: "active", lastActive: "3 days ago" },
-    { id: "4", name: "—", email: "finance@company.com", role: "billing", status: "pending" },
-  ]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<TeamRole>("editor");
 
   const assignableRoles: TeamRole[] = ["admin", "editor", "viewer", "billing"];
+  const teamInvitesEnabled = false;
+
+  useEffect(() => {
+    const displayName =
+      fullName.trim() ||
+      (username.trim() ? `@${username.trim()}` : "") ||
+      email.split("@")[0] ||
+      (lang === "fr" ? "Vous" : "You");
+
+    setMembers([
+      {
+        id: userId,
+        name: displayName,
+        email,
+        role: "owner",
+        status: "active",
+        lastActive: "Active now",
+        isYou: true,
+        avatarUrl,
+      },
+    ]);
+    setMembersLoading(false);
+  }, [userId, email, fullName, username, avatarUrl, lang]);
 
   const sendInvite = () => {
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) return;
-    if (members.some((m) => m.email.toLowerCase() === email)) return;
-    setMembers((list) => [
-      ...list,
-      { id: String(Date.now()), name: "—", email, role: inviteRole, status: "pending" },
-    ]);
+    if (!teamInvitesEnabled) {
+      window.alert(
+        lang === "fr"
+          ? "Les invitations d'équipe arrivent bientôt."
+          : "Team invites are coming soon."
+      );
+      return;
+    }
+    const normalized = inviteEmail.trim().toLowerCase();
+    if (!normalized || !normalized.includes("@")) return;
+    if (members.some((m) => m.email.toLowerCase() === normalized)) return;
     setInviteEmail("");
   };
 
-  const updateRole = (id: string, role: TeamRole) => {
-    if (role === "owner") return;
-    setMembers((list) => list.map((m) => (m.id === id ? { ...m, role } : m)));
-  };
+  const updateRole = (_id: string, _role: TeamRole) => {};
 
-  const removeMember = (id: string) => {
-    setMembers((list) => list.filter((m) => m.id !== id || m.isYou));
-  };
+  const removeMember = (_id: string) => {};
 
   const activeCount = members.filter((m) => m.status === "active").length;
   const pendingCount = members.filter((m) => m.status === "pending").length;
@@ -894,6 +1108,7 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="colleague@company.com"
                 style={inputStyle}
+                disabled={!teamInvitesEnabled}
               />
             </Field>
           </div>
@@ -903,6 +1118,7 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as TeamRole)}
                 style={inputStyle}
+                disabled={!teamInvitesEnabled}
               >
                 {assignableRoles.map((r) => (
                   <option key={r} value={r}>{roleLabel(r, lang)}</option>
@@ -910,10 +1126,22 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
               </select>
             </Field>
           </div>
-          <button type="button" style={{ ...btnPrimary, marginBottom: 16 }} onClick={sendInvite}>
+          <button
+            type="button"
+            style={{ ...btnPrimary, marginBottom: 16, opacity: teamInvitesEnabled ? 1 : 0.5 }}
+            disabled={!teamInvitesEnabled}
+            onClick={sendInvite}
+          >
             {lang === "fr" ? "Envoyer l'invitation" : "Send invite"}
           </button>
         </div>
+        {!teamInvitesEnabled && (
+          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Les invitations d'équipe seront disponibles prochainement."
+              : "Team invites will be available soon."}
+          </p>
+        )}
       </Card>
 
       <Card
@@ -923,6 +1151,11 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
             : `Team members (${activeCount} active${pendingCount ? `, ${pendingCount} pending` : ""})`
         }
       >
+        {membersLoading ? (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+            {lang === "fr" ? "Chargement de l'équipe..." : "Loading team..."}
+          </p>
+        ) : (
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
@@ -948,17 +1181,24 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
                           width: 36,
                           height: 36,
                           borderRadius: "50%",
-                          background: m.isYou ? "#0047FF" : "#EFEFEF",
-                          color: m.isYou ? "#FFF" : "#7A7A7A",
+                          background: m.avatarUrl ? "#EFEFEF" : m.isYou ? "#0047FF" : "#EFEFEF",
+                          color: m.isYou && !m.avatarUrl ? "#FFF" : "#7A7A7A",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           fontSize: 13,
                           fontWeight: 600,
                           flexShrink: 0,
+                          overflow: "hidden",
                         }}
                       >
-                        {m.isYou ? "You" : m.name !== "—" ? m.name.charAt(0) : "?"}
+                        {m.avatarUrl ? (
+                          <img src={m.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : m.name !== "—" ? (
+                          m.name.charAt(0).toUpperCase()
+                        ) : (
+                          "?"
+                        )}
                       </div>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>
@@ -1017,6 +1257,7 @@ function TeamSettings({ isMobile }: { isMobile?: boolean }) {
             </tbody>
           </table>
         </div>
+        )}
       </Card>
 
       <Card title={lang === "fr" ? "Permissions des rôles" : "Role permissions"}>

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { canUseDedicatedSupport, canUsePrioritySupport, type PlanTier } from "@/lib/plan-limits";
 
 const CALENDLY_URL = "https://calendly.com/trackit/15min";
 const SUPPORT_EMAIL = "support@trackit.app";
@@ -918,8 +919,10 @@ function GuideModal({ lang, guideId, onClose }: { lang: "en" | "fr"; guideId: st
   );
 }
 
-export function HelpCenterView({ isMobile }: { isMobile?: boolean }) {
+export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean; plan?: PlanTier }) {
   const lang = useLang();
+  const isDedicated = canUseDedicatedSupport(plan);
+  const isPriority = canUsePrioritySupport(plan);
   const [search, setSearch] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [openGuideId, setOpenGuideId] = useState<string | null>(null);
@@ -927,16 +930,37 @@ export function HelpCenterView({ isMobile }: { isMobile?: boolean }) {
   const supportCards = useMemo(
     () => [
       {
-        icon: "💬",
-        title: lang === "fr" ? "Chattez avec nous" : "Chat with us",
-        text: lang === "fr" ? "Obtenez une réponse en moins de 5 minutes de notre équipe." : "Get a reply in under 5 minutes from our team.",
-        action: lang === "fr" ? "Démarrer le chat →" : "Start chat →",
-        onClick: () => window.alert("Live chat coming soon — email us at support@trackit.app for now."),
+        icon: isDedicated ? "🎯" : isPriority ? "⚡" : "💬",
+        title: isDedicated
+          ? lang === "fr" ? "Support dédié" : "Dedicated support"
+          : isPriority
+            ? lang === "fr" ? "Support prioritaire" : "Priority support"
+            : lang === "fr" ? "Chattez avec nous" : "Chat with us",
+        text: isDedicated
+          ? (lang === "fr" ? "Gestionnaire dédié et réponse sous 1h — inclus sur Scale." : "Dedicated manager and replies within 1 hour — included on Scale.")
+          : isPriority
+            ? (lang === "fr" ? "Réponse prioritaire en moins de 2h — réservé au plan Pro." : "Priority replies in under 2 hours — included on Pro.")
+            : (lang === "fr" ? "Obtenez une réponse en moins de 5 minutes de notre équipe." : "Get a reply in under 5 minutes from our team."),
+        action: isDedicated
+          ? lang === "fr" ? "Contacter votre gestionnaire →" : "Contact your manager →"
+          : isPriority
+            ? lang === "fr" ? "Contacter le support prioritaire →" : "Contact priority support →"
+            : lang === "fr" ? "Démarrer le chat →" : "Start chat →",
+        onClick: () =>
+          window.alert(
+            isDedicated
+              ? "Dedicated support: email support@trackit.app with [Scale] in the subject for your account manager."
+              : isPriority
+                ? "Priority support: email support@trackit.app with [Pro] in the subject."
+                : "Live chat coming soon — email us at support@trackit.app for now."
+          ),
       },
       {
         icon: "📧",
         title: lang === "fr" ? "Support par email" : "Email support",
-        text: lang === "fr" ? "Envoyez-nous un message détaillé et nous répondrons sous 24h." : "Send us a detailed message and we'll get back within 24h.",
+        text: isPriority
+          ? lang === "fr" ? "Ligne directe email — réponse sous 24h." : "Direct email line — reply within 24h."
+          : lang === "fr" ? "Envoyez-nous un message détaillé et nous répondrons sous 24h." : "Send us a detailed message and we'll get back within 24h.",
         action: lang === "fr" ? "Envoyer un email →" : "Send email →",
         href: `mailto:${SUPPORT_EMAIL}`,
       },
@@ -948,7 +972,7 @@ export function HelpCenterView({ isMobile }: { isMobile?: boolean }) {
         href: CALENDLY_URL,
       },
     ],
-    [lang]
+    [lang, isDedicated, isPriority]
   );
 
   const guides = useMemo(

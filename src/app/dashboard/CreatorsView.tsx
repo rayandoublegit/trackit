@@ -5,6 +5,14 @@ import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { getSavedCreators, getCampaigns } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  BASIC_MAX_MANAGED_CREATORS,
+  PRO_MAX_MANAGED_CREATORS,
+  canBulkImportCreatorsCsv,
+  getMaxManagedCreators,
+  hasReachedManagedCreatorLimit,
+  type PlanTier,
+} from "@/lib/plan-limits";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -880,7 +888,19 @@ function RunCampaignModal({
   );
 }
 
-export function CreatorsView({ isMobile, plan = "free" }: { isMobile?: boolean; plan?: "free" | "basic" | "pro" }) {
+export function CreatorsView({
+  isMobile,
+  plan = "free",
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
+}: {
+  isMobile?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
+}) {
   const lang = useLang();
   const [creators, setCreators] = useState<ManagedCreator[]>([]);
   const [tab, setTab] = useState<CreatorsTab>("all");
@@ -979,10 +999,44 @@ export function CreatorsView({ isMobile, plan = "free" }: { isMobile?: boolean; 
             <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>{lang === "fr" ? "Gérez vos relations avec les créateurs." : "Manage your creator relationships."}</p>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button type="button" className="hero-cta-shopify-light" style={{ padding: "10px 16px", fontSize: 13 }} onClick={() => setImportOpen(true)}>
+            <button
+              type="button"
+              className="hero-cta-shopify-light"
+              style={{ padding: "10px 16px", fontSize: 13 }}
+              onClick={() => {
+                if (!canBulkImportCreatorsCsv(plan)) {
+                  setUpgradeMsg(lang === "fr"
+                    ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez des centaines de créateurs en un clic.\n\nPassez à Pro →"
+                    : "🔒 Bulk CSV import — Pro plan required.\n\nImport hundreds of creators in one click.\n\nUpgrade to Pro →");
+                  return;
+                }
+                setImportOpen(true);
+              }}
+            >
               {lang === "fr" ? "Importer un CSV" : "Import CSV"}
             </button>
-            <button type="button" className="hero-cta-shopify" style={{ padding: "10px 16px", fontSize: 13 }} onClick={() => setAddOpen(true)}>
+            <button
+              type="button"
+              className="hero-cta-shopify"
+              style={{ padding: "10px 16px", fontSize: 13 }}
+              onClick={() => {
+                if (hasReachedManagedCreatorLimit(plan, creators.length)) {
+                  setUpgradeMsg(plan === "pro"
+                    ? lang === "fr"
+                      ? `🔒 Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs — Plan Scale requis.\n\nCréateurs illimités sur Scale.\n\nPassez à Scale →`
+                      : `🔒 ${PRO_MAX_MANAGED_CREATORS} creator limit — Scale plan required.\n\nUnlimited creators on Scale.\n\nUpgrade to Scale →`
+                    : plan === "basic"
+                      ? lang === "fr"
+                        ? `🔒 Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs — Plan Pro requis.\n\nGérez jusqu'à 100 créateurs avec Pro.\n\nPassez à Pro →`
+                        : `🔒 ${BASIC_MAX_MANAGED_CREATORS} creator limit — Pro plan required.\n\nManage up to 100 creators on Pro.\n\nUpgrade to Pro →`
+                      : lang === "fr"
+                        ? `🔒 Limite de ${getMaxManagedCreators(plan)} créateurs.\n\nPassez à Growth pour jusqu'à 25 créateurs.\n\nPassez à Growth →`
+                        : `🔒 ${getMaxManagedCreators(plan)} creator limit.\n\nUpgrade to Growth for up to 25 creators.\n\nUpgrade to Growth →`);
+                  return;
+                }
+                setAddOpen(true);
+              }}
+            >
               {lang === "fr" ? "+ Ajouter un créateur" : "+ Add Creator"}
             </button>
           </div>
@@ -1214,6 +1268,21 @@ export function CreatorsView({ isMobile, plan = "free" }: { isMobile?: boolean; 
           lang={lang}
           onClose={() => setAddOpen(false)}
           onAdd={(c) => {
+            if (hasReachedManagedCreatorLimit(plan, creators.length)) {
+              setAddOpen(false);
+              setUpgradeMsg(plan === "pro"
+                ? lang === "fr"
+                  ? `🔒 Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs — Plan Scale requis.\n\nPassez à Scale →`
+                  : `🔒 ${PRO_MAX_MANAGED_CREATORS} creator limit — Scale plan required.\n\nUpgrade to Scale →`
+                : plan === "basic"
+                  ? lang === "fr"
+                    ? `🔒 Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs — Plan Pro requis.\n\nPassez à Pro →`
+                    : `🔒 ${BASIC_MAX_MANAGED_CREATORS} creator limit — Pro plan required.\n\nUpgrade to Pro →`
+                  : lang === "fr"
+                    ? "🔒 Limite de créateurs atteinte. Passez à Growth →"
+                    : "🔒 Creator limit reached. Upgrade to Growth →");
+              return;
+            }
             setCreators((list) => [c, ...list]);
             setAddOpen(false);
             setToast("Creator added ✓");

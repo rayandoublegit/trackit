@@ -5,6 +5,12 @@ import { saveOutreach, getOutreachHistory, getSavedCreators } from "@/lib/db";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  canPersistTemplates,
+  canUseAutoFollowUp,
+  canUseUnlimitedAIOutreach,
+  type PlanTier,
+} from "@/lib/plan-limits";
 
 type OutreachHistoryStatus = "sent" | "opened" | "replied" | "no_response" | "converted";
 type HistoryFilter = "all" | OutreachHistoryStatus;
@@ -463,8 +469,6 @@ function SaveTemplateModal({
   );
 }
 
-type PlanTier = "free" | "basic" | "pro";
-
 function outreachTodayDateKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -582,7 +586,7 @@ function OutreachAIGeneratePanel({
   };
 
   const handleGenerate = async () => {
-    if (plan === "free") {
+    if (!canUseUnlimitedAIOutreach(plan)) {
       const today = new Date().toDateString();
       const key = "trackit_outreach_gen_" + today;
       const used = parseInt(localStorage.getItem(key) || "0");
@@ -675,7 +679,7 @@ function OutreachAIGeneratePanel({
       message,
       sentDate: todayIso(),
       status: "sent",
-      followUpDate: followUpIn3Days(),
+      followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
     });
     onToast(lang === "fr" ? "Message envoyé ✓" : "Outreach sent ✓");
     resetPanel();
@@ -945,10 +949,10 @@ function OutreachAIGeneratePanel({
                     <button
                       type="button"
                       onClick={() => {
-                        if (plan === "free") {
+                        if (!canPersistTemplates(plan)) {
                           setUpgradeMsg(lang === "fr"
-                            ? "🔒 Sauvegarde de modèles — Plan Basic requis.\n\nSauvegardez vos messages qui convertissent et construisez une bibliothèque de templates qui travaille pour vous.\n\nPassez à Basic →"
-                            : "🔒 Save templates — Basic plan required.\n\nSave your best-converting messages and build a template library that works for you.\n\nUpgrade to Basic →");
+                            ? "🔒 Sauvegarde de modèles — Plan Growth requis.\n\nSauvegardez vos messages qui convertissent et construisez une bibliothèque de templates.\n\nPassez à Growth →"
+                            : "🔒 Save templates — Growth plan required.\n\nSave your best-converting messages and build a template library.\n\nUpgrade to Growth →");
                           return;
                         }
                         setSaveTemplateOpen(true);
@@ -1086,6 +1090,7 @@ export function OutreachHistorySection({
   const [followUpEntry, setFollowUpEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpSlideIn, setFollowUpSlideIn] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (followUpEntry) {
@@ -1158,6 +1163,12 @@ export function OutreachHistorySection({
   };
 
   const sendFollowUp = async (item: OutreachHistoryEntry) => {
+    if (!canUseAutoFollowUp(plan)) {
+      setUpgradeMsg(lang === "fr"
+        ? "🔒 Relances automatiques — Plan Pro requis.\n\nProgrammez des relances et convertissez plus de créateurs.\n\nPassez à Pro →"
+        : "🔒 Auto follow-ups — Pro plan required.\n\nSchedule follow-ups and convert more creators.\n\nUpgrade to Pro →");
+      return;
+    }
     const res = await fetch("/api/generate-follow-up", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1397,8 +1408,10 @@ export function OutreachHistorySection({
         </div>
       </div>
 
+      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+
       {manageEntry && (() => {
-        const followUpDisabled = manageEntry.status === "replied" || manageEntry.status === "converted";
+        const followUpDisabled = manageEntry.status === "replied" || manageEntry.status === "converted" || !canUseAutoFollowUp(plan);
         const showMarkReplied = manageEntry.status === "sent" || manageEntry.status === "opened" || manageEntry.status === "no_response";
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setManageEntry(null)}>

@@ -6,6 +6,16 @@ import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
+import {
+  BASIC_MAX_MANAGED_CREATORS,
+  PRO_MAX_MANAGED_CREATORS,
+  getDailyDiscoveryLimit,
+  getResultsPerSearchLimit,
+  getVisibleDiscoveryResults,
+  hasDiscoveryDailyCap,
+  hasReachedManagedCreatorLimit,
+  type PlanTier,
+} from "@/lib/plan-limits";
 
 type DiscoveryTab = "discover" | "saved";
 
@@ -1246,8 +1256,6 @@ function CreatorCard({
   );
 }
 
-type PlanTier = "free" | "basic" | "pro";
-
 function todayDateKey() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -1271,7 +1279,6 @@ function incrementDiscoverySearchCount() {
 }
 
 const DISCOVERY_RESULTS_CACHE_KEY = "trackit_discovery_last_results_v1";
-const FREE_DAILY_DISCOVERIES = 5;
 
 function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
@@ -1287,10 +1294,14 @@ function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
 export function DiscoveryView({
   plan,
   onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
   isMobile,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   isMobile?: boolean;
 }) {
   const lang = useLang();
@@ -1329,8 +1340,45 @@ export function DiscoveryView({
   const [showBlur, setShowBlur] = useState(false);
   const [resetCountdown, setResetCountdown] = useState<string>("");
 
+  const dailyDiscoveryLimit = getDailyDiscoveryLimit(plan);
+  const handleDiscoveryUpgrade = () => {
+    if (plan === "basic" && onUpgradePro) onUpgradePro();
+    else onUpgrade();
+  };
+
+  const handleCreatorLimitUpgrade = () => {
+    if (plan === "pro" && onUpgradeScale) onUpgradeScale();
+    else if (plan === "basic" && onUpgradePro) onUpgradePro();
+    else onUpgrade();
+  };
+
+  const discoveryLimitTitle =
+    dailyDiscoveryLimit != null
+      ? lang === "fr"
+        ? `Vous avez utilisé vos ${dailyDiscoveryLimit} découvertes du jour`
+        : `You've used your ${dailyDiscoveryLimit} daily discoveries`
+      : "";
+
+  const discoveryLimitSubtitle =
+    plan === "basic"
+      ? lang === "fr"
+        ? "Passez à Pro pour des découvertes illimitées et des résultats sans limite."
+        : "Upgrade to Pro for unlimited discoveries and uncapped results."
+      : lang === "fr"
+        ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. 30 découvertes par jour, résultats illimités."
+        : "Brands on Growth find 3x more profitable creators. 30 daily discoveries, unlimited results.";
+
+  const discoveryLimitCta =
+    plan === "basic"
+      ? lang === "fr"
+        ? "Passer à Pro →"
+        : "Upgrade to Pro →"
+      : lang === "fr"
+        ? "Passer à Growth →"
+        : "Upgrade to Growth →";
+
   const syncDiscoveryGateState = async (): Promise<number | null> => {
-    if (plan !== "free") return null;
+    if (!hasDiscoveryDailyCap(plan) || dailyDiscoveryLimit == null) return null;
     const { supabase } = await import("@/lib/supabase");
     if (!supabase) return null;
     const { data: { user } } = await supabase.auth.getUser();
@@ -1358,8 +1406,8 @@ export function DiscoveryView({
       return 0;
     }
 
-    // Force reset legacy users who had old limits
-    if (data.discoveries_used > FREE_DAILY_DISCOVERIES) {
+    // Force reset legacy users who exceeded their plan limit
+    if (data.discoveries_used > dailyDiscoveryLimit) {
       await supabase
         .from("profiles")
         .update({
@@ -1375,22 +1423,22 @@ export function DiscoveryView({
     const used = data.discoveries_used || 0;
     setDiscoveriesUsed(used);
     setDiscoveriesResetAt(resetAt);
-    setShowBlur(used >= FREE_DAILY_DISCOVERIES);
+    setShowBlur(used >= dailyDiscoveryLimit);
     return used;
   };
 
   // Load discoveries from Supabase on mount
   useEffect(() => {
-    if (plan !== "free") return;
+    if (!hasDiscoveryDailyCap(plan)) return;
     const loadDiscoveries = async () => {
       await syncDiscoveryGateState();
     };
     void loadDiscoveries();
-  }, [plan]);
+  }, [plan, dailyDiscoveryLimit]);
 
   // Countdown timer
   useEffect(() => {
-    if (!discoveriesResetAt || discoveriesUsed < FREE_DAILY_DISCOVERIES) return;
+    if (!discoveriesResetAt || dailyDiscoveryLimit == null || discoveriesUsed < dailyDiscoveryLimit) return;
     const tick = () => {
       const resetTime = new Date(discoveriesResetAt.getTime() + 24 * 60 * 60 * 1000);
       const diff = resetTime.getTime() - Date.now();
@@ -1407,13 +1455,13 @@ export function DiscoveryView({
     tick();
     const interval = setInterval(tick, 60000);
     return () => clearInterval(interval);
-  }, [discoveriesResetAt, discoveriesUsed]);
+  }, [discoveriesResetAt, discoveriesUsed, dailyDiscoveryLimit]);
 
   const incrementDiscoveries = async () => {
-    if (plan !== "free") return;
+    if (!hasDiscoveryDailyCap(plan) || dailyDiscoveryLimit == null) return;
     const newCount = discoveriesUsed + 1;
     setDiscoveriesUsed(newCount);
-    setShowBlur(newCount >= FREE_DAILY_DISCOVERIES);
+    setShowBlur(newCount >= dailyDiscoveryLimit);
     const { supabase } = await import("@/lib/supabase");
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -1424,32 +1472,6 @@ export function DiscoveryView({
       discoveries_reset_at: discoveriesResetAt ? discoveriesResetAt.toISOString() : now.toISOString(),
     }).eq("id", user.id);
     if (!discoveriesResetAt) setDiscoveriesResetAt(now);
-  };
-
-  const resetDiscoveryCount = async () => {
-    const now = new Date();
-    setDiscoveriesUsed(0);
-    setDiscoveriesResetAt(now);
-    setShowBlur(false);
-    setResetCountdown("");
-    setSearchCount(0);
-    setCreators([]);
-    setHasSearched(false);
-    setError(null);
-    localStorage.removeItem("trackit_search_" + new Date().toDateString());
-    localStorage.removeItem(DISCOVERY_RESULTS_CACHE_KEY);
-    localStorage.removeItem("trackit_searches_today");
-    localStorage.removeItem("trackit_searches_date");
-
-    if (plan !== "free") return;
-    const { supabase } = await import("@/lib/supabase");
-    if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase
-      .from("profiles")
-      .update({ discoveries_used: 0, discoveries_reset_at: now.toISOString() })
-      .eq("id", user.id);
   };
 
   const openOutreach = (creator: Creator) => {
@@ -1509,6 +1531,10 @@ export function DiscoveryView({
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    if (hasReachedManagedCreatorLimit(plan, savedCreators.length)) {
+      setUpgradeModalOpen(true);
+      return;
+    }
     await saveCreator(user.id, {
       username: creator.username ?? "",
       display_name: creator.displayName,
@@ -1541,11 +1567,24 @@ export function DiscoveryView({
     }
   };
 
+  const resultsLimit = getResultsPerSearchLimit(plan);
+  const visibleCreators = getVisibleDiscoveryResults(plan, creators);
+  const resultsCountLabel =
+    resultsLimit != null
+      ? `${Math.min(creators.length, resultsLimit)}`
+      : `${creators.length}`;
+  const resultsCappedNote =
+    resultsLimit != null && creators.length > resultsLimit
+      ? lang === "fr"
+        ? ` (limité à ${resultsLimit})`
+        : ` (capped at ${resultsLimit})`
+      : "";
+
   const search = async () => {
-    if (plan === "free") {
+    if (hasDiscoveryDailyCap(plan) && dailyDiscoveryLimit != null) {
       const latestUsed = await syncDiscoveryGateState();
       const used = latestUsed ?? discoveriesUsed;
-      if (used >= FREE_DAILY_DISCOVERIES) {
+      if (used >= dailyDiscoveryLimit) {
         setShowBlur(true);
         setHasSearched(true);
         return;
@@ -1634,33 +1673,15 @@ export function DiscoveryView({
             : "🚧 We're still adding creators across every niche. The database grows daily — check back soon for more results."}
         </div>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-          {plan === "free" && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                marginBottom: 12,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                {lang === "fr"
-                  ? (discoveriesUsed >= FREE_DAILY_DISCOVERIES && resetCountdown
-                    ? `Réinitialisation dans ${resetCountdown}`
-                    : `${Math.max(0, FREE_DAILY_DISCOVERIES - discoveriesUsed)}/${FREE_DAILY_DISCOVERIES} découvertes restantes`)
-                  : (discoveriesUsed >= FREE_DAILY_DISCOVERIES && resetCountdown
-                    ? `Resets in ${resetCountdown}`
-                    : `${Math.max(0, FREE_DAILY_DISCOVERIES - discoveriesUsed)}/${FREE_DAILY_DISCOVERIES} discoveries left`)}
-              </div>
-              <button
-                type="button"
-                onClick={() => void resetDiscoveryCount()}
-                style={{ ...btnSecondary, fontSize: 12, padding: "8px 14px", flexShrink: 0 }}
-              >
-                {lang === "fr" ? "Réinitialiser le quota" : "Reset discovery count"}
-              </button>
+          {dailyDiscoveryLimit != null && (
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 12 }}>
+              {lang === "fr"
+                ? (discoveriesUsed >= dailyDiscoveryLimit && resetCountdown
+                  ? `Réinitialisation dans ${resetCountdown}`
+                  : `${Math.max(0, dailyDiscoveryLimit - discoveriesUsed)}/${dailyDiscoveryLimit} découvertes restantes`)
+                : (discoveriesUsed >= dailyDiscoveryLimit && resetCountdown
+                  ? `Resets in ${resetCountdown}`
+                  : `${Math.max(0, dailyDiscoveryLimit - discoveriesUsed)}/${dailyDiscoveryLimit} discoveries left`)}
             </div>
           )}
           <div
@@ -1880,12 +1901,10 @@ export function DiscoveryView({
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </div>
                   <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
-                    {lang === "fr" ? "Vous avez utilisé vos 5 découvertes du jour" : "You've used your 5 daily discoveries"}
+                    {discoveryLimitTitle}
                   </h3>
                   <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
-                    {lang === "fr"
-                      ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. Découvertes illimitées, résultats illimités."
-                      : "Brands on Growth find 3x more profitable creators. Unlimited discoveries, unlimited results."}
+                    {discoveryLimitSubtitle}
                   </p>
                   {resetCountdown && (
                     <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
@@ -1895,10 +1914,10 @@ export function DiscoveryView({
                   {!resetCountdown && <div style={{ marginBottom: 18 }} />}
                   <button
                     type="button"
-                    onClick={onUpgrade}
+                    onClick={handleDiscoveryUpgrade}
                     style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
                   >
-                    {lang === "fr" ? "Débloquer les créateurs illimités →" : "Unlock unlimited creators →"}
+                    {discoveryLimitCta}
                   </button>
                 </div>
               </div>
@@ -1916,13 +1935,13 @@ export function DiscoveryView({
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, letterSpacing: "-0.02em" }}>
                 {lang === "fr"
-                  ? `${plan === "free" ? Math.min(creators.length, 10) : creators.length} ${creators.length === 1 ? "créateur trouvé" : "créateurs trouvés"}${plan === "free" && creators.length > 10 ? " (limité à 10)" : ""}`
-                  : `${plan === "free" ? Math.min(creators.length, 10) : creators.length} ${creators.length === 1 ? "creator" : "creators"} found${plan === "free" && creators.length > 10 ? " (capped at 10)" : ""}`}
+                  ? `${resultsCountLabel} ${creators.length === 1 ? "créateur trouvé" : "créateurs trouvés"}${resultsCappedNote}`
+                  : `${resultsCountLabel} ${creators.length === 1 ? "creator" : "creators"} found${resultsCappedNote}`}
               </p>
             </div>
             <div style={{ position: "relative" }}>
               <div style={{ ...creatorsGridStyle, filter: showBlur ? "blur(6px)" : "none", pointerEvents: showBlur ? "none" : "auto", userSelect: showBlur ? "none" : "auto", transition: "filter 0.3s" }}>
-                {(plan === "free" ? creators.slice(0, 10) : creators).map((c) => (
+                {visibleCreators.map((c) => (
                   <CreatorCard
                     lang={lang}
                     key={c.username  ?? ""}
@@ -1941,12 +1960,10 @@ export function DiscoveryView({
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                     </div>
                     <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
-                      {lang === "fr" ? "Vous avez utilisé vos 5 découvertes du jour" : "You've used your 5 daily discoveries"}
+                      {discoveryLimitTitle}
                     </h3>
                     <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
-                      {lang === "fr"
-                        ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. Découvertes illimitées, résultats illimités."
-                        : "Brands on Growth find 3x more profitable creators. Unlimited discoveries, unlimited results."}
+                      {discoveryLimitSubtitle}
                     </p>
                     {resetCountdown && (
                       <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
@@ -1956,10 +1973,10 @@ export function DiscoveryView({
                     {!resetCountdown && <div style={{ marginBottom: 18 }} />}
                     <button
                       type="button"
-                      onClick={onUpgrade}
+                      onClick={handleDiscoveryUpgrade}
                       style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
                     >
-                      {lang === "fr" ? "Débloquer les créateurs illimités →" : "Unlock unlimited creators →"}
+                      {discoveryLimitCta}
                     </button>
                   </div>
                 </div>
@@ -2056,14 +2073,34 @@ export function DiscoveryView({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-              You&apos;ve used your 5 free searches
+              {plan === "pro"
+                ? lang === "fr"
+                  ? `Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs atteinte`
+                  : `${PRO_MAX_MANAGED_CREATORS} creator limit reached`
+                : plan === "basic"
+                  ? lang === "fr"
+                    ? `Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs atteinte`
+                    : `${BASIC_MAX_MANAGED_CREATORS} creator limit reached`
+                  : lang === "fr"
+                    ? "Limite de créateurs atteinte"
+                    : "Creator limit reached"}
             </h3>
             <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-              Upgrade to Basic for unlimited creator discovery.
+              {plan === "pro"
+                ? lang === "fr"
+                  ? "Passez à Scale pour des créateurs illimités."
+                  : "Upgrade to Scale for unlimited creators."
+                : plan === "basic"
+                  ? lang === "fr"
+                    ? "Passez à Pro pour gérer jusqu'à 100 créateurs."
+                    : "Upgrade to Pro to manage up to 100 creators."
+                  : lang === "fr"
+                    ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
+                    : "Upgrade to Growth to manage up to 25 creators."}
             </p>
             <button
               type="button"
-              onClick={() => void onUpgrade()}
+              onClick={handleCreatorLimitUpgrade}
               style={{
                 background: "#0047FF",
                 color: "#FFFFFF",
@@ -2078,7 +2115,17 @@ export function DiscoveryView({
                 letterSpacing: "-0.02em",
               }}
             >
-              {lang === "fr" ? `Passer à Basic ${formatCurrency(19, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(19, lang)}/mo →`}
+              {plan === "pro"
+                ? lang === "fr"
+                  ? `Passer à Scale ${formatCurrency(99, lang)}/mois →`
+                  : `Upgrade to Scale ${formatCurrency(99, lang)}/mo →`
+                : plan === "basic"
+                  ? lang === "fr"
+                    ? `Passer à Pro ${formatCurrency(39, lang)}/mois →`
+                    : `Upgrade to Pro ${formatCurrency(39, lang)}/mo →`
+                  : lang === "fr"
+                    ? `Passer à Growth ${formatCurrency(19, lang)}/mois →`
+                    : `Upgrade to Growth ${formatCurrency(19, lang)}/mo →`}
             </button>
           </div>
         </div>
