@@ -5,6 +5,7 @@ import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
 
 type DiscoveryTab = "discover" | "saved";
 
@@ -1996,7 +1997,7 @@ export function DiscoveryView({
                 letterSpacing: "-0.02em",
               }}
             >
-              Upgrade to Basic $49/mo →
+              {lang === "fr" ? `Passer à Basic ${formatCurrency(19, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(19, lang)}/mo →`}
             </button>
           </div>
         </div>

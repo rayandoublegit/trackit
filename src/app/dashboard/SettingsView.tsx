@@ -715,10 +715,10 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   };
 
   const invoices = [
-    { date: "Apr 1, 2026", amount: 49, status: "Paid" as const },
-    { date: "Mar 1, 2026", amount: 49, status: "Paid" as const },
-    { date: "Feb 1, 2026", amount: 49, status: "Pending" as const },
-    { date: "Jan 1, 2026", amount: 49, status: "Failed" as const },
+    { date: "Apr 1, 2026", amount: 19, status: "Paid" as const },
+    { date: "Mar 1, 2026", amount: 19, status: "Paid" as const },
+    { date: "Feb 1, 2026", amount: 19, status: "Pending" as const },
+    { date: "Jan 1, 2026", amount: 19, status: "Failed" as const },
   ];
 
   return (
@@ -727,7 +727,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>Basic</span>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>{formatCurrency(49, lang)}<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
+            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>{formatCurrency(19, lang)}<span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>/month</span></div>
             <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"} May 1, 2026</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
@@ -737,7 +737,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               disabled={loading}
               style={btnPrimary}
             >
-              {loading ? "Loading..." : `Basic ${formatCurrency(49, lang)}/mo →`}
+              {loading ? "Loading..." : `Basic ${formatCurrency(19, lang)}/mo →`}
             </button>
             <button
               type="button"
@@ -745,7 +745,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               disabled={loading}
               style={{ ...btnPrimary, background: "#1A1A1A" }}
             >
-              {loading ? "Loading..." : `Pro ${formatCurrency(119, lang)}/mo →`}
+              {loading ? "Loading..." : `Pro ${formatCurrency(99, lang)}/mo →`}
             </button>
           </div>
         </div>

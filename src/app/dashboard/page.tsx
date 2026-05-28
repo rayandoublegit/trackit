@@ -737,8 +737,8 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user }: { full
   return (
     <>
       <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: 60, textAlign: "center", marginBottom: 24 }}>
+      <div style={{ padding: isMobile ? "16px" : "40px" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: isMobile ? 32 : 60, textAlign: "center", marginBottom: 24 }}>
           <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
             <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
           </div>
@@ -1495,7 +1495,7 @@ function IntegrationsView({ isMobile, user, shopifyStore }: { isMobile?: boolean
           ✓ {connectedShop} connected successfully
         </div>
       )}
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+      <div style={{ padding: isMobile ? "16px" : "40px" }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 16 }}>
           {apps.map((app) => (
             <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
@@ -1603,7 +1603,7 @@ function AutomationView({ isMobile }: { isMobile?: boolean }) {
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{lang === "fr" ? "Créez des agents qui gèrent votre marketing créateur en automatique" : "Build agents that run your creator marketing on autopilot"}</p>
         </div>
       </div>
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+      <div style={{ padding: isMobile ? "16px" : "40px" }}>
         <div style={{ background: "linear-gradient(135deg, #0047FF 0%, #003BD6 100%)", color: "#FFFFFF", borderRadius: 18, padding: 32, marginBottom: 20, display: "flex", alignItems: "center", gap: 24 }}>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Créer un agent d'automatisation" : "Make an automation agent"}</h2>
@@ -1659,9 +1659,9 @@ function UpgradeGate({
   return (
     <>
       <PageHeader isMobile={isMobile} title={feature} subtitle={`${feature} is available on the ${requiredPlan} plan and above`} />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 80, textAlign: "center" }}>
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", margin: "0 auto 18px", display: "block" }} />
+      <div style={{ padding: isMobile ? "16px" : "40px" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 48 : 80, textAlign: "center" }}>
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: isMobile ? 56 : 72, width: "auto", margin: "0 auto 18px", display: "block" }} />
           <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Upgrade to unlock {feature}</h3>
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>This feature is part of the {requiredPlan} plan. Upgrade your account to start using {feature.toLowerCase()}.</p>
           <button type="button" style={btnPrimary} onClick={() => void onUpgrade()}>Upgrade to {requiredPlan}</button>
@@ -1675,8 +1675,8 @@ function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: st
   return (
     <>
       <PageHeader isMobile={isMobile} title={title} subtitle={subtitle} />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
-        <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 80, textAlign: "center" }}>
+      <div style={{ padding: isMobile ? "16px" : "40px" }}>
+        <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: isMobile ? 48 : 80, textAlign: "center" }}>
           <div style={{ width: 64, height: 64, borderRadius: 16, background: "#F5F5F5", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#9A9A9A" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </div>

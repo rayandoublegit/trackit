@@ -192,7 +192,7 @@ function CampaignUpgradeModal({ onClose, onUpgrade }: { onClose: () => void; onU
           Free plan includes 1 campaign. Upgrade to Basic for unlimited campaigns.
         </p>
         <button type="button" onClick={() => void onUpgrade()} style={{ ...btnPrimary, width: "100%" }}>
-          {lang === "fr" ? `Passer à Basic ${formatCurrency(49, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(49, lang)}/mo →`}
+          {lang === "fr" ? `Passer à Basic ${formatCurrency(19, lang)}/mois →` : `Upgrade to Basic ${formatCurrency(19, lang)}/mo →`}
         </button>
         <button
           type="button"

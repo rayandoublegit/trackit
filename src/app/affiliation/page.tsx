@@ -35,7 +35,7 @@ export default function AffiliationPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const earnings = Math.round(users * 49 * 0.2);
+  const earnings = Math.round(users * 19 * 0.2);
 
   const canSubmit =
     formData.firstName &&
@@ -333,8 +333,8 @@ export default function AffiliationPage() {
           >
             <span style={{ fontSize: 13, color: SUBTEXT, letterSpacing: "-0.01em" }}>
               {lang === "fr"
-                ? `Votre commission (20% de ${formatCurrency(49, lang)}/mois par utilisateur)`
-                : `Your commission (20% of ${formatCurrency(49, lang)}/mo per user)`}
+                ? `Votre commission (20% de ${formatCurrency(19, lang)}/mois par utilisateur)`
+                : `Your commission (20% of ${formatCurrency(19, lang)}/mo per user)`}
             </span>
             <span style={{ fontSize: 14, fontWeight: 600, color: BLUE, letterSpacing: "-0.02em" }}>
               {formatCurrency(earnings, lang)}/mo
