@@ -20,10 +20,11 @@ export const SCALE_MAX_SHOPIFY_STORES = 3;
 
 /** Map DB / Stripe metadata values to dashboard plan tier. */
 export function normalizePlan(plan: string | null | undefined): PlanTier {
-  const p = (plan ?? "free").toLowerCase();
+  const p = (plan ?? "free").toLowerCase().trim();
   if (p === "scale") return "scale";
-  if (p === "pro") return "pro";
-  if (p === "basic" || p === "growth") return "basic";
+  if (p === "pro" || p === "build") return "pro";
+  if (p === "basic" || p === "growth" || p === "spark") return "basic";
+  if (p === "free") return "free";
   return "free";
 }
 

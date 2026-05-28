@@ -27,10 +27,4 @@ export async function tryAutoAuth(
   return null;
 }
 
-export async function recordLoginIp(): Promise<void> {
-  try {
-    await fetch("/api/auth/record-login", { method: "POST", credentials: "include" });
-  } catch {
-    /* non-blocking */
-  }
-}
+export { recordLoginIp } from "@/lib/record-login";

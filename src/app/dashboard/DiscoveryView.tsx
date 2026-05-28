@@ -1673,17 +1673,6 @@ export function DiscoveryView({
             : "🚧 We're still adding creators across every niche. The database grows daily — check back soon for more results."}
         </div>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-          {dailyDiscoveryLimit != null && (
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 12 }}>
-              {lang === "fr"
-                ? (discoveriesUsed >= dailyDiscoveryLimit && resetCountdown
-                  ? `Réinitialisation dans ${resetCountdown}`
-                  : `${Math.max(0, dailyDiscoveryLimit - discoveriesUsed)}/${dailyDiscoveryLimit} découvertes restantes`)
-                : (discoveriesUsed >= dailyDiscoveryLimit && resetCountdown
-                  ? `Resets in ${resetCountdown}`
-                  : `${Math.max(0, dailyDiscoveryLimit - discoveriesUsed)}/${dailyDiscoveryLimit} discoveries left`)}
-            </div>
-          )}
           <div
             style={{
               display: "flex",

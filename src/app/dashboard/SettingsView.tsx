@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
@@ -8,8 +8,12 @@ import { PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
-import { getGrowthPriceId, getProPriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { formatLastActiveFromDate } from "@/lib/format-last-active";
+import { recordLoginIp } from "@/lib/record-login";
+import { getOrCreateSessionKey } from "@/lib/session-key";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import type { UserSessionRow } from "@/app/api/auth/sessions/route";
 
 const GROWTH_MONTHLY = 19;
 const PRO_MONTHLY = 39;
@@ -718,7 +722,7 @@ function ProfileSettings({
 
 function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const lang = useLang();
-  const [loading, setLoading] = useState<"growth" | "pro" | null>(null);
+  const [loading, setLoading] = useState<"growth" | "pro" | "scale" | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [planLoading, setPlanLoading] = useState(true);
@@ -739,18 +743,34 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const currency = lang === "fr" ? "eur" : "usd";
 
   useEffect(() => {
-    const client = supabase;
-    if (!client) return;
-    void client.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) return;
-      const { data } = await client
-        .from("profiles")
-        .select("plan")
-        .eq("id", user.id)
-        .maybeSingle();
-      setCurrentPlan(normalizePlan(data?.plan));
-      setPlanLoading(false);
-    });
+    let cancelled = false;
+    void fetch("/api/billing/plan", { credentials: "include" })
+      .then(async (res) => {
+        const data = (await res.json()) as { plan?: string; error?: string };
+        if (!res.ok) throw new Error(data.error ?? "Failed to load plan");
+        if (!cancelled) setCurrentPlan(normalizePlan(data.plan));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const client = supabase;
+          if (!client) return;
+          void client.auth.getUser().then(async ({ data: { user } }) => {
+            if (!user || cancelled) return;
+            const { data } = await client
+              .from("profiles")
+              .select("plan")
+              .eq("id", user.id)
+              .maybeSingle();
+            if (!cancelled) setCurrentPlan(normalizePlan(data?.plan));
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPlanLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -793,6 +813,8 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       { year: "numeric", month: "short", day: "numeric" }
     );
 
+  const isPaidPlan = currentPlan !== "free";
+
   const openBillingPortal = async () => {
     const client = supabase;
     setPortalLoading(true);
@@ -825,13 +847,15 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
     }
   };
 
-  const startCheckout = async (target: "growth" | "pro") => {
+  const startCheckout = async (target: "growth" | "pro" | "scale") => {
     setLoading(target);
     try {
       const priceId =
         target === "growth"
           ? getGrowthPriceId(currency)
-          : getProPriceId(currency);
+          : target === "pro"
+            ? getProPriceId(currency)
+            : getScalePriceId(currency);
       await handleUpgrade(priceId);
     } catch (err) {
       console.error("Checkout error:", err);
@@ -856,11 +880,6 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                 <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
                   {lang === "fr" ? "Chargement..." : "Loading..."}
                 </span>
-              ) : currentPlan === "free" ? (
-                <>
-                  {formatCurrency(0, lang)}
-                  <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>{lang === "fr" ? "/mois" : "/month"}</span>
-                </>
               ) : (
                 <>
                   {formatCurrency(planMonthlyPrice(currentPlan), lang)}
@@ -868,7 +887,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                 </>
               )}
             </div>
-            {!planLoading && currentPlan !== "free" && (
+            {!planLoading && isPaidPlan && (
               <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
                 {lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"}{" "}
                 {invoicesLoading
@@ -883,54 +902,98 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               </div>
             )}
           </div>
-          <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row" }}>
-            <button
-              type="button"
-              onClick={() => void startCheckout("growth")}
-              disabled={planLoading || loading !== null || currentPlan !== "free"}
-              style={{ ...btnPrimary, opacity: planLoading || currentPlan !== "free" ? 0.5 : 1 }}
-            >
-              {loading === "growth"
-                ? lang === "fr" ? "Chargement..." : "Loading..."
-                : `Growth ${formatCurrency(GROWTH_MONTHLY, lang)}/mo →`}
-            </button>
-            <button
-              type="button"
-              onClick={() => void startCheckout("pro")}
-              disabled={planLoading || loading !== null || currentPlan === "pro" || currentPlan === "scale"}
-              style={{ ...btnPrimary, background: "#1A1A1A", opacity: planLoading || currentPlan === "pro" || currentPlan === "scale" ? 0.5 : 1 }}
-            >
-              {loading === "pro"
-                ? lang === "fr" ? "Chargement..." : "Loading..."
-                : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
-            </button>
-          </div>
+          {!planLoading && currentPlan !== "scale" && (
+            <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row", flexWrap: "wrap" }}>
+              {currentPlan === "free" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void startCheckout("growth")}
+                    disabled={loading !== null}
+                    style={btnPrimary}
+                  >
+                    {loading === "growth"
+                      ? lang === "fr" ? "Chargement..." : "Loading..."
+                      : `Growth ${formatCurrency(GROWTH_MONTHLY, lang)}/mo →`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCheckout("pro")}
+                    disabled={loading !== null}
+                    style={{ ...btnPrimary, background: "#1A1A1A" }}
+                  >
+                    {loading === "pro"
+                      ? lang === "fr" ? "Chargement..." : "Loading..."
+                      : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
+                  </button>
+                </>
+              )}
+              {currentPlan === "basic" && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => void startCheckout("pro")}
+                    disabled={loading !== null}
+                    style={{ ...btnPrimary, background: "#1A1A1A" }}
+                  >
+                    {loading === "pro"
+                      ? lang === "fr" ? "Chargement..." : "Loading..."
+                      : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void startCheckout("scale")}
+                    disabled={loading !== null}
+                    style={btnPrimary}
+                  >
+                    {loading === "scale"
+                      ? lang === "fr" ? "Chargement..." : "Loading..."
+                      : `Scale ${formatCurrency(SCALE_MONTHLY, lang)}/mo →`}
+                  </button>
+                </>
+              )}
+              {currentPlan === "pro" && (
+                <button
+                  type="button"
+                  onClick={() => void startCheckout("scale")}
+                  disabled={loading !== null}
+                  style={btnPrimary}
+                >
+                  {loading === "scale"
+                    ? lang === "fr" ? "Chargement..." : "Loading..."
+                    : `Scale ${formatCurrency(SCALE_MONTHLY, lang)}/mo →`}
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={() => void openBillingPortal()}
-          disabled={portalLoading}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            marginTop: 14,
-            fontSize: 12,
-            color: "#9A9A9A",
-            cursor: portalLoading ? "wait" : "pointer",
-            fontFamily: "inherit",
-            letterSpacing: "-0.01em",
-            opacity: portalLoading ? 0.6 : 1,
-          }}
-        >
-          {portalLoading
-            ? lang === "fr"
-              ? "Ouverture du portail..."
-              : "Opening portal..."
-            : lang === "fr"
-              ? "Annuler l'abonnement"
-              : "Cancel subscription"}
-        </button>
+        {!planLoading && isPaidPlan && (
+          <button
+            type="button"
+            onClick={() => void openBillingPortal()}
+            disabled={portalLoading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              marginTop: 14,
+              fontSize: 12,
+              color: "#9A9A9A",
+              cursor: portalLoading ? "wait" : "pointer",
+              fontFamily: "inherit",
+              letterSpacing: "-0.01em",
+              opacity: portalLoading ? 0.6 : 1,
+            }}
+          >
+            {portalLoading
+              ? lang === "fr"
+                ? "Ouverture du portail..."
+                : "Opening portal..."
+              : lang === "fr"
+                ? "Annuler l'abonnement"
+                : "Cancel subscription"}
+          </button>
+        )}
       </Card>
 
       <Card title={lang === "fr" ? "Méthode de paiement" : "Payment method"}>
@@ -1340,11 +1403,91 @@ function RoleBadge({ lang, role }: { lang: Lang; role: TeamRole }) {
 
 function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean; setTwoFa: (v: boolean) => void; onDeleteAccount: () => void }) {
   const lang = useLang();
-  const sessions = [
-    { device: "MacBook Pro · Chrome", location: "Paris, FR", last: "Active now" },
-    { device: "iPhone 15 · Safari", location: "Paris, FR", last: "2 hours ago" },
-    { device: "Windows · Firefox", location: "Lyon, FR", last: "3 days ago" },
-  ];
+  const [sessions, setSessions] = useState<UserSessionRow[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [revokingKey, setRevokingKey] = useState<string | null>(null);
+
+  const loadSessions = useCallback(async () => {
+    const sessionKey = getOrCreateSessionKey();
+    setSessionsLoading(true);
+    setSessionsError(null);
+    try {
+      await recordLoginIp();
+      const res = await fetch("/api/auth/sessions", {
+        credentials: "include",
+        headers: sessionKey ? { "X-Trackit-Session-Key": sessionKey } : {},
+      });
+      const data = (await res.json()) as {
+        sessions?: UserSessionRow[];
+        error?: string;
+      };
+      if (!res.ok) throw new Error(data.error ?? "Failed to load sessions");
+      setSessions(data.sessions ?? []);
+    } catch (err) {
+      setSessionsError(
+        err instanceof Error ? err.message : "Failed to load sessions"
+      );
+      setSessions([]);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
+
+  const revokeSession = async (sessionKey: string, isCurrent: boolean) => {
+    setRevokingKey(sessionKey);
+    try {
+      const res = await fetch("/api/auth/sessions", {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Trackit-Session-Key": getOrCreateSessionKey(),
+        },
+        body: JSON.stringify({ sessionKey }),
+      });
+      const data = (await res.json()) as { signOut?: boolean; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not revoke session");
+      if (data.signOut || isCurrent) {
+        if (supabase) await supabase.auth.signOut();
+        window.location.href = "/auth";
+        return;
+      }
+      await loadSessions();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not revoke session");
+    } finally {
+      setRevokingKey(null);
+    }
+  };
+
+  const revokeAllOthers = async () => {
+    setRevokingKey("__all__");
+    try {
+      const res = await fetch("/api/auth/sessions", {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Trackit-Session-Key": getOrCreateSessionKey(),
+        },
+        body: JSON.stringify({ revokeOthers: true }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Could not revoke sessions");
+      await loadSessions();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not revoke sessions");
+    } finally {
+      setRevokingKey(null);
+    }
+  };
+
+  const otherSessionsCount = sessions.filter((s) => !s.isCurrent).length;
 
   return (
     <>
@@ -1377,16 +1520,87 @@ function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean
       </Card>
 
       <Card title={lang === "fr" ? "Sessions actives" : "Active sessions"}>
-        {sessions.map((s) => (
-          <div key={s.device} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid #F5F5F5", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{s.device}</div>
-              <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{s.location} · {formatLastActive(s.last, lang)}</div>
+        {sessionsLoading ? (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>
+            {lang === "fr" ? "Chargement des sessions..." : "Loading sessions..."}
+          </p>
+        ) : sessionsError ? (
+          <p style={{ fontSize: 13, color: "#C62828", margin: 0 }}>{sessionsError}</p>
+        ) : sessions.length === 0 ? (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>
+            {lang === "fr"
+              ? "Aucune session enregistrée. Reconnectez-vous pour voir cet appareil ici."
+              : "No sessions recorded yet. Sign in again to see this device here."}
+          </p>
+        ) : (
+          sessions.map((s) => (
+            <div
+              key={s.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "14px 0",
+                borderBottom: "1px solid #F5F5F5",
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                  {s.device}
+                  {s.isCurrent && (
+                    <span style={{ marginLeft: 8, fontSize: 11, color: "#0047FF", fontWeight: 600 }}>
+                      {lang === "fr" ? "Cet appareil" : "This device"}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                  {s.location} · {formatLastActiveFromDate(s.lastActiveAt, lang)}
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={revokingKey === s.sessionKey}
+                onClick={() => void revokeSession(s.sessionKey, s.isCurrent)}
+                style={{
+                  ...btnSecondary,
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  opacity: revokingKey === s.sessionKey ? 0.6 : 1,
+                }}
+              >
+                {revokingKey === s.sessionKey
+                  ? lang === "fr"
+                    ? "..."
+                    : "..."
+                  : lang === "fr"
+                    ? "Révoquer"
+                    : "Revoke"}
+              </button>
             </div>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Révoquer" : "Revoke"}</button>
-          </div>
-        ))}
-        <button type="button" style={{ ...btnSecondary, marginTop: 16, width: "100%" }}>{lang === "fr" ? "Révoquer toutes les sessions" : "Revoke all sessions"}</button>
+          ))
+        )}
+        {otherSessionsCount > 0 && (
+          <button
+            type="button"
+            disabled={revokingKey === "__all__"}
+            onClick={() => void revokeAllOthers()}
+            style={{
+              ...btnSecondary,
+              marginTop: 16,
+              width: "100%",
+              opacity: revokingKey === "__all__" ? 0.6 : 1,
+            }}
+          >
+            {revokingKey === "__all__"
+              ? lang === "fr"
+                ? "Révocation..."
+                : "Revoking..."
+              : lang === "fr"
+                ? "Révoquer toutes les autres sessions"
+                : "Revoke all other sessions"}
+          </button>
+        )}
       </Card>
 
       <Card title={lang === "fr" ? "Zone dangereuse" : "Danger zone"}>

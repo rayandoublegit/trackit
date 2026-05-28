@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getClientIp } from "@/lib/get-client-ip";
+import { upsertUserSession } from "@/lib/user-sessions-server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: NextRequest) {
@@ -32,16 +33,23 @@ export async function POST(request: NextRequest) {
   }
 
   const ip = getClientIp(request);
-  if (!ip) {
-    return response;
-  }
+  const body = (await request.json().catch(() => ({}))) as {
+    sessionKey?: string;
+    userAgent?: string;
+  };
+  const sessionKey =
+    body.sessionKey ?? request.headers.get("x-trackit-session-key") ?? "";
+  const userAgent =
+    body.userAgent ?? request.headers.get("user-agent") ?? null;
 
   const admin = getSupabaseAdmin();
-  if (!admin) {
-    return response;
+  if (admin && ip) {
+    await admin.from("profiles").update({ last_login_ip: ip }).eq("id", user.id);
   }
 
-  await admin.from("profiles").update({ last_login_ip: ip }).eq("id", user.id);
+  if (sessionKey) {
+    await upsertUserSession(user.id, sessionKey, userAgent, ip);
+  }
 
   return response;
 }

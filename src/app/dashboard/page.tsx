@@ -43,6 +43,7 @@ import {
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
+import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
 
 type View = "dashboard" | "discovery" | "creators" | "campaigns" | "affiliates" | "outreach" | "payouts" | "analytics" | "integrations" | "automation" | "settings" | "feedback" | "notifications" | "help";
@@ -205,6 +206,7 @@ function DashboardPageContent() {
           shopify_store: profileData.shopify_store ?? null,
           plan: normalizePlan(profileData.plan),
         });
+        void recordLoginIp();
       } catch (e) {
         console.error("Dashboard load error:", e);
       } finally {
