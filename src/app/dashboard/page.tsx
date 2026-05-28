@@ -11,7 +11,7 @@ import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
 import { OutreachHistorySection } from "./OutreachView";
-import { getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import {
   canAddAnotherShopifyStore,
   canBulkImportTemplatesCsv,
@@ -287,42 +287,31 @@ function DashboardPageContent() {
     check();
   }, [user?.id]);
 
-  const handleCheckout = useCallback(async (target: "basic" | "pro") => {
-    if (!supabase) return;
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    const priceId =
-      target === "pro"
-        ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_BASIC_PRICE_ID;
-    const res = await fetch("/api/create-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        priceId,
-        userId: authUser?.id,
-        email: authUser?.email,
-        cancelUrl: window.location.href,
-      }),
-    });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else if (data.error) alert(data.error);
-  }, []);
+  const checkoutCurrency = lang === "fr" ? "eur" : "usd";
 
-  const handleUpgradeBasic = useCallback(() => void handleCheckout("basic"), [handleCheckout]);
-  const handleUpgradePro = useCallback(() => void handleCheckout("pro"), [handleCheckout]);
-  const handleUpgradeScale = useCallback(async () => {
+  const handleUpgradeBasic = useCallback(async () => {
     try {
-      const isEur =
-        (typeof window !== "undefined" &&
-          (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr")
-            ? "fr"
-            : "en")) === "fr";
-      await handleUpgrade(getScalePriceId(isEur ? "eur" : "usd"));
+      await handleUpgrade(getGrowthPriceId(checkoutCurrency));
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not start checkout");
     }
-  }, []);
+  }, [checkoutCurrency]);
+
+  const handleUpgradePro = useCallback(async () => {
+    try {
+      await handleUpgrade(getProPriceId(checkoutCurrency));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not start checkout");
+    }
+  }, [checkoutCurrency]);
+
+  const handleUpgradeScale = useCallback(async () => {
+    try {
+      await handleUpgrade(getScalePriceId(checkoutCurrency));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not start checkout");
+    }
+  }, [checkoutCurrency]);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {

@@ -39,6 +39,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {PRELOAD_FONTS.map((href) => (
           <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
+        <script
+          type="text/javascript"
+          dangerouslySetInnerHTML={{
+            __html: `(function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "wycxeotj7b");`,
+          }}
+        />
       </head>
       <body>{children}
         <Analytics />
