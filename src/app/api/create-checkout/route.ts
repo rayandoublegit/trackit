@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       mode: isOneShot ? "payment" : "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       ...(email ? { customer_email: email } : {}),
-      metadata: userId ? { userId: String(userId) } : {},
+      metadata: userId ? { userId: String(userId), plan: priceId.includes(process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID ?? "NOPE") || priceId.includes(process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID ?? "NOPE") ? "scale" : priceId.includes(process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID ?? "NOPE") || priceId.includes(process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID ?? "NOPE") ? "pro" : "growth" } : {},
       ...(!isOneShot && isSpark ? { subscription_data: { trial_period_days: 7 } } : {}),
       success_url: isOneShot ? oneShotSuccessUrl : successUrl,
       cancel_url: cancelUrl ?? `${base}`,
