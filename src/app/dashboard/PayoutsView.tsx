@@ -758,6 +758,44 @@ export function PayoutsView({
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
   const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
   const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances">("overview");
+  const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active">("none");
+  const [connectLoading, setConnectLoading] = useState(false);
+
+  // Check Stripe Connect status on mount + after returning from onboarding
+  useEffect(() => {
+    if (!userId) return;
+    fetch("/api/stripe/connect/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (d?.status) setConnectStatus(d.status); })
+      .catch(() => {});
+  }, [userId]);
+
+  const handleConnectStripe = async () => {
+    if (!userId || connectLoading) return;
+    setConnectLoading(true);
+    try {
+      let email: string | undefined;
+      const { supabase } = await import("@/lib/supabase");
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        email = user?.email ?? undefined;
+      }
+      const res = await fetch("/api/stripe/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, email }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else { alert(data.error || "Could not start Stripe onboarding"); setConnectLoading(false); }
+    } catch {
+      setConnectLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -984,13 +1022,26 @@ export function PayoutsView({
                 : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
             </div>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#fff", background: "#0047FF", borderRadius: 999, padding: "3px 10px", letterSpacing: "0.02em" }}>
-              {lang === "fr" ? "Bientôt" : "Coming Soon"}
-            </span>
-            <span style={{ fontSize: 11, color: "#9A9A9A" }}>
-              {lang === "fr" ? "Scale plan" : "Scale plan"}
-            </span>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
+            {connectStatus === "active" ? (
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#0B8A3C", background: "#E8F7EE", borderRadius: 999, padding: "8px 16px", letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "✓ Connecté" : "✓ Connected"}
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="hero-cta-shopify hero-cta-compact"
+                disabled={!canUseStripeConnectPayouts(plan) || connectLoading}
+                onClick={handleConnectStripe}
+              >
+                {connectLoading
+                  ? (lang === "fr" ? "Chargement…" : "Loading…")
+                  : connectStatus === "pending"
+                  ? (lang === "fr" ? "Terminer la configuration" : "Finish setup")
+                  : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
+              </button>
+            )}
+            <span style={{ fontSize: 11, color: "#9A9A9A" }}>Scale plan</span>
           </div>
         </div>
 

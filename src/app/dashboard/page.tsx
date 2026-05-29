@@ -248,6 +248,16 @@ function DashboardPageContent() {
     };
   }, [user?.id, loading, searchParams]);
 
+  // After returning from Stripe Connect onboarding, land on Payouts so the
+  // status route fires (syncs stripe_connect_status) and the card updates.
+  useEffect(() => {
+    if (!user?.id || loading || searchParams.get("connect") !== "return") return;
+    setView("payouts");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("connect");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  }, [user?.id, loading, searchParams]);
+
   useEffect(() => {
     if (!user?.id) return;
     const check = async () => {
