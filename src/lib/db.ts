@@ -41,13 +41,34 @@ export async function getSavedCreators(userId: string) {
   return data || [];
 }
 
-export async function removeCreator(userId: string, username: string) {
-  if (!supabase) return;
-  await supabase
+/** Delete by handle (Discovery saved creators). */
+export async function removeCreator(userId: string, handle: string) {
+  if (!supabase) return false;
+  const { error } = await supabase
     .from("creators")
     .delete()
     .eq("user_id", userId)
-    .eq("username", username);
+    .eq("handle", handle);
+  if (error) {
+    console.error("removeCreator error:", error);
+    return false;
+  }
+  return true;
+}
+
+/** Delete by row id (Creators tab). */
+export async function deleteCreatorById(userId: string, creatorId: string) {
+  if (!supabase) return false;
+  const { error } = await supabase
+    .from("creators")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", creatorId);
+  if (error) {
+    console.error("deleteCreatorById error:", error);
+    return false;
+  }
+  return true;
 }
 
 // CAMPAIGNS

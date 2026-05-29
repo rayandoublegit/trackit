@@ -1655,7 +1655,7 @@ body { padding-top: 80px; }
 
   /* HERO */
   .hero {
-    padding: 48px 16px 40px;
+    padding: 24px 16px 40px;
     max-width: 100%;
     overflow: visible;
   }
@@ -1671,27 +1671,27 @@ body { padding-top: 80px; }
   .hero-doodle {
     display: block;
     width: 108px;
-    top: 36px;
-    margin-left: -228px;
+    top: 12px;
+    margin-left: -200px;
   }
-  .hero-doodle--fr { width: 100px; top: 48px; margin-left: -236px; }
+  .hero-doodle--fr { width: 100px; top: 28px; margin-left: -208px; }
   .hero-cursor {
     display: block;
     width: 68px;
-    top: 38px;
-    margin-left: 140px;
+    top: 26px;
+    margin-left: 92px;
   }
-  .hero-cursor--fr { top: 64px; margin-left: 138px; }
+  .hero-cursor--fr { top: 56px; margin-left: 90px; }
   .hero-money {
     display: block;
     width: 43px;
-    top: 82px;
-    margin-left: 184px;
+    top: 102px;
+    margin-left: 168px;
   }
   .hero-money--fr {
     width: 38px;
-    top: 78px;
-    margin-left: 188px;
+    top: 98px;
+    margin-left: 172px;
   }
   .hero-sub {
     font-size: 17px;
@@ -1831,13 +1831,13 @@ body { padding-top: 80px; }
     width: calc(100% - 16px);
     top: 8px;
   }
-  .hero { padding-top: 32px; }
-  .hero-doodle { width: 92px; top: 32px; margin-left: -212px; }
-  .hero-doodle--fr { width: 84px; top: 48px; margin-left: -216px; }
-  .hero-cursor { width: 57px; top: 38px; margin-left: 122px; }
-  .hero-cursor--fr { top: 68px; margin-left: 116px; }
-  .hero-money { width: 36px; top: 82px; margin-left: 172px; }
-  .hero-money--fr { width: 32px; top: 76px; margin-left: 170px; }
+  .hero { padding-top: 16px; }
+  .hero-doodle { width: 92px; top: 8px; margin-left: -172px; }
+  .hero-doodle--fr { width: 84px; top: 24px; margin-left: -176px; }
+  .hero-cursor { width: 57px; top: 22px; margin-left: 80px; }
+  .hero-cursor--fr { top: 52px; margin-left: 74px; }
+  .hero-money { width: 36px; top: 92px; margin-left: 150px; }
+  .hero-money--fr { width: 32px; top: 86px; margin-left: 148px; }
   .hero-headline { font-size: 36px; }
   .hero-italic { font-size: 36px; }
   .hero-sub { font-size: 15px; }
@@ -1869,7 +1869,7 @@ body { padding-top: 80px; }
 
   /* HERO */
   .hero {
-    padding: 48px 16px 40px;
+    padding: 24px 16px 40px;
     max-width: 100%;
     overflow: visible;
   }
@@ -1884,27 +1884,27 @@ body { padding-top: 80px; }
   .hero-doodle {
     display: block;
     width: 108px;
-    top: 36px;
-    margin-left: -228px;
+    top: 12px;
+    margin-left: -200px;
   }
-  .hero-doodle--fr { width: 100px; top: 48px; margin-left: -236px; }
+  .hero-doodle--fr { width: 100px; top: 28px; margin-left: -208px; }
   .hero-cursor {
     display: block;
     width: 68px;
-    top: 38px;
-    margin-left: 140px;
+    top: 26px;
+    margin-left: 92px;
   }
-  .hero-cursor--fr { top: 64px; margin-left: 138px; }
+  .hero-cursor--fr { top: 56px; margin-left: 90px; }
   .hero-money {
     display: block;
     width: 43px;
-    top: 82px;
-    margin-left: 184px;
+    top: 102px;
+    margin-left: 168px;
   }
   .hero-money--fr {
     width: 38px;
-    top: 78px;
-    margin-left: 188px;
+    top: 98px;
+    margin-left: 172px;
   }
   .hero-sub { font-size: 17px; max-width: 100%; margin: 20px auto 0; }
   .hero-cta {
@@ -2049,13 +2049,13 @@ body { padding-top: 80px; }
 
 @media (max-width: 480px) {
   .navbar { width: calc(100vw - 16px); top: 8px; }
-  .hero { padding-top: 32px; }
-  .hero-doodle { width: 92px; top: 32px; margin-left: -212px; }
-  .hero-doodle--fr { width: 84px; top: 48px; margin-left: -216px; }
-  .hero-cursor { width: 57px; top: 38px; margin-left: 122px; }
-  .hero-cursor--fr { top: 68px; margin-left: 116px; }
-  .hero-money { width: 36px; top: 82px; margin-left: 172px; }
-  .hero-money--fr { width: 32px; top: 76px; margin-left: 170px; }
+  .hero { padding-top: 16px; }
+  .hero-doodle { width: 92px; top: 8px; margin-left: -172px; }
+  .hero-doodle--fr { width: 84px; top: 24px; margin-left: -176px; }
+  .hero-cursor { width: 57px; top: 22px; margin-left: 80px; }
+  .hero-cursor--fr { top: 52px; margin-left: 74px; }
+  .hero-money { width: 36px; top: 92px; margin-left: 150px; }
+  .hero-money--fr { width: 32px; top: 86px; margin-left: 148px; }
   .hero-headline { font-size: 38px; }
   .hero-italic { font-size: 38px; }
   .hero-sub { font-size: 15px; }

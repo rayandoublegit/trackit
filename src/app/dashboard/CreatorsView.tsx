@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
-import { getSavedCreators, getCampaigns } from "@/lib/db";
+import { deleteCreatorById, getSavedCreators, getCampaigns } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
@@ -971,9 +971,20 @@ export function CreatorsView({
     setDetailCreator((d) => (d?.id === updated.id ? updated : d));
   };
 
-  const removeCreator = (id: string) => {
+  const handleRemoveCreator = async (id: string) => {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const ok = await deleteCreatorById(user.id, id);
+    if (!ok) {
+      setToast(lang === "fr" ? "Impossible de supprimer le créateur" : "Could not remove creator");
+      return;
+    }
     setCreators((list) => list.filter((c) => c.id !== id));
-    setDetailCreator(null);
+    setDetailCreator((d) => (d?.id === id ? null : d));
+    setCampaignCreator((c) => (c?.id === id ? null : c));
+    setOutreachCreator((c) => (c?.id === id ? null : c));
+    setToast(lang === "fr" ? "Créateur supprimé" : "Creator removed");
   };
 
   const iconBtnAction: React.CSSProperties = {
@@ -1175,7 +1186,7 @@ export function CreatorsView({
                       </button>
                       <button
                         type="button"
-                        onClick={() => removeCreator(creator.id)}
+                        onClick={() => void handleRemoveCreator(creator.id)}
                         style={{ flex: 1, padding: "8px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
                       >
                         {lang === "fr" ? "Supprimer" : "Remove"}
@@ -1249,7 +1260,7 @@ export function CreatorsView({
                           type="button"
                           className="hero-cta-shopify-light hero-cta-compact"
                           style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2" }}
-                          onClick={() => removeCreator(c.id)}
+                          onClick={() => void handleRemoveCreator(c.id)}
                         >
                           {lang === "fr" ? "Supprimer" : "Remove"}
                         </button>
@@ -1294,7 +1305,7 @@ export function CreatorsView({
           creator={detailCreator}
           onClose={() => setDetailCreator(null)}
           onUpdate={updateCreator}
-          onRemove={() => removeCreator(detailCreator.id)}
+          onRemove={() => void handleRemoveCreator(detailCreator.id)}
           onRunCampaign={() => {
             if (plan === "free") {
               setUpgradeMsg(lang === "fr"
