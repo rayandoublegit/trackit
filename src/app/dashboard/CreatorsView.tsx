@@ -711,10 +711,21 @@ function RunCampaignModal({
   const [minPayout, setMinPayout] = useState("50");
   const [assignedCode, setAssignedCode] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
+  const [copiedField, setCopiedField] = useState<"code" | "link" | "assigned" | null>(null);
   const [campaigns, setCampaigns] = useState<{ id: string; name: string; platform: string }[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(true);
   const code = discountCodeFor(creator.username);
   const [refLink] = useState(`trackit.app/r/${referralSlug(creator.username)}`);
+
+  const copyWithFeedback = async (text: string, field: "code" | "link" | "assigned") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      window.setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -843,20 +854,30 @@ function RunCampaignModal({
 
       {step === 3 && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Step 3 — Referral assets</p>
-          <Field label="Discount code">
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>
+            {lang === "fr" ? "ÉTAPE 3 — ASSETS DE PARRAINAGE" : "STEP 3 — REFERRAL ASSETS"}
+          </p>
+          <Field label={lang === "fr" ? "Code de réduction" : "Discount code"}>
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={code} style={{ ...inputStyle, fontFamily: "monospace", fontWeight: 600 }} />
-              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(code)}>
-                Copy
+              <button
+                type="button"
+                style={btnSecondary}
+                onClick={() => void copyWithFeedback(code, "code")}
+              >
+                {copiedField === "code" ? (lang === "fr" ? "Copié !" : "Copied!") : lang === "fr" ? "Copier" : "Copy"}
               </button>
             </div>
           </Field>
-          <Field label="Referral link">
+          <Field label={lang === "fr" ? "Lien de parrainage" : "Referral link"}>
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={refLink} style={{ ...inputStyle, fontFamily: "monospace", fontSize: 12 }} />
-              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(refLink)}>
-                Copy
+              <button
+                type="button"
+                style={btnSecondary}
+                onClick={() => void copyWithFeedback(refLink, "link")}
+              >
+                {copiedField === "link" ? (lang === "fr" ? "Copié !" : "Copied!") : lang === "fr" ? "Copier" : "Copy"}
               </button>
             </div>
           </Field>
@@ -873,25 +894,41 @@ function RunCampaignModal({
               setStep(4);
             }}
           >
-            {launching ? "Launching..." : "Launch campaign →"}
+            {launching
+              ? lang === "fr"
+                ? "Lancement…"
+                : "Launching..."
+              : lang === "fr"
+                ? "Lancer la campagne →"
+                : "Launch campaign →"}
           </button>
         </>
       )}
 
       {step === 4 && assignedCode && (
         <>
-          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>Campaign launched</p>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 16px" }}>Share this discount code with {creator.displayName}:</p>
-          <Field label="Discount code">
+          <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", marginBottom: 12 }}>
+            {lang === "fr" ? "CAMPAGNE LANCÉE" : "CAMPAIGN LAUNCHED"}
+          </p>
+          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 16px" }}>
+            {lang === "fr"
+              ? `Partagez ce code de réduction avec ${creator.displayName} :`
+              : `Share this discount code with ${creator.displayName}:`}
+          </p>
+          <Field label={lang === "fr" ? "Code de réduction" : "Discount code"}>
             <div style={{ display: "flex", gap: 8 }}>
               <input readOnly value={assignedCode} style={{ ...inputStyle, fontFamily: "monospace", fontWeight: 600 }} />
-              <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(assignedCode)}>
-                Copy
+              <button
+                type="button"
+                style={btnSecondary}
+                onClick={() => void copyWithFeedback(assignedCode, "assigned")}
+              >
+                {copiedField === "assigned" ? (lang === "fr" ? "Copié !" : "Copied!") : lang === "fr" ? "Copier" : "Copy"}
               </button>
             </div>
           </Field>
           <button type="button" style={{ ...btnBlack, width: "100%", marginTop: 8 }} onClick={onClose}>
-            Done
+            {lang === "fr" ? "Terminé" : "Done"}
           </button>
         </>
       )}
@@ -1138,15 +1175,15 @@ export function CreatorsView({
             />
           </div>
           <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
-            <option value="all">All platforms</option>
+            <option value="all">{lang === "fr" ? "Toutes les plateformes" : "All platforms"}</option>
             <option value="tiktok">TikTok</option>
             <option value="instagram">Instagram</option>
             <option value="youtube">YouTube</option>
           </select>
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortKey)} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
-            <option value="followers">Followers</option>
-            <option value="engagement">Engagement</option>
-            <option value="addedDate">Added date</option>
+            <option value="followers">{lang === "fr" ? "Abonnés" : "Followers"}</option>
+            <option value="engagement">{lang === "fr" ? "Engagement" : "Engagement"}</option>
+            <option value="addedDate">{lang === "fr" ? "Date d'ajout" : "Added date"}</option>
           </select>
         </div>
 
@@ -1183,7 +1220,7 @@ export function CreatorsView({
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{creator.engagement}%</div>
                       </div>
                       <div style={{ textAlign: "center", background: "#F8F8F8", borderRadius: 8, padding: "8px 4px" }}>
-                        <div style={{ fontSize: 11, color: "#9A9A9A" }}>Niche</div>
+                        <div style={{ fontSize: 11, color: "#9A9A9A" }}>{lang === "fr" ? "Niche" : "Niche"}</div>
                         <div style={{ fontWeight: 600, fontSize: 12 }}>{creator.niche || "—"}</div>
                       </div>
                     </div>

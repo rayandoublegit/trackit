@@ -1,47 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { BillingPaymentMethod } from "@/lib/billing-payment-methods";
+import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 
-export interface PaymentMethod {
-  id: string;
-  brand: string;
-  last4: string;
-  expiry: string;
-  isDefault: boolean;
-}
-
-const STORAGE_KEY = "trackit_payment_methods";
-
-const defaultMethods: PaymentMethod[] = [
-  { id: "1", brand: "Visa", last4: "4242", expiry: "12/28", isDefault: true },
-];
-
-type Listener = () => void;
-const listeners = new Set<Listener>();
-
-function loadFromStorage(): PaymentMethod[] {
-  if (typeof window === "undefined") return defaultMethods;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultMethods;
-    const parsed = JSON.parse(raw) as PaymentMethod[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : defaultMethods;
-  } catch {
-    return defaultMethods;
-  }
-}
-
-function persist(methods: PaymentMethod[]) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(methods));
-  }
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener: Listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
+export type PaymentMethod = BillingPaymentMethod;
 
 export function getDefaultPaymentMethod(methods: PaymentMethod[]): PaymentMethod | null {
   return methods.find((m) => m.isDefault) ?? methods[0] ?? null;
@@ -51,37 +14,68 @@ export function formatPaymentLabel(method: PaymentMethod): string {
   return `${method.brand} ending in ${method.last4}`;
 }
 
+export function formatPaymentLabelShort(method: PaymentMethod, lang: "en" | "fr"): string {
+  return lang === "fr"
+    ? `${method.brand} ···· ${method.last4}`
+    : `${method.brand} ···· ${method.last4}`;
+}
+
 export function usePaymentMethods() {
-  const [methods, setMethods] = useState<PaymentMethod[]>(defaultMethods);
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/payment-methods", {
+        credentials: "include",
+      });
+      const data = (await res.json()) as {
+        methods?: PaymentMethod[];
+        hasStripeCustomer?: boolean;
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Failed to load payment methods");
+      }
+      setMethods(data.methods ?? []);
+      setHasStripeCustomer(Boolean(data.hasStripeCustomer));
+    } catch (err) {
+      setMethods([]);
+      setHasStripeCustomer(false);
+      setError(err instanceof Error ? err.message : "Failed to load payment methods");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setMethods(loadFromStorage());
-    const unsubscribe = subscribe(() => setMethods(loadFromStorage()));
-    return () => { unsubscribe(); };
+    void refresh();
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh]);
+
+  const openManage = useCallback(() => {
+    void openStripeBillingPortal();
   }, []);
 
-  const addMethod = useCallback((method: PaymentMethod) => {
-    const current = loadFromStorage();
-    const next = method.isDefault
-      ? [...current.map((m) => ({ ...m, isDefault: false })), method]
-      : current.length === 0
-        ? [{ ...method, isDefault: true }]
-        : [...current, method];
-    persist(next);
-  }, []);
+  const defaultMethod = getDefaultPaymentMethod(methods);
 
-  const removeMethod = useCallback((id: string) => {
-    let next = loadFromStorage().filter((m) => m.id !== id);
-    if (next.length > 0 && !next.some((m) => m.isDefault)) {
-      next = next.map((m, i) => ({ ...m, isDefault: i === 0 }));
-    }
-    persist(next);
-  }, []);
-
-  const setDefault = useCallback((id: string) => {
-    const next = loadFromStorage().map((m) => ({ ...m, isDefault: m.id === id }));
-    persist(next);
-  }, []);
-
-  return { methods, addMethod, removeMethod, setDefault };
+  return {
+    methods,
+    defaultMethod,
+    loading,
+    error,
+    hasStripeCustomer,
+    hasPaymentMethod: methods.length > 0,
+    manageInBilling: true,
+    refresh,
+    openManage,
+  };
 }

@@ -716,6 +716,7 @@ function OutreachModal({
   onMarkSent: () => void;
   userName: string;
 }) {
+  const lang = useLang();
   const [tab, setTab] = useState<OutreachModalTab>("generate");
   const [product, setProduct] = useState("");
   const [tone, setTone] = useState<OutreachTone>("Casual");
@@ -946,7 +947,11 @@ function OutreachModal({
         {tab === "templates" && (
           <>
             {templates.length === 0 ? (
-              <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>No templates yet. Generate a message and save it as a template.</p>
+              <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>
+                {lang === "fr"
+                  ? "Aucun modèle pour le moment. Générez un message et enregistrez-le comme modèle."
+                  : "No templates yet. Generate a message and save it as a template."}
+              </p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {templates.map((tpl) => (
@@ -1297,12 +1302,14 @@ export function DiscoveryView({
   onUpgradePro,
   onUpgradeScale,
   isMobile,
+  onNavigateToOutreachSend,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
   onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
   isMobile?: boolean;
+  onNavigateToOutreachSend?: (creator: Creator) => void;
 }) {
   const lang = useLang();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
@@ -1475,6 +1482,11 @@ export function DiscoveryView({
   };
 
   const openOutreach = (creator: Creator) => {
+    if (onNavigateToOutreachSend) {
+      setSelectedCreator(null);
+      onNavigateToOutreachSend(creator);
+      return;
+    }
     setSelectedCreator(null);
     setOutreachCreator(creator);
   };

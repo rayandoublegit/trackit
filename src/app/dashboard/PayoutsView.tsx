@@ -12,7 +12,7 @@ import {
 import { formatCurrency } from "@/lib/useCurrency";
 import {
   formatPaymentLabel,
-  getDefaultPaymentMethod,
+  formatPaymentLabelShort,
   usePaymentMethods,
   type PaymentMethod,
 } from "./usePaymentMethods";
@@ -307,55 +307,6 @@ const pmBtnSecondary: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
-const pmBtnBlack: React.CSSProperties = {
-  background: "#1A1A1A",
-  color: "#FFFFFF",
-  border: "none",
-  borderRadius: 10,
-  padding: "10px 18px",
-  fontSize: 13,
-  fontWeight: 500,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  letterSpacing: "-0.02em",
-};
-
-const pmInputStyle: React.CSSProperties = {
-  width: "100%",
-  boxSizing: "border-box",
-  padding: "10px 12px",
-  borderRadius: 10,
-  border: "1px solid #E5E5E5",
-  fontSize: 14,
-  fontFamily: "inherit",
-  color: "#1A1A1A",
-  letterSpacing: "-0.02em",
-  background: "#FFFFFF",
-};
-
-function PaymentToast({ message }: { message: string }) {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 24,
-        right: 24,
-        background: "#1A1A1A",
-        color: "#FFFFFF",
-        padding: "12px 18px",
-        borderRadius: 10,
-        fontSize: 13,
-        fontWeight: 500,
-        zIndex: 1100,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-        fontFamily: "inherit",
-      }}
-    >
-      {message}
-    </div>
-  );
-}
-
 function CardBrandIcon({ brand }: { brand: string }) {
   const isMastercard = brand.toLowerCase() === "mastercard";
   return (
@@ -380,171 +331,7 @@ function CardBrandIcon({ brand }: { brand: string }) {
   );
 }
 
-function formatCardNumberInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 16);
-  return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
-}
-
-function formatExpiryInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
-
-function detectBrand(cardNumber: string): string {
-  const d = cardNumber.replace(/\D/g, "");
-  if (d.startsWith("5")) return "Mastercard";
-  return "Visa";
-}
-
-function nextPaymentId() {
-  return `pm-${Date.now()}`;
-}
-
-export function AddPaymentMethodModal({ onClose, onAdded }: { onClose: () => void; onAdded?: () => void }) {
-  const { methods, addMethod } = usePaymentMethods();
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvc, setCvc] = useState("");
-  const [nameOnCard, setNameOnCard] = useState("");
-
-  const digits = cardNumber.replace(/\D/g, "");
-  const canSubmit = digits.length >= 15 && expiry.length >= 5 && cvc.length >= 3 && nameOnCard.trim().length > 0;
-
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-    const brand = detectBrand(cardNumber);
-    const last4 = digits.slice(-4);
-    const method: PaymentMethod = {
-      id: nextPaymentId(),
-      brand,
-      last4,
-      expiry: expiry.trim(),
-      isDefault: methods.length === 0,
-    };
-    addMethod(method);
-    onAdded?.();
-    onClose();
-  };
-
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px" }}>Add payment method</h3>
-        <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Card number</label>
-        <input
-          type="text"
-          value={cardNumber}
-          onChange={(e) => setCardNumber(formatCardNumberInput(e.target.value))}
-          placeholder="4242 4242 4242 4242"
-          style={{ ...pmInputStyle, marginBottom: 12 }}
-        />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Expiry</label>
-            <input
-              type="text"
-              value={expiry}
-              onChange={(e) => setExpiry(formatExpiryInput(e.target.value))}
-              placeholder="MM/YY"
-              style={pmInputStyle}
-            />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>CVC</label>
-            <input
-              type="text"
-              value={cvc}
-              onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              placeholder="123"
-              style={pmInputStyle}
-            />
-          </div>
-        </div>
-        <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Name on card</label>
-        <input
-          type="text"
-          value={nameOnCard}
-          onChange={(e) => setNameOnCard(e.target.value)}
-          placeholder="Jane Smith"
-          style={{ ...pmInputStyle, marginBottom: 12 }}
-        />
-        <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 16px", lineHeight: 1.45 }}>
-          Your card is encrypted and stored securely via Stripe.
-        </p>
-        <button type="button" onClick={handleSubmit} disabled={!canSubmit} style={{ ...pmBtnBlack, width: "100%", opacity: canSubmit ? 1 : 0.5 }}>
-          Add card →
-        </button>
-        <button type="button" onClick={onClose} style={{ ...pmBtnSecondary, width: "100%", marginTop: 10 }}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function RemovePaymentMethodModal({
-  onClose,
-  onConfirm,
-}: {
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 400, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 20px", lineHeight: 1.5, fontWeight: 500 }}>
-          Remove this payment method? This will also disconnect it from your payout balance.
-        </p>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button type="button" onClick={onClose} style={{ ...pmBtnSecondary, flex: 1 }}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            style={{
-              flex: 1,
-              background: "#DC2626",
-              color: "#FFFFFF",
-              border: "none",
-              borderRadius: 10,
-              padding: "10px 16px",
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: "inherit",
-              cursor: "pointer",
-            }}
-          >
-            Remove card
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PaymentMethodCardItem({
-  method,
-  onSetDefault,
-  onRemove,
-}: {
-  method: PaymentMethod;
-  onSetDefault: () => void;
-  onRemove: () => void;
-}) {
+function PaymentMethodCardItem({ method }: { method: PaymentMethod }) {
   const lang = useLang();
   return (
     <div
@@ -562,89 +349,125 @@ function PaymentMethodCardItem({
       <CardBrandIcon brand={method.brand} />
       <div style={{ flex: 1, minWidth: 160 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
-          {method.brand} {lang === "fr" ? "se terminant par" : "ending in"} {method.last4}
+          {formatPaymentLabel(method)}
         </div>
-        <div style={{ fontSize: 12, color: "#7A7A7A" }}>Expiry: {method.expiry}</div>
+        <div style={{ fontSize: 12, color: "#7A7A7A" }}>
+          {lang === "fr" ? "Expire" : "Expires"} {method.expiry}
+        </div>
       </div>
       {method.isDefault && (
         <span style={{ fontSize: 11, fontWeight: 600, color: "#1FB567", background: "rgba(31,181,103,0.12)", padding: "4px 10px", borderRadius: 999 }}>
-          Default
+          {lang === "fr" ? "Par défaut" : "Default"}
         </span>
       )}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <button
-          type="button"
-          onClick={onSetDefault}
-          disabled={method.isDefault}
-          style={{
-            ...pmBtnSecondary,
-            opacity: method.isDefault ? 0.45 : 1,
-            cursor: method.isDefault ? "not-allowed" : "pointer",
-          }}
-        >
-          Set as default
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#DC2626",
-            fontSize: 13,
-            fontWeight: 500,
-            fontFamily: "inherit",
-            cursor: "pointer",
-            padding: "8px 4px",
-          }}
-        >
-          {lang === "fr" ? "Supprimer" : "Remove"}
-        </button>
-      </div>
     </div>
   );
 }
 
-export function PaymentMethodsBillingSection() {
-  const { methods, removeMethod, setDefault } = usePaymentMethods();
-  const [addOpen, setAddOpen] = useState(false);
-  const [removeId, setRemoveId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+export function BillingPaymentMethodSummary({ compact }: { compact?: boolean }) {
+  const lang = useLang();
+  const { defaultMethod, loading, error, hasPaymentMethod, openManage } = usePaymentMethods();
 
-  const confirmRemove = () => {
-    if (!removeId) return;
-    removeMethod(removeId);
-    setRemoveId(null);
-    setToast("Payment method removed ✓");
-  };
+  if (loading) {
+    return (
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? "Chargement de la carte…" : "Loading card…"}
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p style={{ fontSize: 13, color: "#C62828", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+        {error}
+      </p>
+    );
+  }
+
+  if (!hasPaymentMethod || !defaultMethod) {
+    return (
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+        {lang === "fr"
+          ? "Aucune carte enregistrée pour votre abonnement."
+          : "No card on file for your subscription."}{" "}
+        <button
+          type="button"
+          onClick={openManage}
+          style={{ background: "none", border: "none", padding: 0, color: "#0047FF", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          {lang === "fr" ? "Ajouter une carte" : "Add a card"}
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+      {lang === "fr" ? "Facturé sur" : "Billed to"}{" "}
+      <span style={{ color: "#1A1A1A", fontWeight: 500 }}>
+        {formatPaymentLabelShort(defaultMethod, lang)}
+      </span>
+      {!compact && (
+        <>
+          {" "}
+          · {lang === "fr" ? "expire" : "expires"} {defaultMethod.expiry}
+        </>
+      )}
+    </p>
+  );
+}
+
+export function PaymentMethodsBillingSection() {
+  const lang = useLang();
+  const { methods, loading, error, hasPaymentMethod, openManage } = usePaymentMethods();
+
+  if (loading) {
+    return (
+      <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? "Chargement..." : "Loading..."}
+      </p>
+    );
+  }
+
+  if (error) {
+    return (
+      <p style={{ fontSize: 13, color: "#C62828", margin: 0, letterSpacing: "-0.01em" }}>
+        {error}
+      </p>
+    );
+  }
 
   return (
     <>
+      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 12px", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+        {lang === "fr"
+          ? "Carte utilisée lors du choix de votre offre et pour les renouvellements Stripe."
+          : "Card used when you chose your plan and for Stripe renewals."}
+      </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
         {methods.map((m) => (
-          <PaymentMethodCardItem
-            key={m.id}
-            method={m}
-            onSetDefault={() => setDefault(m.id)}
-            onRemove={() => setRemoveId(m.id)}
-          />
+          <PaymentMethodCardItem key={m.id} method={m} />
         ))}
+        {!hasPaymentMethod && (
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Aucune carte enregistrée. Ajoutez-en une via le portail de facturation Stripe."
+              : "No card on file. Add one in the Stripe billing portal."}
+          </p>
+        )}
       </div>
-      <button type="button" onClick={() => setAddOpen(true)} style={{ ...pmBtnSecondary, marginBottom: 16 }}>
-        + Add payment method
+      <button type="button" onClick={openManage} style={{ ...pmBtnSecondary, marginBottom: 16 }}>
+        {hasPaymentMethod
+          ? lang === "fr"
+            ? "Mettre à jour la carte"
+            : "Update card"
+          : lang === "fr"
+            ? "Ajouter une carte"
+            : "Add a card"}
       </button>
       <div style={{ padding: "12px 14px", background: "#FAFAFA", borderRadius: 10, fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
         Switch to annual billing — save 20%
       </div>
-
-      {addOpen && (
-        <AddPaymentMethodModal
-          onClose={() => setAddOpen(false)}
-          onAdded={() => setToast("Card added ✓")}
-        />
-      )}
-      {removeId && <RemovePaymentMethodModal onClose={() => setRemoveId(null)} onConfirm={confirmRemove} />}
-      {toast && <PaymentToast message={toast} />}
     </>
   );
 }
@@ -750,10 +573,12 @@ export function PayoutsView({
   const [methodValue, setMethodValue] = useState("");
   const [payMessage, setPayMessage] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
-  const { methods: paymentMethods } = usePaymentMethods();
-  const defaultPaymentMethod = getDefaultPaymentMethod(paymentMethods);
+  const {
+    defaultMethod: defaultPaymentMethod,
+    hasPaymentMethod: hasBillingPaymentMethod,
+    openManage: openBillingPaymentManage,
+  } = usePaymentMethods();
   const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
-  const [addPaymentForFunds, setAddPaymentForFunds] = useState(false);
   const [fundAmount, setFundAmount] = useState("");
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
   const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
@@ -871,8 +696,10 @@ export function PayoutsView({
   };
 
   const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
-  const canAddFunds = defaultPaymentMethod !== null && parsedFundAmount > 0;
-  const chargingLabel = defaultPaymentMethod ? `${defaultPaymentMethod.brand} ···· ${defaultPaymentMethod.last4}` : null;
+  const canAddFunds = hasBillingPaymentMethod && parsedFundAmount > 0;
+  const chargingLabel = defaultPaymentMethod
+    ? formatPaymentLabelShort(defaultPaymentMethod, lang)
+    : null;
 
   return (
     <>
@@ -1527,10 +1354,20 @@ export function PayoutsView({
           <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</h3>
             <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatCurrency(balance, lang)}</p>
-            {!defaultPaymentMethod ? (
+            {!hasBillingPaymentMethod ? (
               <>
-                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>Add a payment method before you can fund your balance.</p>
-                <button type="button" onClick={() => setAddPaymentForFunds(true)} style={{ ...payoutsBtnPrimary, width: "100%" }}>Add a payment method</button>
+                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>
+                  {lang === "fr"
+                    ? "Ajoutez la carte utilisée pour votre abonnement (facturation Stripe) avant d'alimenter votre solde."
+                    : "Add the card used for your subscription (Stripe billing) before you can fund your balance."}
+                </p>
+                <button
+                  type="button"
+                  onClick={openBillingPaymentManage}
+                  style={{ ...payoutsBtnPrimary, width: "100%" }}
+                >
+                  {lang === "fr" ? "Ouvrir la facturation" : "Open billing"}
+                </button>
               </>
             ) : (
               <>
@@ -1560,14 +1397,6 @@ export function PayoutsView({
         </div>
       )}
 
-      {addPaymentForFunds && (
-        <AddPaymentMethodModal
-          onClose={() => setAddPaymentForFunds(false)}
-          onAdded={() => setPayMessage("Payment method connected. You can add funds now.")}
-        />
-      )}
-
-
       </div>
     </>
   );
@@ -1575,79 +1404,56 @@ export function PayoutsView({
 
 export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPayment?: () => void }) {
   const lang = useLang();
-  const { methods, removeMethod } = usePaymentMethods();
-  const defaultMethod = getDefaultPaymentMethod(methods);
-  const [addOpen, setAddOpen] = useState(false);
-  const [removeId, setRemoveId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const { defaultMethod, loading, error, hasPaymentMethod, openManage } = usePaymentMethods();
 
   const openAdd = () => {
-    setAddOpen(true);
     onOpenAddPayment?.();
-  };
-
-  const confirmRemove = () => {
-    if (!removeId) return;
-    removeMethod(removeId);
-    setRemoveId(null);
-    setToast("Payment method removed ✓");
+    openManage();
   };
 
   return (
-    <>
-      <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-        <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>{lang === "fr" ? "Votre méthode de paiement" : "Your payment method"}</div>
-        {!defaultMethod ? (
-          <>
-            <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>No card connected</div>
-            <button type="button" onClick={openAdd} style={{ ...pmBtnSecondary, width: "100%" }}>
-              Connect a card or bank
-            </button>
-          </>
-        ) : (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <CardBrandIcon brand={defaultMethod.brand} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                  {formatPaymentLabel(defaultMethod)}
-                </div>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}</div>
+    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
+      <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
+        {lang === "fr" ? "Carte de facturation" : "Billing card"}
+      </div>
+      <p style={{ fontSize: 11, color: "#9A9A9A", margin: "0 0 12px", lineHeight: 1.4 }}>
+        {lang === "fr"
+          ? "Même carte que pour votre abonnement Trackit."
+          : "Same card as your Trackit subscription."}
+      </p>
+      {loading ? (
+        <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
+          {lang === "fr" ? "Chargement..." : "Loading..."}
+        </div>
+      ) : error ? (
+        <div style={{ fontSize: 13, color: "#C62828", letterSpacing: "-0.02em" }}>{error}</div>
+      ) : !hasPaymentMethod || !defaultMethod ? (
+        <>
+          <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>
+            {lang === "fr" ? "Aucune carte enregistrée" : "No card on file"}
+          </div>
+          <button type="button" onClick={openAdd} style={{ ...pmBtnSecondary, width: "100%" }}>
+            {lang === "fr" ? "Ajouter dans la facturation" : "Add in billing"}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <CardBrandIcon brand={defaultMethod.brand} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                {formatPaymentLabel(defaultMethod)}
+              </div>
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 2 }}>
+                {lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={openAdd} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ flex: 1 }}>
-                {lang === "fr" ? "Mettre à jour" : "Update payment method"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setRemoveId(defaultMethod.id)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#DC2626",
-                  fontSize: 13,
-                  fontWeight: 500,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                  padding: "10px 8px",
-                }}
-              >
-                {lang === "fr" ? "Supprimer" : "Remove"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {addOpen && (
-        <AddPaymentMethodModal
-          onClose={() => setAddOpen(false)}
-          onAdded={() => setToast("Card added ✓")}
-        />
+          </div>
+          <button type="button" onClick={openAdd} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ width: "100%" }}>
+            {lang === "fr" ? "Mettre à jour la carte" : "Update card"}
+          </button>
+        </>
       )}
-      {removeId && <RemovePaymentMethodModal onClose={() => setRemoveId(null)} onConfirm={confirmRemove} />}
-      {toast && <PaymentToast message={toast} />}
-    </>
+    </div>
   );
 }

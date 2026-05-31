@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
-import { PaymentMethodsBillingSection } from "./PayoutsView";
+import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
@@ -888,18 +888,21 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               )}
             </div>
             {!planLoading && isPaidPlan && (
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"}{" "}
-                {invoicesLoading
-                  ? lang === "fr"
-                    ? "Chargement..."
-                    : "Loading..."
-                  : nextBillingDate
-                    ? formatInvoiceDate(nextBillingDate)
-                    : lang === "fr"
-                      ? "—"
-                      : "—"}
-              </div>
+              <>
+                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                  {lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"}{" "}
+                  {invoicesLoading
+                    ? lang === "fr"
+                      ? "Chargement..."
+                      : "Loading..."
+                    : nextBillingDate
+                      ? formatInvoiceDate(nextBillingDate)
+                      : lang === "fr"
+                        ? "—"
+                        : "—"}
+                </div>
+                <BillingPaymentMethodSummary compact />
+              </>
             )}
           </div>
           {!planLoading && currentPlan !== "scale" && (

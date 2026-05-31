@@ -29,8 +29,7 @@ import {
   normalizePlan,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { AddPaymentMethodModal, LiveSalesFeed, PayoutsView, PayoutsWorkspacePaymentCard } from "./PayoutsView";
-import { getDefaultPaymentMethod, usePaymentMethods } from "./usePaymentMethods";
+import { LiveSalesFeed, PayoutsView } from "./PayoutsView";
 import { FeedbackView } from "./FeedbackView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
@@ -81,6 +80,7 @@ function DashboardPageContent() {
   const [sidebarSearch, setSidebarSearch] = useState("");
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
+  const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);
   const isFree = plan === "free";
@@ -366,6 +366,18 @@ function DashboardPageContent() {
     setView(targetView);
     setSidebarSearch("");
     sidebarSearchRef.current?.blur();
+    if (isMobile) setMobileSidebarOpen(false);
+  };
+
+  const navigateToOutreachSend = (creator?: { username: string; platform: string }) => {
+    const handle = creator ? creatorHandleForOutreach(creator.username) : undefined;
+    setOutreachSendRequest({
+      key: Date.now(),
+      creatorHandle: handle || undefined,
+      dmPlatform: creator ? dmPlatformFromCreatorPlatform(creator.platform) : undefined,
+    });
+    setView("outreach");
+    setSidebarSearch("");
     if (isMobile) setMobileSidebarOpen(false);
   };
 
@@ -655,6 +667,7 @@ function DashboardPageContent() {
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
+            onNavigateToOutreachSend={navigateToOutreachSend}
           />
         )}
         {view === "creators" && (
@@ -688,6 +701,8 @@ function DashboardPageContent() {
             plan={plan}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
+            openSendRequest={outreachSendRequest}
+            onOpenSendHandled={() => setOutreachSendRequest(null)}
             onNavigateToBilling={() => {
               if (plan === "free") void handleUpgradeBasic();
               else if (plan === "basic") void handleUpgradePro();
@@ -909,6 +924,25 @@ type OutreachTemplate = {
 
 const OUTREACH_DM_PLATFORMS = ["Instagram", "TikTok", "YouTube", "Twitter", "Email"] as const;
 
+type OutreachSendRequest = {
+  key: number;
+  creatorHandle?: string;
+  dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
+};
+
+function dmPlatformFromCreatorPlatform(platform: string): (typeof OUTREACH_DM_PLATFORMS)[number] {
+  const p = platform.toLowerCase();
+  if (p.includes("tiktok")) return "TikTok";
+  if (p.includes("youtube")) return "YouTube";
+  if (p.includes("twitter") || p === "x") return "Twitter";
+  if (p.includes("email")) return "Email";
+  return "Instagram";
+}
+
+function creatorHandleForOutreach(username: string): string {
+  const clean = username.replace(/^@/, "").trim();
+  return clean ? `@${clean}` : "";
+}
 
 const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
 
@@ -996,22 +1030,44 @@ function OutreachView({
   onUpgradePro,
   onUpgradeScale,
   isMobile,
+  openSendRequest,
+  onOpenSendHandled,
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
   onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
   isMobile?: boolean;
+  openSendRequest?: OutreachSendRequest | null;
+  onOpenSendHandled?: () => void;
 }) {
   const lang = useLang();
   const [templates, setTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
   const [panel, setPanel] = useState<OutreachPanel>(null);
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
+  const [sendPrefill, setSendPrefill] = useState<{
+    creatorHandle?: string;
+    dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
+  } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
   const [whiteLabel, setWhiteLabel] = useState(false);
 
-  const closePanel = () => setPanel(null);
+  const closePanel = () => {
+    setPanel(null);
+    setSendPrefill(null);
+  };
+
+  useEffect(() => {
+    if (!openSendRequest) return;
+    setSendTemplateId(null);
+    setSendPrefill({
+      creatorHandle: openSendRequest.creatorHandle,
+      dmPlatform: openSendRequest.dmPlatform,
+    });
+    setPanel("send");
+    onOpenSendHandled?.();
+  }, [openSendRequest, onOpenSendHandled]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -1181,6 +1237,8 @@ function OutreachView({
         <SendOutreachPanel
           templates={templates}
           initialTemplateId={sendTemplateId}
+          initialCreatorHandle={sendPrefill?.creatorHandle}
+          initialDmPlatform={sendPrefill?.dmPlatform}
           onClose={closePanel}
           onSent={() => {
             showToast(lang === "fr" ? "Message copié — collez-le dans le DM ✓" : "Message copied — paste it in the DM ✓");
@@ -1408,7 +1466,11 @@ function SeeTemplatesPanel({
   return (
     <OutreachPanelShell title={lang === "fr" ? "Modèles" : "Templates"} subtitle={lang === "fr" ? "Vos modèles de messages sauvegardés et importés." : "Your saved and imported outreach templates."} onClose={onClose}>
       {templates.length === 0 ? (
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>No templates yet. Create or import one to get started.</p>
+        <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>
+          {lang === "fr"
+            ? "Aucun modèle pour le moment. Créez-en un ou importez-en un pour commencer."
+            : "No templates yet. Create or import one to get started."}
+        </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {templates.map((t) => (
@@ -1416,11 +1478,19 @@ function SeeTemplatesPanel({
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{templateDisplayName(t.name)}</div>
-                  {t.imported && <span style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2, display: "block" }}>Imported</span>}
+                  {t.imported && (
+                    <span style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2, display: "block" }}>
+                      {lang === "fr" ? "Importé" : "Imported"}
+                    </span>
+                  )}
                 </div>
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
               </div>
-              {t.subject && <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 4 }}><strong>Subject:</strong> {t.subject}</div>}
+              {t.subject && (
+                <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 4 }}>
+                  <strong>{lang === "fr" ? "Objet :" : "Subject:"}</strong> {t.subject}
+                </div>
+              )}
               <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden" }}>
                 {[t.opening, t.body, t.cta].filter(Boolean).join(" ")}
               </div>
@@ -1560,17 +1630,25 @@ function TemplateSelect({
 function SendOutreachPanel({
   templates,
   initialTemplateId,
+  initialCreatorHandle,
+  initialDmPlatform,
   onClose,
   onSent,
 }: {
   templates: OutreachTemplate[];
   initialTemplateId: string | null;
+  initialCreatorHandle?: string;
+  initialDmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
   onClose: () => void;
   onSent: (count: number) => void;
 }) {
   const lang = useLang();
-  const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>([]);
-  const [dmPlatform, setDmPlatform] = useState<(typeof OUTREACH_DM_PLATFORMS)[number]>("Instagram");
+  const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>(() =>
+    initialCreatorHandle ? [initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`] : []
+  );
+  const [dmPlatform, setDmPlatform] = useState<(typeof OUTREACH_DM_PLATFORMS)[number]>(
+    initialDmPlatform ?? "Instagram"
+  );
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
   const [subject, setSubject] = useState("");
   const [opening, setOpening] = useState("");
@@ -1593,6 +1671,15 @@ function SendOutreachPanel({
     if (initialTemplateId) applyTemplateById(initialTemplateId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialTemplateId]);
+
+  useEffect(() => {
+    if (initialCreatorHandle) {
+      setSelectedInfluencers([
+        initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`,
+      ]);
+    }
+    if (initialDmPlatform) setDmPlatform(initialDmPlatform);
+  }, [initialCreatorHandle, initialDmPlatform]);
 
   const previewName = selectedInfluencers[0]?.replace(/^@/, "") || "there";
   const fullPreview = [opening.replace(/\{\{name\}\}/gi, previewName), body.replace(/\{\{name\}\}/gi, previewName), cta.replace(/\{\{name\}\}/gi, previewName)].filter(Boolean).join("\n\n");
@@ -1650,6 +1737,11 @@ function SendOutreachPanel({
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 4px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "En cliquant sur Envoyer, le message est copié — il ne reste plus qu’à le coller dans le DM du créateur."
+              : "When you click Send, your message is copied to the clipboard — just paste it into their DMs."}
+          </p>
           <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => void handleSend()}>{sendViaLabel}</button>
           <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
