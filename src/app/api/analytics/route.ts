@@ -1,6 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { getLocalhostAnalyticsMock, isLocalhostRequest } from "@/lib/analytics-mock";
 
 export const dynamic = "force-dynamic";
 
@@ -10,10 +9,6 @@ const supabaseAdmin = createClient(
 );
 
 export async function GET(request: Request) {
-  if (isLocalhostRequest(request)) {
-    return NextResponse.json(getLocalhostAnalyticsMock());
-  }
-
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });

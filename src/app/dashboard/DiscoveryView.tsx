@@ -1743,8 +1743,6 @@ export function DiscoveryView({
               options={[
                 { value: "tiktok", label: "TikTok" },
                 { value: "instagram", label: "Instagram" },
-                { value: "youtube", label: "YouTube" },
-                { value: "twitter", label: "Twitter" },
               ]}
             />
             <FilterSelect

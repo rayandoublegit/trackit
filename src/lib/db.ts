@@ -1,5 +1,12 @@
 import { supabase } from "@/lib/supabase";
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isCreatorUuid(id: string): boolean {
+  return UUID_RE.test(id);
+}
+
 // CREATORS
 export async function saveCreator(userId: string, creator: {
   username: string;
@@ -41,34 +48,42 @@ export async function getSavedCreators(userId: string) {
   return data || [];
 }
 
-/** Delete by handle (Discovery saved creators). */
-export async function removeCreator(userId: string, handle: string) {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from("creators")
-    .delete()
-    .eq("user_id", userId)
-    .eq("handle", handle);
-  if (error) {
-    console.error("removeCreator error:", error);
+async function deleteCreatorViaApi(creatorId?: string, handle?: string): Promise<boolean> {
+  const params = new URLSearchParams();
+  const id = creatorId && isCreatorUuid(creatorId) ? creatorId : undefined;
+  const h = handle?.trim().replace(/^@/, "");
+  if (id) params.set("creatorId", id);
+  else if (h) params.set("handle", h);
+  else return false;
+
+  try {
+    const res = await fetch(`/api/creators?${params.toString()}`, { method: "DELETE" });
+    const payload = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      console.error("deleteCreator error:", payload.error ?? res.statusText);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("deleteCreator error:", e instanceof Error ? e.message : e);
     return false;
   }
-  return true;
 }
 
-/** Delete by row id (Creators tab). */
-export async function deleteCreatorById(userId: string, creatorId: string) {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from("creators")
-    .delete()
-    .eq("user_id", userId)
-    .eq("id", creatorId);
-  if (error) {
-    console.error("deleteCreatorById error:", error);
-    return false;
+/** Delete by handle (Discovery saved creators). */
+export async function removeCreator(_userId: string, handle: string) {
+  return deleteCreatorViaApi(undefined, handle);
+}
+
+/** Delete by row id (Creators tab); falls back to handle for client-only temp ids. */
+export async function deleteCreatorById(_userId: string, creatorId: string, handle?: string) {
+  const h = handle?.trim().replace(/^@/, "");
+  if (creatorId && isCreatorUuid(creatorId)) {
+    const ok = await deleteCreatorViaApi(creatorId);
+    if (ok) return true;
   }
-  return true;
+  if (h) return deleteCreatorViaApi(undefined, h);
+  return false;
 }
 
 // CAMPAIGNS
@@ -119,6 +134,7 @@ export async function saveOutreach(userId: string, outreach: {
   platform: string;
   message: string;
   status: string;
+  follow_up_date?: string | null;
 }) {
   if (!supabase) return null;
   const { data, error } = await supabase

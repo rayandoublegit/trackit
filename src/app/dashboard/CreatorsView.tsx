@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
-import { deleteCreatorById, getSavedCreators, getCampaigns } from "@/lib/db";
+import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator } from "@/lib/db";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
@@ -141,18 +141,17 @@ function statusLabel(status: CreatorStatus, lang: "en" | "fr"): string {
 }
 
 function statusBadgeStyle(status: CreatorStatus): React.CSSProperties {
-  const map: Record<CreatorStatus, { bg: string; fg: string }> = {
-    active: { bg: "rgba(31,181,103,0.12)", fg: "#1FB567" },
-    pending: { bg: "rgba(234,179,8,0.15)", fg: "#B45309" },
-    contacted: { bg: "rgba(0,71,255,0.1)", fg: "#0047FF" },
-    declined: { bg: "rgba(220,38,38,0.1)", fg: "#DC2626" },
+  const bg: Record<CreatorStatus, string> = {
+    active: "rgba(31,181,103,0.12)",
+    pending: "rgba(234,179,8,0.15)",
+    contacted: "rgba(0,71,255,0.1)",
+    declined: "rgba(220,38,38,0.1)",
   };
-  const s = map[status];
   return {
     fontSize: 11,
     fontWeight: 600,
-    color: s.fg,
-    background: s.bg,
+    color: "#1A1A1A",
+    background: bg[status],
     padding: "4px 10px",
     borderRadius: 999,
     textTransform: "capitalize",
@@ -559,7 +558,7 @@ function CreatorDetailModal({
           <div style={{ fontSize: 15, color: "#0047FF", marginBottom: 8 }}>@{creator.username}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, background: "#F0F0F0", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>{creator.platform}</span>
-            <span style={statusBadgeStyle(creator.status)}>{creator.status}</span>
+            <span style={statusBadgeStyle(creator.status)}>{statusLabel(creator.status, lang)}</span>
           </div>
         </div>
       </div>
@@ -674,9 +673,21 @@ function CreatorDetailModal({
       <button
         type="button"
         onClick={onRemove}
-        style={{ background: "none", border: "none", color: "#DC2626", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+        style={{
+          background: "none",
+          border: "none",
+          color: "#DC2626",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          padding: 0,
+          marginTop: 8,
+          textDecoration: "underline",
+          textUnderlineOffset: 3,
+        }}
       >
-        {lang === "fr" ? "Supprimer ce créateur" : "Remove creator"}
+        {lang === "fr" ? "Supprimer" : "Remove"}
       </button>
     </ModalShell>
   );
@@ -971,11 +982,12 @@ export function CreatorsView({
     setDetailCreator((d) => (d?.id === updated.id ? updated : d));
   };
 
-  const handleRemoveCreator = async (id: string) => {
+  const handleRemoveCreator = async (id: string, handle?: string) => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const ok = await deleteCreatorById(user.id, id);
+    const creator = creators.find((c) => c.id === id);
+    const ok = await deleteCreatorById(user.id, id, handle ?? creator?.username);
     if (!ok) {
       setToast(lang === "fr" ? "Impossible de supprimer le créateur" : "Could not remove creator");
       return;
@@ -1175,23 +1187,14 @@ export function CreatorsView({
                         <div style={{ fontWeight: 600, fontSize: 12 }}>{creator.niche || "—"}</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button
-                        type="button"
-                        className="hero-cta-shopify-dark hero-cta-compact"
-                        style={{ flex: 1, width: "100%" }}
-                        onClick={() => setDetailCreator(creator)}
-                      >
-                        {lang === "fr" ? "Voir le profil" : "View profile"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleRemoveCreator(creator.id)}
-                        style={{ flex: 1, padding: "8px", background: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}
-                      >
-                        {lang === "fr" ? "Supprimer" : "Remove"}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="hero-cta-shopify-dark hero-cta-compact"
+                      style={{ width: "100%" }}
+                      onClick={() => setDetailCreator(creator)}
+                    >
+                      {lang === "fr" ? "Voir le profil" : "View profile"}
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1252,19 +1255,9 @@ export function CreatorsView({
                     <div style={{ fontSize: 13 }}>{c.niche}</div>
                     <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
-                    <div style={{ display: "flex", gap: 8, flexDirection: "column" }}>
-                        <button type="button" className="hero-cta-shopify-dark hero-cta-compact" onClick={() => setDetailCreator(c)}>
-                          {lang === "fr" ? "Voir le profil" : "View profile"}
-                        </button>
-                        <button
-                          type="button"
-                          className="hero-cta-shopify-light hero-cta-compact"
-                          style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2" }}
-                          onClick={() => void handleRemoveCreator(c.id)}
-                        >
-                          {lang === "fr" ? "Supprimer" : "Remove"}
-                        </button>
-                    </div>
+                    <button type="button" className="hero-cta-shopify-dark hero-cta-compact" onClick={() => setDetailCreator(c)}>
+                      {lang === "fr" ? "Voir le profil" : "View profile"}
+                    </button>
                   </div>
                 ))
               )}
@@ -1278,7 +1271,7 @@ export function CreatorsView({
         <AddCreatorModal
           lang={lang}
           onClose={() => setAddOpen(false)}
-          onAdd={(c) => {
+          onAdd={async (c) => {
             if (hasReachedManagedCreatorLimit(plan, creators.length)) {
               setAddOpen(false);
               setUpgradeMsg(plan === "pro"
@@ -1294,7 +1287,24 @@ export function CreatorsView({
                     : "🔒 Creator limit reached. Upgrade to Growth →");
               return;
             }
-            setCreators((list) => [c, ...list]);
+            if (!supabase) return;
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const saved = await saveCreator(user.id, {
+              username: c.username,
+              display_name: c.displayName,
+              avatar_url: c.avatarUrl ?? "",
+              platform: c.platform,
+              followers_count: c.followers,
+              engagement_rate: c.engagement,
+              avg_views: Math.floor(c.followers * 0.08),
+              bio: c.notes || "",
+              niche: c.niche,
+            });
+            const row = saved
+              ? { ...mapDbCreator(saved as Record<string, unknown>), status: c.status, notes: c.notes, email: c.email, age: c.age, location: c.location }
+              : c;
+            setCreators((list) => [row, ...list]);
             setAddOpen(false);
             setToast("Creator added ✓");
           }}
@@ -1305,12 +1315,12 @@ export function CreatorsView({
           creator={detailCreator}
           onClose={() => setDetailCreator(null)}
           onUpdate={updateCreator}
-          onRemove={() => void handleRemoveCreator(detailCreator.id)}
+          onRemove={() => void handleRemoveCreator(detailCreator.id, detailCreator.username)}
           onRunCampaign={() => {
             if (plan === "free") {
               setUpgradeMsg(lang === "fr"
-                ? "🔒 Lancer une campagne — Plan Basic requis.\n\nAssignez vos créateurs à des campagnes, suivez les ventes et automatisez les commissions.\n\nPassez à Basic →"
-                : "🔒 Run campaigns — Basic plan required.\n\nAssign creators to campaigns, track sales, and automate commissions.\n\nUpgrade to Basic →");
+                ? "🔒 Lancer une campagne — Plan Growth requis.\n\nAssignez vos créateurs à des campagnes, suivez les ventes et automatisez les commissions.\n\nPassez à Growth →"
+                : "🔒 Run campaigns — Growth plan required.\n\nAssign creators to campaigns, track sales, and automate commissions.\n\nUpgrade to Growth →");
               return;
             }
             setCampaignCreator(detailCreator);

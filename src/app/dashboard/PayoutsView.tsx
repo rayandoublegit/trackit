@@ -1041,7 +1041,6 @@ export function PayoutsView({
                   : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
               </button>
             )}
-            <span style={{ fontSize: 11, color: "#9A9A9A" }}>Scale plan</span>
           </div>
         </div>
 
@@ -1367,7 +1366,7 @@ export function PayoutsView({
                 disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0 || payingId === selectedCreatorPayout.id}
                 onClick={async () => {
                   if (plan === "free") {
-                    alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                    alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
                     return;
                   }
                   const amount = selectedCreatorPayout.balance;
@@ -1470,7 +1469,7 @@ export function PayoutsView({
               disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0}
               onClick={() => {
                 if (plan === "free") {
-                  alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Basic." : "Payouts are available on Basic plan and above.");
+                  alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
                   return;
                 }
                 const amount = selectedCreatorPayout.balance;

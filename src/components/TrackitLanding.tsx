@@ -401,7 +401,7 @@ export default function TrackitLanding() {
                 top: 72,
                 left: "50%",
                 transform: "translateX(-50%)",
-                width: "min(1200px, 97vw)",
+                width: "min(720px, 97vw)",
                 background: "#fff",
                 borderRadius: 20,
                 boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
@@ -409,9 +409,10 @@ export default function TrackitLanding() {
                 padding: 24,
                 zIndex: 1000,
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
+                gridTemplateColumns: "1fr",
                 gap: 14,
-                maxHeight: "80vh",
+                maxHeight: "min(70vh, 520px)",
+                overflowX: "hidden",
                 overflowY: "auto"
               }}
               >

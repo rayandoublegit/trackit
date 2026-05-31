@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { saveOutreach, getOutreachHistory, getSavedCreators } from "@/lib/db";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
@@ -431,8 +431,32 @@ function followUpIn3Days() {
   return d.toISOString().slice(0, 10);
 }
 
-function nextHistoryId() {
-  return `oh-${Date.now()}`;
+function normalizeOutreachStatus(raw: string | null | undefined): OutreachHistoryStatus {
+  const s = (raw || "sent").toLowerCase().replace(/\s+/g, "_");
+  if (s === "replied") return "replied";
+  if (s === "converted") return "converted";
+  if (s === "opened") return "opened";
+  if (s === "no_response" || s === "no_reply") return "no_response";
+  return "sent";
+}
+
+function mapOutreachRow(o: Record<string, unknown>): OutreachHistoryEntry {
+  const handle = String(o.creator_username ?? "").replace(/^@/, "");
+  return {
+    id: String(o.id ?? ""),
+    creator: String(o.creator_display_name ?? handle ?? "—"),
+    handle,
+    platform: String(o.platform ?? ""),
+    avatar: String(o.creator_avatar ?? ""),
+    message: String(o.message ?? ""),
+    sentDate: typeof o.created_at === "string" ? o.created_at.split("T")[0] : "",
+    status: normalizeOutreachStatus(o.status as string),
+    followUpDate: typeof o.follow_up_date === "string" ? o.follow_up_date.split("T")[0] : null,
+  };
+}
+
+function avatarForOutreach(handle: string, avatar?: string) {
+  return avatar?.trim() || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(handle || "creator")}`;
 }
 
 function SaveTemplateModal({
@@ -544,30 +568,34 @@ function OutreachAIGeneratePanel({
       if (!user) return;
       const data = await getSavedCreators(user.id);
       setSavedCreators(
-        data.map((c) => ({
-          id: c.id,
-          displayName: c.full_name || c.handle || "",
-          username: c.handle || c.username || "",
-          platform: c.platform || "",
-          avatar: c.avatar_url || "",
-          niche: c.niche || "",
-          followersCount: c.followers || 0,
-          engagementRate: c.engagement_rate || 0,
-          bio: c.bio || "",
-        }))
+        data.map((c) => {
+          const username = String(c.handle || c.username || "").replace(/^@/, "");
+          return {
+            id: String(c.id ?? username),
+            displayName: String(c.full_name || c.handle || username),
+            username,
+            platform: String(c.platform || ""),
+            avatar: avatarForOutreach(username, String(c.avatar_url || "")),
+            niche: String(c.niche || ""),
+            followersCount: Number(c.followers || 0),
+            engagementRate: Number(c.engagement_rate || 0),
+            bio: String(c.bio || ""),
+          };
+        })
       );
     };
     void load();
   }, []);
 
   const filteredCreators = useMemo(() => {
-    const q = creatorSearch.trim().toLowerCase();
+    const q = creatorSearch.trim().toLowerCase().replace(/^@/, "");
     if (!q) return savedCreators;
     return savedCreators.filter(
       (c) =>
         c.displayName.toLowerCase().includes(q) ||
         c.username.toLowerCase().includes(q) ||
-        c.platform.toLowerCase().includes(q)
+        c.platform.toLowerCase().includes(q) ||
+        c.niche.toLowerCase().includes(q)
     );
   }, [creatorSearch, savedCreators]);
 
@@ -592,8 +620,8 @@ function OutreachAIGeneratePanel({
       const used = parseInt(localStorage.getItem(key) || "0");
       if (used >= 1) {
         setUpgradeMsg(lang === "fr"
-          ? "🔒 Votre génération IA gratuite est épuisée.\n\nLes marques qui utilisent Trackit AI envoient 3x plus de messages et closent 2x plus de créateurs.\n\nPassez à Basic → Générations illimitées, suivi des ventes, paiements automatiques."
-          : "🔒 You've used your free AI generation for today.\n\nBrands using Trackit AI send 3x more outreach and close 2x more creators.\n\nUpgrade to Basic → Unlimited AI, sale tracking, automatic payouts.");
+          ? "🔒 Votre génération IA gratuite est épuisée.\n\nLes marques qui utilisent Trackit AI envoient 3x plus de messages et closent 2x plus de créateurs.\n\nPassez à Growth → Générations illimitées, suivi des ventes, paiements automatiques."
+          : "🔒 You've used your free AI generation for today.\n\nBrands using Trackit AI send 3x more outreach and close 2x more creators.\n\nUpgrade to Growth → Unlimited AI, sale tracking, automatic payouts.");
         return;
       }
       localStorage.setItem(key, String(used + 1));
@@ -671,9 +699,9 @@ function OutreachAIGeneratePanel({
   const handleMarkSentClick = async () => {
     if (!selectedCreator || !message) return;
     await onMarkSent({
-      id: nextHistoryId(),
+      id: "",
       creator: selectedCreator.displayName,
-      handle: selectedCreator.username,
+      handle: selectedCreator.username.replace(/^@/, ""),
       platform: selectedCreator.platform,
       avatar: selectedCreator.avatar,
       message,
@@ -804,39 +832,52 @@ function OutreachAIGeneratePanel({
                         overflowY: "auto",
                       }}
                     >
-                      {filteredCreators.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCreator(c);
-                            setCreatorSearch("");
-                            setDropdownOpen(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "10px 12px",
-                            border: "none",
-                            borderBottom: "1px solid #F5F5F5",
-                            background: "#FFFFFF",
-                            cursor: "pointer",
-                            fontFamily: "inherit",
-                            textAlign: "left",
-                          }}
-                        >
-                          <img src={c.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{c.displayName}</div>
-                            <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
-                          </div>
-                          <span style={{ fontSize: 10, background: "#F0F0F0", padding: "3px 8px", borderRadius: 999, textTransform: "capitalize" }}>
-                            {c.platform}
-                          </span>
-                        </button>
-                      ))}
+                      {savedCreators.length === 0 ? (
+                        <div style={{ padding: "14px 12px", fontSize: 13, color: "#7A7A7A" }}>
+                          {lang === "fr"
+                            ? "Aucun créateur sauvegardé. Ajoutez-en depuis Créateurs ou Découverte."
+                            : "No saved creators. Add some from Creators or Discovery."}
+                        </div>
+                      ) : filteredCreators.length === 0 ? (
+                        <div style={{ padding: "14px 12px", fontSize: 13, color: "#7A7A7A" }}>
+                          {lang === "fr" ? "Aucun créateur ne correspond." : "No matching creators."}
+                        </div>
+                      ) : (
+                        filteredCreators.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setSelectedCreator(c);
+                              setCreatorSearch("");
+                              setDropdownOpen(false);
+                            }}
+                            style={{
+                              width: "100%",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "10px 12px",
+                              border: "none",
+                              borderBottom: "1px solid #F5F5F5",
+                              background: "#FFFFFF",
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                              textAlign: "left",
+                            }}
+                          >
+                            <img src={c.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{c.displayName}</div>
+                              <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                            </div>
+                            <span style={{ fontSize: 10, background: "#F0F0F0", padding: "3px 8px", borderRadius: 999, textTransform: "capitalize" }}>
+                              {c.platform}
+                            </span>
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -1083,8 +1124,10 @@ export function OutreachHistorySection({
 }) {
   const lang = useLang();
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>([]);
+  const [savedCreators, setSavedCreators] = useState<OutreachCreator[]>([]);
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const [search, setSearch] = useState("");
+  const [historyCreatorSearchOpen, setHistoryCreatorSearchOpen] = useState(false);
   const [viewingMessage, setViewingMessage] = useState<string | null>(null);
   const [manageEntry, setManageEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpEntry, setFollowUpEntry] = useState<OutreachHistoryEntry | null>(null);
@@ -1106,43 +1149,68 @@ export function OutreachHistorySection({
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => {
-    const load = async () => {
-      if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const history = await getOutreachHistory(user.id);
-      setEntries(history.map((o) => ({
-        id: o.id,
-        creator: o.creator_display_name,
-        handle: o.creator_username,
-        platform: o.platform,
-        avatar: o.creator_avatar,
-        message: o.message,
-        sentDate: o.created_at?.split("T")[0] ?? "",
-        status: o.status as OutreachHistoryStatus,
-        followUpDate: o.follow_up_date ?? null,
-      })));
-    };
-    void load();
-  }, []);
-
-  const handleMarkSent = async (creator: any, message: string) => {
+  const loadHistory = useCallback(async () => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const [history, creators] = await Promise.all([
+      getOutreachHistory(user.id),
+      getSavedCreators(user.id),
+    ]);
+    setEntries(history.map((o) => mapOutreachRow(o as Record<string, unknown>)));
+    setSavedCreators(
+      creators.map((c) => {
+        const username = String(c.handle || c.username || "").replace(/^@/, "");
+        return {
+          id: String(c.id ?? username),
+          displayName: String(c.full_name || c.handle || username),
+          username,
+          platform: String(c.platform || ""),
+          avatar: avatarForOutreach(username, String(c.avatar_url || "")),
+          niche: String(c.niche || ""),
+          followersCount: Number(c.followers || 0),
+          engagementRate: Number(c.engagement_rate || 0),
+          bio: String(c.bio || ""),
+        };
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const handleMarkSent = async (
+    creator: {
+      username?: string;
+      handle?: string;
+      displayName?: string;
+      creator?: string;
+      avatarUrl?: string;
+      avatar?: string;
+      platform: string;
+    },
+    message: string,
+    followUpDate?: string | null
+  ) => {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const handle = (creator.username || creator.handle || "").replace(/^@/, "");
     await saveOutreach(user.id, {
-      creator_username: creator.username || creator.handle,
-      creator_display_name: creator.displayName || creator.creator,
-      creator_avatar: creator.avatarUrl || creator.avatar,
+      creator_username: handle,
+      creator_display_name: creator.displayName || creator.creator || handle,
+      creator_avatar: creator.avatarUrl || creator.avatar || "",
       platform: creator.platform,
-      message: message,
+      message,
       status: "sent",
+      follow_up_date: followUpDate ?? null,
     });
     notifyOutreachSent(
       lang,
-      creator.displayName || creator.creator || creator.username || creator.handle || "creator"
+      creator.displayName || creator.creator || handle || "creator"
     );
+    await loadHistory();
   };
 
   const closeFollowUp = () => {
@@ -1186,23 +1254,54 @@ export function OutreachHistorySection({
       const { supabase: sb } = await import("@/lib/supabase");
       if (sb) await sb.from("outreach_history").update({ follow_up_sent: true }).eq("id", item.id);
       setManageEntry(null);
+      await loadHistory();
     }
   };
 
   const markAsReplied = async (item: OutreachHistoryEntry) => {
-    const { supabase: sb } = await import("@/lib/supabase");
-    if (sb) await sb.from("outreach_history").update({ status: "replied" }).eq("id", item.id);
+    if (supabase) {
+      await supabase.from("outreach_history").update({ status: "replied" }).eq("id", item.id);
+    }
+    updateStatus(item.id, "replied");
     setManageEntry(null);
-    window.location.reload();
   };
+
+  const historyCreatorSuggestions = useMemo(() => {
+    const q = search.trim().toLowerCase().replace(/^@/, "");
+    if (!q) return [];
+    return savedCreators
+      .filter(
+        (c) =>
+          c.displayName.toLowerCase().includes(q) ||
+          c.username.toLowerCase().includes(q) ||
+          c.platform.toLowerCase().includes(q) ||
+          c.niche.toLowerCase().includes(q)
+      )
+      .slice(0, 8);
+  }, [search, savedCreators]);
 
   const filtered = useMemo(() => {
     let list = [...entries];
     if (filter !== "all") list = list.filter((e) => e.status === filter);
-    const q = search.trim().toLowerCase();
-    if (q) list = list.filter((e) => e.creator.toLowerCase().includes(q) || e.handle.toLowerCase().includes(q));
+    const q = search.trim().toLowerCase().replace(/^@/, "");
+    if (q) {
+      list = list.filter(
+        (e) =>
+          e.creator.toLowerCase().includes(q) ||
+          e.handle.toLowerCase().includes(q) ||
+          e.platform.toLowerCase().includes(q)
+      );
+    }
     return list;
   }, [entries, filter, search]);
+
+  const historyStats = useMemo(() => {
+    const totalSent = entries.length;
+    const replied = entries.filter((e) => e.status === "replied" || e.status === "converted").length;
+    const converted = entries.filter((e) => e.status === "converted").length;
+    const replyRate = totalSent > 0 ? Math.round((replied / totalSent) * 100) : 0;
+    return { totalSent, replied, converted, replyRate };
+  }, [entries]);
 
   const updateStatus = (id: string, status: OutreachHistoryStatus) => {
     setEntries((list) => list.map((e) => (e.id === id ? { ...e, status, followUpDate: status === "replied" || status === "converted" ? null : e.followUpDate } : e)));
@@ -1228,9 +1327,9 @@ export function OutreachHistorySection({
         avatar: entry.avatar,
         platform: entry.platform,
       },
-      entry.message
+      entry.message,
+      entry.followUpDate
     );
-    setEntries((list) => [entry, ...list]);
   };
 
   return (
@@ -1240,18 +1339,80 @@ export function OutreachHistorySection({
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
           <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>{lang === "fr" ? "Historique des messages" : "Outreach history"}</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px", minWidth: 220 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
-              <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by creator name..."
-              style={{ border: "none", outline: "none", flex: 1, fontSize: 13, fontFamily: "inherit", background: "transparent" }}
-            />
+          <div style={{ position: "relative", minWidth: 220 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setHistoryCreatorSearchOpen(true);
+                }}
+                onFocus={() => setHistoryCreatorSearchOpen(true)}
+                onBlur={() => window.setTimeout(() => setHistoryCreatorSearchOpen(false), 150)}
+                placeholder={lang === "fr" ? "Rechercher un créateur..." : "Search creators..."}
+                style={{ border: "none", outline: "none", flex: 1, fontSize: 13, fontFamily: "inherit", background: "transparent", minWidth: 140 }}
+              />
+            </div>
+            {historyCreatorSearchOpen && search.trim() && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  right: 0,
+                  left: 0,
+                  marginTop: 4,
+                  background: "#FFFFFF",
+                  border: "1px solid #EFEFEF",
+                  borderRadius: 10,
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
+                  zIndex: 20,
+                  maxHeight: 260,
+                  overflowY: "auto",
+                }}
+              >
+                {historyCreatorSuggestions.length === 0 ? (
+                  <div style={{ padding: "12px 14px", fontSize: 13, color: "#7A7A7A" }}>
+                    {lang === "fr" ? "Aucun créateur trouvé." : "No creators found."}
+                  </div>
+                ) : (
+                  historyCreatorSuggestions.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSearch(c.displayName || c.username);
+                        setHistoryCreatorSearchOpen(false);
+                      }}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        border: "none",
+                        borderBottom: "1px solid #F5F5F5",
+                        background: "#FFFFFF",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        textAlign: "left",
+                      }}
+                    >
+                      <img src={c.avatar} alt="" width={28} height={28} style={{ borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{c.displayName}</div>
+                        <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1281,10 +1442,13 @@ export function OutreachHistorySection({
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
           {[
-            { label: lang === "fr" ? "Total envoyé" : "Total sent", value: "5" },
-            { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: "20%" },
-            { label: lang === "fr" ? "Temps de réponse moyen" : "Avg response time", value: lang === "fr" ? "2,4 jours" : "2.4 days" },
-            { label: lang === "fr" ? "Converti" : "Converted", value: "1" },
+            { label: lang === "fr" ? "Total envoyé" : "Total sent", value: String(historyStats.totalSent) },
+            { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: `${historyStats.replyRate}%` },
+            {
+              label: lang === "fr" ? "Réponses" : "Replies",
+              value: String(historyStats.replied),
+            },
+            { label: lang === "fr" ? "Converti" : "Converted", value: String(historyStats.converted) },
           ].map((kpi) => (
             <div key={kpi.label} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 14 }}>
               <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 6 }}>{kpi.label}</div>
@@ -1294,14 +1458,24 @@ export function OutreachHistorySection({
         </div>
 
         <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, overflow: "hidden" }}>
-          {isMobile ? (
+          {filtered.length === 0 ? (
+            <div style={{ padding: 48, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>
+              {entries.length === 0
+                ? lang === "fr"
+                  ? "Aucun message envoyé pour le moment. Générez un message IA et marquez-le comme envoyé."
+                  : "No outreach sent yet. Generate a message with AI and mark it as sent."
+                : lang === "fr"
+                  ? "Aucun résultat pour ce filtre."
+                  : "No results for this filter."}
+            </div>
+          ) : isMobile ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
               {filtered.map((item) => {
                 return (
                   <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <img
-                        src={item.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${item.handle}`}
+                        src={avatarForOutreach(item.handle, item.avatar)}
                         alt=""
                         style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
                       />
@@ -1379,7 +1553,7 @@ export function OutreachHistorySection({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <img src={row.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                      <img src={avatarForOutreach(row.handle, row.avatar)} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>
