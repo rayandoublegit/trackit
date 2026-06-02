@@ -487,6 +487,7 @@ function CreatorProfileModal({
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, paddingRight: 32 }}>
           <img
             src={creator.avatarUrl}
+            onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }}
             alt={creator.displayName}
             width={80}
             height={80}
@@ -676,7 +677,7 @@ function CreatorMiniCard({ creator }: { creator: Creator }) {
         marginBottom: 20,
       }}
     >
-      <img src={creator.avatarUrl} alt={creator.displayName} width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+      <img src={creator.avatarUrl} alt={creator.displayName} width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{creator.displayName}</div>
         <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username ?? ""}</div>
@@ -1103,6 +1104,7 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <img
           src={creator.avatarUrl}
+          onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }}
           alt={creator.displayName}
           width={48}
           height={48}
