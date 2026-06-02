@@ -20,6 +20,35 @@ function estimateEngagement(followers: number): number {
   return 2.0;
 }
 
+const AVATAR_BUCKET = "avatars";
+
+// Downloads a (possibly-expiring) remote avatar and stores it permanently in
+// Supabase Storage. Returns the permanent public URL, or null on any failure.
+async function storeAvatar(remoteUrl: string, username: string): Promise<string | null> {
+  if (!remoteUrl || remoteUrl.includes("ui-avatars.com")) return null;
+  try {
+    const res = await fetch(remoteUrl);
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") || "image/jpeg";
+    const ext = contentType.includes("png") ? "png" : contentType.includes("webp") ? "webp" : "jpg";
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0) return null;
+    const objectPath = `tiktok_${username}.${ext}`;
+    const { error } = await supabaseAdmin.storage
+      .from(AVATAR_BUCKET)
+      .upload(objectPath, buf, { contentType, upsert: true });
+    if (error) {
+      console.error(`avatar upload failed for ${username}:`, error.message);
+      return null;
+    }
+    const { data } = supabaseAdmin.storage.from(AVATAR_BUCKET).getPublicUrl(objectPath);
+    return data?.publicUrl || null;
+  } catch (e) {
+    console.error(`storeAvatar error for ${username}:`, e);
+    return null;
+  }
+}
+
 type SCUser = {
   unique_id?: string;
   nickname?: string;
@@ -51,16 +80,19 @@ async function seedTarget(query: string, tags: string[], pages: number) {
       const { users, nextCursor } = await fetchPage(query, cursor);
       if (users.length === 0) break;
 
-      const upserts = users
-        .filter(u => Number(u.follower_count || 0) >= MIN_FOLLOWERS)
-        .map(u => {
+      const filtered = users.filter(u => Number(u.follower_count || 0) >= MIN_FOLLOWERS);
+      const upserts = await Promise.all(
+        filtered.map(async u => {
           const followers = Number(u.follower_count || 0);
-          const avatar = u.avatar_medium?.url_list?.[0] || u.avatar_168x168?.url_list?.[0] || "";
+          const username = String(u.unique_id);
+          const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(String(u.nickname || u.unique_id))}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`;
+          const remote = u.avatar_medium?.url_list?.[0] || u.avatar_168x168?.url_list?.[0] || "";
+          // Store the avatar permanently; fall back to remote URL, then ui-avatars.
+          const stored = await storeAvatar(remote, username);
           return {
-            username: String(u.unique_id),
+            username,
             display_name: String(u.nickname || u.unique_id),
-            avatar_url: avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(String(u.nickname || u.unique_id))}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`,
+            avatar_url: stored || remote || fallback,
             platform: "TikTok",
             followers,
             engagement_rate: estimateEngagement(followers),
@@ -70,7 +102,8 @@ async function seedTarget(query: string, tags: string[], pages: number) {
             video_thumbnails: [],
             last_scraped_at: new Date().toISOString(),
           };
-        });
+        })
+      );
 
       if (upserts.length > 0) {
         await supabaseAdmin.from("creators_index").upsert(upserts, { onConflict: "username" });
