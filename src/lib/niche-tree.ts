@@ -1,20 +1,24 @@
 // Parent niche -> sub-niches. Creators get tagged with BOTH the sub-niche
 // and its parent, so searching the parent surfaces all sub-niche creators.
 export const NICHE_TREE: Record<string, string[]> = {
-  fitness: ["calisthenics", "crossfit", "powerlifting", "homeworkout", "bodybuilding", "running", "pilates"],
-  food: ["vegan", "recipes", "baking", "mealprep", "streetfood", "healthyfood", "dessert"],
-  beauty: ["skincare", "makeup", "haircare", "nails", "perfume", "grwm"],
-  fashion: ["streetwear", "luxury", "thrift", "sneakers", "outfits", "menswear", "womenswear"],
-  travel: ["budgettravel", "luxurytravel", "vanlife", "solotravel", "backpacking"],
-  pets: ["dogs", "cats", "puppytraining", "petcare", "exoticpets"],
-  gaming: ["fps", "minecraft", "mobilegaming", "speedrun", "cozygaming"],
-  lifestyle: ["minimalism", "productivity", "selfcare", "morningroutine"],
-  finance: ["investing", "crypto", "personalfinance", "stocks", "budgeting"],
-  tech: ["gadgets", "ai", "coding", "smarthome"],
-  home: ["interiordesign", "diyhome", "cleaning", "organization", "plants"],
-  parenting: ["momlife", "dadlife", "babytips", "toddlers"],
-  wellness: ["mentalhealth", "meditation", "yoga", "nutrition", "supplements"],
-  business: ["entrepreneur", "marketing", "ecommerce", "sidehustle"],
+  fitness: ["calisthenics", "crossfit", "powerlifting", "homeworkout", "bodybuilding", "running", "pilates", "hyrox", "gymtok", "fatloss", "musclebuilding", "yogafit"],
+  food: ["vegan", "recipes", "baking", "mealprep", "streetfood", "healthyfood", "dessert", "vegetarian", "keto", "highprotein", "airfryer", "foodreview"],
+  beauty: ["skincare", "makeup", "haircare", "nails", "perfume", "grwm", "kbeauty", "antiaging", "acne", "lashes", "browns", "cleangirl"],
+  fashion: ["streetwear", "luxury", "thrift", "sneakers", "outfits", "menswear", "womenswear", "ootd", "vintage", "plussize", "modestfashion", "jewelry"],
+  travel: ["budgettravel", "luxurytravel", "vanlife", "solotravel", "backpacking", "citybreaks", "digitalnomad", "traveltips", "roadtrip", "beaches"],
+  pets: ["dogs", "cats", "puppytraining", "petcare", "exoticpets", "doggrooming", "petsupplements", "aquariums", "rescuepets", "petnutrition"],
+  gaming: ["fps", "minecraft", "mobilegaming", "speedrun", "cozygaming", "valorant", "fortnite", "retrogaming", "gamingsetup", "esports"],
+  lifestyle: ["minimalism", "productivity", "selfcare", "morningroutine", "journaling", "declutter", "slowliving", "thatgirl", "dayinmylife"],
+  finance: ["investing", "crypto", "personalfinance", "stocks", "budgeting", "sidehustles", "passiveincome", "realestate", "frugal", "moneytips"],
+  tech: ["gadgets", "ai", "coding", "smarthome", "apps", "techreviews", "pcbuilds", "productivitytech", "iphone", "android"],
+  home: ["interiordesign", "diyhome", "cleaning", "organization", "plants", "homedecor", "renovation", "smallspaces", "rentaldecor", "cottagecore"],
+  parenting: ["momlife", "dadlife", "babytips", "toddlers", "pregnancy", "newborn", "parentinghacks", "homeschool", "bigfamily"],
+  wellness: ["mentalhealth", "meditation", "yoga", "nutrition", "supplements", "sleep", "biohacking", "holistic", "selflove", "therapy"],
+  business: ["entrepreneur", "marketing", "ecommerce", "sidehustle", "smallbusiness", "saas", "dropshipping", "agency", "founder", "freelance"],
+  beautytech: ["ledmask", "microcurrent", "gua sha", "skintools", "hairtools"],
+  outdoors: ["hiking", "camping", "fishing", "climbing", "surfing", "skiing", "cycling"],
+  auto: ["cartok", "carmods", "supercars", "evs", "motorcycles", "detailing"],
+  art: ["digitalart", "painting", "tattoo", "photography", "design", "crafts", "pottery"],
 };
 
 // Returns [...all niche queries to seed], each as { query, tags }

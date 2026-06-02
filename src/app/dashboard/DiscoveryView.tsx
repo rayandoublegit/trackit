@@ -1362,8 +1362,8 @@ export function DiscoveryView({
   const discoveryLimitTitle =
     dailyDiscoveryLimit != null
       ? lang === "fr"
-        ? `Vous avez utilisé vos ${dailyDiscoveryLimit} découvertes du jour`
-        : `You've used your ${dailyDiscoveryLimit} daily discoveries`
+        ? `Vous avez utilisé vos ${dailyDiscoveryLimit} découvertes gratuites`
+        : `You've used your ${dailyDiscoveryLimit} free discoveries`
       : "";
 
   const discoveryLimitSubtitle =
@@ -1397,39 +1397,9 @@ export function DiscoveryView({
       .maybeSingle();
     if (!data) return null;
 
-    const now = new Date();
-    const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at) : now;
-    const resetWindowEnd = new Date(resetAt.getTime() + 24 * 60 * 60 * 1000);
-
-    if (now >= resetWindowEnd) {
-      await supabase
-        .from("profiles")
-        .update({ discoveries_used: 0, discoveries_reset_at: now.toISOString() })
-        .eq("id", user.id);
-      setDiscoveriesUsed(0);
-      setDiscoveriesResetAt(now);
-      setShowBlur(false);
-      setResetCountdown("");
-      return 0;
-    }
-
-    // Force reset legacy users who exceeded their plan limit
-    if (data.discoveries_used > dailyDiscoveryLimit) {
-      await supabase
-        .from("profiles")
-        .update({
-          discoveries_used: 0,
-          discoveries_reset_at: now.toISOString(),
-        })
-        .eq("id", user.id);
-      setDiscoveriesUsed(0);
-      setShowBlur(false);
-      return 0;
-    }
-
+    // Lifetime cap — no daily reset. The 5 free discoveries never refill.
     const used = data.discoveries_used || 0;
     setDiscoveriesUsed(used);
-    setDiscoveriesResetAt(resetAt);
     setShowBlur(used >= dailyDiscoveryLimit);
     return used;
   };
@@ -1443,27 +1413,6 @@ export function DiscoveryView({
     void loadDiscoveries();
   }, [plan, dailyDiscoveryLimit]);
 
-  // Countdown timer
-  useEffect(() => {
-    if (!discoveriesResetAt || dailyDiscoveryLimit == null || discoveriesUsed < dailyDiscoveryLimit) return;
-    const tick = () => {
-      const resetTime = new Date(discoveriesResetAt.getTime() + 24 * 60 * 60 * 1000);
-      const diff = resetTime.getTime() - Date.now();
-      if (diff <= 0) {
-        setDiscoveriesUsed(0);
-        setShowBlur(false);
-        setResetCountdown("");
-        return;
-      }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      setResetCountdown(`${h}h ${m}m`);
-    };
-    tick();
-    const interval = setInterval(tick, 60000);
-    return () => clearInterval(interval);
-  }, [discoveriesResetAt, discoveriesUsed, dailyDiscoveryLimit]);
-
   const incrementDiscoveries = async () => {
     if (!hasDiscoveryDailyCap(plan) || dailyDiscoveryLimit == null) return;
     const newCount = discoveriesUsed + 1;
@@ -1473,12 +1422,9 @@ export function DiscoveryView({
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const now = new Date();
     await supabase.from("profiles").update({
       discoveries_used: newCount,
-      discoveries_reset_at: discoveriesResetAt ? discoveriesResetAt.toISOString() : now.toISOString(),
     }).eq("id", user.id);
-    if (!discoveriesResetAt) setDiscoveriesResetAt(now);
   };
 
   const openOutreach = (creator: Creator) => {
