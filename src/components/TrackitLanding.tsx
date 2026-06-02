@@ -99,7 +99,7 @@ export default function TrackitLanding() {
   pricing_annually: lang === "fr" ? "Annuel" : "Annually",
   pricing_everything_in_pro: lang === "fr" ? "Tout le plan Pro" : "Everything in Pro",
   // Free
-  feat_5_discoveries_day: lang === "fr" ? "5 découvertes de créateurs/jour" : "5 creator discoveries/day",
+  feat_5_discoveries_day: lang === "fr" ? "5 découvertes de créateurs (à vie)" : "5 creator discoveries (lifetime)",
   feat_10_results_per_search: lang === "fr" ? "10 résultats par recherche" : "10 results per search",
   feat_1_active_campaign: lang === "fr" ? "1 campagne active" : "1 active campaign",
   feat_5_managed_creators: lang === "fr" ? "5 créateurs gérés" : "5 managed creators",
