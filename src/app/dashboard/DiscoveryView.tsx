@@ -1323,7 +1323,7 @@ export function DiscoveryView({
     setGender("");
   }, []);
   // FORCE_RESET_FILTERS
-  const [query, setQuery] = useState("");
+  const [productName, setProductName] = useState("");
   const [niche, setNiche] = useState("fitness");
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
@@ -1405,6 +1405,35 @@ export function DiscoveryView({
     setShowBlur(used >= dailyDiscoveryLimit);
     return used;
   };
+
+  const persistProductName = async () => {
+    const trimmed = productName.trim();
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("profiles").update({ business_name: trimmed || null }).eq("id", user.id);
+  };
+
+  useEffect(() => {
+    const loadProductName = async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.business_name) setProductName(data.business_name);
+    };
+    void loadProductName();
+  }, []);
 
   // Load discoveries from Supabase on mount
   useEffect(() => {
@@ -1552,7 +1581,8 @@ export function DiscoveryView({
       setShowBlur(false);
     }
 
-    const nicheTerm = query.trim() || niche;
+    await persistProductName();
+    const nicheTerm = niche;
     setLoading(true);
     setError(null);
     setHasSearched(true);
@@ -1633,40 +1663,38 @@ export function DiscoveryView({
             : "🚧 We're still adding creators across every niche. The database grows daily — check back soon for more results."}
         </div>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-          <div
-            style={{
-              display: "flex",
-              flexDirection: isMobile ? "column" : "row",
-              alignItems: isMobile ? "stretch" : "center",
-              gap: 10,
-              background: "#FAFAFA",
-              border: "1px solid #EFEFEF",
-              borderRadius: 12,
-              padding: "12px 16px",
-              marginBottom: 14,
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
-              <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+          <div style={{ marginBottom: 14 }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#9A9A9A",
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                marginBottom: 8,
+              }}
+            >
+              {lang === "fr" ? "Votre produit ou marque" : "Your product or brand"}
+            </label>
             <input
               type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={productName}
+              onChange={(e) => setProductName(e.target.value)}
+              onBlur={() => void persistProductName()}
               onKeyDown={(e) => e.key === "Enter" && void search()}
-              placeholder={lang === "fr" ? "Rechercher des créateurs" : "Search creators"}
-              style={{
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                fontSize: 14,
-                fontFamily: "inherit",
-                flex: 1,
-                color: "#1A1A1A",
-                letterSpacing: "-0.02em",
-              }}
+              placeholder={
+                lang === "fr"
+                  ? "Ex. Trackit, compléments fitness, skincare…"
+                  : "e.g. Trackit, fitness supplements, skincare…"
+              }
+              style={{ ...inputStyle, marginBottom: 8 }}
             />
+            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              {lang === "fr"
+                ? "Enregistrez ici le nom du produit que vous proposez aux créateurs. Utilisez les filtres ci-dessous pour trouver des profils adaptés."
+                : "Register the product you offer creators here. Use the filters below to find matching profiles."}
+            </p>
             <button
               type="button"
               onClick={() => void search()}
@@ -1678,7 +1706,13 @@ export function DiscoveryView({
                 width: isMobile ? "100%" : undefined,
               }}
             >
-              {loading ? "Searching..." : lang === "fr" ? "Rechercher des créateurs" : "Search creators"}
+              {loading
+                ? lang === "fr"
+                  ? "Recherche…"
+                  : "Searching..."
+                : lang === "fr"
+                  ? "Rechercher des créateurs"
+                  : "Search creators"}
             </button>
           </div>
 
