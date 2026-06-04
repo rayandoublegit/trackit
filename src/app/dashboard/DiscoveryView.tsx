@@ -1315,22 +1315,20 @@ export function DiscoveryView({
 }) {
   const lang = useLang();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
-  useEffect(() => {
-    setFollowers("");
-    setEngagement("");
-    setLocation("");
-    setLanguage("");
-    setGender("");
-  }, []);
-  // FORCE_RESET_FILTERS
   const [productName, setProductName] = useState("");
   const [niche, setNiche] = useState("fitness");
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [location, setLocation] = useState("");
-  const [language, setLanguage] = useState("");
-  const [gender, setGender] = useState("");
+  const [location, setLocation] = useState(lang === "fr" ? "FR" : "");
+  const [language, setLanguage] = useState(lang === "fr" ? "french" : "");
+
+  useEffect(() => {
+    setFollowers("");
+    setEngagement("");
+    setLocation(lang === "fr" ? "FR" : "");
+    setLanguage(lang === "fr" ? "french" : "");
+  }, [lang]);
 
   const [creators, setCreators] = useState<Creator[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1609,7 +1607,6 @@ export function DiscoveryView({
           minEngagement,
           location,
           language,
-          gender,
         }),
       });
 
@@ -1776,33 +1773,17 @@ export function DiscoveryView({
                 { value: "CA", label: lang === "fr" ? "Canada" : "Canada" },
               ]}
             />
-            <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <FilterSelect
-                label={lang === "fr" ? "Langue" : "Language"}
-                value={language}
-                onChange={setLanguage}
-                options={[
-                  { value: "english", label: lang === "fr" ? "Anglais" : "English" },
-                  { value: "french", label: lang === "fr" ? "Français" : "French" },
-                  { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
-                  { value: "german", label: lang === "fr" ? "Allemand" : "German" },
-                ]}
-              />
-              <div>
-                <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>
-                  {lang === "fr" ? "Genre" : "Gender"}
-                </div>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value)}
-                  style={filterSelectStyle}
-                >
-                  <option value="">{lang === "fr" ? "Tous" : "All"}</option>
-                  <option value="female">{lang === "fr" ? "Femme" : "Female"}</option>
-                  <option value="male">{lang === "fr" ? "Homme" : "Male"}</option>
-                </select>
-              </div>
-            </div>
+            <FilterSelect
+              label={lang === "fr" ? "Langue" : "Language"}
+              value={language}
+              onChange={setLanguage}
+              options={[
+                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
+                { value: "french", label: lang === "fr" ? "Français" : "French" },
+                { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
+                { value: "german", label: lang === "fr" ? "Allemand" : "German" },
+              ]}
+            />
           </div>
         </div>
 
