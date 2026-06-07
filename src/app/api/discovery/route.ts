@@ -66,7 +66,12 @@ export async function POST(request: Request) {
   // French market (frontend sends "french"/"fr", location "FR") = curated-only mode.
   const isFrench = langNorm === "fr" || langNorm === "french" || locNorm === "fr" || locNorm === "france";
   const isGerman = langNorm === "de" || langNorm === "german" || locNorm === "de" || locNorm === "germany";
-  const curatedOnly = isFrench || isGerman;
+
+  // Niches not yet curated — fall back to the scraped DB for these even in curated markets.
+  const FALLBACK_NICHES = ["food", "travel"];
+  const isFallbackNiche = FALLBACK_NICHES.some(n => nicheNorm.includes(n));
+  // Curated-only applies to curated markets EXCEPT for not-yet-curated niches.
+  const curatedOnly = (isFrench || isGerman) && !isFallbackNiche;
 
   // 1. Query own DB first (instant, free)
   const orFilter = nicheWords.map((w: string) => `niches.cs.{${w}}`).join(",");
