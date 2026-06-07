@@ -86,9 +86,11 @@ async function storeAvatar(remoteUrl: string, username: string): Promise<string 
 
 function cleanHandle(raw: string): string {
   let h = raw.trim();
-  // strip a full tiktok URL down to the handle
-  const m = h.match(/tiktok\.com\/@?([A-Za-z0-9._]+)/i);
-  if (m) h = m[1];
+  // strip a full tiktok or instagram URL down to the handle
+  const tt = h.match(/tiktok\.com\/@?([A-Za-z0-9._]+)/i);
+  if (tt) h = tt[1];
+  const ig = h.match(/instagram\.com\/@?([A-Za-z0-9._]+)/i);
+  if (ig) h = ig[1];
   h = h.replace(/^@/, "");
   return h.toLowerCase();
 }
@@ -192,6 +194,8 @@ export async function POST(request: Request) {
   const language = String(body.language || "").trim().toLowerCase();
   const location = String(body.location || "").trim();
   const avatarInput = String(body.avatarUrl || "").trim();
+  const platformRaw = String(body.platform || "TikTok").trim().toLowerCase();
+  const platform = platformRaw === "instagram" ? "Instagram" : "TikTok";
   // niches: map typed sub-niches to canonical parent niches (+ keep originals + "curated")
   const nicheRaw = String(body.niches || "").trim();
   const niches = normalizeNiches(nicheRaw);
@@ -209,7 +213,7 @@ export async function POST(request: Request) {
     username,
     display_name: displayName,
     avatar_url: stored || avatarInput || fallback,
-    platform: "TikTok",
+    platform,
     followers,
     engagement_rate: estimateEngagement(followers),
     avg_views: Math.floor(followers * 0.1),

@@ -61,7 +61,8 @@ export default function AddCreatorPage() {
       setRows([emptyRow()]);
       setLoadHandle("");
     } catch (e) {
-      setLoadMsg(Strinpath = "   }
+      setLoadMsg(String(e));
+    }
   };
 
   const loadCreator = async () => {

@@ -1624,10 +1624,7 @@ export function DiscoveryView({
               label={lang === "fr" ? "Plateforme" : "Platform"}
               value={platform}
               onChange={setPlatform}
-              options={[
-                { value: "tiktok", label: "TikTok" },
-                { value: "instagram", label: "Instagram" },
-              ]}
+              options={[{ value: "tiktok", label: "TikTok" }]}
             />
             <FilterSelect
               label={lang === "fr" ? "Abonnés" : "Followers"}
