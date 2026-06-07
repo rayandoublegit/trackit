@@ -5,6 +5,13 @@ import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  getDiscoveryLanguage,
+  getDiscoveryLocation,
+  setDiscoveryPrefs,
+  type DiscoveryLanguage,
+  type DiscoveryLocation,
+} from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 import {
   BASIC_MAX_MANAGED_CREATORS,
@@ -1191,26 +1198,28 @@ export function DiscoveryView({
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [location, setLocation] = useState(lang === "fr" ? "FR" : "US");
-  const [language, setLanguage] = useState(lang === "fr" ? "french" : "english");
+  const [location, setLocation] = useState<DiscoveryLocation>(() => getDiscoveryLocation());
+  const [language, setLanguage] = useState<DiscoveryLanguage>(() => getDiscoveryLanguage());
 
   useEffect(() => {
     setFollowers("");
     setEngagement("");
-    setLocation(lang === "fr" ? "FR" : "US");
-    setLanguage(lang === "fr" ? "french" : "english");
   }, [lang]);
 
   const handleLocationChange = (next: string) => {
-    setLocation(next);
-    if (next === "FR") setLanguage("french");
-    else if (next === "US") setLanguage("english");
+    const loc = next as DiscoveryLocation;
+    const nextLanguage: DiscoveryLanguage = loc === "FR" ? "french" : "english";
+    setLocation(loc);
+    setLanguage(nextLanguage);
+    setDiscoveryPrefs(loc, nextLanguage);
   };
 
   const handleLanguageChange = (next: string) => {
-    setLanguage(next);
-    if (next === "french") setLocation("FR");
-    else if (next === "english") setLocation("US");
+    const nextLanguage = next as DiscoveryLanguage;
+    const nextLocation: DiscoveryLocation = nextLanguage === "french" ? "FR" : "US";
+    setLanguage(nextLanguage);
+    setLocation(nextLocation);
+    setDiscoveryPrefs(nextLocation, nextLanguage);
   };
 
   const [creators, setCreators] = useState<Creator[]>([]);

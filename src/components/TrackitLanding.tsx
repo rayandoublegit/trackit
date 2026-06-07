@@ -4,6 +4,7 @@ import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 
 const instrumentSerif = Instrument_Serif({
@@ -275,7 +276,7 @@ export default function TrackitLanding() {
   };
 
   const switchLandingLang = (next: "en" | "fr") => {
-    localStorage.setItem("trackit_lang", next);
+    applyAppLocale(next);
     window.location.href = `${window.location.pathname}${window.location.search}`;
   };
 

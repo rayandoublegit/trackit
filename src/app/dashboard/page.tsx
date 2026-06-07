@@ -44,6 +44,7 @@ import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/no
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
+import { clearUserSessionStorage } from "@/lib/locale-preferences";
 
 type View = "dashboard" | "discovery" | "creators" | "campaigns" | "affiliates" | "outreach" | "payouts" | "analytics" | "integrations" | "automation" | "settings" | "feedback" | "notifications" | "help";
 
@@ -91,6 +92,7 @@ function DashboardPageContent() {
   const [notificationUnread, setNotificationUnread] = useState(0);
   const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const avatarRetryRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
     shopify: false,
@@ -327,6 +329,14 @@ function DashboardPageContent() {
       alert(e instanceof Error ? e.message : "Could not start checkout");
     }
   }, [checkoutCurrency]);
+
+  const disconnectAccount = useCallback(async () => {
+    if (!supabase || signingOut) return;
+    setSigningOut(true);
+    await supabase.auth.signOut({ scope: "global" });
+    clearUserSessionStorage();
+    window.location.href = "/auth";
+  }, [signingOut]);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
@@ -626,6 +636,14 @@ function DashboardPageContent() {
             </>
           ) : (
             <>
+              <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: sidebarCollapsed ? "none" : "1px solid #F5F5F5" }}>
+                <SidebarItem
+                  collapsed={sidebarCollapsed}
+                  icon={<LogoutIcon />}
+                  label={signingOut ? (lang === "fr" ? "Déconnexion…" : "Disconnecting…") : lang === "fr" ? "Déconnecter" : "Disconnect"}
+                  onClick={() => void disconnectAccount()}
+                />
+              </div>
               {renderNavSection("main")}
               {renderNavSection("tools", true)}
               {renderNavSection("workspace", true)}
@@ -2649,4 +2667,5 @@ function NotificationIcon() { return <svg width="18" height="18" viewBox="0 0 24
 function HelpIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M9.5 9a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>; }
 function FeedbackIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function SettingsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>; }
+function LogoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function DotIcon({ color }: { color: string }) { return <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: "inline-block" }} />; }

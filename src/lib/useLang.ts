@@ -1,30 +1,35 @@
 "use client";
-import { useEffect, useState } from "react";
 
-export type Lang = "en" | "fr";
+import { useEffect, useState } from "react";
+import {
+  getAppLang,
+  LOCALE_UPDATED_EVENT,
+  TRACKIT_LANG_KEY,
+  type AppLang,
+} from "@/lib/locale-preferences";
+
+export type Lang = AppLang;
 
 export function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>("en");
-  const [mounted, setMounted] = useState(false);
+  const [lang, setLang] = useState<Lang>(() =>
+    typeof window !== "undefined" ? getAppLang() : "en"
+  );
 
   useEffect(() => {
-    const get = (): Lang => {
-      const stored = localStorage.getItem("trackit_lang") as Lang | null;
-      if (stored === "en" || stored === "fr") return stored;
-      const browser = navigator.language.toLowerCase();
-      const detected = browser.startsWith("fr") ? "fr" : "en";
-      localStorage.setItem("trackit_lang", detected);
-      return detected;
-    };
-    setLang(get());
-    setMounted(true);
+    setLang(getAppLang());
 
+    const refresh = () => setLang(getAppLang());
     const onStorage = (e: StorageEvent) => {
-      if (e.key === "trackit_lang") setLang(get());
+      if (e.key === TRACKIT_LANG_KEY) refresh();
     };
+
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(LOCALE_UPDATED_EVENT, refresh);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(LOCALE_UPDATED_EVENT, refresh);
+    };
   }, []);
 
-  return mounted ? lang : "en";
+  return lang;
 }

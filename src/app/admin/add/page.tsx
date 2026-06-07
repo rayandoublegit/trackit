@@ -45,6 +45,25 @@ export default function AddCreatorPage() {
   const removeRow = (id: number) =>
     setRows((rs) => (rs.length === 1 ? [emptyRow()] : rs.filter((r) => r.id !== id)));
 
+  const deleteCreator = async () => {
+    const h = (rows[0]?.handle || loadHandle).trim();
+    if (!h) { setLoadMsg("load a creator first"); return; }
+    if (!window.confirm(`Delete @${h.replace(/^@/, "")} permanently?`)) return;
+    setLoadMsg("deleting…");
+    try {
+      const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(h)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      const data = await res.json();
+      if (!data.ok) { setLoadMsg(data.error || "delete failed"); return; }
+      setLoadMsg(`deleted @${data.deleted}`);
+      setRows([emptyRow()]);
+      setLoadHandle("");
+    } catch (e) {
+      setLoadMsg(Strinpath = "   }
+  };
+
   const loadCreator = async () => {
     if (!loadHandle.trim()) { setLoadMsg("enter a handle"); return; }
     setLoadMsg("loading…");
@@ -236,6 +255,17 @@ export default function AddCreatorPage() {
       >
         {busy ? "Saving…" : editMode ? "Update creator" : `Save all (${pending})`}
       </button>
+
+      {editMode && (
+        <button
+          onClick={deleteCreator}
+          style={{ width: "100%", padding: "10px", marginTop: 10, background: "#fff",
+            color: "#c00", border: "1px solid #f0c0c0", borderRadius: 8, fontSize: 14,
+            fontWeight: 600, cursor: "pointer" }}
+        >
+          Delete this creator
+        </button>
+      )}
 
       {savedLog.length > 0 && (
         <div style={{ marginTop: 20 }}>

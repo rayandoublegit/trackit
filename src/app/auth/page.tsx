@@ -5,17 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { getAuthRedirectPath } from "@/lib/auth-destination";
 import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
-
-function useLang(): "en" | "fr" {
-  const [lang, setLang] = useState<"en" | "fr">("en");
-  useEffect(() => {
-    const stored = localStorage.getItem("trackit_lang");
-    if (stored === "fr" || stored === "en") { setLang(stored); return; }
-    const detected = navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
-    setLang(detected);
-  }, []);
-  return lang;
-}
+import { useLang } from "@/lib/useLang";
 
 function AuthPageContent() {
   const router = useRouter();

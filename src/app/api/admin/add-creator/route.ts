@@ -114,6 +114,35 @@ async function fetchTikTokVideo(videoUrl: string): Promise<{ url: string; thumbn
   }
 }
 
+export async function DELETE(request: Request) {
+  const auth = request.headers.get("authorization") || "";
+  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const url = new URL(request.url);
+  const handleRaw = url.searchParams.get("handle") || "";
+  if (!handleRaw.trim()) {
+    return NextResponse.json({ ok: false, error: "handle required" }, { status: 400 });
+  }
+  const username = cleanHandle(handleRaw);
+  const { data: existing } = await supabaseAdmin
+    .from("creators_index")
+    .select("username")
+    .eq("username", username)
+    .maybeSingle();
+  if (!existing) {
+    return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  }
+  const { error } = await supabaseAdmin
+    .from("creators_index")
+    .delete()
+    .eq("username", username);
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, deleted: username });
+}
+
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization") || "";
   if (auth !== `Bearer ${ADMIN_SECRET}`) {

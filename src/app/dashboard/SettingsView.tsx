@@ -7,6 +7,7 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
+import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { formatLastActiveFromDate } from "@/lib/format-last-active";
@@ -454,8 +455,7 @@ function GeneralSettings({
     if (!supabase) return;
     setSigningOut(true);
   await supabase.auth.signOut({ scope: "global" });
-  localStorage.clear();
-  sessionStorage.clear();
+  clearUserSessionStorage();
   window.location.href = "/auth";
   };
 
@@ -516,7 +516,7 @@ function GeneralSettings({
           onChange={(v) => {
             const next = v === "FR" ? "fr" : "en";
             if (next === lang) return;
-            localStorage.setItem("trackit_lang", next);
+            applyAppLocale(next);
             window.location.reload();
           }}
         />
@@ -1457,6 +1457,7 @@ function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean
       if (!res.ok) throw new Error(data.error ?? "Could not revoke session");
       if (data.signOut || isCurrent) {
         if (supabase) await supabase.auth.signOut();
+        clearUserSessionStorage();
         window.location.href = "/auth";
         return;
       }
