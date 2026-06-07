@@ -12,6 +12,9 @@ type Row = {
   language: string;
   location: string;
   avatarUrl: string;
+  video1: string;
+  video2: string;
+  video3: string;
   status: "" | "saving" | "err";
   msg: string;
 };
@@ -21,7 +24,7 @@ const emptyRow = (): Row => ({
   id: counter++,
   handle: "", displayName: "", followers: "", bio: "",
   niches: "", language: "fr", location: "France",
-  avatarUrl: "", status: "", msg: "",
+  avatarUrl: "", video1: "", video2: "", video3: "", status: "", msg: "",
 });
 
 export default function AddCreatorPage() {
@@ -59,6 +62,7 @@ export default function AddCreatorPage() {
             followers: Number(r.followers) || 0, bio: r.bio,
             niches: r.niches, language: r.language, location: r.location,
             avatarUrl: r.avatarUrl,
+            videoUrls: [r.video1, r.video2, r.video3].filter(Boolean),
           }),
         });
         const data = await res.json();
@@ -144,6 +148,11 @@ export default function AddCreatorPage() {
 
           <label style={label}>Avatar image URL (optional — stores real pfp)</label>
           <input style={field} value={r.avatarUrl} onChange={(e) => update(r.id, "avatarUrl", e.target.value)} placeholder="right-click pfp → Copy image address" />
+
+          <label style={label}>TikTok video URLs (optional — up to 3, real previews)</label>
+          <input style={field} value={r.video1} onChange={(e) => update(r.id, "video1", e.target.value)} placeholder="tiktok.com/@user/video/123…" />
+          <input style={field} value={r.video2} onChange={(e) => update(r.id, "video2", e.target.value)} placeholder="video 2 (optional)" />
+          <input style={field} value={r.video3} onChange={(e) => update(r.id, "video3", e.target.value)} placeholder="video 3 (optional)" />
 
           {r.status === "saving" && <div style={{ fontSize: 12, color: "#888" }}>saving…</div>}
           {r.status === "err" && <div style={{ fontSize: 12, color: "#c00" }}>❌ {r.msg}</div>}
