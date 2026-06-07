@@ -49,7 +49,7 @@ async function searchScrapeCreators(niche: string) {
 }
 
 export async function POST(request: Request) {
-  const { niche, platform, minFollowers, maxFollowers, minEngagement, gender } = await request.json();
+  const { niche, platform, minFollowers, maxFollowers, minEngagement, gender, language, location } = await request.json();
   if (!niche) return NextResponse.json({ creators: [] });
 
   const nicheNorm = niche.toLowerCase().trim();
@@ -61,21 +61,46 @@ export async function POST(request: Request) {
   const platRaw = (platform || "TikTok").toLowerCase();
   const plat = platRaw === "instagram" ? "Instagram" : platRaw === "youtube" ? "YouTube" : "TikTok";
 
+  const langNorm = String(language || "").toLowerCase().trim();
+  const locNorm = String(location || "").toLowerCase().trim();
+  // French (or any explicit language/location) = curated-only mode: never scraped, never live API.
+  const curatedOnly = langNorm === "fr" || langNorm === "de" || !!locNorm;
+
   // 1. Query own DB first (instant, free)
   const orFilter = nicheWords.map((w: string) => `niches.cs.{${w}}`).join(",");
-  const { data: dbCreators } = await supabaseAdmin
+  let dbQuery = supabaseAdmin
     .from("creators_index")
     .select("*")
     .eq("platform", plat)
     .or(orFilter || `niches.cs.{${nicheNorm}}`)
     .gte("followers", minF)
     .lte("followers", maxF)
-    .gte("engagement_rate", minE)
-    .order("followers", { ascending: false })
-    .limit(50);
+    .gte("engagement_rate", minE);
 
-  if (dbCreators && dbCreators.length >= 5) {
+  // Curated-only mode (e.g. French): only show creators we hand-picked.
+  if (curatedOnly) {
+    dbQuery = dbQuery.contains("niches", ["curated"]);
+  }
+  // Language filter when provided.
+  if (langNorm) {
+    dbQuery = dbQuery.eq("language", langNorm);
+  }
+
+  const { data: dbCreators } = await dbQuery
+    .order("followers", { ascending: false })
+    .limit(100);
+
+  // In curated mode, even 1 result should show (no falling back to scraping).
+  const dbThreshold = curatedOnly ? 1 : 5;
+  if (dbCreators && dbCreators.length >= dbThreshold) {
     const creators = dbCreators
+      // Curated creators always rank first, then by followers.
+      .sort((a, b) => {
+        const ac = (a.niches || []).includes("curated") ? 1 : 0;
+        const bc = (b.niches || []).includes("curated") ? 1 : 0;
+        if (ac !== bc) return bc - ac;
+        return (b.followers || 0) - (a.followers || 0);
+      })
       .filter(c => {
         if (gender === "female" && !/(she|her|woman|girl|female|femme|elle|mom|mum|sister)/i.test(c.bio || "")) return false;
         if (gender === "male" && !/(he|him|man|guy|male|homme|dad|father|brother)/i.test(c.bio || "")) return false;
@@ -96,6 +121,11 @@ export async function POST(request: Request) {
         videoThumbnails: c.video_thumbnails || [],
       }));
     return NextResponse.json({ creators, source: "db" });
+  }
+
+  // Curated mode never scrapes — return whatever curated creators exist (even if empty).
+  if (curatedOnly) {
+    return NextResponse.json({ creators: [], source: "db", curated: true });
   }
 
   // 2. Live ScrapeCreators search (TikTok only for now)
