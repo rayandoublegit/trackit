@@ -93,6 +93,27 @@ function cleanHandle(raw: string): string {
   return h.toLowerCase();
 }
 
+// Fetch a TikTok video's real thumbnail via oEmbed (free, no key), store it permanently.
+async function fetchTikTokVideo(videoUrl: string): Promise<{ url: string; thumbnail: string | null; views: number | null } | null> {
+  const clean = videoUrl.trim();
+  if (!clean) return null;
+  try {
+    const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(clean)}`);
+    if (!res.ok) return { url: clean, thumbnail: null, views: null };
+    const data = await res.json();
+    const remoteThumb = data?.thumbnail_url || "";
+    // Store the thumbnail permanently so it never expires (reuse storeAvatar's bucket).
+    let stored: string | null = null;
+    if (remoteThumb) {
+      const key = "video_" + clean.replace(/[^a-zA-Z0-9]/g, "_").slice(-40);
+      stored = await storeAvatar(remoteThumb, key);
+    }
+    return { url: clean, thumbnail: stored || remoteThumb || null, views: null };
+  } catch {
+    return { url: clean, thumbnail: null, views: null };
+  }
+}
+
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization") || "";
   if (auth !== `Bearer ${ADMIN_SECRET}`) {
@@ -124,6 +145,12 @@ export async function POST(request: Request) {
   const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`;
   const stored = avatarInput ? await storeAvatar(avatarInput, username) : null;
 
+  // Fetch + permanently store thumbnails for up to 3 TikTok video URLs.
+  const videoUrls: string[] = Array.isArray(body.videoUrls)
+    ? body.videoUrls.filter((u: unknown) => typeof u === "string" && u.trim()).slice(0, 3)
+    : [];
+  const videoThumbs = (await Promise.all(videoUrls.map(u => fetchTikTokVideo(u)))).filter(Boolean);
+
   const row = {
     username,
     display_name: displayName,
@@ -136,7 +163,7 @@ export async function POST(request: Request) {
     niches,
     language: language || null,
     location: location || null,
-    video_thumbnails: [],
+    video_thumbnails: videoThumbs,
     last_scraped_at: new Date().toISOString(),
   };
 
