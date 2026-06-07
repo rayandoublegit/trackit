@@ -140,9 +140,20 @@ export async function POST(request: Request) {
     last_scraped_at: new Date().toISOString(),
   };
 
+  // Reject duplicates — don't silently overwrite an existing creator.
+  const { data: existing } = await supabaseAdmin
+    .from("creators_index")
+    .select("username")
+    .eq("username", username)
+    .maybeSingle();
+
+  if (existing) {
+    return NextResponse.json({ ok: false, error: "already added", duplicate: true }, { status: 409 });
+  }
+
   const { error } = await supabaseAdmin
     .from("creators_index")
-    .upsert(row, { onConflict: "username" });
+    .insert(row);
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

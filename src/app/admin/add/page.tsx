@@ -66,7 +66,8 @@ export default function AddCreatorPage() {
           savedIds.push(r.id);
           newLog.push(`✅ @${data.username}${data.avatar_stored ? " · pfp ✓" : ""}`);
         } else {
-          setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, status: "err", msg: data.error || "failed" } : x)));
+          const dupMsg = data.duplicate ? "already in DB — skipped" : (data.error || "failed");
+          setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, status: "err", msg: dupMsg } : x)));
         }
       } catch (e) {
         setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, status: "err", msg: String(e) } : x)));
