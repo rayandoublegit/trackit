@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   const isGerman = langNorm === "de" || langNorm === "german" || locNorm === "de" || locNorm === "germany";
 
   // Niches not yet curated — fall back to the scraped DB for these even in curated markets.
-  const FALLBACK_NICHES = ["food", "travel"];
+  const FALLBACK_NICHES = ["food"];
   const isFallbackNiche = FALLBACK_NICHES.some(n => nicheNorm.includes(n));
   // Curated-only applies to curated markets EXCEPT for not-yet-curated niches.
   const curatedOnly = (isFrench || isGerman) && !isFallbackNiche;
