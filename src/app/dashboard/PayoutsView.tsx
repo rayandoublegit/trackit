@@ -784,7 +784,12 @@ export function PayoutsView({
           <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28, flex: isMobile ? undefined : 1.4, width: isMobile ? "100%" : undefined }}>
             <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Votre solde" : "Your balance"}</div>
             <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatCurrency(balance, lang)}</div>
-            <button type="button" onClick={openAddFunds} className="hero-cta-shopify-dark">{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</button>
+            <button type="button" onClick={openAddFunds} className="hero-cta-glass">
+              <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                Pay it
+                <span className="brand-dot" aria-hidden />
+              </span>
+            </button>
           </div>
           <div style={{ width: isMobile ? "100%" : undefined, flex: isMobile ? undefined : 1 }}>
             <PayoutsWorkspacePaymentCard />

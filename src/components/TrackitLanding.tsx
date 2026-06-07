@@ -36,12 +36,15 @@ export default function TrackitLanding() {
   nav_login: lang === "fr" ? "Se connecter" : "Log in",
   nav_cta: lang === "fr" ? "Ouvrir thentrack.it" : "Open thentrack.it",
   hero_badge: lang === "fr" ? "Marketing d'influence, automatisé" : "Influencer marketing, automated",
+  hero_v2_soon: lang === "fr" ? "Trackit v2 arrive bientôt.." : "Trackit v2 comes soon..",
+  hero_v2_learn_more: lang === "fr" ? "En savoir plus" : "Learn more",
   hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
   hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
   hero_italic: lang === "fr" ? "A un seul endroit." : "All in one place.",
   hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : `Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No ${formatCurrency(300, lang)}/month enterprise tools.`,
-  hero_cta: lang === "fr" ? "Commencer gratuitement" : "Get started for Free",
+  hero_cta: lang === "fr" ? "Commencer" : "Get Started",
+  hero_cta_hover: lang === "fr" ? "Gratuit !!" : "For Free!!",
   hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
   hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
@@ -269,6 +272,11 @@ export default function TrackitLanding() {
     const data = await res.json();
     if (data.url) window.location.href = data.url;
     else alert(data.error || "Could not start checkout");
+  };
+
+  const switchLandingLang = (next: "en" | "fr") => {
+    localStorage.setItem("trackit_lang", next);
+    window.location.href = `${window.location.pathname}${window.location.search}`;
   };
 
   useEffect(() => {
@@ -586,7 +594,7 @@ export default function TrackitLanding() {
               <div className="lang-dropdown-menu">
                 <button
                   type="button"
-                  onClick={() => { localStorage.setItem("trackit_lang", "en"); window.location.reload(); }}
+                  onClick={() => switchLandingLang("en")}
                   style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "en" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "en" ? 600 : 400, color: lang === "en" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20M8 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
@@ -595,7 +603,7 @@ export default function TrackitLanding() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { localStorage.setItem("trackit_lang", "fr"); window.location.reload(); }}
+                  onClick={() => switchLandingLang("fr")}
                   style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "fr" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "fr" ? 600 : 400, color: lang === "fr" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 4v16M14 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
@@ -649,20 +657,14 @@ export default function TrackitLanding() {
             <button
               type="button"
               className={`mobile-nav-lang${lang === "en" ? " is-active" : ""}`}
-              onClick={() => {
-                localStorage.setItem("trackit_lang", "en");
-                window.location.reload();
-              }}
+              onClick={() => switchLandingLang("en")}
             >
               EN
             </button>
             <button
               type="button"
               className={`mobile-nav-lang${lang === "fr" ? " is-active" : ""}`}
-              onClick={() => {
-                localStorage.setItem("trackit_lang", "fr");
-                window.location.reload();
-              }}
+              onClick={() => switchLandingLang("fr")}
             >
               FR
             </button>
@@ -674,7 +676,7 @@ export default function TrackitLanding() {
       )}
 
       {/* HERO */}
-      <section className="hero">
+      <section className="hero" id="hero">
         <img
           ref={heroDoodleRef}
           src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
@@ -693,7 +695,40 @@ export default function TrackitLanding() {
           className={lang === "fr" ? "hero-money hero-money--fr" : "hero-money"}
           alt=""
         />
-        <h1 className="hero-headline">
+        <div className="hero-v2-pill-wrap fade-up">
+          <a href="#features" className="hero-v2-pill">
+            <span className="hero-v2-pill-primary">{t.hero_v2_soon}</span>
+            <span className="hero-v2-pill-secondary">
+              {t.hero_v2_learn_more}
+              <svg
+                className="hero-v2-pill-icon"
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+              >
+                <path
+                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M15 3h6v6M10 14L21 3"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+          </a>
+        </div>
+
+        <div className="hero-content">
+          <h1 className="hero-headline">
           <span className="hero-line-wrap fade-up">{t.hero_title_1}</span>
           <span className="hero-line-wrap fade-up fade-up-delay-1">{t.hero_title_2}</span>
           <span className={`hero-line-wrap fade-up fade-up-delay-2${lang === "fr" ? " hero-line-wrap--fr" : ""}`}>{t.hero_title_3}</span>
@@ -709,7 +744,8 @@ export default function TrackitLanding() {
         </p>
 
         <a href="/auth" className="hero-cta fade-up fade-up-delay-5">
-          {t.hero_cta}
+          <span className="hero-cta-label hero-cta-label--default">{t.hero_cta}</span>
+          <span className="hero-cta-label hero-cta-label--hover">{t.hero_cta_hover}</span>
         </a>
 
         <div className="hero-badges fade-up fade-up-delay-5">
@@ -727,8 +763,10 @@ export default function TrackitLanding() {
           </div>
         </div>
         <p className="hero-trusted fade-up fade-up-delay-5">
-          {t.hero_trusted}
+          <span>{t.hero_trusted}</span>
+          <img src="/shopify-logo.svg" alt="" className="hero-trusted-shopify" aria-hidden />
         </p>
+        </div>
       </section>
 
       {/* TRACKIT SECTION */}

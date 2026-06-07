@@ -29,6 +29,9 @@ const emptyRow = (): Row => ({
 
 export default function AddCreatorPage() {
   const [secret, setSecret] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [loadHandle, setLoadHandle] = useState("");
+  const [loadMsg, setLoadMsg] = useState("");
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [busy, setBusy] = useState(false);
   const [savedTotal, setSavedTotal] = useState(0);
@@ -41,6 +44,38 @@ export default function AddCreatorPage() {
   const addRow = () => setRows((rs) => [...rs, emptyRow()]);
   const removeRow = (id: number) =>
     setRows((rs) => (rs.length === 1 ? [emptyRow()] : rs.filter((r) => r.id !== id)));
+
+  const loadCreator = async () => {
+    if (!loadHandle.trim()) { setLoadMsg("enter a handle"); return; }
+    setLoadMsg("loading…");
+    try {
+      const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(loadHandle)}`, {
+        headers: { Authorization: `Bearer ${secret}` },
+      });
+      const data = await res.json();
+      if (!data.ok) { setLoadMsg(data.error || "not found"); return; }
+      const c = data.creator;
+      const vids = Array.isArray(c.video_thumbnails) ? c.video_thumbnails : [];
+      setRows([{
+        id: counter++,
+        handle: c.username || loadHandle,
+        displayName: c.display_name || "",
+        followers: c.followers ? String(c.followers) : "",
+        bio: c.bio || "",
+        niches: (c.niches || []).filter((n: string) => n !== "curated").join(", "),
+        language: c.language || "fr",
+        location: c.location || "France",
+        avatarUrl: "",
+        video1: vids[0]?.url || "",
+        video2: vids[1]?.url || "",
+        video3: vids[2]?.url || "",
+        status: "", msg: "",
+      }]);
+      setLoadMsg(`loaded @${c.username}`);
+    } catch (e) {
+      setLoadMsg(String(e));
+    }
+  };
 
   const saveAll = async () => {
     setBusy(true);
@@ -63,6 +98,7 @@ export default function AddCreatorPage() {
             niches: r.niches, language: r.language, location: r.location,
             avatarUrl: r.avatarUrl,
             videoUrls: [r.video1, r.video2, r.video3].filter(Boolean),
+            update: editMode,
           }),
         });
         const data = await res.json();
@@ -105,6 +141,29 @@ export default function AddCreatorPage() {
 
       <label style={label}>Admin secret</label>
       <input style={field} type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="admin secret" />
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <button
+          onClick={() => setEditMode(false)}
+          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #ddd",
+            background: !editMode ? "#0047FF" : "#fff", color: !editMode ? "#fff" : "#333",
+            fontWeight: 600, cursor: "pointer" }}
+        >Add new</button>
+        <button
+          onClick={() => setEditMode(true)}
+          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #ddd",
+            background: editMode ? "#0047FF" : "#fff", color: editMode ? "#fff" : "#333",
+            fontWeight: 600, cursor: "pointer" }}
+        >Edit existing</button>
+      </div>
+
+      {editMode && (
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <input style={{ ...field, marginBottom: 0 }} value={loadHandle} onChange={(e) => setLoadHandle(e.target.value)} placeholder="@handle to edit" />
+          <button onClick={loadCreator} style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: "#111", color: "#fff", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>Load</button>
+        </div>
+      )}
+      {editMode && loadMsg && <div style={{ fontSize: 12, color: "#666", marginBottom: 12 }}>{loadMsg}</div>}
 
       {rows.map((r) => (
         <div key={r.id} style={{
@@ -175,7 +234,7 @@ export default function AddCreatorPage() {
           color: "#fff", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600,
           cursor: busy ? "default" : "pointer" }}
       >
-        {busy ? "Saving batch…" : `Save all (${pending})`}
+        {busy ? "Saving…" : editMode ? "Update creator" : `Save all (${pending})`}
       </button>
 
       {savedLog.length > 0 && (

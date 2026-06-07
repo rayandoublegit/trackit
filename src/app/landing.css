@@ -355,6 +355,95 @@ body { padding-top: 80px; }
   margin: 0 auto;
   position: relative;
 }
+.hero-content {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.hero-v2-pill-wrap {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  z-index: 4;
+  pointer-events: none;
+}
+.hero-v2-pill-wrap .hero-v2-pill {
+  pointer-events: auto;
+}
+.hero-v2-pill,
+.hero-v2-pill:link,
+.hero-v2-pill:visited,
+.hero-v2-pill:active {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: transparent;
+  border: 2.5px solid #0047ff;
+  box-shadow: none;
+  text-decoration: none;
+  color: #000000;
+  white-space: nowrap;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+  transition:
+    background 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-v2-pill:hover {
+  background: #0047ff;
+  color: #ffffff;
+  transform: scale(1.08);
+  border-color: #0047ff;
+  box-shadow: 0 8px 24px rgba(0, 71, 255, 0.35);
+}
+.hero-v2-pill-primary {
+  font-family: 'InterDisplay', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #000000;
+  transition: color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-v2-pill:hover .hero-v2-pill-primary {
+  color: #ffffff;
+}
+.hero-v2-pill-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'InstrumentSans', sans-serif;
+  font-weight: 400;
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #7a7a7a;
+  transition: color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-v2-pill:hover .hero-v2-pill-secondary {
+  color: rgba(255, 255, 255, 0.85);
+}
+.hero-v2-pill-icon {
+  flex-shrink: 0;
+  color: #7a7a7a;
+  transition: color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.hero-v2-pill:hover .hero-v2-pill-icon {
+  color: rgba(255, 255, 255, 0.85);
+}
 .hero-headline {
   font-family: 'InterDisplay', sans-serif;
   font-weight: 600;
@@ -424,6 +513,25 @@ body { padding-top: 80px; }
   top: 176px;
   margin-left: 355px;
 }
+
+@media (min-width: 769px) {
+  .hero-content {
+    padding-top: 40px;
+  }
+  .hero-doodle {
+    top: 68px;
+  }
+  .hero-cursor {
+    top: 88px;
+  }
+  .hero-money {
+    top: 160px;
+  }
+  .hero-money--fr {
+    top: 216px;
+  }
+}
+
 .hero-sub {
   font-family: 'InstrumentSans', sans-serif;
   font-weight: 370;
@@ -452,6 +560,15 @@ body { padding-top: 80px; }
   transform-origin: center;
 }
 
+.hero-cta-label--hover {
+  display: none;
+}
+.hero-cta:hover .hero-cta-label--default {
+  display: none;
+}
+.hero-cta:hover .hero-cta-label--hover {
+  display: inline;
+}
 .hero-cta:hover {
   transform: scale(1.08);
 }
@@ -488,6 +605,10 @@ body { padding-top: 80px; }
   max-width: 10.5em;
 }
 .hero-trusted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   margin-top: 24px;
   font-family: 'InstrumentSans', sans-serif;
   font-weight: 400;
@@ -495,6 +616,12 @@ body { padding-top: 80px; }
   letter-spacing: -0.01em;
   line-height: 1.8em;
   color: var(--subtext);
+}
+.hero-trusted-shopify {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 /* ===== PAIN POINTS (sticky stack) ===== */
@@ -1659,9 +1786,27 @@ body { padding-top: 80px; }
 
   /* HERO */
   .hero {
-    padding: 24px 16px 40px;
+    padding: 36px 16px 40px;
     max-width: 100%;
     overflow: visible;
+  }
+  .hero-content {
+    padding-top: 52px;
+  }
+  .hero-v2-pill-wrap {
+    top: 28px;
+    padding: 0 4px;
+  }
+  .hero-v2-pill,
+  .hero-v2-pill:link,
+  .hero-v2-pill:visited {
+    gap: 10px;
+    padding: 8px 14px;
+    max-width: 100%;
+  }
+  .hero-v2-pill-primary,
+  .hero-v2-pill-secondary {
+    font-size: 13px;
   }
   .hero-headline {
     font-size: 44px;
@@ -1675,26 +1820,26 @@ body { padding-top: 80px; }
   .hero-doodle {
     display: block;
     width: 108px;
-    top: 12px;
+    top: 76px;
     margin-left: -200px;
   }
-  .hero-doodle--fr { width: 100px; top: 28px; margin-left: -208px; }
+  .hero-doodle--fr { width: 100px; top: 92px; margin-left: -208px; }
   .hero-cursor {
     display: block;
     width: 68px;
-    top: 26px;
+    top: 90px;
     margin-left: 92px;
   }
-  .hero-cursor--fr { top: 56px; margin-left: 90px; }
+  .hero-cursor--fr { top: 120px; margin-left: 90px; }
   .hero-money {
     display: block;
     width: 43px;
-    top: 102px;
+    top: 166px;
     margin-left: 168px;
   }
   .hero-money--fr {
     width: 38px;
-    top: 98px;
+    top: 162px;
     margin-left: 172px;
   }
   .hero-sub {
@@ -1836,13 +1981,29 @@ body { padding-top: 80px; }
     width: calc(100% - 16px);
     top: 8px;
   }
-  .hero { padding-top: 16px; }
-  .hero-doodle { width: 92px; top: 8px; margin-left: -172px; }
-  .hero-doodle--fr { width: 84px; top: 24px; margin-left: -176px; }
-  .hero-cursor { width: 57px; top: 22px; margin-left: 80px; }
-  .hero-cursor--fr { top: 52px; margin-left: 74px; }
-  .hero-money { width: 36px; top: 92px; margin-left: 150px; }
-  .hero-money--fr { width: 32px; top: 86px; margin-left: 148px; }
+  .hero { padding-top: 28px; }
+  .hero-content {
+    padding-top: 48px;
+  }
+  .hero-v2-pill-wrap {
+    top: 26px;
+  }
+  .hero-v2-pill,
+  .hero-v2-pill:link,
+  .hero-v2-pill:visited {
+    gap: 8px;
+    padding: 7px 12px;
+  }
+  .hero-v2-pill-primary,
+  .hero-v2-pill-secondary {
+    font-size: 12px;
+  }
+  .hero-doodle { width: 92px; top: 68px; margin-left: -172px; }
+  .hero-doodle--fr { width: 84px; top: 84px; margin-left: -176px; }
+  .hero-cursor { width: 57px; top: 82px; margin-left: 80px; }
+  .hero-cursor--fr { top: 112px; margin-left: 74px; }
+  .hero-money { width: 36px; top: 152px; margin-left: 150px; }
+  .hero-money--fr { width: 32px; top: 146px; margin-left: 148px; }
   .hero-headline { font-size: 36px; }
   .hero-italic { font-size: 36px; }
   .hero-sub { font-size: 15px; }
@@ -1874,9 +2035,27 @@ body { padding-top: 80px; }
 
   /* HERO */
   .hero {
-    padding: 24px 16px 40px;
+    padding: 36px 16px 40px;
     max-width: 100%;
     overflow: visible;
+  }
+  .hero-content {
+    padding-top: 52px;
+  }
+  .hero-v2-pill-wrap {
+    top: 28px;
+    padding: 0 4px;
+  }
+  .hero-v2-pill,
+  .hero-v2-pill:link,
+  .hero-v2-pill:visited {
+    gap: 10px;
+    padding: 8px 14px;
+    max-width: 100%;
+  }
+  .hero-v2-pill-primary,
+  .hero-v2-pill-secondary {
+    font-size: 13px;
   }
   .hero-headline {
     font-size: 48px;
@@ -1889,26 +2068,26 @@ body { padding-top: 80px; }
   .hero-doodle {
     display: block;
     width: 108px;
-    top: 12px;
+    top: 76px;
     margin-left: -200px;
   }
-  .hero-doodle--fr { width: 100px; top: 28px; margin-left: -208px; }
+  .hero-doodle--fr { width: 100px; top: 92px; margin-left: -208px; }
   .hero-cursor {
     display: block;
     width: 68px;
-    top: 26px;
+    top: 90px;
     margin-left: 92px;
   }
-  .hero-cursor--fr { top: 56px; margin-left: 90px; }
+  .hero-cursor--fr { top: 120px; margin-left: 90px; }
   .hero-money {
     display: block;
     width: 43px;
-    top: 102px;
+    top: 166px;
     margin-left: 168px;
   }
   .hero-money--fr {
     width: 38px;
-    top: 98px;
+    top: 162px;
     margin-left: 172px;
   }
   .hero-sub { font-size: 17px; max-width: 100%; margin: 20px auto 0; }
@@ -2055,13 +2234,20 @@ body { padding-top: 80px; }
 
 @media (max-width: 480px) {
   .navbar { width: calc(100vw - 16px); top: 8px; }
-  .hero { padding-top: 16px; }
-  .hero-doodle { width: 92px; top: 8px; margin-left: -172px; }
-  .hero-doodle--fr { width: 84px; top: 24px; margin-left: -176px; }
-  .hero-cursor { width: 57px; top: 22px; margin-left: 80px; }
-  .hero-cursor--fr { top: 52px; margin-left: 74px; }
-  .hero-money { width: 36px; top: 92px; margin-left: 150px; }
-  .hero-money--fr { width: 32px; top: 86px; margin-left: 148px; }
+  .hero { padding-top: 28px; }
+  .hero-content { padding-top: 48px; }
+  .hero-v2-pill-wrap { top: 26px; }
+  .hero-v2-pill,
+  .hero-v2-pill:link,
+  .hero-v2-pill:visited { gap: 8px; padding: 7px 12px; }
+  .hero-v2-pill-primary,
+  .hero-v2-pill-secondary { font-size: 12px; }
+  .hero-doodle { width: 92px; top: 68px; margin-left: -172px; }
+  .hero-doodle--fr { width: 84px; top: 84px; margin-left: -176px; }
+  .hero-cursor { width: 57px; top: 82px; margin-left: 80px; }
+  .hero-cursor--fr { top: 112px; margin-left: 74px; }
+  .hero-money { width: 36px; top: 152px; margin-left: 150px; }
+  .hero-money--fr { width: 32px; top: 146px; margin-left: 148px; }
   .hero-headline { font-size: 38px; }
   .hero-italic { font-size: 38px; }
   .hero-sub { font-size: 15px; }

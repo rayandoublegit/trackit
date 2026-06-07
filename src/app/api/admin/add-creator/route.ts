@@ -114,6 +114,31 @@ async function fetchTikTokVideo(videoUrl: string): Promise<{ url: string; thumbn
   }
 }
 
+export async function GET(request: Request) {
+  const auth = request.headers.get("authorization") || "";
+  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  }
+  const url = new URL(request.url);
+  const handleRaw = url.searchParams.get("handle") || "";
+  if (!handleRaw.trim()) {
+    return NextResponse.json({ ok: false, error: "handle required" }, { status: 400 });
+  }
+  const username = cleanHandle(handleRaw);
+  const { data, error } = await supabaseAdmin
+    .from("creators_index")
+    .select("username, display_name, followers, bio, niches, language, location, avatar_url, video_thumbnails")
+    .eq("username", username)
+    .maybeSingle();
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  if (!data) {
+    return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true, creator: data });
+}
+
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization") || "";
   if (auth !== `Bearer ${ADMIN_SECRET}`) {
@@ -167,23 +192,50 @@ export async function POST(request: Request) {
     last_scraped_at: new Date().toISOString(),
   };
 
-  // Reject duplicates — don't silently overwrite an existing creator.
+  const isUpdate = body.update === true;
+
   const { data: existing } = await supabaseAdmin
     .from("creators_index")
     .select("username")
     .eq("username", username)
     .maybeSingle();
 
-  if (existing) {
-    return NextResponse.json({ ok: false, error: "already added", duplicate: true }, { status: 409 });
+  if (!isUpdate) {
+    // ADD mode: reject duplicates — don't silently overwrite an existing creator.
+    if (existing) {
+      return NextResponse.json({ ok: false, error: "already added", duplicate: true }, { status: 409 });
+    }
+    const { error } = await supabaseAdmin.from("creators_index").insert(row);
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, username, avatar_stored: !!stored });
   }
+
+  // EDIT mode: only update fields that were actually provided (blank = keep existing).
+  if (!existing) {
+    return NextResponse.json({ ok: false, error: "not found", notFound: true }, { status: 404 });
+  }
+  const updates: Record<string, unknown> = { last_scraped_at: new Date().toISOString() };
+  if (String(body.displayName || "").trim()) updates.display_name = displayName;
+  if (body.followers !== undefined && body.followers !== "" && body.followers !== null) {
+    updates.followers = followers;
+    updates.engagement_rate = estimateEngagement(followers);
+    updates.avg_views = Math.floor(followers * 0.1);
+  }
+  if (body.bio !== undefined && String(body.bio).trim()) updates.bio = bio;
+  if (nicheRaw) updates.niches = niches;
+  if (language) updates.language = language;
+  if (location) updates.location = location;
+  if (stored || avatarInput) updates.avatar_url = stored || avatarInput;
+  if (videoThumbs.length > 0) updates.video_thumbnails = videoThumbs;
 
   const { error } = await supabaseAdmin
     .from("creators_index")
-    .insert(row);
-
+    .update(updates)
+    .eq("username", username);
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ ok: true, username, avatar_stored: !!stored });
+  return NextResponse.json({ ok: true, username, updated: true, fields: Object.keys(updates) });
 }

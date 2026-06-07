@@ -336,6 +336,7 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
               </svg>
             </div>
           </div>
+          {video.views != null && video.views > 0 && (
           <div
             style={{
               position: "absolute",
@@ -352,47 +353,12 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
           >
             {formatCount(video.views)} {lang === "fr" ? "vues" : "views"}
           </div>
+          )}
         </Wrapper>
         );
       })}
     </div>
   );
-}
-
-type ParsedAnalysis = {
-  fitScore: number | null;
-  fitReason: string;
-  audienceMatch: string;
-  risk: string;
-  recommendation: "BUILD IT" | "APPROACH WITH CAUTION" | "SKIP IT" | null;
-  recommendationReason: string;
-};
-
-function parseAnalysis(raw: string): ParsedAnalysis {
-  const fit = raw.match(/FIT SCORE:\s*(\d+)\s*\/?\s*10?\s*[—–-]?\s*([^\n]+)/i);
-  const audience = raw.match(/AUDIENCE MATCH:\s*([^\n]+)/i);
-  const risk = raw.match(/RISK:\s*([^\n]+)/i);
-  const rec = raw.match(/RECOMMENDATION:\s*(BUILD IT|APPROACH WITH CAUTION|SKIP IT)\s*[—–-]?\s*([^\n]+)/i);
-  return {
-    fitScore: fit ? parseInt(fit[1], 10) : null,
-    fitReason: fit?.[2]?.trim() ?? "",
-    audienceMatch: audience?.[1]?.trim() ?? "",
-    risk: risk?.[1]?.trim() ?? "",
-    recommendation: rec ? (rec[1].toUpperCase() as ParsedAnalysis["recommendation"]) : null,
-    recommendationReason: rec?.[2]?.trim() ?? "",
-  };
-}
-
-function fitScoreColor(score: number) {
-  if (score >= 8) return "#1FB567";
-  if (score >= 5) return "#B45309";
-  return "#DC2626";
-}
-
-function recommendationBadgeStyle(rec: NonNullable<ParsedAnalysis["recommendation"]>) {
-  if (rec === "BUILD IT") return { bg: "rgba(31,181,103,0.12)", fg: "#1FB567" };
-  if (rec === "APPROACH WITH CAUTION") return { bg: "rgba(234,179,8,0.15)", fg: "#B45309" };
-  return { bg: "rgba(220,38,38,0.1)", fg: "#DC2626" };
 }
 
 function CreatorProfileModal({
@@ -406,36 +372,6 @@ function CreatorProfileModal({
   onClose: () => void;
   onGenerateOutreach: () => void;
 }) {
-  const [brand, setBrand] = useState("");
-  const [showBrandInput, setShowBrandInput] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisRaw, setAnalysisRaw] = useState<string | null>(null);
-
-  const parsed = analysisRaw ? parseAnalysis(analysisRaw) : null;
-
-  const handleAnalyze = async () => {
-    if (!brand.trim()) {
-      setShowBrandInput(true);
-      return;
-    }
-    setAnalyzing(true);
-    setAnalysisRaw(null);
-    try {
-      const res = await fetch("/api/analyze-creator", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ creator, brand: brand.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error("Analysis failed");
-      setAnalysisRaw(data.analysis);
-    } catch {
-      setAnalysisRaw(null);
-    } finally {
-      setAnalyzing(false);
-    }
-  };
-
   const totalLikes = creator.followersCount * 8;
   const nicheTags = creator.niche
     .split(/[,;]+/)
@@ -529,6 +465,25 @@ function CreatorProfileModal({
 
         <p style={{ fontSize: 14, color: "#5A5A5A", lineHeight: 1.55, margin: "0 0 20px 0" }}>{creator.bio}</p>
 
+        {creator.email && (
+          <div style={{ marginBottom: 20 }}>
+            <a
+              href={`mailto:${creator.email}`}
+              style={{
+                fontSize: 13,
+                color: "#0047FF",
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                textDecoration: "none",
+              }}
+            >
+              {creator.email}
+            </a>
+          </div>
+        )}
+
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
           {[
             { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
@@ -541,85 +496,6 @@ function CreatorProfileModal({
               <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 4 }}>{stat.label}</div>
             </div>
           ))}
-        </div>
-
-        <div style={{ marginBottom: 20, padding: 20, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
-            {lang === "fr" ? "ANALYSE IA" : "AI ANALYSIS"}
-          </div>
-          {showBrandInput && (
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Que vendez-vous ?" : "What do you sell?"}</label>
-              <input
-                type="text"
-                value={brand}
-                onChange={(e) => setBrand(e.target.value)}
-                placeholder={lang === "fr" ? "Votre produit ou marque" : "Your product or brand"}
-                style={{ ...inputStyle, marginBottom: 0 }}
-              />
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleAnalyze()}
-            disabled={analyzing}
-            style={{ ...btnSecondary, width: "100%", opacity: analyzing ? 0.7 : 1 }}
-          >
-            {lang === "fr" ? "Analyser la compatibilité avec ma marque →" : "Analyze fit for my brand →"}
-          </button>
-          {analyzing && (
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: "12px 0 0", textAlign: "center" }}>{lang === "fr" ? "Analyse en cours..." : "Analyzing..."}</p>
-          )}
-          {parsed && !analyzing && (
-            <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 14 }}>
-              {parsed.fitScore !== null && (
-                <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
-                  <div style={{ fontSize: 36, fontWeight: 700, color: fitScoreColor(parsed.fitScore), lineHeight: 1, flexShrink: 0 }}>
-                    {parsed.fitScore}
-                    <span style={{ fontSize: 16, fontWeight: 500, color: "#9A9A9A" }}>/10</span>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginBottom: 4, letterSpacing: "0.04em" }}>FIT SCORE</div>
-                    {parsed.fitReason && <p style={{ fontSize: 13, color: "#4A4A4A", margin: 0, lineHeight: 1.45 }}>{parsed.fitReason}</p>}
-                  </div>
-                </div>
-              )}
-              {parsed.recommendation && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginBottom: 6, letterSpacing: "0.04em" }}>RECOMMENDATION</div>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "5px 12px",
-                      borderRadius: 999,
-                      background: recommendationBadgeStyle(parsed.recommendation).bg,
-                      color: recommendationBadgeStyle(parsed.recommendation).fg,
-                      letterSpacing: "0.02em",
-                    }}
-                  >
-                    {parsed.recommendation}
-                  </span>
-                  {parsed.recommendationReason && (
-                    <p style={{ fontSize: 13, color: "#4A4A4A", margin: "8px 0 0", lineHeight: 1.45 }}>{parsed.recommendationReason}</p>
-                  )}
-                </div>
-              )}
-              {parsed.audienceMatch && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginBottom: 4, letterSpacing: "0.04em" }}>AUDIENCE MATCH</div>
-                  <p style={{ fontSize: 13, color: "#4A4A4A", margin: 0, lineHeight: 1.45 }}>{parsed.audienceMatch}</p>
-                </div>
-              )}
-              {parsed.risk && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", marginBottom: 4, letterSpacing: "0.04em" }}>RISK</div>
-                  <p style={{ fontSize: 13, color: "#4A4A4A", margin: 0, lineHeight: 1.45 }}>{parsed.risk}</p>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
@@ -1159,22 +1035,6 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
           <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Vues moyennes" : "Avg views"}</div>
         </div>
       </div>
-
-      {creator.email && (
-        <div style={{
-          marginTop: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "#F0FDF4",
-          border: "1px solid #BBF7D0",
-          borderRadius: 8,
-          padding: "8px 10px",
-        }}>
-          <span style={{ fontSize: 12 }}>📧</span>
-          <span style={{ fontSize: 12, color: "#15803D", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{creator.email}</span>
-        </div>
-      )}
     </>
   );
 }
@@ -1719,20 +1579,21 @@ export function DiscoveryView({
               type="button"
               onClick={() => void search()}
               disabled={loading}
-              className="hero-cta-shopify hero-cta-compact"
+              className="hero-cta-glass"
               style={{
                 cursor: loading ? "wait" : "pointer",
                 opacity: loading ? 0.7 : 1,
                 width: isMobile ? "100%" : undefined,
               }}
             >
-              {loading
-                ? lang === "fr"
-                  ? "Recherche…"
-                  : "Searching..."
-                : lang === "fr"
-                  ? "Rechercher des créateurs"
-                  : "Search creators"}
+              {loading ? (
+                lang === "fr" ? "Recherche…" : "Searching..."
+              ) : (
+                <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+                  Find it
+                  <span className="brand-dot" aria-hidden />
+                </span>
+              )}
             </button>
           </div>
 

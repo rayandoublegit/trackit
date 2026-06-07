@@ -193,6 +193,11 @@ function DashboardPageContent() {
           router.replace("/auth");
           return;
         }
+        // If onboarding was never finished, resume it instead of showing an empty dashboard.
+        if (profileData.onboarding_completed === false) {
+          router.replace("/onboarding");
+          return;
+        }
         setShopifyStore(profileData.shopify_store || null);
         setUser(authUser);
         const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
@@ -512,7 +517,7 @@ function DashboardPageContent() {
           />
           {!sidebarCollapsed && (
             <span style={{ fontSize: 14, fontWeight: 600, color: "#000000", letterSpacing: "-0.02em", lineHeight: 1.35, fontFamily: "inherit" }}>
-              Find it, Track it, Pay it
+              Find it, <span style={{ color: "#0047FF" }}>Track it</span>, Pay it
               <span style={{ color: "#0047FF", fontSize: 28, lineHeight: 1 }}>.</span>
             </span>
           )}

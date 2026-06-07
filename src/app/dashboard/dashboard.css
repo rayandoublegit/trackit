@@ -211,6 +211,81 @@ body.dashboard-page {
   transform: scale(1.08);
 }
 
+.hero-cta-glass {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.48) 42%,
+    rgba(255, 255, 255, 0.65) 100%
+  );
+  color: #1a1a1a;
+  padding: 12px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.04em;
+  line-height: 1.1em;
+  box-shadow:
+    0 8px 28px rgba(0, 71, 255, 0.12),
+    0 2px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -3px 10px rgba(0, 0, 0, 0.05) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  backdrop-filter: blur(32px) saturate(240%);
+  -webkit-backdrop-filter: blur(32px) saturate(240%);
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-glass::before {
+  content: "";
+  position: absolute;
+  inset: 1px 12% auto 12%;
+  height: 52%;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.hero-cta-glass > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-cta-glass:hover {
+  transform: scale(1.08);
+  border-color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.94) 0%,
+    rgba(255, 255, 255, 0.62) 42%,
+    rgba(255, 255, 255, 0.78) 100%
+  );
+  box-shadow:
+    0 12px 36px rgba(0, 71, 255, 0.16),
+    0 2px 0 rgba(255, 255, 255, 1) inset,
+    0 -3px 12px rgba(0, 0, 0, 0.06) inset;
+}
+
+.hero-cta-glass:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
 .hero-cta-compact {
   padding: 10px 16px;
   font-size: 13px;
@@ -219,4 +294,15 @@ body.dashboard-page {
 .hero-cta-compact-sm {
   padding: 8px 12px;
   font-size: 12px;
+}
+
+.brand-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #0047ff;
+  flex-shrink: 0;
+  margin-left: 0.14em;
+  transform: translateY(0.5px);
 }

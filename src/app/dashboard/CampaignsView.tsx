@@ -147,7 +147,12 @@ export function CampaignsView({
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
             {lang === "fr" ? "Créez votre première campagne pour commencer à suivre les performances et les commissions." : "Create your first campaign to start tracking creator performance and commissions."}
           </p>
-          <button type="button" style={btnPrimary} onClick={tryOpenNewCampaign}>{lang === "fr" ? "+ Créer votre première campagne →" : "+ Create your first campaign →"}</button>
+          <button type="button" className="hero-cta-glass" onClick={tryOpenNewCampaign}>
+            <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+              Track it
+              <span className="brand-dot" aria-hidden />
+            </span>
+          </button>
         </div>
         {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
         {upgradeModalOpen && (
