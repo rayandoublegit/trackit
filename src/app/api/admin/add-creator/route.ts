@@ -36,7 +36,7 @@ const NICHE_MAP: Record<string, string> = {
   // beauty
   beauty: "beauty", beaute: "beauty", "beauté": "beauty", beaut: "beauty", beat: "beauty",
   makeup: "beauty", maquillage: "beauty", skincare: "beauty", soin: "beauty",
-  cheveux: "beauty", hair: "beauty", nails: "beauty", ongles: "beauty", parfum: "beauty",  "beat"
+  cheveux: "beauty", hair: "beauty", nails: "beauty", ongles: "beauty", parfum: "beauty",
   // tech
   tech: "tech", technologie: "tech", gadgets: "tech", ai: "tech", ia: "tech",
   coding: "tech", code: "tech", apps: "tech", gaming: "tech", jeux: "tech",

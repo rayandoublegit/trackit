@@ -63,8 +63,10 @@ export async function POST(request: Request) {
 
   const langNorm = String(language || "").toLowerCase().trim();
   const locNorm = String(location || "").toLowerCase().trim();
-  // French (or any explicit language/location) = curated-only mode: never scraped, never live API.
-  const curatedOnly = langNorm === "fr" || langNorm === "de" || !!locNorm;
+  // French market (frontend sends "french"/"fr", location "FR") = curated-only mode.
+  const isFrench = langNorm === "fr" || langNorm === "french" || locNorm === "fr" || locNorm === "france";
+  const isGerman = langNorm === "de" || langNorm === "german" || locNorm === "de" || locNorm === "germany";
+  const curatedOnly = isFrench || isGerman;
 
   // 1. Query own DB first (instant, free)
   const orFilter = nicheWords.map((w: string) => `niches.cs.{${w}}`).join(",");
@@ -81,10 +83,8 @@ export async function POST(request: Request) {
   if (curatedOnly) {
     dbQuery = dbQuery.contains("niches", ["curated"]);
   }
-  // Language filter when provided.
-  if (langNorm) {
-    dbQuery = dbQuery.eq("language", langNorm);
-  }
+  // NOTE: no strict language .eq filter — curated creators are already the right
+  // market, and exact-matching the language column wiped out valid results.
 
   const { data: dbCreators } = await dbQuery
     .order("followers", { ascending: false })
