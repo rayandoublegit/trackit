@@ -1320,15 +1320,27 @@ export function DiscoveryView({
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [location, setLocation] = useState(lang === "fr" ? "FR" : "");
-  const [language, setLanguage] = useState(lang === "fr" ? "french" : "");
+  const [location, setLocation] = useState(lang === "fr" ? "FR" : "US");
+  const [language, setLanguage] = useState(lang === "fr" ? "french" : "english");
 
   useEffect(() => {
     setFollowers("");
     setEngagement("");
-    setLocation(lang === "fr" ? "FR" : "");
-    setLanguage(lang === "fr" ? "french" : "");
+    setLocation(lang === "fr" ? "FR" : "US");
+    setLanguage(lang === "fr" ? "french" : "english");
   }, [lang]);
+
+  const handleLocationChange = (next: string) => {
+    setLocation(next);
+    if (next === "FR") setLanguage("french");
+    else if (next === "US") setLanguage("english");
+  };
+
+  const handleLanguageChange = (next: string) => {
+    setLanguage(next);
+    if (next === "french") setLocation("FR");
+    else if (next === "english") setLocation("US");
+  };
 
   const [creators, setCreators] = useState<Creator[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1764,24 +1776,19 @@ export function DiscoveryView({
             <FilterSelect
               label={lang === "fr" ? "Localisation" : "Location"}
               value={location}
-              onChange={setLocation}
+              onChange={handleLocationChange}
               options={[
-                { value: "US", label: lang === "fr" ? "États-Unis" : "United States" },
-                { value: "UK", label: lang === "fr" ? "Royaume-Uni" : "United Kingdom" },
                 { value: "FR", label: lang === "fr" ? "France" : "France" },
-                { value: "DE", label: lang === "fr" ? "Allemagne" : "Germany" },
-                { value: "CA", label: lang === "fr" ? "Canada" : "Canada" },
+                { value: "US", label: lang === "fr" ? "États-Unis" : "United States" },
               ]}
             />
             <FilterSelect
               label={lang === "fr" ? "Langue" : "Language"}
               value={language}
-              onChange={setLanguage}
+              onChange={handleLanguageChange}
               options={[
-                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
                 { value: "french", label: lang === "fr" ? "Français" : "French" },
-                { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
-                { value: "german", label: lang === "fr" ? "Allemand" : "German" },
+                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
               ]}
             />
           </div>

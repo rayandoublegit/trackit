@@ -20,6 +20,48 @@ function estimateEngagement(followers: number): number {
   return 2.0;
 }
 
+// The app's canonical niches (must match the discovery dropdown).
+const CANONICAL = ["fitness", "fashion", "beauty", "tech", "food", "travel"];
+
+// Map messy/variant/French sub-niche terms to a canonical parent niche.
+const NICHE_MAP: Record<string, string> = {
+  // fitness
+  fitness: "fitness", muscu: "fitness", musculation: "fitness", gym: "fitness",
+  sport: "fitness", fit: "fitness", bodybuilding: "fitness", crossfit: "fitness",
+  yoga: "fitness", running: "fitness", workout: "fitness", calisthenics: "fitness",
+  // fashion
+  fashion: "fashion", mode: "fashion", outfit: "fashion", outfits: "fashion",
+  ootd: "fashion", style: "fashion", streetwear: "fashion", luxe: "fashion",
+  vetements: "fashion", sneakers: "fashion",
+  // beauty
+  beauty: "beauty", beaute: "beauty", "beauté": "beauty", beaut: "beauty", beat: "beauty",
+  makeup: "beauty", maquillage: "beauty", skincare: "beauty", soin: "beauty",
+  cheveux: "beauty", hair: "beauty", nails: "beauty", ongles: "beauty", parfum: "beauty",  "beat"
+  // tech
+  tech: "tech", technologie: "tech", gadgets: "tech", ai: "tech", ia: "tech",
+  coding: "tech", code: "tech", apps: "tech", gaming: "tech", jeux: "tech",
+  // food
+  food: "food", cuisine: "food", recette: "food", recettes: "food", cooking: "food",
+  resto: "food", restaurant: "food", vegan: "food", patisserie: "food", boulangerie: "food",
+  // travel
+  travel: "travel", voyage: "travel", voyages: "travel", trip: "travel",
+  vanlife: "travel", roadtrip: "travel", tourisme: "travel", aventure: "travel",
+};
+
+// Returns canonical parent niches + original sub-niches + "curated", deduped.
+function normalizeNiches(raw: string): string[] {
+  const subs = raw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const out = new Set<string>(["curated"]);
+  for (const s of subs) {
+    out.add(s); // keep the original sub-niche so it's searchable directly
+    const parent = NICHE_MAP[s];
+    if (parent) out.add(parent);
+    else if (CANONICAL.includes(s)) out.add(s);
+    // if unknown, the sub-niche is still kept above (just no parent mapping)
+  }
+  return Array.from(out);
+}
+
 // Download a remote avatar and store it permanently. Returns permanent URL or null.
 async function storeAvatar(remoteUrl: string, username: string): Promise<string | null> {
   if (!remoteUrl || remoteUrl.includes("ui-avatars.com")) return null;
@@ -75,11 +117,9 @@ export async function POST(request: Request) {
   const language = String(body.language || "").trim().toLowerCase();
   const location = String(body.location || "").trim();
   const avatarInput = String(body.avatarUrl || "").trim();
-  // niches: comma-separated string -> array, always lowercased, always include "curated"
+  // niches: map typed sub-niches to canonical parent niches (+ keep originals + "curated")
   const nicheRaw = String(body.niches || "").trim();
-  const niches = Array.from(new Set(
-    nicheRaw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean).concat("curated")
-  ));
+  const niches = normalizeNiches(nicheRaw);
 
   const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`;
   const stored = avatarInput ? await storeAvatar(avatarInput, username) : null;
