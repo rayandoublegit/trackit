@@ -22,6 +22,7 @@ type DiscoveryTab = "discover" | "saved";
 type VideoThumbnail = {
   views: number;
   thumbnail: string | null;
+  url?: string | null;
 };
 
 type Creator = {
@@ -294,9 +295,15 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
 
   return (
     <div style={{ display: "flex", gap: isModal ? 10 : 6 }}>
-      {videoThumbnails.map((video, i) => (
-        <div
+      {videoThumbnails.map((video, i) => {
+        const Wrapper: any = video.url ? "a" : "div";
+        const wrapperProps = video.url
+          ? { href: video.url, target: "_blank", rel: "noopener noreferrer" }
+          : {};
+        return (
+        <Wrapper
           key={i}
+          {...wrapperProps}
           style={{
             flex: isModal ? 1 : "0 0 30%",
             aspectRatio: "9 / 16",
@@ -304,6 +311,9 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
             borderRadius: isModal ? 10 : 8,
             overflow: "hidden",
             position: "relative",
+            display: "block",
+            cursor: video.url ? "pointer" : "default",
+            textDecoration: "none",
             background: video.thumbnail
               ? `url(${video.thumbnail}) center / cover no-repeat`
               : gradientForVideo(creator.username ?? "", i),
@@ -342,8 +352,9 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
           >
             {formatCount(video.views)} {lang === "fr" ? "vues" : "views"}
           </div>
-        </div>
-      ))}
+        </Wrapper>
+        );
+      })}
     </div>
   );
 }
