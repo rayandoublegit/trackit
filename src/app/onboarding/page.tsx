@@ -1,9 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { formatCurrency } from "@/lib/useCurrency";
+import {
+  getGrowthPriceId,
+  getProPriceId,
+  getScalePriceId,
+  handleUpgrade,
+} from "@/lib/checkout";
 import type { User } from "@supabase/supabase-js";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -159,16 +167,31 @@ export default function OnboardingPage() {
 
   if (!user) return <div style={{ minHeight: "100vh", background: "#FFFFFF" }} />;
 
+  const cardShellStyle: React.CSSProperties = {
+    background: "#FFFFFF",
+    border: "1px solid rgba(0,0,0,0.08)",
+    borderRadius: 20,
+    padding: "32px 28px",
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "8px 24px 32px" }}>
-      <div style={{ width: "100%", maxWidth: 440 }}>
-        <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "8px 24px 48px" }}>
+      <div style={{ width: "100%", maxWidth: step === 5 ? 1100 : 440 }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 24, maxWidth: 440, marginLeft: step === 5 ? "auto" : undefined, marginRight: step === 5 ? "auto" : undefined }}>
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= i ? "#0047FF" : "rgba(0,0,0,0.08)", transition: "background 0.3s" }} />
           ))}
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 20, padding: "32px 28px" }}>
+        {step === 5 ? (
+          <>
+            <div style={{ ...cardShellStyle, maxWidth: 440, margin: "0 auto" }}>
+              <Done name={fullName} router={router} />
+            </div>
+            <OnboardingPricingReminder />
+          </>
+        ) : (
+        <div style={cardShellStyle}>
           {step === 1 && (
             <>
               <Header step={step} title="Set up your profile" subtitle="Tell us who you are. This is what creators will see when you reach out." titleFr="Configurez votre profil" subtitleFr="Dites-nous qui vous êtes. C'est ce que les créateurs verront quand vous les contactez." />
@@ -260,20 +283,288 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {step === 5 && (
-            <Done name={fullName} router={router} />
-          )}
-
-          {error && step !== 5 && (
+          {error && (
             <div style={{ fontSize: 14, color: "#ff6b6b", padding: "12px 14px", borderRadius: 12, background: "rgba(255,107,107,0.08)", marginTop: 16 }}>{error}</div>
           )}
 
-          {step !== 5 && step !== 4 && (
+          {step !== 4 && (
             <button type="button" onClick={goNext} disabled={loading} style={{ ...primaryBtn, marginTop: 16 }}>
               {lang === "fr" ? "Continuer →" : "Continue →"}
             </button>
           )}
         </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getOnboardingPricingCopy(lang: "en" | "fr") {
+  const fr = lang === "fr";
+  return {
+    reminderTitle: fr ? "Passez à l'offre supérieure quand vous voulez" : "Upgrade when you're ready",
+    reminderSub: fr
+      ? "Vous êtes déjà sur le plan gratuit. Voici les offres si vous voulez aller plus loin — sans obligation."
+      : "You're already on the free plan. Here's what's available if you want to go further — no pressure.",
+    pricingSave: fr ? "−20% annuel" : "Save 20% annual",
+    pricingBasicDesc: fr
+      ? "L'entrée idéale pour lancer votre programme créateurs."
+      : "Your entry point — start fast without overcommitting.",
+    pricingTrackitDesc: fr
+      ? "Le meilleur rapport qualité-prix. Le choix de la plupart des marques."
+      : "Best value. The plan most brands choose.",
+    pricingScaleDesc: fr
+      ? "Tout Pro, plus la puissance multi-boutiques et l'automatisation."
+      : "Everything in Pro, plus multi-store power and full automation.",
+    pricingScalePill: fr ? "Pour les agences" : "For agencies",
+    pricingMostPopular: fr ? "Le plus populaire" : "Most Popular",
+    pricingCta: fr ? "Commencer" : "Get Started",
+    pricingMonth: fr ? "/mois" : "/month",
+    pricingYear: fr ? "par an" : "/year",
+    pricingAnnually: fr ? "Annuel" : "Annually",
+    pricingEverythingInPro: fr ? "Tout le plan Pro" : "Everything in Pro",
+    continueFree: fr ? "Continuer en gratuit →" : "Continue free →",
+    growthFeatures: [
+      fr ? "30 découvertes/jour" : "30 discoveries/day",
+      fr ? "50 résultats par recherche" : "50 results per search",
+      fr ? "3 campagnes actives" : "3 active campaigns",
+      fr ? "25 créateurs gérés" : "25 managed creators",
+      fr ? "Messages IA illimités" : "Unlimited AI outreach",
+      fr ? "Modèles d'outreach (sauvegarde & import)" : "Outreach templates (save & import)",
+      fr ? "Paiements manuels (PayPal, Revolut, IBAN)" : "Manual payouts (PayPal, Revolut, IBAN)",
+      fr ? "Tableau de bord analytique complet" : "Full analytics dashboard",
+      fr ? "Intégration Shopify" : "Shopify integration",
+      fr ? "Liens d'affiliation & suivi" : "Affiliate links & tracking",
+    ],
+    proFeatures: [
+      fr ? "Découvertes illimitées" : "Unlimited discoveries",
+      fr ? "Résultats illimités" : "Unlimited results",
+      fr ? "10 campagnes actives" : "10 active campaigns",
+      fr ? "100 créateurs gérés" : "100 managed creators",
+      fr ? "Messages IA illimités" : "Unlimited AI outreach",
+      fr ? "Tous les modèles + import CSV en masse" : "All templates + bulk import via CSV",
+      fr ? "Paiements manuels + automatiques" : "Manual + auto payouts",
+      fr ? "Analytiques avancées + suivi ROI" : "Advanced analytics + ROI tracking",
+      fr ? "Intégration Shopify" : "Shopify integration",
+      fr ? "Liens d'affiliation & suivi" : "Affiliate links & tracking",
+      fr ? "Workflows d'automatisation" : "Automation workflows",
+      fr ? "Support prioritaire" : "Priority support",
+    ],
+    scaleFeatures: [
+      fr ? "Tout le plan Pro" : "Everything in Pro",
+      fr ? "Campagnes illimitées" : "Unlimited campaigns",
+      fr ? "Créateurs gérés illimités" : "Unlimited managed creators",
+      fr ? "Import CSV en masse (illimité)" : "Bulk CSV import (unlimited)",
+      fr ? "Paiements auto (Stripe Connect)" : "Auto payouts (Stripe Connect)",
+      fr ? "Agent d'automatisation complet" : "Full automation agent",
+      fr ? "Outreach en marque blanche" : "White-label outreach",
+      fr ? "Shopify multi-boutiques (3 boutiques)" : "Multi-store Shopify (3 stores)",
+      fr ? "Support dédié" : "Dedicated support",
+    ],
+  };
+}
+
+const pricingCheckIcon = (
+  <svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+function OnboardingPricingReminder() {
+  const lang = useLang();
+  const t = getOnboardingPricingCopy(lang);
+  const [growthAnnual, setGrowthAnnual] = useState(false);
+  const [proAnnual, setProAnnual] = useState(false);
+  const [scaleAnnual, setScaleAnnual] = useState(false);
+  const checkoutCurrency = lang === "fr" ? "eur" : "usd";
+
+  const startCheckout = async (plan: "growth" | "pro" | "scale", annual: boolean) => {
+    try {
+      const priceId =
+        plan === "growth"
+          ? getGrowthPriceId(checkoutCurrency, annual)
+          : plan === "pro"
+            ? getProPriceId(checkoutCurrency, annual)
+            : getScalePriceId(checkoutCurrency, annual);
+      await handleUpgrade(priceId);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Could not start checkout");
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ maxWidth: 440, margin: "0 auto 28px", textAlign: "center" }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#0047FF", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
+          {lang === "fr" ? "Tarifs" : "Pricing"}
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.03em", margin: "0 0 8px" }}>
+          {t.reminderTitle}
+        </h2>
+        <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: "0 0 6px", lineHeight: 1.5 }}>
+          {t.reminderSub}
+        </p>
+      </div>
+
+      <div className="pricing-grid">
+        <div className="pricing-wrap">
+          <div className="pricing-toggle">
+            <div className="pricing-toggle-left">
+              <button
+                type="button"
+                className={`toggle-switch${growthAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={growthAnnual}
+                onClick={() => setGrowthAnnual((on) => !on)}
+              >
+                <span className="toggle-thumb" />
+              </button>
+              <span className="toggle-label">{t.pricingAnnually}</span>
+            </div>
+            <div className="pricing-toggle-pill">{t.pricingSave}</div>
+          </div>
+          <div className="pricing-card">
+            <div className="pricing-card-top">
+              <div className="pricing-logo">
+                <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
+              </div>
+              <div className="pricing-name">Growth</div>
+              <div className="pricing-desc">{t.pricingBasicDesc}</div>
+              <div className="pricing-price">
+                <span className="pricing-amount">
+                  {growthAnnual ? formatCurrency(190, lang) : formatCurrency(19, lang)}
+                </span>
+                <span className="pricing-period">{growthAnnual ? t.pricingYear : t.pricingMonth}</span>
+              </div>
+            </div>
+            <div className="pricing-divider" />
+            <div className="pricing-features">
+              {t.growthFeatures.map((label) => (
+                <div key={label} className="pricing-feature">
+                  {pricingCheckIcon}
+                  {label}
+                </div>
+              ))}
+            </div>
+            <button type="button" onClick={() => void startCheckout("growth", growthAnnual)} className="pricing-cta">
+              {t.pricingCta}
+            </button>
+          </div>
+        </div>
+
+        <div className="pricing-wrap pricing-wrap-hero">
+          <div className="pricing-toggle">
+            <div className="pricing-toggle-left">
+              <button
+                type="button"
+                className={`toggle-switch${proAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={proAnnual}
+                onClick={() => setProAnnual((on) => !on)}
+              >
+                <span className="toggle-thumb" />
+              </button>
+              <span className="toggle-label">{t.pricingAnnually}</span>
+            </div>
+          </div>
+          <div className="pricing-card pricing-card-hero">
+            <span className="pricing-badge-most-popular">{t.pricingMostPopular}</span>
+            <div className="pricing-card-top">
+              <div className="pricing-logo">
+                <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
+              </div>
+              <div className="pricing-name">Pro</div>
+              <div className="pricing-desc">{t.pricingTrackitDesc}</div>
+              <div className="pricing-price">
+                <span className="pricing-amount">
+                  {proAnnual ? formatCurrency(390, lang) : formatCurrency(39, lang)}
+                </span>
+                <span className="pricing-period">{proAnnual ? t.pricingYear : t.pricingMonth}</span>
+              </div>
+            </div>
+            <div className="pricing-divider" />
+            <div className="pricing-features">
+              {t.proFeatures.map((label) => (
+                <div key={label} className="pricing-feature">
+                  {pricingCheckIcon}
+                  {label}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void startCheckout("pro", proAnnual)}
+              className="pricing-cta pricing-cta-hero"
+            >
+              {t.pricingCta}
+            </button>
+          </div>
+        </div>
+
+        <div className="pricing-wrap">
+          <div className="pricing-toggle">
+            <div className="pricing-toggle-left">
+              <button
+                type="button"
+                className={`toggle-switch${scaleAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={scaleAnnual}
+                onClick={() => setScaleAnnual((on) => !on)}
+              >
+                <span className="toggle-thumb" />
+              </button>
+              <span className="toggle-label">{t.pricingAnnually}</span>
+            </div>
+            <div className="pricing-toggle-pill">{t.pricingScalePill}</div>
+          </div>
+          <div className="pricing-card">
+            <div className="pricing-card-top">
+              <div className="pricing-logo">
+                <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
+              </div>
+              <div className="pricing-name">Scale</div>
+              <div className="pricing-desc">{t.pricingScaleDesc}</div>
+              <div className="pricing-price">
+                <span className="pricing-amount">
+                  {scaleAnnual ? formatCurrency(990, lang) : formatCurrency(99, lang)}
+                </span>
+                <span className="pricing-period">{scaleAnnual ? t.pricingYear : t.pricingMonth}</span>
+              </div>
+            </div>
+            <div className="pricing-divider" />
+            <div className="pricing-features">
+              {t.scaleFeatures.map((label) => (
+                <div key={label} className="pricing-feature">
+                  {pricingCheckIcon}
+                  {label}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void startCheckout("scale", scaleAnnual)}
+              className="pricing-cta pricing-cta-dark"
+            >
+              {t.pricingCta}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: 24 }}>
+        <Link
+          href="/dashboard"
+          style={{
+            fontSize: 15,
+            fontWeight: 500,
+            color: "#0047FF",
+            textDecoration: "none",
+            letterSpacing: "-0.02em",
+            fontFamily: "inherit",
+          }}
+        >
+          {t.continueFree}
+        </Link>
       </div>
     </div>
   );

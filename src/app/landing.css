@@ -995,12 +995,14 @@ body { padding-top: 80px; }
   color: #323232;
   line-height: 1.2;
   cursor: default;
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: center;
+  will-change: transform;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-.badge:hover {
-  transform: scale(1.08);
+.hero-badges .badge:first-child {
+  transform-origin: right center;
+}
+.hero-badges .badge:last-child {
+  transform-origin: left center;
 }
 
 .badge-text {
@@ -1017,20 +1019,129 @@ body { padding-top: 80px; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 2px;
   margin-top: 24px;
   font-family: 'InstrumentSans', sans-serif;
   font-weight: 400;
   font-size: 14px;
   letter-spacing: -0.01em;
-  line-height: 1.8em;
+  line-height: 1.5;
   color: var(--subtext);
 }
-.hero-trusted-shopify {
-  width: 16px;
+.hero-trusted-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  line-height: 1.5;
+}
+.hero-trusted-prefix {
+  white-space: pre;
+  line-height: 1.5;
+}
+.hero-trusted-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 1.5em;
+  padding-right: 2px;
+  overflow: hidden;
+  vertical-align: middle;
+  line-height: 1.5;
+}
+.hero-trusted-sizer {
+  display: inline-grid;
+  height: 1.5em;
+  line-height: 1.5;
+  visibility: hidden;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  pointer-events: none;
+}
+.hero-trusted-sizer > span {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+.hero-trusted-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  height: 1.5em;
+  line-height: 1.5;
+  white-space: nowrap;
+  font-weight: 500;
+  color: #1a1a1a;
+  letter-spacing: -0.02em;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+/* Shopify visible — parked above, ready to slide down on return */
+.hero-trusted-slot[data-active="0"] .hero-trusted-line--shopify {
+  transform: translateY(0);
+}
+.hero-trusted-slot[data-active="0"] .hero-trusted-line--saas {
+  transform: translateY(-100%);
+}
+/* SaaS visible — Shopify exited up, SaaS slid down into place */
+.hero-trusted-slot[data-active="1"] .hero-trusted-line--shopify {
+  transform: translateY(-100%);
+}
+.hero-trusted-slot[data-active="1"] .hero-trusted-line--saas {
+  transform: translateY(0);
+}
+.hero-trusted-logo-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
   height: 16px;
-  object-fit: contain;
+  margin-left: -4px;
   flex-shrink: 0;
+  overflow: hidden;
+  isolation: isolate;
+}
+.hero-trusted-logo-wrap[data-stripe="true"] {
+  margin-left: -1px;
+}
+.hero-trusted-logo {
+  position: absolute;
+  top: 50%;
+  height: 16px;
+  width: auto;
+  object-fit: contain;
+  background: transparent;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) scale(0.92);
+  transition:
+    opacity 0.45s ease,
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0.45s ease;
+  pointer-events: none;
+}
+.hero-trusted-logo--shopify {
+  left: 50%;
+  width: 16px;
+  max-width: 16px;
+  margin-left: -11px;
+  object-position: center center;
+}
+.hero-trusted-logo--stripe {
+  left: 50%;
+  width: 34px;
+  max-width: 34px;
+  margin-left: -17px;
+  object-position: center center;
+}
+.hero-trusted-logo.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) scale(1);
 }
 
 /* ===== PAIN POINTS (sticky stack) ===== */
@@ -2270,8 +2381,36 @@ body { padding-top: 80px; }
     gap: 16px;
     margin-top: 24px;
   }
+  .hero-badges .badge:first-child,
+  .hero-badges .badge:last-child {
+    transform-origin: center center;
+  }
   .badge { font-size: 15px; }
-  .hero-trusted { font-size: 12px; }
+  .hero-trusted {
+    font-size: 12px;
+    line-height: 1.45;
+    align-items: center;
+    gap: 5px;
+  }
+  .hero-trusted-inner {
+    align-items: center;
+    justify-content: center;
+    line-height: 1.45;
+    row-gap: 2px;
+  }
+  .hero-trusted-prefix,
+  .hero-trusted-slot,
+  .hero-trusted-sizer,
+  .hero-trusted-line {
+    height: 1.45em;
+    line-height: 1.45;
+  }
+  .hero-trusted-line {
+    align-items: center;
+  }
+  .hero-trusted-logo-wrap {
+    align-self: center;
+  }
 
   /* SECTIONS */
   .section {
@@ -2509,8 +2648,36 @@ body { padding-top: 80px; }
     max-width: 100%;
   }
   .hero-badges { flex-direction: column; align-items: center; gap: 16px; margin-top: 24px; }
+  .hero-badges .badge:first-child,
+  .hero-badges .badge:last-child {
+    transform-origin: center center;
+  }
   .badge { font-size: 15px; }
-  .hero-trusted { font-size: 12px; }
+  .hero-trusted {
+    font-size: 12px;
+    line-height: 1.45;
+    align-items: center;
+    gap: 5px;
+  }
+  .hero-trusted-inner {
+    align-items: center;
+    justify-content: center;
+    line-height: 1.45;
+    row-gap: 2px;
+  }
+  .hero-trusted-prefix,
+  .hero-trusted-slot,
+  .hero-trusted-sizer,
+  .hero-trusted-line {
+    height: 1.45em;
+    line-height: 1.45;
+  }
+  .hero-trusted-line {
+    align-items: center;
+  }
+  .hero-trusted-logo-wrap {
+    align-self: center;
+  }
 
   /* SECTIONS */
   .section { padding: 48px 20px; }
@@ -2678,6 +2845,26 @@ body { padding-top: 80px; }
   .hero-money,
   .hero-money--fr {
     display: none !important;
+  }
+
+  .hero-trusted {
+    line-height: 1.45;
+    align-items: center;
+  }
+  .hero-trusted-inner {
+    align-items: center;
+    justify-content: center;
+    line-height: 1.45;
+  }
+  .hero-trusted-prefix,
+  .hero-trusted-slot,
+  .hero-trusted-sizer,
+  .hero-trusted-line {
+    height: 1.45em;
+    line-height: 1.45;
+  }
+  .hero-trusted-logo-wrap {
+    align-self: center;
   }
 }
 

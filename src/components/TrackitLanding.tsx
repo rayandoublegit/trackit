@@ -13,10 +13,59 @@ const instrumentSerif = Instrument_Serif({
   style: "italic",
 });
 
+function HeroTrustedTicker({ lang }: { lang: "en" | "fr" }) {
+  const [lineIndex, setLineIndex] = useState(0);
+
+  useEffect(() => {
+    const holdMs = 3600;
+    const animMs = 700;
+    const id = window.setInterval(() => {
+      setLineIndex((i) => (i + 1) % 2);
+    }, holdMs + animMs);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const prefix = lang === "fr" ? "Fait confiance par plus de " : "Trusted by ";
+  const lines =
+    lang === "fr"
+      ? ["1k+ boutiques Shopify", "500+ fondateurs SaaS"]
+      : ["1k+ Shopify stores", "500+ SaaS owners"];
+  return (
+    <p className="hero-trusted fade-up fade-up-delay-5">
+      <span className="hero-trusted-inner">
+        <span className="hero-trusted-prefix">{prefix}</span>
+        <span className="hero-trusted-slot" data-active={lineIndex} aria-live="polite">
+          <span className="hero-trusted-line hero-trusted-line--shopify">{lines[0]}</span>
+          <span className="hero-trusted-line hero-trusted-line--saas">{lines[1]}</span>
+          <span className="hero-trusted-sizer" aria-hidden>
+            {lines.map((line) => (
+              <span key={line}>{line}</span>
+            ))}
+          </span>
+        </span>
+      </span>
+      <span className="hero-trusted-logo-wrap" data-stripe={lineIndex === 1 ? "true" : undefined} aria-hidden>
+        <img
+          src="/shopify-logo.svg"
+          alt=""
+          className={`hero-trusted-logo hero-trusted-logo--shopify${lineIndex === 0 ? " is-visible" : ""}`}
+        />
+        <img
+          src="/stripe-logo.svg"
+          alt=""
+          className={`hero-trusted-logo hero-trusted-logo--stripe${lineIndex === 1 ? " is-visible" : ""}`}
+        />
+      </span>
+    </p>
+  );
+}
+
 export default function TrackitLanding() {
   const heroDoodleRef = useRef<HTMLImageElement>(null);
   const heroCursorRef = useRef<HTMLImageElement>(null);
   const heroMoneyRef = useRef<HTMLImageElement>(null);
+  const heroBadge1Ref = useRef<HTMLDivElement>(null);
+  const heroBadge2Ref = useRef<HTMLDivElement>(null);
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [trackitAnnual, setTrackitAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
@@ -50,7 +99,6 @@ export default function TrackitLanding() {
   hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
   hero_bank: lang === "fr" ? "0€ de Virements Bancaires Manuels" : `${formatCurrency(0, lang)} Manual Bank Transfers`,
-  hero_trusted: lang === "fr" ? "Fait confiance par plus de 2 000 boutiques Shopify" : "Trusted by over 2,000 of the best Shopify Stores",
   section_does_everything: lang === "fr" ? "Trackit fait tout." : "Trackit does everything.",
   section_in_one_place: lang === "fr" ? "Au même endroit" : "In one place",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
@@ -315,6 +363,9 @@ export default function TrackitLanding() {
     const heroCursor = heroCursorRef.current;
     const heroMoney = heroMoneyRef.current;
 
+    const badge1 = heroBadge1Ref.current;
+    const badge2 = heroBadge2Ref.current;
+
     const onScroll = () => {
       const scrollY = window.scrollY;
       if (heroDoodle) {
@@ -326,8 +377,25 @@ export default function TrackitLanding() {
       if (heroMoney) {
         heroMoney.style.transform = `rotate(-10deg) translateY(${-scrollY * 0.45}px)`;
       }
+      if (badge1 && badge2) {
+        const zoomScale = 1.08;
+        const firstThreshold = 28;
+        const secondThreshold = 72;
+        let badge1Scale = 1;
+        let badge2Scale = 1;
+
+        if (scrollY >= secondThreshold) {
+          badge2Scale = zoomScale;
+        } else if (scrollY >= firstThreshold) {
+          badge1Scale = zoomScale;
+        }
+
+        badge1.style.transform = `scale(${badge1Scale})`;
+        badge2.style.transform = `scale(${badge2Scale})`;
+      }
     };
 
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -750,23 +818,20 @@ export default function TrackitLanding() {
         </a>
 
         <div className="hero-badges fade-up fade-up-delay-5">
-          <div className="badge">
+          <div className="badge" ref={heroBadge1Ref}>
             <span className="badge-text">
               {t.hero_commission}
               <br />
               {t.hero_automated}
             </span>
           </div>
-          <div className="badge">
+          <div className="badge" ref={heroBadge2Ref}>
             <span className="badge-text">
               {t.hero_bank}
             </span>
           </div>
         </div>
-        <p className="hero-trusted fade-up fade-up-delay-5">
-          <span>{t.hero_trusted}</span>
-          <img src="/shopify-logo.svg" alt="" className="hero-trusted-shopify" aria-hidden />
-        </p>
+        <HeroTrustedTicker lang={lang} />
         </div>
       </section>
 
