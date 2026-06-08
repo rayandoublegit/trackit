@@ -697,7 +697,7 @@ export default function TrackitLanding() {
           alt=""
         />
         <div className="hero-v2-pill-wrap fade-up">
-          <a href="#features" className="hero-v2-pill">
+          <a href="/v2" className="hero-v2-pill">
             <span className="hero-v2-pill-primary">{t.hero_v2_soon}</span>
             <span className="hero-v2-pill-secondary">
               {t.hero_v2_learn_more}
