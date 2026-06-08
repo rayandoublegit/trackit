@@ -30,6 +30,7 @@ const emptyRow = (): Row => ({
 export default function AddCreatorPage() {
   const [secret, setSecret] = useState("");
   const [editMode, setEditMode] = useState(false);
+  const [platform, setPlatform] = useState<"TikTok" | "Instagram">("TikTok");
   const [loadHandle, setLoadHandle] = useState("");
   const [loadMsg, setLoadMsg] = useState("");
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
@@ -119,6 +120,7 @@ export default function AddCreatorPage() {
             avatarUrl: r.avatarUrl,
             videoUrls: [r.video1, r.video2, r.video3].filter(Boolean),
             update: editMode,
+            platform,
           }),
         });
         const data = await res.json();
@@ -175,6 +177,21 @@ export default function AddCreatorPage() {
             background: editMode ? "#0047FF" : "#fff", color: editMode ? "#fff" : "#333",
             fontWeight: 600, cursor: "pointer" }}
         >Edit existing</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+        <button
+          onClick={() => setPlatform("TikTok")}
+          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #ddd",
+            background: platform === "TikTok" ? "#111" : "#fff", color: platform === "TikTok" ? "#fff" : "#333",
+            fontWeight: 600, cursor: "pointer" }}
+        >TikTok</button>
+        <button
+          onClick={() => setPlatform("Instagram")}
+          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #ddd",
+            background: platform === "Instagram" ? "#C13584" : "#fff", color: platform === "Instagram" ? "#fff" : "#333",
+            fontWeight: 600, cursor: "pointer" }}
+        >Instagram</button>
       </div>
 
       {editMode && (
