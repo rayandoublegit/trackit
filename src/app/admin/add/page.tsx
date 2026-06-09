@@ -12,6 +12,7 @@ type Row = {
   language: string;
   location: string;
   avatarUrl: string;
+  currentAvatar?: string;
   video1: string;
   video2: string;
   video3: string;
@@ -24,7 +25,7 @@ const emptyRow = (): Row => ({
   id: counter++,
   handle: "", displayName: "", followers: "", bio: "",
   niches: "", language: "fr", location: "France",
-  avatarUrl: "", video1: "", video2: "", video3: "", status: "", msg: "",
+  avatarUrl: "", currentAvatar: "", video1: "", video2: "", video3: "", status: "", msg: "",
 });
 
 export default function AddCreatorPage() {
@@ -87,6 +88,7 @@ export default function AddCreatorPage() {
         language: c.language || "fr",
         location: c.location || "France",
         avatarUrl: "",
+        currentAvatar: c.avatar_url || "",
         video1: vids[0]?.url || "",
         video2: vids[1]?.url || "",
         video3: vids[2]?.url || "",
@@ -244,6 +246,12 @@ export default function AddCreatorPage() {
 
           <label style={label}>Avatar image URL (optional — stores real pfp)</label>
           <input style={field} value={r.avatarUrl} onChange={(e) => update(r.id, "avatarUrl", e.target.value)} placeholder="right-click pfp → Copy image address" />
+          {r.currentAvatar && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: -4, marginBottom: 8 }}>
+              <img src={r.currentAvatar} alt="" width={32} height={32} style={{ borderRadius: "50%", objectFit: "cover", background: "#eee" }} />
+              <span style={{ fontSize: 12, color: "#666" }}>current pfp — leave blank to keep, paste a new URL to replace</span>
+            </div>
+          )}
 
           <label style={label}>TikTok video URLs (optional — up to 3, real previews)</label>
           <input style={field} value={r.video1} onChange={(e) => update(r.id, "video1", e.target.value)} placeholder="tiktok.com/@user/video/123…" />
