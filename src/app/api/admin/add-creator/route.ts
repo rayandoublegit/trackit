@@ -189,7 +189,8 @@ export async function POST(request: Request) {
   }
   const username = cleanHandle(handleRaw);
   const displayName = String(body.displayName || username).trim();
-  const followers = Number(body.followers || 0);
+  const followersRaw = String(body.followers ?? "").replace(/[^0-9]/g, "");
+  const followers = followersRaw ? Number(followersRaw) : 0;
   const bio = String(body.bio || "").trim();
   const language = String(body.language || "").trim().toLowerCase();
   const location = String(body.location || "").trim();
@@ -251,7 +252,7 @@ export async function POST(request: Request) {
   }
   const updates: Record<string, unknown> = { last_scraped_at: new Date().toISOString() };
   if (String(body.displayName || "").trim()) updates.display_name = displayName;
-  if (body.followers !== undefined && body.followers !== "" && body.followers !== null) {
+  if (followersRaw) {
     updates.followers = followers;
     updates.engagement_rate = estimateEngagement(followers);
     updates.avg_views = Math.floor(followers * 0.1);

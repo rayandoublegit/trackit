@@ -115,7 +115,7 @@ export default function AddCreatorPage() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
           body: JSON.stringify({
             handle: r.handle, displayName: r.displayName,
-            followers: Number(r.followers) || 0, bio: r.bio,
+            followers: r.followers.trim(), bio: r.bio,
             niches: r.niches, language: r.language, location: r.location,
             avatarUrl: r.avatarUrl,
             videoUrls: [r.video1, r.video2, r.video3].filter(Boolean),
