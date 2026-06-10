@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
+import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -51,13 +52,13 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       setLoadingData(true);
       let data: Record<string, unknown> | null = null;
 
-      const fetchAnalytics = async () => {
-        const res = await fetch(`/api/analytics?userId=${userId}`);
+      const fetchAnalytics = async (activeRange: DateRange) => {
+        const res = await fetch(`/api/analytics?userId=${userId}&range=${activeRange}`);
         return res.json() as Promise<Record<string, unknown>>;
       };
 
       try {
-        data = await fetchAnalytics();
+        data = await fetchAnalytics(range);
         const shouldSync = !!(shopifyStore || data?.shopifyConnected);
         if (shouldSync) {
           try {
@@ -66,7 +67,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ userId }),
             });
-            data = await fetchAnalytics();
+            data = await fetchAnalytics(range);
           } catch {
             // Keep first analytics payload if sync fails
           }
@@ -83,7 +84,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     return () => {
       cancelled = true;
     };
-  }, [userId, shopifyStore]);
+  }, [userId, shopifyStore, range]);
 
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
@@ -120,6 +121,14 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const netRevenue = Math.max(0, totalRevenue - totalCommissions);
   const conversionRate = totalSent > 0 ? Math.round((converted / totalSent) * 100) : 0;
   const avgCommissionRate = totalRevenue > 0 ? Math.round((totalCommissions / totalRevenue) * 100) : 0;
+  const trends = analyticsData?.trends as
+    | {
+        revenue?: PeriodTrend;
+        commissions?: PeriodTrend;
+        outreachSent?: PeriodTrend;
+        responseRate?: PeriodTrend;
+      }
+    | undefined;
 
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [saleCreators, setSaleCreators] = useState<{ id: string; label: string }[]>([]);
@@ -234,16 +243,36 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <button type="button" onClick={openSaleModal} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "#1A1A1A" }}>
+          <button type="button" onClick={openSaleModal} className="hero-cta-shopify hero-cta-compact">
             {lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
           </button>
         </div>
         {saleModal}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-          <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={formatCurrency(totalRevenue, lang)} />
-          <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value={String(totalSent)} />
-          <KpiCard title={lang === "fr" ? "Taux de réponse" : "Response Rate"} value={`${responseRate}%`} />
-          <KpiCard title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"} value={formatCurrency(totalCommissions, lang)} />
+          <KpiCard
+            title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"}
+            value={formatCurrency(totalRevenue, lang)}
+            trend={compare ? trends?.revenue : undefined}
+            lang={lang}
+          />
+          <KpiCard
+            title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"}
+            value={String(totalSent)}
+            trend={compare ? trends?.outreachSent : undefined}
+            lang={lang}
+          />
+          <KpiCard
+            title={lang === "fr" ? "Taux de réponse" : "Response Rate"}
+            value={`${responseRate}%`}
+            trend={compare ? trends?.responseRate : undefined}
+            lang={lang}
+          />
+          <KpiCard
+            title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"}
+            value={formatCurrency(totalCommissions, lang)}
+            trend={compare ? trends?.commissions : undefined}
+            lang={lang}
+          />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
@@ -466,14 +495,19 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
         </button>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-        <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
-          {ranges.map((r) => (
-            <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
-              padding: "8px 14px", borderRadius: 8, border: "none", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
-              background: range === r.id ? "#FFF" : "transparent", color: range === r.id ? "#1A1A1A" : "#7A7A7A",
-              fontWeight: range === r.id ? 500 : 400, boxShadow: range === r.id ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
-            }}>{r.label}</button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
+            {ranges.map((r) => (
+              <button key={r.id} type="button" onClick={() => setRange(r.id)} style={{
+                padding: "8px 14px", borderRadius: 8, border: "none", fontSize: 13, fontFamily: "inherit", cursor: "pointer",
+                background: range === r.id ? "#FFF" : "transparent", color: range === r.id ? "#1A1A1A" : "#7A7A7A",
+                fontWeight: range === r.id ? 500 : 400, boxShadow: range === r.id ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+              }}>{r.label}</button>
+            ))}
+          </div>
+          {compare && analyticsData?.trends?.revenue ? (
+            <TrendStat trend={analyticsData.trends.revenue as PeriodTrend} lang={lang} />
+          ) : null}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Comparer à la période précédente" : "Compare to previous period"}</span>
@@ -492,12 +526,89 @@ function CompareToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) 
   );
 }
 
-function KpiCard({ title, value, sub, subColor }: { title: string; value: string; sub?: string; subColor?: string }) {
+function trendColors(direction: PeriodTrend["direction"]) {
+  if (direction === "up") return { fg: "#1FB567", bg: "rgba(31,181,103,0.12)" };
+  if (direction === "down") return { fg: "#E53935", bg: "rgba(229,57,53,0.12)" };
+  return { fg: "#9A9A9A", bg: "#F5F5F5" };
+}
+
+function TrendStat({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
+  const { fg, bg } = trendColors(trend.direction);
+  const label = formatTrendLabel(trend.changePct, lang);
+  const prefix = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+        fontWeight: 600,
+        color: fg,
+        background: bg,
+        padding: "6px 10px",
+        borderRadius: 8,
+        letterSpacing: "-0.02em",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span aria-hidden>{prefix}</span>
+      <span>{label}</span>
+      <span style={{ fontWeight: 500, color: fg, opacity: 0.85 }}>
+        {lang === "fr" ? "revenus" : "revenue"}
+      </span>
+    </span>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  sub,
+  subColor,
+  trend,
+  lang,
+}: {
+  title: string;
+  value: string;
+  sub?: string;
+  subColor?: string;
+  trend?: PeriodTrend;
+  lang?: "en" | "fr";
+}) {
+  const showTrend = trend && lang;
+  const { fg, bg } = showTrend ? trendColors(trend.direction) : { fg: "", bg: "" };
   return (
     <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
       <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: sub ? 6 : 0 }}>{value}</div>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: sub || showTrend ? 6 : 0 }}>
+        <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em" }}>{value}</div>
+        {showTrend ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 600,
+              color: fg,
+              background: bg,
+              padding: "4px 8px",
+              borderRadius: 6,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            <span aria-hidden>{trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→"}</span>
+            {formatTrendLabel(trend.changePct, lang)}
+          </span>
+        ) : null}
+      </div>
       {sub ? <div style={{ fontSize: 12, color: subColor || "#9A9A9A", letterSpacing: "-0.01em" }}>{sub}</div> : null}
+      {showTrend ? (
+        <div style={{ fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "vs période précédente" : "vs previous period"}
+        </div>
+      ) : null}
     </div>
   );
 }

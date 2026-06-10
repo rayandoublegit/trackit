@@ -40,14 +40,43 @@ export function saveDashboardView(view: DashboardView, userId?: string | null) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(viewStorageKey(userId), view);
+    if (userId) {
+      localStorage.setItem(viewStorageKey(), view);
+    }
   } catch {
     /* storage unavailable */
   }
 }
 
-export function readInitialDashboardView(): DashboardView {
+export function readViewFromUrl(search?: string): DashboardView | null {
+  const qs = search ?? (typeof window !== "undefined" ? window.location.search : "");
+  if (!qs) return null;
+  const value = new URLSearchParams(qs).get("view");
+  if (value && isDashboardView(value)) return value;
+  return null;
+}
+
+export function writeViewToUrl(view: DashboardView) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (view === "dashboard") {
+    url.searchParams.delete("view");
+  } else {
+    url.searchParams.set("view", view);
+  }
+  const search = url.searchParams.toString();
+  const next = search ? `${url.pathname}?${search}` : url.pathname;
+  const current = `${window.location.pathname}${window.location.search}`;
+  if (current !== next) {
+    window.history.replaceState({}, "", next);
+  }
+}
+
+export function readInitialDashboardView(userId?: string | null): DashboardView {
   if (typeof window === "undefined") return "dashboard";
   const params = new URLSearchParams(window.location.search);
   if (params.get("connect") === "return") return "payouts";
-  return loadDashboardView() ?? "dashboard";
+  const fromUrl = readViewFromUrl(window.location.search);
+  if (fromUrl) return fromUrl;
+  return loadDashboardView(userId) ?? loadDashboardView() ?? "dashboard";
 }

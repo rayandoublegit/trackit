@@ -783,10 +783,12 @@ export function PayoutsView({
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20, marginBottom: 20 }}>
           <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28, flex: isMobile ? undefined : 1.4, width: isMobile ? "100%" : undefined, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
             <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Votre solde" : "Your balance"}</div>
-            <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", marginBottom: 18 }}>{formatCurrency(balance, lang)}</div>
-            <button type="button" onClick={openAddFunds} className="hero-cta-shopify-light hero-cta-compact-sm">
-              {lang === "fr" ? "Ajouter au solde" : "Add to balance"}
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1 }}>{formatCurrency(balance, lang)}</div>
+              <button type="button" onClick={openAddFunds} className="hero-cta-shopify-light hero-cta-compact">
+                {lang === "fr" ? "Ajouter au solde" : "Add to balance"}
+              </button>
+            </div>
           </div>
           <div style={{ width: isMobile ? "100%" : undefined, flex: isMobile ? undefined : 1 }}>
             <PayoutsWorkspacePaymentCard />

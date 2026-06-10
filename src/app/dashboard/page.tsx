@@ -48,7 +48,9 @@ import { loadAffiliates, saveAffiliates, type StoredAffiliate } from "@/lib/affi
 import {
   loadDashboardView,
   readInitialDashboardView,
+  readViewFromUrl,
   saveDashboardView,
+  writeViewToUrl,
   type DashboardView,
 } from "@/lib/dashboard-view-storage";
 
@@ -86,7 +88,8 @@ function DashboardPageContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
-  const [view, setView] = useState<View>(readInitialDashboardView);
+  const [view, setView] = useState<View>("dashboard");
+  const [viewReady, setViewReady] = useState(false);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);
@@ -271,15 +274,23 @@ function DashboardPageContent() {
   }, [user?.id, loading, searchParams]);
 
   useEffect(() => {
-    if (!user?.id || loading) return;
-    if (searchParams.get("connect") === "return") return;
-    const saved = loadDashboardView(user.id);
-    if (saved) setView(saved);
-  }, [user?.id, loading, searchParams]);
+    setView(readInitialDashboardView());
+    setViewReady(true);
+  }, []);
 
   useEffect(() => {
+    if (!user?.id || loading || !viewReady) return;
+    if (searchParams.get("connect") === "return") return;
+    if (readViewFromUrl()) return;
+    const saved = loadDashboardView(user.id);
+    if (saved) setView(saved);
+  }, [user?.id, loading, searchParams, viewReady]);
+
+  useEffect(() => {
+    if (!viewReady) return;
+    writeViewToUrl(view);
     saveDashboardView(view, user?.id);
-  }, [view, user?.id]);
+  }, [view, user?.id, viewReady]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -417,7 +428,7 @@ function DashboardPageContent() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  if (loading) {
+  if (loading || !viewReady) {
     return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
   }
 

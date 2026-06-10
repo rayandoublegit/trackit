@@ -1229,9 +1229,11 @@ export function OutreachHistorySection({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        creatorHandle: item.handle,
-        platform: item.platform,
+        creator: { displayName: item.creator, username: item.handle, platform: item.platform },
         originalMessage: item.message,
+        brand: "Trackit",
+        daysSince: 3,
+        tone: "casual",
         lang,
       }),
     });
@@ -1240,7 +1242,7 @@ export function OutreachHistorySection({
       await navigator.clipboard.writeText(data.followUp || data.message);
       alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
       const { supabase: sb } = await import("@/lib/supabase");
-      if (sb) await sb.from("outreach_history").update({ follow_up_sent: true }).eq("id", item.id);
+      if (sb) await sb.from("outreach_history").update({ follow_up_date: null, updated_at: new Date().toISOString() }).eq("id", item.id);
       setManageEntry(null);
       await loadHistory();
     }
