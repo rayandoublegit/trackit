@@ -668,6 +668,8 @@ function OutreachAIGeneratePanel({
     } else if (platform === "Email") {
       window.open(`mailto:${creatorEmail.trim() || handle}?body=${encodeURIComponent(generatedMessage)}`, "_blank");
     }
+    console.log("[DEBUG] handleSend: calling onMarkSent");
+    console.log("[DEBUG] handleSend: calling onMarkSent");
     // Log the outreach so it appears in history and feeds analytics
     await onMarkSent({
       id: "",
@@ -1151,9 +1153,10 @@ export function OutreachHistorySection({
   }, [toast]);
 
   const loadHistory = useCallback(async () => {
-    if (!supabase) return;
+    if (!supabase) { console.error("[DEBUG] logOutreach: supabase client is NULL"); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { console.error("[DEBUG] logOutreach: NO USER from auth.getUser()"); return; }
+    console.log("[DEBUG] logOutreach: user OK", user.id);
     const [history, creators] = await Promise.all([
       getOutreachHistory(user.id),
       getSavedCreators(user.id),
@@ -1194,9 +1197,10 @@ export function OutreachHistorySection({
     message: string,
     followUpDate?: string | null
   ) => {
-    if (!supabase) return;
+    if (!supabase) { console.error("[DEBUG] logOutreach: supabase client is NULL"); return; }
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { console.error("[DEBUG] logOutreach: NO USER from auth.getUser()"); return; }
+    console.log("[DEBUG] logOutreach: user OK", user.id);
     const handle = (creator.username || creator.handle || "").replace(/^@/, "");
     await saveOutreach(user.id, {
       creator_username: handle,

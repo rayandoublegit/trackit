@@ -142,7 +142,8 @@ export async function saveOutreach(userId: string, outreach: {
     .insert({ user_id: userId, ...outreach })
     .select()
     .single();
-  if (error) console.error("saveOutreach error:", error);
+  if (error) console.error("[DEBUG] saveOutreach FAILED:", error.message, error);
+  else console.log("[DEBUG] saveOutreach OK, inserted id:", data?.id);
   return data;
 }
 
