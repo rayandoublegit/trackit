@@ -980,6 +980,189 @@ function creatorHandleForOutreach(username: string): string {
 
 const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
 
+function messageFromTemplate(t: Pick<OutreachTemplate, "subject" | "opening" | "body">) {
+  const parts = [t.opening, t.body].map((part) => part.trim()).filter(Boolean);
+  if (parts.length > 0) return parts.join("\n\n");
+  return t.subject.trim();
+}
+
+type OutreachMessageFields = Pick<OutreachTemplate, "subject" | "opening" | "body" | "cta">;
+
+function outreachFieldsFromMessage(message: string, cta = ""): OutreachMessageFields {
+  return { subject: "", opening: "", body: message.trim(), cta: cta.trim() };
+}
+
+function templateHasStructuredFields(fields: OutreachMessageFields) {
+  return !!(fields.subject.trim() || fields.cta.trim() || (fields.opening.trim() && fields.body.trim()));
+}
+
+function previewFromFields(fields: OutreachMessageFields, name = "there") {
+  const main = messageFromTemplate(fields);
+  return buildOutreachPreview(main, fields.cta, name);
+}
+
+function buildOutreachPreview(message: string, cta: string, name = "there") {
+  const personalized = (text: string) => personalizeOutreachText(text, name).replace(/\{\{brand\}\}/gi, "your brand");
+  return [personalized(message.trim()), personalized(cta.trim())].filter(Boolean).join("\n\n");
+}
+
+function outreachCreatorName(handle?: string) {
+  return handle?.replace(/^@/, "").trim() || "";
+}
+
+function personalizeOutreachText(text: string, creatorName: string) {
+  if (!creatorName) return text;
+  return text.replace(/\{\{name\}\}/gi, creatorName);
+}
+
+function depersonalizeOutreachText(text: string, creatorName: string) {
+  if (!creatorName) return text;
+  const escaped = creatorName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.replace(new RegExp(escaped, "gi"), "{{name}}");
+}
+
+function personalizeOutreachFields(fields: OutreachMessageFields, creatorName: string): OutreachMessageFields {
+  if (!creatorName) return fields;
+  return {
+    subject: personalizeOutreachText(fields.subject, creatorName),
+    opening: personalizeOutreachText(fields.opening, creatorName),
+    body: personalizeOutreachText(fields.body, creatorName),
+    cta: personalizeOutreachText(fields.cta, creatorName),
+  };
+}
+
+function depersonalizeOutreachFields(fields: OutreachMessageFields, creatorName: string): OutreachMessageFields {
+  if (!creatorName) return fields;
+  return {
+    subject: depersonalizeOutreachText(fields.subject, creatorName),
+    opening: depersonalizeOutreachText(fields.opening, creatorName),
+    body: depersonalizeOutreachText(fields.body, creatorName),
+    cta: depersonalizeOutreachText(fields.cta, creatorName),
+  };
+}
+
+function OutreachMessageEditor({
+  lang,
+  value,
+  onChange,
+  creatorName = "",
+}: {
+  lang: "en" | "fr";
+  value: OutreachMessageFields;
+  onChange: (next: OutreachMessageFields) => void;
+  creatorName?: string;
+}) {
+  const [detailed, setDetailed] = useState(() => templateHasStructuredFields(value));
+  const display = personalizeOutreachFields(value, creatorName);
+
+  const updateFields = (next: OutreachMessageFields) => {
+    onChange(depersonalizeOutreachFields(next, creatorName));
+  };
+
+  const toggleDetailed = () => {
+    if (detailed) {
+      const merged = [messageFromTemplate(display), display.cta].filter(Boolean).join("\n\n");
+      updateFields({ subject: "", opening: "", body: merged, cta: "" });
+      setDetailed(false);
+      return;
+    }
+    const body = value.body.trim();
+    const opening = value.opening.trim() || (body ? body.split("\n\n")[0] ?? "" : "Hey {{name}},");
+    const rest = value.opening.trim()
+      ? body
+      : body.includes("\n\n")
+        ? body.split("\n\n").slice(1).join("\n\n")
+        : "";
+    updateFields({ subject: value.subject, opening, body: rest, cta: value.cta });
+    setDetailed(true);
+  };
+
+  const setField = <K extends keyof OutreachMessageFields>(key: K, next: OutreachMessageFields[K]) => {
+    updateFields({ ...display, [key]: next });
+  };
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Message" : "Message"}</label>
+        <button
+          type="button"
+          className="hero-cta-shopify-light hero-cta-compact-sm"
+          onClick={toggleDetailed}
+          style={{ flexShrink: 0 }}
+        >
+          {detailed
+            ? lang === "fr"
+              ? "Mode simple"
+              : "Simple mode"
+            : lang === "fr"
+              ? "Structure avancée"
+              : "Advanced structure"}
+        </button>
+      </div>
+
+      {creatorName ? (
+        <p style={{ fontSize: 11, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? `Personnalisé pour @${creatorName}` : `Personalized for @${creatorName}`}
+        </p>
+      ) : null}
+
+      {!detailed ? (
+        <textarea
+          value={[messageFromTemplate(display), display.cta].filter(Boolean).join("\n\n")}
+          onChange={(e) => updateFields(outreachFieldsFromMessage(e.target.value))}
+          rows={12}
+          placeholder={lang === "fr" ? "Écrivez votre message ici…" : "Write your message here…"}
+          style={panelMessageStyle}
+        />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Sujet" : "Subject"}</label>
+            <input
+              type="text"
+              value={display.subject}
+              onChange={(e) => setField("subject", e.target.value)}
+              placeholder={lang === "fr" ? "Partenariat avec {{brand}}" : "Partnership with {{brand}}"}
+              style={panelInputStyle}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
+            <textarea
+              value={display.opening}
+              onChange={(e) => setField("opening", e.target.value)}
+              rows={2}
+              placeholder="Hey {{name}},"
+              style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
+            <textarea
+              value={display.body}
+              onChange={(e) => setField("body", e.target.value)}
+              rows={6}
+              placeholder={lang === "fr" ? "Votre pitch…" : "Your pitch…"}
+              style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
+            />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
+            <input
+              type="text"
+              value={display.cta}
+              onChange={(e) => setField("cta", e.target.value)}
+              placeholder={lang === "fr" ? "Seriez-vous ouvert à un échange rapide ?" : "Would you be open to a quick chat?"}
+              style={panelInputStyle}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const panelInputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
@@ -990,6 +1173,13 @@ const panelInputStyle: React.CSSProperties = {
   fontFamily: "inherit",
   color: "#1A1A1A",
   letterSpacing: "-0.02em",
+};
+
+const panelMessageStyle: React.CSSProperties = {
+  ...panelInputStyle,
+  resize: "vertical",
+  minHeight: 240,
+  lineHeight: 1.55,
 };
 
 function newTemplateId() {
@@ -1411,23 +1601,21 @@ function BulkImportTemplatesPanel({
 function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave: (t: Omit<OutreachTemplate, "id" | "imported">) => void }) {
   const lang = useLang();
   const [name, setName] = useState("");
-  const [subject, setSubject] = useState("");
-  const [opening, setOpening] = useState("Hey {{name}},");
-  const [body, setBody] = useState("");
-  const [cta, setCta] = useState("");
+  const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage("Hey {{name}},\n\n"));
+  const hasMessage = !!(fields.opening.trim() || fields.body.trim() || fields.subject.trim());
 
   return (
     <OutreachPanelShell
       title={lang === "fr" ? "Créer un modèle" : "Create template"}
-      subtitle={lang === "fr" ? "Créez des blocs réutilisables. Utilisez {{name}} et {{brand}} pour la personnalisation." : "Build reusable blocks. Use {{name}} and {{brand}} for personalization."}
+      subtitle={lang === "fr" ? "Écrivez votre message en un bloc, ou utilisez la structure avancée pour détailler chaque section." : "Write your message in one block, or use advanced structure to split each section."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <button
             type="button"
-            style={{ ...btnPrimary, width: "100%", opacity: name.trim() && (body.trim() || opening.trim()) ? 1 : 0.45 }}
-            disabled={!name.trim() || (!body.trim() && !opening.trim())}
-            onClick={() => onSave({ name: name.trim(), subject: subject.trim(), opening: opening.trim(), body: body.trim(), cta: cta.trim() })}
+            style={{ ...btnPrimary, width: "100%", opacity: name.trim() && hasMessage ? 1 : 0.45 }}
+            disabled={!name.trim() || !hasMessage}
+            onClick={() => onSave({ name: name.trim(), ...fields })}
           >
             {lang === "fr" ? "Sauvegarder le modèle" : "Save template"}
           </button>
@@ -1437,14 +1625,7 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
     >
       <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Intro collaboration" : "Collab intro"} style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Ligne d'objet" : "Subject line"}</label>
-      <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Partnership with {{brand}}" style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
-      <input type="text" value={opening} onChange={(e) => setOpening(e.target.value)} style={{ ...panelInputStyle, marginBottom: 16 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder="Your pitch..." style={{ ...panelInputStyle, resize: "vertical", marginBottom: 16, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
-      <input type="text" value={cta} onChange={(e) => setCta(e.target.value)} placeholder="Would you be open to a quick chat?" style={panelInputStyle} />
+      <OutreachMessageEditor key="create-template" lang={lang} value={fields} onChange={setFields} />
     </OutreachPanelShell>
   );
 }
@@ -1487,13 +1668,8 @@ function SeeTemplatesPanel({
                 </div>
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
               </div>
-              {t.subject && (
-                <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 4 }}>
-                  <strong>{lang === "fr" ? "Objet :" : "Subject:"}</strong> {t.subject}
-                </div>
-              )}
-              <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden" }}>
-                {[t.opening, t.body, t.cta].filter(Boolean).join(" ")}
+              <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
+                {buildOutreachPreview(messageFromTemplate(t), t.cta)}
               </div>
             </div>
           ))}
@@ -1651,20 +1827,14 @@ function SendOutreachPanel({
     initialDmPlatform ?? "Instagram"
   );
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
-  const [subject, setSubject] = useState("");
-  const [opening, setOpening] = useState("");
-  const [body, setBody] = useState("");
-  const [cta, setCta] = useState("");
+  const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage(""));
 
   const applyTemplateById = (id: string) => {
     setTemplateId(id);
     if (!id) return;
     const t = templates.find((x) => x.id === id);
     if (t) {
-      setSubject(t.subject);
-      setOpening(t.opening);
-      setBody(t.body);
-      setCta(t.cta);
+      setFields({ subject: t.subject, opening: t.opening, body: t.body, cta: t.cta });
     }
   };
 
@@ -1682,10 +1852,11 @@ function SendOutreachPanel({
     if (initialDmPlatform) setDmPlatform(initialDmPlatform);
   }, [initialCreatorHandle, initialDmPlatform]);
 
-  const previewName = selectedInfluencers[0]?.replace(/^@/, "") || "there";
-  const fullPreview = [opening.replace(/\{\{name\}\}/gi, previewName), body.replace(/\{\{name\}\}/gi, previewName), cta.replace(/\{\{name\}\}/gi, previewName)].filter(Boolean).join("\n\n");
+  const creatorName = outreachCreatorName(selectedInfluencers[0]);
+  const previewName = creatorName || "there";
+  const fullPreview = previewFromFields(fields, previewName);
 
-  const canSend = selectedInfluencers.length > 0 && (opening.trim() || body.trim());
+  const canSend = selectedInfluencers.length > 0 && messageFromTemplate(fields).trim();
 
   const handleSend = async () => {
     if (!canSend) return;
@@ -1705,7 +1876,11 @@ function SendOutreachPanel({
     } else if (dmPlatform === "Twitter") {
       window.open(`https://twitter.com/messages/compose?recipient_id=${handle}`, "_blank");
     } else if (dmPlatform === "Email") {
-      window.open(`mailto:${handle}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(messageText)}`, "_blank");
+      const emailSubject =
+        personalizeOutreachText(fields.subject, previewName).trim() ||
+        personalizeOutreachText(messageFromTemplate(fields), previewName).split("\n").find((line) => line.trim())?.trim().slice(0, 80) ||
+        (lang === "fr" ? "Partenariat" : "Partnership");
+      window.open(`mailto:${handle}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`, "_blank");
     }
     onSent(selectedInfluencers.length);
   };
@@ -1761,18 +1936,10 @@ function SendOutreachPanel({
 
       <InfluencerPicker selected={selectedInfluencers} onChange={setSelectedInfluencers} />
       <TemplateSelect templates={templates} value={templateId} onChange={applyTemplateById} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Sujet" : "Subject"}</label>
-      <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ ...panelInputStyle, marginBottom: 14 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
-      <textarea value={opening} onChange={(e) => setOpening(e.target.value)} rows={2} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 14, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
-      <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 14, lineHeight: 1.5 }} />
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
-      <textarea value={cta} onChange={(e) => setCta(e.target.value)} rows={2} style={{ ...panelInputStyle, resize: "vertical", marginBottom: 16, lineHeight: 1.5 }} />
+      <OutreachMessageEditor key={templateId || "send-scratch"} lang={lang} value={fields} onChange={setFields} creatorName={creatorName} />
       {fullPreview && (
         <div style={{ padding: 14, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Preview · {dmPlatform}</div>
-          {subject && <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Subject: {subject}</div>}
           <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{fullPreview}</div>
         </div>
       )}

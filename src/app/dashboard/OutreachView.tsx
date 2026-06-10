@@ -668,7 +668,20 @@ function OutreachAIGeneratePanel({
     } else if (platform === "Email") {
       window.open(`mailto:${creatorEmail.trim() || handle}?body=${encodeURIComponent(generatedMessage)}`, "_blank");
     }
+    // Log the outreach so it appears in history and feeds analytics
+    await onMarkSent({
+      id: "",
+      creator: selectedCreator.displayName,
+      handle,
+      platform: selectedCreator.platform,
+      avatar: selectedCreator.avatar,
+      message: generatedMessage,
+      sentDate: todayIso(),
+      status: "sent",
+      followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
+    });
     onToast(lang === "fr" ? "Message copié — collez dans le DM ✓" : "Message copied — paste in the DM ✓");
+    resetPanel();
   };
 
   const sendViaLabel =
