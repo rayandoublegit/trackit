@@ -152,22 +152,23 @@ export default function TrackitLanding() {
   pricing_everything_in_pro: lang === "fr" ? "Tout le plan Pro" : "Everything in Pro",
   // Free
   feat_5_discoveries_day: lang === "fr" ? "5 découvertes de créateurs (à vie)" : "5 creator discoveries (lifetime)",
-  feat_10_results_per_search: lang === "fr" ? "10 résultats par recherche" : "10 results per search",
+  feat_10_results_per_search: lang === "fr" ? "5 résultats par recherche" : "5 results per search",
   feat_1_active_campaign: lang === "fr" ? "1 campagne active" : "1 active campaign",
   feat_5_managed_creators: lang === "fr" ? "5 créateurs gérés" : "5 managed creators",
   feat_1_ai_outreach_day: lang === "fr" ? "1 message IA/jour" : "1 AI outreach/day",
   feat_manual_payouts_only: lang === "fr" ? "Paiements manuels uniquement" : "Manual payouts only",
   feat_basic_analytics: lang === "fr" ? "Analytiques de base" : "Basic analytics",
   // Growth
-  feat_30_discoveries_day: lang === "fr" ? "30 découvertes/jour" : "30 discoveries/day",
-  feat_50_results_per_search: lang === "fr" ? "50 résultats par recherche" : "50 results per search",
-  feat_3_active_campaigns: lang === "fr" ? "3 campagnes actives" : "3 active campaigns",
-  feat_25_managed_creators: lang === "fr" ? "25 créateurs gérés" : "25 managed creators",
+  feat_30_discoveries_day: lang === "fr" ? "15 découvertes/mois" : "15 discoveries/month",
+  feat_50_results_per_search: lang === "fr" ? "10 résultats par recherche" : "10 results per search",
+  feat_3_active_campaigns: lang === "fr" ? "1 campagne active" : "1 active campaign",
+  feat_25_managed_creators: lang === "fr" ? "10 créateurs gérés" : "10 managed creators",
+  feat_50_ai_month: lang === "fr" ? "50 messages IA/mois" : "50 AI messages/month",
   feat_unlimited_ai_outreach: lang === "fr" ? "Messages IA illimités" : "Unlimited AI outreach",
   feat_templates_save_import: lang === "fr" ? "Modèles d'outreach (sauvegarde & import)" : "Outreach templates (save & import)",
   feat_manual_payouts_methods: lang === "fr" ? "Paiements manuels (PayPal, Revolut, IBAN)" : "Manual payouts (PayPal, Revolut, IBAN)",
   feat_full_analytics: lang === "fr" ? "Tableau de bord analytique complet" : "Full analytics dashboard",
-  feat_shopify_integration: lang === "fr" ? "Intégration Shopify" : "Shopify integration",
+  feat_shopify_integration: lang === "fr" ? "Intégration Shopify + suivi des ventes par créateur" : "Shopify integration + per-creator sales tracking",
   feat_affiliate_links: lang === "fr" ? "Liens d'affiliation & suivi" : "Affiliate links & tracking",
   // Pro
   feat_unlimited_discoveries: lang === "fr" ? "Découvertes illimitées" : "Unlimited discoveries",
@@ -187,7 +188,9 @@ export default function TrackitLanding() {
   feat_full_automation_agent: lang === "fr" ? "Agent d'automatisation complet" : "Full automation agent",
   feat_white_label_outreach: lang === "fr" ? "Outreach en marque blanche" : "White-label outreach",
   feat_multi_store_shopify_3: lang === "fr" ? "Shopify multi-boutiques (3 boutiques)" : "Multi-store Shopify (3 stores)",
-  feat_dedicated_support: lang === "fr" ? "Support dédié" : "Dedicated support",
+  feat_dedicated_support: lang === "fr" ? "Onboarding dédié + ligne directe fondateur" : "Dedicated onboarding + direct founder line",
+  feat_curation_on_demand: lang === "fr" ? "Curation à la demande (créateurs sourcés pour votre niche)" : "Curation on demand (creators sourced for your niche)",
+  feat_early_access: lang === "fr" ? "Accès anticipé aux nouveaux créateurs (7 jours)" : "Early access to new creators (7 days)",
   footer_tagline: lang === "fr" ? "Une plateforme créée par des fondateurs e-com pour des fondateurs e-com" : "A Platform made by e-com founders to e-com founders",
   footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
   traditional_title: lang === "fr" ? "Plateformes Traditionnelles" : "Traditional Platforms",
@@ -222,9 +225,6 @@ export default function TrackitLanding() {
   const freePricingFeatures = [
     t.feat_5_discoveries_day,
     t.feat_10_results_per_search,
-    t.feat_1_active_campaign,
-    t.feat_5_managed_creators,
-    t.feat_1_ai_outreach_day,
     t.feat_manual_payouts_only,
     t.feat_basic_analytics,
   ];
@@ -234,11 +234,10 @@ export default function TrackitLanding() {
     t.feat_50_results_per_search,
     t.feat_3_active_campaigns,
     t.feat_25_managed_creators,
-    t.feat_unlimited_ai_outreach,
+    t.feat_50_ai_month,
     t.feat_templates_save_import,
     t.feat_manual_payouts_methods,
     t.feat_full_analytics,
-    t.feat_shopify_integration,
     t.feat_affiliate_links,
   ];
 
@@ -266,6 +265,8 @@ export default function TrackitLanding() {
     t.feat_full_automation_agent,
     t.feat_white_label_outreach,
     t.feat_multi_store_shopify_3,
+    t.feat_curation_on_demand,
+    t.feat_early_access,
     t.feat_dedicated_support,
   ];
 
