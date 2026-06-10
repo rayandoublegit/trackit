@@ -1,20 +1,20 @@
 export type PlanTier = "free" | "basic" | "pro" | "scale";
 
-export const FREE_DAILY_DISCOVERIES = 5;
-export const BASIC_DAILY_DISCOVERIES = 30;
+export const FREE_LIFETIME_DISCOVERIES = 5;
+export const BASIC_MONTHLY_DISCOVERIES = 15;
 
-export const FREE_RESULTS_PER_SEARCH = 10;
-export const BASIC_RESULTS_PER_SEARCH = 50;
+export const FREE_RESULTS_PER_SEARCH = 5;
+export const BASIC_RESULTS_PER_SEARCH = 10;
 
-export const FREE_MAX_CAMPAIGNS = 1;
-export const BASIC_MAX_CAMPAIGNS = 3;
+export const FREE_MAX_CAMPAIGNS = 0;
+export const BASIC_MAX_CAMPAIGNS = 1;
 export const PRO_MAX_CAMPAIGNS = 10;
 
-export const FREE_MAX_MANAGED_CREATORS = 5;
-export const BASIC_MAX_MANAGED_CREATORS = 25;
+export const FREE_MAX_MANAGED_CREATORS = 0;
+export const BASIC_MAX_MANAGED_CREATORS = 10;
 export const PRO_MAX_MANAGED_CREATORS = 100;
 
-export const BASIC_MAX_SHOPIFY_STORES = 1;
+export const BASIC_MAX_SHOPIFY_STORES = 0;
 export const PRO_MAX_SHOPIFY_STORES = 1;
 export const SCALE_MAX_SHOPIFY_STORES = 3;
 
@@ -40,10 +40,10 @@ export function isScalePlan(plan: PlanTier): boolean {
   return plan === "scale";
 }
 
-/** Daily discovery cap; `null` = unlimited (Pro + Scale). */
+/** Discovery cap; free = lifetime pool, basic = monthly pool, `null` = unlimited (Pro + Scale). */
 export function getDailyDiscoveryLimit(plan: PlanTier): number | null {
-  if (plan === "free") return FREE_DAILY_DISCOVERIES;
-  if (plan === "basic") return BASIC_DAILY_DISCOVERIES;
+  if (plan === "free") return FREE_LIFETIME_DISCOVERIES;
+  if (plan === "basic") return BASIC_MONTHLY_DISCOVERIES;
   return null;
 }
 
@@ -100,9 +100,18 @@ export function hasReachedManagedCreatorLimit(plan: PlanTier, creatorCount: numb
   return creatorCount >= max;
 }
 
-/** Growth + Pro + Scale: unlimited AI outreach. */
+export const BASIC_MONTHLY_AI_MESSAGES = 50;
+
+/** Pro + Scale: unlimited AI outreach. Basic: 50/month. */
 export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
-  return plan !== "free";
+  return isProOrAbove(plan);
+}
+
+/** Monthly AI message cap; `null` = unlimited (Pro + Scale), 0 = none (free). */
+export function getMonthlyAIMessageLimit(plan: PlanTier): number | null {
+  if (plan === "free") return 0;
+  if (plan === "basic") return BASIC_MONTHLY_AI_MESSAGES;
+  return null;
 }
 
 export function canImportTemplates(plan: PlanTier): boolean {
@@ -148,8 +157,9 @@ export function canUseAdvancedAnalytics(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
+/** Pro + Scale only: Shopify integration + per-creator sales tracking. */
 export function canUseShopify(plan: PlanTier): boolean {
-  return isGrowthOrAbove(plan);
+  return isProOrAbove(plan);
 }
 
 export function canUseAffiliates(plan: PlanTier): boolean {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { marketDefaultsFromSearch, resolveCreatorCountryCode } from "@/lib/creator-country";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -124,6 +125,9 @@ export async function POST(request: Request) {
         bio: c.bio,
         email: extractEmail(c.bio || ""),
         niche,
+        language: c.language,
+        location: c.location,
+        countryCode: resolveCreatorCountryCode(c.location, c.language),
         videoThumbnails: c.video_thumbnails || [],
       }));
     return NextResponse.json({ creators, source: "db" });
@@ -166,6 +170,8 @@ export async function POST(request: Request) {
       await supabaseAdmin.from("creators_index").upsert(upserts, { onConflict: "username" });
     }
 
+    const market = marketDefaultsFromSearch(location, language);
+
     const creators = upserts
       .map(u => ({
         username: u.username,
@@ -178,6 +184,9 @@ export async function POST(request: Request) {
         bio: u.bio,
         email: extractEmail(u.bio),
         niche,
+        language: market.language,
+        location: market.location,
+        countryCode: market.countryCode,
         videoThumbnails: [],
       }))
       .filter(c => {

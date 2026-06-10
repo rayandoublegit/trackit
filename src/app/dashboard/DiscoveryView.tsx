@@ -12,7 +12,14 @@ import {
   type DiscoveryLanguage,
   type DiscoveryLocation,
 } from "@/lib/locale-preferences";
-import { formatCurrency } from "@/lib/useCurrency";
+import {
+  formatCurrency,
+} from "@/lib/useCurrency";
+import {
+  getCreatorCountryFlag,
+  getCreatorCountryLabel,
+  resolveCreatorCountryCode,
+} from "@/lib/creator-country";
 import {
   BASIC_MAX_MANAGED_CREATORS,
   PRO_MAX_MANAGED_CREATORS,
@@ -43,6 +50,9 @@ type Creator = {
   bio: string;
   email?: string | null;
   niche: string;
+  language?: string | null;
+  location?: string | null;
+  countryCode?: string | null;
   videoThumbnails?: VideoThumbnail[];
 };
 
@@ -76,6 +86,35 @@ const inputStyle: React.CSSProperties = {
   color: "#1A1A1A",
   letterSpacing: "-0.02em",
 };
+
+function enrichCreatorCountry(
+  creator: Creator,
+  fallbackLocation?: DiscoveryLocation,
+  fallbackLanguage?: DiscoveryLanguage
+): Creator {
+  const countryCode =
+    creator.countryCode || resolveCreatorCountryCode(creator.location, creator.language);
+  if (countryCode) {
+    return { ...creator, countryCode };
+  }
+  if (fallbackLocation === "FR" || fallbackLanguage === "french") {
+    return {
+      ...creator,
+      countryCode: "FR",
+      location: creator.location || "France",
+      language: creator.language || "fr",
+    };
+  }
+  if (fallbackLocation === "US" || fallbackLanguage === "english") {
+    return {
+      ...creator,
+      countryCode: "US",
+      location: creator.location || "United States",
+      language: creator.language || "en",
+    };
+  }
+  return creator;
+}
 
 function buildGeneratedMessage(creator: Creator, brand: string, userName: string) {
   const brandLabel = brand.trim() || "our brand";
@@ -452,21 +491,10 @@ function CreatorProfileModal({
               {creator.displayName}
             </h2>
             <div style={{ fontSize: 15, color: "#0047FF", letterSpacing: "-0.02em", marginBottom: 8 }}>@{creator.username ?? ""}</div>
-            <span
-              style={{
-                display: "inline-block",
-                fontSize: 11,
-                fontWeight: 500,
-                color: "#1A1A1A",
-                background: "#F0F0F0",
-                padding: "4px 10px",
-                borderRadius: 999,
-                textTransform: "capitalize",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {creator.platform}
-            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <PlatformBadge platform={creator.platform} />
+              <CountryBadge creator={creator} lang={lang} />
+            </div>
           </div>
         </div>
 
@@ -992,55 +1020,303 @@ function FilterSelect({
   );
 }
 
+function getCreatorProfileUrl(creator: Creator): string {
+  const username = creator.username ?? "";
+  const platform = creator.platform.toLowerCase();
+  if (platform === "instagram") return `https://instagram.com/${username}`;
+  if (platform === "youtube") return `https://youtube.com/@${username}`;
+  return `https://tiktok.com/@${username}`;
+}
+
+function getNicheTags(creator: Creator): string[] {
+  const tags = creator.niche
+    .split(/[,;+/|&]+/)
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+  return (tags.length > 0 ? tags : [creator.niche]).filter(Boolean).slice(0, 3);
+}
+
+function estimateReachPerPost(creator: Creator) {
+  if (creator.avgViews > 0) return creator.avgViews;
+  return Math.max(Math.round((creator.followersCount * creator.engagementRate) / 100), 0);
+}
+
+function PlatformBadge({ platform }: { platform: string }) {
+  const normalized = platform.toLowerCase();
+  const label = normalized === "instagram" ? "Instagram" : normalized === "youtube" ? "YouTube" : "TikTok";
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        fontSize: 11,
+        fontWeight: 600,
+        color: "#1A1A1A",
+        background: "#F5F5F5",
+        border: "1px solid #EFEFEF",
+        padding: "4px 9px",
+        borderRadius: 999,
+        letterSpacing: "-0.01em",
+        textTransform: "capitalize",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function CountryBadge({ creator, lang }: { creator: Creator; lang: "en" | "fr" }) {
+  const countryCode =
+    creator.countryCode || resolveCreatorCountryCode(creator.location, creator.language);
+  const flag = getCreatorCountryFlag(creator.location, creator.language, countryCode);
+  if (!flag || !countryCode) return null;
+
+  return (
+    <span
+      title={getCreatorCountryLabel(countryCode, lang)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 11,
+        fontWeight: 600,
+        color: "#1A1A1A",
+        background: "#F5F5F5",
+        border: "1px solid #EFEFEF",
+        padding: "4px 9px",
+        borderRadius: 999,
+        letterSpacing: "-0.01em",
+      }}
+    >
+      <span style={{ fontSize: 13, lineHeight: 1 }} aria-hidden>
+        {flag}
+      </span>
+      {getCreatorCountryLabel(countryCode, lang)}
+    </span>
+  );
+}
+
 function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr" }) {
+  const nicheTagList = getNicheTags(creator);
+  const reachEstimate = estimateReachPerPost(creator);
+  const profileUrl = getCreatorProfileUrl(creator);
+
   return (
     <>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-        <img
-          src={creator.avatarUrl}
-          onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }}
-          alt={creator.displayName}
-          width={48}
-          height={48}
-          style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }}
-        />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <img
+            src={creator.avatarUrl}
+            onError={(e) => {
+              const img = e.currentTarget;
+              if (!img.dataset.fb) {
+                img.dataset.fb = "1";
+                img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=eef4ff&color=0047ff&size=200&bold=true&rounded=true`;
+              }
+            }}
+            alt={creator.displayName}
+            width={56}
+            height={56}
+            style={{ borderRadius: "50%", background: "#EEF4FF", border: "2px solid #FFFFFF", boxShadow: "0 0 0 1px #D4E2FF" }}
+          />
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{creator.displayName}</div>
-          <div style={{ fontSize: 13, color: "#0047FF", letterSpacing: "-0.01em" }}>@{creator.username ?? ""}</div>
-          <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4, textTransform: "capitalize" }}>{creator.platform}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
+              {creator.displayName}
+            </div>
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                display: "inline-block",
+                fontSize: 13,
+                color: "#0047FF",
+                letterSpacing: "-0.01em",
+                marginTop: 3,
+                textDecoration: "none",
+                fontWeight: 500,
+              }}
+            >
+              @{creator.username ?? ""}
+            </a>
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            <PlatformBadge platform={creator.platform} />
+            <CountryBadge creator={creator} lang={lang} />
+            {nicheTagList.map((tag) => (
+              <span
+                key={tag}
+                style={{
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "#0047FF",
+                  background: "#EEF4FF",
+                  border: "1px solid #D4E2FF",
+                  padding: "4px 9px",
+                  borderRadius: 999,
+                  letterSpacing: "-0.01em",
+                  textTransform: "capitalize",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
-      <p
+      {creator.bio && (
+        <p
+          style={{
+            fontSize: 13,
+            color: "#5A5A5A",
+            lineHeight: 1.55,
+            margin: 0,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {creator.bio}
+        </p>
+      )}
+
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: "#9A9A9A",
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            marginBottom: 8,
+          }}
+        >
+          {lang === "fr" ? "Contenu récent" : "Recent content"}
+        </div>
+        <VideoPreviews creator={creator} size="card" lang={lang} />
+      </div>
+
+      <div
         style={{
-          fontSize: 13,
-          color: "#5A5A5A",
-          lineHeight: 1.5,
-          margin: 0,
-          display: "-webkit-box",
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: "vertical",
-          overflow: "hidden",
+          display: "grid",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: 8,
+          background: "#FAFAFA",
+          border: "1px solid #EFEFEF",
+          borderRadius: 12,
+          padding: 10,
         }}
       >
-        {creator.bio}
-      </p>
+        {[
+          { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
+          { label: lang === "fr" ? "Vues moy." : "Avg views", value: formatCount(creator.avgViews) },
+          { label: lang === "fr" ? "Portée est." : "Est. reach", value: formatCount(reachEstimate) },
+          {
+            label: lang === "fr" ? "Engagement" : "Engagement",
+            value: `${creator.engagementRate}%`,
+            accent: true,
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 10,
+              padding: "10px 12px",
+              border: "1px solid #EFEFEF",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: stat.accent ? "#0047FF" : "#1A1A1A",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {stat.value}
+            </div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 3, letterSpacing: "-0.01em" }}>{stat.label}</div>
+          </div>
+        ))}
+      </div>
 
-      <VideoPreviews creator={creator} size="card" lang={lang} />
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-        <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{formatCount(creator.followersCount)}</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "abonnés" : "followers"}</div>
-        </div>
-        <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{creator.engagementRate}%</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "engagement" : "engagement"}</div>
-        </div>
-        <div style={{ background: "#FAFAFA", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{formatCount(creator.avgViews)}</div>
-          <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{lang === "fr" ? "Vues moyennes" : "Avg views"}</div>
-        </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {creator.email ? (
+          <a
+            href={`mailto:${creator.email}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#0047FF",
+              background: "#EEF4FF",
+              border: "1px solid #D4E2FF",
+              borderRadius: 999,
+              padding: "6px 10px",
+              textDecoration: "none",
+              maxWidth: "100%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M4 8l8 5 8-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            {creator.email}
+          </a>
+        ) : (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 12,
+              color: "#9A9A9A",
+              background: "#FAFAFA",
+              border: "1px solid #EFEFEF",
+              borderRadius: 999,
+              padding: "6px 10px",
+            }}
+          >
+            {lang === "fr" ? "Contact via DM" : "Contact via DM"}
+          </span>
+        )}
+        <a
+          href={profileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#1A1A1A",
+            background: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            borderRadius: 999,
+            padding: "6px 10px",
+            textDecoration: "none",
+          }}
+        >
+          {lang === "fr" ? "Voir le profil" : "Open profile"}
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M7 17L17 7M17 7H9M17 7v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </a>
       </div>
     </>
   );
@@ -1069,15 +1345,27 @@ function CreatorCard({
     background: "#FFFFFF",
     border: "1px solid #EFEFEF",
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     display: "flex",
     flexDirection: "column",
-    gap: 14,
+    gap: 16,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+    transition: "box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease",
   };
 
   if (variant === "saved") {
     return (
-      <div style={cardStyle}>
+      <div
+        style={cardStyle}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,71,255,0.08)";
+          e.currentTarget.style.borderColor = "#D4E2FF";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)";
+          e.currentTarget.style.borderColor = "#EFEFEF";
+        }}
+      >
         <CreatorCardBody creator={creator} lang={lang} />
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8 }}>
@@ -1111,11 +1399,21 @@ function CreatorCard({
   }
 
   return (
-    <div style={cardStyle}>
+    <div
+      style={cardStyle}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,71,255,0.08)";
+        e.currentTarget.style.borderColor = "#D4E2FF";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.04)";
+        e.currentTarget.style.borderColor = "#EFEFEF";
+      }}
+    >
       <CreatorCardBody creator={creator} lang={lang} />
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, paddingTop: 4, borderTop: "1px solid #F5F5F5" }}>
         <button type="button" onClick={onViewProfile} className="hero-cta-shopify-light hero-cta-compact-sm" style={{ flex: 1 }}>
-          {lang === "fr" ? "Voir le profil" : "View profile"}
+          {lang === "fr" ? "Détails" : "Details"}
         </button>
         <button
           type="button"
@@ -1130,11 +1428,11 @@ function CreatorCard({
             fontFamily: "inherit",
             cursor: "pointer",
             letterSpacing: "-0.02em",
-            background: isSaved ? "#E5E5E5" : "#0047FF",
+            background: isSaved ? "#F5F5F5" : "#0047FF",
             color: isSaved ? "#5A5A5A" : "#FFFFFF",
           }}
         >
-          {isSaved ? (lang === "fr" ? "Sauvegardé" : "Saved") : lang === "fr" ? "Sauvegarder" : "Save creator"}
+          {isSaved ? (lang === "fr" ? "Sauvegardé ✓" : "Saved ✓") : lang === "fr" ? "Sauvegarder" : "Save creator"}
         </button>
       </div>
     </div>
@@ -1289,8 +1587,20 @@ export function DiscoveryView({
       .maybeSingle();
     if (!data) return null;
 
-    // Lifetime cap — no daily reset. The 5 free discoveries never refill.
-    const used = data.discoveries_used || 0;
+    // free = lifetime pool (never refills). basic = monthly pool (resets 30 days
+    // after discoveries_reset_at). Pro/Scale never reach this code (no cap).
+    let used = data.discoveries_used || 0;
+    if (plan === "basic") {
+      const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at).getTime() : 0;
+      const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+      if (!resetAt || Date.now() - resetAt >= THIRTY_DAYS) {
+        used = 0;
+        await supabase.from("profiles").update({
+          discoveries_used: 0,
+          discoveries_reset_at: new Date().toISOString(),
+        }).eq("id", user.id);
+      }
+    }
     setDiscoveriesUsed(used);
     setShowBlur(used >= dailyDiscoveryLimit);
     return used;
@@ -1375,13 +1685,13 @@ export function DiscoveryView({
     try {
       const parsed = JSON.parse(cached) as Creator[];
       if (Array.isArray(parsed) && parsed.length > 0) {
-        setCreators(parsed);
+        setCreators(parsed.map((c) => enrichCreatorCountry(c, location, language)));
         setHasSearched(true);
       }
     } catch {
       /* ignore malformed cache */
     }
-  }, []);
+  }, [location, language]);
 
   useEffect(() => {
     const loadSaved = async () => {
@@ -1508,7 +1818,9 @@ export function DiscoveryView({
 
       const data = (await res.json()) as { creators: Creator[] };
       const seed = Date.now() + Math.floor(Math.random() * 999999);
-      const shuffled = shuffleWithSeed(data.creators ?? [], seed);
+      const shuffled = shuffleWithSeed(data.creators ?? [], seed).map((c) =>
+        enrichCreatorCountry(c, location, language)
+      );
       setCreators(shuffled);
       localStorage.setItem(DISCOVERY_RESULTS_CACHE_KEY, JSON.stringify(shuffled));
       const newCount = searchCount + 1;
@@ -1525,7 +1837,7 @@ export function DiscoveryView({
 
   const creatorsGridStyle: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
     gap: 16,
   };
 
