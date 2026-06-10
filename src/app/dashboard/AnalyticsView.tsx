@@ -637,7 +637,6 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
-  const active = status === "Active";
   const label =
     status === "Active"
       ? lang === "fr"
@@ -648,17 +647,17 @@ function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
           ? "Inactif"
           : "Inactive"
         : status;
-  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: active ? "#E8F5E9" : "#F5F5F5", color: active ? "#2E7D32" : "#9A9A9A" }}>{label}</span>;
+  return <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{label}</span>;
 }
 
 function CampaignStatus({ lang, status }: { lang: "en" | "fr"; status: string }) {
-  const map: Record<string, { bg: string; c: string; en: string; fr: string }> = {
-    Active: { bg: "#E8F5E9", c: "#2E7D32", en: "Active", fr: "Actif" },
-    Paused: { bg: "#FFF8E1", c: "#F57F17", en: "Paused", fr: "En pause" },
-    Completed: { bg: "#F5F5F5", c: "#9A9A9A", en: "Completed", fr: "Terminé" },
+  const map: Record<string, { en: string; fr: string }> = {
+    Active: { en: "Active", fr: "Actif" },
+    Paused: { en: "Paused", fr: "En pause" },
+    Completed: { en: "Completed", fr: "Terminé" },
   };
   const s = map[status] ?? map.Completed;
-  return <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{lang === "fr" ? s.fr : s.en}</span>;
+  return <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{lang === "fr" ? s.fr : s.en}</span>;
 }
 
 function MiniStat({ label, value, large }: { label: string; value: string; large?: boolean }) {

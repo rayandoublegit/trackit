@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators } from "@/lib/db";
 import { dispatchOutreachHistoryUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
 import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
+import { avatarUrlForCreatorHandle, buildCreatorAvatarMap } from "@/lib/creator-avatar";
+import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
@@ -1694,7 +1696,7 @@ function InfluencerPicker({
   onChange: (handles: string[]) => void;
 }) {
   const lang = useLang();
-  const [influencers, setInfluencers] = useState<{ handle: string; platform: string }[]>([]);
+  const [influencers, setInfluencers] = useState<{ handle: string; platform: string; avatarUrl: string }[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -1706,6 +1708,7 @@ function InfluencerPicker({
         data.map((c) => ({
           handle: `@${String(c.handle ?? c.username ?? "").replace(/^@/, "")}`,
           platform: String(c.platform ?? ""),
+          avatarUrl: String(c.avatar_url ?? "").trim(),
         }))
       );
     };
@@ -1757,7 +1760,7 @@ function InfluencerPicker({
               width: "100%",
             }}
           >
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+            <CreatorAvatar src={inf.avatarUrl} size={32} alt={inf.handle} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{inf.handle}</div>
               <div style={{ fontSize: 11, color: "#9A9A9A" }}>{inf.platform}</div>
@@ -1836,6 +1839,18 @@ function SendOutreachPanel({
   );
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
   const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage(""));
+  const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const loadCreators = async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const data = await getSavedCreators(user.id);
+      setCreatorAvatarMap(buildCreatorAvatarMap(data));
+    };
+    void loadCreators();
+  }, []);
 
   const applyTemplateById = (id: string) => {
     setTemplateId(id);
@@ -1893,7 +1908,7 @@ function SendOutreachPanel({
       appendStoredOutreachEntry(userId, {
         creator_username: name || influencerHandle.replace(/^@/, ""),
         creator_display_name: influencerHandle,
-        creator_avatar: "",
+        creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
         platform: dmPlatform,
         message: copiedMessage,
         status: "sent",
@@ -2432,7 +2447,6 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
   const [panelOpen, setPanelOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<{ ref: string; kind: "link" | "code" } | null>(null);
   const [payMessage, setPayMessage] = useState<string | null>(null);
-  const statusColor = (s: string) => s === "Active" ? { bg: "rgba(31,181,103,0.1)", fg: "#1FB567" } : { bg: "rgba(122,122,122,0.1)", fg: "#7A7A7A" };
 
   const activeAffiliateCount = affiliates.filter((a) => a.status === "Active").length;
   const totalClicks = affiliates.reduce((sum, a) => sum + a.clicks, 0);
@@ -2527,7 +2541,6 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
               {lang === "fr" ? "Aucun affilié pour le moment." : "No affiliates yet."}
             </div>
           ) : affiliates.map((a, i) => {
-            const sc = statusColor(a.status);
             const linkCopied = copiedRow?.ref === a.ref && copiedRow.kind === "link";
             const codeCopied = copiedRow?.ref === a.ref && copiedRow.kind === "code";
             return (
@@ -2545,7 +2558,7 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>{a.conversions}</div>
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.sales.toLocaleString()}</div>
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.commission}</div>
-                <div><span style={{ fontSize: 11, fontWeight: 500, color: sc.fg, background: sc.bg, padding: "4px 10px", borderRadius: 999 }}>{affiliateStatusLabel(a.status, lang)}</span></div>
+                <div><span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"

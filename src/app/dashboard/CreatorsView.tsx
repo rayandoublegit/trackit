@@ -141,20 +141,11 @@ function statusLabel(status: CreatorStatus, lang: "en" | "fr"): string {
   return lang === "fr" ? labels[status].fr : labels[status].en;
 }
 
-function statusBadgeStyle(status: CreatorStatus): React.CSSProperties {
-  const bg: Record<CreatorStatus, string> = {
-    active: "rgba(31,181,103,0.12)",
-    pending: "rgba(234,179,8,0.15)",
-    contacted: "rgba(0,71,255,0.1)",
-    declined: "rgba(220,38,38,0.1)",
-  };
+function statusBadgeStyle(): React.CSSProperties {
   return {
     fontSize: 11,
     fontWeight: 600,
     color: "#1A1A1A",
-    background: bg[status],
-    padding: "4px 10px",
-    borderRadius: 999,
     textTransform: "capitalize",
     letterSpacing: "-0.01em",
   };
@@ -545,7 +536,7 @@ function CreatorDetailModal({
           <div style={{ fontSize: 15, color: "#0047FF", marginBottom: 8 }}>@{creator.username}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, background: "#F0F0F0", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>{creator.platform}</span>
-            <span style={statusBadgeStyle(creator.status)}>{statusLabel(creator.status, lang)}</span>
+            <span style={statusBadgeStyle()}>{statusLabel(creator.status, lang)}</span>
           </div>
         </div>
       </div>
@@ -1194,7 +1185,7 @@ export function CreatorsView({
                         <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>{creator.platform}</div>
                       </div>
                       <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-                        <span style={statusBadgeStyle(creator.status)}>{statusLabel(creator.status, lang)}</span>
+                        <span style={statusBadgeStyle()}>{statusLabel(creator.status, lang)}</span>
                       </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
@@ -1277,7 +1268,7 @@ export function CreatorsView({
                     <div style={{ fontSize: 13 }}>{formatCount(c.followers)}</div>
                     <div style={{ fontSize: 13 }}>{c.engagement}%</div>
                     <div style={{ fontSize: 13 }}>{c.niche}</div>
-                    <div><span style={statusBadgeStyle(c.status)}>{statusLabel(c.status, lang)}</span></div>
+                    <div><span style={statusBadgeStyle()}>{statusLabel(c.status, lang)}</span></div>
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
                     <button type="button" className="hero-cta-shopify-dark hero-cta-compact" onClick={() => setDetailCreator(c)}>
                       {lang === "fr" ? "Voir le profil" : "View profile"}

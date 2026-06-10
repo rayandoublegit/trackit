@@ -394,15 +394,8 @@ function Kpi({ title, value, sub, subColor }: { title: string; value: string; su
 }
 
 function CampaignBadge({ lang, status }: { lang: "en" | "fr"; status: CampaignStatus }) {
-  const map: Record<CampaignStatus, { bg: string; c: string }> = {
-    Active: { bg: "#E8F5E9", c: "#2E7D32" },
-    Paused: { bg: "#FFF8E1", c: "#F57F17" },
-    Completed: { bg: "#F5F5F5", c: "#9A9A9A" },
-    Draft: { bg: "#E3F2FD", c: "#1565C0" },
-  };
-  const s = map[status] ?? { bg: "#F5F5F5", c: "#7A7A7A" };
   return (
-    <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.c }}>{campaignStatusLabel(status, lang)}</span>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{campaignStatusLabel(status, lang)}</span>
   );
 }
 

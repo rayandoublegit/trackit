@@ -10,6 +10,12 @@ import {
   updateStoredOutreachEntry,
   type StoredOutreachEntry,
 } from "@/lib/outreach-history-storage";
+import {
+  avatarUrlForCreatorHandle,
+  buildCreatorAvatarMap,
+  resolveCreatorAvatarUrl,
+} from "@/lib/creator-avatar";
+import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
@@ -137,17 +143,17 @@ function displayTone(tone: string, lang: "en" | "fr"): string {
 }
 
 function outreachStatusBadge(status: OutreachHistoryStatus, lang: "en" | "fr") {
-  const map: Record<OutreachHistoryStatus, { bg: string; fg: string; en: string; fr: string }> = {
-    replied: { bg: "rgba(31,181,103,0.12)", fg: "#1FB567", en: "Replied", fr: "Répondu" },
-    sent: { bg: "rgba(0,71,255,0.1)", fg: "#0047FF", en: "Sent", fr: "Envoyé" },
-    no_response: { bg: "#F0F0F0", fg: "#7A7A7A", en: "No reply", fr: "Pas de réponse" },
-    opened: { bg: "rgba(234,179,8,0.15)", fg: "#B45309", en: "Opened", fr: "Ouvert" },
-    converted: { bg: "rgba(21,128,61,0.15)", fg: "#15803D", en: "Converted ✓", fr: "Converti ✓" },
+  const map: Record<OutreachHistoryStatus, { en: string; fr: string }> = {
+    replied: { en: "Replied", fr: "Répondu" },
+    sent: { en: "Sent", fr: "Envoyé" },
+    no_response: { en: "No reply", fr: "Pas de réponse" },
+    opened: { en: "Opened", fr: "Ouvert" },
+    converted: { en: "Converted ✓", fr: "Converti ✓" },
   };
   const s = map[status];
   const label = lang === "fr" ? s.fr : s.en;
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: s.fg, background: s.bg, padding: "4px 10px", borderRadius: 999, whiteSpace: "nowrap" }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
       {label}
     </span>
   );
@@ -188,7 +194,7 @@ function FollowUpPanel({
   entry: OutreachHistoryEntry;
   slideIn: boolean;
   onClose: () => void;
-  onSend: () => void;
+  onSend: () => Promise<void> | void;
   onMarkManual: () => void;
 }) {
   const [message, setMessage] = useState(() => buildFollowUpMessage(entry.creator, "Trackit"));
@@ -232,12 +238,20 @@ function FollowUpPanel({
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     setSending(true);
-    setTimeout(() => {
-      onSend();
-      setSending(false);
-    }, 1000);
+    const handle = (entry.handle || "").replace(/^@/, "");
+    try { await navigator.clipboard.writeText(message); } catch { /* clipboard may be unavailable */ }
+    // Mark the follow-up in DB FIRST (parent updates Supabase + reloads history)
+    await onSend();
+    // Then open the platform so the request isn't killed by the new tab
+    const p = entry.platform.toLowerCase();
+    if (p.includes("instagram")) {
+      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
+    } else if (p.includes("tiktok")) {
+      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
+    }
+    setSending(false);
   };
 
   return (
@@ -298,7 +312,7 @@ function FollowUpPanel({
             </svg>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 36 }}>
-            <img src={entry.avatar} alt="" width={40} height={40} style={{ borderRadius: "50%", flexShrink: 0 }} />
+            <CreatorAvatar src={entry.avatar} size={40} alt={entry.creator} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{entry.creator}</div>
               <div style={{ fontSize: 12, color: "#0047FF" }}>@{entry.handle}</div>
@@ -464,10 +478,6 @@ function mapOutreachRow(o: Record<string, unknown>): OutreachHistoryEntry {
   };
 }
 
-function avatarForOutreach(handle: string, avatar?: string) {
-  return avatar?.trim() || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(handle || "creator")}`;
-}
-
 function SaveTemplateModal({
   lang,
   defaultName,
@@ -571,7 +581,7 @@ function OutreachAIGeneratePanel({
             displayName: String(c.full_name || c.handle || username),
             username,
             platform: String(c.platform || ""),
-            avatar: avatarForOutreach(username, String(c.avatar_url || "")),
+            avatar: resolveCreatorAvatarUrl(String(c.avatar_url || "")),
             niche: String(c.niche || ""),
             followersCount: Number(c.followers || 0),
             engagementRate: Number(c.engagement_rate || 0),
@@ -878,7 +888,7 @@ function OutreachAIGeneratePanel({
                               textAlign: "left",
                             }}
                           >
-                            <img src={c.avatar} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                            <CreatorAvatar src={c.avatar} size={32} alt={c.displayName} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 500 }}>{c.displayName}</div>
                               <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
@@ -894,7 +904,7 @@ function OutreachAIGeneratePanel({
                 </div>
                 {selectedCreator && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, padding: 12, background: "#FAFAFA", borderRadius: 10, border: "1px solid #EFEFEF" }}>
-                    <img src={selectedCreator.avatar} alt="" width={40} height={40} style={{ borderRadius: "50%" }} />
+                    <CreatorAvatar src={selectedCreator.avatar} size={40} alt={selectedCreator.displayName} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedCreator.displayName}</div>
                       <div style={{ fontSize: 12, color: "#0047FF" }}>@{selectedCreator.username}</div>
@@ -1030,6 +1040,9 @@ function OutreachAIGeneratePanel({
                           >
                             Open TikTok DMs →
                           </a>
+                          <button type="button" onClick={() => void handleSend()} style={{ ...btnBlack, marginBottom: 8 }}>
+                            {lang === "fr" ? "Envoyer via Email" : "Send via Email"}
+                          </button>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
                             {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
                           </button>
@@ -1059,9 +1072,6 @@ function OutreachAIGeneratePanel({
                             placeholder="creator@email.com"
                             style={inputStyle}
                           />
-                          <button type="button" disabled style={{ ...btnSecondary, opacity: 0.45, cursor: "not-allowed" }}>
-                            Send email → (coming soon)
-                          </button>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
                             {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
                           </button>
@@ -1187,7 +1197,17 @@ export function OutreachHistorySection({
     }
 
     const creators = await getSavedCreators(user.id);
-    setEntries(history.map((o) => mapOutreachRow(o as Record<string, unknown>)));
+    const avatarMap = buildCreatorAvatarMap(creators);
+    setEntries(
+      history.map((o) => {
+        const row = mapOutreachRow(o as Record<string, unknown>);
+        if (!resolveCreatorAvatarUrl(row.avatar)) {
+          const resolved = avatarUrlForCreatorHandle(row.handle, avatarMap);
+          if (resolved) row.avatar = resolved;
+        }
+        return row;
+      })
+    );
     setSavedCreators(
       creators.map((c) => {
         const username = String(c.handle || c.username || "").replace(/^@/, "");
@@ -1196,7 +1216,7 @@ export function OutreachHistorySection({
           displayName: String(c.full_name || c.handle || username),
           username,
           platform: String(c.platform || ""),
-          avatar: avatarForOutreach(username, String(c.avatar_url || "")),
+          avatar: resolveCreatorAvatarUrl(String(c.avatar_url || "")),
           niche: String(c.niche || ""),
           followersCount: Number(c.followers || 0),
           engagementRate: Number(c.engagement_rate || 0),
@@ -1284,7 +1304,9 @@ export function OutreachHistorySection({
     setTimeout(() => setFollowUpEntry(null), 300);
   };
 
-  const completeFollowUpSend = (id: string) => {
+  const completeFollowUpSend = async (id: string) => {
+    const { supabase: sb } = await import("@/lib/supabase");
+    if (sb) await sb.from("outreach_history").update({ follow_up_date: null, updated_at: new Date().toISOString() }).eq("id", id);
     setEntries((list) =>
       list.map((e) =>
         e.id === id
@@ -1293,7 +1315,8 @@ export function OutreachHistorySection({
       )
     );
     closeFollowUp();
-    setToast("Follow up sent ✓");
+    setToast(lang === "fr" ? "Relance envoyée ✓" : "Follow up sent ✓");
+    await loadHistory();
   };
 
   const sendFollowUp = async (item: OutreachHistoryEntry) => {
@@ -1496,7 +1519,7 @@ export function OutreachHistorySection({
                         textAlign: "left",
                       }}
                     >
-                      <img src={c.avatar} alt="" width={28} height={28} style={{ borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+                      <CreatorAvatar src={c.avatar} size={28} alt={c.displayName} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{c.displayName}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
@@ -1568,11 +1591,7 @@ export function OutreachHistorySection({
                 return (
                   <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      <img
-                        src={avatarForOutreach(item.handle, item.avatar)}
-                        alt=""
-                        style={{ width: 40, height: 40, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                      />
+                      <CreatorAvatar src={item.avatar} size={40} alt={item.creator} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
@@ -1647,7 +1666,7 @@ export function OutreachHistorySection({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <img src={avatarForOutreach(row.handle, row.avatar)} alt="" width={32} height={32} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                      <CreatorAvatar src={row.avatar} size={32} alt={row.creator} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>

@@ -403,14 +403,8 @@ function SettingsToggle({ on, onToggle }: { on: boolean; onToggle: () => void })
 }
 
 function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    Paid: { bg: "#E8F5E9", color: "#2E7D32" },
-    Failed: { bg: "#FFEBEE", color: "#C62828" },
-    Pending: { bg: "#FFF8E1", color: "#F57F17" },
-  };
-  const s = styles[status];
   return (
-    <span style={{ fontSize: 11, fontWeight: 500, padding: "3px 8px", borderRadius: 6, background: s.bg, color: s.color, letterSpacing: "-0.01em" }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
       {invoiceStatusLabel(status, lang)}
     </span>
   );
@@ -1327,16 +1321,7 @@ function TeamSettings({
                     )}
                   </td>
                   <td style={{ padding: "14px 8px" }}>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 500,
-                        padding: "3px 8px",
-                        borderRadius: 6,
-                        background: m.status === "active" ? "#E8F5E9" : "#FFF8E1",
-                        color: m.status === "active" ? "#2E7D32" : "#F57F17",
-                      }}
-                    >
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
                       {m.status === "active" ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Invitation en attente" : "Pending invite"}
                     </span>
                   </td>
