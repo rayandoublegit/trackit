@@ -8,7 +8,7 @@ export function isCreatorUuid(id: string): boolean {
 }
 
 // CREATORS
-export async function saveCreator(userId: string, creator: {
+export async function saveCreator(_userId: string, creator: {
   username: string;
   display_name: string;
   avatar_url: string;
@@ -19,33 +19,34 @@ export async function saveCreator(userId: string, creator: {
   bio: string;
   niche: string;
 }) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("creators")
-    .upsert({
-      user_id: userId,
-      handle: creator.username,
-      full_name: creator.display_name,
-      avatar_url: creator.avatar_url,
-      platform: creator.platform,
-      followers: creator.followers_count,
-      engagement_rate: creator.engagement_rate,
-      niche: creator.niche,
-    }, { onConflict: "user_id,handle" })
-    .select()
-    .single();
-  if (error) console.error("saveCreator error:", error);
-  return data;
+  try {
+    const res = await fetch("/api/creators", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(creator),
+    });
+    const payload = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string };
+    if (!res.ok) {
+      console.error("saveCreator error:", payload.error ?? res.statusText);
+      return null;
+    }
+    return payload;
+  } catch (e) {
+    console.error("saveCreator error:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
-export async function getSavedCreators(userId: string) {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("creators")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  return data || [];
+export async function getSavedCreators(_userId: string) {
+  try {
+    const res = await fetch("/api/creators", { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error("getSavedCreators error:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 async function deleteCreatorViaApi(creatorId?: string, handle?: string): Promise<boolean> {

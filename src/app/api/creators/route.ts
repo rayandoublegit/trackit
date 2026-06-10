@@ -28,6 +28,80 @@ async function getAuthedUser(request: NextRequest) {
   return user;
 }
 
+export async function GET(request: NextRequest) {
+  const user = await getAuthedUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  const { data, error } = await admin
+    .from("creators")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("GET /api/creators error:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data || []);
+}
+
+export async function POST(request: NextRequest) {
+  const user = await getAuthedUser(request);
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const username = String(body.username ?? "").trim().replace(/^@/, "");
+  if (!username) {
+    return NextResponse.json({ error: "Missing username" }, { status: 400 });
+  }
+
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+  }
+
+  const { data, error } = await admin
+    .from("creators")
+    .upsert(
+      {
+        user_id: user.id,
+        handle: username,
+        full_name: String(body.display_name ?? username),
+        avatar_url: String(body.avatar_url ?? ""),
+        platform: String(body.platform ?? "TikTok"),
+        followers: Number(body.followers_count ?? 0) || 0,
+        engagement_rate: Number(body.engagement_rate ?? 0) || 0,
+        niche: String(body.niche ?? ""),
+      },
+      { onConflict: "user_id,handle" }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error("POST /api/creators error:", error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json(data);
+}
+
 export async function DELETE(request: NextRequest) {
   const user = await getAuthedUser(request);
   if (!user) {

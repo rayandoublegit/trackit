@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   // Creator must have a connected, onboarded Stripe account
   const { data: creator } = await supabaseAdmin
     .from("creators")
-    .select("id, stripe_account_id, stripe_onboarded, total_earned")
+    .select("id, stripe_account_id, stripe_onboarded, total_earned, balance")
     .eq("id", creatorId)
     .single();
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   try {
     transfer = await stripe.transfers.create({
       amount: amountCents,
-      currency: "usd",
+      currency: "eur",
       destination: creator.stripe_account_id,
       metadata: { userId, creatorId },
     });
@@ -71,10 +71,12 @@ export async function POST(request: Request) {
     paid_at: new Date().toISOString(),
   });
 
-  // Update creator lifetime earnings
+  // Deduct the paid amount from the creator's outstanding balance.
+  // total_earned is NOT touched here: it is already credited at sale time.
+  const newBalance = Math.max(0, Number(creator.balance || 0) - Number(amount));
   await supabaseAdmin
     .from("creators")
-    .update({ total_earned: (creator.total_earned || 0) + Number(amount) })
+    .update({ balance: newBalance })
     .eq("id", creatorId);
 
   return NextResponse.json({ success: true, transferId: transfer.id });

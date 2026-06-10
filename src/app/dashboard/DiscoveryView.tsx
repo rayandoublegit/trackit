@@ -34,6 +34,7 @@ import { UpgradeModal } from "./UpgradeModal";
 import {
   DISCOVERY_RESULTS_CACHE_KEY,
   SAVED_CREATOR_SNAPSHOTS_KEY,
+  SAVED_CREATORS_ORDER_KEY,
 } from "@/lib/discovery-cache";
 
 type DiscoveryTab = "discover" | "saved";
@@ -372,6 +373,50 @@ function estimateAvgViews(followers: number, avgViews?: number | null) {
   return followers > 0 ? Math.floor(followers * 0.1) : 0;
 }
 
+function readSavedCreatorOrder(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(SAVED_CREATORS_ORDER_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.map((u) => String(u).replace(/^@/, "").trim()).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedCreatorOrder(order: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SAVED_CREATORS_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function addSavedCreatorToOrder(username: string) {
+  const key = username.replace(/^@/, "").trim();
+  if (!key) return;
+  writeSavedCreatorOrder([key, ...readSavedCreatorOrder().filter((u) => u !== key)]);
+}
+
+function removeSavedCreatorFromOrder(username: string) {
+  const key = username.replace(/^@/, "").trim();
+  writeSavedCreatorOrder(readSavedCreatorOrder().filter((u) => u !== key));
+}
+
+function readSavedCreatorsFromStorage(): Creator[] {
+  const snapshots = readSavedCreatorSnapshots();
+  const order = readSavedCreatorOrder();
+  if (order.length > 0) {
+    const ordered = order
+      .map((username) => snapshots[username])
+      .filter((creator): creator is Creator => Boolean(creator?.username));
+    if (ordered.length > 0) return ordered;
+  }
+  return Object.values(snapshots).filter((creator) => Boolean(creator?.username));
+}
+
 function readSavedCreatorSnapshots(): Record<string, Creator> {
   if (typeof window === "undefined") return {};
   try {
@@ -390,6 +435,7 @@ function writeSavedCreatorSnapshot(creator: Creator) {
     const map = readSavedCreatorSnapshots();
     map[creator.username] = creator;
     localStorage.setItem(SAVED_CREATOR_SNAPSHOTS_KEY, JSON.stringify(map));
+    addSavedCreatorToOrder(creator.username);
   } catch {
     /* storage unavailable */
   }
@@ -401,6 +447,7 @@ function removeSavedCreatorSnapshot(username: string) {
     const map = readSavedCreatorSnapshots();
     delete map[username.replace(/^@/, "")];
     localStorage.setItem(SAVED_CREATOR_SNAPSHOTS_KEY, JSON.stringify(map));
+    removeSavedCreatorFromOrder(username);
   } catch {
     /* storage unavailable */
   }
@@ -1855,7 +1902,7 @@ export function DiscoveryView({
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedCreators, setSavedCreators] = useState<Creator[]>([]);
+  const [savedCreators, setSavedCreators] = useState<Creator[]>(() => readSavedCreatorsFromStorage());
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [outreachCreator, setOutreachCreator] = useState<Creator | null>(null);
   const [outreachTemplates, setOutreachTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
@@ -2066,20 +2113,20 @@ export function DiscoveryView({
   }, [location, language]);
 
   useEffect(() => {
-    const loadSaved = async () => {
-      if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const hydrateSavedCreators = async (userId: string) => {
+      const rows = await getSavedCreators(userId);
 
-      const rows = await getSavedCreators(user.id);
       if (rows.length === 0) {
-        setSavedCreators([]);
+        const fromStorage = readSavedCreatorsFromStorage();
+        if (fromStorage.length > 0) setSavedCreators(fromStorage);
         return;
       }
 
       const usernames = rows
         .map((row) => String(row.handle ?? row.username ?? "").replace(/^@/, "").trim())
         .filter(Boolean);
+
+      writeSavedCreatorOrder(usernames);
 
       const snapshots = readSavedCreatorSnapshots();
       let discoveryCacheByUsername: Record<string, Creator> = {};
@@ -2119,17 +2166,40 @@ export function DiscoveryView({
           const username = String(row.handle ?? row.username ?? "").replace(/^@/, "").trim();
           const index = indexMap[username] ?? null;
           const snapshot = snapshots[username] ?? discoveryCacheByUsername[username] ?? null;
-          return mapSavedCreatorRow(
+          const mapped = mapSavedCreatorRow(
             row as Record<string, unknown>,
             index,
             snapshot,
             location,
             language
           );
+          writeSavedCreatorSnapshot(mapped);
+          return mapped;
         })
       );
     };
+
+    if (!supabase) return;
+    const client = supabase;
+
+    const fromStorage = readSavedCreatorsFromStorage();
+    if (fromStorage.length > 0) setSavedCreators(fromStorage);
+
+    const loadSaved = async () => {
+      const { data: { user } } = await client.auth.getUser();
+      if (!user) return;
+      await hydrateSavedCreators(user.id);
+    };
+
     void loadSaved();
+
+    const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        void hydrateSavedCreators(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [location, language]);
 
   const isCreatorSaved = (username: string) => savedCreators.some((c) => (c.username  ?? "") === username);
