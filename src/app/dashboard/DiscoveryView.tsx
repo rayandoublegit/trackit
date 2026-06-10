@@ -31,6 +31,10 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
+import {
+  DISCOVERY_RESULTS_CACHE_KEY,
+  SAVED_CREATOR_SNAPSHOTS_KEY,
+} from "@/lib/discovery-cache";
 
 type DiscoveryTab = "discover" | "saved";
 
@@ -212,9 +216,11 @@ const filterSelectStyle: React.CSSProperties = {
 };
 
 function formatCount(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
+  const num = Number(n);
+  if (!Number.isFinite(num) || num < 0) return "0";
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return String(Math.round(num));
 }
 
 function DiscoveryHeader({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
@@ -326,14 +332,158 @@ function SaveToast({ message }: { message: string }) {
   );
 }
 
-function getVideoThumbnails(creator: Creator) {
-  return (
-    creator.videoThumbnails ?? [
-      { views: Math.floor(creator.avgViews * 0.8), thumbnail: null },
-      { views: Math.floor(creator.avgViews * 1.2), thumbnail: null },
-      { views: Math.floor(creator.avgViews * 0.9), thumbnail: null },
-    ]
+type CreatorsIndexRow = {
+  username?: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  followers?: number | null;
+  engagement_rate?: number | null;
+  avg_views?: number | null;
+  bio?: string | null;
+  platform?: string | null;
+  language?: string | null;
+  location?: string | null;
+  niches?: string[] | null;
+  video_thumbnails?: unknown;
+};
+
+function normalizeVideoThumbnails(raw: unknown): VideoThumbnail[] {
+  if (!Array.isArray(raw)) return [];
+  const out: VideoThumbnail[] = [];
+  for (const item of raw.slice(0, 3)) {
+    if (!item || typeof item !== "object") continue;
+    const v = item as Record<string, unknown>;
+    const views = Number(v.views);
+    const thumbnail = typeof v.thumbnail === "string" ? v.thumbnail : null;
+    const url = typeof v.url === "string" ? v.url : null;
+    if (!thumbnail && !url && (!Number.isFinite(views) || views <= 0)) continue;
+    out.push({
+      views: Number.isFinite(views) && views > 0 ? views : 0,
+      thumbnail,
+      ...(url ? { url } : {}),
+    });
+  }
+  return out;
+}
+
+function estimateAvgViews(followers: number, avgViews?: number | null) {
+  const avg = Number(avgViews);
+  if (Number.isFinite(avg) && avg > 0) return avg;
+  return followers > 0 ? Math.floor(followers * 0.1) : 0;
+}
+
+function readSavedCreatorSnapshots(): Record<string, Creator> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(SAVED_CREATOR_SNAPSHOTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, Creator>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSavedCreatorSnapshot(creator: Creator) {
+  if (typeof window === "undefined" || !creator.username) return;
+  try {
+    const map = readSavedCreatorSnapshots();
+    map[creator.username] = creator;
+    localStorage.setItem(SAVED_CREATOR_SNAPSHOTS_KEY, JSON.stringify(map));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function removeSavedCreatorSnapshot(username: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const map = readSavedCreatorSnapshots();
+    delete map[username.replace(/^@/, "")];
+    localStorage.setItem(SAVED_CREATOR_SNAPSHOTS_KEY, JSON.stringify(map));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function nicheFromRow(row: Record<string, unknown>, index?: CreatorsIndexRow | null) {
+  const direct = String(row.niche ?? "").trim();
+  if (direct) return direct;
+  const niches = index?.niches;
+  if (Array.isArray(niches) && niches.length > 0) {
+    return niches.filter((n) => n !== "curated").join(", ") || niches[0];
+  }
+  return "Creator";
+}
+
+function mapSavedCreatorRow(
+  row: Record<string, unknown>,
+  index: CreatorsIndexRow | null | undefined,
+  snapshot: Creator | null | undefined,
+  fallbackLocation?: DiscoveryLocation,
+  fallbackLanguage?: DiscoveryLanguage
+): Creator {
+  const username = String(row.handle ?? row.username ?? snapshot?.username ?? "")
+    .replace(/^@/, "")
+    .trim();
+
+  const followersCount =
+    Number(index?.followers ?? snapshot?.followersCount ?? row.followers ?? 0) || 0;
+  const engagementRate =
+    Number(index?.engagement_rate ?? snapshot?.engagementRate ?? row.engagement_rate ?? 0) || 0;
+  const rowAvgViews = Number(row.avg_views);
+  const avgViews = estimateAvgViews(
+    followersCount,
+    index?.avg_views ??
+      snapshot?.avgViews ??
+      (Number.isFinite(rowAvgViews) ? rowAvgViews : null)
   );
+
+  const indexVideos = normalizeVideoThumbnails(index?.video_thumbnails);
+  const snapshotVideos = normalizeVideoThumbnails(snapshot?.videoThumbnails);
+  const videoThumbnails =
+    indexVideos.length > 0 ? indexVideos : snapshotVideos.length > 0 ? snapshotVideos : snapshot?.videoThumbnails ?? [];
+
+  const creator: Creator = {
+    username,
+    displayName: String(
+      index?.display_name ??
+        snapshot?.displayName ??
+        row.full_name ??
+        row.display_name ??
+        username
+    ),
+    avatarUrl: String(
+      index?.avatar_url ?? snapshot?.avatarUrl ?? row.avatar_url ?? ""
+    ),
+    followersCount,
+    engagementRate,
+    avgViews,
+    platform: String(index?.platform ?? snapshot?.platform ?? row.platform ?? "TikTok"),
+    bio: String(index?.bio ?? snapshot?.bio ?? row.bio ?? row.notes ?? ""),
+    email: snapshot?.email ?? null,
+    niche: nicheFromRow(row, index) || snapshot?.niche || "Creator",
+    language: index?.language ?? snapshot?.language ?? null,
+    location: index?.location ?? snapshot?.location ?? null,
+    countryCode: snapshot?.countryCode ?? null,
+    videoThumbnails,
+  };
+
+  return enrichCreatorCountry(creator, fallbackLocation, fallbackLanguage);
+}
+
+function getVideoThumbnails(creator: Creator): VideoThumbnail[] {
+  const fromCreator = normalizeVideoThumbnails(creator.videoThumbnails);
+  if (fromCreator.length > 0) return fromCreator;
+
+  const avg = Number(creator.avgViews);
+  if (!Number.isFinite(avg) || avg <= 0) return [];
+
+  return [
+    { views: Math.floor(avg * 0.8), thumbnail: null },
+    { views: Math.floor(avg * 1.2), thumbnail: null },
+    { views: Math.floor(avg * 0.9), thumbnail: null },
+  ];
 }
 
 function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card" | "modal"; lang: "en" | "fr" }) {
@@ -1644,8 +1794,6 @@ function incrementDiscoverySearchCount() {
   localStorage.setItem("trackit_searches_today", String(count));
 }
 
-const DISCOVERY_RESULTS_CACHE_KEY = "trackit_discovery_last_results_v1";
-
 function shuffleWithSeed<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
   let s = seed;
@@ -1922,21 +2070,67 @@ export function DiscoveryView({
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const saved = await getSavedCreators(user.id);
-      setSavedCreators(saved.map(c => ({
-        username: c.username  ?? "",
-        displayName: c.display_name,
-        avatarUrl: c.avatar_url,
-        platform: c.platform,
-        followersCount: c.followers_count,
-        engagementRate: c.engagement_rate,
-        avgViews: c.avg_views,
-        bio: c.bio,
-        niche: c.niche
-      })));
+
+      const rows = await getSavedCreators(user.id);
+      if (rows.length === 0) {
+        setSavedCreators([]);
+        return;
+      }
+
+      const usernames = rows
+        .map((row) => String(row.handle ?? row.username ?? "").replace(/^@/, "").trim())
+        .filter(Boolean);
+
+      const snapshots = readSavedCreatorSnapshots();
+      let discoveryCacheByUsername: Record<string, Creator> = {};
+      try {
+        const cached = localStorage.getItem(DISCOVERY_RESULTS_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as Creator[];
+          if (Array.isArray(parsed)) {
+            discoveryCacheByUsername = Object.fromEntries(
+              parsed
+                .filter((c) => c.username)
+                .map((c) => [String(c.username).replace(/^@/, ""), c])
+            );
+          }
+        }
+      } catch {
+        /* ignore malformed cache */
+      }
+
+      let indexMap: Record<string, CreatorsIndexRow> = {};
+      try {
+        const res = await fetch("/api/creators-index", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usernames }),
+        });
+        if (res.ok) {
+          const payload = (await res.json()) as { creators?: Record<string, CreatorsIndexRow> };
+          indexMap = payload.creators ?? {};
+        }
+      } catch {
+        /* fallback to snapshots / discovery cache */
+      }
+
+      setSavedCreators(
+        rows.map((row) => {
+          const username = String(row.handle ?? row.username ?? "").replace(/^@/, "").trim();
+          const index = indexMap[username] ?? null;
+          const snapshot = snapshots[username] ?? discoveryCacheByUsername[username] ?? null;
+          return mapSavedCreatorRow(
+            row as Record<string, unknown>,
+            index,
+            snapshot,
+            location,
+            language
+          );
+        })
+      );
     };
     void loadSaved();
-  }, []);
+  }, [location, language]);
 
   const isCreatorSaved = (username: string) => savedCreators.some((c) => (c.username  ?? "") === username);
 
@@ -1959,6 +2153,7 @@ export function DiscoveryView({
       bio: creator.bio,
       niche: creator.niche || ""
     });
+    writeSavedCreatorSnapshot(creator);
     setSavedCreators(prev => [...prev.filter(c => (c.username  ?? "") !== (creator.username ?? "")), creator]);
     setToast("Creator saved ✓");
     notifyCreatorSaved(lang, creator.displayName || `@${creator.username ?? "creator"}`);
@@ -1969,6 +2164,7 @@ export function DiscoveryView({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await removeCreator(user.id, username);
+    removeSavedCreatorSnapshot(username);
     setSavedCreators(prev => prev.filter(c => (c.username  ?? "") !== username));
   };
 
