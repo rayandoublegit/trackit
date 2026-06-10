@@ -11,6 +11,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { formatCurrency } from "@/lib/useCurrency";
+import { UpgradeModal } from "./UpgradeModal";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
@@ -192,79 +193,53 @@ function CampaignUpgradeModal({
   const max = getMaxActiveCampaigns(plan);
   const isGrowth = plan === "basic";
   const isPro = plan === "pro";
+
+  const title =
+    isGrowth || isPro
+      ? lang === "fr"
+        ? "Limite de campagnes atteinte"
+        : "Campaign limit reached"
+      : lang === "fr"
+        ? "Créer plus de campagnes"
+        : "Upgrade to create more campaigns";
+
+  const description = isPro
+    ? lang === "fr"
+      ? `Le plan Pro inclut ${max} campagnes actives. Passez à Scale pour des campagnes illimitées.`
+      : `Pro includes ${max} active campaigns. Upgrade to Scale for unlimited campaigns.`
+    : isGrowth
+      ? lang === "fr"
+        ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 10 campagnes.`
+        : `Growth includes ${max} active campaigns. Upgrade to Pro for up to 10 campaigns.`
+      : lang === "fr"
+        ? `Le plan gratuit inclut ${max} campagne. Passez à Growth pour jusqu'à 3 campagnes.`
+        : `Free includes ${max} campaign. Upgrade to Growth for up to 3 campaigns.`;
+
+  const planBadge = isPro ? "Scale" : isGrowth ? "Pro" : "Growth";
+
+  const primaryLabel = isPro
+    ? lang === "fr"
+      ? `Passer à Scale ${formatCurrency(99, lang)}/mois`
+      : `Upgrade to Scale ${formatCurrency(99, lang)}/mo`
+    : isGrowth
+      ? lang === "fr"
+        ? `Passer à Pro ${formatCurrency(39, lang)}/mois`
+        : `Upgrade to Pro ${formatCurrency(39, lang)}/mo`
+      : lang === "fr"
+        ? `Passer à Growth ${formatCurrency(19, lang)}/mois`
+        : `Upgrade to Growth ${formatCurrency(19, lang)}/mo`;
+
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1100,
-        padding: 24,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          background: "#FFFFFF",
-          borderRadius: 16,
-          padding: 32,
-          maxWidth: 420,
-          width: "100%",
-          boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-          {isGrowth || isPro
-            ? lang === "fr"
-              ? "Limite de campagnes atteinte"
-              : "Campaign limit reached"
-            : lang === "fr"
-              ? "Créer plus de campagnes"
-              : "Upgrade to create more campaigns"}
-        </h3>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-          {isPro
-            ? lang === "fr"
-              ? `Le plan Pro inclut ${max} campagnes actives. Passez à Scale pour des campagnes illimitées.`
-              : `Pro includes ${max} active campaigns. Upgrade to Scale for unlimited campaigns.`
-            : isGrowth
-              ? lang === "fr"
-                ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 10 campagnes.`
-                : `Growth includes ${max} active campaigns. Upgrade to Pro for up to 10 campaigns.`
-              : lang === "fr"
-                ? `Le plan gratuit inclut ${max} campagne. Passez à Growth pour jusqu'à 3 campagnes.`
-                : `Free includes ${max} campaign. Upgrade to Growth for up to 3 campaigns.`}
-        </p>
-        <button
-          type="button"
-          onClick={() => void (isPro && onUpgradeScale ? onUpgradeScale() : isGrowth && onUpgradePro ? onUpgradePro() : onUpgrade())}
-          style={{ ...btnPrimary, width: "100%" }}
-        >
-          {isPro
-            ? lang === "fr"
-              ? `Passer à Scale ${formatCurrency(99, lang)}/mois →`
-              : `Upgrade to Scale ${formatCurrency(99, lang)}/mo →`
-            : isGrowth
-              ? lang === "fr"
-                ? `Passer à Pro ${formatCurrency(39, lang)}/mois →`
-                : `Upgrade to Pro ${formatCurrency(39, lang)}/mo →`
-              : lang === "fr"
-                ? `Passer à Growth ${formatCurrency(19, lang)}/mois →`
-                : `Upgrade to Growth ${formatCurrency(19, lang)}/mo →`}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          style={{ ...btnSecondary, width: "100%", marginTop: 10, background: "#FFFFFF" }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
+    <UpgradeModal
+      lang={lang}
+      onClose={onClose}
+      title={title}
+      description={description}
+      planBadge={planBadge}
+      primaryLabel={primaryLabel}
+      onPrimary={() => void (isPro && onUpgradeScale ? onUpgradeScale() : isGrowth && onUpgradePro ? onUpgradePro() : onUpgrade())}
+      showAllPlansLink={false}
+    />
   );
 }
 

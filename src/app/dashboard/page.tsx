@@ -11,6 +11,7 @@ import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
 import { OutreachHistorySection } from "./OutreachView";
+import { UpgradeModal } from "./UpgradeModal";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import {
   canAddAnotherShopifyStore,
@@ -22,7 +23,6 @@ import {
   canUseAutomationWorkflows,
   canUseFullAutomationAgent,
   canUseShopify,
-  canUseWhiteLabelOutreach,
   isGrowthOrAbove,
   isScalePlan,
   maxShopifyStores,
@@ -44,8 +44,15 @@ import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/no
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
+import { loadAffiliates, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
+import {
+  loadDashboardView,
+  readInitialDashboardView,
+  saveDashboardView,
+  type DashboardView,
+} from "@/lib/dashboard-view-storage";
 
-type View = "dashboard" | "discovery" | "creators" | "campaigns" | "affiliates" | "outreach" | "payouts" | "analytics" | "integrations" | "automation" | "settings" | "feedback" | "notifications" | "help";
+type View = DashboardView;
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -79,7 +86,7 @@ function DashboardPageContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarSearch, setSidebarSearch] = useState("");
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
-  const [view, setView] = useState<View>("dashboard");
+  const [view, setView] = useState<View>(readInitialDashboardView);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);
@@ -262,6 +269,17 @@ function DashboardPageContent() {
     url.searchParams.delete("connect");
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
   }, [user?.id, loading, searchParams]);
+
+  useEffect(() => {
+    if (!user?.id || loading) return;
+    if (searchParams.get("connect") === "return") return;
+    const saved = loadDashboardView(user.id);
+    if (saved) setView(saved);
+  }, [user?.id, loading, searchParams]);
+
+  useEffect(() => {
+    saveDashboardView(view, user?.id);
+  }, [view, user?.id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -693,9 +711,9 @@ function DashboardPageContent() {
             onUpgradeScale={handleUpgradeScale}
           />
         )}
-        {view === "affiliates" && (
+        {view === "affiliates" && user && (
           canUseBasicFeatures ? (
-            <AffiliatesView isMobile={isMobile} />
+            <AffiliatesView userId={user.id} isMobile={isMobile} />
           ) : (
             <UpgradeGate feature="Affiliates" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
@@ -1015,19 +1033,6 @@ function OutreachPanelShell({
   );
 }
 
-function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: string; onClose: () => void }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
-        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 56, width: "auto", marginBottom: 16 }} />
-        <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.6, margin: "0 0 24px", whiteSpace: "pre-line" }}>{message}</p>
-        <button type="button" onClick={() => { window.location.href = "/#pricing"; }} style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.02em" }}>
-          {lang === "fr" ? "Voir les plans →" : "View plans →"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function OutreachView({
   plan,
@@ -1056,7 +1061,6 @@ function OutreachView({
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
-  const [whiteLabel, setWhiteLabel] = useState(false);
 
   const closePanel = () => {
     setPanel(null);
@@ -1135,25 +1139,6 @@ function OutreachView({
         {toast && (
           <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
             {toast}
-          </div>
-        )}
-
-        {canUseWhiteLabelOutreach(plan) && (
-          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: isMobile ? "wrap" : undefined }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-                {lang === "fr" ? "Outreach white-label" : "White-label outreach"}
-              </div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                {lang === "fr"
-                  ? "Retirez la marque Trackit de vos messages et relances."
-                  : "Remove Trackit branding from your messages and follow-ups."}
-              </div>
-            </div>
-            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-              <span style={{ fontSize: 13, color: "#7A7A7A" }}>{whiteLabel ? (lang === "fr" ? "Activé" : "On") : (lang === "fr" ? "Désactivé" : "Off")}</span>
-              <Toggle on={whiteLabel} onChange={() => setWhiteLabel((v) => !v)} />
-            </label>
           </div>
         )}
 
@@ -2190,19 +2175,7 @@ function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: st
   );
 }
 
-type AffiliateRow = {
-  creator: string;
-  platform: string;
-  ref: string;
-  code: string;
-  clicks: number;
-  conversions: number;
-  sales: number;
-  commission: number;
-  status: string;
-};
-
-const INITIAL_AFFILIATES: AffiliateRow[] = [];
+type AffiliateRow = StoredAffiliate;
 
 function slugFromHandle(handle: string) {
   const base = handle.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
@@ -2213,6 +2186,10 @@ function codeFromHandle(handle: string, discount: string) {
   const base = handle.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "CREATOR";
   const pct = discount.replace(/\D/g, "") || "15";
   return `${base}${pct}`;
+}
+
+function affiliateReferralLink(ref: string) {
+  return `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
 }
 
 const affiliateInputStyle: React.CSSProperties = {
@@ -2235,10 +2212,12 @@ function affiliateStatusLabel(status: string, lang: "en" | "fr"): string {
   return labels[status]?.[lang] ?? labels[status]?.en ?? status;
 }
 
-function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
+function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boolean }) {
   const lang = useLang();
-  const [affiliates, setAffiliates] = useState<AffiliateRow[]>(INITIAL_AFFILIATES);
+  const [affiliates, setAffiliates] = useState<AffiliateRow[]>(() => loadAffiliates(userId));
   const [panelOpen, setPanelOpen] = useState(false);
+  const [copiedRow, setCopiedRow] = useState<{ ref: string; kind: "link" | "code" } | null>(null);
+  const [payMessage, setPayMessage] = useState<string | null>(null);
   const statusColor = (s: string) => s === "Active" ? { bg: "rgba(31,181,103,0.1)", fg: "#1FB567" } : { bg: "rgba(122,122,122,0.1)", fg: "#7A7A7A" };
 
   const activeAffiliateCount = affiliates.filter((a) => a.status === "Active").length;
@@ -2246,12 +2225,44 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
   const totalConversions = affiliates.reduce((sum, a) => sum + a.conversions, 0);
   const conversionRate = totalClicks > 0 ? `${((totalConversions / totalClicks) * 100).toFixed(1)}%` : "0%";
 
+  useEffect(() => {
+    saveAffiliates(userId, affiliates);
+  }, [affiliates, userId]);
+
   const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => {
     setAffiliates((list) => [
       { ...row, clicks: 0, conversions: 0, sales: 0, commission: 0, status: "Active" },
       ...list,
     ]);
     setPanelOpen(false);
+  };
+
+  const copyAffiliateText = async (text: string, ref: string, kind: "link" | "code") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedRow({ ref, kind });
+      setTimeout(() => setCopiedRow(null), 2000);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  const handlePayAffiliate = (affiliate: AffiliateRow) => {
+    if (affiliate.commission <= 0) {
+      setPayMessage(lang === "fr" ? "Aucune commission à payer" : "No commission to pay");
+      setTimeout(() => setPayMessage(null), 3000);
+      return;
+    }
+    const amount = affiliate.commission;
+    setAffiliates((list) =>
+      list.map((a) => (a.ref === affiliate.ref ? { ...a, commission: 0 } : a))
+    );
+    setPayMessage(
+      lang === "fr"
+        ? `Paiement de $${amount} envoyé à ${affiliate.creator}.`
+        : `Payment of $${amount} sent to ${affiliate.creator}.`
+    );
+    setTimeout(() => setPayMessage(null), 4000);
   };
 
   return (
@@ -2273,6 +2284,12 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
             </div>
           ))}
         </div>
+
+        {payMessage && (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(31,181,103,0.1)", border: "1px solid rgba(31,181,103,0.2)", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+            {payMessage}
+          </div>
+        )}
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
@@ -2297,8 +2314,10 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
             </div>
           ) : affiliates.map((a, i) => {
             const sc = statusColor(a.status);
+            const linkCopied = copiedRow?.ref === a.ref && copiedRow.kind === "link";
+            const codeCopied = copiedRow?.ref === a.ref && copiedRow.kind === "code";
             return (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>
+              <div key={a.ref} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
@@ -2314,9 +2333,31 @@ function AffiliatesView({ isMobile }: { isMobile?: boolean }) {
                 <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.commission}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 500, color: sc.fg, background: sc.bg, padding: "4px 10px", borderRadius: 999 }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button type="button" title="Copy link" style={iconBtn}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1" stroke="#7A7A7A" strokeWidth="1.7" strokeLinecap="round"/></svg></button>
-                  <button type="button" title="Copy code" style={iconBtn}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg></button>
-                  <button type="button" title="Pay" style={{ ...iconBtn, color: "#0047FF" }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="#0047FF" strokeWidth="1.7"/><path d="M2 10h20" stroke="#0047FF" strokeWidth="1.7"/></svg></button>
+                  <button
+                    type="button"
+                    title={linkCopied ? (lang === "fr" ? "Copié" : "Copied") : (lang === "fr" ? "Copier le lien" : "Copy link")}
+                    style={iconBtn}
+                    onClick={() => void copyAffiliateText(affiliateReferralLink(a.ref), a.ref, "link")}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1" stroke={linkCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7" strokeLinecap="round"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    title={codeCopied ? (lang === "fr" ? "Copié" : "Copied") : (lang === "fr" ? "Copier le code" : "Copy code")}
+                    style={iconBtn}
+                    onClick={() => void copyAffiliateText(a.code, a.ref, "code")}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke={codeCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke={codeCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    title={lang === "fr" ? "Payer" : "Pay"}
+                    style={{ ...iconBtn, color: "#0047FF", opacity: a.commission > 0 ? 1 : 0.45, cursor: a.commission > 0 ? "pointer" : "not-allowed" }}
+                    disabled={a.commission <= 0}
+                    onClick={() => handlePayAffiliate(a)}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="#0047FF" strokeWidth="1.7"/><path d="M2 10h20" stroke="#0047FF" strokeWidth="1.7"/></svg>
+                  </button>
                 </div>
               </div>
             );
@@ -2355,7 +2396,7 @@ function AddAffiliatePanel({
     if (!normalizedHandle) return;
     const ref = slugFromHandle(normalizedHandle);
     const code = codeFromHandle(normalizedHandle, discount);
-    const link = `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
+    const link = affiliateReferralLink(ref);
     setGenerated({ ref, code, link });
     setCopied(null);
   };

@@ -11,6 +11,7 @@ import {
   canUseUnlimitedAIOutreach,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { UpgradeModal } from "./UpgradeModal";
 
 type OutreachHistoryStatus = "sent" | "opened" | "replied" | "no_response" | "converted";
 type HistoryFilter = "all" | OutreachHistoryStatus;
@@ -515,19 +516,6 @@ function incrementOutreachGenerationsToday() {
   localStorage.setItem("trackit_outreach_today", String(count));
 }
 
-function UpgradeModal({ lang, message, onClose }: { lang: "fr" | "en"; message: string; onClose: () => void }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 20, padding: 32, maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
-        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 56, width: "auto", marginBottom: 16 }} />
-        <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.6, margin: "0 0 24px", whiteSpace: "pre-line" }}>{message}</p>
-        <button type="button" onClick={() => { window.location.href = "/#pricing"; }} style={{ width: "100%", background: "#0047FF", color: "#fff", border: "none", borderRadius: 12, padding: "14px 0", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", letterSpacing: "-0.02em" }}>
-          {lang === "fr" ? "Voir les plans →" : "View plans →"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function OutreachAIGeneratePanel({
   lang,

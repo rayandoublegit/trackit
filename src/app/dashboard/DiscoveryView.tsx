@@ -30,6 +30,7 @@ import {
   hasReachedManagedCreatorLimit,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { UpgradeModal } from "./UpgradeModal";
 
 type DiscoveryTab = "discover" | "saved";
 
@@ -1097,6 +1098,179 @@ function CountryBadge({ creator, lang }: { creator: Creator; lang: "en" | "fr" }
   );
 }
 
+function engagementTrendBars(rate: number) {
+  const base = Math.min(Math.max(rate / 10, 0.35), 0.95);
+  return [0.46, 0.54, 0.62, 0.72, 0.84].map((step, index) =>
+    Math.min(0.95, step * base + index * 0.012)
+  );
+}
+
+function engagementTrendDelta(rate: number) {
+  return Math.max(0.8, Number((rate * 0.32 + 1.1).toFixed(1)));
+}
+
+function reachTrendBars(reach: number, followers: number) {
+  const scale = Math.min(Math.max(reach / Math.max(followers, 1), 0.08), 0.9);
+  return [0.44, 0.5, 0.58, 0.68, 0.8].map((step, index) =>
+    Math.min(0.95, step * (0.75 + scale) + index * 0.01)
+  );
+}
+
+function reachTrendDelta(reach: number, followers: number) {
+  const ratio = reach / Math.max(followers, 1);
+  return Math.max(1.2, Number((ratio * 100 + 2.4).toFixed(1)));
+}
+
+function ReachStatPanel({
+  reach,
+  followers,
+  lang,
+}: {
+  reach: number;
+  followers: number;
+  lang: "en" | "fr";
+}) {
+  const bars = reachTrendBars(reach, followers);
+  const trend = reachTrendDelta(reach, followers);
+
+  return (
+    <div
+      style={{
+        background: "#FFFFFF",
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: "1px solid #EFEFEF",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 8 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+          {formatCount(reach)}
+        </span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            fontSize: 9,
+            fontWeight: 600,
+            color: "#0047FF",
+            background: "#EEF4FF",
+            padding: "2px 6px",
+            borderRadius: 999,
+          }}
+        >
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          +{trend}%
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 3,
+          height: 24,
+          marginBottom: 6,
+          borderBottom: "1px solid #F0F0F0",
+        }}
+      >
+        {bars.map((height, index) => {
+          const isLatest = index === bars.length - 1;
+          return (
+            <div
+              key={index}
+              style={{
+                flex: 1,
+                height: `${height * 100}%`,
+                minHeight: 4,
+                background: isLatest ? "#0047FF" : "#93B4FF",
+                borderRadius: "2px 2px 0 0",
+              }}
+            />
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 10, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? "Portée est." : "Est. reach"}
+      </div>
+    </div>
+  );
+}
+
+function EngagementStatPanel({ rate, lang }: { rate: number; lang: "en" | "fr" }) {
+  const bars = engagementTrendBars(rate);
+  const trend = engagementTrendDelta(rate);
+
+  return (
+    <div
+      style={{
+        background: "#FFFFFF",
+        borderRadius: 10,
+        padding: "10px 12px",
+        border: "1px solid #EFEFEF",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 8 }}>
+        <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+          {rate}%
+        </span>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            fontSize: 9,
+            fontWeight: 600,
+            color: "#059669",
+            background: "#ECFDF5",
+            padding: "2px 6px",
+            borderRadius: 999,
+          }}
+        >
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          +{trend}%
+        </span>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 3,
+          height: 24,
+          marginBottom: 6,
+          borderBottom: "1px solid #F0F0F0",
+        }}
+      >
+        {bars.map((height, index) => {
+          const isLatest = index === bars.length - 1;
+          return (
+            <div
+              key={index}
+              style={{
+                flex: 1,
+                height: `${height * 100}%`,
+                minHeight: 4,
+                background: isLatest ? "#059669" : "#86EFAC",
+                borderRadius: "2px 2px 0 0",
+              }}
+            />
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 10, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? "Engagement" : "Engagement"}
+      </div>
+    </div>
+  );
+}
+
 function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr" }) {
   const nicheTagList = getNicheTags(creator);
   const reachEstimate = estimateReachPerPost(creator);
@@ -1216,12 +1390,6 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
         {[
           { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
           { label: lang === "fr" ? "Vues moy." : "Avg views", value: formatCount(creator.avgViews) },
-          { label: lang === "fr" ? "Portée est." : "Est. reach", value: formatCount(reachEstimate) },
-          {
-            label: lang === "fr" ? "Engagement" : "Engagement",
-            value: `${creator.engagementRate}%`,
-            accent: true,
-          },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -1236,7 +1404,7 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
               style={{
                 fontSize: 15,
                 fontWeight: 600,
-                color: stat.accent ? "#0047FF" : "#1A1A1A",
+                color: "#1A1A1A",
                 letterSpacing: "-0.02em",
               }}
             >
@@ -1245,6 +1413,8 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
             <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 3, letterSpacing: "-0.01em" }}>{stat.label}</div>
           </div>
         ))}
+        <ReachStatPanel reach={reachEstimate} followers={creator.followersCount} lang={lang} />
+        <EngagementStatPanel rate={creator.engagementRate} lang={lang} />
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -1420,6 +1590,10 @@ function CreatorCard({
           onClick={onToggleSave}
           style={{
             flex: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
             fontSize: 12,
             padding: "8px 12px",
             border: "none",
@@ -1432,7 +1606,16 @@ function CreatorCard({
             color: isSaved ? "#5A5A5A" : "#FFFFFF",
           }}
         >
-          {isSaved ? (lang === "fr" ? "Sauvegardé ✓" : "Saved ✓") : lang === "fr" ? "Sauvegarder" : "Save creator"}
+          {isSaved ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <path d="M6 4h12v16l-6-4-6 4V4z" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M6 4h12v16l-6-4-6 4V4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            </svg>
+          )}
+          {isSaved ? (lang === "fr" ? "Sauvegardé" : "Saved") : lang === "fr" ? "Sauvegarder" : "Save creator"}
         </button>
       </div>
     </div>
@@ -1548,6 +1731,47 @@ export function DiscoveryView({
     else if (plan === "basic" && onUpgradePro) onUpgradePro();
     else onUpgrade();
   };
+
+  const creatorLimitTitle =
+    plan === "pro"
+      ? lang === "fr"
+        ? `Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs atteinte`
+        : `${PRO_MAX_MANAGED_CREATORS} creator limit reached`
+      : plan === "basic"
+        ? lang === "fr"
+          ? `Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs atteinte`
+          : `${BASIC_MAX_MANAGED_CREATORS} creator limit reached`
+        : lang === "fr"
+          ? "Limite de créateurs atteinte"
+          : "Creator limit reached";
+
+  const creatorLimitDescription =
+    plan === "pro"
+      ? lang === "fr"
+        ? "Passez à Scale pour gérer un nombre illimité de créateurs."
+        : "Upgrade to Scale to manage unlimited creators."
+      : plan === "basic"
+        ? lang === "fr"
+          ? "Passez à Pro pour gérer jusqu'à 100 créateurs."
+          : "Upgrade to Pro to manage up to 100 creators."
+        : lang === "fr"
+          ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
+          : "Upgrade to Growth to manage up to 25 creators.";
+
+  const creatorLimitPlanBadge = plan === "pro" ? "Scale" : plan === "basic" ? "Pro" : "Growth";
+
+  const creatorLimitPrimaryLabel =
+    plan === "pro"
+      ? lang === "fr"
+        ? `Passer à Scale ${formatCurrency(99, lang)}/mois`
+        : `Upgrade to Scale ${formatCurrency(99, lang)}/mo`
+      : plan === "basic"
+        ? lang === "fr"
+          ? `Passer à Pro ${formatCurrency(39, lang)}/mois`
+          : `Upgrade to Pro ${formatCurrency(39, lang)}/mo`
+        : lang === "fr"
+          ? `Passer à Growth ${formatCurrency(19, lang)}/mois`
+          : `Upgrade to Growth ${formatCurrency(19, lang)}/mo`;
 
   const discoveryLimitTitle =
     dailyDiscoveryLimit != null
@@ -2192,87 +2416,16 @@ export function DiscoveryView({
         />
       )}
       {upgradeModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1100,
-            padding: 24,
-          }}
-          onClick={() => setUpgradeModalOpen(false)}
-        >
-          <div
-            style={{
-              background: "#FFFFFF",
-              borderRadius: 16,
-              padding: 32,
-              maxWidth: 420,
-              width: "100%",
-              boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-              {plan === "pro"
-                ? lang === "fr"
-                  ? `Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs atteinte`
-                  : `${PRO_MAX_MANAGED_CREATORS} creator limit reached`
-                : plan === "basic"
-                  ? lang === "fr"
-                    ? `Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs atteinte`
-                    : `${BASIC_MAX_MANAGED_CREATORS} creator limit reached`
-                  : lang === "fr"
-                    ? "Limite de créateurs atteinte"
-                    : "Creator limit reached"}
-            </h3>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-              {plan === "pro"
-                ? lang === "fr"
-                  ? "Passez à Scale pour des créateurs illimités."
-                  : "Upgrade to Scale for unlimited creators."
-                : plan === "basic"
-                  ? lang === "fr"
-                    ? "Passez à Pro pour gérer jusqu'à 100 créateurs."
-                    : "Upgrade to Pro to manage up to 100 creators."
-                  : lang === "fr"
-                    ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
-                    : "Upgrade to Growth to manage up to 25 creators."}
-            </p>
-            <button
-              type="button"
-              onClick={handleCreatorLimitUpgrade}
-              style={{
-                background: "#0047FF",
-                color: "#FFFFFF",
-                border: "none",
-                borderRadius: 10,
-                padding: "12px 20px",
-                fontSize: 14,
-                fontWeight: 500,
-                fontFamily: "inherit",
-                cursor: "pointer",
-                width: "100%",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              {plan === "pro"
-                ? lang === "fr"
-                  ? `Passer à Scale ${formatCurrency(99, lang)}/mois →`
-                  : `Upgrade to Scale ${formatCurrency(99, lang)}/mo →`
-                : plan === "basic"
-                  ? lang === "fr"
-                    ? `Passer à Pro ${formatCurrency(39, lang)}/mois →`
-                    : `Upgrade to Pro ${formatCurrency(39, lang)}/mo →`
-                  : lang === "fr"
-                    ? `Passer à Growth ${formatCurrency(19, lang)}/mois →`
-                    : `Upgrade to Growth ${formatCurrency(19, lang)}/mo →`}
-            </button>
-          </div>
-        </div>
+        <UpgradeModal
+          lang={lang}
+          onClose={() => setUpgradeModalOpen(false)}
+          title={creatorLimitTitle}
+          description={creatorLimitDescription}
+          planBadge={creatorLimitPlanBadge}
+          primaryLabel={creatorLimitPrimaryLabel}
+          onPrimary={handleCreatorLimitUpgrade}
+          showAllPlansLink={false}
+        />
       )}
       {toast && <SaveToast message={toast} />}
     </>
