@@ -121,6 +121,78 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const conversionRate = totalSent > 0 ? Math.round((converted / totalSent) * 100) : 0;
   const avgCommissionRate = totalRevenue > 0 ? Math.round((totalCommissions / totalRevenue) * 100) : 0;
 
+  const [showSaleModal, setShowSaleModal] = useState(false);
+  const [saleCreators, setSaleCreators] = useState<{ id: string; label: string }[]>([]);
+  const [saleCreatorId, setSaleCreatorId] = useState("");
+  const [saleAmount, setSaleAmount] = useState("");
+  const [saleDate, setSaleDate] = useState("");
+  const [saleBusy, setSaleBusy] = useState(false);
+  const [saleMsg, setSaleMsg] = useState("");
+
+  const openSaleModal = async () => {
+    setShowSaleModal(true);
+    setSaleMsg("");
+    try {
+      const res = await fetch(`/api/creators-list?userId=${userId}`);
+      const data = await res.json();
+      const list = (data.creators || data || []).map((c: { id: string; full_name?: string; handle?: string }) => ({
+        id: c.id,
+        label: c.full_name || c.handle || c.id,
+      }));
+      setSaleCreators(list);
+      if (list.length > 0) setSaleCreatorId(list[0].id);
+    } catch {
+      setSaleMsg(lang === "fr" ? "Impossible de charger vos créateurs" : "Could not load your creators");
+    }
+  };
+
+  const submitManualSale = async () => {
+    if (!saleCreatorId || !saleAmount) return;
+    setSaleBusy(true);
+    setSaleMsg("");
+    try {
+      const res = await fetch("/api/sales/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, creatorId: saleCreatorId, amount: saleAmount, date: saleDate || undefined }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSaleMsg(lang === "fr" ? `Vente ajoutée — ${data.commissionAmount}€ de commission créditée` : `Sale added — ${data.commissionAmount}€ commission credited`);
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        setSaleMsg(data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale"));
+        setSaleBusy(false);
+      }
+    } catch {
+      setSaleMsg(lang === "fr" ? "Erreur réseau" : "Network error");
+      setSaleBusy(false);
+    }
+  };
+
+  const saleModal = showSaleModal ? (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => !saleBusy && setShowSaleModal(false)}>
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
+        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1A1A1A" }}>{lang === "fr" ? "Ajouter une vente" : "Add a sale"}</h3>
+        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>{lang === "fr" ? "Enregistrez une vente générée par un créateur. La commission est calculée automatiquement." : "Record a sale driven by a creator. Commission is calculated automatically."}</p>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Créateur" : "Creator"}</label>
+        <select value={saleCreatorId} onChange={(e) => setSaleCreatorId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12 }}>
+          {saleCreators.length === 0 && <option value="">{lang === "fr" ? "Aucun créateur géré" : "No managed creators"}</option>}
+          {saleCreators.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Montant de la commande (€)" : "Order amount (€)"}</label>
+        <input type="number" min="0" step="0.01" value={saleAmount} onChange={(e) => setSaleAmount(e.target.value)} placeholder="149.90" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Date (optionnel)" : "Date (optional)"}</label>
+        <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 16, boxSizing: "border-box" }} />
+        {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button type="button" disabled={saleBusy} onClick={() => setShowSaleModal(false)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
+          <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("desc"); }
@@ -146,7 +218,13 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
           <button type="button" style={btnPrimary} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
+          <div style={{ marginTop: 12 }}>
+            <button type="button" onClick={openSaleModal} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
+              {lang === "fr" ? "Ou ajoutez vos ventes manuellement" : "Or add your sales manually"}
+            </button>
+          </div>
         </div>
+        {saleModal}
       </>
     );
   }
@@ -155,6 +233,12 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     <>
       <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+          <button type="button" onClick={openSaleModal} style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 13, fontWeight: 500, cursor: "pointer", color: "#1A1A1A" }}>
+            {lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
+          </button>
+        </div>
+        {saleModal}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
           <KpiCard title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"} value={formatCurrency(totalRevenue, lang)} />
           <KpiCard title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"} value={String(totalSent)} />
