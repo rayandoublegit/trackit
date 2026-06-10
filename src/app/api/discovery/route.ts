@@ -84,12 +84,13 @@ export async function POST(request: Request) {
     .lte("followers", maxF)
     .gte("engagement_rate", minE);
 
-  // Curated-only mode (e.g. French): only show creators we hand-picked.
+  // Curated-only mode (e.g. French): only show creators we hand-picked,
+  // restricted to the user's market so US/EN creators never leak into FR results.
   if (curatedOnly) {
     dbQuery = dbQuery.contains("niches", ["curated"]);
+    const marketLang = isFrench ? "fr" : "de";
+    dbQuery = dbQuery.eq("language", marketLang);
   }
-  // NOTE: no strict language .eq filter — curated creators are already the right
-  // market, and exact-matching the language column wiped out valid results.
 
   const { data: dbCreators } = await dbQuery
     .order("followers", { ascending: false })
