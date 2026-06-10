@@ -661,16 +661,8 @@ function OutreachAIGeneratePanel({
     } catch {
       /* clipboard may be unavailable */
     }
-    if (platform === "Instagram DM") {
-      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
-    } else if (platform === "TikTok DM") {
-      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
-    } else if (platform === "Email") {
-      window.open(`mailto:${creatorEmail.trim() || handle}?body=${encodeURIComponent(generatedMessage)}`, "_blank");
-    }
-    console.log("[DEBUG] handleSend: calling onMarkSent");
-    console.log("[DEBUG] handleSend: calling onMarkSent");
-    // Log the outreach so it appears in history and feeds analytics
+    console.log("[DEBUG] handleSend: calling onMarkSent (before window.open)");
+    // Log the outreach FIRST so the insert completes before we hand off focus
     await onMarkSent({
       id: "",
       creator: selectedCreator.displayName,
@@ -682,6 +674,14 @@ function OutreachAIGeneratePanel({
       status: "sent",
       followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
     });
+    // Insert is done — now open the platform
+    if (platform === "Instagram DM") {
+      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
+    } else if (platform === "TikTok DM") {
+      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
+    } else if (platform === "Email") {
+      window.open(`mailto:${creatorEmail.trim() || handle}?body=${encodeURIComponent(generatedMessage)}`, "_blank");
+    }
     onToast(lang === "fr" ? "Message copié — collez dans le DM ✓" : "Message copied — paste in the DM ✓");
     resetPanel();
   };
