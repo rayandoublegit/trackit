@@ -3,6 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators } from "@/lib/db";
+import { dispatchOutreachHistoryUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
+import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
+import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
@@ -1262,6 +1265,7 @@ function OutreachView({
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const closePanel = () => {
     setPanel(null);
@@ -1383,7 +1387,7 @@ function OutreachView({
           </div>
         </div>
 
-        <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} />
+        <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} refreshKey={historyRefreshKey} />
       </div>
 
       {panel === "import" && (
@@ -1427,12 +1431,14 @@ function OutreachView({
       {panel === "send" && (
         <SendOutreachPanel
           templates={templates}
+          plan={plan}
           initialTemplateId={sendTemplateId}
           initialCreatorHandle={sendPrefill?.creatorHandle}
           initialDmPlatform={sendPrefill?.dmPlatform}
           onClose={closePanel}
           onSent={() => {
-            showToast(lang === "fr" ? "Message copié — collez-le dans le DM ✓" : "Message copied — paste it in the DM ✓");
+            setHistoryRefreshKey((k) => k + 1);
+            showToast(lang === "fr" ? "Message copié et ajouté à l'historique ✓" : "Message copied and added to history ✓");
             closePanel();
           }}
         />
@@ -1806,6 +1812,7 @@ function TemplateSelect({
 
 function SendOutreachPanel({
   templates,
+  plan,
   initialTemplateId,
   initialCreatorHandle,
   initialDmPlatform,
@@ -1813,6 +1820,7 @@ function SendOutreachPanel({
   onSent,
 }: {
   templates: OutreachTemplate[];
+  plan: PlanTier;
   initialTemplateId: string | null;
   initialCreatorHandle?: string;
   initialDmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
@@ -1860,12 +1868,38 @@ function SendOutreachPanel({
 
   const handleSend = async () => {
     if (!canSend) return;
+
     const messageText = fullPreview;
     const handle = selectedInfluencers[0].replace(/^@/, "");
+
+    let userId: string | null = null;
+    if (supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
+    }
+    if (!userId) return;
+
     try {
       await navigator.clipboard.writeText(messageText);
     } catch {
       /* clipboard may be unavailable */
+    }
+
+    const followUpDate = canUseAutoFollowUp(plan) ? followUpIn3Days() : null;
+
+    for (const influencerHandle of selectedInfluencers) {
+      const name = outreachCreatorName(influencerHandle);
+      const copiedMessage = previewFromFields(fields, name || "there");
+      appendStoredOutreachEntry(userId, {
+        creator_username: name || influencerHandle.replace(/^@/, ""),
+        creator_display_name: influencerHandle,
+        creator_avatar: "",
+        platform: dmPlatform,
+        message: copiedMessage,
+        status: "sent",
+        follow_up_date: followUpDate,
+      });
+      notifyOutreachSent(lang, influencerHandle);
     }
     if (dmPlatform === "Instagram") {
       window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
@@ -1882,6 +1916,8 @@ function SendOutreachPanel({
         (lang === "fr" ? "Partenariat" : "Partnership");
       window.open(`mailto:${handle}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`, "_blank");
     }
+
+    dispatchOutreachHistoryUpdated();
     onSent(selectedInfluencers.length);
   };
 

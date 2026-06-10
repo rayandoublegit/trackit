@@ -164,3 +164,13 @@ export async function updateOutreachStatus(outreachId: string, status: string) {
     .update({ status, updated_at: new Date().toISOString() })
     .eq("id", outreachId);
 }
+
+export async function clearOutreachHistory(userId: string) {
+  if (!supabase) return false;
+  const { error } = await supabase.from("outreach_history").delete().eq("user_id", userId);
+  if (error) {
+    console.error("clearOutreachHistory error:", error.message);
+    return false;
+  }
+  return true;
+}

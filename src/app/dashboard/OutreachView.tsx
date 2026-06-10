@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { saveOutreach, getOutreachHistory, getSavedCreators } from "@/lib/db";
+import { saveOutreach, getOutreachHistory, getSavedCreators, clearOutreachHistory } from "@/lib/db";
+import { dispatchOutreachHistoryUpdated, OUTREACH_HISTORY_UPDATED_EVENT } from "@/lib/outreach-history-events";
+import {
+  appendStoredOutreachEntry,
+  clearStoredOutreachHistory,
+  loadStoredOutreachHistory,
+  updateStoredOutreachEntry,
+  type StoredOutreachEntry,
+} from "@/lib/outreach-history-storage";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
@@ -1120,10 +1128,12 @@ export function OutreachHistorySection({
   plan,
   onNavigateToBilling,
   isMobile,
+  refreshKey = 0,
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
   isMobile?: boolean;
+  refreshKey?: number;
 }) {
   const lang = useLang();
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>([]);
@@ -1153,14 +1163,30 @@ export function OutreachHistorySection({
   }, [toast]);
 
   const loadHistory = useCallback(async () => {
-    if (!supabase) { console.error("[DEBUG] logOutreach: supabase client is NULL"); return; }
+    if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { console.error("[DEBUG] logOutreach: NO USER from auth.getUser()"); return; }
-    console.log("[DEBUG] logOutreach: user OK", user.id);
-    const [history, creators] = await Promise.all([
-      getOutreachHistory(user.id),
-      getSavedCreators(user.id),
-    ]);
+    if (!user) return;
+
+    let history = loadStoredOutreachHistory(user.id);
+    if (history.length === 0) {
+      const remote = await getOutreachHistory(user.id);
+      if (remote.length > 0) {
+        history = remote.map((row) => ({
+          id: String(row.id ?? ""),
+          user_id: user.id,
+          creator_username: String(row.creator_username ?? ""),
+          creator_display_name: String(row.creator_display_name ?? ""),
+          creator_avatar: String(row.creator_avatar ?? ""),
+          platform: String(row.platform ?? ""),
+          message: String(row.message ?? ""),
+          status: String(row.status ?? "sent"),
+          follow_up_date: typeof row.follow_up_date === "string" ? row.follow_up_date : null,
+          created_at: typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
+        })) satisfies StoredOutreachEntry[];
+      }
+    }
+
+    const creators = await getSavedCreators(user.id);
     setEntries(history.map((o) => mapOutreachRow(o as Record<string, unknown>)));
     setSavedCreators(
       creators.map((c) => {
@@ -1182,6 +1208,12 @@ export function OutreachHistorySection({
 
   useEffect(() => {
     void loadHistory();
+  }, [loadHistory, refreshKey]);
+
+  useEffect(() => {
+    const refresh = () => void loadHistory();
+    window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refresh);
+    return () => window.removeEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refresh);
   }, [loadHistory]);
 
   const handleMarkSent = async (
@@ -1202,7 +1234,16 @@ export function OutreachHistorySection({
     if (!user) { console.error("[DEBUG] logOutreach: NO USER from auth.getUser()"); return; }
     console.log("[DEBUG] logOutreach: user OK", user.id);
     const handle = (creator.username || creator.handle || "").replace(/^@/, "");
-    await saveOutreach(user.id, {
+    appendStoredOutreachEntry(user.id, {
+      creator_username: handle,
+      creator_display_name: creator.displayName || creator.creator || handle,
+      creator_avatar: creator.avatarUrl || creator.avatar || "",
+      platform: creator.platform,
+      message,
+      status: "sent",
+      follow_up_date: followUpDate ?? null,
+    });
+    void saveOutreach(user.id, {
       creator_username: handle,
       creator_display_name: creator.displayName || creator.creator || handle,
       creator_avatar: creator.avatarUrl || creator.avatar || "",
@@ -1216,6 +1257,26 @@ export function OutreachHistorySection({
       creator.displayName || creator.creator || handle || "creator"
     );
     await loadHistory();
+    dispatchOutreachHistoryUpdated();
+  };
+
+  const handleClearHistory = async () => {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const confirmed = window.confirm(
+      lang === "fr"
+        ? "Supprimer tout l'historique des messages ? Cette action est irréversible."
+        : "Delete all outreach history? This cannot be undone."
+    );
+    if (!confirmed) return;
+    clearStoredOutreachHistory(user.id);
+    void clearOutreachHistory(user.id);
+    setEntries([]);
+    setManageEntry(null);
+    setFollowUpEntry(null);
+    setToast(lang === "fr" ? "Historique effacé ✓" : "History cleared ✓");
+    dispatchOutreachHistoryUpdated();
   };
 
   const closeFollowUp = () => {
@@ -1311,7 +1372,22 @@ export function OutreachHistorySection({
   }, [entries]);
 
   const updateStatus = (id: string, status: OutreachHistoryStatus) => {
-    setEntries((list) => list.map((e) => (e.id === id ? { ...e, status, followUpDate: status === "replied" || status === "converted" ? null : e.followUpDate } : e)));
+    setEntries((list) =>
+      list.map((e) =>
+        e.id === id
+          ? { ...e, status, followUpDate: status === "replied" || status === "converted" ? null : e.followUpDate }
+          : e
+      )
+    );
+    void (async () => {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      updateStoredOutreachEntry(user.id, id, {
+        status,
+        ...(status === "replied" || status === "converted" ? { follow_up_date: null } : {}),
+      });
+    })();
   };
 
   const filterTabs: { id: HistoryFilter; label: string }[] = [
@@ -1346,6 +1422,16 @@ export function OutreachHistorySection({
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
           <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>{lang === "fr" ? "Historique des messages" : "Outreach history"}</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {entries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void handleClearHistory()}
+              className="hero-cta-shopify-light hero-cta-compact-sm"
+            >
+              {lang === "fr" ? "Vider l'historique" : "Clear history"}
+            </button>
+          )}
           <div style={{ position: "relative", minWidth: 220 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -1421,6 +1507,7 @@ export function OutreachHistorySection({
               </div>
             )}
           </div>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: 4, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : undefined, paddingBottom: isMobile ? 4 : undefined, marginBottom: 20, borderBottom: "1px solid #EFEFEF" }}>
@@ -1469,8 +1556,8 @@ export function OutreachHistorySection({
             <div style={{ padding: 48, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>
               {entries.length === 0
                 ? lang === "fr"
-                  ? "Aucun message envoyé pour le moment. Générez un message IA et marquez-le comme envoyé."
-                  : "No outreach sent yet. Generate a message with AI and mark it as sent."
+                  ? "Aucun message envoyé pour le moment. Envoyez un message via Instagram, TikTok, etc."
+                  : "No outreach sent yet. Send a message via Instagram, TikTok, etc."
                 : lang === "fr"
                   ? "Aucun résultat pour ce filtre."
                   : "No results for this filter."}
