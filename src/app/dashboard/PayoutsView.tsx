@@ -1017,8 +1017,8 @@ export function PayoutsView({
     setTimeout(() => {
       const done = window.confirm(
         lang === "fr"
-          ? `Avez-vous bien effectué le virement de ${formatCurrency(amount, lang)} à ${creator.full_name || creator.handle} ?\n\nOK = marquer comme payé (solde remis à zéro)`
-          : `Did you complete the ${formatCurrency(amount, lang)} transfer to ${creator.full_name || creator.handle}?\n\nOK = mark as paid (balance reset)`
+          ? `Confirmation du paiement\n\nVirement de ${formatCurrency(amount, lang)} à ${creator.full_name || creator.handle}.\n\nOK : le paiement est enregistré et le solde du créateur est remis à zéro.\nAnnuler : aucune modification.`
+          : `Payment confirmation\n\n${formatCurrency(amount, lang)} transfer to ${creator.full_name || creator.handle}.\n\nOK: the payment is recorded and the creator's balance is reset.\nCancel: no changes.`
       );
       if (!done) return;
       const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
