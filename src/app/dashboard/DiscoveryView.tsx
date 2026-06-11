@@ -1934,6 +1934,10 @@ export function DiscoveryView({
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [followerFilterHint, setFollowerFilterHint] = useState<{
+    filteredOut: number;
+    followerRange: [number, number];
+  } | null>(null);
   const [savedCreators, setSavedCreators] = useState<Creator[]>(() => readSavedCreatorsFromStorage());
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [outreachCreator, setOutreachCreator] = useState<Creator | null>(null);
@@ -2291,7 +2295,7 @@ export function DiscoveryView({
         : ` (capped at ${resultsLimit})`
       : "";
 
-  const search = async () => {
+  const search = async (followersOverride?: string) => {
     if (hasDiscoveryDailyCap(plan) && dailyDiscoveryLimit != null) {
       const latestUsed = await syncDiscoveryGateState();
       const used = latestUsed ?? discoveriesUsed;
@@ -2307,6 +2311,7 @@ export function DiscoveryView({
     const nicheTerm = niche;
     setLoading(true);
     setError(null);
+    setFollowerFilterHint(null);
     setHasSearched(true);
 
     try {
@@ -2317,7 +2322,8 @@ export function DiscoveryView({
         "50-100k": { min: 50000, max: 100000 },
         "100k+": { min: 100000 },
       };
-      const { min: minFollowers, max: maxFollowers } = followerBounds[followers] ?? { min: 0 };
+      const activeFollowers = followersOverride !== undefined ? followersOverride : followers;
+      const { min: minFollowers, max: maxFollowers } = followerBounds[activeFollowers] ?? { min: 0 };
       const minEngagement = parseInt(engagement, 10) || 0;
 
       const res = await fetch("/api/discovery", {
@@ -2338,9 +2344,29 @@ export function DiscoveryView({
         throw new Error("Search failed. Please try again.");
       }
 
-      const data = (await res.json()) as { creators: Creator[] };
+      const data = (await res.json()) as {
+        creators?: Creator[];
+        filteredOut?: number;
+        followerRange?: [number, number];
+      };
+      const creatorsList = data.creators ?? [];
+
+      if (
+        creatorsList.length === 0 &&
+        (data.filteredOut ?? 0) > 0 &&
+        Array.isArray(data.followerRange) &&
+        data.followerRange.length === 2
+      ) {
+        setCreators([]);
+        setFollowerFilterHint({
+          filteredOut: data.filteredOut!,
+          followerRange: [Number(data.followerRange[0]), Number(data.followerRange[1])],
+        });
+        return;
+      }
+
       const seed = Date.now() + Math.floor(Math.random() * 999999);
-      const shuffled = shuffleWithSeed(data.creators ?? [], seed).map((c) =>
+      const shuffled = shuffleWithSeed(creatorsList, seed).map((c) =>
         enrichCreatorCountry(c, location, language)
       );
       setCreators(shuffled);
@@ -2351,10 +2377,16 @@ export function DiscoveryView({
       localStorage.setItem("trackit_search_" + new Date().toDateString(), String(newCount));
     } catch (e) {
       setCreators([]);
+      setFollowerFilterHint(null);
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const widenFollowerFiltersAndSearch = () => {
+    setFollowers("");
+    void search("");
   };
 
   const creatorsGridStyle: React.CSSProperties = {
@@ -2587,6 +2619,50 @@ export function DiscoveryView({
                   </button>
                 </div>
               </div>
+            </div>
+          ) : followerFilterHint ? (
+            <div
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFEFEF",
+                borderRadius: 16,
+                padding: "28px 24px",
+                textAlign: "center",
+                maxWidth: 560,
+                margin: "0 auto",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "#7A7A7A",
+                  letterSpacing: "-0.02em",
+                  margin: "0 0 20px",
+                  lineHeight: 1.55,
+                }}
+              >
+                {lang === "fr"
+                  ? `${followerFilterHint.filteredOut} créateurs disponibles dans cette niche, mais aucun dans votre fourchette d'abonnés. Les créateurs de cette niche vont de ${formatCount(followerFilterHint.followerRange[0]).replace(".", ",")} à ${formatCount(followerFilterHint.followerRange[1]).replace(".", ",")} abonnés.`
+                  : `${followerFilterHint.filteredOut} creators available in this niche, but none in your follower range. Creators in this niche range from ${formatCount(followerFilterHint.followerRange[0])} to ${formatCount(followerFilterHint.followerRange[1])} followers.`}
+              </p>
+              <button
+                type="button"
+                onClick={widenFollowerFiltersAndSearch}
+                style={{
+                  background: "#1A1A1A",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "11px 20px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {lang === "fr" ? "Élargir les filtres" : "Widen filters"}
+              </button>
             </div>
           ) : (
             <div style={{ background: "#FFFFFF", border: "1px dashed #E5E5E5", borderRadius: 16, padding: 60, textAlign: "center" }}>

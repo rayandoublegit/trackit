@@ -82,9 +82,13 @@ export async function POST(request: Request) {
     .select("*")
     .eq("platform", plat)
     .or(orFilter || `niches.cs.{${nicheNorm}}`)
-    .gte("followers", minF)
-    .lte("followers", maxF)
     .gte("engagement_rate", minE);
+
+  // In curated mode we apply the follower bounds in JS (below) so we can
+  // tell the user when their filter excluded every available creator.
+  if (!(isFrench || isGerman)) {
+    dbQuery = dbQuery.gte("followers", minF).lte("followers", maxF);
+  }
 
   // Curated-only mode (e.g. French): only show creators we hand-picked,
   // restricted to the user's market so US/EN creators never leak into FR results.
@@ -98,10 +102,28 @@ export async function POST(request: Request) {
     .order("followers", { ascending: false })
     .limit(100);
 
+  // Curated mode: apply follower bounds in JS and report when the filter
+  // excludes every creator in the niche (so the UI can explain why).
+  let pool = dbCreators || [];
+  if (curatedOnly && pool.length > 0) {
+    const inRange = pool.filter(c => (c.followers || 0) >= minF && (c.followers || 0) <= maxF);
+    if (inRange.length === 0) {
+      const counts = pool.map(c => c.followers || 0).sort((a, b) => a - b);
+      return NextResponse.json({
+        creators: [],
+        source: "db",
+        curated: true,
+        filteredOut: pool.length,
+        followerRange: [counts[0], counts[counts.length - 1]],
+      });
+    }
+    pool = inRange;
+  }
+
   // In curated mode, even 1 result should show (no falling back to scraping).
   const dbThreshold = curatedOnly ? 1 : 5;
-  if (dbCreators && dbCreators.length >= dbThreshold) {
-    const creators = dbCreators
+  if (pool && pool.length >= dbThreshold) {
+    const creators = pool
       // Curated creators always rank first, then by followers.
       .sort((a, b) => {
         const ac = (a.niches || []).includes("curated") ? 1 : 0;
