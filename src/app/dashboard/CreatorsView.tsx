@@ -1204,8 +1204,8 @@ export function CreatorsView({
                     </div>
                     <button
                       type="button"
-                      className="hero-cta-shopify-dark hero-cta-compact"
-                      style={{ width: "100%" }}
+                      className="hero-cta-shopify-dark hero-cta-compact-sm"
+                      style={{ width: "fit-content", alignSelf: "flex-start" }}
                       onClick={() => setDetailCreator(creator)}
                     >
                       {lang === "fr" ? "Voir le profil" : "View profile"}
@@ -1270,7 +1270,12 @@ export function CreatorsView({
                     <div style={{ fontSize: 13 }}>{c.niche}</div>
                     <div><span style={statusBadgeStyle()}>{statusLabel(c.status, lang)}</span></div>
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
-                    <button type="button" className="hero-cta-shopify-dark hero-cta-compact" onClick={() => setDetailCreator(c)}>
+                    <button
+                      type="button"
+                      className="hero-cta-shopify-dark hero-cta-compact-sm"
+                      style={{ width: "fit-content", justifySelf: "start" }}
+                      onClick={() => setDetailCreator(c)}
+                    >
                       {lang === "fr" ? "Voir le profil" : "View profile"}
                     </button>
                   </div>

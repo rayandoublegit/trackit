@@ -49,7 +49,7 @@ import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/no
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
-import { loadAffiliates, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
+import { loadAffiliates, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
   loadDashboardView,
   readInitialDashboardView,
@@ -2443,10 +2443,11 @@ function affiliateStatusLabel(status: string, lang: "en" | "fr"): string {
 
 function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boolean }) {
   const lang = useLang();
-  const [affiliates, setAffiliates] = useState<AffiliateRow[]>(() => loadAffiliates(userId));
+  const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
+  const [affiliatesLoaded, setAffiliatesLoaded] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<{ ref: string; kind: "link" | "code" } | null>(null);
-  const [payMessage, setPayMessage] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const activeAffiliateCount = affiliates.filter((a) => a.status === "Active").length;
   const totalClicks = affiliates.reduce((sum, a) => sum + a.clicks, 0);
@@ -2454,8 +2455,14 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
   const conversionRate = totalClicks > 0 ? `${((totalConversions / totalClicks) * 100).toFixed(1)}%` : "0%";
 
   useEffect(() => {
+    setAffiliates(loadAffiliates(userId));
+    setAffiliatesLoaded(true);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!affiliatesLoaded) return;
     saveAffiliates(userId, affiliates);
-  }, [affiliates, userId]);
+  }, [affiliates, userId, affiliatesLoaded]);
 
   const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => {
     setAffiliates((list) => [
@@ -2475,28 +2482,28 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
     }
   };
 
-  const handlePayAffiliate = (affiliate: AffiliateRow) => {
-    if (affiliate.commission <= 0) {
-      setPayMessage(lang === "fr" ? "Aucune commission à payer" : "No commission to pay");
-      setTimeout(() => setPayMessage(null), 3000);
-      return;
-    }
-    const amount = affiliate.commission;
-    setAffiliates((list) =>
-      list.map((a) => (a.ref === affiliate.ref ? { ...a, commission: 0 } : a))
-    );
-    setPayMessage(
+  const handleRemoveAffiliate = (affiliate: AffiliateRow) => {
+    const confirmed = window.confirm(
       lang === "fr"
-        ? `Paiement de $${amount} envoyé à ${affiliate.creator}.`
-        : `Payment of $${amount} sent to ${affiliate.creator}.`
+        ? `Supprimer ${affiliate.creator} et son lien d'affiliation (/r/${affiliate.ref}) ?\n\nCette action est définitive.`
+        : `Remove ${affiliate.creator} and their affiliate link (/r/${affiliate.ref})?\n\nThis cannot be undone.`
     );
-    setTimeout(() => setPayMessage(null), 4000);
+    if (!confirmed) return;
+
+    const next = removeAffiliate(userId, affiliate.ref);
+    setAffiliates(next);
+    setActionMessage(
+      lang === "fr"
+        ? `${affiliate.creator} supprimé de vos affiliés.`
+        : `${affiliate.creator} removed from your affiliates.`
+    );
+    setTimeout(() => setActionMessage(null), 4000);
   };
 
   return (
     <>
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
-        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
+        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
       } />
         <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginTop: 12, marginBottom: 24 }}>
@@ -2513,9 +2520,9 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
           ))}
         </div>
 
-        {payMessage && (
-          <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(31,181,103,0.1)", border: "1px solid rgba(31,181,103,0.2)", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
-            {payMessage}
+        {actionMessage && (
+          <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+            {actionMessage}
           </div>
         )}
 
@@ -2578,12 +2585,16 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
                   </button>
                   <button
                     type="button"
-                    title={lang === "fr" ? "Payer" : "Pay"}
-                    style={{ ...iconBtn, color: "#0047FF", opacity: a.commission > 0 ? 1 : 0.45, cursor: a.commission > 0 ? "pointer" : "not-allowed" }}
-                    disabled={a.commission <= 0}
-                    onClick={() => handlePayAffiliate(a)}
+                    title={lang === "fr" ? "Supprimer l'affilié" : "Remove affiliate"}
+                    style={{ ...iconBtn, color: "#C62828" }}
+                    onClick={() => handleRemoveAffiliate(a)}
                   >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="#0047FF" strokeWidth="1.7"/><path d="M2 10h20" stroke="#0047FF" strokeWidth="1.7"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M4 7h16" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
+                      <path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
+                      <path d="M7 7l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12" stroke="#C62828" strokeWidth="1.7" strokeLinejoin="round" />
+                      <path d="M10 11v5M14 11v5" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
+                    </svg>
                   </button>
                 </div>
               </div>

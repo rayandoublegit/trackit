@@ -243,7 +243,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <button type="button" onClick={openSaleModal} className="hero-cta-shopify hero-cta-compact">
+          <button type="button" onClick={openSaleModal} className="hero-cta-shopify-light hero-cta-compact">
             {lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
           </button>
         </div>

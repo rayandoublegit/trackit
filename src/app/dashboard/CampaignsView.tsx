@@ -141,7 +141,7 @@ export function CampaignsView({
   if (campaigns.length === 0) {
     return (
       <>
-        <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} />
+        <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucune campagne pour l'instant." : "No campaigns yet."}</h2>
@@ -243,12 +243,14 @@ function CampaignUpgradeModal({
   );
 }
 
-function CampaignsHeader({ lang, onNew, showFilters, isMobile }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean; isMobile?: boolean }) {
+function CampaignsHeader({ lang, onNew, showFilters, showNewButton = true, isMobile }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean; showNewButton?: boolean; isMobile?: boolean }) {
   return (
     <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
-        <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
+        {showNewButton && (
+          <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
+        )}
       </div>
     </div>
   );

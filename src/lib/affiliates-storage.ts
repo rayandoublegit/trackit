@@ -51,3 +51,9 @@ export function saveAffiliates(userId: string, affiliates: StoredAffiliate[]) {
     /* storage unavailable */
   }
 }
+
+export function removeAffiliate(userId: string, ref: string): StoredAffiliate[] {
+  const next = loadAffiliates(userId).filter((row) => row.ref !== ref);
+  saveAffiliates(userId, next);
+  return next;
+}

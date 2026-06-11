@@ -1295,22 +1295,8 @@ function CountryBadge({ creator, lang }: { creator: Creator; lang: "en" | "fr" }
   );
 }
 
-function engagementTrendBars(rate: number) {
-  const base = Math.min(Math.max(rate / 10, 0.35), 0.95);
-  return [0.46, 0.54, 0.62, 0.72, 0.84].map((step, index) =>
-    Math.min(0.95, step * base + index * 0.012)
-  );
-}
-
 function engagementTrendDelta(rate: number) {
   return Math.max(0.8, Number((rate * 0.32 + 1.1).toFixed(1)));
-}
-
-function reachTrendBars(reach: number, followers: number) {
-  const scale = Math.min(Math.max(reach / Math.max(followers, 1), 0.08), 0.9);
-  return [0.44, 0.5, 0.58, 0.68, 0.8].map((step, index) =>
-    Math.min(0.95, step * (0.75 + scale) + index * 0.01)
-  );
 }
 
 function reachTrendDelta(reach: number, followers: number) {
@@ -1318,17 +1304,108 @@ function reachTrendDelta(reach: number, followers: number) {
   return Math.max(1.2, Number((ratio * 100 + 2.4).toFixed(1)));
 }
 
+function GrowthTrendBadge({
+  trend,
+  color,
+  background,
+  title,
+  rows,
+}: {
+  trend: number;
+  color: string;
+  background: string;
+  title: string;
+  rows: { label: string; value: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span
+      style={{ position: "relative", display: "inline-flex" }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        type="button"
+        tabIndex={0}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((value) => !value);
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        aria-expanded={open}
+        aria-label={title}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 2,
+          fontSize: 9,
+          fontWeight: 600,
+          color,
+          background,
+          padding: "2px 6px",
+          borderRadius: 999,
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        +{trend}%
+      </button>
+
+      {open && (
+        <div
+          role="tooltip"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            right: 0,
+            bottom: "calc(100% + 8px)",
+            zIndex: 40,
+            background: "#FFFFFF",
+            border: "1px solid #EFEFEF",
+            borderRadius: 14,
+            padding: "14px 16px",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+            minWidth: 220,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+            {title}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {rows.map((row) => (
+              <div key={row.label}>
+                <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+                  {row.value}
+                </div>
+                <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 3, letterSpacing: "-0.01em" }}>{row.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
 function ReachStatPanel({
   reach,
   followers,
+  avgViews,
   lang,
 }: {
   reach: number;
   followers: number;
+  avgViews?: number;
   lang: "en" | "fr";
 }) {
-  const bars = reachTrendBars(reach, followers);
   const trend = reachTrendDelta(reach, followers);
+  const reachRatio = ((reach / Math.max(followers, 1)) * 100).toFixed(1);
 
   return (
     <div
@@ -1339,55 +1416,28 @@ function ReachStatPanel({
         border: "1px solid #EFEFEF",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
           {formatCount(reach)}
         </span>
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 2,
-            fontSize: 9,
-            fontWeight: 600,
-            color: "#0047FF",
-            background: "#EEF4FF",
-            padding: "2px 6px",
-            borderRadius: 999,
-          }}
-        >
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          +{trend}%
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 3,
-          height: 24,
-          marginBottom: 6,
-          borderBottom: "1px solid #F0F0F0",
-        }}
-      >
-        {bars.map((height, index) => {
-          const isLatest = index === bars.length - 1;
-          return (
-            <div
-              key={index}
-              style={{
-                flex: 1,
-                height: `${height * 100}%`,
-                minHeight: 4,
-                background: isLatest ? "#0047FF" : "#93B4FF",
-                borderRadius: "2px 2px 0 0",
-              }}
-            />
-          );
-        })}
+        <GrowthTrendBadge
+          trend={trend}
+          color="#0047FF"
+          background="#EEF4FF"
+          title={lang === "fr" ? "Détails portée" : "Reach details"}
+          rows={[
+            { label: lang === "fr" ? "Portée estimée" : "Estimated reach", value: formatCount(reach) },
+            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(followers) },
+            {
+              label: lang === "fr" ? "Ratio portée / abonnés" : "Reach / followers ratio",
+              value: `${reachRatio}%`,
+            },
+            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${trend}%` },
+            ...(avgViews && avgViews > 0
+              ? [{ label: lang === "fr" ? "Vues moyennes" : "Average views", value: formatCount(avgViews) }]
+              : []),
+          ]}
+        />
       </div>
 
       <div style={{ fontSize: 10, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
@@ -1397,9 +1447,18 @@ function ReachStatPanel({
   );
 }
 
-function EngagementStatPanel({ rate, lang }: { rate: number; lang: "en" | "fr" }) {
-  const bars = engagementTrendBars(rate);
+function EngagementStatPanel({
+  rate,
+  followers,
+  lang,
+}: {
+  rate: number;
+  followers: number;
+  lang: "en" | "fr";
+}) {
   const trend = engagementTrendDelta(rate);
+  const estInteractions = Math.max(Math.round((followers * rate) / 100), 0);
+  const estPerPost = Math.max(Math.round(estInteractions / 3), 0);
 
   return (
     <div
@@ -1410,55 +1469,28 @@ function EngagementStatPanel({ rate, lang }: { rate: number; lang: "en" | "fr" }
         border: "1px solid #EFEFEF",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
           {rate}%
         </span>
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 2,
-            fontSize: 9,
-            fontWeight: 600,
-            color: "#059669",
-            background: "#ECFDF5",
-            padding: "2px 6px",
-            borderRadius: 999,
-          }}
-        >
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          +{trend}%
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: 3,
-          height: 24,
-          marginBottom: 6,
-          borderBottom: "1px solid #F0F0F0",
-        }}
-      >
-        {bars.map((height, index) => {
-          const isLatest = index === bars.length - 1;
-          return (
-            <div
-              key={index}
-              style={{
-                flex: 1,
-                height: `${height * 100}%`,
-                minHeight: 4,
-                background: isLatest ? "#059669" : "#86EFAC",
-                borderRadius: "2px 2px 0 0",
-              }}
-            />
-          );
-        })}
+        <GrowthTrendBadge
+          trend={trend}
+          color="#059669"
+          background="#ECFDF5"
+          title={lang === "fr" ? "Détails engagement" : "Engagement details"}
+          rows={[
+            { label: lang === "fr" ? "Taux d'engagement" : "Engagement rate", value: `${rate}%` },
+            {
+              label: lang === "fr" ? "Interactions estimées" : "Estimated interactions",
+              value: formatCount(estInteractions),
+            },
+            {
+              label: lang === "fr" ? "Par publication (est.)" : "Per post (est.)",
+              value: formatCount(estPerPost),
+            },
+            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${trend}%` },
+          ]}
+        />
       </div>
 
       <div style={{ fontSize: 10, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
@@ -1610,8 +1642,8 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
             <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 3, letterSpacing: "-0.01em" }}>{stat.label}</div>
           </div>
         ))}
-        <ReachStatPanel reach={reachEstimate} followers={creator.followersCount} lang={lang} />
-        <EngagementStatPanel rate={creator.engagementRate} lang={lang} />
+        <ReachStatPanel reach={reachEstimate} followers={creator.followersCount} avgViews={creator.avgViews} lang={lang} />
+        <EngagementStatPanel rate={creator.engagementRate} followers={creator.followersCount} lang={lang} />
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

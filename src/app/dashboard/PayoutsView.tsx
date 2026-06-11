@@ -710,6 +710,41 @@ function creatorHasPayoutDetails(c: { paypal_link?: string; revolut_link?: strin
   return Boolean(c.paypal_link || c.revolut_link || c.iban);
 }
 
+type CompletedPayout = {
+  id: string;
+  creator_id: string | null;
+  amount: number;
+  status: string;
+  stripe_transfer_id: string | null;
+  paid_at: string | null;
+  created_at: string | null;
+  creator: {
+    handle?: string;
+    full_name?: string;
+    avatar_url?: string;
+    platform?: string;
+  } | null;
+};
+
+function payoutMethodLabel(transferId: string | null | undefined, lang: "en" | "fr") {
+  const id = String(transferId ?? "");
+  if (id.startsWith("manual_paypal")) return "PayPal";
+  if (id.startsWith("manual_revolut")) return "Revolut";
+  if (id.startsWith("manual_iban")) return "IBAN";
+  if (id.startsWith("tr_")) return "Stripe Connect";
+  if (id && !id.startsWith("manual_")) return "Stripe Connect";
+  return lang === "fr" ? "Manuel" : "Manual";
+}
+
+function formatPayoutDate(iso: string | null | undefined, lang: "en" | "fr") {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function OwedToCreatorsSummaryCard({
   lang,
   isMobile,
@@ -900,10 +935,14 @@ export function PayoutsView({
     openManage: openBillingPaymentManage,
   } = usePaymentMethods();
   const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
+  const [confirmPay, setConfirmPay] = useState<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
   const [fundAmount, setFundAmount] = useState("");
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
   const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
-  const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances">("overview");
+  const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances" | "history">("overview");
+  const [completedPayouts, setCompletedPayouts] = useState<CompletedPayout[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
   const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active">("none");
   const [connectLoading, setConnectLoading] = useState(false);
 
@@ -962,6 +1001,25 @@ export function PayoutsView({
       .catch(console.error);
   }, [userId]);
 
+  const loadCompletedPayouts = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await fetch("/api/payouts/history", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { payouts?: CompletedPayout[] };
+      setCompletedPayouts(Array.isArray(data.payouts) ? data.payouts : []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!userId) return;
+    void loadCompletedPayouts();
+  }, [userId]);
+
   const creatorsPendingPayout = useMemo(
     () => creators.filter((c) => (Number(c.balance) || 0) > 0),
     [creators]
@@ -974,6 +1032,19 @@ export function PayoutsView({
     const handle = String(c.handle || c.username || "").toLowerCase();
     return name.includes(q) || handle.includes(q);
   });
+
+  const historyQuery = historySearch.trim().toLowerCase();
+  const filteredCompletedPayouts = completedPayouts.filter((payout) => {
+    if (!historyQuery) return true;
+    const name = String(payout.creator?.full_name || payout.creator?.handle || "").toLowerCase();
+    const handle = String(payout.creator?.handle || "").toLowerCase();
+    return name.includes(historyQuery) || handle.includes(historyQuery);
+  });
+
+  const completedPayoutsTotal = completedPayouts.reduce(
+    (sum, payout) => sum + (Number(payout.amount) || 0),
+    0
+  );
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
     if (!canUseManualPayouts(plan as PlanTier)) {
@@ -1012,34 +1083,38 @@ export function PayoutsView({
         ? `Paiement de ${formatCurrency(amount, lang)} initié pour ${creator.full_name || creator.handle}.`
         : `Payment of ${formatCurrency(amount, lang)} started for ${creator.full_name || creator.handle}.`
     );
-    // Ask for confirmation that the transfer was actually completed,
-    // then record the payout in DB and reset the creator's balance.
+    // Open the Trackit confirmation modal once the user comes back
+    const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
     setTimeout(() => {
-      const done = window.confirm(
-        lang === "fr"
-          ? `Confirmation du paiement\n\nVirement de ${formatCurrency(amount, lang)} à ${creator.full_name || creator.handle}.\n\nOK : le paiement est enregistré et le solde du créateur est remis à zéro.\nAnnuler : aucune modification.`
-          : `Payment confirmation\n\n${formatCurrency(amount, lang)} transfer to ${creator.full_name || creator.handle}.\n\nOK: the payment is recorded and the creator's balance is reset.\nCancel: no changes.`
-      );
-      if (!done) return;
-      const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
-      void fetch("/api/payouts/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, creatorId: creator.id, amount, method }),
-      }).then(async (res) => {
-        const data = await res.json();
-        if (data.ok) {
-          setPayMessage(
-            lang === "fr"
-              ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
-              : `${formatCurrency(amount, lang)} marked as paid ✓`
-          );
-          window.location.reload();
-        } else {
-          alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
-        }
-      });
+      setConfirmPay({ creatorId: creator.id, name: creator.full_name || creator.handle || "creator", amount, method });
     }, 800);
+  };
+
+  const confirmManualPayout = async () => {
+    if (!confirmPay) return;
+    const { creatorId, amount, method } = confirmPay;
+    setConfirmPay(null);
+    const res = await fetch("/api/payouts/manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, creatorId, amount, method }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      setPayMessage(
+        lang === "fr"
+          ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
+          : `${formatCurrency(amount, lang)} marked as paid ✓`
+      );
+      setCreators((list) =>
+        list.map((c) =>
+          c.id === creatorId ? { ...c, balance: Math.max(0, Number(c.balance || 0) - amount) } : c
+        )
+      );
+      void loadCompletedPayouts();
+    } else {
+      alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
+    }
   };
 
 
@@ -1066,11 +1141,12 @@ export function PayoutsView({
           {[
             { id: "overview", label: lang === "fr" ? "Aperçu" : "Overview" },
             { id: "balances", label: lang === "fr" ? "Soldes des créateurs" : "Creator Balances" },
+            { id: "history", label: lang === "fr" ? "Paiements effectués" : "Completed payments" },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setPayoutsTab(tab.id as "overview" | "balances")}
+              onClick={() => setPayoutsTab(tab.id as "overview" | "balances" | "history")}
               style={{
                 padding: "10px 16px",
                 background: "none",
@@ -1153,7 +1229,7 @@ export function PayoutsView({
         <LiveSalesFeed isMobile={isMobile} />
 
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden", position: "relative" }}>
           {!canUseAutoPayouts(plan as PlanTier) && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
               <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
@@ -1164,70 +1240,84 @@ export function PayoutsView({
               </p>
             </div>
           )}
-          <div style={{ flex: 1, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Paiement automatique mensuel" : "Monthly auto payout"}</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement." : "On the 1st of every month, all creators with a positive balance are paid automatically."}</div>
+          <div style={{ padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ flex: 1, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
+                {lang === "fr" ? "Paiement automatique" : "Automatic payout"}
+              </div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                {lang === "fr"
+                  ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement."
+                  : "On the 1st of every month, all creators with a positive balance are paid automatically."}
+              </div>
+            </div>
+            <label style={{ cursor: canUseAutoPayouts(plan as PlanTier) ? "pointer" : "not-allowed", display: "flex", flexShrink: 0, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
+              <input
+                type="checkbox"
+                checked={autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier)}
+                disabled={!canUseAutoPayouts(plan as PlanTier)}
+                onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                  if (!canUseAutoPayouts(plan as PlanTier)) return;
+                  const val = e.target.checked;
+                  setAutoPayoutMonthly(val);
+                  const { supabase } = await import("@/lib/supabase");
+                  if (!supabase) return;
+                  await supabase.from("profiles").update({ auto_payout_monthly: val }).eq("id", userId);
+                }}
+                style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
+              />
+              <PayoutsToggle on={autoPayoutMonthly && canUseAutoPayouts(plan)} />
+            </label>
           </div>
-          <label style={{ cursor: canUseAutoPayouts(plan as PlanTier) ? "pointer" : "not-allowed", display: "flex", opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
-            <input
-              type="checkbox"
-              checked={autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier)}
-              disabled={!canUseAutoPayouts(plan as PlanTier)}
-              onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
-                if (!canUseAutoPayouts(plan as PlanTier)) return;
-                const val = e.target.checked;
-                setAutoPayoutMonthly(val);
-                const { supabase } = await import("@/lib/supabase");
-                if (!supabase) return;
-                await supabase.from("profiles").update({ auto_payout_monthly: val }).eq("id", userId);
-              }}
-              style={{ position: "absolute", opacity: 0, width: 0, height: 0 }}
-            />
-            <PayoutsToggle on={autoPayoutMonthly && canUseAutoPayouts(plan)} />
-          </label>
-        </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 20, display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
-          {!canUseStripeConnectPayouts(plan) && (
-            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
-                {lang === "fr" ? "Paiements auto Stripe Connect — Plan Scale. " : "Stripe Connect auto payouts — Scale plan. "}
-                <button type="button" onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                  {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
-                </button>
-              </p>
+          {autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier) && (
+            <div style={{ borderTop: "1px solid #EFEFEF", padding: "16px 20px 20px", background: "#FAFAFA" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                    {lang === "fr" ? "Stripe Connect" : "Stripe Connect"}
+                  </div>
+                  <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+                    {lang === "fr"
+                      ? "Versez automatiquement vos créateurs via Stripe Connect dès qu'une commission est due."
+                      : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
+                  </div>
+                  {!canUseStripeConnectPayouts(plan) && (
+                    <p style={{ fontSize: 13, color: "#7A7A7A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
+                      {lang === "fr" ? "Disponible sur le plan Scale. " : "Available on the Scale plan. "}
+                      <button
+                        type="button"
+                        onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()}
+                        style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+                      >
+                        {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
+                      </button>
+                    </p>
+                  )}
+                </div>
+                <div style={{ flexShrink: 0, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
+                  {connectStatus === "active" ? (
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                      {lang === "fr" ? "✓ Connecté" : "✓ Connected"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="hero-cta-shopify hero-cta-compact"
+                      disabled={!canUseStripeConnectPayouts(plan) || connectLoading}
+                      onClick={handleConnectStripe}
+                    >
+                      {connectLoading
+                        ? (lang === "fr" ? "Chargement…" : "Loading…")
+                        : connectStatus === "pending"
+                          ? (lang === "fr" ? "Terminer la configuration" : "Finish setup")
+                          : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
-          <div style={{ flex: 1, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
-              {lang === "fr" ? "Paiements automatiques (Stripe Connect)" : "Automatic payouts (Stripe Connect)"}
-            </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-              {lang === "fr"
-                ? "Versez automatiquement vos créateurs via Stripe Connect dès qu'une commission est due."
-                : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
-            </div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
-            {connectStatus === "active" ? (
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "✓ Connecté" : "✓ Connected"}
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="hero-cta-shopify hero-cta-compact"
-                disabled={!canUseStripeConnectPayouts(plan) || connectLoading}
-                onClick={handleConnectStripe}
-              >
-                {connectLoading
-                  ? (lang === "fr" ? "Chargement…" : "Loading…")
-                  : connectStatus === "pending"
-                  ? (lang === "fr" ? "Terminer la configuration" : "Finish setup")
-                  : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
-              </button>
-            )}
-          </div>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
@@ -1478,6 +1568,7 @@ export function PayoutsView({
                         const r = await fetch(`/api/creators-list?userId=${userId}`);
                         const list = await r.json();
                         if (Array.isArray(list)) setCreators(list);
+                        void loadCompletedPayouts();
                         setSelectedCreatorPayout(null);
                       } else {
                         alert(data.error || "Payout failed");
@@ -1543,6 +1634,129 @@ export function PayoutsView({
         </>
         )}
 
+        {payoutsTab === "history" && (
+        <>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+          <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+              {lang === "fr" ? "Paiements effectués" : "Completed payments"}
+            </div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 14 }}>
+              {completedPayouts.length === 0
+                ? (lang === "fr" ? "Aucun paiement enregistré pour le moment" : "No payments recorded yet")
+                : lang === "fr"
+                  ? `${completedPayouts.length} paiement${completedPayouts.length > 1 ? "s" : ""} · ${formatCurrency(completedPayoutsTotal, lang)} versés au total`
+                  : `${completedPayouts.length} payment${completedPayouts.length > 1 ? "s" : ""} · ${formatCurrency(completedPayoutsTotal, lang)} paid in total`}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
+              <input
+                type="text"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder={lang === "fr" ? "Rechercher par nom ou pseudo..." : "Search by name or handle..."}
+                style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {historyLoading ? (
+              <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
+                {lang === "fr" ? "Chargement…" : "Loading…"}
+              </div>
+            ) : filteredCompletedPayouts.length === 0 ? (
+              <div style={{ padding: 48, textAlign: "center" }}>
+                <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+                  {completedPayouts.length === 0
+                    ? (lang === "fr" ? "Vos paiements confirmés apparaîtront ici" : "Your confirmed payments will appear here")
+                    : (lang === "fr" ? "Aucun paiement ne correspond à votre recherche" : "No payments match your search")}
+                </div>
+                {completedPayouts.length === 0 && (
+                  <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                    {lang === "fr"
+                      ? "PayPal, Revolut, IBAN et Stripe Connect sont enregistrés automatiquement."
+                      : "PayPal, Revolut, IBAN and Stripe Connect payouts are recorded automatically."}
+                  </div>
+                )}
+              </div>
+            ) : (
+              filteredCompletedPayouts.map((payout, i) => {
+                const creatorName = payout.creator?.full_name || payout.creator?.handle || (lang === "fr" ? "Créateur" : "Creator");
+                const creatorHandle = payout.creator?.handle || "";
+                const method = payoutMethodLabel(payout.stripe_transfer_id, lang);
+                return (
+                  <div
+                    key={payout.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 14,
+                      width: "100%",
+                      padding: "16px 20px",
+                      borderBottom: i < filteredCompletedPayouts.length - 1 ? "1px solid #F5F5F5" : "none",
+                      background: "#FFFFFF",
+                    }}
+                  >
+                    <CreatorAvatar src={payout.creator?.avatar_url} size={44} alt={creatorName} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+                        {creatorName}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 3 }}>
+                        {creatorHandle ? `@${creatorHandle}` : "—"}
+                        {payout.creator?.platform ? ` · ${payout.creator.platform}` : ""}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", marginTop: 4 }}>
+                        {formatPayoutDate(payout.paid_at || payout.created_at, lang)}
+                        {" · "}
+                        {method}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                        {formatCurrency(Number(payout.amount) || 0, lang)}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                        {lang === "fr" ? "Payé" : "Paid"}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+        </>
+        )}
+
+      {confirmPay && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setConfirmPay(null)}>
+          <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+              alt="Trackit"
+              style={{ height: 96, width: "auto", display: "block", margin: "0 auto 20px", objectFit: "contain" }}
+            />
+            <h3 style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+              {lang === "fr" ? "Confirmation du paiement" : "Payment confirmation"}
+            </h3>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 6px", lineHeight: 1.5 }}>
+              {lang === "fr" ? "Virement de" : "Transfer of"} <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong> {lang === "fr" ? "à" : "to"} <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+            </p>
+            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
+              {lang === "fr" ? "En confirmant, le paiement est enregistré et le solde du créateur est remis à zéro." : "By confirming, the payment is recorded and the creator's balance is reset."}
+            </p>
+            <button type="button" onClick={() => void confirmManualPayout()} style={{ width: "100%", padding: "13px 0", background: "#1A1A1A", color: "#FFFFFF", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
+              {lang === "fr" ? "Virement effectué ✓" : "Transfer completed ✓"}
+            </button>
+            <button type="button" onClick={() => setConfirmPay(null)} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              {lang === "fr" ? "Annuler" : "Cancel"}
+            </button>
+          </div>
+        </div>
+      )}
       {payoutModal === "addFunds" && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
           <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
