@@ -679,7 +679,6 @@ function OutreachAIGeneratePanel({
     } catch {
       /* clipboard may be unavailable */
     }
-    console.log("[DEBUG] handleSend: calling onMarkSent (before window.open)");
     // Log the outreach FIRST so the insert completes before we hand off focus
     await onMarkSent({
       id: "",
@@ -1249,10 +1248,9 @@ export function OutreachHistorySection({
     message: string,
     followUpDate?: string | null
   ) => {
-    if (!supabase) { console.error("[DEBUG] logOutreach: supabase client is NULL"); return; }
+    if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { console.error("[DEBUG] logOutreach: NO USER from auth.getUser()"); return; }
-    console.log("[DEBUG] logOutreach: user OK", user.id);
+    if (!user) return;
     const handle = (creator.username || creator.handle || "").replace(/^@/, "");
     appendStoredOutreachEntry(user.id, {
       creator_username: handle,

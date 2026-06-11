@@ -706,6 +706,127 @@ function CreatorPayoutMethodFields({
   );
 }
 
+function creatorHasPayoutDetails(c: { paypal_link?: string; revolut_link?: string; iban?: string }) {
+  return Boolean(c.paypal_link || c.revolut_link || c.iban);
+}
+
+function OwedToCreatorsSummaryCard({
+  lang,
+  isMobile,
+  balance,
+  creators,
+  autoPayoutMonthly,
+}: {
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  balance: number;
+  creators: { balance?: number; total_earned?: number; total_sales?: number; paypal_link?: string; revolut_link?: string; iban?: string }[];
+  autoPayoutMonthly: boolean;
+}) {
+  const pending = creators.filter((c) => (Number(c.balance) || 0) > 0);
+  const readyCount = pending.filter(creatorHasPayoutDetails).length;
+  const missingCount = pending.length - readyCount;
+  const totalEarned = creators.reduce((sum, c) => sum + (Number(c.total_earned) || 0), 0);
+  const totalSales = creators.reduce((sum, c) => sum + (Number(c.total_sales) || 0), 0);
+  const totalPaid = Math.max(totalEarned - balance, 0);
+
+  const nextPayoutLabel = (() => {
+    if (!autoPayoutMonthly) return lang === "fr" ? "Manuel" : "Manual";
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return next.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
+  })();
+
+  const subtitle =
+    balance <= 0
+      ? lang === "fr"
+        ? "Tous les soldes sont à jour"
+        : "All balances are settled"
+      : lang === "fr"
+        ? `${pending.length} créateur${pending.length > 1 ? "s" : ""} en attente · ${readyCount} prêt${readyCount > 1 ? "s" : ""} à payer`
+        : `${pending.length} creator${pending.length > 1 ? "s" : ""} pending · ${readyCount} ready to pay`;
+
+  const stat = (label: string, value: string) => (
+    <div>
+      <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>{value}</div>
+      <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{label}</div>
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        background: "#0047FF",
+        color: "#FFFFFF",
+        borderRadius: 16,
+        padding: 28,
+        flex: isMobile ? undefined : 1.4,
+        width: isMobile ? "100%" : undefined,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        textAlign: "left",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, marginBottom: 6 }}>
+        <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "À verser aux créateurs" : "Owed to creators"}
+        </div>
+        {pending.length > 0 && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
+              background: "rgba(255,255,255,0.16)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              borderRadius: 999,
+              padding: "3px 10px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {lang === "fr"
+              ? `${pending.length} en attente`
+              : `${pending.length} pending`}
+          </span>
+        )}
+      </div>
+
+      <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1 }}>
+        {formatCurrency(balance, lang)}
+      </div>
+
+      <div style={{ fontSize: 13, opacity: 0.88, marginTop: 10, letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+        {subtitle}
+      </div>
+
+      {missingCount > 0 && (
+        <div style={{ fontSize: 12, opacity: 0.82, marginTop: 6, letterSpacing: "-0.01em" }}>
+          {lang === "fr"
+            ? `${missingCount} créateur${missingCount > 1 ? "s" : ""} sans coordonnées de paiement`
+            : `${missingCount} creator${missingCount > 1 ? "s" : ""} missing payment details`}
+        </div>
+      )}
+
+      <div style={{ width: "100%", height: 1, background: "rgba(255,255,255,0.18)", margin: "18px 0 16px" }} />
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+          gap: "16px 24px",
+          width: "100%",
+        }}
+      >
+        {stat(lang === "fr" ? "Commissions totales" : "Total commissions", formatCurrency(totalEarned, lang))}
+        {stat(lang === "fr" ? "Déjà versé" : "Already paid", formatCurrency(totalPaid, lang))}
+        {stat(lang === "fr" ? "Ventes trackées" : "Tracked sales", String(totalSales))}
+        {stat(lang === "fr" ? "Prochain versement" : "Next payout", nextPayoutLabel)}
+      </div>
+    </div>
+  );
+}
+
 function PayoutsPageHeader({ title, subtitle, isMobile }: { title: string; subtitle?: string; isMobile?: boolean }) {
   return (
     <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
@@ -1017,12 +1138,13 @@ export function PayoutsView({
         {payoutsTab === "overview" && (
         <>
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20, marginBottom: 20 }}>
-          <div style={{ background: "#0047FF", color: "#FFFFFF", borderRadius: 16, padding: 28, flex: isMobile ? undefined : 1.4, width: isMobile ? "100%" : undefined, display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
-            <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "À verser aux créateurs" : "Owed to creators"}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1 }}>{formatCurrency(balance, lang)}</div>
-            </div>
-          </div>
+          <OwedToCreatorsSummaryCard
+            lang={lang}
+            isMobile={isMobile}
+            balance={balance}
+            creators={creators}
+            autoPayoutMonthly={autoPayoutMonthly}
+          />
           <div style={{ width: isMobile ? "100%" : undefined, flex: isMobile ? undefined : 1 }}>
             <PayoutsWorkspacePaymentCard />
           </div>
