@@ -891,6 +891,34 @@ export function PayoutsView({
         ? `Paiement de ${formatCurrency(amount, lang)} initié pour ${creator.full_name || creator.handle}.`
         : `Payment of ${formatCurrency(amount, lang)} started for ${creator.full_name || creator.handle}.`
     );
+    // Ask for confirmation that the transfer was actually completed,
+    // then record the payout in DB and reset the creator's balance.
+    setTimeout(() => {
+      const done = window.confirm(
+        lang === "fr"
+          ? `Avez-vous bien effectué le virement de ${formatCurrency(amount, lang)} à ${creator.full_name || creator.handle} ?\n\nOK = marquer comme payé (solde remis à zéro)`
+          : `Did you complete the ${formatCurrency(amount, lang)} transfer to ${creator.full_name || creator.handle}?\n\nOK = mark as paid (balance reset)`
+      );
+      if (!done) return;
+      const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
+      void fetch("/api/payouts/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, creatorId: creator.id, amount, method }),
+      }).then(async (res) => {
+        const data = await res.json();
+        if (data.ok) {
+          setPayMessage(
+            lang === "fr"
+              ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
+              : `${formatCurrency(amount, lang)} marked as paid ✓`
+          );
+          window.location.reload();
+        } else {
+          alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
+        }
+      });
+    }, 800);
   };
 
   const openAddFunds = () => {
