@@ -10,12 +10,9 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Per-niche curation targets. Edit these numbers as you grow.
-const NICHE_TARGETS: Record<string, number> = {
-  food: 50, beauty: 80, fitness: 60, fashion: 80, lifestyle: 60,
-  tech: 40, gaming: 50, travel: 40, family: 40, pets: 30,
-};
-const DEFAULT_TARGET = 50;
+// Official Trackit niches (from the discovery dropdown). Only these are tracked.
+const OFFICIAL_NICHES = ["fitness", "fashion", "beauty", "tech", "food", "travel"];
+const TARGET_PER_NICHE = 100;
 
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -25,21 +22,20 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabaseAdmin
     .from("creators_index")
-    .select("niches, platform, followers, language");
+    .select("niches, platform, followers");
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   const rows = data || [];
   const total = rows.length;
+  // Total curated = distinct creators carrying the "curated" tag.
   const curated = rows.filter(r => (r.niches || []).includes("curated")).length;
 
-  const byPlatform: Record<string, number> = {};
+  // Per niche: same logic as the reference SQL (unnest of niches).
+  // A creator tagged ["curated","fitness"] counts in fitness; counted in each of its niches.
   const nicheCounts: Record<string, { total: number; curated: number; min: number; max: number; under10k: number; from10kto100k: number; over100k: number }> = {};
 
   for (const r of rows) {
-    const p = r.platform || "unknown";
-    byPlatform[p] = (byPlatform[p] || 0) + 1;
-
     const f = Number(r.followers) || 0;
     const isCur = (r.niches || []).includes("curated");
     for (const n of (r.niches || [])) {
@@ -56,19 +52,10 @@ export async function GET(request: Request) {
     }
   }
 
-  const niches = Object.entries(nicheCounts)
-    .map(([niche, c]) => ({
-      niche,
-      ...c,
-      target: NICHE_TARGETS[niche] ?? DEFAULT_TARGET,
-    }))
-    .sort((a, b) => b.total - a.total);
+  const niches = OFFICIAL_NICHES.map(niche => {
+    const c = nicheCounts[niche] || { total: 0, curated: 0, min: 0, max: 0, under10k: 0, from10kto100k: 0, over100k: 0 };
+    return { niche, ...c, target: TARGET_PER_NICHE };
+  }).sort((a, b) => a.curated - b.curated);
 
-  return NextResponse.json({
-    ok: true,
-    total,
-    curated,
-    byPlatform,
-    niches,
-  });
+  return NextResponse.json({ ok: true, total, curated, niches });
 }
