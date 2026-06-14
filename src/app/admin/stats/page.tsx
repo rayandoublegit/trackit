@@ -2,40 +2,25 @@
 
 import { useMemo, useState } from "react";
 
-type NicheStat = {
+type NicheRow = {
   niche: string;
   total: number;
   curated: number;
   target: number;
-  min: number;
-  max: number;
-  under10k: number;
-  from10kto100k: number;
-  over100k: number;
 };
 
-type StatsResponse = {
-  ok: boolean;
-  error?: string;
-  total?: number;
-  curated?: number;
-  byPlatform?: Record<string, number>;
-  niches?: NicheStat[];
+type StatsData = {
+  total: number;
+  curated: number;
+  niches: NicheRow[];
 };
 
-function formatCompact(n: number): string {
-  if (!Number.isFinite(n)) return "0";
-  if (n >= 1_000_000) {
-    const v = n / 1_000_000;
-    const s = v % 1 === 0 ? String(v) : v.toFixed(1);
-    return `${s.replace(".", ",")}M`;
-  }
-  if (n >= 10_000) {
-    const v = n / 1_000;
-    const s = v % 1 === 0 ? String(v) : v.toFixed(1);
-    return `${s.replace(".", ",")}k`;
-  }
-  return n.toLocaleString("fr-FR");
+function barColor(curated: number, target: number): string {
+  if (curated === 0) return "#e53935";
+  if (target <= 0) return "#fb8c00";
+  const ratio = curated / target;
+  if (ratio < 0.5) return "#fb8c00";
+  return "#43a047";
 }
 
 export default function AdminStatsPage() {
@@ -43,34 +28,39 @@ export default function AdminStatsPage() {
   const [pseudo, setPseudo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [data, setData] = useState<StatsData | null>(null);
 
-  const sortedNiches = useMemo(() => {
-    if (!stats?.niches) return [];
-    return [...stats.niches].sort((a, b) => b.total - a.total);
-  }, [stats]);
-
-  const platforms = useMemo(() => {
-    if (!stats?.byPlatform) return [];
-    return Object.entries(stats.byPlatform).sort((a, b) => b[1] - a[1]);
-  }, [stats]);
+  const niches = useMemo(() => {
+    if (!data) return [];
+    return [...data.niches].sort((a, b) => a.curated - b.curated);
+  }, [data]);
 
   const loadStats = async () => {
     setLoading(true);
     setError("");
+    setData(null);
     try {
       const res = await fetch("/api/admin/stats", {
-        headers: { Authorization: `Bearer ${secret}` },
+        method: "GET",
+        headers: { Authorization: `Bearer ${secret.trim()}` },
+        cache: "no-store",
       });
-      const data: StatsResponse = await res.json();
-      if (!data.ok) {
-        setStats(null);
-        setError(data.error || "Échec du chargement");
+      const json = await res.json();
+      if (!json.ok) {
+        setError(json.error || "Accès refusé");
         return;
       }
-      setStats(data);
+      setData({
+        total: Number(json.total) || 0,
+        curated: Number(json.curated) || 0,
+        niches: (Array.isArray(json.niches) ? json.niches : []).map((n: NicheRow) => ({
+          niche: String(n.niche),
+          total: Number(n.total) || 0,
+          curated: Number(n.curated) || 0,
+          target: Number(n.target) || 0,
+        })),
+      });
     } catch (e) {
-      setStats(null);
       setError(String(e));
     } finally {
       setLoading(false);
@@ -91,16 +81,14 @@ export default function AdminStatsPage() {
 
   return (
     <div style={{ maxWidth: 560, margin: "40px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Stats créateurs</h1>
+      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Curation</h1>
       <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
-        Vue d&apos;ensemble de la base créateurs et de la curation par niche.
+        Où en est-on ? Les niches en haut = celles où il faut curer en priorité.
       </p>
 
-      {pseudo.trim() && (
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: "#111" }}>
-          Salut {pseudo.trim()} 👋
-        </div>
-      )}
+      {pseudo.trim() ? (
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Salut {pseudo.trim()}</div>
+      ) : null}
 
       <label style={label}>Admin secret</label>
       <input
@@ -116,7 +104,7 @@ export default function AdminStatsPage() {
         style={{ ...field, marginBottom: 16 }}
         value={pseudo}
         onChange={(e) => setPseudo(e.target.value)}
-        placeholder="ton prénom ou pseudo"
+        placeholder="ton prénom"
       />
 
       <button
@@ -135,126 +123,63 @@ export default function AdminStatsPage() {
           marginBottom: 16,
         }}
       >
-        {loading ? "Chargement…" : "Charger les stats"}
+        {loading ? "Chargement…" : "Voir les stats"}
       </button>
 
-      {error && (
-        <div style={{ fontSize: 13, color: "#c00", marginBottom: 16 }}>{error}</div>
-      )}
+      {error ? <div style={{ fontSize: 13, color: "#c00", marginBottom: 16 }}>{error}</div> : null}
 
-      {stats?.ok && (
+      {data ? (
         <>
-          <div
-            style={{
-              border: "1px solid #eee",
-              borderRadius: 12,
-              padding: 16,
-              marginBottom: 14,
-              background: "#fff",
-            }}
-          >
-            <div style={{ fontSize: 12, color: "#999", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-              Vue globale
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, marginBottom: 8 }}>
+              {data.total.toLocaleString("fr-FR")} créateurs dans la base
             </div>
-            <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "#111" }}>{formatCompact(stats.total ?? 0)}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>créateurs total</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: "#0047FF" }}>{formatCompact(stats.curated ?? 0)}</div>
-                <div style={{ fontSize: 12, color: "#666" }}>curated</div>
-              </div>
+            <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, color: "#0047FF" }}>
+              {data.curated.toLocaleString("fr-FR")} curated
             </div>
-            {platforms.length > 0 && (
-              <>
-                <div style={{ fontSize: 11, color: "#777", marginBottom: 8 }}>Par plateforme</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {platforms.map(([platform, count]) => (
-                    <span
-                      key={platform}
-                      style={{
-                        fontSize: 12,
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        background: "#f5f5f5",
-                        border: "1px solid #eee",
-                        color: "#333",
-                      }}
-                    >
-                      {platform} · {formatCompact(count)}
-                    </span>
-                  ))}
-                </div>
-              </>
-            )}
           </div>
 
-          {sortedNiches.map((n) => {
-            const pct = n.target > 0 ? Math.min(100, (n.total / n.target) * 100) : 0;
-            return (
-              <div
-                key={n.niche}
-                style={{
-                  border: "1px solid #eee",
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 14,
-                  background: "#fafafa",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: "#111", textTransform: "capitalize" }}>
-                    {n.niche}
-                  </div>
-                  <div style={{ fontSize: 13, color: "#666" }}>
-                    {n.total}/{n.target}
-                    {n.curated > 0 && (
-                      <span style={{ color: "#0047FF", marginLeft: 6 }}>· {n.curated} curated</span>
-                    )}
-                  </div>
-                </div>
-
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {niches.map((n) => {
+              const pct = n.target > 0 ? Math.min(100, (n.curated / n.target) * 100) : 0;
+              const color = barColor(n.curated, n.target);
+              return (
                 <div
+                  key={n.niche}
                   style={{
-                    height: 8,
-                    borderRadius: 999,
-                    background: "#e8e8e8",
-                    overflow: "hidden",
-                    marginBottom: 12,
+                    border: "1px solid #eee",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    background: "#fff",
                   }}
                 >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${pct}%`,
-                      borderRadius: 999,
-                      background: pct >= 100 ? "#1a7f37" : "#0047FF",
-                      transition: "width 0.3s ease",
-                    }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <div style={{ flex: 1, fontSize: 15, fontWeight: 600, textTransform: "capitalize" }}>
+                      {n.niche}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {n.curated} / {n.target} curated
+                    </div>
+                    <div style={{ fontSize: 11, color: "#999", whiteSpace: "nowrap" }}>
+                      {n.total.toLocaleString("fr-FR")} scrapés
+                    </div>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 999, background: "#eee", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${pct}%`,
+                        borderRadius: 999,
+                        background: color,
+                      }}
+                    />
+                  </div>
                 </div>
-
-                <div style={{ fontSize: 11, color: "#777", marginBottom: 6 }}>Followers</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
-                  <span style={{ fontSize: 12, color: "#444" }}>
-                    &lt;10k · {n.under10k}
-                  </span>
-                  <span style={{ fontSize: 12, color: "#444" }}>
-                    10k–100k · {n.from10kto100k}
-                  </span>
-                  <span style={{ fontSize: 12, color: "#444" }}>
-                    &gt;100k · {n.over100k}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: "#888" }}>
-                  Fourchette {formatCompact(n.min)} – {formatCompact(n.max)}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </>
-      )}
+      ) : null}
     </div>
   );
 }
