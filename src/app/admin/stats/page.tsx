@@ -2,25 +2,56 @@
 
 import { useMemo, useState } from "react";
 
-type NicheRow = {
+const NICHE_OPTIONS = [
+  { value: "fitness", label: "Fitness", emoji: "🏋️" },
+  { value: "fashion", label: "Fashion", emoji: "👗" },
+  { value: "beauty", label: "Beauty", emoji: "💄" },
+  { value: "tech", label: "Tech", emoji: "📱" },
+  { value: "food", label: "Food", emoji: "🍴" },
+  { value: "travel", label: "Travel", emoji: "✈️" },
+] as const;
+
+type NicheStat = {
   niche: string;
   total: number;
   curated: number;
   target: number;
+  min: number;
+  max: number;
+  under10k: number;
+  from10kto100k: number;
+  over100k: number;
 };
 
 type StatsData = {
   total: number;
   curated: number;
-  niches: NicheRow[];
+  niches: NicheStat[];
 };
 
-function barColor(curated: number, target: number): string {
-  if (curated === 0) return "#e53935";
-  if (target <= 0) return "#fb8c00";
-  const ratio = curated / target;
-  if (ratio < 0.5) return "#fb8c00";
-  return "#43a047";
+function formatCompact(n: number): string {
+  if (!Number.isFinite(n)) return "0";
+  if (n >= 1_000_000) {
+    const v = n / 1_000_000;
+    const s = v % 1 === 0 ? String(v) : v.toFixed(1);
+    return `${s.replace(".", ",")}M`;
+  }
+  if (n >= 10_000) {
+    const v = n / 1_000;
+    const s = v % 1 === 0 ? String(v) : v.toFixed(1);
+    return `${s.replace(".", ",")}k`;
+  }
+  return n.toLocaleString("fr-FR");
+}
+
+function nicheMeta(value: string) {
+  return NICHE_OPTIONS.find((o) => o.value === value) ?? { value, label: value, emoji: "📌" };
+}
+
+function statusBadge(curated: number): { label: string; bg: string; color: string } {
+  if (curated === 0) return { label: "À FAIRE", bg: "#fdecea", color: "#c62828" };
+  if (curated < 50) return { label: "EN COURS", bg: "#fff3e0", color: "#e65100" };
+  return { label: "BIEN", bg: "#e8f5e9", color: "#2e7d32" };
 }
 
 export default function AdminStatsPage() {
@@ -28,17 +59,35 @@ export default function AdminStatsPage() {
   const [pseudo, setPseudo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
   const [data, setData] = useState<StatsData | null>(null);
+  const [selectedNiche, setSelectedNiche] = useState("");
 
-  const niches = useMemo(() => {
-    if (!data) return [];
-    return [...data.niches].sort((a, b) => a.curated - b.curated);
+  const curationRate = useMemo(() => {
+    if (!data || data.total === 0) return 0;
+    return Math.round((data.curated / data.total) * 100);
   }, [data]);
 
-  const loadStats = async () => {
+  const selected = useMemo(() => {
+    if (!selectedNiche || !data) return null;
+    const found = data.niches.find((n) => n.niche === selectedNiche);
+    if (found) return found;
+    return {
+      niche: selectedNiche,
+      total: 0,
+      curated: 0,
+      target: 100,
+      min: 0,
+      max: 0,
+      under10k: 0,
+      from10kto100k: 0,
+      over100k: 0,
+    };
+  }, [data, selectedNiche]);
+
+  const unlock = async () => {
     setLoading(true);
     setError("");
-    setData(null);
     try {
       const res = await fetch("/api/admin/stats", {
         method: "GET",
@@ -47,139 +96,267 @@ export default function AdminStatsPage() {
       });
       const json = await res.json();
       if (!json.ok) {
-        setError(json.error || "Accès refusé");
+        setUnlocked(false);
+        setData(null);
+        setError("Accès refusé");
         return;
       }
       setData({
         total: Number(json.total) || 0,
         curated: Number(json.curated) || 0,
-        niches: (Array.isArray(json.niches) ? json.niches : []).map((n: NicheRow) => ({
+        niches: (Array.isArray(json.niches) ? json.niches : []).map((n: NicheStat) => ({
           niche: String(n.niche),
           total: Number(n.total) || 0,
           curated: Number(n.curated) || 0,
-          target: Number(n.target) || 0,
+          target: Number(n.target) || 100,
+          min: Number(n.min) || 0,
+          max: Number(n.max) || 0,
+          under10k: Number(n.under10k) || 0,
+          from10kto100k: Number(n.from10kto100k) || 0,
+          over100k: Number(n.over10k) || 0,
         })),
       });
+      setUnlocked(true);
+      setSelectedNiche("");
     } catch (e) {
+      setUnlocked(false);
+      setData(null);
       setError(String(e));
     } finally {
       setLoading(false);
     }
   };
 
+  const card: React.CSSProperties = {
+    background: "#fff",
+    borderRadius: 18,
+    padding: "20px 22px",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+    border: "1px solid rgba(0,0,0,0.04)",
+  };
+
   const field: React.CSSProperties = {
     width: "100%",
-    padding: "8px 10px",
-    marginBottom: 8,
-    border: "1px solid #ddd",
-    borderRadius: 8,
+    padding: "10px 12px",
+    border: "1px solid #e5e5e5",
+    borderRadius: 10,
     fontSize: 14,
     fontFamily: "inherit",
     boxSizing: "border-box",
+    background: "#fff",
   };
-  const label: React.CSSProperties = { fontSize: 11, color: "#777", marginBottom: 3, display: "block" };
 
   return (
-    <div style={{ maxWidth: 560, margin: "40px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Curation</h1>
-      <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
-        Où en est-on ? Les niches en haut = celles où il faut curer en priorité.
-      </p>
-
-      {pseudo.trim() ? (
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Salut {pseudo.trim()}</div>
-      ) : null}
-
-      <label style={label}>Admin secret</label>
-      <input
-        style={field}
-        type="password"
-        value={secret}
-        onChange={(e) => setSecret(e.target.value)}
-        placeholder="admin secret"
-      />
-
-      <label style={label}>Pseudo (optionnel)</label>
-      <input
-        style={{ ...field, marginBottom: 16 }}
-        value={pseudo}
-        onChange={(e) => setPseudo(e.target.value)}
-        placeholder="ton prénom"
-      />
-
-      <button
-        onClick={loadStats}
-        disabled={loading}
-        style={{
-          width: "100%",
-          padding: "12px",
-          background: loading ? "#999" : "#0047FF",
-          color: "#fff",
-          border: "none",
-          borderRadius: 8,
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: loading ? "default" : "pointer",
-          marginBottom: 16,
-        }}
-      >
-        {loading ? "Chargement…" : "Voir les stats"}
-      </button>
-
-      {error ? <div style={{ fontSize: 13, color: "#c00", marginBottom: 16 }}>{error}</div> : null}
-
-      {data ? (
-        <>
-          <div style={{ marginBottom: 28 }}>
-            <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, marginBottom: 8 }}>
-              {data.total.toLocaleString("fr-FR")} créateurs dans la base
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.2, color: "#0047FF" }}>
-              {data.curated.toLocaleString("fr-FR")} curated
-            </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#F7F7F8",
+        fontFamily: "system-ui, -apple-system, sans-serif",
+        letterSpacing: "-0.02em",
+      }}
+    >
+      <div style={{ maxWidth: 640, margin: "0 auto", padding: "32px 20px 48px" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="/icon.png" alt="Trackit" width={48} height={48} style={{ borderRadius: 12 }} />
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#111" }}>Curation Dashboard</h1>
           </div>
+          {pseudo.trim() ? (
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#333", whiteSpace: "nowrap" }}>
+              Salut {pseudo.trim()} 👋
+            </div>
+          ) : (
+            <input
+              style={{ ...field, width: 140, marginBottom: 0 }}
+              value={pseudo}
+              onChange={(e) => setPseudo(e.target.value)}
+              placeholder="Pseudo"
+            />
+          )}
+        </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {niches.map((n) => {
-              const pct = n.target > 0 ? Math.min(100, (n.curated / n.target) * 100) : 0;
-              const color = barColor(n.curated, n.target);
-              return (
-                <div
-                  key={n.niche}
-                  style={{
-                    border: "1px solid #eee",
-                    borderRadius: 10,
-                    padding: "12px 14px",
-                    background: "#fff",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                    <div style={{ flex: 1, fontSize: 15, fontWeight: 600, textTransform: "capitalize" }}>
-                      {n.niche}
+        {/* Lock screen */}
+        {!unlocked ? (
+          <div style={card}>
+            <label style={{ fontSize: 12, color: "#888", marginBottom: 6, display: "block" }}>Secret admin</label>
+            <input
+              style={{ ...field, marginBottom: 12 }}
+              type="password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="••••••••"
+            />
+            <button
+              onClick={unlock}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: loading ? "#999" : "#0047FF",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: loading ? "default" : "pointer",
+              }}
+            >
+              {loading ? "Vérification…" : "Débloquer"}
+            </button>
+            {error ? <div style={{ marginTop: 12, fontSize: 13, color: "#c62828" }}>{error}</div> : null}
+          </div>
+        ) : (
+          <>
+            {/* Global stats */}
+            {data && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 24 }}>
+                <div style={card}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#111" }}>{formatCompact(data.total)}</div>
+                  <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>créateurs scrapés</div>
+                </div>
+                <div style={card}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#0047FF" }}>{formatCompact(data.curated)}</div>
+                  <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>curés au total</div>
+                </div>
+                <div style={card}>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: "#111" }}>{curationRate}%</div>
+                  <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>taux de curation</div>
+                </div>
+              </div>
+            )}
+
+            {/* Niche dropdown */}
+            <div style={{ marginBottom: 20 }}>
+              <select
+                value={selectedNiche}
+                onChange={(e) => setSelectedNiche(e.target.value)}
+                style={{
+                  ...field,
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                  color: selectedNiche ? "#111" : "#888",
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M1 1l5 5 5-5'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 14px center",
+                  paddingRight: 36,
+                }}
+              >
+                <option value="">Choisir une niche…</option>
+                {NICHE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Placeholder or detail */}
+            {!selectedNiche ? (
+              <div
+                style={{
+                  ...card,
+                  textAlign: "center",
+                  padding: "48px 24px",
+                  color: "#aaa",
+                  fontSize: 15,
+                }}
+              >
+                ← Choisis une niche pour voir le détail
+              </div>
+            ) : selected ? (
+              (() => {
+                const meta = nicheMeta(selected.niche);
+                const badge = statusBadge(selected.curated);
+                const target = selected.target || 100;
+                const pct = Math.min(100, (selected.curated / target) * 100);
+                const remaining = Math.max(0, target - selected.curated);
+                const notCurated = selected.total - selected.curated;
+
+                return (
+                  <div style={card}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                      <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: "#111" }}>
+                        {meta.emoji} {meta.label}
+                      </h2>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "5px 10px",
+                          borderRadius: 999,
+                          background: badge.bg,
+                          color: badge.color,
+                          letterSpacing: "0.04em",
+                        }}
+                      >
+                        {badge.label}
+                      </span>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {n.curated} / {n.target} curated
+
+                    <div style={{ fontSize: 36, fontWeight: 700, color: "#111", marginBottom: 12 }}>
+                      {selected.curated} / {target} curés
                     </div>
-                    <div style={{ fontSize: 11, color: "#999", whiteSpace: "nowrap" }}>
-                      {n.total.toLocaleString("fr-FR")} scrapés
-                    </div>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 999, background: "#eee", overflow: "hidden" }}>
+
                     <div
                       style={{
-                        height: "100%",
-                        width: `${pct}%`,
+                        height: 10,
                         borderRadius: 999,
-                        background: color,
+                        background: "#e8e8e8",
+                        overflow: "hidden",
+                        marginBottom: 20,
                       }}
-                    />
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${pct}%`,
+                          borderRadius: 999,
+                          background: "#0047FF",
+                          transition: "width 0.35s ease",
+                        }}
+                      />
+                    </div>
+
+                    <p style={{ fontSize: 14, color: "#444", margin: "0 0 8px" }}>
+                      Il reste <strong>{remaining}</strong> créateurs à curer pour cette niche
+                    </p>
+                    <p style={{ fontSize: 14, color: "#666", margin: "0 0 24px" }}>
+                      {formatCompact(selected.total)} créateurs scrapés disponibles, dont{" "}
+                      <strong>{formatCompact(Math.max(0, notCurated))}</strong> pas encore curés
+                    </p>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
+                      {[
+                        { label: "< 10k", value: selected.under10k },
+                        { label: "10k – 100k", value: selected.from10kto100k },
+                        { label: "> 100k", value: selected.over100k },
+                      ].map((s) => (
+                        <div
+                          key={s.label}
+                          style={{
+                            background: "#F7F7F8",
+                            borderRadius: 12,
+                            padding: "12px 10px",
+                            textAlign: "center",
+                          }}
+                        >
+                          <div style={{ fontSize: 20, fontWeight: 700, color: "#111" }}>{s.value}</div>
+                          <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{s.label}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p style={{ fontSize: 13, color: "#888", margin: 0 }}>
+                      De {formatCompact(selected.min)} à {formatCompact(selected.max)} abonnés
+                    </p>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      ) : null}
+                );
+              })()
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   );
 }
