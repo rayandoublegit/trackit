@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./fonts.module.css";
 import "./landing.css";
+import "./hero-doodles.css";
 
 export const metadata: Metadata = {
   icons: {

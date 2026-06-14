@@ -1,0 +1,20 @@
+---
+description: Hero doodle positions are frozen — edit only when user explicitly asks
+globs: src/app/landing.css,src/app/hero-doodles.css,src/components/TrackitLanding.tsx
+alwaysApply: false
+---
+
+# Hero doodles — frozen positions
+
+All hero doodle placement (Trackit logo, cursor, money) lives in **`src/app/hero-doodles.css`** only.
+
+## Rules
+
+- **Do NOT** add, move, or duplicate doodle CSS in `landing.css` or elsewhere.
+- **Do NOT** change `top`, `margin-left`, `width`, or `z-index` on `.hero-doodle`, `.hero-cursor`, `.hero-money` (or their `--fr` variants) unless the user **explicitly** asks to reposition doodles.
+- Safe to edit in `landing.css`: hero padding, headline typography, pill banner, layout — as long as doodle selectors are not touched.
+- Scroll parallax in `TrackitLanding.tsx` (`translateY` on scroll) is intentional; do not remove unless asked.
+
+## To reposition doodles
+
+Edit **`src/app/hero-doodles.css`** only. Keep one media-query block per breakpoint (768px, 480px) — no duplicates.

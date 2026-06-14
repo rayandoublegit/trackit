@@ -870,6 +870,7 @@ body { padding-top: 80px; }
 .hero-line-wrap--fr {
   white-space: normal;
 }
+/* Hero doodle positions: see hero-doodles.css (do not add doodle rules here) */
 .hero-italic {
   font-style: italic;
   font-weight: 400;
@@ -879,65 +880,10 @@ body { padding-top: 80px; }
   display: block;
   margin-top: 4px;
 }
-.hero-doodle {
-  position: absolute;
-  width: 200px;
-  height: auto;
-  top: 28px;
-  left: 50%;
-  margin-left: -338px;
-  transform: rotate(-5deg);
-  pointer-events: none;
-  z-index: 2;
-}
-.hero-doodle--fr {
-  margin-left: -495px;
-}
-.hero-cursor {
-  position: absolute;
-  width: 150px;
-  height: auto;
-  top: 48px;
-  left: 50%;
-  margin-left: 130px;
-  pointer-events: none;
-  z-index: 2;
-}
-.hero-cursor--fr {
-  margin-left: 295px;
-}
-.hero-money {
-  position: absolute;
-  width: 95px;
-  height: auto;
-  top: 120px;
-  left: 50%;
-  margin-left: 260px;
-  transform: rotate(-10deg);
-  pointer-events: none;
-  z-index: 2;
-}
-.hero-money--fr {
-  width: 68px;
-  top: 176px;
-  margin-left: 355px;
-}
 
 @media (min-width: 769px) {
   .hero-content {
     padding-top: 40px;
-  }
-  .hero-doodle {
-    top: 68px;
-  }
-  .hero-cursor {
-    top: 88px;
-  }
-  .hero-money {
-    top: 160px;
-  }
-  .hero-money--fr {
-    top: 216px;
   }
 }
 
@@ -2337,31 +2283,6 @@ body { padding-top: 80px; }
   .hero-italic {
     font-size: 44px;
   }
-  .hero-doodle {
-    display: block;
-    width: 108px;
-    top: 76px;
-    margin-left: -200px;
-  }
-  .hero-doodle--fr { width: 100px; top: 92px; margin-left: -208px; }
-  .hero-cursor {
-    display: block;
-    width: 68px;
-    top: 90px;
-    margin-left: 92px;
-  }
-  .hero-cursor--fr { top: 120px; margin-left: 90px; }
-  .hero-money {
-    display: block;
-    width: 43px;
-    top: 166px;
-    margin-left: 168px;
-  }
-  .hero-money--fr {
-    width: 38px;
-    top: 162px;
-    margin-left: 172px;
-  }
   .hero-sub {
     font-size: 17px;
     margin: 20px auto 0;
@@ -2546,12 +2467,6 @@ body { padding-top: 80px; }
   .hero-v2-pill-secondary {
     font-size: 12px;
   }
-  .hero-doodle { width: 92px; top: 68px; margin-left: -172px; }
-  .hero-doodle--fr { width: 84px; top: 84px; margin-left: -176px; }
-  .hero-cursor { width: 57px; top: 82px; margin-left: 80px; }
-  .hero-cursor--fr { top: 112px; margin-left: 74px; }
-  .hero-money { width: 36px; top: 152px; margin-left: 150px; }
-  .hero-money--fr { width: 32px; top: 146px; margin-left: 148px; }
   .hero-headline { font-size: 36px; }
   .hero-italic { font-size: 36px; }
   .hero-sub { font-size: 15px; }
@@ -2613,31 +2528,6 @@ body { padding-top: 80px; }
   }
   .hero-italic { font-size: 48px; }
   .hero-line-wrap { white-space: normal; }
-  .hero-doodle {
-    display: block;
-    width: 108px;
-    top: 76px;
-    margin-left: -200px;
-  }
-  .hero-doodle--fr { width: 100px; top: 92px; margin-left: -208px; }
-  .hero-cursor {
-    display: block;
-    width: 68px;
-    top: 90px;
-    margin-left: 92px;
-  }
-  .hero-cursor--fr { top: 120px; margin-left: 90px; }
-  .hero-money {
-    display: block;
-    width: 43px;
-    top: 166px;
-    margin-left: 168px;
-  }
-  .hero-money--fr {
-    width: 38px;
-    top: 162px;
-    margin-left: 172px;
-  }
   .hero-sub { font-size: 17px; max-width: 100%; margin: 20px auto 0; }
   .hero-cta {
     font-size: 15px;
@@ -2818,12 +2708,6 @@ body { padding-top: 80px; }
   .hero-v2-pill:visited { gap: 8px; padding: 7px 12px; }
   .hero-v2-pill-primary,
   .hero-v2-pill-secondary { font-size: 12px; }
-  .hero-doodle { width: 92px; top: 68px; margin-left: -172px; }
-  .hero-doodle--fr { width: 84px; top: 84px; margin-left: -176px; }
-  .hero-cursor { width: 57px; top: 82px; margin-left: 80px; }
-  .hero-cursor--fr { top: 112px; margin-left: 74px; }
-  .hero-money { width: 36px; top: 152px; margin-left: 150px; }
-  .hero-money--fr { width: 32px; top: 146px; margin-left: 148px; }
   .hero-headline { font-size: 38px; }
   .hero-italic { font-size: 38px; }
   .hero-sub { font-size: 15px; }
@@ -2836,17 +2720,8 @@ body { padding-top: 80px; }
   .process-card-title { font-size: 16px; }
 }
 
-/* Tablet — hide hero decorative logos */
+/* Tablet */
 @media (min-width: 600px) and (max-width: 1024px) {
-  .hero-doodle,
-  .hero-doodle--fr,
-  .hero-cursor,
-  .hero-cursor--fr,
-  .hero-money,
-  .hero-money--fr {
-    display: none !important;
-  }
-
   .hero-trusted {
     line-height: 1.45;
     align-items: center;

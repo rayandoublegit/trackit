@@ -1,0 +1,151 @@
+/*
+ * ============================================================================
+ * HERO DOODLES — FROZEN POSITIONS (DO NOT EDIT)
+ * ============================================================================
+ * Single source of truth for Trackit / cursor / money hero doodle placement.
+ * Do NOT change this file unless the user explicitly asks to reposition doodles.
+ * Landing layout work belongs in landing.css only — never duplicate doodle rules there.
+ * Locked: 2026-05-27 (EN + FR mobile fine-tuned)
+ * ============================================================================
+ */
+
+/* --- Desktop base --- */
+.hero-doodle {
+  position: absolute;
+  width: 200px;
+  height: auto;
+  top: 28px;
+  left: 50%;
+  margin-left: -338px;
+  transform: rotate(-5deg);
+  pointer-events: none;
+  z-index: 2;
+}
+.hero-doodle--fr {
+  margin-left: -495px;
+}
+.hero-cursor {
+  position: absolute;
+  width: 150px;
+  height: auto;
+  top: 48px;
+  left: 50%;
+  margin-left: 130px;
+  pointer-events: none;
+  z-index: 2;
+}
+.hero-cursor--fr {
+  margin-left: 295px;
+}
+.hero-money {
+  position: absolute;
+  width: 95px;
+  height: auto;
+  top: 120px;
+  left: 50%;
+  margin-left: 260px;
+  transform: rotate(-10deg);
+  pointer-events: none;
+  z-index: 2;
+}
+.hero-money--fr {
+  width: 68px;
+  top: 176px;
+  margin-left: 355px;
+}
+
+@media (min-width: 769px) {
+  .hero-doodle {
+    top: 68px;
+  }
+  .hero-cursor {
+    top: 88px;
+  }
+  .hero-money {
+    top: 160px;
+  }
+  .hero-money--fr {
+    top: 216px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-doodle {
+    display: block;
+    width: 108px;
+    top: 76px;
+    margin-left: -208px;
+  }
+  .hero-doodle--fr {
+    width: 100px;
+    top: 102px;
+    margin-left: -246px;
+  }
+  .hero-cursor {
+    display: block;
+    width: 68px;
+    top: 90px;
+    margin-left: 92px;
+  }
+  .hero-cursor--fr {
+    top: 120px;
+    margin-left: 136px;
+    z-index: 5;
+  }
+  .hero-money {
+    display: block;
+    width: 43px;
+    top: 142px;
+    margin-left: 168px;
+  }
+  .hero-money--fr {
+    width: 38px;
+    top: 134px;
+    margin-left: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-doodle {
+    width: 92px;
+    top: 68px;
+    margin-left: -172px;
+  }
+  .hero-doodle--fr {
+    width: 84px;
+    top: 92px;
+    margin-left: -210px;
+  }
+  .hero-cursor {
+    width: 57px;
+    top: 82px;
+    margin-left: 80px;
+  }
+  .hero-cursor--fr {
+    top: 112px;
+    margin-left: 116px;
+    z-index: 5;
+  }
+  .hero-money {
+    width: 36px;
+    top: 132px;
+    margin-left: 150px;
+  }
+  .hero-money--fr {
+    width: 32px;
+    top: 120px;
+    margin-left: 176px;
+  }
+}
+
+/* Tablet — hide hero decorative logos */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .hero-doodle,
+  .hero-doodle--fr,
+  .hero-cursor,
+  .hero-cursor--fr,
+  .hero-money,
+  .hero-money--fr {
+    display: none !important;
+  }
+}
