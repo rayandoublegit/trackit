@@ -132,6 +132,9 @@ export default function OnboardingPage() {
     }
     if (step === 3) {
       if (!source) { setError(lang === "fr" ? "Veuillez choisir une option" : "Please pick one"); return; }
+      // Last step now: finish onboarding directly (Shopify step removed).
+      await handleFinish();
+      return;
     }
     setStep((s) => (s + 1) as Step);
   };
@@ -270,28 +273,15 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {step === 4 && (
-            <>
-              <Header step={step} title="Connect Shopify" subtitle="Connect your store to track sales and automate commission payouts. You can skip this and connect later." titleFr="Connectez Shopify" subtitleFr="Connectez votre boutique pour suivre les ventes et automatiser les commissions. Vous pouvez ignorer cette étape." />
-              <Input label="Your Shopify store URL" labelFr="URL de votre boutique Shopify" value={shopifyUrl} onChange={setShopifyUrl} placeholder="yourstore.myshopify.com" placeholderFr="maboutique.myshopify.com" />
-              <button type="button" onClick={handleFinish} disabled={loading} style={{ ...primaryBtn, marginTop: 8, background: "#95BF47" }}>
-                {loading ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →")}
-              </button>
-              <button type="button" onClick={() => { setShopifyUrl(""); void handleFinish(); }} disabled={loading} style={{ background: "transparent", color: "rgba(0,0,0,0.5)", border: "none", padding: "12px 0", fontSize: 14, fontFamily: "inherit", cursor: "pointer", width: "100%", marginTop: 8, letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Ignorer pour l'instant →" : "Skip for now →"}
-              </button>
-            </>
-          )}
-
           {error && (
             <div style={{ fontSize: 14, color: "#ff6b6b", padding: "12px 14px", borderRadius: 12, background: "rgba(255,107,107,0.08)", marginTop: 16 }}>{error}</div>
           )}
 
-          {step !== 4 && (
-            <button type="button" onClick={goNext} disabled={loading} style={{ ...primaryBtn, marginTop: 16 }}>
-              {lang === "fr" ? "Continuer →" : "Continue →"}
-            </button>
-          )}
+          <button type="button" onClick={goNext} disabled={loading} style={{ ...primaryBtn, marginTop: 16 }}>
+            {step === 3
+              ? (loading ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Terminer →" : "Finish →"))
+              : (lang === "fr" ? "Continuer →" : "Continue →")}
+          </button>
         </div>
         )}
       </div>
