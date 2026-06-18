@@ -97,7 +97,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
   return (
     <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
-      <div style={{ maxWidth: 640, margin: "0 auto" }}>
+      <div style={{ maxWidth: 640 }}>
 
         <div style={{ marginBottom: 32 }}>
           <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.035em", margin: "0 0 8px" }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
