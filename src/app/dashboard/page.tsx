@@ -781,7 +781,7 @@ function DashboardPageContent() {
         )}
         {view === "analytics" && user && (
           (canUseBasicFeatures || isCreator) ? (
-            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
+            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
@@ -28,11 +29,15 @@ function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
+export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify, isCreator }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
   const isFree = plan === "free";
   const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
+
+  if (isCreator) {
+    return <CreatorAnalytics userId={userId} isMobile={isMobile} />;
+  }
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [range, setRange] = useState<DateRange>("30d");
