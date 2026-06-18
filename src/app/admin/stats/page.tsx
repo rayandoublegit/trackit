@@ -159,7 +159,11 @@ export default function AdminStatsPage() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 32 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="/icon.png" alt="Trackit" width={48} height={48} style={{ borderRadius: 12 }} />
+            <img
+              src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+              alt="Trackit"
+              style={{ height: 48, width: "auto", display: "block", objectFit: "contain" }}
+            />
             <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: "#111" }}>Curation Dashboard</h1>
           </div>
           {pseudo.trim() ? (

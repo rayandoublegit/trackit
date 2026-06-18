@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   // Supabase caps .select() at 1000 rows by default. Paginate to read the whole table.
   const rows: { niches: string[] | null; platform: string | null; followers: number | null }[] = [];
-  const PAGE = 1000;
+  const PAGE = 500;
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await supabaseAdmin
       .from("creators_index")
