@@ -6,6 +6,7 @@ export const DASHBOARD_VIEWS = [
   "affiliates",
   "outreach",
   "payouts",
+  "invitations",
   "analytics",
   "integrations",
   "automation",
