@@ -73,11 +73,14 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
       )}
 
       {!stats?.linked ? (
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "40px 28px", textAlign: "center", maxWidth: 560 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.02em" }}>
-            {lang === "fr" ? "Pas encore de ventes enregistrées" : "No sales recorded yet"}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "55vh", textAlign: "center", padding: "0 24px" }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(0,71,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 4 8-8" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 8h4v4" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
-          <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, margin: 0 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Pas encore de ventes" : "No sales recorded yet"}
+          </div>
+          <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, margin: 0, maxWidth: 380 }}>
             {lang === "fr"
               ? "Vos ventes et commissions apparaîtront ici dès que la marque les aura enregistrées."
               : "Your sales and commissions will appear here once the brand records them."}
