@@ -773,14 +773,14 @@ function DashboardPageContent() {
           />
         )}
         {view === "payouts" && user && (
-          canUseBasicFeatures ? (
+          (canUseBasicFeatures || isCreator) ? (
             <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
             <UpgradeGate feature="Payouts" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
         )}
         {view === "analytics" && user && (
-          canUseBasicFeatures ? (
+          (canUseBasicFeatures || isCreator) ? (
             <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
