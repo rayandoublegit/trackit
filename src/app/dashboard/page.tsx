@@ -11,6 +11,7 @@ import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
+import { CreatorSettings } from "./CreatorSettings";
 import { AnalyticsView } from "./AnalyticsView";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
@@ -818,7 +819,11 @@ function DashboardPageContent() {
           )
         )}
         {view === "settings" && user && (
-          <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
+          isCreator ? (
+            <CreatorSettings userId={user.id} isMobile={isMobile} onSaved={() => void reloadProfile(user.id)} />
+          ) : (
+            <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
+          )
         )}
         {view === "feedback" && <FeedbackView isMobile={isMobile} />}
         {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
