@@ -94,24 +94,45 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
     try { return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "short", year: "numeric" }); } catch { return iso; }
   };
 
+  const targetLabel = (s: Script) =>
+    s.targetName
+      ? (lang === "fr" ? s.targetName : s.targetName)
+      : (lang === "fr" ? "Tous les créateurs" : "All creators");
+
   const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 14 };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 500, color: "rgba(0,0,0,0.55)", marginBottom: 6, letterSpacing: "-0.01em" };
 
+  const subtitle =
+    loading
+      ? (lang === "fr" ? "Chargement..." : "Loading...")
+      : scripts.length === 0
+        ? (lang === "fr" ? "Partagez des scripts et briefs avec vos créateurs" : "Share scripts and briefs with your creators")
+        : lang === "fr"
+          ? `${scripts.length} script${scripts.length > 1 ? "s" : ""} partagé${scripts.length > 1 ? "s" : ""}`
+          : `${scripts.length} script${scripts.length > 1 ? "s" : ""} shared`;
+
   return (
-    <div style={{ maxWidth: 760 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-        <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", margin: 0, letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "Partagez des scripts et briefs avec vos créateurs." : "Share scripts and briefs with your creators."}
-        </p>
-        {!formOpen && (
-          <button type="button" onClick={() => setFormOpen(true)} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em" }}>
-            {lang === "fr" ? "+ Nouveau script" : "+ New script"}
-          </button>
-        )}
+    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: 32 }}>
+      <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+              Scripts
+            </div>
+            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+              {subtitle}
+            </div>
+          </div>
+          {!formOpen && (
+            <button type="button" onClick={() => setFormOpen(true)} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em", flexShrink: 0 }}>
+              {lang === "fr" ? "+ Nouveau script" : "+ New script"}
+            </button>
+          )}
+        </div>
       </div>
 
       {formOpen && (
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 24 }}>
+        <div style={{ padding: "20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA" }}>
           <label style={labelStyle}>{lang === "fr" ? "Titre" : "Title"}</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={lang === "fr" ? "Ex : Brief vidéo lancement" : "e.g. Launch video brief"} style={inputStyle} />
 
@@ -131,7 +152,7 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
 
           {error && <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>}
 
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button type="button" onClick={handleSubmit} disabled={saving} style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
               {saving ? (lang === "fr" ? "Envoi..." : "Sending...") : (lang === "fr" ? "Envoyer le script" : "Send script")}
             </button>
@@ -142,34 +163,108 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
         </div>
       )}
 
-      {loading ? (
-        <div style={{ color: "#9A9A9A", fontSize: 14 }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
-      ) : scripts.length === 0 ? (
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>{lang === "fr" ? "Aucun script pour le moment" : "No scripts yet"}</div>
-          <p style={{ fontSize: 14, color: "rgba(0,0,0,0.45)", margin: 0 }}>{lang === "fr" ? "Créez votre premier script pour vos créateurs." : "Create your first script for your creators."}</p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {scripts.map((s) => (
-            <div key={s.id} style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "18px 20px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
-                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: s.content ? 10 : 0 }}>
-                    {fmtDate(s.created_at)} · {s.targetName ? (lang === "fr" ? `Pour ${s.targetName}` : `For ${s.targetName}`) : (lang === "fr" ? "Tous les créateurs" : "All creators")}
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {loading ? (
+          <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Chargement..." : "Loading..."}
+          </div>
+        ) : scripts.length === 0 ? (
+          <div style={{ padding: 48, textAlign: "center" }}>
+            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              {lang === "fr" ? "Aucun script pour le moment" : "No scripts yet"}
+            </div>
+            <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? "Créez votre premier script pour vos créateurs." : "Create your first script for your creators."}
+            </div>
+          </div>
+        ) : isMobile ? (
+          scripts.map((s, i) => (
+            <div
+              key={s.id}
+              style={{
+                padding: "16px 20px",
+                borderBottom: i < scripts.length - 1 ? "1px solid #F5F5F5" : "none",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: s.content ? 8 : 0 }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
+                  <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                    {targetLabel(s)} · {fmtDate(s.created_at)}
                   </div>
-                  {s.content && <p style={{ fontSize: 14, color: "rgba(0,0,0,0.7)", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>{s.content}</p>}
-                  {s.file_url && <a href={s.file_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 10, fontSize: 14, color: BLUE, fontWeight: 500, textDecoration: "none" }}>{lang === "fr" ? "Voir le fichier joint" : "View attachment"} →</a>}
                 </div>
                 <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "#B5B5B5", fontSize: 13, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
                   {lang === "fr" ? "Supprimer" : "Delete"}
                 </button>
               </div>
+              {s.content && (
+                <p style={{ fontSize: 13, color: "rgba(0,0,0,0.65)", lineHeight: 1.45, margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+                  {s.content.length > 120 ? `${s.content.slice(0, 120)}…` : s.content}
+                </p>
+              )}
+              {s.file_url && (
+                <a href={s.file_url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 8, fontSize: 13, color: BLUE, fontWeight: 500, textDecoration: "none" }}>
+                  {lang === "fr" ? "Voir le fichier joint" : "View attachment"} →
+                </a>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+          ))
+        ) : (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr 0.9fr 1.2fr",
+                gap: 12,
+                padding: "14px 20px",
+                background: "#FAFAFA",
+                borderBottom: "1px solid #EFEFEF",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "#9A9A9A",
+              }}
+            >
+              {[lang === "fr" ? "Titre" : "Title", lang === "fr" ? "Destinataire" : "Recipient", lang === "fr" ? "Date" : "Date", lang === "fr" ? "Actions" : "Actions"].map((h) => (
+                <div key={h}>{h}</div>
+              ))}
+            </div>
+            {scripts.map((s, i) => (
+              <div
+                key={s.id}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "2fr 1fr 0.9fr 1.2fr",
+                  gap: 12,
+                  padding: "16px 20px",
+                  alignItems: "center",
+                  borderBottom: i < scripts.length - 1 ? "1px solid #F5F5F5" : "none",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: s.content ? 4 : 0 }}>{s.title}</div>
+                  {s.content && (
+                    <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {s.content}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontSize: 13, color: "#1A1A1A" }}>{targetLabel(s)}</div>
+                <div style={{ fontSize: 13, color: "#7A7A7A" }}>{fmtDate(s.created_at)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                  {s.file_url && (
+                    <a href={s.file_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: BLUE, fontWeight: 500, textDecoration: "none" }}>
+                      {lang === "fr" ? "Fichier" : "File"} →
+                    </a>
+                  )}
+                  <button type="button" onClick={() => handleDelete(s.id)} style={{ background: "none", border: "none", color: "#B5B5B5", fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                    {lang === "fr" ? "Supprimer" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 import { UpgradeModal } from "./UpgradeModal";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
-type CreatorsTab = "all" | "active" | "pending" | "scripts";
+type CreatorsTab = "all" | "active" | "pending";
 type SortKey = "followers" | "engagement" | "addedDate";
 
 type ManagedCreator = {
@@ -1105,7 +1105,6 @@ export function CreatorsView({
               { id: "all" as const, label: lang === "fr" ? "Tous les créateurs" : "All Creators" },
               { id: "active" as const, label: lang === "fr" ? "Actifs" : "Active" },
               { id: "pending" as const, label: lang === "fr" ? "En attente" : "Pending" },
-              { id: "scripts" as const, label: "Scripts" },
             ] as const
           ).map((t) => (
             <button
@@ -1130,10 +1129,6 @@ export function CreatorsView({
           ))}
         </div>
 
-        {tab === "scripts" ? (
-          <ScriptsManager brandId={userId} isMobile={isMobile} />
-        ) : (
-        <>
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <div
             style={{
@@ -1292,8 +1287,8 @@ export function CreatorsView({
             </>
           )}
         </div>
-        </>
-        )}
+
+        <ScriptsManager brandId={userId} isMobile={isMobile} />
       </div>
 
       {importOpen && <ImportCsvModal lang={lang} onClose={() => setImportOpen(false)} />}
