@@ -117,7 +117,7 @@ function DashboardPageContent() {
   const isScale = isScalePlan(plan);
   const canUseBasicFeatures = isGrowthOrAbove(plan);
   const [notificationUnread, setNotificationUnread] = useState(0);
-  const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
+  const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0, unreadScripts: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
@@ -183,9 +183,18 @@ function DashboardPageContent() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId),
     ]);
+    let unreadScripts = 0;
+    try {
+      const res = await fetch(`/api/creator/scripts?userId=${userId}`);
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.scripts)) {
+        unreadScripts = data.scripts.filter((s: { status: string | null }) => s.status !== "done").length;
+      }
+    } catch {}
     setSidebarCounts({
       activeCampaigns: activeCampaigns ?? 0,
       savedCreators: savedCreators ?? 0,
+      unreadScripts,
     });
   }, []);
 
@@ -2864,7 +2873,7 @@ const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid
 function buildSidebarNavEntries(
   notificationUnread: number,
   lang: "en" | "fr",
-  counts: { activeCampaigns: number; savedCreators: number }
+  counts: { activeCampaigns: number; savedCreators: number; unreadScripts: number }
 ): SidebarNavEntry[] {
   return [
     { id: "dashboard", label: lang === "fr" ? "Tableau de bord" : "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
@@ -2876,7 +2885,7 @@ function buildSidebarNavEntries(
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
-    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand"] },
+    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand"], badge: counts.unreadScripts > 0 ? String(counts.unreadScripts) : undefined },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
     { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {

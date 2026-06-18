@@ -32,7 +32,14 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
     }
   };
 
-  useEffect(() => { void load(); }, [userId]);
+  useEffect(() => {
+    void load();
+    if (!userId) return;
+    const interval = setInterval(() => { void load(); }, 20000);
+    const onFocus = () => { void load(); };
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); };
+  }, [userId]);
 
   const markDone = async (scriptId: string) => {
     if (!userId) return;
