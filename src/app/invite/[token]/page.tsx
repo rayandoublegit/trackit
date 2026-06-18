@@ -110,7 +110,7 @@ function InviteUI(props: {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#F4F6FB", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px" }}>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "56px 24px 24px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", width: "100%", maxWidth: 920, background: "#FFFFFF", borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,30,90,0.12)" }}>
 
         <div style={{ flex: "1 1 380px", background: `linear-gradient(160deg, ${BLUE} 0%, #0035C4 100%)`, padding: "48px 44px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 520 }}>
