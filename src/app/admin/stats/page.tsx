@@ -150,7 +150,7 @@ export default function AdminStatsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#F7F7F8",
+        background: "#fff",
         fontFamily: "system-ui, -apple-system, sans-serif",
         letterSpacing: "-0.02em",
       }}
