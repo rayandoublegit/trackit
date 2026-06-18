@@ -30,7 +30,11 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          if (profile && profile.account_type === "creator") {
+            router.replace("/creator");
+            return;
+          }
           if (!profile || profile.onboarding_completed === false) {
             router.replace("/onboarding");
           } else {
@@ -55,7 +59,11 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          if (profile && profile.account_type === "creator") {
+            router.replace("/creator");
+            return;
+          }
           if (!profile || profile.onboarding_completed === false) {
             router.replace("/onboarding");
           } else {
@@ -73,7 +81,11 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle();
+          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          if (profile && profile.account_type === "creator") {
+            router.replace("/creator");
+            return;
+          }
           if (!profile || profile.onboarding_completed === false) {
             router.replace("/onboarding");
           } else {

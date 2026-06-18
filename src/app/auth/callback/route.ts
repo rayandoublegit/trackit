@@ -33,9 +33,12 @@ export async function GET(request: Request) {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("onboarding_completed")
+          .select("onboarding_completed, account_type")
           .eq("id", user.id)
           .maybeSingle();
+        if (profile && profile.account_type === "creator") {
+          return NextResponse.redirect(`${origin}/creator`);
+        }
         if (!profile || profile.onboarding_completed === false) {
           return NextResponse.redirect(`${origin}/onboarding`);
         }
