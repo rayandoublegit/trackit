@@ -113,6 +113,9 @@ function DashboardPageContent() {
     creators: false,
     outreach: false,
     sales: false,
+    creatorsCount: 0,
+    outreachCount: 0,
+    salesCount: 0,
   });
 
   const reloadProfile = useCallback(async (userId: string) => {
@@ -331,6 +334,9 @@ function DashboardPageContent() {
         creators: (creatorsCount || 0) > 0,
         outreach: (outreachCount || 0) > 0,
         sales: (salesCount || 0) > 0,
+        creatorsCount: creatorsCount || 0,
+        outreachCount: outreachCount || 0,
+        salesCount: salesCount || 0,
       });
     };
     check();
@@ -881,44 +887,40 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
   );
 }
 
-function HomeView({ fullName, username, isMobile, gettingStarted, user }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean }; user?: User | null }) {
+function HomeView({ fullName, username, isMobile, gettingStarted, user }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean; creatorsCount: number; outreachCount: number; salesCount: number }; user?: User | null }) {
   const lang = useLang();
   const [shopifyModalOpen, setShopifyModalOpen] = useState(false);
   const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
   const welcomeGreeting = lang === "fr" ? "Bon retour" : "Welcome back";
   const checklistSteps = [
-    { label: lang === "fr" ? "Connecter la boutique Shopify" : "Connect Shopify store", completed: gettingStarted.shopify },
     { label: lang === "fr" ? "Trouver vos premiers créateurs" : "Find your first creators", completed: gettingStarted.creators },
     { label: lang === "fr" ? "Envoyer votre premier message" : "Send first outreach", completed: gettingStarted.outreach },
     { label: lang === "fr" ? "Suivre votre première vente" : "Track first sale", completed: gettingStarted.sales },
   ];
   return (
     <>
-      <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Connectez votre boutique Shopify pour commencer." : "Connect your Shopify store to get started."} />
+      <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Trouvez, contactez et suivez vos créateurs au même endroit." : "Find, reach and track your creators in one place."} />
       <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: isMobile ? 32 : 60, textAlign: "center", marginBottom: 24 }}>
-          <div style={{ margin: "0 auto 20px", display: "flex", justifyContent: "center" }}>
-            <img src="/shopify-logo.svg" alt="Shopify" width={56} height={64} style={{ display: "block" }} />
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+          {[
+            { label: lang === "fr" ? "Créateurs sauvegardés" : "Saved creators", value: gettingStarted.creatorsCount },
+            { label: lang === "fr" ? "Messages envoyés" : "Messages sent", value: gettingStarted.outreachCount },
+            { label: lang === "fr" ? "Ventes suivies" : "Sales tracked", value: gettingStarted.salesCount },
+          ].map((stat, i) => (
+            <div key={i} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
+              <div style={{ fontSize: 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", marginBottom: 4 }}>{stat.value}</div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{stat.label}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: "#0047FF", borderRadius: 18, padding: isMobile ? 28 : 40, marginBottom: 24, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: 20 }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#FFFFFF", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Trouvez vos prochains créateurs" : "Find your next creators"}</h2>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.01em", margin: 0, maxWidth: 460 }}>{lang === "fr" ? "Parcourez des milliers de créateurs sélectionnés et lancez votre première campagne en quelques minutes." : "Browse thousands of curated creators and launch your first campaign in minutes."}</p>
           </div>
-          {gettingStarted.shopify ? (
-            <>
-              <h2 style={{ fontSize: 22, fontWeight: 600, color: "#22C55E", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Boutique Shopify connectée ✓" : "Shopify store connected ✓"}</h2>
-              <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Vos commandes sont synchronisées. Les ventes de vos créateurs sont suivies automatiquement." : "Your orders are synced. Creator sales are tracked automatically."}</p>
-              {gettingStarted.shopifyStore && (
-                <p style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginTop: 16, marginBottom: 0, letterSpacing: "-0.01em" }}>{gettingStarted.shopifyStore}</p>
-              )}
-            </>
-          ) : (
-            <>
-              <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>{lang === "fr" ? "Connectez votre boutique Shopify" : "Connect your Shopify store"}</h2>
-              <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 24, maxWidth: 480, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Synchronisez vos produits, commandes et clients en temps réel. Nous suivrons automatiquement chaque vente générée par vos créateurs." : "Sync products, orders, and customers in real time. We'll automatically track every sale your creators drive."}</p>
-              <button type="button" className="hero-cta-shopify-dark" onClick={() => setShopifyModalOpen(true)}>
-                <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
-                {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
-              </button>
-              <p style={{ fontSize: 12, color: "#9A9A9A", marginTop: 14 }}>{lang === "fr" ? "Intégration Shopify non connectée" : "Shopify integration not connected yet"}</p>
-            </>
-          )}
+          <button type="button" onClick={() => { window.location.hash = "discovery"; window.location.reload(); }} style={{ background: "#FFFFFF", color: "#0047FF", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+            {lang === "fr" ? "Trouver des créateurs" : "Find creators"}
+          </button>
         </div>
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>

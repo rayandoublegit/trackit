@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const NICHE_OPTIONS = [
   { value: "fitness", label: "Fitness", emoji: "🏋️" },
@@ -54,14 +54,45 @@ function statusBadge(curated: number): { label: string; bg: string; color: strin
   return { label: "BIEN", bg: "#e8f5e9", color: "#2e7d32" };
 }
 
+const INITIAL_STATE = {
+  secret: "",
+  pseudo: "",
+  loading: false,
+  error: "",
+  unlocked: false,
+  data: null as StatsData | null,
+  selectedNiche: "",
+};
+
 export default function AdminStatsPage() {
-  const [secret, setSecret] = useState("");
-  const [pseudo, setPseudo] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [unlocked, setUnlocked] = useState(false);
-  const [data, setData] = useState<StatsData | null>(null);
-  const [selectedNiche, setSelectedNiche] = useState("");
+  const [secret, setSecret] = useState(INITIAL_STATE.secret);
+  const [pseudo, setPseudo] = useState(INITIAL_STATE.pseudo);
+  const [loading, setLoading] = useState(INITIAL_STATE.loading);
+  const [error, setError] = useState(INITIAL_STATE.error);
+  const [unlocked, setUnlocked] = useState(INITIAL_STATE.unlocked);
+  const [data, setData] = useState<StatsData | null>(INITIAL_STATE.data);
+  const [selectedNiche, setSelectedNiche] = useState(INITIAL_STATE.selectedNiche);
+
+  const resetPage = () => {
+    setSecret(INITIAL_STATE.secret);
+    setPseudo(INITIAL_STATE.pseudo);
+    setLoading(INITIAL_STATE.loading);
+    setError(INITIAL_STATE.error);
+    setUnlocked(INITIAL_STATE.unlocked);
+    setData(INITIAL_STATE.data);
+    setSelectedNiche(INITIAL_STATE.selectedNiche);
+  };
+
+  useEffect(() => {
+    resetPage();
+
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) resetPage();
+    };
+
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   const curationRate = useMemo(() => {
     if (!data || data.total === 0) return 0;
@@ -176,6 +207,7 @@ export default function AdminStatsPage() {
               value={pseudo}
               onChange={(e) => setPseudo(e.target.value)}
               placeholder="Pseudo"
+              autoComplete="off"
             />
           )}
         </div>
@@ -190,6 +222,7 @@ export default function AdminStatsPage() {
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
               placeholder="••••••••"
+              autoComplete="new-password"
             />
             <button
               onClick={unlock}
