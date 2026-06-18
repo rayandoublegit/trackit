@@ -196,8 +196,6 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: "general", label: lang === "fr" ? "Général" : "General" },
     { id: "profile", label: lang === "fr" ? "Profil" : "Profile" },
-    { id: "team", label: lang === "fr" ? "Équipe" : "Team" },
-    { id: "billing", label: lang === "fr" ? "Facturation" : "Billing" },
     { id: "notifications", label: lang === "fr" ? "Notifications" : "Notifications" },
     { id: "security", label: lang === "fr" ? "Sécurité" : "Security" },
     { id: "api", label: lang === "fr" ? "API" : "API" },
@@ -485,20 +483,6 @@ function GeneralSettings({
     <Card>
       <Field label={lang === "fr" ? "Nom de la boutique" : "Store name"}>
         <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Acme Co." style={inputStyle} />
-      </Field>
-      <Field label={lang === "fr" ? "URL de la boutique Shopify" : "Shopify store URL"}>
-        <input type="text" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="yourstore.myshopify.com" style={inputStyle} />
-      </Field>
-      <Field label={lang === "fr" ? "Votre niche" : "Your niche"}>
-        <input type="text" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder="Fashion, fitness, beauty..." style={inputStyle} />
-      </Field>
-      <Field label={lang === "fr" ? "Type d'activité" : "Business type"}>
-        <select value={businessType} onChange={(e) => setBusinessType(e.target.value)} style={inputStyle}>
-          <option value="Ecommerce">{businessTypeLabel("Ecommerce", lang)}</option>
-          <option value="Infopreneur">{businessTypeLabel("Infopreneur", lang)}</option>
-          <option value="Agency">{businessTypeLabel("Agency", lang)}</option>
-          <option value="Other">{businessTypeLabel("Other", lang)}</option>
-        </select>
       </Field>
       <Field label={lang === "fr" ? "Devise par défaut" : "Default currency"}>
         <SegmentedToggle options={["EUR", "USD"]} value={currency} onChange={setCurrency} />
