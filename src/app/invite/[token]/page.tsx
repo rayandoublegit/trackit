@@ -97,6 +97,7 @@ function InviteUI(props: {
   submitting: boolean; formError: string; done: boolean; onJoin: () => void;
 }) {
   const { loading, brandName, inviteError, email, setEmail, password, setPassword, submitting, formError, done, onJoin } = props;
+  const [showPassword, setShowPassword] = useState(false);
 
   const input: React.CSSProperties = {
     width: "100%", padding: "14px 15px", fontSize: 15, fontFamily: "inherit",
@@ -159,7 +160,16 @@ function InviteUI(props: {
                 Créez votre compte gratuit en quelques secondes.
               </p>
               <input type="email" placeholder="Votre email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" />
-              <input type="password" placeholder="Choisissez un mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} style={input} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />
+              <div style={{ position: "relative" }}>
+                <input type={showPassword ? "text" : "password"} placeholder="Choisissez un mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...input, paddingRight: 46 }} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />
+                <button type="button" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"} style={{ position: "absolute", right: 12, top: 14, background: "transparent", border: "none", padding: 0, cursor: "pointer", color: "rgba(0,0,0,0.4)", display: "flex" }}>
+                  {showPassword ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/></svg>
+                  )}
+                </button>
+              </div>
               {formError && (
                 <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 12 }}>{formError}</div>
               )}
