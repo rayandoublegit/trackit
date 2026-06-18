@@ -20,13 +20,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data, error } = await supabaseAdmin
-    .from("creators_index")
-    .select("niches, platform, followers");
-
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-
-  const rows = data || [];
+  // Supabase caps .select() at 1000 rows by default. Paginate to read the whole table.
+  const rows: { niches: string[] | null; platform: string | null; followers: number | null }[] = [];
+  const PAGE = 1000;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("creators_index")
+      .select("niches, platform, followers")
+      .range(from, from + PAGE - 1);
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (!data || data.length === 0) break;
+    rows.push(...data);
+    if (data.length < PAGE) break;
+  }
   const total = rows.length;
   // Total curated = distinct creators carrying the "curated" tag.
   const curated = rows.filter(r => (r.niches || []).includes("curated")).length;

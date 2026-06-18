@@ -113,7 +113,7 @@ export default function AdminStatsPage() {
           max: Number(n.max) || 0,
           under10k: Number(n.under10k) || 0,
           from10kto100k: Number(n.from10kto100k) || 0,
-          over100k: Number(n.over10k) || 0,
+          over100k: Number(n.over100k) || 0,
         })),
       });
       setUnlocked(true);
