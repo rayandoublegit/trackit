@@ -73,6 +73,38 @@ export async function POST(req: Request) {
     );
   if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });
 
+  // Crée (ou relie) la ligne du créateur dans le carnet de la marque,
+  // pour qu'il apparaisse direct dans les Payouts et reçoive son IBAN.
+  const handle = socialHandle.toLowerCase().replace(/\s+/g, "");
+  if (handle) {
+    const { data: existing } = await supabase
+      .from("creators")
+      .select("id")
+      .eq("user_id", invite.brand_id)
+      .eq("handle", handle)
+      .maybeSingle();
+
+    if (existing) {
+      // La marque l'avait déjà ajouté : on pose juste le lien + le nom.
+      await supabase
+        .from("creators")
+        .update({ linked_user_id: creatorId, full_name: fullName || undefined })
+        .eq("id", existing.id);
+    } else {
+      // Sinon on crée la ligne d'accueil.
+      await supabase
+        .from("creators")
+        .insert({
+          user_id: invite.brand_id,
+          handle,
+          full_name: fullName || handle,
+          linked_user_id: creatorId,
+          platform: "tiktok",
+          commission_rate: 10,
+        });
+    }
+  }
+
   // Marque l'invitation comme utilisée.
   await supabase
     .from("creator_invites")
