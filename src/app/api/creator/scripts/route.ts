@@ -46,6 +46,7 @@ export async function GET(request: Request) {
     .select("script_id, status")
     .eq("creator_id", userId);
   const statusBy = new Map((reads || []).map((r) => [r.script_id, r.status]));
+  const dismissed = new Set((reads || []).filter((r) => r.status === "dismissed").map((r) => r.script_id));
 
   // Noms des marques
   const { data: brands } = await supabaseAdmin
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
     .in("id", brandIds);
   const brandName = new Map((brands || []).map((b) => [b.id, b.business_name || b.full_name || (b.username ? `@${b.username}` : "")]));
 
-  const result = visible.map((s) => ({
+  const result = visible.filter((s) => !dismissed.has(s.id)).map((s) => ({
     id: s.id,
     title: s.title,
     content: s.content,
