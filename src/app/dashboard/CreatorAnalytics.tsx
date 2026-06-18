@@ -29,6 +29,16 @@ function StatCard({ label, value, hint, accent }: { label: string; value: string
   );
 }
 
+function StepCard({ n, title, text }: { n: number; title: string; text: string }) {
+  return (
+    <div style={{ flex: "1 1 240px", minWidth: 220, background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "22px 24px" }}>
+      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(0,71,255,0.08)", color: BLUE, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, marginBottom: 14 }}>{n}</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6, letterSpacing: "-0.02em" }}>{title}</div>
+      <p style={{ fontSize: 13.5, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, margin: 0 }}>{text}</p>
+    </div>
+  );
+}
+
 export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
   const [stats, setStats] = useState<CreatorStats | null>(null);
@@ -140,6 +150,38 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
               </table>
             </div>
           )}
+        </div>
+
+        <div style={{ marginTop: 40 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 16px" }}>{lang === "fr" ? "Comment ça marche" : "How it works"}</h2>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+            <StepCard n={1} title={lang === "fr" ? "Partagez votre code" : "Share your code"} text={lang === "fr" ? "Diffusez votre code promo à votre audience sur vos réseaux." : "Share your promo code with your audience across your socials."} />
+            <StepCard n={2} title={lang === "fr" ? "Vos abonnés achètent" : "Your followers buy"} text={lang === "fr" ? "Chaque commande passée avec votre code est suivie automatiquement." : "Every order placed with your code is tracked automatically."} />
+            <StepCard n={3} title={lang === "fr" ? "Vous êtes payé" : "You get paid"} text={lang === "fr" ? "Vos commissions s'accumulent et vous sont versées sur votre IBAN." : "Your commissions add up and are paid out to your bank account."} />
+          </div>
+        </div>
+
+        <div style={{ marginTop: 40 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 16px" }}>{lang === "fr" ? "Conseils pour vendre plus" : "Tips to sell more"}</h2>
+          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "8px 0" }}>
+            {[
+              lang === "fr" ? "Montrez le produit en situation réelle, pas juste un lien en bio." : "Show the product in real use, not just a link in bio.",
+              lang === "fr" ? "Rappelez votre code à la fin de vos vidéos, c'est là qu'on agit." : "Repeat your code at the end of your videos, that's when people act.",
+              lang === "fr" ? "Postez régulièrement : la répétition crée la confiance et les ventes." : "Post consistently: repetition builds trust and sales.",
+            ].map((tip, i, arr) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "14px 22px", borderBottom: i < arr.length - 1 ? "1px solid #F5F5F5" : "none" }}>
+                <div style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(0,71,255,0.08)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#0047FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <span style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.5, letterSpacing: "-0.01em" }}>{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 48, paddingTop: 24, borderTop: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "rgba(0,0,0,0.4)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Propulsé par" : "Powered by"}</span>
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 18, width: "auto", opacity: 0.85 }} />
         </div>
 
       </div>
