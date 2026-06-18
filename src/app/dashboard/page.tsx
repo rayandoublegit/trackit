@@ -704,7 +704,7 @@ function DashboardPageContent() {
       </aside>
 
       <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
-        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} />}
+        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} onNavigateToDiscovery={() => goToSidebarItem("discovery")} />}
         {view === "discovery" && (
           <DiscoveryView
             isMobile={isMobile}
@@ -887,7 +887,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
   );
 }
 
-function HomeView({ fullName, username, isMobile, gettingStarted, user }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean; creatorsCount: number; outreachCount: number; salesCount: number }; user?: User | null }) {
+function HomeView({ fullName, username, isMobile, gettingStarted, user, onNavigateToDiscovery }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean; creatorsCount: number; outreachCount: number; salesCount: number }; user?: User | null; onNavigateToDiscovery: () => void }) {
   const lang = useLang();
   const [shopifyModalOpen, setShopifyModalOpen] = useState(false);
   const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
@@ -918,7 +918,7 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user }: { full
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "#FFFFFF", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Trouvez vos prochains créateurs" : "Find your next creators"}</h2>
             <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.01em", margin: 0, maxWidth: 460 }}>{lang === "fr" ? "Parcourez des milliers de créateurs sélectionnés et lancez votre première campagne en quelques minutes." : "Browse thousands of curated creators and launch your first campaign in minutes."}</p>
           </div>
-          <button type="button" onClick={() => { window.location.hash = "discovery"; window.location.reload(); }} style={{ background: "#FFFFFF", color: "#0047FF", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <button type="button" onClick={onNavigateToDiscovery} style={{ background: "#FFFFFF", color: "#0047FF", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {lang === "fr" ? "Trouver des créateurs" : "Find creators"}
           </button>
         </div>
