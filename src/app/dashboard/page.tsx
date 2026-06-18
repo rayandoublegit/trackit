@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
+import { CreatorScripts } from "./CreatorScripts";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CampaignsView } from "./CampaignsView";
@@ -63,7 +64,7 @@ import {
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "payouts", "settings"];
+const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "scripts", "payouts", "settings"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -804,6 +805,9 @@ function DashboardPageContent() {
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
+        )}
+        {view === "scripts" && user && isCreator && (
+          <CreatorScripts userId={user.id} isMobile={isMobile} />
         )}
         {view === "integrations" && (
           <IntegrationsView
@@ -2872,6 +2876,7 @@ function buildSidebarNavEntries(
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
+    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand"] },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
     { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {
@@ -2927,6 +2932,8 @@ function renderSidebarNavIcon(iconKey: string) {
       return <InviteIcon />;
     case "analytics":
       return <AnalyticsIcon />;
+    case "scripts":
+      return <ScriptsIcon />;
     case "integrations":
       return <IntegrationIcon />;
     case "automation":
@@ -2966,6 +2973,7 @@ function AffiliateIcon() { return <svg width="18" height="18" viewBox="0 0 24 24
 function CampaignIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l16-6v14L3 13v-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M7 13v5l4 1v-5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function MessageIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function PayoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>; }
+function ScriptsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function InviteIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 7l10 6 10-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function AnalyticsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>; }
 function IntegrationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
