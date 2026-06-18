@@ -13,6 +13,7 @@ import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
 import { CreatorScripts } from "./CreatorScripts";
+import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CampaignsView } from "./CampaignsView";
@@ -1000,6 +1001,7 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user, onNaviga
       {shopifyModalOpen && (
         <ShopifyConnectModal lang={lang} userId={user?.id} onClose={() => setShopifyModalOpen(false)} />
       )}
+      {user && <NewCreatorModal brandId={user.id} />}
     </>
   );
 }
