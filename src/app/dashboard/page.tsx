@@ -599,8 +599,10 @@ function DashboardPageContent() {
                 <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {profile?.username ? `@${profile.username}` : "Account"}
                 </span>
-                <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                  {lang === "fr"
+                <span style={{ fontSize: 12, color: isCreator ? "#0047FF" : "#9A9A9A", letterSpacing: "-0.01em" }}>
+                  {isCreator
+                    ? (lang === "fr" ? "Créateur" : "Creator")
+                    : lang === "fr"
                     ? isScale
                       ? "Plan Scale"
                       : plan === "pro"

@@ -36,11 +36,13 @@ export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ ok: false, error: "Server not configured" }, { status: 500 });
 
-  let body: { token?: string; creatorId?: string };
+  let body: { token?: string; creatorId?: string; fullName?: string; socialHandle?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 }); }
 
   const token = (body.token || "").trim();
   const creatorId = (body.creatorId || "").trim();
+  const fullName = (body.fullName || "").trim();
+  const socialHandle = (body.socialHandle || "").trim().replace(/^@+/, "");
   if (!token || !creatorId) return NextResponse.json({ ok: false, error: "Missing token or creatorId" }, { status: 400 });
 
   // Vérifie l'invitation.
@@ -53,9 +55,12 @@ export async function POST(req: Request) {
   if (invite.status === "revoked") return NextResponse.json({ ok: false, error: "Invite revoked" }, { status: 410 });
 
   // Marque le compte comme "creator".
+  const profileUpdate: Record<string, unknown> = { account_type: "creator" };
+  if (fullName) profileUpdate.full_name = fullName;
+  if (socialHandle) profileUpdate.username = socialHandle;
   const { error: profErr } = await supabase
     .from("profiles")
-    .update({ account_type: "creator" })
+    .update(profileUpdate)
     .eq("id", creatorId);
   if (profErr) return NextResponse.json({ ok: false, error: profErr.message }, { status: 500 });
 

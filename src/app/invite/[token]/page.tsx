@@ -16,6 +16,8 @@ export default function InvitePage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [socialHandle, setSocialHandle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [done, setDone] = useState(false);
@@ -36,6 +38,8 @@ export default function InvitePage() {
     setFormError("");
     if (!supabase) { setFormError("Service indisponible"); return; }
     if (!email.trim() || !password) { setFormError("Entrez votre email et un mot de passe"); return; }
+    if (!fullName.trim()) { setFormError("Entrez votre nom complet"); return; }
+    if (!socialHandle.trim()) { setFormError("Entrez votre pseudo sur les réseaux"); return; }
     setSubmitting(true);
     try {
       let userId = "";
@@ -59,7 +63,7 @@ export default function InvitePage() {
       const res = await fetch("/api/invites/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, creatorId: userId }),
+        body: JSON.stringify({ token, creatorId: userId, fullName: fullName.trim(), socialHandle: socialHandle.trim() }),
       });
       const data = await res.json();
       if (!data.ok) { setFormError(data.error || "Échec de la liaison"); setSubmitting(false); return; }
@@ -73,6 +77,7 @@ export default function InvitePage() {
   return <InviteUI
     loading={loading} brandName={brandName} inviteError={inviteError}
     email={email} setEmail={setEmail} password={password} setPassword={setPassword}
+    fullName={fullName} setFullName={setFullName} socialHandle={socialHandle} setSocialHandle={setSocialHandle}
     submitting={submitting} formError={formError} done={done} onJoin={handleJoin}
   />;
 }
@@ -94,9 +99,11 @@ function InviteUI(props: {
   loading: boolean; brandName: string; inviteError: string;
   email: string; setEmail: (v: string) => void;
   password: string; setPassword: (v: string) => void;
+  fullName: string; setFullName: (v: string) => void;
+  socialHandle: string; setSocialHandle: (v: string) => void;
   submitting: boolean; formError: string; done: boolean; onJoin: () => void;
 }) {
-  const { loading, brandName, inviteError, email, setEmail, password, setPassword, submitting, formError, done, onJoin } = props;
+  const { loading, brandName, inviteError, email, setEmail, password, setPassword, fullName, setFullName, socialHandle, setSocialHandle, submitting, formError, done, onJoin } = props;
   const [showPassword, setShowPassword] = useState(false);
 
   const input: React.CSSProperties = {
@@ -159,6 +166,8 @@ function InviteUI(props: {
               <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, marginBottom: 28 }}>
                 Créez votre compte gratuit en quelques secondes.
               </p>
+              <input type="text" placeholder="Votre nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} style={input} autoComplete="name" />
+              <input type="text" placeholder="Votre pseudo (ex : @moncompte)" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} style={input} autoComplete="off" />
               <input type="email" placeholder="Votre email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" />
               <div style={{ position: "relative" }}>
                 <input type={showPassword ? "text" : "password"} placeholder="Choisissez un mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...input, paddingRight: 46 }} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />
