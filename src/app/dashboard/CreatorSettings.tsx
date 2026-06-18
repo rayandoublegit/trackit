@@ -92,7 +92,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const displayAvatar = avatarPreview || avatarUrl;
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF" }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
       <div style={{ maxWidth: 520, border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 20 : 28 }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 18, marginBottom: 28 }}>

@@ -734,7 +734,7 @@ function DashboardPageContent() {
         )}
       </aside>
 
-      <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
+      <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FFFFFF" }}>
         {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} onNavigateToDiscovery={navigateToDiscovery} />}
         {view === "discovery" && (
           <DiscoveryView
