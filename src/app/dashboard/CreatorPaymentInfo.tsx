@@ -40,16 +40,13 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      if (!supabase || !userId) { setLoading(false); return; }
+      if (!userId) { setLoading(false); return; }
       try {
-        const { data } = await supabase
-          .from("creator_payment_info")
-          .select("account_holder, bank_name, iban")
-          .eq("creator_id", userId)
-          .maybeSingle();
-        if (!cancelled && data) {
-          setAccountHolder(data.account_holder || "");
-          setBankName(data.bank_name || "");
+        const res = await fetch(`/api/creator/payment?userId=${userId}`);
+        const data = await res.json();
+        if (!cancelled && data?.ok) {
+          setAccountHolder(data.accountHolder || "");
+          setBankName(data.bankName || "");
           setIban(data.iban || "");
         }
       } finally {
@@ -70,19 +67,13 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
     }
     setSaving(true);
     try {
-      const { error: upErr } = await supabase
-        .from("creator_payment_info")
-        .upsert(
-          {
-            creator_id: userId,
-            account_holder: accountHolder.trim(),
-            bank_name: bankName.trim(),
-            iban: iban.trim().replace(/\s+/g, ""),
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "creator_id" }
-        );
-      if (upErr) { setError(upErr.message); return; }
+      const res = await fetch("/api/creator/payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, accountHolder: accountHolder.trim(), bankName: bankName.trim(), iban: iban.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) { setError(data?.error || (lang === "fr" ? "Échec de l'enregistrement." : "Save failed.")); return; }
       setSaved(true);
     } finally {
       setSaving(false);
