@@ -1136,6 +1136,15 @@ export function PayoutsView({
     ? formatPaymentLabelShort(defaultPaymentMethod, lang)
     : null;
 
+  if (isCreator) {
+    return (
+      <>
+        <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Vos commissions et vos coordonnées de virement" : "Your commissions and payout details"} />
+        <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
+      </>
+    );
+  }
+
   return (
     <>
       <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Suivez les commissions et payez les créateurs automatiquement lors des ventes Shopify" : "Track commissions and pay creators automatically when Shopify sales come in"} />
