@@ -181,7 +181,7 @@ export default function OnboardingPage() {
     <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "8px 24px 48px" }}>
       <div style={{ width: "100%", maxWidth: step === 5 ? 1100 : 440 }}>
         <div style={{ display: "flex", gap: 6, marginBottom: 24, maxWidth: 440, marginLeft: step === 5 ? "auto" : undefined, marginRight: step === 5 ? "auto" : undefined }}>
-          {[1, 2, 3, 4, 5].map((i) => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: step >= i ? "#0047FF" : "rgba(0,0,0,0.08)", transition: "background 0.3s" }} />
           ))}
         </div>
