@@ -58,7 +58,8 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
   const resetForm = () => { setTitle(""); setContent(""); setLink(""); setFile(null); setTarget("all"); setError(""); };
 
   const handleSubmit = async () => {
-    if (!brandId || !title.trim()) { setError(lang === "fr" ? "Le titre est requis." : "Title is required."); return; }
+    if (!brandId) { setError(lang === "fr" ? "Erreur : compte marque non identifié. Rafraîchissez la page." : "Error: brand account not identified. Refresh the page."); return; }
+    if (!title.trim()) { setError(lang === "fr" ? "Le titre est requis." : "Title is required."); return; }
     setSaving(true); setError("");
     try {
       let fileUrl = link.trim() || null;
