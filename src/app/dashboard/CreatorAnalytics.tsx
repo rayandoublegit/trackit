@@ -64,7 +64,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
   };
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF" }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
       {stats?.brandName && (
         <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginBottom: 20, letterSpacing: "-0.01em" }}>
           {lang === "fr" ? "Partenariat avec " : "Partnership with "}<strong style={{ color: "#1A1A1A" }}>{stats.brandName}</strong>
