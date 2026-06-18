@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { CreatorPaymentInfo } from "./CreatorPaymentInfo";
 import {
   canUseAutoPayouts,
   canUseManualPayouts,
@@ -914,6 +915,7 @@ export function PayoutsView({
   onUpgradeScale,
   isMobile,
   userId,
+  isCreator,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
@@ -921,6 +923,7 @@ export function PayoutsView({
   onUpgradeScale?: () => void;
   isMobile?: boolean;
   userId?: string;
+  isCreator?: boolean;
 }) {
   const lang = useLang();
   const [search, setSearch] = useState("");

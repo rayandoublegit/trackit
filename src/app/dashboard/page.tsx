@@ -774,7 +774,7 @@ function DashboardPageContent() {
         )}
         {view === "payouts" && user && (
           canUseBasicFeatures ? (
-            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
+            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
             <UpgradeGate feature="Payouts" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
