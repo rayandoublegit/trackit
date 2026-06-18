@@ -12,7 +12,7 @@ export async function getAuthRedirectPath(
 
   // Les créateurs invités ont leur propre espace, jamais l'onboarding marque.
   if (data && data.account_type === "creator") {
-    return "/creator";
+    return "/dashboard?view=analytics";
   }
   if (!data || data.onboarding_completed === false) {
     return "/onboarding";

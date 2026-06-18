@@ -32,7 +32,7 @@ function ConfirmContent() {
         if (user) {
           const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
           if (profile && profile.account_type === "creator") {
-            router.replace("/creator");
+            router.replace("/dashboard?view=analytics");
             return;
           }
           if (!profile || profile.onboarding_completed === false) {
@@ -61,7 +61,7 @@ function ConfirmContent() {
         if (user) {
           const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
           if (profile && profile.account_type === "creator") {
-            router.replace("/creator");
+            router.replace("/dashboard?view=analytics");
             return;
           }
           if (!profile || profile.onboarding_completed === false) {
@@ -83,7 +83,7 @@ function ConfirmContent() {
         if (user) {
           const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
           if (profile && profile.account_type === "creator") {
-            router.replace("/creator");
+            router.replace("/dashboard?view=analytics");
             return;
           }
           if (!profile || profile.onboarding_completed === false) {

@@ -37,7 +37,7 @@ export async function GET(request: Request) {
           .eq("id", user.id)
           .maybeSingle();
         if (profile && profile.account_type === "creator") {
-          return NextResponse.redirect(`${origin}/creator`);
+          return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
         }
         if (!profile || profile.onboarding_completed === false) {
           return NextResponse.redirect(`${origin}/onboarding`);

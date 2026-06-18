@@ -61,6 +61,8 @@ import {
 
 type View = DashboardView;
 
+const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "payouts", "settings"];
+
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
 type SidebarNavEntry = {
@@ -97,9 +99,9 @@ function DashboardPageContent() {
   const [viewReady, setViewReady] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
 
-  // Créateur : seules les vues analytics + payouts sont autorisées.
+  // Créateur : analytics, payouts et paramètres uniquement.
   useEffect(() => {
-    if (isCreator && view !== "analytics" && view !== "payouts") {
+    if (isCreator && !CREATOR_ALLOWED_VIEWS.includes(view)) {
       setView("analytics");
     }
   }, [isCreator, view]);
@@ -399,7 +401,6 @@ function DashboardPageContent() {
 
   const sidebarSectionLabels = useMemo(() => getSidebarSectionLabels(lang), [lang]);
 
-  const CREATOR_ALLOWED_VIEWS = ["analytics", "payouts"];
   const filteredSidebarNav = useMemo(() => {
     let entries = sidebarNavEntries;
     if (isCreator) {
@@ -424,9 +425,15 @@ function DashboardPageContent() {
 
   const goToSidebarItem = (targetView: View) => {
     setView(targetView);
+    writeViewToUrl(targetView);
+    if (user?.id) saveDashboardView(targetView, user.id);
     setSidebarSearch("");
     sidebarSearchRef.current?.blur();
     if (isMobile) setMobileSidebarOpen(false);
+  };
+
+  const navigateToDiscovery = () => {
+    goToSidebarItem("discovery");
   };
 
   const navigateToOutreachSend = (creator?: { username: string; platform: string }) => {
@@ -692,10 +699,15 @@ function DashboardPageContent() {
 
         {!isSidebarSearching && (
           <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
-            {renderSidebarNavItems(sidebarNavEntries.filter((item) => item.section === "footer"))}
+            {renderSidebarNavItems(
+              sidebarNavEntries.filter((item) =>
+                item.section === "footer" && (!isCreator || item.view === "settings")
+              )
+            )}
           </div>
         )}
 
+        {!isCreator && (
         <div style={{ padding: "12px 12px 16px 12px" }}>
           <button
             type="button"
@@ -718,10 +730,11 @@ function DashboardPageContent() {
             )}
           </button>
         </div>
+        )}
       </aside>
 
       <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FAFAFA" }}>
-        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} onNavigateToDiscovery={() => goToSidebarItem("discovery")} />}
+        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} onNavigateToDiscovery={navigateToDiscovery} />}
         {view === "discovery" && (
           <DiscoveryView
             isMobile={isMobile}
