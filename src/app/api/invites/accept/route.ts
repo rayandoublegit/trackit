@@ -88,7 +88,7 @@ export async function POST(req: Request) {
       // La marque l'avait déjà ajouté : on pose juste le lien + le nom.
       await supabase
         .from("creators")
-        .update({ linked_user_id: creatorId, full_name: fullName || undefined })
+        .update({ linked_user_id: creatorId, full_name: fullName || undefined, needs_review: true })
         .eq("id", existing.id);
     } else {
       // Sinon on crée la ligne d'accueil.
@@ -101,6 +101,7 @@ export async function POST(req: Request) {
           linked_user_id: creatorId,
           platform: "tiktok",
           commission_rate: 10,
+          needs_review: true,
         });
     }
   }
