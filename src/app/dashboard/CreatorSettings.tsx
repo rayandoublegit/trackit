@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { applyAppLocale } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 
 const BLUE = "#0047FF";
@@ -28,7 +28,16 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
+
+  const disconnectAccount = async () => {
+    if (!supabase) return;
+    setSigningOut(true);
+    await supabase.auth.signOut({ scope: "global" });
+    clearUserSessionStorage();
+    window.location.href = "/auth";
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -166,13 +175,33 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           </div>
         )}
 
-        <button type="button" onClick={handleSave} disabled={saving} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving ? 0.7 : 1 }}>
+        <button type="button" onClick={handleSave} disabled={saving || signingOut} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: saving || signingOut ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving || signingOut ? 0.7 : 1 }}>
           {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer" : "Save")}
         </button>
 
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid #EFEFEF" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
+          <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
+            {lang === "fr" ? "Déconnectez-vous et dissociez cet appareil de votre compte Trackit." : "Sign out and disconnect this device from your Trackit account."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void disconnectAccount()}
+            disabled={signingOut}
+            style={{
+              padding: "11px 18px", borderRadius: 10, border: "1px solid rgba(220, 38, 38, 0.35)",
+              background: "#FFFFFF", color: "#DC2626", fontSize: 14, fontWeight: 600,
+              fontFamily: "inherit", cursor: signingOut ? "default" : "pointer", letterSpacing: "-0.01em",
+              opacity: signingOut ? 0.6 : 1,
+            }}
+          >
+            {signingOut ? (lang === "fr" ? "Déconnexion..." : "Disconnecting...") : (lang === "fr" ? "Déconnecter" : "Disconnect")}
+          </button>
+        </div>
+
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <span style={{ fontSize: 13, color: "rgba(0,0,0,0.4)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Propulsé par" : "Powered by"}</span>
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 18, width: "auto", opacity: 0.85 }} />
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 26, width: "auto", opacity: 0.85 }} />
         </div>
 
       </div>

@@ -38,8 +38,8 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
   };
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
-      <div style={{ maxWidth: 640 }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 48, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
+      <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.035em", margin: "0 0 8px" }}>{lang === "fr" ? "Inviter un créateur" : "Invite a creator"}</h1>
           <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.5 }}>
@@ -73,7 +73,7 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
 
         <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <span style={{ fontSize: 13, color: "rgba(0,0,0,0.4)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Propulsé par" : "Powered by"}</span>
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 18, width: "auto", opacity: 0.85 }} />
+          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 36, width: "auto", opacity: 0.85 }} />
         </div>
       </div>
     </div>
