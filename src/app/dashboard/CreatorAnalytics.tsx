@@ -48,3 +48,82 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
     void load();
     return () => { cancelled = true; };
   }, [userId]);
+
+  if (loading) {
+    return (
+      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "#9A9A9A", fontSize: 14 }}>
+        {lang === "fr" ? "Chargement de vos statistiques..." : "Loading your stats..."}
+      </div>
+    );
+  }
+
+  const fmtDate = (iso: string) => {
+    try {
+      return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
+    } catch { return iso; }
+  };
+
+  return (
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF" }}>
+      {stats?.brandName && (
+        <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginBottom: 20, letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "Partenariat avec " : "Partnership with "}<strong style={{ color: "#1A1A1A" }}>{stats.brandName}</strong>
+          {stats.discountCode ? (lang === "fr" ? ` · Code : ${stats.discountCode}` : ` · Code: ${stats.discountCode}`) : ""}
+        </p>
+      )}
+
+      {!stats?.linked ? (
+        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "40px 28px", textAlign: "center", maxWidth: 560 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Pas encore de ventes enregistrées" : "No sales recorded yet"}
+          </div>
+          <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, margin: 0 }}>
+            {lang === "fr"
+              ? "Vos ventes et commissions apparaîtront ici dès que la marque les aura enregistrées."
+              : "Your sales and commissions will appear here once the brand records them."}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 28 }}>
+            <StatCard label={lang === "fr" ? "Ventes générées" : "Sales driven"} value={formatCurrency(stats.totalSales, lang)} />
+            <StatCard label={lang === "fr" ? "Commissions gagnées" : "Commissions earned"} value={formatCurrency(stats.totalCommissions, lang)} />
+            <StatCard label={lang === "fr" ? "Solde à recevoir" : "Balance due"} value={formatCurrency(stats.balance, lang)} accent />
+          </div>
+
+          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #EFEFEF", fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+              {lang === "fr" ? "Historique de mes ventes" : "My sales history"}
+            </div>
+            {stats.sales.length === 0 ? (
+              <div style={{ padding: "32px 20px", textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+                {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #EFEFEF" }}>
+                      <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
+                      <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Montant vente" : "Sale amount"}</th>
+                      <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Ma commission" : "My commission"}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.sales.map((s, i) => (
+                      <tr key={i} style={{ borderBottom: i < stats.sales.length - 1 ? "1px solid #F5F5F5" : "none" }}>
+                        <td style={{ padding: "12px 20px", color: "#1A1A1A" }}>{fmtDate(s.date)}</td>
+                        <td style={{ padding: "12px 20px", textAlign: "right", color: "#1A1A1A" }}>{formatCurrency(s.orderAmount, lang)}</td>
+                        <td style={{ padding: "12px 20px", textAlign: "right", color: "#0047FF", fontWeight: 600 }}>{formatCurrency(s.commissionAmount, lang)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
