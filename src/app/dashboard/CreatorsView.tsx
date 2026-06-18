@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator } from "@/lib/db";
+import { ScriptsManager } from "./ScriptsManager";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
@@ -16,7 +17,7 @@ import {
 import { UpgradeModal } from "./UpgradeModal";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
-type CreatorsTab = "all" | "active" | "pending";
+type CreatorsTab = "all" | "active" | "pending" | "scripts";
 type SortKey = "followers" | "engagement" | "addedDate";
 
 type ManagedCreator = {
@@ -920,12 +921,14 @@ export function CreatorsView({
   onUpgrade,
   onUpgradePro,
   onUpgradeScale,
+  userId,
 }: {
   isMobile?: boolean;
   plan?: PlanTier;
   onUpgrade?: () => void;
   onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
+  userId?: string;
 }) {
   const lang = useLang();
   const [creators, setCreators] = useState<ManagedCreator[]>([]);
@@ -1102,6 +1105,7 @@ export function CreatorsView({
               { id: "all" as const, label: lang === "fr" ? "Tous les créateurs" : "All Creators" },
               { id: "active" as const, label: lang === "fr" ? "Actifs" : "Active" },
               { id: "pending" as const, label: lang === "fr" ? "En attente" : "Pending" },
+              { id: "scripts" as const, label: "Scripts" },
             ] as const
           ).map((t) => (
             <button
@@ -1126,6 +1130,10 @@ export function CreatorsView({
           ))}
         </div>
 
+        {tab === "scripts" ? (
+          <ScriptsManager brandId={userId} isMobile={isMobile} />
+        ) : (
+        <>
         <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
           <div
             style={{
@@ -1284,6 +1292,8 @@ export function CreatorsView({
             </>
           )}
         </div>
+        </>
+        )}
       </div>
 
       {importOpen && <ImportCsvModal lang={lang} onClose={() => setImportOpen(false)} />}

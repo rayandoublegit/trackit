@@ -754,6 +754,7 @@ function DashboardPageContent() {
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
+            userId={user?.id}
           />
         )}
         {view === "campaigns" && (
