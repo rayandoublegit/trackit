@@ -95,6 +95,14 @@ function DashboardPageContent() {
   const sidebarSearchRef = useRef<HTMLInputElement>(null);
   const [view, setView] = useState<View>("dashboard");
   const [viewReady, setViewReady] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
+
+  // Créateur : seules les vues analytics + payouts sont autorisées.
+  useEffect(() => {
+    if (isCreator && view !== "analytics" && view !== "payouts") {
+      setView("analytics");
+    }
+  }, [isCreator, view]);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);
@@ -213,10 +221,8 @@ function DashboardPageContent() {
         }
         // If onboarding was never finished, resume it instead of showing an empty dashboard.
         if (profileData.account_type === "creator") {
-          router.replace("/creator");
-          return;
-        }
-        if (profileData.onboarding_completed === false) {
+          setIsCreator(true);
+        } else if (profileData.onboarding_completed === false) {
           router.replace("/onboarding");
           return;
         }
@@ -393,10 +399,15 @@ function DashboardPageContent() {
 
   const sidebarSectionLabels = useMemo(() => getSidebarSectionLabels(lang), [lang]);
 
+  const CREATOR_ALLOWED_VIEWS = ["analytics", "payouts"];
   const filteredSidebarNav = useMemo(() => {
+    let entries = sidebarNavEntries;
+    if (isCreator) {
+      entries = entries.filter((item) => CREATOR_ALLOWED_VIEWS.includes(item.view));
+    }
     const q = sidebarSearch.trim().toLowerCase();
-    if (!q) return sidebarNavEntries;
-    return sidebarNavEntries.filter((item) => {
+    if (!q) return entries;
+    return entries.filter((item) => {
       const haystack = [
         item.label,
         item.section,
@@ -407,7 +418,7 @@ function DashboardPageContent() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [sidebarSearch, sidebarNavEntries, sidebarSectionLabels]);
+  }, [sidebarSearch, sidebarNavEntries, sidebarSectionLabels, isCreator]);
 
   const isSidebarSearching = sidebarSearch.trim().length > 0;
 
