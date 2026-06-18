@@ -94,7 +94,7 @@ function InviteUI(props: {
   const shell: React.CSSProperties = {
     minHeight: "100vh", background: "#FFFFFF",
     fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
-    display: "flex", alignItems: "center", justifyContent: "center", padding: "24px",
+    display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "96px 24px 48px",
   };
   const card: React.CSSProperties = { width: "100%", maxWidth: 420 };
   const input: React.CSSProperties = {
@@ -111,7 +111,7 @@ function InviteUI(props: {
   return (
     <div style={shell}>
       <div style={card}>
-        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 28, marginBottom: 32, display: "block" }} />
+        <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 40, marginBottom: 40, display: "block" }} />
 
         {loading ? (
           <div style={{ fontSize: 15, color: "rgba(0,0,0,0.4)" }}>Chargement...</div>
