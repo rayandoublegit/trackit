@@ -19,11 +19,12 @@ type CreatorStats = {
   sales: { orderAmount: number; commissionAmount: number; date: string; discountCode: string | null }[];
 };
 
-function StatCard({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function StatCard({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: boolean }) {
   return (
-    <div style={{ flex: "1 1 180px", minWidth: 160, background: accent ? BLUE : "#FFFFFF", border: accent ? "none" : "1px solid #EFEFEF", borderRadius: 16, padding: "20px 22px" }}>
-      <div style={{ fontSize: 13, color: accent ? "rgba(255,255,255,0.8)" : "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 600, color: accent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.03em" }}>{value}</div>
+    <div style={{ flex: "1 1 200px", minWidth: 170, background: accent ? BLUE : "#FFFFFF", border: accent ? "none" : "1px solid #EFEFEF", borderRadius: 16, padding: "22px 24px", boxShadow: accent ? "0 8px 24px rgba(0,71,255,0.18)" : "0 1px 2px rgba(0,0,0,0.03)" }}>
+      <div style={{ fontSize: 13, color: accent ? "rgba(255,255,255,0.85)" : "#9A9A9A", marginBottom: 10, letterSpacing: "-0.01em", fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 650, color: accent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1 }}>{value}</div>
+      {hint && <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.7)" : "#B0B0B0", marginTop: 8, letterSpacing: "-0.01em" }}>{hint}</div>}
     </div>
   );
 }
@@ -31,6 +32,7 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
 export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
   const [stats, setStats] = useState<CreatorStats | null>(null);
+  const [firstName, setFirstName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +42,10 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
       try {
         const res = await fetch(`/api/creator/stats?userId=${userId}`);
         const data = await res.json();
-        if (!cancelled && data?.ok) setStats(data);
+        if (!cancelled && data?.ok) {
+          setStats(data);
+          if (data.creatorName) setFirstName(String(data.creatorName).split(" ")[0]);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -51,7 +56,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
 
   if (loading) {
     return (
-      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "#9A9A9A", fontSize: 14 }}>
+      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "#9A9A9A", fontSize: 14, background: "#FFFFFF", minHeight: "100vh" }}>
         {lang === "fr" ? "Chargement de vos statistiques..." : "Loading your stats..."}
       </div>
     );
@@ -63,70 +68,34 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
     } catch { return iso; }
   };
 
+  const greeting = firstName
+    ? (lang === "fr" ? `Bonjour ${firstName}` : `Hi ${firstName}`)
+    : (lang === "fr" ? "Bonjour" : "Welcome");
+  const subtitle = stats?.brandName
+    ? (lang === "fr" ? `Voici un aperçu de votre partenariat avec ${stats.brandName}.` : `Here's an overview of your partnership with ${stats.brandName}.`)
+    : (lang === "fr" ? "Voici un aperçu de votre activité de créateur." : "Here's an overview of your creator activity.");
+  const sales = stats?.sales ?? [];
+
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
-      {stats?.brandName && (
-        <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", marginBottom: 20, letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "Partenariat avec " : "Partnership with "}<strong style={{ color: "#1A1A1A" }}>{stats.brandName}</strong>
-          {stats.discountCode ? (lang === "fr" ? ` · Code : ${stats.discountCode}` : ` · Code: ${stats.discountCode}`) : ""}
-        </p>
-      )}
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
+      <div style={{ maxWidth: 920, margin: "0 auto" }}>
 
-      {!stats?.linked ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "55vh", textAlign: "center", padding: "0 24px" }}>
-          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "rgba(0,71,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 4 8-8" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 8h4v4" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.02em" }}>
-            {lang === "fr" ? "Pas encore de ventes" : "No sales recorded yet"}
-          </div>
-          <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, margin: 0, maxWidth: 380 }}>
-            {lang === "fr"
-              ? "Vos ventes et commissions apparaîtront ici dès que la marque les aura enregistrées."
-              : "Your sales and commissions will appear here once the brand records them."}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 28 }}>
-            <StatCard label={lang === "fr" ? "Ventes générées" : "Sales driven"} value={formatCurrency(stats.totalSales, lang)} />
-            <StatCard label={lang === "fr" ? "Commissions gagnées" : "Commissions earned"} value={formatCurrency(stats.totalCommissions, lang)} />
-            <StatCard label={lang === "fr" ? "Solde à recevoir" : "Balance due"} value={formatCurrency(stats.balance, lang)} accent />
-          </div>
-
-          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #EFEFEF", fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-              {lang === "fr" ? "Historique de mes ventes" : "My sales history"}
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.035em", margin: "0 0 8px" }}>{greeting}</h1>
+          <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.5 }}>{subtitle}</p>
+          {stats?.discountCode && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 16, padding: "8px 14px", borderRadius: 999, background: "rgba(0,71,255,0.06)", border: "1px solid rgba(0,71,255,0.15)" }}>
+              <span style={{ fontSize: 13, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Votre code" : "Your code"}</span>
+              <span style={{ fontSize: 13, fontWeight: 650, color: BLUE, letterSpacing: "0.02em" }}>{stats.discountCode}</span>
+              {stats.commissionRate != null && (
+                <span style={{ fontSize: 13, color: "rgba(0,0,0,0.4)", letterSpacing: "-0.01em" }}>· {stats.commissionRate}%</span>
+              )}
             </div>
-            {stats.sales.length === 0 ? (
-              <div style={{ padding: "32px 20px", textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
-                {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
-              </div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid #EFEFEF" }}>
-                      <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
-                      <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Montant vente" : "Sale amount"}</th>
-                      <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Ma commission" : "My commission"}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.sales.map((s, i) => (
-                      <tr key={i} style={{ borderBottom: i < stats.sales.length - 1 ? "1px solid #F5F5F5" : "none" }}>
-                        <td style={{ padding: "12px 20px", color: "#1A1A1A" }}>{fmtDate(s.date)}</td>
-                        <td style={{ padding: "12px 20px", textAlign: "right", color: "#1A1A1A" }}>{formatCurrency(s.orderAmount, lang)}</td>
-                        <td style={{ padding: "12px 20px", textAlign: "right", color: "#0047FF", fontWeight: 600 }}>{formatCurrency(s.commissionAmount, lang)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 32 }}>
+          <StatCard label={lang === "fr" ? "Ventes générées" : "Sales driven"} value={formatCurrency(stats?.totalSales ?? 0, lang)} hint={lang === "fr" ? "Total des commandes via votre code" : "Total orders via your code"} />
+          <StatCard label={lang === "fr" ? "Commissions gagnées" : "Commissions earned"} value={formatCurrency(stats?.totalCommissions ?? 0, lang)} hint={lang === "fr" ? "Cumul depuis le début" : "All-time total"} />
+          <StatCard label={lang === "fr" ? "Solde à recevoir" : "Balance due"} value={formatCurrency(stats?.balance ?? 0, lang)} hint={lang === "fr" ? "En attente de versement" : "Awaiting payout"} accent />
+        </div>
