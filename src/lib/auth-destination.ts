@@ -6,10 +6,14 @@ export async function getAuthRedirectPath(
 ): Promise<string> {
   const { data } = await supabase
     .from("profiles")
-    .select("onboarding_completed")
+    .select("onboarding_completed, account_type")
     .eq("id", userId)
     .maybeSingle();
 
+  // Les créateurs invités ont leur propre espace, jamais l'onboarding marque.
+  if (data && data.account_type === "creator") {
+    return "/creator";
+  }
   if (!data || data.onboarding_completed === false) {
     return "/onboarding";
   }

@@ -200,7 +200,7 @@ function DashboardPageContent() {
         const loadProfile = async () => {
           const { data } = await supabase!
             .from("profiles")
-            .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store")
+            .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
             .eq("id", authUser.id)
             .maybeSingle();
           return data;
@@ -212,6 +212,10 @@ function DashboardPageContent() {
           return;
         }
         // If onboarding was never finished, resume it instead of showing an empty dashboard.
+        if (profileData.account_type === "creator") {
+          router.replace("/creator");
+          return;
+        }
         if (profileData.onboarding_completed === false) {
           router.replace("/onboarding");
           return;
