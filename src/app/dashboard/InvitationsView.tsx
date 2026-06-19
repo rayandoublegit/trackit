@@ -94,10 +94,6 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
           0%, 100% { transform: scale(1); opacity: 0.55; }
           50% { transform: scale(1.06); opacity: 0.85; }
         }
-        @keyframes inviteLineGrow {
-          from { transform: scaleX(0); }
-          to { transform: scaleX(1); }
-        }
         @keyframes inviteSuccessIn {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
@@ -107,10 +103,6 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
         }
         .invite-step {
           animation: inviteFadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
-        }
-        .invite-step-line {
-          animation: inviteLineGrow 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
-          transform-origin: left center;
         }
         .invite-glow {
           animation: invitePulse 3.5s ease-in-out infinite;
@@ -130,7 +122,7 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
           background: "#FFFFFF",
         }}
       >
-        <div style={{ maxWidth: 760 }}>
+        <div style={{ maxWidth: 960 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: isMobile ? 22 : 26, width: "auto" }} />
             <span
@@ -185,7 +177,7 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
           flex: 1,
         }}
       >
-        <div style={{ maxWidth: 760 }}>
+        <div style={{ maxWidth: 960 }}>
           <div
             className="invite-hero-card"
             style={{
@@ -368,26 +360,11 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
               </h2>
             </div>
 
-            {!isMobile && (
-              <div
-                className="invite-step-line"
-                aria-hidden
-                style={{
-                  height: 2,
-                  background: `linear-gradient(90deg, ${BLUE} 0%, rgba(0,71,255,0.15) 100%)`,
-                  borderRadius: 999,
-                  marginBottom: 28,
-                  marginLeft: 28,
-                  marginRight: 28,
-                }}
-              />
-            )}
-
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
-                gap: isMobile ? 12 : 16,
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(4, minmax(0, 1fr))",
+                gap: isMobile ? 12 : 20,
               }}
             >
               {PROCESS_STEPS.map((step, i) => {
@@ -399,10 +376,11 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
                     style={{
                       animationDelay: `${0.15 + i * 0.1}s`,
                       border: "1px solid #EFEFEF",
-                      borderRadius: 16,
-                      padding: isMobile ? "18px 18px 18px 56px" : "20px 18px 18px",
+                      borderRadius: 18,
+                      padding: isMobile ? "20px 20px 20px 60px" : "26px 22px 24px",
                       background: "#FFFFFF",
                       position: "relative",
+                      minHeight: isMobile ? undefined : 220,
                       transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                     }}
                     onMouseEnter={(e) => {
@@ -417,18 +395,18 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
                     <div
                       style={{
                         position: isMobile ? "absolute" : "static",
-                        left: isMobile ? 16 : undefined,
-                        top: isMobile ? 18 : undefined,
-                        width: 32,
-                        height: 32,
-                        borderRadius: 10,
+                        left: isMobile ? 18 : undefined,
+                        top: isMobile ? 20 : undefined,
+                        width: isMobile ? 36 : 40,
+                        height: isMobile ? 36 : 40,
+                        borderRadius: 12,
                         background: "rgba(0,71,255,0.08)",
                         border: "1px solid rgba(0,71,255,0.12)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         color: BLUE,
-                        marginBottom: isMobile ? 0 : 14,
+                        marginBottom: isMobile ? 0 : 18,
                       }}
                     >
                       {step.icon}
@@ -436,9 +414,9 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
                     <div
                       style={{
                         position: "absolute",
-                        top: isMobile ? 18 : 14,
-                        right: 14,
-                        fontSize: 11,
+                        top: isMobile ? 20 : 18,
+                        right: 18,
+                        fontSize: 12,
                         fontWeight: 700,
                         color: "rgba(0,71,255,0.35)",
                         letterSpacing: "-0.02em",
@@ -446,10 +424,10 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
                     >
                       {String(i + 1).padStart(2, "0")}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: isMobile ? 14 : 15, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 8, lineHeight: 1.35 }}>
                       {copy.title}
                     </div>
-                    <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0, lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                    <p style={{ fontSize: isMobile ? 12 : 13, color: "#7A7A7A", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
                       {copy.desc}
                     </p>
                   </div>
