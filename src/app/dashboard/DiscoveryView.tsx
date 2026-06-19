@@ -1983,7 +1983,7 @@ export function DiscoveryView({
         : "Upgrade to Scale to manage unlimited creators."
       : plan === "basic"
         ? lang === "fr"
-          ? "Passez à Pro pour gérer jusqu'à 100 créateurs."
+          ? "Passez à Pro pour gérer jusqu'à 50 créateurs."
           : "Upgrade to Pro to manage up to 100 creators."
         : lang === "fr"
           ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
@@ -2014,11 +2014,11 @@ export function DiscoveryView({
   const discoveryLimitSubtitle =
     plan === "basic"
       ? lang === "fr"
-        ? "Passez à Pro pour des découvertes illimitées et des résultats sans limite."
-        : "Upgrade to Pro for unlimited discoveries and uncapped results."
+        ? "Passez à Pro pour 50 découvertes/mois et 25 résultats par recherche."
+        : "Upgrade to Pro for 50 discoveries/month and 25 results per search."
       : lang === "fr"
-        ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. 30 découvertes par jour, résultats illimités."
-        : "Brands on Growth find 3x more profitable creators. 30 daily discoveries, unlimited results.";
+        ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. 20 découvertes par mois, 10 résultats par recherche."
+        : "Brands on Growth find 3x more profitable creators. 20 monthly discoveries, 10 results per search.";
 
   const discoveryLimitCta =
     plan === "basic"

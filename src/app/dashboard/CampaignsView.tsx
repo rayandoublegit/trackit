@@ -209,7 +209,7 @@ function CampaignUpgradeModal({
       : `Pro includes ${max} active campaigns. Upgrade to Scale for unlimited campaigns.`
     : isGrowth
       ? lang === "fr"
-        ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 10 campagnes.`
+        ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 15 campagnes.`
         : `Growth includes ${max} active campaigns. Upgrade to Pro for up to 10 campaigns.`
       : lang === "fr"
         ? `Le plan gratuit inclut ${max} campagne. Passez à Growth pour jusqu'à 3 campagnes.`
