@@ -34,7 +34,22 @@ export async function POST(request: NextRequest) {
     (creators || []).map(c => [c.discount_code?.toUpperCase(), c])
   );
 
-  if (discountMap.size === 0) {
+  // Campaign-specific codes (one per creator+campaign). A matched campaign code
+  // tags the sale with campaign_id and applies the link's rate.
+  const { data: campaignLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("creator_id, campaign_id, discount_code, commission_rate")
+    .eq("user_id", userId)
+    .not("discount_code", "is", null);
+
+  const campaignCodeMap = new Map(
+    (campaignLinks || []).map(l => [
+      l.discount_code?.toUpperCase(),
+      { creator_id: l.creator_id, campaign_id: l.campaign_id, rate: l.commission_rate },
+    ])
+  );
+
+  if (discountMap.size === 0 && campaignCodeMap.size === 0) {
     return NextResponse.json({ synced: 0, message: "No creators with discount codes" });
   }
 
@@ -50,8 +65,13 @@ export async function POST(request: NextRequest) {
   for (const order of orders) {
     const codes: string[] = order.discount_codes?.map((d: any) => d.code.toUpperCase()) || [];
     for (const code of codes) {
-      const creator = discountMap.get(code);
+      // Campaign code wins; else fall back to the creator's own code.
+      const campaignLink = campaignCodeMap.get(code);
+      const creator = campaignLink
+        ? { id: campaignLink.creator_id, commission_rate: campaignLink.rate }
+        : discountMap.get(code);
       if (!creator) continue;
+      const linkedCampaignId = campaignLink ? campaignLink.campaign_id : null;
 
       const orderAmount = parseFloat(order.total_price || "0");
       const commissionRate = creator.commission_rate || 10;
@@ -73,6 +93,7 @@ export async function POST(request: NextRequest) {
         order_amount: orderAmount,
         commission_amount: commissionAmount,
         discount_code_used: code,
+        campaign_id: linkedCampaignId,
         shop_domain: profile.shopify_store,
         status: order.financial_status === "paid" ? "paid" : "pending",
         created_at: order.created_at,
