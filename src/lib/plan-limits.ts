@@ -55,7 +55,7 @@ export function hasDiscoveryDailyCap(plan: PlanTier): boolean {
 }
 
 export function hasUnlimitedDiscoveries(plan: PlanTier): boolean {
-  return isProOrAbove(plan);
+  return plan === "scale";
 }
 
 /** Max creators shown per search; `null` = unlimited (Pro + Scale). */
@@ -67,7 +67,7 @@ export function getResultsPerSearchLimit(plan: PlanTier): number | null {
 }
 
 export function hasUnlimitedSearchResults(plan: PlanTier): boolean {
-  return isProOrAbove(plan);
+  return plan === "scale";
 }
 
 export function getVisibleDiscoveryResults<T>(plan: PlanTier, creators: T[]): T[] {
