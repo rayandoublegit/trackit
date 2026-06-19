@@ -114,6 +114,25 @@ function mapDbCampaign(row: Record<string, unknown>, creatorIds?: string[]): Cam
   };
 }
 
+// Clamp a commission rate string to a sane 0-100 range. Returns a number.
+function clampRate(raw: string, fallback = 10): number {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(100, Math.max(0, n));
+}
+
+// Normalize a free-text date entry to an ISO date (YYYY-MM-DD), or undefined if unparseable.
+// Accepts "May 1, 2026", "2026-05-01", "01/05/2026", etc. Rejects junk like "22" or "020".
+function normalizeDate(raw: string | undefined): string | undefined {
+  const s = (raw || "").trim();
+  if (!s) return undefined;
+  const parsed = new Date(s);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  // Guard against partial inputs the Date constructor over-accepts (e.g. a bare "22").
+  if (!/[a-zA-Z]/.test(s) && !/\d{4}/.test(s)) return undefined;
+  return parsed.toISOString().split("T")[0];
+}
+
 function mapSavedCreator(row: Record<string, unknown>): SavedCreatorOption {
   return {
     id: String(row.id ?? ""),
@@ -1121,10 +1140,10 @@ function EditCampaignModal({
         name: name.trim(),
         description: description.trim() || undefined,
         platform,
-        startDate: start.trim() || undefined,
-        endDate: end.trim() || undefined,
+        startDate: normalizeDate(start),
+        endDate: normalizeDate(end),
         commissionType: commissionType === "percent" ? "percentage" : "flat",
-        commissionRate: parseFloat(commissionRate) || 10,
+        commissionRate: clampRate(commissionRate),
         autoPayout,
         creatorIds: assignedIds,
       });
@@ -1330,10 +1349,10 @@ function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onCl
       name: name || "Untitled Campaign",
       description,
       platform,
-      startDate: start,
-      endDate: end,
+      startDate: normalizeDate(start),
+      endDate: normalizeDate(end),
       commissionType: commissionType === "percent" ? "percentage" : "flat",
-      commissionRate: parseFloat(commissionRate) || 10,
+      commissionRate: clampRate(commissionRate),
       autoPayout: false,
     });
   };
