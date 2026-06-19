@@ -1638,7 +1638,7 @@ function ApiSettings() {
         <div style={{ height: 8, background: "#EFEFEF", borderRadius: 999, overflow: "hidden", marginBottom: 14 }}>
           <div style={{ width: `${(apiCalls / apiLimit) * 100}%`, height: "100%", background: "#0047FF", borderRadius: 999 }} />
         </div>
-        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Passer à Pro pour des appels API illimités →" : "Upgrade for unlimited API calls →"}</a>
+        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Passer à Pro pour plus de fonctionnalités →" : "Upgrade for more features →"}</a>
       </Card>
     </>
   );

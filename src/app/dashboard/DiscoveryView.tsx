@@ -1984,7 +1984,7 @@ export function DiscoveryView({
       : plan === "basic"
         ? lang === "fr"
           ? "Passez à Pro pour gérer jusqu'à 50 créateurs."
-          : "Upgrade to Pro to manage up to 100 creators."
+          : "Upgrade to Pro to manage up to 50 creators."
         : lang === "fr"
           ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
           : "Upgrade to Growth to manage up to 25 creators.";

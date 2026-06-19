@@ -321,7 +321,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for unlimited everything.",
+    a: "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for 50 discoveries/month, 25 results per search, and 50 managed creators.",
   },
   {
     q: "How does the AI outreach work?",
@@ -1035,8 +1035,8 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
         q: lang === "fr" ? "Y a-t-il un plan gratuit ?" : "Is there a free plan?",
         a:
           lang === "fr"
-            ? "Oui. Le plan gratuit vous donne 5 recherches de créateurs par jour, des modèles de messages de base et 1 connexion boutique Shopify. Passez à Pro pour tout en illimité."
-            : "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for unlimited everything.",
+            ? "Oui. Le plan gratuit vous donne 5 recherches de créateurs par jour, des modèles de messages de base et 1 connexion boutique Shopify. Passez à Pro pour 50 découvertes/mois, 25 résultats par recherche et 50 créateurs gérés."
+            : "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for 50 discoveries/month, 25 results per search, and 50 managed creators.",
       },
       {
         q: lang === "fr" ? "Comment fonctionne le message IA ?" : "How does the AI outreach work?",

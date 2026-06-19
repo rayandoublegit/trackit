@@ -1070,7 +1070,7 @@ export function CreatorsView({
                     : plan === "basic"
                       ? lang === "fr"
                         ? `🔒 Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs — Plan Pro requis.\n\nGérez jusqu'à 50 créateurs avec Pro.\n\nPassez à Pro →`
-                        : `🔒 ${BASIC_MAX_MANAGED_CREATORS} creator limit — Pro plan required.\n\nManage up to 100 creators on Pro.\n\nUpgrade to Pro →`
+                        : `🔒 ${BASIC_MAX_MANAGED_CREATORS} creator limit — Pro plan required.\n\nManage up to 50 creators on Pro.\n\nUpgrade to Pro →`
                       : lang === "fr"
                         ? `🔒 Limite de ${getMaxManagedCreators(plan)} créateurs.\n\nPassez à Growth pour jusqu'à 25 créateurs.\n\nPassez à Growth →`
                         : `🔒 ${getMaxManagedCreators(plan)} creator limit.\n\nUpgrade to Growth for up to 25 creators.\n\nUpgrade to Growth →`);
