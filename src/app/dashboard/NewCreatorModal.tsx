@@ -167,35 +167,43 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                   color: BLUE,
                   letterSpacing: "0.06em",
                   textTransform: "uppercase",
-                  marginBottom: 6,
+                  marginBottom: 8,
                 }}
               >
-                {lang === "fr" ? "Nouveau créateur" : "New creator"}
+                {lang === "fr" ? "Bonne nouvelle !" : "Great news!"}
               </div>
               <h2
                 style={{
-                  fontSize: 20,
+                  fontSize: 19,
                   fontWeight: 650,
                   color: "#1A1A1A",
-                  margin: "0 0 6px",
+                  margin: "0 0 8px",
                   letterSpacing: "-0.03em",
-                  lineHeight: 1.2,
+                  lineHeight: 1.25,
                 }}
               >
-                {displayName}
+                {lang === "fr" ? "Vous avez un nouveau créateur !" : "You have a new creator!"}
               </h2>
               <p
                 style={{
                   fontSize: 13,
                   color: "#7A7A7A",
                   margin: 0,
-                  lineHeight: 1.45,
+                  lineHeight: 1.5,
                   letterSpacing: "-0.01em",
                 }}
               >
-                {lang === "fr"
-                  ? "a rejoint via votre lien d'invitation. Complétez ses informations pour finaliser."
-                  : "joined via your invite link. Complete their details to finish setup."}
+                {lang === "fr" ? (
+                  <>
+                    <span style={{ color: "#1A1A1A", fontWeight: 600 }}>{displayName}</span>
+                    {" "}vient de rejoindre via votre lien d&apos;invitation — complétez ses infos pour le lancer !
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: "#1A1A1A", fontWeight: 600 }}>{displayName}</span>
+                    {" "}just joined via your invite link — complete their details to get them started!
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -247,7 +255,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
               marginBottom: 8,
             }}
           >
-            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer le créateur" : "Save creator")}
+            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer le créateur !" : "Save creator!")}
           </button>
           <button
             type="button"
@@ -272,7 +280,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
 
           {queue.length > 1 && (
             <div style={{ marginTop: 14, fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-              {lang === "fr" ? `+${queue.length - 1} autre(s) en attente` : `+${queue.length - 1} more waiting`}
+              {lang === "fr" ? `+${queue.length - 1} autre(s) créateur(s) en attente !` : `+${queue.length - 1} more creator(s) waiting!`}
             </div>
           )}
         </div>
