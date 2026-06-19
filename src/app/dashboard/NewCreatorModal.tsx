@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 
 const BLUE = "#0047FF";
@@ -22,6 +23,8 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const [discount, setDiscount] = useState("");
   const [platform, setPlatform] = useState("tiktok");
   const [saving, setSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   const current = queue[0];
 
@@ -49,19 +52,49 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
       setCommission(current.commission_rate != null ? String(current.commission_rate) : "10");
       setDiscount(current.discount_code || "");
       setPlatform(current.platform || "tiktok");
+      setAvatarFile(null);
+      setAvatarPreview((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
     }
   }, [current?.id]);
 
+  useEffect(() => () => {
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+  }, [avatarPreview]);
+
   const next = () => setQueue((q) => q.slice(1));
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    if (file.size > 2 * 1024 * 1024) return;
+    setAvatarFile(file);
+    setAvatarPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
 
   const handleSave = async () => {
     if (!brandId || !current) return;
     setSaving(true);
     try {
+      let avatarUrl: string | undefined;
+      if (avatarFile && supabase) {
+        const ext = avatarFile.name.split(".").pop() || "jpg";
+        const path = `${brandId}/creators/${current.id}/avatar.${ext}`;
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+        if (!upErr) {
+          const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+          avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
+        }
+      }
       await fetch("/api/creators/pending-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId, creatorId: current.id, commissionRate: commission, discountCode: discount, platform }),
+        body: JSON.stringify({ brandId, creatorId: current.id, commissionRate: commission, discountCode: discount, platform, avatarUrl }),
       });
       next();
     } finally {
@@ -83,6 +116,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   if (!current) return null;
 
   const displayName = current.full_name || `@${current.handle}`;
+  const displayAvatar = avatarPreview || current.avatar_url;
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "11px 13px",
@@ -137,27 +171,60 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
           }}
         >
           <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
-            <div
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: "50%",
-                overflow: "hidden",
-                background: "#FFFFFF",
-                border: "1px solid #EFEFEF",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              {current.avatar_url ? (
-                <img src={current.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <span style={{ fontSize: 24, color: BLUE, fontWeight: 600, letterSpacing: "-0.02em" }}>
-                  {displayName.replace("@", "").charAt(0).toUpperCase()}
+            <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <label
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, cursor: saving ? "default" : "pointer" }}
+                title={lang === "fr" ? "Changer la photo" : "Change photo"}
+              >
+                <div style={{ position: "relative" }}>
+                  <div
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      background: "#FFFFFF",
+                      border: "1px solid #EFEFEF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {displayAvatar ? (
+                      <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : (
+                      <span style={{ fontSize: 24, color: BLUE, fontWeight: 600, letterSpacing: "-0.02em" }}>
+                        {displayName.replace("@", "").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      position: "absolute",
+                      right: -2,
+                      bottom: -2,
+                      width: 24,
+                      height: 24,
+                      borderRadius: "50%",
+                      background: BLUE,
+                      border: "2px solid #FFFFFF",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      boxShadow: "0 2px 8px rgba(0,71,255,0.25)",
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M12 16a4 4 0 100-8 4 4 0 000 8z" stroke="#FFFFFF" strokeWidth="1.8" />
+                      <path d="M4 8l1.2-1.2a2 2 0 011.4-.6h11.8a2 2 0 011.4.6L21 8" stroke="#FFFFFF" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 500, color: BLUE, letterSpacing: "-0.01em", textAlign: "center" }}>
+                  {lang === "fr" ? "Changer la photo" : "Change photo"}
                 </span>
-              )}
+                <input type="file" accept="image/*" onChange={handleAvatarChange} disabled={saving} style={{ display: "none" }} />
+              </label>
             </div>
             <div style={{ minWidth: 0, paddingTop: 2 }}>
               <div

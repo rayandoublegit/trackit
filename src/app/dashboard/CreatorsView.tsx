@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator } from "@/lib/db";
 import { ScriptsManager } from "./ScriptsManager";
+import { CreatorAvatar } from "./CreatorAvatar";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
@@ -126,10 +127,6 @@ function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
-}
-
-function avatarUrlFor(username: string, custom?: string) {
-  return custom ?? `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
 }
 
 function statusLabel(status: CreatorStatus, lang: "en" | "fr"): string {
@@ -531,7 +528,7 @@ function CreatorDetailModal({
   return (
     <ModalShell onClose={onClose} maxWidth={600}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, paddingRight: 32 }}>
-        <img src={avatarUrlFor(creator.username, creator.avatarUrl)} alt="" width={80} height={80} style={{ borderRadius: "50%", background: "#F0F0F0" }} />
+        <CreatorAvatar src={creator.avatarUrl} size={80} alt={creator.displayName} />
         <div style={{ flex: 1 }}>
           <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px" }}>{creator.displayName}</h2>
           <div style={{ fontSize: 15, color: "#0047FF", marginBottom: 8 }}>@{creator.username}</div>
@@ -1177,11 +1174,7 @@ export function CreatorsView({
                 {filtered.map((creator) => (
                   <div key={creator.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                      <img
-                        src={avatarUrlFor(creator.username, creator.avatarUrl)}
-                        alt=""
-                        style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-                      />
+                      <CreatorAvatar src={creator.avatarUrl} size={44} alt={creator.displayName} />
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{creator.displayName}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username}</div>
@@ -1261,7 +1254,7 @@ export function CreatorsView({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <img src={avatarUrlFor(c.username, c.avatarUrl)} alt="" width={36} height={36} style={{ borderRadius: "50%", flexShrink: 0 }} />
+                      <CreatorAvatar src={c.avatarUrl} size={36} alt={c.displayName} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.displayName}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>

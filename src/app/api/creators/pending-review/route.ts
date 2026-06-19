@@ -33,12 +33,14 @@ export async function POST(request: Request) {
   const commissionRate = body?.commissionRate;
   const discountCode = (body?.discountCode as string | undefined)?.trim() || null;
   const platform = (body?.platform as string | undefined)?.trim() || null;
+  const avatarUrl = (body?.avatarUrl as string | undefined)?.trim() || null;
   if (!brandId || !creatorId) return NextResponse.json({ error: "Missing brandId or creatorId" }, { status: 400 });
 
   const update: Record<string, unknown> = { needs_review: false };
   if (commissionRate !== undefined && commissionRate !== null && commissionRate !== "") update.commission_rate = Number(commissionRate);
   if (discountCode) update.discount_code = discountCode;
   if (platform) update.platform = platform;
+  if (avatarUrl) update.avatar_url = avatarUrl;
 
   const { error } = await supabaseAdmin
     .from("creators")
