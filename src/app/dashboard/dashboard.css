@@ -306,3 +306,67 @@ body.dashboard-page {
   margin-left: 0.14em;
   transform: translateY(0.5px);
 }
+
+@keyframes splitHeaderMenuIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.split-header-menu {
+  animation: splitHeaderMenuIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.split-header-menu-section {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9A9A9A;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px 8px;
+}
+
+.split-header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  color: #1A1A1A;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.split-header-menu-item:hover {
+  background: rgba(0, 71, 255, 0.06);
+  color: #0047FF;
+}
+
+.split-header-menu-item:hover .split-header-menu-icon {
+  color: #0047FF;
+}
+
+.split-header-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #F7F8FA;
+  color: #7A7A7A;
+  flex-shrink: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.split-header-menu-item:hover .split-header-menu-icon {
+  background: rgba(0, 71, 255, 0.1);
+}

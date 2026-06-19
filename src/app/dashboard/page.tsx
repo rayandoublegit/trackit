@@ -12,13 +12,13 @@ import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
-import { CreatorScripts } from "./CreatorScripts";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
+import { SplitHeaderActions } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
@@ -65,7 +65,7 @@ import {
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "scripts", "payouts", "settings"];
+const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "payouts", "settings"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -118,7 +118,7 @@ function DashboardPageContent() {
   const isScale = isScalePlan(plan);
   const canUseBasicFeatures = isGrowthOrAbove(plan);
   const [notificationUnread, setNotificationUnread] = useState(0);
-  const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0, unreadScripts: 0 });
+  const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
   const [gettingStarted, setGettingStarted] = useState({
@@ -184,18 +184,9 @@ function DashboardPageContent() {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId),
     ]);
-    let unreadScripts = 0;
-    try {
-      const res = await fetch(`/api/creator/scripts?userId=${userId}`);
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.scripts)) {
-        unreadScripts = data.scripts.filter((s: { status: string | null }) => s.status !== "done").length;
-      }
-    } catch {}
     setSidebarCounts({
       activeCampaigns: activeCampaigns ?? 0,
       savedCreators: savedCreators ?? 0,
-      unreadScripts,
     });
   }, []);
 
@@ -768,13 +759,14 @@ function DashboardPageContent() {
             userId={user?.id}
           />
         )}
-        {view === "campaigns" && (
+        {view === "campaigns" && user && (
           <CampaignsView
             isMobile={isMobile}
             plan={plan}
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
+            userId={user.id}
           />
         )}
         {view === "affiliates" && user && (
@@ -815,9 +807,6 @@ function DashboardPageContent() {
           ) : (
             <UpgradeGate feature="Analytics" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
-        )}
-        {view === "scripts" && user && isCreator && (
-          <CreatorScripts userId={user.id} isMobile={isMobile} />
         )}
         {view === "integrations" && (
           <IntegrationsView
@@ -1297,6 +1286,73 @@ function OutreachPanelShell({
 }
 
 
+function OutreachHeaderActions({
+  lang,
+  onSend,
+  onSeeTemplates,
+  onImportTemplate,
+  onImportCsv,
+  onCreateTemplate,
+}: {
+  lang: "en" | "fr";
+  onSend: () => void;
+  onSeeTemplates: () => void;
+  onImportTemplate: () => void;
+  onImportCsv: () => void;
+  onCreateTemplate: () => void;
+}) {
+  return (
+    <SplitHeaderActions
+      primaryLabel={lang === "fr" ? "Envoyer un message" : "Send outreach"}
+      onPrimaryClick={onSend}
+      sectionLabel={lang === "fr" ? "Modèles" : "Templates"}
+      menuAriaLabel={lang === "fr" ? "Plus d'actions" : "More actions"}
+      menuItems={[
+        {
+          label: lang === "fr" ? "Voir les modèles" : "See templates",
+          onClick: onSeeTemplates,
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M4 8l8 5 8-5" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            </svg>
+          ),
+        },
+        {
+          label: lang === "fr" ? "Importer un modèle" : "Import template",
+          onClick: onImportTemplate,
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 16V4M12 4l4 4M12 4L8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 20h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          ),
+        },
+        {
+          label: lang === "fr" ? "Import CSV" : "Import CSV",
+          onClick: onImportCsv,
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              <path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          ),
+        },
+        {
+          label: lang === "fr" ? "Créer un modèle" : "Create template",
+          onClick: onCreateTemplate,
+          icon: (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          ),
+        },
+      ]}
+    />
+  );
+}
+
+
 function OutreachView({
   plan,
   onNavigateToBilling,
@@ -1359,8 +1415,10 @@ function OutreachView({
   return (
     <>
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+        <OutreachHeaderActions
+          lang={lang}
+          onSend={() => { setSendTemplateId(null); setPanel("send"); }}
+          onSeeTemplates={() => {
             if (!canImportTemplates(plan)) {
               setUpgradeMsg(lang === "fr"
                 ? "🔒 Modèles — Plan Growth requis.\n\nAccédez à vos meilleurs templates et réutilisez-les sur tous vos créateurs.\n\nPassez à Growth →"
@@ -1368,8 +1426,8 @@ function OutreachView({
               return;
             }
             setPanel("seeTemplates");
-          }}>{lang === "fr" ? "Voir les modèles" : "See templates"}</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+          }}
+          onImportTemplate={() => {
             if (!canImportTemplates(plan)) {
               setUpgradeMsg(lang === "fr"
                 ? "🔒 Import de modèles — Plan Growth requis.\n\nImportez vos meilleurs templates en un clic.\n\nPassez à Growth →"
@@ -1377,8 +1435,8 @@ function OutreachView({
               return;
             }
             setPanel("import");
-          }}>{lang === "fr" ? "Importer un modèle" : "Import template"}</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+          }}
+          onImportCsv={() => {
             if (!canBulkImportTemplatesCsv(plan)) {
               setUpgradeMsg(lang === "fr"
                 ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez tous vos modèles d'un coup.\n\nPassez à Pro →"
@@ -1386,8 +1444,8 @@ function OutreachView({
               return;
             }
             setPanel("importCsv");
-          }}>{lang === "fr" ? "Import CSV" : "Import CSV"}</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => {
+          }}
+          onCreateTemplate={() => {
             if (!canCreateTemplates(plan)) {
               setUpgradeMsg(lang === "fr"
                 ? "🔒 Créer un modèle — Plan Growth requis.\n\nPassez à Growth →"
@@ -1395,9 +1453,8 @@ function OutreachView({
               return;
             }
             setPanel("create");
-          }}>{lang === "fr" ? "Créer un modèle" : "Create template"}</button>
-          <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => { setSendTemplateId(null); setPanel("send"); }}>{lang === "fr" ? "Envoyer un message" : "Send outreach"}</button>
-        </div>
+          }}
+        />
       } />
       <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
         {toast && (
@@ -2663,6 +2720,8 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
 
       {panelOpen && (
         <AddAffiliatePanel
+          userId={userId}
+          existingAffiliates={affiliates}
           onClose={() => setPanelOpen(false)}
           onAdd={handleAddAffiliate}
         />
@@ -2671,10 +2730,49 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
   );
 }
 
+function affiliateHandlesMatch(affiliateCreator: string, creatorHandle: string) {
+  const a = affiliateCreator.replace(/^@/, "").toLowerCase();
+  const b = creatorHandle.replace(/^@/, "").toLowerCase();
+  return a === b;
+}
+
+function mapAffiliatePlatform(platform?: string) {
+  const value = (platform || "").toLowerCase();
+  if (value.includes("tiktok")) return "TikTok";
+  if (value.includes("instagram")) return "Instagram";
+  if (value.includes("youtube")) return "YouTube";
+  if (value.includes("twitter") || value === "x") return "Twitter";
+  return "Other";
+}
+
+type SavedCreatorPick = {
+  id: string;
+  handle: string;
+  full_name?: string;
+  platform?: string;
+  avatar_url?: string;
+  discount_code?: string;
+};
+
+function mapSavedCreatorPick(row: Record<string, unknown>): SavedCreatorPick {
+  return {
+    id: String(row.id ?? ""),
+    handle: String(row.handle ?? row.username ?? ""),
+    full_name: typeof row.full_name === "string" ? row.full_name : undefined,
+    platform: typeof row.platform === "string" ? row.platform : undefined,
+    avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : undefined,
+    discount_code: typeof row.discount_code === "string" ? row.discount_code : undefined,
+  };
+}
+
 function AddAffiliatePanel({
+  userId,
+  existingAffiliates,
   onClose,
   onAdd,
 }: {
+  userId: string;
+  existingAffiliates: AffiliateRow[];
   onClose: () => void;
   onAdd: (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => void;
 }) {
@@ -2684,13 +2782,50 @@ function AddAffiliatePanel({
   const [discount, setDiscount] = useState("15");
   const [generated, setGenerated] = useState<{ ref: string; code: string; link: string } | null>(null);
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
+  const [savedCreators, setSavedCreators] = useState<SavedCreatorPick[]>([]);
+  const [loadingCreators, setLoadingCreators] = useState(true);
+  const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoadingCreators(true);
+      const data = await getSavedCreators(userId);
+      if (!cancelled) {
+        setSavedCreators(data.map((row) => mapSavedCreatorPick(row as Record<string, unknown>)));
+        setLoadingCreators(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const availableCreators = savedCreators.filter(
+    (creator) => !existingAffiliates.some((affiliate) => affiliateHandlesMatch(affiliate.creator, creator.handle)),
+  );
 
   const normalizedHandle = handle.trim().startsWith("@") ? handle.trim() : handle.trim() ? `@${handle.trim()}` : "";
+
+  const selectSavedCreator = (creator: SavedCreatorPick) => {
+    const normalized = creator.handle.replace(/^@/, "");
+    setSelectedCreatorId(creator.id);
+    setHandle(normalized ? `@${normalized}` : "");
+    setPlatform(mapAffiliatePlatform(creator.platform));
+    setGenerated(null);
+    setCopied(null);
+    if (creator.discount_code) {
+      const match = creator.discount_code.match(/(\d{1,2})$/);
+      if (match) setDiscount(match[1]);
+    }
+  };
 
   const handleGenerate = () => {
     if (!normalizedHandle) return;
     const ref = slugFromHandle(normalizedHandle);
-    const code = codeFromHandle(normalizedHandle, discount);
+    const selected = savedCreators.find((creator) => creator.id === selectedCreatorId);
+    const code = selected?.discount_code || codeFromHandle(normalizedHandle, discount);
     const link = affiliateReferralLink(ref);
     setGenerated({ ref, code, link });
     setCopied(null);
@@ -2735,7 +2870,11 @@ function AddAffiliatePanel({
         <div style={{ padding: "24px 24px 20px", borderBottom: "1px solid #EFEFEF", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Nouvel affilié" : "New affiliate"}</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>{lang === "fr" ? "Ajoutez un influenceur et générez son lien de parrainage et son code de réduction." : "Add an influencer and generate their referral link and discount code."}</p>
+            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>
+              {lang === "fr"
+                ? "Choisissez un créateur sauvegardé ou saisissez un pseudo, puis générez son lien et son code."
+                : "Pick a saved creator or enter a handle, then generate their link and discount code."}
+            </p>
           </div>
           <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
@@ -2743,11 +2882,73 @@ function AddAffiliatePanel({
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Influencer handle</label>
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 10 }}>
+              {lang === "fr" ? "Créateurs sauvegardés" : "Saved creators"}
+            </label>
+            {loadingCreators ? (
+              <div style={{ fontSize: 13, color: "#9A9A9A", padding: "12px 0" }}>
+                {lang === "fr" ? "Chargement…" : "Loading…"}
+              </div>
+            ) : availableCreators.length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9A9A9A", padding: "12px 14px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
+                {savedCreators.length === 0
+                  ? lang === "fr"
+                    ? "Aucun créateur sauvegardé. Ajoutez-en depuis l’onglet Créateurs."
+                    : "No saved creators yet. Add creators from the Creators tab."
+                  : lang === "fr"
+                    ? "Tous vos créateurs sauvegardés sont déjà des affiliés."
+                    : "All your saved creators are already affiliates."}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
+                {availableCreators.map((creator) => {
+                  const isSelected = selectedCreatorId === creator.id;
+                  const displayName = creator.full_name || creator.handle;
+                  const handleLabel = `@${creator.handle.replace(/^@/, "")}`;
+                  return (
+                    <button
+                      key={creator.id}
+                      type="button"
+                      onClick={() => selectSavedCreator(creator)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: isSelected ? "1px solid #0047FF" : "1px solid #EFEFEF",
+                        background: isSelected ? "rgba(0,71,255,0.06)" : "#FAFAFA",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      <CreatorAvatar src={creator.avatar_url} size={36} alt={displayName} />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{displayName}</div>
+                        <div style={{ fontSize: 12, color: "#7A7A7A" }}>{handleLabel}</div>
+                      </div>
+                      {creator.platform && (
+                        <span style={{ fontSize: 11, color: "#9A9A9A", flexShrink: 0 }}>{mapAffiliatePlatform(creator.platform)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>
+            {lang === "fr" ? "Ou saisir manuellement" : "Or enter manually"}
+          </div>
+
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "Pseudo de l'influenceur" : "Influencer handle"}</label>
           <input
             type="text"
             value={handle}
-            onChange={(e) => { setHandle(e.target.value); setGenerated(null); }}
+            onChange={(e) => { setHandle(e.target.value); setGenerated(null); setSelectedCreatorId(null); }}
             placeholder={lang === "fr" ? "Pseudo de l'influenceur" : "Influencer handle"}
             style={{ ...affiliateInputStyle, marginBottom: 16 }}
           />
@@ -2875,7 +3076,7 @@ const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid
 function buildSidebarNavEntries(
   notificationUnread: number,
   lang: "en" | "fr",
-  counts: { activeCampaigns: number; savedCreators: number; unreadScripts: number }
+  counts: { activeCampaigns: number; savedCreators: number }
 ): SidebarNavEntry[] {
   return [
     { id: "dashboard", label: lang === "fr" ? "Tableau de bord" : "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
@@ -2887,7 +3088,6 @@ function buildSidebarNavEntries(
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
-    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand"], badge: counts.unreadScripts > 0 ? String(counts.unreadScripts) : undefined },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
     { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {
@@ -2943,8 +3143,6 @@ function renderSidebarNavIcon(iconKey: string) {
       return <InviteIcon />;
     case "analytics":
       return <AnalyticsIcon />;
-    case "scripts":
-      return <ScriptsIcon />;
     case "integrations":
       return <IntegrationIcon />;
     case "automation":
@@ -2984,7 +3182,6 @@ function AffiliateIcon() { return <svg width="18" height="18" viewBox="0 0 24 24
 function CampaignIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l16-6v14L3 13v-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M7 13v5l4 1v-5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function MessageIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function PayoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>; }
-function ScriptsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function InviteIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 7l10 6 10-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function AnalyticsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>; }
 function IntegrationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }

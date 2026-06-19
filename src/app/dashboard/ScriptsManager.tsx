@@ -125,7 +125,12 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
             </div>
           </div>
           {!formOpen && (
-            <button type="button" onClick={() => setFormOpen(true)} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em", flexShrink: 0 }}>
+            <button
+              type="button"
+              className="hero-cta-shopify"
+              onClick={() => setFormOpen(true)}
+              style={{ padding: "10px 22px", fontSize: 13, flexShrink: 0 }}
+            >
               {lang === "fr" ? "+ Nouveau script" : "+ New script"}
             </button>
           )}
@@ -154,10 +159,21 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
           {error && <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>}
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button type="button" onClick={handleSubmit} disabled={saving} style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            <button
+              type="button"
+              className="hero-cta-shopify"
+              onClick={handleSubmit}
+              disabled={saving}
+              style={{ padding: "10px 22px", fontSize: 13, opacity: saving ? 0.7 : 1, cursor: saving ? "default" : "pointer" }}
+            >
               {saving ? (lang === "fr" ? "Envoi..." : "Sending...") : (lang === "fr" ? "Envoyer le script" : "Send script")}
             </button>
-            <button type="button" onClick={() => { setFormOpen(false); resetForm(); }} style={{ padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}>
+            <button
+              type="button"
+              className="hero-cta-shopify-light"
+              onClick={() => { setFormOpen(false); resetForm(); }}
+              style={{ padding: "10px 22px", fontSize: 13 }}
+            >
               {lang === "fr" ? "Annuler" : "Cancel"}
             </button>
           </div>

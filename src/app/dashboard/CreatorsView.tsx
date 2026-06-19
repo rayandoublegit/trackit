@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
-import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator } from "@/lib/db";
+import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator, syncCampaignCreators } from "@/lib/db";
 import { ScriptsManager } from "./ScriptsManager";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +16,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
+import { SplitHeaderActions } from "./SplitHeaderActions";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -1040,28 +1041,10 @@ export function CreatorsView({
             <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Créateurs" : "Creators"}</h1>
             <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 0" }}>{lang === "fr" ? "Gérez vos relations avec les créateurs." : "Manage your creator relationships."}</p>
           </div>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button
-              type="button"
-              className="hero-cta-shopify-light"
-              style={{ padding: "10px 16px", fontSize: 13 }}
-              onClick={() => {
-                if (!canBulkImportCreatorsCsv(plan)) {
-                  setUpgradeMsg(lang === "fr"
-                    ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez des centaines de créateurs en un clic.\n\nPassez à Pro →"
-                    : "🔒 Bulk CSV import — Pro plan required.\n\nImport hundreds of creators in one click.\n\nUpgrade to Pro →");
-                  return;
-                }
-                setImportOpen(true);
-              }}
-            >
-              {lang === "fr" ? "Importer un CSV" : "Import CSV"}
-            </button>
-            <button
-              type="button"
-              className="hero-cta-shopify"
-              style={{ padding: "10px 16px", fontSize: 13 }}
-              onClick={() => {
+          <div style={{ marginTop: 8 }}>
+            <SplitHeaderActions
+              primaryLabel={lang === "fr" ? "+ Ajouter un créateur" : "+ Add Creator"}
+              onPrimaryClick={() => {
                 if (hasReachedManagedCreatorLimit(plan, creators.length)) {
                   setUpgradeMsg(plan === "pro"
                     ? lang === "fr"
@@ -1078,9 +1061,29 @@ export function CreatorsView({
                 }
                 setAddOpen(true);
               }}
-            >
-              {lang === "fr" ? "+ Ajouter un créateur" : "+ Add Creator"}
-            </button>
+              sectionLabel={lang === "fr" ? "Import" : "Import"}
+              menuAriaLabel={lang === "fr" ? "Plus d'actions" : "More actions"}
+              menuItems={[
+                {
+                  label: lang === "fr" ? "Importer un CSV" : "Import CSV",
+                  onClick: () => {
+                    if (!canBulkImportCreatorsCsv(plan)) {
+                      setUpgradeMsg(lang === "fr"
+                        ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez des centaines de créateurs en un clic.\n\nPassez à Pro →"
+                        : "🔒 Bulk CSV import — Pro plan required.\n\nImport hundreds of creators in one click.\n\nUpgrade to Pro →");
+                      return;
+                    }
+                    setImportOpen(true);
+                  },
+                  icon: (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                      <path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                  ),
+                },
+              ]}
+            />
           </div>
         </div>
       </div>
@@ -1362,6 +1365,19 @@ export function CreatorsView({
             const discountCode = generateDiscountCode(
               campaignCreator.username || (campaignCreator as ManagedCreator & { handle?: string }).handle || "creator"
             );
+            const { data: { user } } = await supabase!.auth.getUser();
+            if (user) {
+              const { data: existingRows } = await supabase!
+                .from("campaign_creators")
+                .select("creator_id")
+                .eq("campaign_id", campaignId)
+                .eq("user_id", user.id);
+              const existingIds = (existingRows || []).map((row) => String(row.creator_id));
+              const mergedIds = existingIds.includes(campaignCreator.id)
+                ? existingIds
+                : [...existingIds, campaignCreator.id];
+              await syncCampaignCreators(user.id, campaignId, mergedIds);
+            }
             await supabase!
               .from("creators")
               .update({

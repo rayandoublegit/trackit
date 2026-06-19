@@ -140,6 +140,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const [saleCreatorId, setSaleCreatorId] = useState("");
   const [saleAmount, setSaleAmount] = useState("");
   const [saleDate, setSaleDate] = useState("");
+  const [saleCampaignId, setSaleCampaignId] = useState("");
   const [saleBusy, setSaleBusy] = useState(false);
   const [saleMsg, setSaleMsg] = useState("");
 
@@ -168,7 +169,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       const res = await fetch("/api/sales/manual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, creatorId: saleCreatorId, amount: saleAmount, date: saleDate || undefined }),
+        body: JSON.stringify({ userId, creatorId: saleCreatorId, amount: saleAmount, date: saleDate || undefined, campaignId: saleCampaignId || undefined }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -197,7 +198,18 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Montant de la commande (€)" : "Order amount (€)"}</label>
         <input type="number" min="0" step="0.01" value={saleAmount} onChange={(e) => setSaleAmount(e.target.value)} placeholder="149.90" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Date (optionnel)" : "Date (optional)"}</label>
-        <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 16, boxSizing: "border-box" }} />
+        <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
+        {campaignRows.length > 0 && (
+          <>
+            <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Campagne (optionnel)" : "Campaign (optional)"}</label>
+            <select value={saleCampaignId} onChange={(e) => setSaleCampaignId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 16 }}>
+              <option value="">{lang === "fr" ? "Aucune campagne" : "No campaign"}</option>
+              {campaignRows.map((c: { id?: string; name?: string }) => (
+                <option key={c.id} value={c.id}>{c.name || c.id}</option>
+              ))}
+            </select>
+          </>
+        )}
         {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button type="button" disabled={saleBusy} onClick={() => setShowSaleModal(false)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
@@ -231,7 +243,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
-          <button type="button" style={btnPrimary} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
+          <button type="button" className="hero-cta-shopify" style={{ padding: "10px 22px", fontSize: 13 }} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
           <div style={{ marginTop: 12 }}>
             <button type="button" onClick={openSaleModal} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
               {lang === "fr" ? "Ou ajoutez vos ventes manuellement" : "Or add your sales manually"}

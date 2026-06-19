@@ -127,6 +127,119 @@ export async function updateCampaignStatus(campaignId: string, status: string) {
     .eq("id", campaignId);
 }
 
+export async function updateCampaign(campaignId: string, campaign: {
+  name: string;
+  description?: string;
+  platform: string;
+  start_date?: string;
+  end_date?: string;
+  commission_type: string;
+  commission_rate: number;
+  auto_payout: boolean;
+}) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("campaigns")
+    .update(campaign)
+    .eq("id", campaignId)
+    .select()
+    .single();
+  if (error) console.error("updateCampaign error:", error);
+  return data;
+}
+
+export async function getCampaignCreatorCounts(userId: string): Promise<Record<string, string[]>> {
+  if (!supabase) return {};
+  const { data, error } = await supabase
+    .from("campaign_creators")
+    .select("campaign_id, creator_id")
+    .eq("user_id", userId);
+  if (error) {
+    console.error("getCampaignCreatorCounts error:", error);
+    return {};
+  }
+  const map: Record<string, string[]> = {};
+  for (const row of data || []) {
+    const campaignId = String(row.campaign_id);
+    if (!map[campaignId]) map[campaignId] = [];
+    map[campaignId].push(String(row.creator_id));
+  }
+  return map;
+}
+
+// Build a per-campaign affiliate code from the creator's base discount code + campaign name.
+// e.g. base "JULIE10" + campaign "Black Friday" -> "JULIE10-BLACK"
+function buildCampaignCode(baseCode: string | null, handle: string, campaignName: string): string {
+  const base = (baseCode || handle || "CODE")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 16) || "CODE";
+  const suffix = (campaignName || "CAMP")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6) || "CAMP";
+  return `${base}-${suffix}`;
+}
+
+export async function syncCampaignCreators(userId: string, campaignId: string, creatorIds: string[]) {
+  if (!supabase) return false;
+  const { error: deleteError } = await supabase
+    .from("campaign_creators")
+    .delete()
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId);
+  if (deleteError) {
+    console.error("syncCampaignCreators delete error:", deleteError);
+    return false;
+  }
+  if (creatorIds.length === 0) return true;
+
+  // Fetch campaign name (for the code suffix) + each creator's base code & rate.
+  const { data: campaignRow } = await supabase
+    .from("campaigns")
+    .select("name")
+    .eq("id", campaignId)
+    .maybeSingle();
+  const campaignName = String((campaignRow as { name?: string } | null)?.name ?? "");
+
+  const { data: creatorRows } = await supabase
+    .from("creators")
+    .select("id, handle, discount_code, commission_rate")
+    .in("id", creatorIds);
+  const creatorMap = new Map(
+    (creatorRows || []).map((c) => [String(c.id), c as { handle?: string; discount_code?: string | null; commission_rate?: number | null }]),
+  );
+
+  const seen = new Set<string>();
+  const rows = creatorIds.map((creatorId) => {
+    const c = creatorMap.get(creatorId);
+    let code = buildCampaignCode(c?.discount_code ?? null, c?.handle ?? "", campaignName);
+    // Guarantee uniqueness within this batch (DB also has a unique index on upper(discount_code)).
+    let candidate = code;
+    let n = 2;
+    while (seen.has(candidate.toUpperCase())) {
+      candidate = `${code}${n}`;
+      n += 1;
+    }
+    seen.add(candidate.toUpperCase());
+    return {
+      user_id: userId,
+      campaign_id: campaignId,
+      creator_id: creatorId,
+      discount_code: candidate,
+      commission_rate: c?.commission_rate ?? null,
+      commission_type: "percentage",
+    };
+  });
+
+  const { error: insertError } = await supabase.from("campaign_creators").insert(rows);
+  if (insertError) {
+    console.error("syncCampaignCreators insert error:", insertError);
+    return false;
+  }
+  return true;
+}
+
 // OUTREACH
 export async function saveOutreach(userId: string, outreach: {
   creator_username: string;
