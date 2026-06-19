@@ -83,56 +83,200 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   if (!current) return null;
 
   const displayName = current.full_name || `@${current.handle}`;
-  const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box" };
-  const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 500, color: "rgba(0,0,0,0.55)", marginBottom: 6, letterSpacing: "-0.01em" };
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    padding: "11px 13px",
+    borderRadius: 10,
+    border: "1px solid #E5E5E5",
+    background: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: "inherit",
+    outline: "none",
+    boxSizing: "border-box",
+    color: "#1A1A1A",
+    letterSpacing: "-0.01em",
+  };
+  const labelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: 12,
+    fontWeight: 500,
+    color: "#6B6B6B",
+    marginBottom: 6,
+    letterSpacing: "-0.01em",
+  };
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 }}>
-      <div style={{ background: "#FFFFFF", borderRadius: 24, padding: 40, maxWidth: 480, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", marginBottom: 28 }}>
-          <div style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", background: "#F2F2F2", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}>
-            {current.avatar_url ? (
-              <img src={current.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <span style={{ fontSize: 32, color: "#B5B5B5", fontWeight: 600 }}>{displayName.replace("@", "").charAt(0).toUpperCase()}</span>
-            )}
+    <>
+      <style>{`
+        .ncm-field:focus {
+          border-color: #0047FF;
+          box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.12);
+        }
+      `}</style>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.45)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000,
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            background: "#FFFFFF",
+            borderRadius: 20,
+            border: "1px solid #EFEFEF",
+            padding: "28px 28px 24px",
+            maxWidth: 440,
+            width: "100%",
+            boxShadow: "0 24px 48px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.04)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: "50%",
+                overflow: "hidden",
+                background: "#FFFFFF",
+                border: "1px solid #EFEFEF",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {current.avatar_url ? (
+                <img src={current.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <span style={{ fontSize: 24, color: BLUE, fontWeight: 600, letterSpacing: "-0.02em" }}>
+                  {displayName.replace("@", "").charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div style={{ minWidth: 0, paddingTop: 2 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: BLUE,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  marginBottom: 6,
+                }}
+              >
+                {lang === "fr" ? "Nouveau créateur" : "New creator"}
+              </div>
+              <h2
+                style={{
+                  fontSize: 20,
+                  fontWeight: 650,
+                  color: "#1A1A1A",
+                  margin: "0 0 6px",
+                  letterSpacing: "-0.03em",
+                  lineHeight: 1.2,
+                }}
+              >
+                {displayName}
+              </h2>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: "#7A7A7A",
+                  margin: 0,
+                  lineHeight: 1.45,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {lang === "fr"
+                  ? "a rejoint via votre lien d'invitation. Complétez ses informations pour finaliser."
+                  : "joined via your invite link. Complete their details to finish setup."}
+              </p>
+            </div>
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: BLUE, letterSpacing: "0.02em", textTransform: "uppercase", marginBottom: 8 }}>
-            {lang === "fr" ? "Nouveau créateur" : "New creator"}
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 22 }}>
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Commission (%)" : "Commission (%)"}</label>
+              <input type="number" value={commission} onChange={(e) => setCommission(e.target.value)} className="ncm-field" style={inputStyle} />
+            </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Code promo" : "Discount code"}</label>
+              <input
+                type="text"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+                placeholder={lang === "fr" ? "Ex : SARAH10" : "e.g. SARAH10"}
+                className="ncm-field"
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
+              <select value={platform} onChange={(e) => setPlatform(e.target.value)} className="ncm-field" style={inputStyle}>
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram</option>
+              </select>
+            </div>
           </div>
-          <h2 style={{ fontSize: 24, fontWeight: 700, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>{displayName}</h2>
-          <p style={{ fontSize: 15, color: "rgba(0,0,0,0.55)", margin: 0, lineHeight: 1.5 }}>
-            {lang === "fr"
-              ? "a rejoint via votre lien d'invitation. Complétez ses informations pour finaliser."
-              : "joined via your invite link. Complete their details to finish setup."}
-          </p>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              width: "100%",
+              padding: "13px 20px",
+              borderRadius: 10,
+              border: "none",
+              background: BLUE,
+              color: "#FFFFFF",
+              fontSize: 15,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: saving ? "default" : "pointer",
+              letterSpacing: "-0.01em",
+              opacity: saving ? 0.7 : 1,
+              marginBottom: 8,
+            }}
+          >
+            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer le créateur" : "Save creator")}
+          </button>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            disabled={saving}
+            style={{
+              width: "100%",
+              padding: "11px 20px",
+              borderRadius: 10,
+              border: "none",
+              background: "transparent",
+              color: "#7A7A7A",
+              fontSize: 14,
+              fontWeight: 500,
+              fontFamily: "inherit",
+              cursor: saving ? "default" : "pointer",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {lang === "fr" ? "Ignorer pour l'instant" : "Skip for now"}
+          </button>
+
+          {queue.length > 1 && (
+            <div style={{ marginTop: 14, fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? `+${queue.length - 1} autre(s) en attente` : `+${queue.length - 1} more waiting`}
+            </div>
+          )}
         </div>
-
-        <label style={labelStyle}>{lang === "fr" ? "Commission (%)" : "Commission (%)"}</label>
-        <input type="number" value={commission} onChange={(e) => setCommission(e.target.value)} style={{ ...inputStyle, marginBottom: 18 }} />
-
-        <label style={labelStyle}>{lang === "fr" ? "Code promo" : "Discount code"}</label>
-        <input type="text" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder={lang === "fr" ? "Ex : SARAH10" : "e.g. SARAH10"} style={{ ...inputStyle, marginBottom: 18 }} />
-
-        <label style={labelStyle}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
-        <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={{ ...inputStyle, marginBottom: 28 }}>
-          <option value="tiktok">TikTok</option>
-          <option value="instagram">Instagram</option>
-        </select>
-
-        <button type="button" onClick={handleSave} disabled={saving} style={{ width: "100%", padding: "14px 20px", borderRadius: 14, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 16, fontWeight: 600, fontFamily: "inherit", cursor: saving ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving ? 0.7 : 1, marginBottom: 12 }}>
-          {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer le créateur" : "Save creator")}
-        </button>
-        <button type="button" onClick={handleDismiss} disabled={saving} style={{ width: "100%", padding: "12px", borderRadius: 14, border: "none", background: "transparent", color: "rgba(0,0,0,0.5)", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer" }}>
-          {lang === "fr" ? "Ignorer pour l'instant" : "Skip for now"}
-        </button>
-
-        {queue.length > 1 && (
-          <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: "#9A9A9A" }}>
-            {lang === "fr" ? `+${queue.length - 1} autre(s) en attente` : `+${queue.length - 1} more waiting`}
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 }
