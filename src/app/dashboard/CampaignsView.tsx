@@ -44,6 +44,7 @@ type SavedCreatorOption = {
   full_name?: string;
   avatar_url?: string;
   platform?: string;
+  commission_rate?: number;
 };
 
 type SaleRow = { order_amount?: number; commission_amount?: number; created_at?: string };
@@ -140,6 +141,7 @@ function mapSavedCreator(row: Record<string, unknown>): SavedCreatorOption {
     full_name: typeof row.full_name === "string" ? row.full_name : undefined,
     avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : undefined,
     platform: typeof row.platform === "string" ? row.platform : undefined,
+    commission_rate: Number(row.commission_rate ?? 10) || 10,
   };
 }
 
@@ -341,7 +343,18 @@ export function CampaignsView({
     [campaigns, sales, creators],
   );
 
-  const handleCreateCampaign = async (campaignData: any) => {
+  const handleCreateCampaign = async (campaignData: {
+    name: string;
+    description?: string;
+    platform: string;
+    startDate?: string;
+    endDate?: string;
+    commissionType: string;
+    commissionRate: number;
+    autoPayout?: boolean;
+    creatorIds?: string[];
+    creatorCommissions?: { creatorId: string; commission_rate: number }[];
+  }) => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -357,7 +370,16 @@ export function CampaignsView({
       status: "active",
     });
     if (saved) {
-      setCampaigns((prev) => [mapDbCampaign(saved as Record<string, unknown>, []), ...prev]);
+      const creatorIds = campaignData.creatorIds ?? [];
+      await syncCampaignCreators(user.id, String(saved.id), creatorIds);
+      for (const entry of campaignData.creatorCommissions ?? []) {
+        await supabase
+          .from("creators")
+          .update({ commission_rate: entry.commission_rate })
+          .eq("id", entry.creatorId)
+          .eq("user_id", user.id);
+      }
+      setCampaigns((prev) => [mapDbCampaign(saved as Record<string, unknown>, creatorIds), ...prev]);
       notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
     }
     setModalOpen(false);
@@ -462,7 +484,7 @@ export function CampaignsView({
             </span>
           </button>
         </div>
-        {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+        {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
         {upgradeModalOpen && (
           <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
         )}
@@ -495,7 +517,7 @@ export function CampaignsView({
           onSave={(data) => void handleUpdateCampaign(editingCampaign.id, data)}
         />
       )}
-      {modalOpen && <NewCampaignModal lang={lang} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+      {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
       {upgradeModalOpen && (
         <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
       )}
@@ -1058,7 +1080,434 @@ function SettingsTab({ lang, campaign, onUpdate }: { lang: "en" | "fr"; campaign
   );
 }
 
-const MODAL_STEPS = ["Basics", "Commission", "Add creators", "Review & launch"] as const;
+const NEW_CAMPAIGN_STEPS = [
+  { en: "Basics", fr: "Informations" },
+  { en: "Add creators", fr: "Ajouter des créateurs" },
+  { en: "Review & launch", fr: "Vérifier et lancer" },
+] as const;
+
+type AddedCampaignCreator = {
+  key: string;
+  creatorId?: string;
+  handle: string;
+  displayName?: string;
+  avatar_url?: string;
+  platform?: string;
+  commissionType: "percent" | "flat";
+  commissionRate: string;
+};
+
+function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | "fr") {
+  if (entry.commissionType === "flat") {
+    return `${formatCurrency(Number(entry.commissionRate) || 0, lang)} ${lang === "fr" ? "fixe" : "flat"}`;
+  }
+  return `${clampRate(entry.commissionRate)}%`;
+}
+
+function NewCampaignModal({
+  lang,
+  userId,
+  onClose,
+  onCreate,
+}: {
+  lang: "en" | "fr";
+  userId?: string;
+  onClose: () => void;
+  onCreate: (campaignData: {
+    name: string;
+    description?: string;
+    platform: string;
+    startDate?: string;
+    endDate?: string;
+    commissionType: string;
+    commissionRate: number;
+    autoPayout: boolean;
+    creatorIds: string[];
+    creatorCommissions: { creatorId: string; commission_rate: number }[];
+  }) => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
+  const [platform, setPlatform] = useState("TikTok");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+  const [description, setDescription] = useState("");
+  const [addedCreators, setAddedCreators] = useState<AddedCampaignCreator[]>([]);
+  const [savedCreators, setSavedCreators] = useState<SavedCreatorOption[]>([]);
+  const [loadingCreators, setLoadingCreators] = useState(true);
+  const [pickerId, setPickerId] = useState("");
+  const [manualHandle, setManualHandle] = useState("");
+  const [manualCommissionType, setManualCommissionType] = useState<"percent" | "flat">("percent");
+  const [manualCommissionRate, setManualCommissionRate] = useState("10");
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoadingCreators(true);
+      if (!supabase) {
+        if (!cancelled) setLoadingCreators(false);
+        return;
+      }
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      }
+      if (!resolvedUserId) {
+        if (!cancelled) setLoadingCreators(false);
+        return;
+      }
+      const data = await getSavedCreators(resolvedUserId);
+      if (!cancelled) {
+        setSavedCreators(data.map((row) => mapSavedCreator(row as Record<string, unknown>)));
+        setLoadingCreators(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const savedById = useMemo(
+    () => new Map(savedCreators.map((creator) => [creator.id, creator])),
+    [savedCreators],
+  );
+
+  const availableSavedCreators = savedCreators.filter(
+    (creator) => !addedCreators.some((entry) => entry.creatorId === creator.id),
+  );
+
+  const addSavedCreator = () => {
+    if (!pickerId) return;
+    const creator = savedById.get(pickerId);
+    if (!creator || addedCreators.some((entry) => entry.creatorId === creator.id)) return;
+    setAddedCreators((list) => [
+      ...list,
+      {
+        key: creator.id,
+        creatorId: creator.id,
+        handle: creator.handle,
+        displayName: creator.full_name,
+        avatar_url: creator.avatar_url,
+        platform: creator.platform,
+        commissionType: "percent",
+        commissionRate: String(creator.commission_rate ?? 10),
+      },
+    ]);
+    setPickerId("");
+  };
+
+  const addManualCreator = () => {
+    const normalized = manualHandle.trim().replace(/^@/, "");
+    if (!normalized) return;
+    const key = `manual-${normalized.toLowerCase()}`;
+    if (addedCreators.some((entry) => entry.key === key)) return;
+    setAddedCreators((list) => [
+      ...list,
+      {
+        key,
+        handle: normalized,
+        commissionType: manualCommissionType,
+        commissionRate: manualCommissionRate,
+      },
+    ]);
+    setManualHandle("");
+  };
+
+  const removeCreator = (key: string) => {
+    setAddedCreators((list) => list.filter((entry) => entry.key !== key));
+  };
+
+  const updateCreatorField = (
+    key: string,
+    field: "commissionType" | "commissionRate",
+    value: string,
+  ) => {
+    setAddedCreators((list) =>
+      list.map((entry) => (entry.key === key ? { ...entry, [field]: value } : entry)),
+    );
+  };
+
+  const launch = () => {
+    const creatorIds = addedCreators.filter((entry) => entry.creatorId).map((entry) => entry.creatorId!);
+    const creatorCommissions = addedCreators
+      .filter((entry) => entry.creatorId)
+      .map((entry) => ({
+        creatorId: entry.creatorId!,
+        commission_rate: clampRate(entry.commissionRate),
+      }));
+    const primaryRate = addedCreators.length > 0 ? clampRate(addedCreators[0].commissionRate) : 10;
+
+    onCreate({
+      name: name || "Untitled Campaign",
+      description,
+      platform,
+      startDate: normalizeDate(start),
+      endDate: normalizeDate(end),
+      commissionType: "percentage",
+      commissionRate: primaryRate,
+      autoPayout: false,
+      creatorIds,
+      creatorCommissions,
+    });
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#FFF", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ padding: "24px 24px 0", borderBottom: "1px solid #EFEFEF" }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.03em" }}>
+            {lang === "fr" ? "Nouvelle campagne" : "New Campaign"}
+          </h2>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            {NEW_CAMPAIGN_STEPS.map((label, i) => (
+              <div
+                key={label.en}
+                style={{
+                  fontSize: 12,
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: i === step ? "#0047FF" : i < step ? "#E8EEFC" : "#F5F5F5",
+                  color: i === step ? "#FFF" : i < step ? "#0047FF" : "#9A9A9A",
+                  fontWeight: i === step ? 500 : 400,
+                }}
+              >
+                {i + 1}. {lang === "fr" ? label.fr : label.en}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ padding: 24 }}>
+          {step === 0 && (
+            <>
+              <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Nom de la campagne" : "Campaign name"} style={inputStyle} />
+              </Field>
+              <Field label={lang === "fr" ? "Plateforme" : "Platform"}>
+                <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
+                  {["TikTok", "Instagram", "YouTube", "TikTok + Instagram", "All"].map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </Field>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label={lang === "fr" ? "Date de début" : "Start date"}>
+                  <input type="text" value={start} onChange={(e) => setStart(e.target.value)} placeholder="May 1, 2026" style={inputStyle} />
+                </Field>
+                <Field label={lang === "fr" ? "Date de fin" : "End date"}>
+                  <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="Jun 30, 2026" style={inputStyle} />
+                </Field>
+              </div>
+              <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder={lang === "fr" ? "Objectifs et notes…" : "Campaign goals and notes..."} />
+              </Field>
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px", lineHeight: 1.45 }}>
+                {lang === "fr"
+                  ? "Ajoutez des créateurs sauvegardés ou saisissez un pseudo. La commission est préremplie depuis le profil du créateur, modifiable pour chacun."
+                  : "Add saved creators or enter a handle manually. Commission is prefilled from each creator’s profile and can be edited per person."}
+              </p>
+
+              <Field label={lang === "fr" ? "Créateurs sauvegardés" : "Saved creators"}>
+                {loadingCreators ? (
+                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+                ) : savedCreators.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
+                    {lang === "fr" ? "Aucun créateur sauvegardé." : "No saved creators yet."}
+                  </p>
+                ) : availableSavedCreators.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
+                    {lang === "fr" ? "Tous vos créateurs sauvegardés sont déjà ajoutés." : "All saved creators are already added."}
+                  </p>
+                ) : (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <select value={pickerId} onChange={(e) => setPickerId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
+                      <option value="">{lang === "fr" ? "Choisir un créateur…" : "Select a creator…"}</option>
+                      {availableSavedCreators.map((creator) => (
+                        <option key={creator.id} value={creator.id}>
+                          {(creator.full_name || creator.handle) + ` (@${creator.handle.replace(/^@/, "")})`}
+                        </option>
+                      ))}
+                    </select>
+                    <button type="button" style={{ ...btnPrimary, flexShrink: 0 }} onClick={addSavedCreator} disabled={!pickerId}>
+                      {lang === "fr" ? "Ajouter" : "Add"}
+                    </button>
+                  </div>
+                )}
+              </Field>
+
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", margin: "20px 0 12px" }}>
+                {lang === "fr" ? "Ou ajouter manuellement" : "Or add manually"}
+              </div>
+
+              <Field label={lang === "fr" ? "Pseudo" : "Handle"}>
+                <input
+                  type="text"
+                  value={manualHandle}
+                  onChange={(e) => setManualHandle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addManualCreator())}
+                  placeholder="@creator"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label={lang === "fr" ? "Type de commission" : "Commission type"}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {(["percent", "flat"] as const).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setManualCommissionType(t)}
+                      style={{
+                        flex: 1,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: manualCommissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
+                        background: manualCommissionType === t ? "#E8EEFC" : "#FFF",
+                        fontSize: 13,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      {t === "percent"
+                        ? lang === "fr" ? "% de vente" : "% of sale"
+                        : lang === "fr" ? "Montant fixe" : "Flat per sale"}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={manualCommissionType === "percent" ? (lang === "fr" ? "Taux (%)" : "Rate (%)") : lang === "fr" ? "Montant fixe" : "Flat amount"}>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    value={manualCommissionRate}
+                    onChange={(e) => setManualCommissionRate(e.target.value)}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button type="button" style={btnPrimary} onClick={addManualCreator} disabled={!manualHandle.trim()}>
+                    {lang === "fr" ? "Ajouter" : "Add"}
+                  </button>
+                </div>
+              </Field>
+
+              {addedCreators.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+                  {addedCreators.map((entry) => {
+                    const label = entry.displayName || entry.handle;
+                    const handleLabel = `@${entry.handle.replace(/^@/, "")}`;
+                    return (
+                      <div
+                        key={entry.key}
+                        style={{
+                          padding: "12px",
+                          background: "#FAFAFA",
+                          borderRadius: 12,
+                          border: "1px solid #EFEFEF",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                          <CreatorAvatar src={entry.avatar_url} size={36} alt={label} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{label}</div>
+                            <div style={{ fontSize: 12, color: "#7A7A7A" }}>{handleLabel}</div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeCreator(entry.key)}
+                            style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}
+                          >
+                            {lang === "fr" ? "Retirer" : "Remove"}
+                          </button>
+                        </div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: 6, flex: 1 }}>
+                            {(["percent", "flat"] as const).map((t) => (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => updateCreatorField(entry.key, "commissionType", t)}
+                                style={{
+                                  flex: 1,
+                                  padding: "8px 10px",
+                                  borderRadius: 8,
+                                  border: entry.commissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
+                                  background: entry.commissionType === t ? "#E8EEFC" : "#FFF",
+                                  fontSize: 12,
+                                  fontFamily: "inherit",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                {t === "percent" ? "%" : lang === "fr" ? "Fixe" : "Flat"}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            value={entry.commissionRate}
+                            onChange={(e) => updateCreatorField(entry.key, "commissionRate", e.target.value)}
+                            style={{ ...inputStyle, width: 88, flexShrink: 0 }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p style={{ fontSize: 13, color: "#9A9A9A", margin: "8px 0 0" }}>
+                  {lang === "fr" ? "Aucun créateur ajouté pour l'instant." : "No creators added yet."}
+                </p>
+              )}
+            </>
+          )}
+
+          {step === 2 && (
+            <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6 }}>
+              <p style={{ margin: "0 0 16px", fontWeight: 500 }}>{lang === "fr" ? "Vérifier votre campagne" : "Review your campaign"}</p>
+              <div style={{ background: "#FAFAFA", borderRadius: 12, padding: 16, border: "1px solid #EFEFEF" }}>
+                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Nom :" : "Name:"}</strong> {name || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign")}</div>
+                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Plateforme :" : "Platform:"}</strong> {platform}</div>
+                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Dates :" : "Dates:"}</strong> {start || "—"} – {end || "—"}</div>
+                <div style={{ marginBottom: addedCreators.length > 0 ? 12 : 0 }}>
+                  <strong>{lang === "fr" ? "Créateurs :" : "Creators:"}</strong> {addedCreators.length}
+                </div>
+                {addedCreators.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {addedCreators.map((entry) => (
+                      <div key={entry.key} style={{ fontSize: 13, padding: "8px 10px", background: "#FFF", borderRadius: 8, border: "1px solid #EFEFEF" }}>
+                        @{entry.handle.replace(/^@/, "")} · {formatCreatorCommissionLabel(entry, lang)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "16px 24px 24px", display: "flex", justifyContent: "space-between", gap: 12, borderTop: "1px solid #EFEFEF" }}>
+          <button type="button" style={btnSecondary} onClick={step === 0 ? onClose : () => setStep((s) => s - 1)}>
+            {step === 0 ? (lang === "fr" ? "Annuler" : "Cancel") : lang === "fr" ? "Retour" : "Back"}
+          </button>
+          {step < NEW_CAMPAIGN_STEPS.length - 1 ? (
+            <button type="button" style={btnPrimary} onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !name.trim()}>
+              {lang === "fr" ? "Continuer →" : "Continue →"}
+            </button>
+          ) : (
+            <button type="button" style={btnPrimary} onClick={launch}>
+              {lang === "fr" ? "Lancer la campagne →" : "Launch campaign →"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type EditCampaignPayload = {
   name: string;
@@ -1320,175 +1769,6 @@ function EditCampaignModal({
           <button type="button" style={btnPrimary} onClick={() => void submit()} disabled={!name.trim() || saving}>
             {saving ? (lang === "fr" ? "Enregistrement…" : "Saving…") : lang === "fr" ? "Enregistrer" : "Save changes"}
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NewCampaignModal({ lang, onClose, onCreate }: { lang: "en" | "fr"; onClose: () => void; onCreate: (campaignData: any) => void }) {
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
-  const [platform, setPlatform] = useState("TikTok");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [description, setDescription] = useState("");
-  const [commissionRate, setCommissionRate] = useState("8");
-  const [commissionType, setCommissionType] = useState<"percent" | "flat">("percent");
-  const [creatorInput, setCreatorInput] = useState("");
-  const [creators, setCreators] = useState<string[]>([]);
-
-  const addCreator = () => {
-    const v = creatorInput.trim();
-    if (v && !creators.includes(v)) setCreators((list) => [...list, v]);
-    setCreatorInput("");
-  };
-
-  const launch = () => {
-    onCreate({
-      name: name || "Untitled Campaign",
-      description,
-      platform,
-      startDate: normalizeDate(start),
-      endDate: normalizeDate(end),
-      commissionType: commissionType === "percent" ? "percentage" : "flat",
-      commissionRate: clampRate(commissionRate),
-      autoPayout: false,
-    });
-  };
-
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={onClose}>
-      <div style={{ background: "#FFF", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ padding: "24px 24px 0", borderBottom: "1px solid #EFEFEF" }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.03em" }}>New Campaign</h2>
-          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-            {MODAL_STEPS.map((label, i) => (
-              <div
-                key={label}
-                style={{
-                  fontSize: 12,
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  background: i === step ? "#0047FF" : i < step ? "#E8EEFC" : "#F5F5F5",
-                  color: i === step ? "#FFF" : i < step ? "#0047FF" : "#9A9A9A",
-                  fontWeight: i === step ? 500 : 400,
-                }}
-              >
-                {i + 1}. {label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: 24 }}>
-          {step === 0 && (
-            <>
-              <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Nom de la campagne" : "Campaign name"} style={inputStyle} />
-              </Field>
-              <Field label="Platform">
-                <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
-                  {["TikTok", "Instagram", "YouTube", "TikTok + Instagram", "All"].map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label="Start date">
-                  <input type="text" value={start} onChange={(e) => setStart(e.target.value)} placeholder="May 1, 2026" style={inputStyle} />
-                </Field>
-                <Field label="End date">
-                  <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="Jun 30, 2026" style={inputStyle} />
-                </Field>
-              </div>
-              <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder="Campaign goals and notes..." />
-              </Field>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <Field label="Commission type">
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["percent", "flat"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setCommissionType(t)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: commissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
-                        background: commissionType === t ? "#E8EEFC" : "#FFF",
-                        fontSize: 13,
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      {t === "percent" ? "% of sale" : "Flat per sale"}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label={commissionType === "percent" ? (lang === "fr" ? "Taux de commission (%)" : "Commission rate (%)") : "Flat amount ($)"}>
-                <input type="text" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
-              </Field>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>Creators earn {commissionType === "percent" ? `${commissionRate}%` : formatCurrency(Number(commissionRate) || 0, lang)} on each attributed sale.</p>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <Field label="Add creators (handles or emails)">
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input type="text" value={creatorInput} onChange={(e) => setCreatorInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCreator())} placeholder="@creator or email" style={{ ...inputStyle, flex: 1 }} />
-                  <button type="button" style={btnPrimary} onClick={addCreator}>Add</button>
-                </div>
-              </Field>
-              {creators.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {creators.map((cr) => (
-                    <div key={cr} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", background: "#FAFAFA", borderRadius: 10, border: "1px solid #EFEFEF", fontSize: 13 }}>
-                      <span>{cr}</span>
-                      <button type="button" onClick={() => setCreators((list) => list.filter((x) => x !== cr))} style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}>Remove</button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>No creators added yet. You can add them later from the campaign detail view.</p>
-              )}
-            </>
-          )}
-
-          {step === 3 && (
-            <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6 }}>
-              <p style={{ margin: "0 0 16px", fontWeight: 500 }}>Review your campaign</p>
-              <div style={{ background: "#FAFAFA", borderRadius: 12, padding: 16, border: "1px solid #EFEFEF" }}>
-                <div style={{ marginBottom: 8 }}><strong>Name:</strong> {name || "Untitled Campaign"}</div>
-                <div style={{ marginBottom: 8 }}><strong>Platform:</strong> {platform}</div>
-                <div style={{ marginBottom: 8 }}><strong>Dates:</strong> {start || "—"} – {end || "—"}</div>
-                <div style={{ marginBottom: 8 }}><strong>Commission:</strong> {commissionType === "percent" ? `${commissionRate}%` : `${formatCurrency(Number(commissionRate) || 0, lang)} flat`}</div>
-                <div><strong>Creators:</strong> {creators.length ? creators.join(", ") : "None yet"}</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ padding: "16px 24px 24px", display: "flex", justifyContent: "space-between", gap: 12, borderTop: "1px solid #EFEFEF" }}>
-          <button type="button" style={btnSecondary} onClick={step === 0 ? onClose : () => setStep((s) => s - 1)}>
-            {step === 0 ? (lang === "fr" ? "Annuler" : "Cancel") : "Back"}
-          </button>
-          {step < MODAL_STEPS.length - 1 ? (
-            <button type="button" style={btnPrimary} onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !name.trim()}>
-              Continue →
-            </button>
-          ) : (
-            <button type="button" style={btnPrimary} onClick={launch}>{lang === "fr" ? "Lancer la campagne →" : "Launch campaign →"}</button>
-          )}
         </div>
       </div>
     </div>

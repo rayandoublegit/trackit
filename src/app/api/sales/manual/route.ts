@@ -33,24 +33,45 @@ export async function POST(request: Request) {
 
   if (!creator) return NextResponse.json({ ok: false, error: "Creator not found" }, { status: 404 });
 
-  // If a campaign is specified, look up the per-campaign link for this creator.
-  // It carries the campaign-specific code and (optionally) an overridden rate.
+  // Resolve which campaign this sale belongs to.
+  // Manual pick (campaignId) wins; otherwise auto-attach to the creator's campaign:
+  // a single campaign -> that one; multiple -> active first, then most recent.
   let linkedCampaignId: string | null = null;
   let campaignDiscountCode: string | null = null;
   let campaignRate: number | null = null;
+
+  const { data: ccLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("campaign_id, discount_code, commission_rate, campaigns(status, created_at)")
+    .eq("creator_id", creator.id)
+    .eq("user_id", userId);
+
+  const links = (ccLinks || []) as Array<{
+    campaign_id: string;
+    discount_code: string | null;
+    commission_rate: number | null;
+    campaigns: { status?: string | null; created_at?: string | null } | null;
+  }>;
+
+  let chosen: (typeof links)[number] | null = null;
   if (campaignId) {
-    const { data: link } = await supabaseAdmin
-      .from("campaign_creators")
-      .select("campaign_id, discount_code, commission_rate")
-      .eq("campaign_id", campaignId)
-      .eq("creator_id", creator.id)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (link) {
-      linkedCampaignId = String(link.campaign_id);
-      campaignDiscountCode = link.discount_code ? String(link.discount_code) : null;
-      campaignRate = link.commission_rate != null ? Number(link.commission_rate) : null;
-    }
+    chosen = links.find((l) => String(l.campaign_id) === String(campaignId)) ?? null;
+  } else if (links.length === 1) {
+    chosen = links[0];
+  } else if (links.length > 1) {
+    const active = links
+      .filter((l) => (l.campaigns?.status || "").toLowerCase() === "active")
+      .sort((a, b) => (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || ""));
+    const byRecency = [...links].sort((a, b) =>
+      (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || "")
+    );
+    chosen = active[0] ?? byRecency[0] ?? null;
+  }
+
+  if (chosen) {
+    linkedCampaignId = String(chosen.campaign_id);
+    campaignDiscountCode = chosen.discount_code ? String(chosen.discount_code) : null;
+    campaignRate = chosen.commission_rate != null ? Number(chosen.commission_rate) : null;
   }
 
   // Rate priority: campaign override (if set) -> creator's own rate -> 10.
