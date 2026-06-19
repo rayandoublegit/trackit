@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   // Total revenue and commissions from sales
   const { data: salesData } = await supabaseAdmin
     .from("sales")
-    .select("order_amount, commission_amount, discount_code_used, created_at")
+    .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id")
     .eq("user_id", userId);
 
   const sumSales = (from: Date, to: Date) => {
@@ -91,10 +91,46 @@ export async function GET(request: Request) {
     .limit(5);
 
   // Campaigns
-  const { data: campaignsData } = await supabaseAdmin
+  const { data: campaignsRaw } = await supabaseAdmin
     .from("campaigns")
-    .select("name, platform, status, created_at")
+    .select("id, name, platform, status, created_at, start_date")
     .eq("user_id", userId);
+
+  // Creator counts per campaign
+  const { data: ccLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("campaign_id, creator_id")
+    .eq("user_id", userId);
+  const creatorCountByCampaign = new Map<string, number>();
+  for (const link of ccLinks || []) {
+    const cid = String(link.campaign_id);
+    creatorCountByCampaign.set(cid, (creatorCountByCampaign.get(cid) || 0) + 1);
+  }
+
+  // Sales totals per campaign (all-time, from tagged sales)
+  const salesByCampaign = new Map<string, { sales: number; commissions: number }>();
+  for (const s of salesData || []) {
+    if (!s.campaign_id) continue;
+    const cid = String(s.campaign_id);
+    const agg = salesByCampaign.get(cid) || { sales: 0, commissions: 0 };
+    agg.sales += s.order_amount || 0;
+    agg.commissions += s.commission_amount || 0;
+    salesByCampaign.set(cid, agg);
+  }
+
+  const campaignsData = (campaignsRaw || []).map((c) => {
+    const cid = String(c.id);
+    const agg = salesByCampaign.get(cid) || { sales: 0, commissions: 0 };
+    const creatorCount = creatorCountByCampaign.get(cid) || 0;
+    const roi = agg.commissions > 0 ? agg.sales / agg.commissions : 0;
+    return {
+      ...c,
+      creatorCount,
+      totalSales: agg.sales,
+      totalCommissions: agg.commissions,
+      roi,
+    };
+  });
 
   const hasData =
     shopifyConnected ||

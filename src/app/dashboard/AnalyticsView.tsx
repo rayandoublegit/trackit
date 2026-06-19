@@ -393,14 +393,14 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                     {lang === "fr" ? "Aucune campagne pour le moment." : "No campaigns yet."}
                   </td>
                 </tr>
-              ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string }) => (
+              ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string; start_date?: string; creatorCount?: number; totalSales?: number; totalCommissions?: number; roi?: number }) => (
                 <tr key={c.id || c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name || "—"}</td>
-                  <td style={{ padding: "12px 8px" }}>—</td>
-                  <td style={{ padding: "12px 8px" }}>—</td>
-                  <td style={{ padding: "12px 8px" }}>—</td>
-                  <td style={{ padding: "12px 8px" }}>—</td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{c.created_at?.split("T")[0] ?? "—"}</td>
+                  <td style={{ padding: "12px 8px" }}>{c.creatorCount ?? 0}</td>
+                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalSales ?? 0, lang)}</td>
+                  <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalCommissions ?? 0, lang)}</td>
+                  <td style={{ padding: "12px 8px" }}>{c.roi && c.roi > 0 ? `${c.roi.toFixed(1)}x` : "—"}</td>
+                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{(c.start_date || c.created_at)?.split("T")[0] ?? "—"}</td>
                   <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={String(c.status || "Draft")} /></td>
                 </tr>
               ))}
