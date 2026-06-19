@@ -22,6 +22,9 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const [commission, setCommission] = useState("10");
   const [discount, setDiscount] = useState("");
   const [platform, setPlatform] = useState("tiktok");
+  const [niche, setNiche] = useState("");
+  const [followers, setFollowers] = useState("");
+  const [engagement, setEngagement] = useState("");
   const [saving, setSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -94,7 +97,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
       await fetch("/api/creators/pending-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId, creatorId: current.id, commissionRate: commission, discountCode: discount, platform, avatarUrl }),
+        body: JSON.stringify({ brandId, creatorId: current.id, commissionRate: commission, discountCode: discount, platform, avatarUrl, niche, followers, engagement }),
       });
       next();
     } finally {
@@ -299,6 +302,21 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                 <option value="tiktok">TikTok</option>
                 <option value="instagram">Instagram</option>
               </select>
+            </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Niche" : "Niche"}</label>
+              <input type="text" value={niche} onChange={(e) => setNiche(e.target.value)} placeholder={lang === "fr" ? "Ex : mode, beauté, fitness" : "e.g. fashion, beauty, fitness"} className="ncm-field" style={inputStyle} />
+            </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Abonnés" : "Followers"}</label>
+              <input type="number" value={followers} onChange={(e) => setFollowers(e.target.value)} placeholder="10000" className="ncm-field" style={inputStyle} />
+            </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Taux d'engagement (%)" : "Engagement rate (%)"}</label>
+              <input type="number" value={engagement} onChange={(e) => setEngagement(e.target.value)} placeholder="3.5" className="ncm-field" style={inputStyle} />
             </div>
           </div>
 
