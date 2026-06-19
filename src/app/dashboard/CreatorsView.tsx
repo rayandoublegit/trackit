@@ -51,7 +51,7 @@ function mapDbCreator(c: Record<string, unknown>): ManagedCreator {
     followers: Number(c.followers ?? 0),
     engagement: Number(c.engagement_rate ?? 0),
     niche: String(c.niche ?? ""),
-    status: "pending",
+    status: c.needs_review === false ? "active" : "pending",
     addedDate: typeof c.created_at === "string" ? c.created_at.split("T")[0] : "",
     age: 0,
     email: "",
