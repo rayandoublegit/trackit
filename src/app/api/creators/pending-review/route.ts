@@ -34,6 +34,9 @@ export async function POST(request: Request) {
   const discountCode = (body?.discountCode as string | undefined)?.trim() || null;
   const platform = (body?.platform as string | undefined)?.trim() || null;
   const avatarUrl = (body?.avatarUrl as string | undefined)?.trim() || null;
+  const niche = (body?.niche as string | undefined)?.trim() || null;
+  const followers = body?.followers;
+  const engagement = body?.engagement;
   if (!brandId || !creatorId) return NextResponse.json({ error: "Missing brandId or creatorId" }, { status: 400 });
 
   const update: Record<string, unknown> = { needs_review: false };
@@ -41,6 +44,9 @@ export async function POST(request: Request) {
   if (discountCode) update.discount_code = discountCode;
   if (platform) update.platform = platform;
   if (avatarUrl) update.avatar_url = avatarUrl;
+  if (niche) update.niche = niche;
+  if (followers !== undefined && followers !== null && followers !== "") update.followers = Number(followers);
+  if (engagement !== undefined && engagement !== null && engagement !== "") update.engagement_rate = Number(engagement);
 
   const { error } = await supabaseAdmin
     .from("creators")
