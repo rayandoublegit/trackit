@@ -951,6 +951,10 @@ export function CreatorsView({
       setCreators(data.map(mapDbCreator));
     };
     void load();
+    const interval = setInterval(() => { void load(); }, 15000);
+    const onFocus = () => { void load(); };
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); };
   }, []);
 
   useEffect(() => {
