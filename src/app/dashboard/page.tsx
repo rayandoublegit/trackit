@@ -848,6 +848,7 @@ function DashboardPageContent() {
         {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
         {view === "notifications" && <NotificationsView isMobile={isMobile} onUnreadChange={setNotificationUnread} />}
       </main>
+      {user && !isCreator && <NewCreatorModal brandId={user.id} />}
     </div>
   );
 }
@@ -1001,7 +1002,6 @@ function HomeView({ fullName, username, isMobile, gettingStarted, user, onNaviga
       {shopifyModalOpen && (
         <ShopifyConnectModal lang={lang} userId={user?.id} onClose={() => setShopifyModalOpen(false)} />
       )}
-      {user && <NewCreatorModal brandId={user.id} />}
     </>
   );
 }
