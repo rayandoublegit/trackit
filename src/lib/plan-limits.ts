@@ -1,18 +1,20 @@
 export type PlanTier = "free" | "basic" | "pro" | "scale";
 
 export const FREE_LIFETIME_DISCOVERIES = 5;
-export const BASIC_MONTHLY_DISCOVERIES = 15;
+export const BASIC_MONTHLY_DISCOVERIES = 20;
+export const PRO_MONTHLY_DISCOVERIES = 50;
 
 export const FREE_RESULTS_PER_SEARCH = 5;
 export const BASIC_RESULTS_PER_SEARCH = 10;
+export const PRO_RESULTS_PER_SEARCH = 25;
 
 export const FREE_MAX_CAMPAIGNS = 0;
-export const BASIC_MAX_CAMPAIGNS = 1;
-export const PRO_MAX_CAMPAIGNS = 10;
+export const BASIC_MAX_CAMPAIGNS = 3;
+export const PRO_MAX_CAMPAIGNS = 15;
 
-export const FREE_MAX_MANAGED_CREATORS = 0;
-export const BASIC_MAX_MANAGED_CREATORS = 10;
-export const PRO_MAX_MANAGED_CREATORS = 100;
+export const FREE_MAX_MANAGED_CREATORS = 3;
+export const BASIC_MAX_MANAGED_CREATORS = 15;
+export const PRO_MAX_MANAGED_CREATORS = 50;
 
 export const BASIC_MAX_SHOPIFY_STORES = 0;
 export const PRO_MAX_SHOPIFY_STORES = 1;
@@ -44,6 +46,7 @@ export function isScalePlan(plan: PlanTier): boolean {
 export function getDailyDiscoveryLimit(plan: PlanTier): number | null {
   if (plan === "free") return FREE_LIFETIME_DISCOVERIES;
   if (plan === "basic") return BASIC_MONTHLY_DISCOVERIES;
+  if (plan === "pro") return PRO_MONTHLY_DISCOVERIES;
   return null;
 }
 
@@ -59,6 +62,7 @@ export function hasUnlimitedDiscoveries(plan: PlanTier): boolean {
 export function getResultsPerSearchLimit(plan: PlanTier): number | null {
   if (plan === "free") return FREE_RESULTS_PER_SEARCH;
   if (plan === "basic") return BASIC_RESULTS_PER_SEARCH;
+  if (plan === "pro") return PRO_RESULTS_PER_SEARCH;
   return null;
 }
 
@@ -100,7 +104,7 @@ export function hasReachedManagedCreatorLimit(plan: PlanTier, creatorCount: numb
   return creatorCount >= max;
 }
 
-export const BASIC_MONTHLY_AI_MESSAGES = 50;
+export const BASIC_MONTHLY_AI_MESSAGES = 100;
 
 /** Pro + Scale: unlimited AI outreach. Basic: 50/month. */
 export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
