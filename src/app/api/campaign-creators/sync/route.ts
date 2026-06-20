@@ -8,21 +8,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Build a per-campaign affiliate code from the creator's base code + campaign name.
-function buildCampaignCode(baseCode: string | null, handle: string, campaignName: string): string {
-  const base = (baseCode || handle || "CODE")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 16) || "CODE";
-  const suffix = (campaignName || "CAMP")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6) || "CAMP";
-  return `${base}-${suffix}`;
-}
-
 // Sync the creators linked to a campaign (service role: bypasses RLS).
-// Mirrors the old client-side syncCampaignCreators: full delete + re-insert.
+// The promo code lives on the creator, NOT on the link, so discount_code stays
+// null here. Attribution reads the creator's own code. No code generation = no
+// collision on the unique index over upper(discount_code).
 export async function POST(request: Request) {
   const body = await request.json();
   const userId = String(body.userId || "");
@@ -37,13 +26,12 @@ export async function POST(request: Request) {
   // Ownership guard: the campaign must belong to this user.
   const { data: campaignRow } = await supabaseAdmin
     .from("campaigns")
-    .select("name, user_id")
+    .select("user_id")
     .eq("id", campaignId)
     .maybeSingle();
   if (!campaignRow || String(campaignRow.user_id) !== userId) {
     return NextResponse.json({ ok: false, error: "Campaign not found" }, { status: 404 });
   }
-  const campaignName = String(campaignRow.name ?? "");
 
   // 1. Wipe existing links for this campaign.
   const { error: deleteError } = await supabaseAdmin
@@ -59,38 +47,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, linked: 0 });
   }
 
-  // 2. Pull each creator's base code + rate (and verify ownership).
+  // 2. Pull each creator's rate (and verify ownership).
   const { data: creatorRows } = await supabaseAdmin
     .from("creators")
-    .select("id, handle, discount_code, commission_rate, user_id")
+    .select("id, commission_rate, user_id")
     .in("id", creatorIds)
     .eq("user_id", userId);
   const creatorMap = new Map(
     (creatorRows || []).map((c) => [
       String(c.id),
-      c as { handle?: string; discount_code?: string | null; commission_rate?: number | null },
+      c as { commission_rate?: number | null },
     ]),
   );
 
-  // 3. Build rows with unique per-batch codes.
-  const seen = new Set<string>();
+  // 3. Build link rows (no discount_code -> stays null -> no collision).
   const rows = creatorIds
     .filter((id) => creatorMap.has(id))
     .map((creatorId) => {
       const c = creatorMap.get(creatorId);
-      const code = buildCampaignCode(c?.discount_code ?? null, c?.handle ?? "", campaignName);
-      let candidate = code;
-      let n = 2;
-      while (seen.has(candidate.toUpperCase())) {
-        candidate = `${code}${n}`;
-        n += 1;
-      }
-      seen.add(candidate.toUpperCase());
       return {
         user_id: userId,
         campaign_id: campaignId,
         creator_id: creatorId,
-        discount_code: candidate,
         commission_rate: c?.commission_rate ?? null,
         commission_type: "percentage",
       };
