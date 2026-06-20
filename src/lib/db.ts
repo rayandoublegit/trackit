@@ -167,77 +167,24 @@ export async function getCampaignCreatorCounts(userId: string): Promise<Record<s
   return map;
 }
 
-// Build a per-campaign affiliate code from the creator's base discount code + campaign name.
-// e.g. base "JULIE10" + campaign "Black Friday" -> "JULIE10-BLACK"
-function buildCampaignCode(baseCode: string | null, handle: string, campaignName: string): string {
-  const base = (baseCode || handle || "CODE")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 16) || "CODE";
-  const suffix = (campaignName || "CAMP")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6) || "CAMP";
-  return `${base}-${suffix}`;
-}
-
 export async function syncCampaignCreators(userId: string, campaignId: string, creatorIds: string[]) {
-  if (!supabase) return false;
-  const { error: deleteError } = await supabase
-    .from("campaign_creators")
-    .delete()
-    .eq("campaign_id", campaignId)
-    .eq("user_id", userId);
-  if (deleteError) {
-    console.error("syncCampaignCreators delete error:", deleteError);
-    return false;
-  }
-  if (creatorIds.length === 0) return true;
-
-  // Fetch campaign name (for the code suffix) + each creator's base code & rate.
-  const { data: campaignRow } = await supabase
-    .from("campaigns")
-    .select("name")
-    .eq("id", campaignId)
-    .maybeSingle();
-  const campaignName = String((campaignRow as { name?: string } | null)?.name ?? "");
-
-  const { data: creatorRows } = await supabase
-    .from("creators")
-    .select("id, handle, discount_code, commission_rate")
-    .in("id", creatorIds);
-  const creatorMap = new Map(
-    (creatorRows || []).map((c) => [String(c.id), c as { handle?: string; discount_code?: string | null; commission_rate?: number | null }]),
-  );
-
-  const seen = new Set<string>();
-  const rows = creatorIds.map((creatorId) => {
-    const c = creatorMap.get(creatorId);
-    let code = buildCampaignCode(c?.discount_code ?? null, c?.handle ?? "", campaignName);
-    // Guarantee uniqueness within this batch (DB also has a unique index on upper(discount_code)).
-    let candidate = code;
-    let n = 2;
-    while (seen.has(candidate.toUpperCase())) {
-      candidate = `${code}${n}`;
-      n += 1;
+  // Routed through a service-role API so the write isn't subject to browser-session RLS.
+  try {
+    const res = await fetch("/api/campaign-creators/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, campaignId, creatorIds }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("syncCampaignCreators error:", payload.error ?? res.statusText);
+      return false;
     }
-    seen.add(candidate.toUpperCase());
-    return {
-      user_id: userId,
-      campaign_id: campaignId,
-      creator_id: creatorId,
-      discount_code: candidate,
-      commission_rate: c?.commission_rate ?? null,
-      commission_type: "percentage",
-    };
-  });
-
-  const { error: insertError } = await supabase.from("campaign_creators").insert(rows);
-  if (insertError) {
-    console.error("syncCampaignCreators insert error:", insertError);
+    return true;
+  } catch (e) {
+    console.error("syncCampaignCreators error:", e instanceof Error ? e.message : e);
     return false;
   }
-  return true;
 }
 
 // OUTREACH
