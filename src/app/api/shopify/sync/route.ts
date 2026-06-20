@@ -49,6 +49,36 @@ export async function POST(request: NextRequest) {
     ])
   );
 
+  const { data: allCampaignLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("creator_id, campaign_id, campaigns(status, created_at)")
+    .eq("user_id", userId);
+
+  const linksByCreator = new Map<string, Array<{ campaign_id: string; campaigns: { status?: string | null; created_at?: string | null } | null }>>();
+  for (const link of allCampaignLinks || []) {
+    const creatorId = String(link.creator_id);
+    const bucket = linksByCreator.get(creatorId) || [];
+    bucket.push({
+      campaign_id: String(link.campaign_id),
+      campaigns: link.campaigns as { status?: string | null; created_at?: string | null } | null,
+    });
+    linksByCreator.set(creatorId, bucket);
+  }
+
+  function pickCampaignForCreator(creatorId: string): string | null {
+    const links = linksByCreator.get(creatorId) || [];
+    if (links.length === 0) return null;
+    if (links.length === 1) return links[0].campaign_id;
+    const active = links
+      .filter((l) => (l.campaigns?.status || "").toLowerCase() === "active")
+      .sort((a, b) => (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || ""));
+    if (active[0]) return active[0].campaign_id;
+    const byRecency = [...links].sort((a, b) =>
+      (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || ""),
+    );
+    return byRecency[0]?.campaign_id ?? null;
+  }
+
   if (discountMap.size === 0 && campaignCodeMap.size === 0) {
     return NextResponse.json({ synced: 0, message: "No creators with discount codes" });
   }
@@ -71,7 +101,9 @@ export async function POST(request: NextRequest) {
         ? { id: campaignLink.creator_id, commission_rate: campaignLink.rate }
         : discountMap.get(code);
       if (!creator) continue;
-      const linkedCampaignId = campaignLink ? campaignLink.campaign_id : null;
+      const linkedCampaignId = campaignLink
+        ? campaignLink.campaign_id
+        : pickCampaignForCreator(String(creator.id));
 
       const orderAmount = parseFloat(order.total_price || "0");
       const commissionRate = creator.commission_rate || 10;

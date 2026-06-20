@@ -18,7 +18,9 @@ import {
   type PaymentMethod,
 } from "./usePaymentMethods";
 import { notifyCreatorPaid, notifyFundsAdded } from "@/lib/notifications-storage";
+import { dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { CreatorPayoutMethodFields, creatorHasPayoutDetails } from "./CreatorPayoutMethodFields";
 
 type SalePlatform = "tiktok" | "instagram" | "youtube";
 
@@ -496,221 +498,6 @@ function paymentMethodLabel(c: {
   return lang === "fr" ? "Non configuré" : "Not set";
 }
 
-const payoutPanelInputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: 10,
-  border: "1px solid #EFEFEF",
-  background: "#FFFFFF",
-  fontSize: 14,
-  fontFamily: "inherit",
-  width: "100%",
-  boxSizing: "border-box",
-  letterSpacing: "-0.02em",
-  color: "#1A1A1A",
-  outline: "none",
-};
-
-const payoutPanelFieldLabelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 12,
-  fontWeight: 600,
-  color: "#1A1A1A",
-  marginBottom: 6,
-  letterSpacing: "-0.01em",
-};
-
-type PayoutMethodType = "paypal" | "revolut" | "iban";
-
-function defaultPayoutMethodType(c: {
-  paypal_link?: string | null;
-  revolut_link?: string | null;
-  iban?: string | null;
-}): PayoutMethodType {
-  if (c.paypal_link) return "paypal";
-  if (c.revolut_link) return "revolut";
-  if (c.iban) return "iban";
-  return "paypal";
-}
-
-const PAYMENT_METHOD_LOGOS: Record<PayoutMethodType, { src: string; alt: string; height: number; maxWidth: number }> = {
-  paypal: { src: "/payment-logos/paypal.svg", alt: "PayPal", height: 14, maxWidth: 54 },
-  revolut: { src: "/payment-logos/revolut.svg", alt: "Revolut", height: 11, maxWidth: 62 },
-  iban: { src: "/payment-logos/iban.svg", alt: "IBAN", height: 16, maxWidth: 48 },
-};
-
-function PaymentMethodLogo({ method }: { method: PayoutMethodType }) {
-  const logo = PAYMENT_METHOD_LOGOS[method];
-  return (
-    <img
-      src={logo.src}
-      alt={logo.alt}
-      style={{
-        height: logo.height,
-        width: "auto",
-        maxWidth: logo.maxWidth,
-        objectFit: "contain",
-        display: "block",
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-const PAYOUT_METHOD_OPTIONS: { id: PayoutMethodType; label: string }[] = [
-  { id: "paypal", label: "PayPal" },
-  { id: "revolut", label: "Revolut" },
-  { id: "iban", label: "IBAN" },
-];
-
-function CreatorPayoutMethodFields({
-  creator,
-  lang,
-  onUpdate,
-}: {
-  creator: {
-    id: string;
-    paypal_link?: string | null;
-    revolut_link?: string | null;
-    iban?: string | null;
-  };
-  lang: "en" | "fr";
-  onUpdate: (next: typeof creator) => void;
-}) {
-  const [method, setMethod] = useState<PayoutMethodType>(() => defaultPayoutMethodType(creator));
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMethod(defaultPayoutMethodType(creator));
-    setOpen(false);
-  }, [creator.id]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  const current = PAYOUT_METHOD_OPTIONS.find((m) => m.id === method) ?? PAYOUT_METHOD_OPTIONS[0];
-
-  const fieldConfig: Record<PayoutMethodType, { key: "paypal_link" | "revolut_link" | "iban"; placeholder: string; label: string }> = {
-    paypal: { key: "paypal_link", placeholder: "paypal.me/username", label: "PayPal" },
-    revolut: { key: "revolut_link", placeholder: "revolut.me/username", label: "Revolut" },
-    iban: { key: "iban", placeholder: "FR76 1234 5678 9012 3456 7890 123", label: "IBAN" },
-  };
-  const active = fieldConfig[method];
-  const activeValue = String(creator[active.key] || "");
-
-  const saveField = async (value: string) => {
-    if (!supabase) return;
-    await supabase.from("creators").update({ [active.key]: value }).eq("id", creator.id);
-    onUpdate({ ...creator, [active.key]: value });
-  };
-
-  return (
-    <div ref={rootRef}>
-      <span style={payoutPanelFieldLabelStyle}>{lang === "fr" ? "Moyen de paiement" : "Payment method"}</span>
-      <div style={{ position: "relative", marginBottom: 12 }}>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          style={{
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid #EFEFEF",
-            background: "#FFFFFF",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            textAlign: "left",
-          }}
-        >
-          <PaymentMethodLogo method={current.id} />
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{current.label}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-            <path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        {open && (
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
-              left: 0,
-              right: 0,
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
-              borderRadius: 12,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
-              zIndex: 20,
-              overflow: "hidden",
-            }}
-          >
-            {PAYOUT_METHOD_OPTIONS.map((option, i) => {
-              const selected = option.id === method;
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => {
-                    setMethod(option.id);
-                    setOpen(false);
-                  }}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    padding: "12px 14px",
-                    border: "none",
-                    borderBottom: i < PAYOUT_METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none",
-                    background: selected ? "#FAFAFA" : "#FFFFFF",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    textAlign: "left",
-                  }}
-                >
-                  <PaymentMethodLogo method={option.id} />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: selected ? 600 : 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{option.label}</span>
-                  {selected && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 13l4 4L19 7" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <label>
-        <span style={{ ...payoutPanelFieldLabelStyle, marginBottom: 6 }}>{active.label}</span>
-        <input
-          key={`${creator.id}-${method}`}
-          type="text"
-          defaultValue={activeValue}
-          placeholder={active.placeholder}
-          onBlur={(e) => void saveField(e.target.value)}
-          style={payoutPanelInputStyle}
-        />
-      </label>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
-        {lang === "fr" ? "Sauvegarde automatique en quittant le champ" : "Auto-saves when you leave the field"}
-      </p>
-    </div>
-  );
-}
-
-function creatorHasPayoutDetails(c: { paypal_link?: string; revolut_link?: string; iban?: string }) {
-  return Boolean(c.paypal_link || c.revolut_link || c.iban);
-}
-
 type CompletedPayout = {
   id: string;
   creator_id: string | null;
@@ -939,6 +726,9 @@ export function PayoutsView({
   } = usePaymentMethods();
   const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
   const [confirmPay, setConfirmPay] = useState<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
+  const pendingConfirmRef = useRef<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
+  const paymentLeftTabRef = useRef(false);
+  const pendingSinceRef = useRef(0);
   const [fundAmount, setFundAmount] = useState("");
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
   const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
@@ -1023,6 +813,30 @@ export function PayoutsView({
     void loadCompletedPayouts();
   }, [userId]);
 
+  useEffect(() => {
+    const tryShowPaymentConfirm = () => {
+      if (document.visibilityState === "hidden") {
+        if (pendingConfirmRef.current) paymentLeftTabRef.current = true;
+        return;
+      }
+      if (!pendingConfirmRef.current) return;
+
+      const waitedLongEnough = Date.now() - pendingSinceRef.current >= 2000;
+      if (!paymentLeftTabRef.current && !waitedLongEnough) return;
+
+      setConfirmPay(pendingConfirmRef.current);
+      pendingConfirmRef.current = null;
+      paymentLeftTabRef.current = false;
+    };
+
+    document.addEventListener("visibilitychange", tryShowPaymentConfirm);
+    window.addEventListener("focus", tryShowPaymentConfirm);
+    return () => {
+      document.removeEventListener("visibilitychange", tryShowPaymentConfirm);
+      window.removeEventListener("focus", tryShowPaymentConfirm);
+    };
+  }, []);
+
   const creatorsPendingPayout = useMemo(
     () => creators.filter((c) => (Number(c.balance) || 0) > 0),
     [creators]
@@ -1059,44 +873,58 @@ export function PayoutsView({
       alert(lang === "fr" ? "Solde insuffisant" : "No balance to pay");
       return;
     }
+
+    const payload = {
+      creatorId: creator.id,
+      name: creator.full_name || creator.handle || "creator",
+      amount,
+      method: creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban",
+    };
+
     if (creator.paypal_link) {
       const clean = String(creator.paypal_link).replace("https://paypal.me/", "").replace("paypal.me/", "");
+      pendingConfirmRef.current = payload;
+      paymentLeftTabRef.current = false;
+      pendingSinceRef.current = Date.now();
       window.open(`https://paypal.me/${clean}/${amount}`, "_blank");
     } else if (creator.revolut_link) {
       const clean = String(creator.revolut_link).replace("https://revolut.me/", "").replace("revolut.me/", "");
+      pendingConfirmRef.current = payload;
+      paymentLeftTabRef.current = false;
+      pendingSinceRef.current = Date.now();
       window.open(`https://revolut.me/${clean}`, "_blank");
     } else if (creator.iban) {
       navigator.clipboard.writeText(String(creator.iban));
       alert(
         lang === "fr"
           ? `IBAN copié ✓\nMontant à virer : ${formatCurrency(amount, lang)}`
-          : `IBAN copied ✓\nAmount to transfer: ${formatCurrency(amount, lang)}`
+          : `IBAN copied ✓\nAmount to transfer: ${formatCurrency(amount, lang)}`,
       );
+      setConfirmPay(payload);
     } else {
       alert(
         lang === "fr"
           ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
-          : `${creator.full_name || creator.handle} hasn't added their payment details yet.`
+          : `${creator.full_name || creator.handle} hasn't added their payment details yet.`,
       );
       return;
     }
+
     notifyCreatorPaid(lang, creator.full_name || creator.handle || "creator", amount);
     setPayMessage(
       lang === "fr"
         ? `Paiement de ${formatCurrency(amount, lang)} initié pour ${creator.full_name || creator.handle}.`
-        : `Payment of ${formatCurrency(amount, lang)} started for ${creator.full_name || creator.handle}.`
+        : `Payment of ${formatCurrency(amount, lang)} started for ${creator.full_name || creator.handle}.`,
     );
-    // Open the Trackit confirmation modal once the user comes back
-    const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
-    setTimeout(() => {
-      setConfirmPay({ creatorId: creator.id, name: creator.full_name || creator.handle || "creator", amount, method });
-    }, 800);
   };
 
   const confirmManualPayout = async () => {
     if (!confirmPay) return;
     const { creatorId, amount, method } = confirmPay;
     setConfirmPay(null);
+    setSelectedCreatorPayout(null);
+    pendingConfirmRef.current = null;
+
     const res = await fetch("/api/payouts/manual", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1115,6 +943,7 @@ export function PayoutsView({
         )
       );
       void loadCompletedPayouts();
+      dispatchPayoutsUpdated();
     } else {
       alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
     }
@@ -1590,6 +1419,7 @@ export function PayoutsView({
                         const list = await r.json();
                         if (Array.isArray(list)) setCreators(list);
                         void loadCompletedPayouts();
+                        dispatchPayoutsUpdated();
                         setSelectedCreatorPayout(null);
                       } else {
                         alert(data.error || "Payout failed");
@@ -1752,7 +1582,7 @@ export function PayoutsView({
         )}
 
       {confirmPay && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setConfirmPay(null)}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -1761,19 +1591,24 @@ export function PayoutsView({
               style={{ height: 96, width: "auto", display: "block", margin: "0 auto 20px", objectFit: "contain" }}
             />
             <h3 style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-              {lang === "fr" ? "Confirmation du paiement" : "Payment confirmation"}
+              {lang === "fr" ? "Le virement a été effectué ?" : "Did you complete the transfer?"}
             </h3>
             <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 6px", lineHeight: 1.5 }}>
-              {lang === "fr" ? "Virement de" : "Transfer of"} <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong> {lang === "fr" ? "à" : "to"} <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+              {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
+              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
+              {lang === "fr" ? "à" : "to"}{" "}
+              <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
             </p>
             <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
-              {lang === "fr" ? "En confirmant, le paiement est enregistré et le solde du créateur est remis à zéro." : "By confirming, the payment is recorded and the creator's balance is reset."}
+              {lang === "fr"
+                ? "Si vous confirmez, le paiement est enregistré et le solde du créateur est remis à zéro."
+                : "If you confirm, the payment is recorded and the creator's balance is reset."}
             </p>
             <button type="button" onClick={() => void confirmManualPayout()} style={{ width: "100%", padding: "13px 0", background: "#1A1A1A", color: "#FFFFFF", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
-              {lang === "fr" ? "Virement effectué ✓" : "Transfer completed ✓"}
+              {lang === "fr" ? "Oui, virement effectué ✓" : "Yes, transfer completed ✓"}
             </button>
-            <button type="button" onClick={() => setConfirmPay(null)} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-              {lang === "fr" ? "Annuler" : "Cancel"}
+            <button type="button" onClick={() => { setConfirmPay(null); pendingConfirmRef.current = null; paymentLeftTabRef.current = false; }} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+              {lang === "fr" ? "Non, pas encore" : "No, not yet"}
             </button>
           </div>
         </div>

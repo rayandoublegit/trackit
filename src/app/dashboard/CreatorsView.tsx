@@ -17,6 +17,7 @@ import {
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
 import { SplitHeaderActions } from "./SplitHeaderActions";
+import { CreatorPayoutMethodFields } from "./CreatorPayoutMethodFields";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -505,167 +506,144 @@ function CreatorDetailModal({
   onGenerateOutreach: () => void;
 }) {
   const lang = useLang();
-  // Notes should be writable immediately, with explicit "Save notes" persistence.
-  const [editing, setEditing] = useState(true);
-  const [draft, setDraft] = useState(creator);
+  const [localCreator, setLocalCreator] = useState(creator);
+  const [notesDraft, setNotesDraft] = useState(creator.notes);
+  const [savingNotes, setSavingNotes] = useState(false);
+
+  useEffect(() => {
+    setLocalCreator(creator);
+    setNotesDraft(creator.notes);
+  }, [creator]);
 
   const avgViews = Math.floor(creator.followers * 0.08);
+  const notesDirty = notesDraft.trim() !== (creator.notes || "").trim();
 
-  const saveEdit = async () => {
-    if (!supabase) return;
-    const nextNotes = draft.notes.trim();
-
-    const { error } = await supabase.from("creators").update({ notes: nextNotes }).eq("id", creator.id);
-    if (error) {
-      // Keep editing open so the user can retry.
-      console.error("Failed to save creator notes:", error);
-      return;
+  const saveNotes = async () => {
+    if (!supabase || !notesDirty) return;
+    setSavingNotes(true);
+    try {
+      const nextNotes = notesDraft.trim();
+      const { error } = await supabase.from("creators").update({ notes: nextNotes }).eq("id", creator.id);
+      if (error) {
+        console.error("Failed to save creator notes:", error);
+        return;
+      }
+      const updated = { ...localCreator, notes: nextNotes };
+      setLocalCreator(updated);
+      onUpdate(updated);
+    } finally {
+      setSavingNotes(false);
     }
-
-    onUpdate({ ...draft, notes: nextNotes });
-    setEditing(false);
   };
+
+  const statCards = [
+    { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followers) },
+    { label: lang === "fr" ? "Engagement" : "Engagement", value: `${creator.engagement}%` },
+    { label: lang === "fr" ? "Vues moy." : "Avg Views", value: formatCount(avgViews) },
+    { label: lang === "fr" ? "Niche" : "Niche", value: creator.niche || "—" },
+    { label: lang === "fr" ? "Localisation" : "Location", value: creator.location || "—" },
+    { label: lang === "fr" ? "Âge" : "Age", value: creator.age ? String(creator.age) : "—" },
+  ];
 
   return (
     <ModalShell onClose={onClose} maxWidth={600}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, paddingRight: 32 }}>
-        <CreatorAvatar src={creator.avatarUrl} size={80} alt={creator.displayName} />
-        <div style={{ flex: 1 }}>
-          <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px" }}>{creator.displayName}</h2>
-          <div style={{ fontSize: 15, color: "#0047FF", marginBottom: 8 }}>@{creator.username}</div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24, paddingRight: 32 }}>
+        <CreatorAvatar src={creator.avatarUrl} size={72} alt={creator.displayName} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-0.03em", color: "#1A1A1A" }}>
+            {creator.displayName}
+          </h2>
+          <div style={{ fontSize: 14, color: "#0047FF", marginBottom: 10, fontWeight: 500 }}>@{creator.username}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, background: "#F0F0F0", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>{creator.platform}</span>
-            <span style={statusBadgeStyle()}>{statusLabel(creator.status, lang)}</span>
+            <span style={{ fontSize: 11, fontWeight: 500, background: "#F5F5F5", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize", color: "#1A1A1A" }}>
+              {creator.platform}
+            </span>
+            <span style={{ ...statusBadgeStyle(), background: "#F5F5F5", padding: "4px 10px", borderRadius: 999 }}>
+              {statusLabel(creator.status, lang)}
+            </span>
           </div>
         </div>
       </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
-        {[
-          { label: "Followers", value: formatCount(creator.followers) },
-          { label: "Engagement", value: `${creator.engagement}%` },
-          { label: "Avg Views", value: formatCount(avgViews) },
-          { label: "Niche", value: creator.niche },
-          { label: "Location", value: creator.location },
-          { label: "Age", value: String(creator.age) },
-        ].map((s) => (
-          <div key={s.label} style={{ background: "#FAFAFA", borderRadius: 10, padding: 12, textAlign: "center" }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 4 }}>{s.label}</div>
+        {statCards.map((s) => (
+          <div key={s.label} style={{ background: "#FAFAFA", border: "1px solid #F0F0F0", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{s.value}</div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>{s.label}</div>
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>
-        <strong style={{ color: "#1A1A1A" }}>Email:</strong> {creator.email}
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
-          {lang === "fr" ? "Lien PayPal.me" : "PayPal.me link"}
-        </label>
-        <input
-          type="text"
-          placeholder="paypal.me/yourname"
-          value={creator.paypal_link || ""}
-          onChange={async (e) => {
-            const { supabase } = await import("@/lib/supabase");
-            if (!supabase) return;
-            const val = e.target.value;
-            await supabase.from("creators").update({ paypal_link: val }).eq("id", creator.id);
-            onUpdate({ ...creator, paypal_link: val });
+
+      <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16, marginBottom: 16 }}>
+        <CreatorPayoutMethodFields
+          creator={localCreator}
+          lang={lang}
+          onUpdate={(next) => {
+            const updated = { ...localCreator, ...next };
+            setLocalCreator(updated);
+            onUpdate(updated);
           }}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
         />
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
-          {lang === "fr" ? "Ex: paypal.me/emmalauren" : "e.g. paypal.me/emmalauren"}
-        </div>
       </div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
-          {lang === "fr" ? "Lien Revolut.me" : "Revolut.me link"}
+
+      <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16, marginBottom: 24 }}>
+        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "Notes" : "Notes"}
         </label>
-        <input
-          type="text"
-          placeholder="revolut.me/yourname"
-          value={creator.revolut_link || ""}
-          onChange={async (e) => {
-            const { supabase } = await import("@/lib/supabase");
-            if (!supabase) return;
-            await supabase.from("creators").update({ revolut_link: e.target.value }).eq("id", creator.id);
-          }}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
-        />
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
-          {lang === "fr" ? "Ex: revolut.me/emmalauren" : "e.g. revolut.me/emmalauren"}
-        </div>
-      </div>
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", display: "block", marginBottom: 6 }}>
-          {lang === "fr" ? "IBAN" : "IBAN"}
-        </label>
-        <input
-          type="text"
-          placeholder="FR76 3000 6000 0112 3456 7890 189"
-          value={creator.iban || ""}
-          onChange={async (e) => {
-            const { supabase } = await import("@/lib/supabase");
-            if (!supabase) return;
-            await supabase.from("creators").update({ iban: e.target.value }).eq("id", creator.id);
-          }}
-          style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit" }}
-        />
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4 }}>
-          {lang === "fr" ? "Virement bancaire manuel — l'IBAN sera copié automatiquement" : "Manual bank transfer — IBAN will be auto-copied"}
-        </div>
-      </div>
-      <Field label="Notes">
         <textarea
-          value={editing ? draft.notes : creator.notes}
-          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-          readOnly={!editing}
+          value={notesDraft}
+          onChange={(e) => setNotesDraft(e.target.value)}
           rows={4}
-          style={{ ...inputStyle, lineHeight: 1.5 }}
+          placeholder={lang === "fr" ? "Notes internes sur ce créateur…" : "Internal notes about this creator…"}
+          style={{ ...inputStyle, lineHeight: 1.5, resize: "vertical", borderColor: "#EFEFEF" }}
         />
-      </Field>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-        {editing ? (
-          <>
-            <button type="button" style={btnSecondary} onClick={() => { setDraft(creator); setEditing(false); }}>
-              Cancel edit
+        {notesDirty && (
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button
+              type="button"
+              style={btnSecondary}
+              onClick={() => setNotesDraft(creator.notes)}
+              disabled={savingNotes}
+            >
+              {lang === "fr" ? "Annuler" : "Cancel"}
             </button>
-            <button type="button" style={btnPrimary} onClick={saveEdit}>
-              Save notes
+            <button type="button" style={btnPrimary} onClick={() => void saveNotes()} disabled={savingNotes}>
+              {savingNotes ? (lang === "fr" ? "Enregistrement…" : "Saving…") : lang === "fr" ? "Enregistrer" : "Save notes"}
             </button>
-          </>
-        ) : (
-          <button type="button" style={btnSecondary} onClick={() => setEditing(true)}>
-            {lang === "fr" ? "Modifier ce créateur" : "Edit creator"}
-          </button>
+          </div>
         )}
-        <button type="button" style={btnBlack} onClick={onRunCampaign}>
-          {lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
-        </button>
-        <button type="button" style={btnSecondary} onClick={onGenerateOutreach}>
-          {lang === "fr" ? "Générer un outreach →" : "Generate outreach →"}
-        </button>
       </div>
-      <button
-        type="button"
-        onClick={onRemove}
-        style={{
-          background: "none",
-          border: "none",
-          color: "#DC2626",
-          fontSize: 13,
-          fontWeight: 500,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          padding: 0,
-          marginTop: 8,
-          textDecoration: "underline",
-          textUnderlineOffset: 3,
-        }}
-      >
-        {lang === "fr" ? "Supprimer" : "Remove"}
-      </button>
+
+      <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 12, paddingTop: 16, borderTop: "1px solid #EFEFEF" }}>
+        <SplitHeaderActions
+          variant="white"
+          size="compact"
+          primaryLabel={lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
+          onPrimaryClick={onRunCampaign}
+          menuAriaLabel={lang === "fr" ? "Actions créateur" : "Creator actions"}
+          menuItems={[
+            {
+              label: lang === "fr" ? "Générer un outreach →" : "Generate outreach →",
+              onClick: onGenerateOutreach,
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+            },
+            {
+              label: lang === "fr" ? "Supprimer le créateur" : "Remove creator",
+              onClick: onRemove,
+              danger: true,
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ),
+            },
+          ]}
+        />
+      </div>
     </ModalShell>
   );
 }
@@ -1207,7 +1185,7 @@ export function CreatorsView({
                     </div>
                     <button
                       type="button"
-                      className="hero-cta-shopify-dark hero-cta-compact-sm"
+                      className="hero-cta-shopify-light hero-cta-compact-sm"
                       style={{ width: "fit-content", alignSelf: "flex-start" }}
                       onClick={() => setDetailCreator(creator)}
                     >
@@ -1275,7 +1253,7 @@ export function CreatorsView({
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
                     <button
                       type="button"
-                      className="hero-cta-shopify-dark hero-cta-compact-sm"
+                      className="hero-cta-shopify-light hero-cta-compact-sm"
                       style={{ width: "fit-content", justifySelf: "start" }}
                       onClick={() => setDetailCreator(c)}
                     >

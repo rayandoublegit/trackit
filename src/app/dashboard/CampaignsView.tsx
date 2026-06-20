@@ -1,23 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { saveCampaign, getCampaigns, getSavedCreators, updateCampaignStatus, updateCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { saveCampaign, getCampaigns, getSavedCreators, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyCampaignCreated } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
+  canUseManualPayouts,
   getMaxActiveCampaigns,
   hasReachedCampaignLimit,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { notifyCreatorPaid } from "@/lib/notifications-storage";
+import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, formatTrendLabel, isWithinPeriod, type PeriodTrend } from "@/lib/analytics-periods";
 import { formatCurrency } from "@/lib/useCurrency";
 import { UpgradeModal } from "./UpgradeModal";
+import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
-type DetailTab = "creators" | "outreach" | "sales" | "payouts" | "settings";
+type DetailTab = "creators" | "payouts" | "settings";
 
 type Campaign = {
   id: string;
@@ -47,7 +51,13 @@ type SavedCreatorOption = {
   commission_rate?: number;
 };
 
-type SaleRow = { order_amount?: number; commission_amount?: number; created_at?: string };
+type SaleRow = {
+  order_amount?: number;
+  commission_amount?: number;
+  created_at?: string;
+  campaign_id?: string | null;
+  creator_id?: string;
+};
 type CreatorBalanceRow = { balance?: number };
 
 type CampaignKpiStats = {
@@ -91,7 +101,11 @@ function isEndingThisMonth(dateStr: string | undefined, now = new Date()): boole
   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
 }
 
-function mapDbCampaign(row: Record<string, unknown>, creatorIds?: string[]): Campaign {
+function mapDbCampaign(
+  row: Record<string, unknown>,
+  creatorIds?: string[],
+  salesTotals?: { sales: number; commission: number },
+): Campaign {
   const startRaw = row.start_date ? String(row.start_date) : undefined;
   const endRaw = row.end_date ? String(row.end_date) : undefined;
   const ids = creatorIds ?? (Array.isArray(row.creator_ids) ? row.creator_ids.map(String) : undefined);
@@ -100,8 +114,8 @@ function mapDbCampaign(row: Record<string, unknown>, creatorIds?: string[]): Cam
     name: String(row.name ?? ""),
     creators: ids?.length ?? Number(row.creators ?? 0),
     platform: String(row.platform ?? ""),
-    sales: Number(row.sales ?? 0),
-    commission: Number(row.commission ?? 0),
+    sales: salesTotals?.sales ?? 0,
+    commission: salesTotals?.commission ?? 0,
     status: normalizeCampaignStatus(String(row.status ?? "draft")),
     start: formatCampaignDate(startRaw),
     end: formatCampaignDate(endRaw),
@@ -122,16 +136,31 @@ function clampRate(raw: string, fallback = 10): number {
   return Math.min(100, Math.max(0, n));
 }
 
-// Normalize a free-text date entry to an ISO date (YYYY-MM-DD), or undefined if unparseable.
-// Accepts "May 1, 2026", "2026-05-01", "01/05/2026", etc. Rejects junk like "22" or "020".
+// Normalize a date value to ISO (YYYY-MM-DD), or undefined if unparseable.
 function normalizeDate(raw: string | undefined): string | undefined {
   const s = (raw || "").trim();
   if (!s) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const parsed = new Date(s);
   if (Number.isNaN(parsed.getTime())) return undefined;
   // Guard against partial inputs the Date constructor over-accepts (e.g. a bare "22").
   if (!/[a-zA-Z]/.test(s) && !/\d{4}/.test(s)) return undefined;
   return parsed.toISOString().split("T")[0];
+}
+
+function toDateInputValue(raw: string | undefined): string {
+  if (!raw || raw === "—") return "";
+  const normalized = normalizeDate(raw.trim());
+  return normalized ?? "";
+}
+
+function formatDateLabel(raw: string, lang: "en" | "fr"): string {
+  if (!raw.trim()) return "";
+  const iso = toDateInputValue(raw);
+  if (!iso) return raw;
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function mapSavedCreator(row: Record<string, unknown>): SavedCreatorOption {
@@ -143,6 +172,161 @@ function mapSavedCreator(row: Record<string, unknown>): SavedCreatorOption {
     platform: typeof row.platform === "string" ? row.platform : undefined,
     commission_rate: Number(row.commission_rate ?? 10) || 10,
   };
+}
+
+function campaignRowFingerprint(row: Record<string, unknown>): string {
+  const name = String(row.name ?? "").trim().toLowerCase();
+  const platform = String(row.platform ?? "").trim().toLowerCase();
+  const minute = row.created_at ? String(row.created_at).slice(0, 16) : "";
+  return `${name}|${platform}|${minute}`;
+}
+
+function dedupeCampaignRows<T extends Record<string, unknown>>(rows: T[]): T[] {
+  const seenIds = new Set<string>();
+  const seenFingerprints = new Set<string>();
+  return rows.filter((row) => {
+    const id = String(row.id ?? "");
+    if (id) {
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+    }
+    const fingerprint = campaignRowFingerprint(row);
+    if (seenFingerprints.has(fingerprint)) return false;
+    seenFingerprints.add(fingerprint);
+    return true;
+  });
+}
+
+type CampaignSalesMeta = { status: string; created_at?: string };
+
+function pickCampaignForCreatorSale(
+  creatorId: string,
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+): string | null {
+  const campaignIds = Object.keys(creatorCounts).filter((campaignId) =>
+    creatorCounts[campaignId].includes(creatorId),
+  );
+  if (campaignIds.length === 0) return null;
+  if (campaignIds.length === 1) return campaignIds[0];
+
+  const active = campaignIds
+    .filter((id) => (campaignMeta[id]?.status || "").toLowerCase() === "active")
+    .sort((a, b) => (campaignMeta[b]?.created_at || "").localeCompare(campaignMeta[a]?.created_at || ""));
+  if (active[0]) return active[0];
+
+  const byRecency = [...campaignIds].sort((a, b) =>
+    (campaignMeta[b]?.created_at || "").localeCompare(campaignMeta[a]?.created_at || ""),
+  );
+  return byRecency[0] ?? null;
+}
+
+function computeCampaignSalesTotals(
+  sales: SaleRow[],
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+): Record<string, { sales: number; commission: number }> {
+  const totals: Record<string, { sales: number; commission: number }> = {};
+
+  const add = (campaignId: string, orderAmount: number, commissionAmount: number) => {
+    if (!totals[campaignId]) totals[campaignId] = { sales: 0, commission: 0 };
+    totals[campaignId].sales += orderAmount;
+    totals[campaignId].commission += commissionAmount;
+  };
+
+  for (const sale of sales) {
+    const orderAmount = Number(sale.order_amount) || 0;
+    const commissionAmount = Number(sale.commission_amount) || 0;
+    if (sale.campaign_id) {
+      add(String(sale.campaign_id), orderAmount, commissionAmount);
+      continue;
+    }
+    if (sale.creator_id) {
+      const campaignId = pickCampaignForCreatorSale(String(sale.creator_id), creatorCounts, campaignMeta);
+      if (campaignId) add(campaignId, orderAmount, commissionAmount);
+    }
+  }
+
+  return totals;
+}
+
+type CreatorCampaignStats = { salesCount: number; salesAmount: number; commission: number };
+
+function computeCreatorStatsForCampaign(
+  sales: SaleRow[],
+  campaignId: string,
+  creatorIds: string[],
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+): Record<string, CreatorCampaignStats> {
+  const totals: Record<string, CreatorCampaignStats> = {};
+
+  const add = (creatorId: string, orderAmount: number, commissionAmount: number) => {
+    if (!totals[creatorId]) totals[creatorId] = { salesCount: 0, salesAmount: 0, commission: 0 };
+    totals[creatorId].salesCount += 1;
+    totals[creatorId].salesAmount += orderAmount;
+    totals[creatorId].commission += commissionAmount;
+  };
+
+  for (const sale of sales) {
+    if (!sale.creator_id) continue;
+    const creatorId = String(sale.creator_id);
+    if (!creatorIds.includes(creatorId)) continue;
+
+    let attributedCampaignId: string | null = sale.campaign_id ? String(sale.campaign_id) : null;
+    if (!attributedCampaignId) {
+      attributedCampaignId = pickCampaignForCreatorSale(creatorId, creatorCounts, campaignMeta);
+    }
+    if (attributedCampaignId !== campaignId) continue;
+
+    add(creatorId, Number(sale.order_amount) || 0, Number(sale.commission_amount) || 0);
+  }
+
+  return totals;
+}
+
+type CampaignCreatorRow = {
+  id: string;
+  handle: string;
+  full_name?: string;
+  avatar_url?: string;
+  platform?: string;
+  salesCount: number;
+  salesAmount: number;
+  commission: number;
+};
+
+type PayableCreator = {
+  id: string;
+  handle: string;
+  full_name?: string;
+  avatar_url?: string;
+  balance: number;
+  campaignCommission: number;
+  paypal_link?: string;
+  revolut_link?: string;
+  iban?: string;
+};
+
+type CampaignPayoutRow = {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorHandle: string;
+  avatar_url?: string;
+  amount: number;
+  status: string;
+  dueDate: string;
+  kind: "pending" | "history";
+  payableCreator?: PayableCreator;
+};
+
+function formatPayoutStatusLabel(status: string, lang: "en" | "fr"): string {
+  const s = (status || "").toLowerCase();
+  if (s === "paid") return lang === "fr" ? "Payé" : "Paid";
+  if (s === "pending") return lang === "fr" ? "En attente" : "Pending";
+  if (s === "failed") return lang === "fr" ? "Échoué" : "Failed";
+  return status;
 }
 
 function computeCampaignKpis(
@@ -242,6 +426,11 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A",
   letterSpacing: "-0.02em", background: "#FFF",
 };
+const dateInputStyle: React.CSSProperties = {
+  ...inputStyle,
+  minHeight: 40,
+  cursor: "pointer",
+};
 
 function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
   const labels: Record<string, { en: string; fr: string }> = {
@@ -279,6 +468,7 @@ export function CampaignsView({
   const [modalOpen, setModalOpen] = useState(false);
   const [editCampaignId, setEditCampaignId] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const creatingCampaignRef = useRef(false);
 
   const tryOpenNewCampaign = () => {
     if (plan === "free") {
@@ -315,17 +505,32 @@ export function CampaignsView({
       try {
         const [campaignData, salesResult, creatorsResult, creatorCounts] = await Promise.all([
           getCampaigns(resolvedUserId),
-          supabase.from("sales").select("order_amount, commission_amount, created_at").eq("user_id", resolvedUserId),
+          supabase.from("sales").select("order_amount, commission_amount, created_at, campaign_id, creator_id").eq("user_id", resolvedUserId),
           supabase.from("creators").select("balance").eq("user_id", resolvedUserId),
           getCampaignCreatorCounts(resolvedUserId),
         ]);
         if (cancelled) return;
+
+        const campaignMeta: Record<string, CampaignSalesMeta> = {};
+        for (const row of campaignData) {
+          campaignMeta[String(row.id)] = {
+            status: String(row.status ?? ""),
+            created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+          };
+        }
+        const salesRows = (salesResult.data || []) as SaleRow[];
+        const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, campaignMeta);
+
         setCampaigns(
-          campaignData.map((row) =>
-            mapDbCampaign(row as Record<string, unknown>, creatorCounts[String(row.id)] ?? []),
+          dedupeCampaignRows(campaignData).map((row) =>
+            mapDbCampaign(
+              row as Record<string, unknown>,
+              creatorCounts[String(row.id)] ?? [],
+              salesTotals[String(row.id)],
+            ),
           ),
         );
-        setSales(salesResult.data || []);
+        setSales(salesRows);
         setCreators(creatorsResult.data || []);
       } finally {
         if (!cancelled) setLoading(false);
@@ -355,34 +560,42 @@ export function CampaignsView({
     creatorIds?: string[];
     creatorCommissions?: { creatorId: string; commission_rate: number }[];
   }) => {
-    if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const saved = await saveCampaign(user.id, {
-      name: campaignData.name,
-      description: campaignData.description,
-      platform: campaignData.platform,
-      start_date: campaignData.startDate,
-      end_date: campaignData.endDate,
-      commission_type: campaignData.commissionType || "percentage",
-      commission_rate: campaignData.commissionRate || 10,
-      auto_payout: campaignData.autoPayout || false,
-      status: "active",
-    });
-    if (saved) {
-      const creatorIds = campaignData.creatorIds ?? [];
-      await syncCampaignCreators(user.id, String(saved.id), creatorIds);
-      for (const entry of campaignData.creatorCommissions ?? []) {
-        await supabase
-          .from("creators")
-          .update({ commission_rate: entry.commission_rate })
-          .eq("id", entry.creatorId)
-          .eq("user_id", user.id);
+    if (creatingCampaignRef.current) return;
+    creatingCampaignRef.current = true;
+
+    try {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const saved = await saveCampaign(user.id, {
+        name: campaignData.name,
+        description: campaignData.description,
+        platform: campaignData.platform,
+        start_date: campaignData.startDate,
+        end_date: campaignData.endDate,
+        commission_type: campaignData.commissionType || "percentage",
+        commission_rate: campaignData.commissionRate || 10,
+        auto_payout: campaignData.autoPayout || false,
+        status: "active",
+      });
+      if (saved) {
+        const creatorIds = campaignData.creatorIds ?? [];
+        await syncCampaignCreators(user.id, String(saved.id), creatorIds);
+        for (const entry of campaignData.creatorCommissions ?? []) {
+          await supabase
+            .from("creators")
+            .update({ commission_rate: entry.commission_rate })
+            .eq("id", entry.creatorId)
+            .eq("user_id", user.id);
+        }
+        const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
+        setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
+        notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
+        setModalOpen(false);
       }
-      setCampaigns((prev) => [mapDbCampaign(saved as Record<string, unknown>, creatorIds), ...prev]);
-      notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
+    } finally {
+      creatingCampaignRef.current = false;
     }
-    setModalOpen(false);
   };
 
   const handleStatusChange = async (campaignId: string, status: CampaignStatus) => {
@@ -423,11 +636,34 @@ export function CampaignsView({
         c.id === campaignId
           ? {
               ...mapDbCampaign(updated as Record<string, unknown>, campaignData.creatorIds),
+              sales: c.sales,
+              commission: c.commission,
             }
           : c,
       ),
     );
     setEditCampaignId(null);
+  };
+
+  const handleDeleteCampaign = async (campaignId: string) => {
+    const campaign = campaigns.find((c) => c.id === campaignId);
+    const label = campaign?.name ?? campaignId;
+    const confirmed = window.confirm(
+      lang === "fr"
+        ? `Supprimer la campagne « ${label} » ?\n\nCette action est définitive.`
+        : `Delete campaign "${label}"?\n\nThis cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    const ok = await deleteCampaign(campaignId);
+    if (!ok) {
+      alert(lang === "fr" ? "Impossible de supprimer la campagne." : "Could not delete the campaign.");
+      return;
+    }
+
+    setCampaigns((list) => list.filter((c) => c.id !== campaignId));
+    if (detailId === campaignId) setDetailId(null);
+    if (editCampaignId === campaignId) setEditCampaignId(null);
   };
 
   const editingCampaign = editCampaignId ? campaigns.find((c) => c.id === editCampaignId) ?? null : null;
@@ -440,11 +676,14 @@ export function CampaignsView({
         <CampaignDetail
           isMobile={isMobile}
           lang={lang}
+          userId={userId}
+          plan={plan}
           campaign={selected}
           onBack={() => setDetailId(null)}
           onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))}
           onStatusChange={handleStatusChange}
           onEdit={setEditCampaignId}
+          onDelete={(id) => void handleDeleteCampaign(id)}
         />
         {editingCampaign && (
           <EditCampaignModal
@@ -484,7 +723,7 @@ export function CampaignsView({
             </span>
           </button>
         </div>
-        {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+        {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={handleCreateCampaign} />}
         {upgradeModalOpen && (
           <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
         )}
@@ -505,7 +744,7 @@ export function CampaignsView({
         search={search}
         setSearch={setSearch}
         onView={setDetailId}
-        onDelete={(id) => setCampaigns((l) => l.filter((c) => c.id !== id))}
+        onDelete={(id) => void handleDeleteCampaign(id)}
         onStatusChange={handleStatusChange}
         onEdit={setEditCampaignId}
       />
@@ -517,7 +756,7 @@ export function CampaignsView({
           onSave={(data) => void handleUpdateCampaign(editingCampaign.id, data)}
         />
       )}
-      {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={(data) => void handleCreateCampaign(data)} />}
+      {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={handleCreateCampaign} />}
       {upgradeModalOpen && (
         <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
       )}
@@ -644,6 +883,208 @@ function CampaignsHeader({ lang, onNew, showFilters, showNewButton = true, isMob
   );
 }
 
+function CampaignRowActions({
+  lang,
+  campaign,
+  onView,
+  onEdit,
+  onStatusChange,
+  onDelete,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  onView: (id: string) => void;
+  onEdit: (id: string) => void;
+  onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+}) {
+  const menuItems: SplitMenuItem[] = [
+    {
+      label: lang === "fr" ? "Modifier" : "Edit",
+      onClick: () => onEdit(campaign.id),
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+  ];
+
+  if (campaign.status === "Active") {
+    menuItems.push({
+      label: lang === "fr" ? "Pause" : "Pause",
+      onClick: () => void onStatusChange(campaign.id, "Paused"),
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+          <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+        </svg>
+      ),
+    });
+  }
+
+  if (campaign.status === "Paused") {
+    menuItems.push({
+      label: lang === "fr" ? "Reprendre" : "Resume",
+      onClick: () => void onStatusChange(campaign.id, "Active"),
+      icon: resumeMenuIcon,
+    });
+  }
+
+  if (campaign.status === "Completed") {
+    menuItems.push({
+      label: lang === "fr" ? "Reprendre" : "Resume",
+      onClick: () => void onStatusChange(campaign.id, "Active"),
+      icon: resumeMenuIcon,
+    });
+  }
+
+  if (campaign.status !== "Completed") {
+    menuItems.push({
+      label: lang === "fr" ? "Terminer" : "Finish",
+      onClick: () => void onStatusChange(campaign.id, "Completed"),
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    });
+  }
+
+  menuItems.push({
+    label: lang === "fr" ? "Supprimer" : "Delete",
+    onClick: () => void onDelete(campaign.id),
+    danger: true,
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  });
+
+  return (
+    <SplitHeaderActions
+      variant="white"
+      size="sm"
+      primaryLabel={lang === "fr" ? "Voir →" : "View →"}
+      onPrimaryClick={() => onView(campaign.id)}
+      menuAriaLabel={lang === "fr" ? "Actions de campagne" : "Campaign actions"}
+      menuItems={menuItems}
+    />
+  );
+}
+
+const editMenuIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4 12.5-12.5z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const finishMenuIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const resumeMenuIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M8 5v14l11-7L8 5z" fill="currentColor" />
+  </svg>
+);
+
+function CampaignDetailActions({
+  lang,
+  campaign,
+  onEdit,
+  onStatusChange,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  onEdit: (id: string) => void;
+  onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
+}) {
+  const editItem: SplitMenuItem = {
+    label: lang === "fr" ? "Modifier" : "Edit",
+    onClick: () => onEdit(campaign.id),
+    icon: editMenuIcon,
+  };
+
+  const finishItem: SplitMenuItem = {
+    label: lang === "fr" ? "Terminée" : "Finish",
+    onClick: () => void onStatusChange(campaign.id, "Completed"),
+    icon: finishMenuIcon,
+  };
+
+  const pauseItem: SplitMenuItem = {
+    label: lang === "fr" ? "Pause" : "Pause",
+    onClick: () => void onStatusChange(campaign.id, "Paused"),
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor" />
+        <rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor" />
+      </svg>
+    ),
+  };
+
+  const resumeItem: SplitMenuItem = {
+    label: lang === "fr" ? "Reprendre" : "Resume",
+    onClick: () => void onStatusChange(campaign.id, "Active"),
+    icon: resumeMenuIcon,
+  };
+
+  const menuAria = lang === "fr" ? "Actions de campagne" : "Campaign actions";
+
+  if (campaign.status === "Active") {
+    return (
+      <SplitHeaderActions
+        variant="white"
+        size="sm"
+        primaryLabel={lang === "fr" ? "Pause" : "Pause"}
+        onPrimaryClick={() => void onStatusChange(campaign.id, "Paused")}
+        menuAriaLabel={menuAria}
+        menuItems={[editItem, finishItem]}
+      />
+    );
+  }
+
+  if (campaign.status === "Paused") {
+    return (
+      <SplitHeaderActions
+        variant="white"
+        size="sm"
+        primaryLabel={lang === "fr" ? "Reprendre" : "Resume"}
+        onPrimaryClick={() => void onStatusChange(campaign.id, "Active")}
+        menuAriaLabel={menuAria}
+        menuItems={[editItem, finishItem]}
+      />
+    );
+  }
+
+  if (campaign.status === "Completed") {
+    return (
+      <SplitHeaderActions
+        variant="white"
+        size="sm"
+        primaryLabel={lang === "fr" ? "Modifier" : "Edit"}
+        onPrimaryClick={() => onEdit(campaign.id)}
+        menuAriaLabel={menuAria}
+        menuItems={[resumeItem]}
+      />
+    );
+  }
+
+  return (
+    <SplitHeaderActions
+      variant="white"
+      size="sm"
+      primaryLabel={lang === "fr" ? "Modifier" : "Edit"}
+      onPrimaryClick={() => onEdit(campaign.id)}
+      menuAriaLabel={menuAria}
+      menuItems={[pauseItem, finishItem]}
+    />
+  );
+}
+
 function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, setSearch, onView, onDelete, onStatusChange, onEdit, isMobile }: {
   lang: "en" | "fr";
   campaigns: Campaign[];
@@ -651,7 +1092,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
   filter: CampaignFilter; setFilter: (f: CampaignFilter) => void;
   search: string; setSearch: (s: string) => void;
   onView: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string) => void | Promise<void>;
   onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
   onEdit: (id: string) => void;
   isMobile?: boolean;
@@ -685,7 +1126,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
         <Kpi title={lang === "fr" ? "Commissions dues" : "Total Commissions Owed"} value={formatCurrency(kpiStats.totalCommissionOwed, lang)} sub={formatPendingPayoutsSub(kpiStats.pendingPayouts, lang)} />
       </div>
 
-      <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16 }}>
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 700 : undefined }}>
             <thead>
@@ -725,29 +1166,14 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
                   <td style={{ padding: "14px", color: isPaused ? "#B0B0B0" : "#7A7A7A" }}>{c.start}</td>
                   <td style={{ padding: "14px", color: isPaused ? "#B0B0B0" : "#7A7A7A" }}>{c.end}</td>
                   <td style={{ padding: "14px" }}>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button type="button" onClick={() => onView(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>{lang === "fr" ? "Voir →" : "View →"}</button>
-                      <button type="button" onClick={() => onEdit(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}>{lang === "fr" ? "Modifier" : "Edit"}</button>
-                      {c.status === "Active" && (
-                        <button
-                          type="button"
-                          style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}
-                          onClick={() => void onStatusChange(c.id, "Paused")}
-                        >
-                          {lang === "fr" ? "Pause" : "Pause"}
-                        </button>
-                      )}
-                      {c.status === "Paused" && (
-                        <button
-                          type="button"
-                          style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12 }}
-                          onClick={() => void onStatusChange(c.id, "Active")}
-                        >
-                          {lang === "fr" ? "Reprendre" : "Resume"}
-                        </button>
-                      )}
-                      <button type="button" onClick={() => onDelete(c.id)} style={{ ...btnSecondary, padding: "6px 10px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>{lang === "fr" ? "Supprimer" : "Delete"}</button>
-                    </div>
+                    <CampaignRowActions
+                      lang={lang}
+                      campaign={c}
+                      onView={onView}
+                      onEdit={onEdit}
+                      onStatusChange={onStatusChange}
+                      onDelete={onDelete}
+                    />
                   </td>
                 </tr>
               );
@@ -918,12 +1344,10 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-function CampaignDetail({ lang, campaign, onBack, onUpdate, onStatusChange, onEdit, isMobile }: { lang: "en" | "fr"; campaign: Campaign; onBack: () => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; isMobile?: boolean }) {
+function CampaignDetail({ lang, campaign, userId, plan, onBack, onUpdate, onStatusChange, onEdit, onDelete, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; onBack: () => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>("creators");
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
-    { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach" },
-    { id: "sales", label: lang === "fr" ? "Ventes" : "Sales" },
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts" },
     { id: "settings", label: lang === "fr" ? "Paramètres" : "Settings" },
   ];
@@ -932,7 +1356,7 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate, onStatusChange, onEd
 
   return (
   <>
-    <div style={{ padding: isMobile ? "16px" : "32px 40px 0", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid #EFEFEF", background: isPaused ? "#F7F7F7" : "#FFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: 0, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: isPaused ? "#F7F7F7" : "#FFF" }}>
       <button type="button" onClick={onBack} style={{ ...btnSecondary, marginBottom: 16, padding: "8px 12px", fontSize: 12 }}>{lang === "fr" ? "← Retour aux campagnes" : "← Back to campaigns"}</button>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
         <div>
@@ -943,19 +1367,12 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate, onStatusChange, onEd
             <span>{campaign.start} – {campaign.end}</span>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {campaign.status === "Active" && (
-            <BtnSm onClick={() => void onStatusChange(campaign.id, "Paused")}>
-              {lang === "fr" ? "Pause" : "Pause"}
-            </BtnSm>
-          )}
-          {campaign.status === "Paused" && (
-            <BtnSm onClick={() => void onStatusChange(campaign.id, "Active")}>
-              {lang === "fr" ? "Reprendre" : "Resume"}
-            </BtnSm>
-          )}
-          <BtnSm onClick={() => onEdit(campaign.id)}>{lang === "fr" ? "Modifier" : "Edit"}</BtnSm>
-        </div>
+        <CampaignDetailActions
+          lang={lang}
+          campaign={campaign}
+          onEdit={onEdit}
+          onStatusChange={onStatusChange}
+        />
       </div>
       <div style={{ display: "flex", gap: 28, overflowX: "auto", marginTop: 20 }}>
         {detailTabs.map((t) => (
@@ -983,67 +1400,608 @@ function CampaignDetail({ lang, campaign, onBack, onUpdate, onStatusChange, onEd
         ))}
       </div>
     </div>
-    <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? undefined : undefined }}>
+    <div style={{ padding: isMobile ? 16 : "40px 40px 40px" }}>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
         <Kpi title={lang === "fr" ? "Créateurs" : "Creators"} value={String(campaign.creators ?? 0)} sub={lang === "fr" ? "dans cette campagne" : "in this campaign"} />
         <Kpi title={lang === "fr" ? "Ventes" : "Sales"} value={formatCurrency(campaign.sales ?? 0, lang)} sub={lang === "fr" ? "revenus attribués" : "attributed revenue"} />
         <Kpi title={lang === "fr" ? "Commission" : "Commission"} value={formatCurrency(campaign.commission ?? 0, lang)} sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"} />
         <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? formatCurrency(Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)), lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "ventes générées" : "sales driven"} />
       </div>
-      {tab === "creators" && <CreatorsTab lang={lang} />}
-      {tab === "outreach" && <OutreachTab lang={lang} />}
-      {tab === "sales" && <SalesTab lang={lang} />}
-      {tab === "payouts" && <PayoutsTab lang={lang} />}
-      {tab === "settings" && <SettingsTab lang={lang} campaign={campaign} onUpdate={onUpdate} />}
+      {tab === "creators" && (
+        <CreatorsTab lang={lang} campaign={campaign} userId={userId} onAddCreator={() => onEdit(campaign.id)} />
+      )}
+      {tab === "payouts" && <PayoutsTab lang={lang} campaign={campaign} userId={userId} plan={plan} />}
+      {tab === "settings" && <SettingsTab lang={lang} campaign={campaign} onUpdate={onUpdate} onDelete={() => void onDelete(campaign.id)} />}
     </div>
   </>
   );
 }
 
-function CreatorsTab({ lang }: { lang: "en" | "fr" }) {
+function CreatorsTab({
+  lang,
+  campaign,
+  userId,
+  onAddCreator,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  userId?: string;
+  onAddCreator: () => void;
+}) {
+  const [rows, setRows] = useState<CampaignCreatorRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      if (!supabase) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        resolvedUserId = user.id;
+      }
+
+      const creatorIds = campaign.creatorIds ?? [];
+      if (creatorIds.length === 0) {
+        if (!cancelled) {
+          setRows([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const [creatorResult, salesResult, creatorCounts, campaignData] = await Promise.all([
+          supabase
+            .from("creators")
+            .select("id, handle, full_name, avatar_url, platform")
+            .eq("user_id", resolvedUserId)
+            .in("id", creatorIds),
+          supabase
+            .from("sales")
+            .select("order_amount, commission_amount, campaign_id, creator_id")
+            .eq("user_id", resolvedUserId),
+          getCampaignCreatorCounts(resolvedUserId),
+          getCampaigns(resolvedUserId),
+        ]);
+        if (cancelled) return;
+
+        const campaignMeta: Record<string, CampaignSalesMeta> = {};
+        for (const row of campaignData) {
+          campaignMeta[String(row.id)] = {
+            status: String(row.status ?? ""),
+            created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+          };
+        }
+
+        const stats = computeCreatorStatsForCampaign(
+          (salesResult.data || []) as SaleRow[],
+          campaign.id,
+          creatorIds,
+          creatorCounts,
+          campaignMeta,
+        );
+
+        const creatorMap = new Map(
+          (creatorResult.data || []).map((c) => [String(c.id), c as { id: string; handle: string; full_name?: string; avatar_url?: string; platform?: string }]),
+        );
+
+        const nextRows: CampaignCreatorRow[] = creatorIds.map((id) => {
+          const c = creatorMap.get(id);
+          const s = stats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 };
+          return {
+            id,
+            handle: c?.handle ?? "—",
+            full_name: c?.full_name,
+            avatar_url: c?.avatar_url,
+            platform: c?.platform,
+            salesCount: s.salesCount,
+            salesAmount: s.salesAmount,
+            commission: s.commission,
+          };
+        });
+
+        nextRows.sort((a, b) => b.salesAmount - a.salesAmount);
+        setRows(nextRows);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id, campaign.creatorIds, userId]);
+
+  const headers = [
+    lang === "fr" ? "Créateur" : "Creator",
+    lang === "fr" ? "Pseudo" : "Handle",
+    lang === "fr" ? "Plateforme" : "Platform",
+    lang === "fr" ? "Ventes" : "Sales",
+    lang === "fr" ? "Revenus" : "Revenue",
+    lang === "fr" ? "Commission" : "Commission",
+  ];
+
   return (
     <Card title={lang === "fr" ? "Créateurs de la campagne" : "Campaign creators"}>
-      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Pseudo" : "Handle", lang === "fr" ? "Plateforme" : "Platform", "Sales", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Action" : "Action"]}>
-        <EmptyTableRow lang={lang} colSpan={7} />
+      <Table headers={headers}>
+        {loading ? (
+          <tr>
+            <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              {lang === "fr" ? "Chargement…" : "Loading…"}
+            </td>
+          </tr>
+        ) : rows.length === 0 ? (
+          <EmptyTableRow lang={lang} colSpan={headers.length} />
+        ) : (
+          rows.map((row) => (
+            <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+              <td style={{ padding: "14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <CreatorAvatar src={row.avatar_url} size={32} alt={row.full_name || row.handle} />
+                  <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                </div>
+              </td>
+              <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
+              <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
+              <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
+              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.salesAmount, lang)}</td>
+              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.commission, lang)}</td>
+            </tr>
+          ))
+        )}
       </Table>
       <div style={{ marginTop: 16 }}>
-        <BtnSm>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
+        <BtnSm onClick={onAddCreator}>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
       </div>
     </Card>
   );
 }
 
-function OutreachTab({ lang }: { lang: "en" | "fr" }) {
+function PayoutsTab({
+  lang,
+  campaign,
+  userId,
+  plan,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  userId?: string;
+  plan: PlanTier;
+}) {
+  const [rows, setRows] = useState<CampaignPayoutRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creatorCount, setCreatorCount] = useState(0);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [confirmPay, setConfirmPay] = useState<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      if (!supabase) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        resolvedUserId = user.id;
+      }
+
+      try {
+        const creatorCounts = await getCampaignCreatorCounts(resolvedUserId);
+        const creatorIds = [
+          ...new Set(
+            (campaign.creatorIds?.length ? campaign.creatorIds : creatorCounts[campaign.id] ?? []).map(String),
+          ),
+        ];
+
+        if (!cancelled) setCreatorCount(creatorIds.length);
+
+        if (creatorIds.length === 0) {
+          if (!cancelled) {
+            setRows([]);
+            setPendingTotal(0);
+            setLoading(false);
+          }
+          return;
+        }
+
+        const [creatorResult, salesResult, payoutResult, campaignData] = await Promise.all([
+          supabase
+            .from("creators")
+            .select("id, handle, full_name, avatar_url, balance, paypal_link, revolut_link, iban")
+            .eq("user_id", resolvedUserId)
+            .in("id", creatorIds),
+          supabase
+            .from("sales")
+            .select("order_amount, commission_amount, campaign_id, creator_id")
+            .eq("user_id", resolvedUserId),
+          supabase
+            .from("payouts")
+            .select("id, creator_id, amount, status, paid_at, created_at")
+            .eq("user_id", resolvedUserId)
+            .in("creator_id", creatorIds)
+            .order("created_at", { ascending: false }),
+          getCampaigns(resolvedUserId),
+        ]);
+
+        if (cancelled) return;
+
+        const campaignMeta: Record<string, CampaignSalesMeta> = {};
+        for (const row of campaignData) {
+          campaignMeta[String(row.id)] = {
+            status: String(row.status ?? ""),
+            created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+          };
+        }
+
+        const stats = computeCreatorStatsForCampaign(
+          (salesResult.data || []) as SaleRow[],
+          campaign.id,
+          creatorIds,
+          creatorCounts,
+          campaignMeta,
+        );
+
+        const creatorMap = new Map(
+          (creatorResult.data || []).map((c) => [
+            String(c.id),
+            c as {
+              id: string;
+              handle: string;
+              full_name?: string;
+              avatar_url?: string;
+              balance?: number;
+              paypal_link?: string;
+              revolut_link?: string;
+              iban?: string;
+            },
+          ]),
+        );
+
+        const payableCreators: PayableCreator[] = creatorIds.map((id) => {
+          const c = creatorMap.get(id);
+          return {
+            id,
+            handle: c?.handle ?? "—",
+            full_name: c?.full_name,
+            avatar_url: c?.avatar_url,
+            balance: Number(c?.balance) || 0,
+            campaignCommission: stats[id]?.commission ?? 0,
+            paypal_link: c?.paypal_link,
+            revolut_link: c?.revolut_link,
+            iban: c?.iban,
+          };
+        });
+
+        const payouts = payoutResult.data || [];
+        const payoutCreatorIds = [...new Set(payouts.map((p) => String(p.creator_id)).filter(Boolean))];
+
+        let payoutCreatorMap: Record<string, { handle?: string; full_name?: string; avatar_url?: string }> = {};
+        if (payoutCreatorIds.length > 0) {
+          const missingIds = payoutCreatorIds.filter((id) => !creatorMap.has(id));
+          if (missingIds.length > 0) {
+            const { data: extraCreators } = await supabase
+              .from("creators")
+              .select("id, handle, full_name, avatar_url")
+              .in("id", missingIds);
+            payoutCreatorMap = Object.fromEntries((extraCreators || []).map((c) => [String(c.id), c]));
+          }
+        }
+
+        const nextRows: CampaignPayoutRow[] = [];
+        let pendingSum = 0;
+
+        const pendingCreators = payableCreators
+          .filter((c) => c.balance > 0)
+          .sort((a, b) => b.balance - a.balance);
+
+        for (const creator of pendingCreators) {
+          pendingSum += creator.balance;
+          nextRows.push({
+            id: `pending-${creator.id}`,
+            creatorId: creator.id,
+            creatorName: creator.full_name || creator.handle || "—",
+            creatorHandle: creator.handle,
+            avatar_url: creator.avatar_url,
+            amount: creator.balance,
+            status: "pending",
+            dueDate: lang === "fr" ? "En attente" : "Due now",
+            kind: "pending",
+            payableCreator: creator,
+          });
+        }
+
+        for (const p of payouts) {
+          const creatorId = String(p.creator_id);
+          const fromCampaign = creatorMap.get(creatorId) ?? payoutCreatorMap[creatorId];
+          const dueRaw = p.paid_at || p.created_at;
+          const dueDate = dueRaw
+            ? new Date(String(dueRaw)).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+            : "—";
+          nextRows.push({
+            id: String(p.id),
+            creatorId,
+            creatorName: fromCampaign?.full_name || fromCampaign?.handle || "—",
+            creatorHandle: fromCampaign?.handle || "",
+            avatar_url: fromCampaign?.avatar_url,
+            amount: Number(p.amount) || 0,
+            status: String(p.status ?? "paid"),
+            dueDate,
+            kind: "history",
+          });
+        }
+
+        if (!cancelled) {
+          setRows(nextRows);
+          setPendingTotal(pendingSum);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setRows([]);
+          setPendingTotal(0);
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+
+    const onRefresh = () => void load();
+    window.addEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
+    window.addEventListener(SALES_UPDATED_EVENT, onRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
+      window.removeEventListener(SALES_UPDATED_EVENT, onRefresh);
+    };
+  }, [campaign.id, campaign.creatorIds, userId, lang]);
+
+  const handlePayCreator = (creator: PayableCreator) => {
+    if (!canUseManualPayouts(plan)) {
+      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on the Growth plan and above.");
+      return;
+    }
+    const amount = creator.balance;
+    if (amount <= 0) {
+      alert(lang === "fr" ? "Solde insuffisant" : "No balance to pay");
+      return;
+    }
+    if (creator.paypal_link) {
+      const clean = String(creator.paypal_link).replace("https://paypal.me/", "").replace("paypal.me/", "");
+      window.open(`https://paypal.me/${clean}/${amount}`, "_blank");
+    } else if (creator.revolut_link) {
+      const clean = String(creator.revolut_link).replace("https://revolut.me/", "").replace("revolut.me/", "");
+      window.open(`https://revolut.me/${clean}`, "_blank");
+    } else if (creator.iban) {
+      navigator.clipboard.writeText(String(creator.iban));
+      alert(
+        lang === "fr"
+          ? `IBAN copié ✓\nMontant à virer : ${formatCurrency(amount, lang)}`
+          : `IBAN copied ✓\nAmount to transfer: ${formatCurrency(amount, lang)}`,
+      );
+    } else {
+      alert(
+        lang === "fr"
+          ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
+          : `${creator.full_name || creator.handle} hasn't added their payment details yet.`,
+      );
+      return;
+    }
+
+    notifyCreatorPaid(lang, creator.full_name || creator.handle || "creator", amount);
+    const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
+    setTimeout(() => {
+      setConfirmPay({
+        creatorId: creator.id,
+        name: creator.full_name || creator.handle || "creator",
+        amount,
+        method,
+      });
+    }, 800);
+  };
+
+  const confirmManualPayout = async () => {
+    if (!confirmPay) return;
+    const { creatorId, amount, method } = confirmPay;
+    setConfirmPay(null);
+    setPayingId(creatorId);
+
+    let resolvedUserId = userId;
+    if (!resolvedUserId && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+    if (!resolvedUserId) {
+      setPayingId(null);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/payouts/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: resolvedUserId, creatorId, amount, method }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setRows((prev) => {
+          const withoutPending = prev.filter((row) => row.creatorId !== creatorId || row.kind !== "pending");
+          const paidRow = prev.find((row) => row.creatorId === creatorId && row.kind === "pending");
+          const historyRow: CampaignPayoutRow = {
+            id: `paid-${creatorId}-${Date.now()}`,
+            creatorId,
+            creatorName: paidRow?.creatorName ?? "—",
+            creatorHandle: paidRow?.creatorHandle ?? "",
+            avatar_url: paidRow?.avatar_url,
+            amount,
+            status: "paid",
+            dueDate: new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+            kind: "history",
+          };
+          return [historyRow, ...withoutPending];
+        });
+        setPendingTotal((sum) => Math.max(0, sum - amount));
+        dispatchPayoutsUpdated();
+      } else {
+        alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
+      }
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const headers = [
+    lang === "fr" ? "Créateur" : "Creator",
+    lang === "fr" ? "Montant" : "Amount",
+    lang === "fr" ? "Statut" : "Status",
+    lang === "fr" ? "Date" : "Date",
+    lang === "fr" ? "Action" : "Action",
+  ];
+
+  const emptyMessage =
+    creatorCount === 0
+      ? lang === "fr"
+        ? "Ajoutez des créateurs à cette campagne pour suivre les paiements."
+        : "Add creators to this campaign to track payouts."
+      : lang === "fr"
+        ? "Aucun paiement en attente. Les commissions apparaîtront ici après les ventes."
+        : "No pending payouts. Commissions will appear here after sales.";
+
   return (
-    <Card title={lang === "fr" ? "Messages envoyés" : "Outreach messages"}>
-      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Plateforme" : "Platform", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Envoyé" : "Sent", lang === "fr" ? "Aperçu" : "Preview", lang === "fr" ? "Action" : "Action"]}>
-        <EmptyTableRow lang={lang} colSpan={6} />
-      </Table>
-    </Card>
+    <>
+      <Card title={lang === "fr" ? "Paiements créateurs" : "Creator payouts"}>
+        {!loading && creatorCount > 0 && (
+          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+            <div style={{ fontSize: 13, color: "#7A7A7A" }}>
+              {lang === "fr" ? "En attente" : "Pending"}:{" "}
+              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(pendingTotal, lang)}</strong>
+            </div>
+            <div style={{ fontSize: 13, color: "#7A7A7A" }}>
+              {lang === "fr" ? "Commission campagne" : "Campaign commission"}:{" "}
+              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(campaign.commission ?? 0, lang)}</strong>
+            </div>
+          </div>
+        )}
+        <Table headers={headers}>
+          {loading ? (
+            <tr>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                {lang === "fr" ? "Chargement…" : "Loading…"}
+              </td>
+            </tr>
+          ) : rows.length === 0 ? (
+            <tr>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+              <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                <td style={{ padding: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <CreatorAvatar src={row.avatar_url} size={32} alt={row.creatorName} />
+                    <div>
+                      <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.creatorName}</span>
+                      {row.creatorHandle && row.creatorHandle !== row.creatorName ? (
+                        <div style={{ fontSize: 12, color: "#9A9A9A" }}>{row.creatorHandle}</div>
+                      ) : null}
+                    </div>
+                  </div>
+                </td>
+                <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCurrency(row.amount, lang)}</td>
+                <td style={{ padding: "14px" }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: row.kind === "pending" ? "#D97706" : row.status.toLowerCase() === "paid" ? "#1FB567" : "#7A7A7A",
+                    }}
+                  >
+                    {formatPayoutStatusLabel(row.status, lang)}
+                  </span>
+                </td>
+                <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.dueDate}</td>
+                <td style={{ padding: "14px" }}>
+                  {row.kind === "pending" && row.payableCreator ? (
+                    <BtnSm onClick={() => handlePayCreator(row.payableCreator!)}>
+                      {payingId === row.creatorId
+                        ? lang === "fr" ? "…" : "…"
+                        : lang === "fr" ? "Payer" : "Pay"}
+                    </BtnSm>
+                  ) : (
+                    <span style={{ color: "#9A9A9A", fontSize: 12 }}>—</span>
+                  )}
+                </td>
+              </tr>
+            ))
+          )}
+        </Table>
+      </Card>
+
+      {confirmPay && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={() => setConfirmPay(null)}
+        >
+          <div
+            style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>
+              {lang === "fr" ? "Confirmer le paiement ?" : "Confirm payment?"}
+            </h3>
+            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 8px", lineHeight: 1.5 }}>
+              {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
+              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
+              {lang === "fr" ? "à" : "to"}{" "}
+              <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+            </p>
+            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
+              {lang === "fr"
+                ? "En confirmant, le paiement est enregistré et le solde du créateur est remis à zéro."
+                : "By confirming, the payment is recorded and the creator's balance is reset."}
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={() => setConfirmPay(null)} style={{ ...btnSecondary, flex: 1 }}>
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+              <button type="button" onClick={() => void confirmManualPayout()} style={{ ...btnPrimary, flex: 1 }}>
+                {lang === "fr" ? "Confirmer" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-function SalesTab({ lang }: { lang: "en" | "fr" }) {
-  return (
-    <Card title={lang === "fr" ? "Ventes attribuées" : "Attributed sales"}>
-      <Table headers={[lang === "fr" ? "N° commande" : "Order ID", lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Produit" : "Product", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Commission" : "Commission", lang === "fr" ? "Date" : "Date"]}>
-        <EmptyTableRow lang={lang} colSpan={6} />
-      </Table>
-    </Card>
-  );
-}
-
-function PayoutsTab({ lang }: { lang: "en" | "fr" }) {
-  return (
-    <Card title={lang === "fr" ? "Paiements créateurs" : "Creator payouts"}>
-      <Table headers={[lang === "fr" ? "Créateur" : "Creator", lang === "fr" ? "Montant" : "Amount", lang === "fr" ? "Statut" : "Status", lang === "fr" ? "Date d'échéance" : "Due Date", lang === "fr" ? "Action" : "Action"]}>
-        <EmptyTableRow lang={lang} colSpan={5} />
-      </Table>
-    </Card>
-  );
-}
-
-function SettingsTab({ lang, campaign, onUpdate }: { lang: "en" | "fr"; campaign: Campaign; onUpdate: (c: Campaign) => void }) {
+function SettingsTab({ lang, campaign, onUpdate, onDelete }: { lang: "en" | "fr"; campaign: Campaign; onUpdate: (c: Campaign) => void; onDelete: () => void }) {
   const [autoPayout, setAutoPayout] = useState(true);
   const [trackClicks, setTrackClicks] = useState(true);
 
@@ -1073,7 +2031,7 @@ function SettingsTab({ lang, campaign, onUpdate }: { lang: "en" | "fr"; campaign
         <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>Mark this campaign as completed or delete it permanently.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <BtnSm onClick={() => onUpdate({ ...campaign, status: "Completed" })}>Mark completed</BtnSm>
-          <BtnSm variant="danger">Delete campaign</BtnSm>
+          <BtnSm variant="danger" onClick={onDelete}>{lang === "fr" ? "Supprimer la campagne" : "Delete campaign"}</BtnSm>
         </div>
       </Card>
     </>
@@ -1124,9 +2082,10 @@ function NewCampaignModal({
     autoPayout: boolean;
     creatorIds: string[];
     creatorCommissions: { creatorId: string; commission_rate: number }[];
-  }) => void;
+  }) => void | Promise<void>;
 }) {
   const [step, setStep] = useState(0);
+  const [launching, setLaunching] = useState(false);
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState("TikTok");
   const [start, setStart] = useState("");
@@ -1229,28 +2188,34 @@ function NewCampaignModal({
     );
   };
 
-  const launch = () => {
-    const creatorIds = addedCreators.filter((entry) => entry.creatorId).map((entry) => entry.creatorId!);
-    const creatorCommissions = addedCreators
-      .filter((entry) => entry.creatorId)
-      .map((entry) => ({
-        creatorId: entry.creatorId!,
-        commission_rate: clampRate(entry.commissionRate),
-      }));
-    const primaryRate = addedCreators.length > 0 ? clampRate(addedCreators[0].commissionRate) : 10;
+  const launch = async () => {
+    if (launching) return;
+    setLaunching(true);
+    try {
+      const creatorIds = addedCreators.filter((entry) => entry.creatorId).map((entry) => entry.creatorId!);
+      const creatorCommissions = addedCreators
+        .filter((entry) => entry.creatorId)
+        .map((entry) => ({
+          creatorId: entry.creatorId!,
+          commission_rate: clampRate(entry.commissionRate),
+        }));
+      const primaryRate = addedCreators.length > 0 ? clampRate(addedCreators[0].commissionRate) : 10;
 
-    onCreate({
-      name: name || "Untitled Campaign",
-      description,
-      platform,
-      startDate: normalizeDate(start),
-      endDate: normalizeDate(end),
-      commissionType: "percentage",
-      commissionRate: primaryRate,
-      autoPayout: false,
-      creatorIds,
-      creatorCommissions,
-    });
+      await onCreate({
+        name: name || "Untitled Campaign",
+        description,
+        platform,
+        startDate: normalizeDate(start),
+        endDate: normalizeDate(end),
+        commissionType: "percentage",
+        commissionRate: primaryRate,
+        autoPayout: false,
+        creatorIds,
+        creatorCommissions,
+      });
+    } finally {
+      setLaunching(false);
+    }
   };
 
   return (
@@ -1294,10 +2259,21 @@ function NewCampaignModal({
               </Field>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <Field label={lang === "fr" ? "Date de début" : "Start date"}>
-                  <input type="text" value={start} onChange={(e) => setStart(e.target.value)} placeholder="May 1, 2026" style={inputStyle} />
+                  <input
+                    type="date"
+                    value={start}
+                    onChange={(e) => setStart(e.target.value)}
+                    style={dateInputStyle}
+                  />
                 </Field>
                 <Field label={lang === "fr" ? "Date de fin" : "End date"}>
-                  <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="Jun 30, 2026" style={inputStyle} />
+                  <input
+                    type="date"
+                    value={end}
+                    min={start || undefined}
+                    onChange={(e) => setEnd(e.target.value)}
+                    style={dateInputStyle}
+                  />
                 </Field>
               </div>
               <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
@@ -1472,7 +2448,7 @@ function NewCampaignModal({
               <div style={{ background: "#FAFAFA", borderRadius: 12, padding: 16, border: "1px solid #EFEFEF" }}>
                 <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Nom :" : "Name:"}</strong> {name || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign")}</div>
                 <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Plateforme :" : "Platform:"}</strong> {platform}</div>
-                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Dates :" : "Dates:"}</strong> {start || "—"} – {end || "—"}</div>
+                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Dates :" : "Dates:"}</strong> {formatDateLabel(start, lang) || "—"} – {formatDateLabel(end, lang) || "—"}</div>
                 <div style={{ marginBottom: addedCreators.length > 0 ? 12 : 0 }}>
                   <strong>{lang === "fr" ? "Créateurs :" : "Creators:"}</strong> {addedCreators.length}
                 </div>
@@ -1499,8 +2475,14 @@ function NewCampaignModal({
               {lang === "fr" ? "Continuer →" : "Continue →"}
             </button>
           ) : (
-            <button type="button" style={btnPrimary} onClick={launch}>
-              {lang === "fr" ? "Lancer la campagne →" : "Launch campaign →"}
+            <button type="button" style={btnPrimary} onClick={() => void launch()} disabled={launching}>
+              {launching
+                ? lang === "fr"
+                  ? "Création…"
+                  : "Creating…"
+                : lang === "fr"
+                  ? "Lancer la campagne →"
+                  : "Launch campaign →"}
             </button>
           )}
         </div>
@@ -1535,8 +2517,8 @@ function EditCampaignModal({
   const initialCommissionType = campaign.commissionType === "flat" ? "flat" : "percent";
   const [name, setName] = useState(campaign.name);
   const [platform, setPlatform] = useState(campaign.platform || "TikTok");
-  const [start, setStart] = useState(campaign.startRaw ?? (campaign.start === "—" ? "" : campaign.start));
-  const [end, setEnd] = useState(campaign.endRaw ?? (campaign.end === "—" ? "" : campaign.end));
+  const [start, setStart] = useState(toDateInputValue(campaign.startRaw ?? campaign.start));
+  const [end, setEnd] = useState(toDateInputValue(campaign.endRaw ?? campaign.end));
   const [description, setDescription] = useState(campaign.description ?? "");
   const [commissionRate, setCommissionRate] = useState(String(campaign.commissionRate ?? 10));
   const [commissionType, setCommissionType] = useState<"percent" | "flat">(initialCommissionType);
@@ -1632,10 +2614,21 @@ function EditCampaignModal({
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label={lang === "fr" ? "Date de début" : "Start date"}>
-              <input type="text" value={start} onChange={(e) => setStart(e.target.value)} placeholder="May 1, 2026" style={inputStyle} />
+              <input
+                type="date"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                style={dateInputStyle}
+              />
             </Field>
             <Field label={lang === "fr" ? "Date de fin" : "End date"}>
-              <input type="text" value={end} onChange={(e) => setEnd(e.target.value)} placeholder="Jun 30, 2026" style={inputStyle} />
+              <input
+                type="date"
+                value={end}
+                min={start || undefined}
+                onChange={(e) => setEnd(e.target.value)}
+                style={dateInputStyle}
+              />
             </Field>
           </div>
           <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>

@@ -370,3 +370,22 @@ body.dashboard-page {
 .split-header-menu-item:hover .split-header-menu-icon {
   background: rgba(0, 71, 255, 0.1);
 }
+
+.split-header-menu-item-danger {
+  color: #DC2626;
+}
+
+.split-header-menu-item-danger .split-header-menu-icon {
+  background: #FEF2F2;
+  color: #DC2626;
+}
+
+.split-header-menu-item-danger:hover {
+  background: rgba(220, 38, 38, 0.06);
+  color: #DC2626;
+}
+
+.split-header-menu-item-danger:hover .split-header-menu-icon {
+  background: rgba(220, 38, 38, 0.1);
+  color: #DC2626;
+}

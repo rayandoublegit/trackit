@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { saveOutreach, getOutreachHistory, getSavedCreators, clearOutreachHistory } from "@/lib/db";
+import { saveOutreach, getOutreachHistory, getSavedCreators, clearOutreachHistory, updateOutreachStatus } from "@/lib/db";
 import { dispatchOutreachHistoryUpdated, OUTREACH_HISTORY_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import {
   appendStoredOutreachEntry,
   clearStoredOutreachHistory,
+  dedupeOutreachEntries,
   loadStoredOutreachHistory,
+  outreachEntryFingerprint,
+  pruneSyncedOutreachEntries,
   updateStoredOutreachEntry,
   type StoredOutreachEntry,
 } from "@/lib/outreach-history-storage";
@@ -1176,24 +1179,85 @@ export function OutreachHistorySection({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    let history = loadStoredOutreachHistory(user.id);
-    if (history.length === 0) {
-      const remote = await getOutreachHistory(user.id);
-      if (remote.length > 0) {
-        history = remote.map((row) => ({
-          id: String(row.id ?? ""),
-          user_id: user.id,
-          creator_username: String(row.creator_username ?? ""),
-          creator_display_name: String(row.creator_display_name ?? ""),
-          creator_avatar: String(row.creator_avatar ?? ""),
-          platform: String(row.platform ?? ""),
-          message: String(row.message ?? ""),
-          status: String(row.status ?? "sent"),
-          follow_up_date: typeof row.follow_up_date === "string" ? row.follow_up_date : null,
-          created_at: typeof row.created_at === "string" ? row.created_at : new Date().toISOString(),
-        })) satisfies StoredOutreachEntry[];
-      }
+    const local = loadStoredOutreachHistory(user.id);
+    const remote = await getOutreachHistory(user.id);
+
+    const remoteFingerprints = new Set(
+      remote.map((row) =>
+        outreachEntryFingerprint({
+          creator_username: String((row as Record<string, unknown>).creator_username ?? ""),
+          creator_display_name: String((row as Record<string, unknown>).creator_display_name ?? ""),
+          platform: String((row as Record<string, unknown>).platform ?? ""),
+          message: String((row as Record<string, unknown>).message ?? ""),
+          created_at: String((row as Record<string, unknown>).created_at ?? ""),
+        }),
+      ),
+    );
+
+    const unsyncedLocal = local.filter(
+      (entry) =>
+        entry.id.startsWith("oh_") &&
+        !remoteFingerprints.has(outreachEntryFingerprint(entry)),
+    );
+
+    for (const entry of unsyncedLocal) {
+      await saveOutreach(user.id, {
+        creator_username: entry.creator_username,
+        creator_display_name: entry.creator_display_name,
+        creator_avatar: entry.creator_avatar,
+        platform: entry.platform,
+        message: entry.message,
+        status: entry.status,
+        follow_up_date: entry.follow_up_date,
+      });
     }
+
+    const freshRemote = unsyncedLocal.length > 0 ? await getOutreachHistory(user.id) : remote;
+    const freshRemoteFingerprints = new Set(
+      freshRemote.map((row) =>
+        outreachEntryFingerprint({
+          creator_username: String((row as Record<string, unknown>).creator_username ?? ""),
+          creator_display_name: String((row as Record<string, unknown>).creator_display_name ?? ""),
+          platform: String((row as Record<string, unknown>).platform ?? ""),
+          message: String((row as Record<string, unknown>).message ?? ""),
+          created_at: String((row as Record<string, unknown>).created_at ?? ""),
+        }),
+      ),
+    );
+    const stillLocal = local.filter(
+      (entry) =>
+        entry.id.startsWith("oh_") &&
+        !freshRemoteFingerprints.has(outreachEntryFingerprint(entry)),
+    );
+
+    pruneSyncedOutreachEntries(user.id, freshRemote as StoredOutreachEntry[]);
+
+    const merged = dedupeOutreachEntries(
+      [...freshRemote, ...stillLocal]
+        .map((row) => ({
+          id: String((row as Record<string, unknown>).id ?? ""),
+          user_id: user.id,
+          creator_username: String((row as Record<string, unknown>).creator_username ?? ""),
+          creator_display_name: String((row as Record<string, unknown>).creator_display_name ?? ""),
+          creator_avatar: String((row as Record<string, unknown>).creator_avatar ?? ""),
+          platform: String((row as Record<string, unknown>).platform ?? ""),
+          message: String((row as Record<string, unknown>).message ?? ""),
+          status: String((row as Record<string, unknown>).status ?? "sent"),
+          follow_up_date:
+            typeof (row as Record<string, unknown>).follow_up_date === "string"
+              ? ((row as Record<string, unknown>).follow_up_date as string)
+              : null,
+          created_at:
+            typeof (row as Record<string, unknown>).created_at === "string"
+              ? ((row as Record<string, unknown>).created_at as string)
+              : new Date().toISOString(),
+        }))
+        .sort(
+          (a, b) => new Date(String(b.created_at ?? 0)).getTime() - new Date(String(a.created_at ?? 0)).getTime(),
+        ),
+    );
+
+    const history = merged;
 
     const creators = await getSavedCreators(user.id);
     const avatarMap = buildCreatorAvatarMap(creators);
@@ -1252,7 +1316,7 @@ export function OutreachHistorySection({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const handle = (creator.username || creator.handle || "").replace(/^@/, "");
-    appendStoredOutreachEntry(user.id, {
+    const payload = {
       creator_username: handle,
       creator_display_name: creator.displayName || creator.creator || handle,
       creator_avatar: creator.avatarUrl || creator.avatar || "",
@@ -1260,16 +1324,11 @@ export function OutreachHistorySection({
       message,
       status: "sent",
       follow_up_date: followUpDate ?? null,
-    });
-    void saveOutreach(user.id, {
-      creator_username: handle,
-      creator_display_name: creator.displayName || creator.creator || handle,
-      creator_avatar: creator.avatarUrl || creator.avatar || "",
-      platform: creator.platform,
-      message,
-      status: "sent",
-      follow_up_date: followUpDate ?? null,
-    });
+    };
+    const saved = await saveOutreach(user.id, payload);
+    if (!saved) {
+      appendStoredOutreachEntry(user.id, payload);
+    }
     notifyOutreachSent(
       lang,
       creator.displayName || creator.creator || handle || "creator"
@@ -1303,8 +1362,10 @@ export function OutreachHistorySection({
   };
 
   const completeFollowUpSend = async (id: string) => {
-    const { supabase: sb } = await import("@/lib/supabase");
-    if (sb) await sb.from("outreach_history").update({ follow_up_date: null, updated_at: new Date().toISOString() }).eq("id", id);
+    if (supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await updateOutreachStatus(user.id, id, "sent", null);
+    }
     setEntries((list) =>
       list.map((e) =>
         e.id === id
@@ -1315,6 +1376,7 @@ export function OutreachHistorySection({
     closeFollowUp();
     setToast(lang === "fr" ? "Relance envoyée ✓" : "Follow up sent ✓");
     await loadHistory();
+    dispatchOutreachHistoryUpdated();
   };
 
   const sendFollowUp = async (item: OutreachHistoryEntry) => {
@@ -1341,18 +1403,24 @@ export function OutreachHistorySection({
       await navigator.clipboard.writeText(data.followUp || data.message);
       alert(lang === "fr" ? "Message de relance copié ✓" : "Follow-up copied to clipboard ✓");
       const { supabase: sb } = await import("@/lib/supabase");
-      if (sb) await sb.from("outreach_history").update({ follow_up_date: null, updated_at: new Date().toISOString() }).eq("id", item.id);
+      if (sb) {
+        const { data: { user } } = await sb.auth.getUser();
+        if (user) await updateOutreachStatus(user.id, item.id, item.status, null);
+      }
       setManageEntry(null);
       await loadHistory();
+      dispatchOutreachHistoryUpdated();
     }
   };
 
   const markAsReplied = async (item: OutreachHistoryEntry) => {
     if (supabase) {
-      await supabase.from("outreach_history").update({ status: "replied" }).eq("id", item.id);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await updateOutreachStatus(user.id, item.id, "replied");
     }
     updateStatus(item.id, "replied");
     setManageEntry(null);
+    dispatchOutreachHistoryUpdated();
   };
 
   const historyCreatorSuggestions = useMemo(() => {
@@ -1408,6 +1476,15 @@ export function OutreachHistorySection({
         status,
         ...(status === "replied" || status === "converted" ? { follow_up_date: null } : {}),
       });
+      if (!id.startsWith("oh_")) {
+        await updateOutreachStatus(
+          user.id,
+          id,
+          status,
+          status === "replied" || status === "converted" ? null : undefined,
+        );
+      }
+      dispatchOutreachHistoryUpdated();
     })();
   };
 
@@ -1613,7 +1690,7 @@ export function OutreachHistorySection({
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         type="button"
-                        className="hero-cta-shopify-dark hero-cta-compact"
+                        className="hero-cta-shopify-light hero-cta-compact"
                         style={{ flex: 1, width: "100%" }}
                         onClick={() => setManageEntry(item)}
                       >
@@ -1681,7 +1758,7 @@ export function OutreachHistorySection({
                       {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
                     </div>
                     <div>
-                      <button type="button" className="hero-cta-shopify-dark hero-cta-compact" style={{ width: "100%" }} onClick={() => setManageEntry(row)}>
+                      <button type="button" className="hero-cta-shopify-light hero-cta-compact" style={{ width: "100%" }} onClick={() => setManageEntry(row)}>
                         {lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}
                       </button>
                     </div>

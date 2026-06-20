@@ -6,6 +6,7 @@ export type SplitMenuItem = {
   label: string;
   onClick: () => void;
   icon: ReactNode;
+  danger?: boolean;
 };
 
 export function SplitHeaderActions({
@@ -14,12 +15,16 @@ export function SplitHeaderActions({
   sectionLabel,
   menuItems,
   menuAriaLabel,
+  variant = "primary",
+  size = "default",
 }: {
   primaryLabel: string;
   onPrimaryClick: () => void;
   sectionLabel?: string;
   menuItems: SplitMenuItem[];
   menuAriaLabel?: string;
+  variant?: "primary" | "white";
+  size?: "default" | "compact" | "sm";
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -33,19 +38,51 @@ export function SplitHeaderActions({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, [open]);
 
+  const btnClass =
+    variant === "white"
+      ? "hero-cta-shopify-light"
+      : "hero-cta-shopify";
+  const sizeClass = size === "sm" ? "hero-cta-compact-sm" : size === "compact" ? "hero-cta-compact" : "";
+  const dividerColor = variant === "white" ? "#E5E5E5" : "rgba(255,255,255,0.28)";
+  const primaryPadding =
+    size === "sm"
+      ? { paddingRight: 12, paddingLeft: 12, fontSize: 12 }
+      : { paddingRight: 18, paddingLeft: 18, fontSize: 14 };
+
+  if (menuItems.length === 0) {
+    return (
+      <button
+        type="button"
+        className={`${btnClass} ${sizeClass}`.trim()}
+        onClick={onPrimaryClick}
+        style={{
+          ...primaryPadding,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {primaryLabel}
+      </button>
+    );
+  }
+
   return (
     <div ref={rootRef} style={{ position: "relative", display: "inline-flex", alignItems: "stretch", flexShrink: 0 }}>
       <button
         type="button"
-        className="hero-cta-shopify hero-cta-compact"
+        className={`${btnClass} ${sizeClass}`.trim()}
         onClick={onPrimaryClick}
-        style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0, paddingRight: 18, paddingLeft: 18, fontSize: 14, letterSpacing: "-0.03em" }}
+        style={{
+          borderTopRightRadius: 0,
+          borderBottomRightRadius: 0,
+          ...primaryPadding,
+          letterSpacing: "-0.03em",
+        }}
       >
         {primaryLabel}
       </button>
       <button
         type="button"
-        className="hero-cta-shopify hero-cta-compact"
+        className={`${btnClass} ${sizeClass}`.trim()}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -53,10 +90,10 @@ export function SplitHeaderActions({
         style={{
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
-          borderLeft: "1px solid rgba(255,255,255,0.28)",
-          paddingLeft: 11,
-          paddingRight: 11,
-          minWidth: 40,
+          borderLeft: `1px solid ${dividerColor}`,
+          paddingLeft: size === "sm" ? 8 : 11,
+          paddingRight: size === "sm" ? 8 : 11,
+          minWidth: size === "sm" ? 32 : 40,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -96,7 +133,7 @@ export function SplitHeaderActions({
               key={item.label}
               type="button"
               role="menuitem"
-              className="split-header-menu-item"
+              className={item.danger ? "split-header-menu-item split-header-menu-item-danger" : "split-header-menu-item"}
               onClick={() => {
                 item.onClick();
                 setOpen(false);

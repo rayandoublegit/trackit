@@ -148,6 +148,23 @@ export async function updateCampaign(campaignId: string, campaign: {
   return data;
 }
 
+export async function deleteCampaign(campaignId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/campaigns?campaignId=${encodeURIComponent(campaignId)}`, {
+      method: "DELETE",
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("deleteCampaign error:", payload.error ?? res.statusText);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("deleteCampaign error:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
 export async function getCampaignCreatorCounts(userId: string): Promise<Record<string, string[]>> {
   if (!supabase) return {};
   const { data, error } = await supabase
@@ -197,40 +214,76 @@ export async function saveOutreach(userId: string, outreach: {
   status: string;
   follow_up_date?: string | null;
 }) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("outreach_history")
-    .insert({ user_id: userId, ...outreach })
-    .select()
-    .single();
-  if (error) console.error("saveOutreach error:", error);
-  return data;
+  try {
+    const res = await fetch("/api/outreach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, ...outreach }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; row?: unknown; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("saveOutreach error:", payload.error ?? res.statusText);
+      return null;
+    }
+    return payload.row;
+  } catch (e) {
+    console.error("saveOutreach error:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 export async function getOutreachHistory(userId: string) {
-  if (!supabase) return [];
-  const { data } = await supabase
-    .from("outreach_history")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-  return data || [];
+  try {
+    const res = await fetch(`/api/outreach?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; rows?: unknown[]; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("getOutreachHistory error:", payload.error ?? res.statusText);
+      return [];
+    }
+    return Array.isArray(payload.rows) ? payload.rows : [];
+  } catch (e) {
+    console.error("getOutreachHistory error:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
-export async function updateOutreachStatus(outreachId: string, status: string) {
-  if (!supabase) return;
-  await supabase
-    .from("outreach_history")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", outreachId);
+export async function updateOutreachStatus(
+  userId: string,
+  outreachId: string,
+  status: string,
+  followUpDate?: string | null,
+) {
+  try {
+    const res = await fetch("/api/outreach", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        outreachId,
+        status,
+        ...(followUpDate !== undefined ? { follow_up_date: followUpDate } : {}),
+      }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("updateOutreachStatus error:", payload.error ?? res.statusText);
+    }
+  } catch (e) {
+    console.error("updateOutreachStatus error:", e instanceof Error ? e.message : e);
+  }
 }
 
 export async function clearOutreachHistory(userId: string) {
-  if (!supabase) return false;
-  const { error } = await supabase.from("outreach_history").delete().eq("user_id", userId);
-  if (error) {
-    console.error("clearOutreachHistory error:", error.message);
+  try {
+    const res = await fetch(`/api/outreach?userId=${encodeURIComponent(userId)}`, { method: "DELETE" });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    if (!res.ok || !payload.ok) {
+      console.error("clearOutreachHistory error:", payload.error ?? res.statusText);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("clearOutreachHistory error:", e instanceof Error ? e.message : e);
     return false;
   }
-  return true;
 }

@@ -5,6 +5,20 @@ export function dispatchOutreachHistoryUpdated() {
   window.dispatchEvent(new CustomEvent(OUTREACH_HISTORY_UPDATED_EVENT));
 }
 
+export const PAYOUTS_UPDATED_EVENT = "trackit-payouts-updated";
+
+export function dispatchPayoutsUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(PAYOUTS_UPDATED_EVENT));
+}
+
+export const SALES_UPDATED_EVENT = "trackit-sales-updated";
+
+export function dispatchSalesUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SALES_UPDATED_EVENT));
+}
+
 export function followUpIn3Days() {
   const d = new Date();
   d.setDate(d.getDate() + 3);

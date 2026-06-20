@@ -19,6 +19,45 @@ function newEntryId() {
   return `oh_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export function outreachEntryFingerprint(
+  entry: Pick<StoredOutreachEntry, "creator_username" | "creator_display_name" | "platform" | "message" | "created_at">,
+): string {
+  const handle = String(entry.creator_username || entry.creator_display_name || "")
+    .replace(/^@/, "")
+    .toLowerCase();
+  const platform = String(entry.platform || "").toLowerCase();
+  const message = String(entry.message || "").trim();
+  const minute = entry.created_at ? String(entry.created_at).slice(0, 16) : "";
+  return `${handle}|${platform}|${message}|${minute}`;
+}
+
+export function dedupeOutreachEntries<T extends StoredOutreachEntry>(entries: T[]): T[] {
+  const seen = new Set<string>();
+  return entries.filter((entry) => {
+    const key = outreachEntryFingerprint(entry);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function pruneSyncedOutreachEntries(
+  userId: string,
+  remoteEntries: Pick<
+    StoredOutreachEntry,
+    "creator_username" | "creator_display_name" | "platform" | "message" | "created_at"
+  >[],
+) {
+  const remoteFingerprints = new Set(remoteEntries.map((entry) => outreachEntryFingerprint(entry)));
+  const local = loadStoredOutreachHistory(userId);
+  const kept = local.filter(
+    (entry) => !(entry.id.startsWith("oh_") && remoteFingerprints.has(outreachEntryFingerprint(entry))),
+  );
+  if (kept.length !== local.length) {
+    saveStoredOutreachHistory(userId, kept);
+  }
+}
+
 export function loadStoredOutreachHistory(userId: string): StoredOutreachEntry[] {
   if (typeof window === "undefined") return [];
   try {

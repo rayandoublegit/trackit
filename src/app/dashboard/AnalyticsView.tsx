@@ -6,6 +6,8 @@ import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
+import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
+import { SplitHeaderActions } from "./SplitHeaderActions";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -91,41 +93,90 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     };
   }, [userId, shopifyStore, range]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const refreshAnalytics = async () => {
+      try {
+        const res = await fetch(`/api/analytics?userId=${userId}&range=${range}`);
+        const data = await res.json();
+        setAnalyticsData(data);
+      } catch {
+        /* keep current data */
+      }
+    };
+
+    window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
+    window.addEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
+    window.addEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
+    return () => {
+      window.removeEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
+      window.removeEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
+      window.removeEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
+    };
+  }, [userId, range]);
+
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
 
   const sortedCreators = useMemo(() => {
-    const rows = (analyticsData?.creators || []).map((c: { full_name?: string; handle?: string; username?: string; platform?: string; total_sales?: number; total_earned?: number }, i: number) => {
-      const sales = c.total_sales || 0;
-      const commission = c.total_earned || 0;
+    type CreatorPerfRow = {
+      id?: string;
+      full_name?: string;
+      handle?: string;
+      username?: string;
+      platform?: string;
+      periodRevenue?: number;
+      periodCommission?: number;
+      salesCount?: number;
+      commissionPaid?: number;
+      roi?: number;
+    };
+    const source: CreatorPerfRow[] = analyticsData?.creatorsPerformance || analyticsData?.creators || [];
+    const rows = source.map((c, i) => {
+      const revenue = Number(c.periodRevenue ?? 0);
+      const commission = Number(c.periodCommission ?? 0);
+      const paid = Number(c.commissionPaid ?? 0);
+      const roi = Number(c.roi ?? (commission > 0 ? revenue / commission : 0));
       return {
         rank: i + 1,
         creator: c.full_name || c.handle || c.username || "—",
         platform: c.platform || "—",
-        sales,
-        commission,
-        status: sales > 0 ? "Active" : "Inactive",
-        roi: commission > 0 ? sales / commission : 0,
+        sales: revenue,
+        commission: paid > 0 ? paid : commission,
+        status: revenue > 0 ? "Active" : "Inactive",
+        roi,
       };
     });
-    rows.sort((a: { creator: string; commission: number; roi: number; sales: number }, b: { creator: string; commission: number; roi: number; sales: number }) => {
+    rows.sort((a, b) => {
       const av = sortKey === "creator" ? a.creator : sortKey === "commission" ? a.commission : sortKey === "roi" ? a.roi : a.sales;
       const bv = sortKey === "creator" ? b.creator : sortKey === "commission" ? b.commission : sortKey === "roi" ? b.roi : b.sales;
       if (typeof av === "string") return sortDir === "asc" ? av.localeCompare(bv as string) : (bv as string).localeCompare(av);
       return sortDir === "asc" ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+    rows.forEach((r, i) => {
+      r.rank = i + 1;
     });
     return rows;
   }, [sortKey, sortDir, analyticsData]);
 
   const campaignRows = analyticsData?.campaigns || [];
   const totalSent = analyticsData?.totalSent || 0;
+  const outreachMessagesSent = analyticsData?.outreachMessagesSent || 0;
   const responseRate = analyticsData?.responseRate || 0;
   const converted = analyticsData?.converted || 0;
   const totalRevenue = analyticsData?.totalRevenue || 0;
   const totalCommissions = analyticsData?.totalCommissions || 0;
-  const netRevenue = Math.max(0, totalRevenue - totalCommissions);
-  const conversionRate = totalSent > 0 ? Math.round((converted / totalSent) * 100) : 0;
-  const avgCommissionRate = totalRevenue > 0 ? Math.round((totalCommissions / totalRevenue) * 100) : 0;
+  const accruedCommissions = analyticsData?.accruedCommissions || 0;
+  const revenueTimeline = (analyticsData?.revenueTimeline || []) as Array<{ date: string; revenue: number }>;
+  const platformBreakdown = (analyticsData?.platformBreakdown || []) as Array<{ platform: string; revenue: number; commission: number; salesCount: number }>;
+  const outreachByPlatform = (analyticsData?.outreachByPlatform || []) as Array<{ platform: string; sent: number; replied: number; converted: number; bestMessage: string }>;
+  const followUpImpact = analyticsData?.followUpImpact as
+    | { withFollowUp?: { sent: number; replied: number; replyRate: number }; withoutFollowUp?: { sent: number; replied: number; replyRate: number } }
+    | undefined;
+  const netRevenue = Math.max(0, totalRevenue - accruedCommissions);
+  const conversionRate = outreachMessagesSent > 0 ? Math.round((converted / outreachMessagesSent) * 100) : 0;
+  const avgCommissionRate = totalRevenue > 0 ? Math.round((accruedCommissions / totalRevenue) * 100) : 0;
   const trends = analyticsData?.trends as
     | {
         revenue?: PeriodTrend;
@@ -174,7 +225,11 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       const data = await res.json();
       if (data.ok) {
         setSaleMsg(lang === "fr" ? `Vente ajoutée — ${data.commissionAmount}€ de commission créditée` : `Sale added — ${data.commissionAmount}€ commission credited`);
-        setTimeout(() => window.location.reload(), 1200);
+        dispatchSalesUpdated();
+        setTimeout(() => {
+          setShowSaleModal(false);
+          setSaleBusy(false);
+        }, 1200);
       } else {
         setSaleMsg(data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale"));
         setSaleBusy(false);
@@ -224,10 +279,66 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     else { setSortKey(key); setSortDir("desc"); }
   };
 
+  const exportAnalyticsCsv = () => {
+    if (!canUseAdvancedAnalytics(plan as PlanTier)) {
+      if (onUpgradePro) void onUpgradePro();
+      else alert(lang === "fr" ? "L'export CSV et le ROI avancé sont disponibles sur le plan Pro." : "CSV export and advanced ROI are available on the Pro plan.");
+      return;
+    }
+    if (!analyticsData) return;
+
+    const creatorRows = (analyticsData.creatorsPerformance || analyticsData.creators || []) as Array<{
+      full_name?: string;
+      handle?: string;
+      platform?: string;
+      periodRevenue?: number;
+      periodCommission?: number;
+      commissionPaid?: number;
+    }>;
+
+    const rows = [
+      ["Metric", "Value"],
+      ["Total Revenue", analyticsData.totalRevenue || 0],
+      ["Total Commissions Paid", analyticsData.totalCommissions || 0],
+      ["Accrued Commissions", analyticsData.accruedCommissions || 0],
+      ["Total Creators Contacted", analyticsData.totalSent || 0],
+      ["Outreach Messages Sent", analyticsData.outreachMessagesSent || 0],
+      ["Response Rate", `${analyticsData.responseRate || 0}%`],
+      ["Converted", analyticsData.converted || 0],
+      "",
+      ["Creator", "Platform", "Revenue", "Commission", "Commission Paid"],
+      ...creatorRows.map((c) => [
+        c.full_name || c.handle || "",
+        c.platform || "",
+        c.periodRevenue || 0,
+        c.periodCommission || 0,
+        c.commissionPaid || 0,
+      ]),
+      "",
+      ["Campaign", "Creators", "Sales", "Commissions", "Status"],
+      ...(analyticsData.campaigns || []).map((c: { name?: string; creatorCount?: number; totalSales?: number; totalCommissions?: number; status?: string }) => [
+        c.name,
+        c.creatorCount ?? 0,
+        c.totalSales ?? 0,
+        c.totalCommissions ?? 0,
+        c.status,
+      ]),
+    ];
+
+    const csv = rows.map((r) => (Array.isArray(r) ? r.join(",") : "")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trackit-analytics-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loadingData) {
     return (
       <>
-        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
         <div style={{ padding: 80, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
           {lang === "fr" ? "Chargement des analytiques…" : "Loading analytics…"}
         </div>
@@ -238,7 +349,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   if (!HAS_DATA) {
     return (
       <>
-        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
+        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
         <div style={{ padding: 80, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
@@ -257,12 +368,27 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
   return (
     <>
-      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} plan={plan} onUpgradePro={onUpgradePro} />
+      <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
       <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
-          <button type="button" onClick={openSaleModal} className="hero-cta-shopify-light hero-cta-compact">
-            {lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
-          </button>
+          <SplitHeaderActions
+            variant="white"
+            size="compact"
+            primaryLabel={lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
+            onPrimaryClick={openSaleModal}
+            menuAriaLabel={lang === "fr" ? "Plus d'actions" : "More actions"}
+            menuItems={[
+              {
+                label: lang === "fr" ? "Exporter CSV →" : "Export CSV →",
+                onClick: exportAnalyticsCsv,
+                icon: (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M12 3v12M8 11l4 4 4-4M5 21h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                ),
+              },
+            ]}
+          />
         </div>
         {saleModal}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
@@ -294,10 +420,18 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
           <ChartCard title={lang === "fr" ? "Revenus par créateur dans le temps" : "Revenue by Creator Over Time"}>
-            <ChartEmpty lang={lang} />
+            {revenueTimeline.length > 0 ? (
+              <RevenueTimelineChart lang={lang} points={revenueTimeline} />
+            ) : (
+              <ChartEmpty lang={lang} />
+            )}
           </ChartCard>
           <ChartCard title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}>
-            {totalSent > 0 ? <FunnelBarChart lang={lang} totalSent={totalSent} responseRate={responseRate} converted={converted} /> : <ChartEmpty lang={lang} />}
+            {outreachMessagesSent > 0 ? (
+              <FunnelBarChart lang={lang} totalSent={outreachMessagesSent} responseRate={responseRate} converted={converted} />
+            ) : (
+              <ChartEmpty lang={lang} />
+            )}
           </ChartCard>
         </div>
 
@@ -323,7 +457,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                     </td>
                   </tr>
                 ) : sortedCreators.map((r: { rank: number; creator: string; platform: string; sales: number; commission: number; roi: number; status: string }, i: number) => (
-                  <tr key={r.creator} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
+                  <tr key={`${r.rank}-${r.creator}`} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
                     <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>{r.creator}</td>
                     <td style={{ padding: "12px 8px", color: "#7A7A7A", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.platform}</td>
@@ -374,7 +508,11 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
             )}
           </ChartCard>
           <ChartCard title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}>
-            <ChartEmpty lang={lang} />
+            {platformBreakdown.length > 0 ? (
+              <PlatformBreakdownChart lang={lang} rows={platformBreakdown} />
+            ) : (
+              <ChartEmpty lang={lang} />
+            )}
           </ChartCard>
         </div>
 
@@ -411,7 +549,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
         <ChartCard title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"} style={{ marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value={String(totalSent)} />
+            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value={String(outreachMessagesSent)} />
             <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value={`${responseRate}%`} />
             <MiniStat label={lang === "fr" ? "Convertis" : "Converted"} value={String(converted)} />
             <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value={`${conversionRate}%`} />
@@ -424,32 +562,46 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td colSpan={5} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
-                  {lang === "fr" ? "Répartition par plateforme non disponible pour le moment." : "Platform breakdown not available yet."}
-                </td>
-              </tr>
+              {outreachByPlatform.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                    {lang === "fr" ? "Aucun message envoyé sur cette période." : "No outreach sent in this period."}
+                  </td>
+                </tr>
+              ) : outreachByPlatform.map((row) => (
+                <tr key={row.platform} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{row.platform}</td>
+                  <td style={{ padding: "12px 8px" }}>{row.sent}</td>
+                  <td style={{ padding: "12px 8px" }}>{row.replied}</td>
+                  <td style={{ padding: "12px 8px" }}>{row.converted}</td>
+                  <td style={{ padding: "12px 8px", color: "#7A7A7A", maxWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {row.bestMessage || "—"}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           </div>
         </ChartCard>
 
         <ChartCard title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}>
-          <ChartEmpty lang={lang} />
+          {(followUpImpact?.withFollowUp?.sent || 0) + (followUpImpact?.withoutFollowUp?.sent || 0) > 0 ? (
+            <FollowUpImpactChart lang={lang} withFollowUp={followUpImpact?.withFollowUp} withoutFollowUp={followUpImpact?.withoutFollowUp} />
+          ) : (
+            <ChartEmpty lang={lang} />
+          )}
         </ChartCard>
       </div>
     </>
   );
 }
 
-function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData, plan, onUpgradePro }: {
+function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile, analyticsData }: {
   lang: "en" | "fr";
   range: DateRange; setRange: (r: DateRange) => void;
   compare: boolean; setCompare: (v: boolean) => void;
   isMobile?: boolean;
   analyticsData?: any;
-  plan?: PlanTier;
-  onUpgradePro?: () => void;
 }) {
   const ranges: { id: DateRange; label: string }[] = [
     { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
@@ -460,56 +612,8 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
   ];
   return (
     <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
-        <button
-          type="button"
-          className="hero-cta-shopify-light hero-cta-compact"
-          style={{ marginTop: 8 }}
-          onClick={() => {
-            if (!canUseAdvancedAnalytics(plan as PlanTier)) {
-              if (onUpgradePro) void onUpgradePro();
-              else alert(lang === "fr" ? "L'export CSV et le ROI avancé sont disponibles sur le plan Pro." : "CSV export and advanced ROI are available on the Pro plan.");
-              return;
-            }
-            if (!analyticsData) return;
-
-            const rows = [
-              ["Metric", "Value"],
-              ["Total Revenue", analyticsData.totalRevenue || 0],
-              ["Total Commissions", analyticsData.totalCommissions || 0],
-              ["Total Creators Contacted", analyticsData.totalSent || 0],
-              ["Response Rate", `${analyticsData.responseRate || 0}%`],
-              ["Converted", analyticsData.converted || 0],
-              "",
-              ["Creator", "Platform", "Sales", "Commission"],
-              ...(analyticsData.creators || []).map((c: any) => [
-                c.full_name || c.handle,
-                c.platform,
-                c.total_sales || 0,
-                c.total_earned || 0,
-              ]),
-              "",
-              ["Campaign", "Platform", "Status"],
-              ...(analyticsData.campaigns || []).map((c: any) => [
-                c.name,
-                c.platform,
-                c.status,
-              ]),
-            ];
-
-            const csv = rows.map(r => Array.isArray(r) ? r.join(",") : "").join("\n");
-            const blob = new Blob([csv], { type: "text/csv" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `trackit-analytics-${new Date().toISOString().split("T")[0]}.csv`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-        >
-          {lang === "fr" ? "Exporter CSV →" : "Export CSV →"}
-        </button>
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -717,6 +821,90 @@ function DonutChart({ lang, netPct }: { lang: "en" | "fr"; netPct: number }) {
         <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">{netPct}%</text>
         <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">{lang === "fr" ? "Revenus nets" : "Net revenue"}</text>
       </svg>
+    </div>
+  );
+}
+
+function RevenueTimelineChart({ lang, points }: { lang: "en" | "fr"; points: Array<{ date: string; revenue: number }> }) {
+  const max = Math.max(...points.map((p) => p.revenue), 1);
+  return (
+    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180, paddingTop: 8 }}>
+      {points.map((p) => {
+        const h = Math.max(8, Math.round((p.revenue / max) * 100));
+        return (
+          <div key={p.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 28 }}>
+            <div style={{ width: "100%", maxWidth: 40, height: `${h}%`, minHeight: 8, background: "#0047FF", borderRadius: "6px 6px 0 0" }} title={formatCurrency(p.revenue, lang)} />
+            <span style={{ fontSize: 10, color: "#9A9A9A" }}>{p.date.slice(5)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function PlatformBreakdownChart({
+  lang,
+  rows,
+}: {
+  lang: "en" | "fr";
+  rows: Array<{ platform: string; revenue: number; commission: number; salesCount: number }>;
+}) {
+  const max = Math.max(...rows.map((r) => r.revenue), 1);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {rows.map((row) => {
+        const pct = Math.max(4, Math.round((row.revenue / max) * 100));
+        return (
+          <div key={row.platform}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
+              <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.platform}</span>
+              <span style={{ color: "#7A7A7A" }}>{formatCurrency(row.revenue, lang)} · {row.salesCount} {lang === "fr" ? "ventes" : "sales"}</span>
+            </div>
+            <div style={{ height: 8, background: "#F0F0F0", borderRadius: 999 }}>
+              <div style={{ width: `${pct}%`, height: 8, background: "#0047FF", borderRadius: 999 }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FollowUpImpactChart({
+  lang,
+  withFollowUp,
+  withoutFollowUp,
+}: {
+  lang: "en" | "fr";
+  withFollowUp?: { sent: number; replied: number; replyRate: number };
+  withoutFollowUp?: { sent: number; replied: number; replyRate: number };
+}) {
+  const groups = [
+    { label: lang === "fr" ? "Avec relance" : "With follow-up", stats: withFollowUp },
+    { label: lang === "fr" ? "Sans relance" : "Without follow-up", stats: withoutFollowUp },
+  ];
+  const maxRate = Math.max(withFollowUp?.replyRate || 0, withoutFollowUp?.replyRate || 0, 1);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      {groups.map((g) => (
+        <div key={g.label} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>{g.label}</div>
+          <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 10 }}>
+            {g.stats?.sent ?? 0} {lang === "fr" ? "envoyés" : "sent"} · {g.stats?.replied ?? 0} {lang === "fr" ? "réponses" : "replies"}
+          </div>
+          <div style={{ height: 8, background: "#ECECEC", borderRadius: 999, marginBottom: 6 }}>
+            <div
+              style={{
+                width: `${Math.max(4, Math.round(((g.stats?.replyRate || 0) / maxRate) * 100))}%`,
+                height: 8,
+                background: "#95BF47",
+                borderRadius: 999,
+              }}
+            />
+          </div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A" }}>{g.stats?.replyRate ?? 0}%</div>
+        </div>
+      ))}
     </div>
   );
 }

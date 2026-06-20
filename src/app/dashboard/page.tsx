@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getSavedCreators } from "@/lib/db";
+import { getSavedCreators, saveOutreach } from "@/lib/db";
 import { dispatchOutreachHistoryUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
 import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
 import { avatarUrlForCreatorHandle, buildCreatorAvatarMap } from "@/lib/creator-avatar";
@@ -2019,15 +2019,20 @@ function SendOutreachPanel({
     for (const influencerHandle of selectedInfluencers) {
       const name = outreachCreatorName(influencerHandle);
       const copiedMessage = previewFromFields(fields, name || "there");
-      appendStoredOutreachEntry(userId, {
-        creator_username: name || influencerHandle.replace(/^@/, ""),
+      const handleClean = influencerHandle.replace(/^@/, "");
+      const payload = {
+        creator_username: name || handleClean,
         creator_display_name: influencerHandle,
         creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
         platform: dmPlatform,
         message: copiedMessage,
         status: "sent",
         follow_up_date: followUpDate,
-      });
+      };
+      const saved = await saveOutreach(userId, payload);
+      if (!saved) {
+        appendStoredOutreachEntry(userId, payload);
+      }
       notifyOutreachSent(lang, influencerHandle);
     }
     if (dmPlatform === "Instagram") {
