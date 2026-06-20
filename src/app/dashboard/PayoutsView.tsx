@@ -18,7 +18,13 @@ import {
   type PaymentMethod,
 } from "./usePaymentMethods";
 import { notifyCreatorPaid, notifyFundsAdded } from "@/lib/notifications-storage";
-import { dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
+import { dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
+import {
+  dismissCommissionHistoryItems,
+  dismissSaleFeedItems,
+  loadDismissedCommissionHistoryIds,
+  loadDismissedSaleIds,
+} from "@/lib/live-sales-feed-storage";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CreatorPayoutMethodFields, creatorHasPayoutDetails } from "./CreatorPayoutMethodFields";
 
@@ -72,15 +78,157 @@ function platformLabel(platform: SalePlatform) {
   return "YouTube";
 }
 
+type TrackedSale = {
+  id: string;
+  creator_id: string;
+  order_amount: number;
+  commission_amount: number;
+  discount_code_used?: string | null;
+  shopify_order_id?: string | null;
+  shop_domain?: string | null;
+  status?: string | null;
+  created_at: string;
+  campaign_id?: string | null;
+  creators?: {
+    handle?: string;
+    full_name?: string;
+    avatar_url?: string;
+    platform?: string;
+  } | null;
+};
 
-export function LiveSalesFeed({ isMobile }: { isMobile?: boolean } = {}) {
+function saleCreatorMeta(sale: TrackedSale) {
+  const c = sale.creators;
+  if (Array.isArray(c)) return c[0] ?? null;
+  return c ?? null;
+}
+
+function minutesAgoFromIso(iso: string) {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+}
+
+function salePlatformFromCreator(platform?: string | null): SalePlatform {
+  const p = String(platform || "").toLowerCase();
+  if (p.includes("instagram")) return "instagram";
+  if (p.includes("youtube")) return "youtube";
+  return "tiktok";
+}
+
+function commissionRateFromSale(sale: TrackedSale) {
+  const order = Number(sale.order_amount) || 0;
+  const commission = Number(sale.commission_amount) || 0;
+  return order > 0 ? commission / order : 0;
+}
+
+function formatTrackedSaleTime(iso: string, lang: "en" | "fr") {
+  const mins = minutesAgoFromIso(iso);
+  if (mins < 60 * 24) return formatRelativeTime(mins, lang);
+  return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function shopifyOrderUrl(sale: TrackedSale) {
+  const orderId = sale.shopify_order_id;
+  const domain = sale.shop_domain;
+  if (!orderId || !domain || orderId.startsWith("manual_")) return null;
+  const shop = domain.includes(".") ? domain : `${domain}.myshopify.com`;
+  return `https://${shop}/admin/orders/${orderId}`;
+}
+
+async function fetchTrackedSales(userId: string): Promise<TrackedSale[]> {
+  const { supabase } = await import("@/lib/supabase");
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("sales")
+    .select(
+      "id, creator_id, order_amount, commission_amount, discount_code_used, shopify_order_id, shop_domain, status, created_at, campaign_id, creators ( handle, full_name, avatar_url, platform )",
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(150);
+  if (error) {
+    console.error(error);
+    return [];
+  }
+  return (data || []) as TrackedSale[];
+}
+
+function mapSaleToNotification(row: TrackedSale, isNew: boolean): SaleNotification {
+  const creator = saleCreatorMeta(row);
+  const handle = creator?.handle || creator?.full_name || "creator";
+  return {
+    id: row.id,
+    amount: Number(row.order_amount) || 0,
+    creatorHandle: String(handle).replace(/^@/, ""),
+    commissionRate: commissionRateFromSale(row),
+    platform: salePlatformFromCreator(creator?.platform),
+    minutesAgo: minutesAgoFromIso(row.created_at),
+    isNew,
+  };
+}
+
+export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId?: string } = {}) {
   const lang = useLang();
   const [notifications, setNotifications] = useState<SaleNotification[]>([]);
   const [paused, setPaused] = useState(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
+  const hiddenIdsRef = useRef<Set<string>>(new Set());
 
-  const clearNotifications = () => setNotifications([]);
+  useEffect(() => {
+    if (!userId) return;
+    hiddenIdsRef.current = loadDismissedSaleIds(userId);
+    knownIdsRef.current = new Set();
+    initialLoadRef.current = true;
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const load = async () => {
+      const rows = await fetchTrackedSales(userId);
+      if (cancelled) return;
+      const visible = rows.filter((row) => !hiddenIdsRef.current.has(row.id));
+      const mapped = visible.slice(0, 30).map((row) =>
+        mapSaleToNotification(row, !knownIdsRef.current.has(row.id) && !initialLoadRef.current),
+      );
+      for (const row of visible) knownIdsRef.current.add(row.id);
+      initialLoadRef.current = false;
+      setNotifications(mapped);
+    };
+
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
+    const interval = window.setInterval(load, 25000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
+      window.clearInterval(interval);
+    };
+  }, [userId]);
+
+  const clearNotifications = () => {
+    if (!userId) {
+      setNotifications([]);
+      return;
+    }
+    const ids = notifications.map((sale) => sale.id);
+    hiddenIdsRef.current = dismissSaleFeedItems(userId, ids);
+    setNotifications([]);
+  };
 
   const removeNotification = (id: string) => {
+    if (userId) {
+      hiddenIdsRef.current = dismissSaleFeedItems(userId, [id]);
+    } else {
+      hiddenIdsRef.current.add(id);
+    }
     setNotifications((list) => list.filter((n) => n.id !== id));
   };
 
@@ -533,6 +681,287 @@ function formatPayoutDate(iso: string | null | undefined, lang: "en" | "fr") {
   });
 }
 
+function saleStatusLabel(status: string | null | undefined, lang: "en" | "fr") {
+  const s = String(status || "pending").toLowerCase();
+  if (s === "paid") return lang === "fr" ? "Payée" : "Paid";
+  return lang === "fr" ? "En attente" : "Pending";
+}
+
+function saleStatusColor(status: string | null | undefined) {
+  const s = String(status || "pending").toLowerCase();
+  if (s === "paid") return { bg: "#ECFDF3", color: "#1FB567" };
+  return { bg: "#FFF7ED", color: "#D97706" };
+}
+
+function CommissionTracker({
+  userId,
+  shopifyStore,
+  onConnectShopify,
+  lang,
+  isMobile,
+}: {
+  userId?: string;
+  shopifyStore?: string | null;
+  onConnectShopify?: () => void;
+  lang: "en" | "fr";
+  isMobile?: boolean;
+}) {
+  const [sales, setSales] = useState<TrackedSale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"active" | "history">("active");
+  const [dismissedHistoryIds, setDismissedHistoryIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!userId) return;
+    setDismissedHistoryIds(loadDismissedCommissionHistoryIds(userId));
+  }, [userId]);
+
+  const removeHistoryItem = (saleId: string) => {
+    if (!userId) return;
+    const next = dismissCommissionHistoryItems(userId, [saleId]);
+    setDismissedHistoryIds(next);
+  };
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+
+    const load = async () => {
+      const rows = await fetchTrackedSales(userId);
+      if (!cancelled) {
+        setSales(rows);
+        setLoading(false);
+      }
+    };
+
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
+    const interval = window.setInterval(load, 25000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
+      window.clearInterval(interval);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !shopifyStore) return;
+    let cancelled = false;
+    void fetch("/api/shopify/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+      .then(() => {
+        if (!cancelled) dispatchSalesUpdated();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, shopifyStore]);
+
+  const activeSales = useMemo(
+    () => sales.filter((s) => String(s.status || "pending").toLowerCase() === "pending"),
+    [sales],
+  );
+  const historySales = useMemo(
+    () =>
+      sales.filter(
+        (s) =>
+          String(s.status || "pending").toLowerCase() !== "pending" &&
+          !dismissedHistoryIds.has(s.id),
+      ),
+    [sales, dismissedHistoryIds],
+  );
+  const visible = tab === "active" ? activeSales : historySales;
+  const shopifyConnected = !!shopifyStore;
+
+  const tabBtn = (id: "active" | "history", label: string, count: number) => (
+    <button
+      type="button"
+      onClick={() => setTab(id)}
+      style={{
+        background: "none",
+        border: "none",
+        fontSize: 13,
+        color: tab === id ? "#1A1A1A" : "#7A7A7A",
+        fontWeight: tab === id ? 500 : 400,
+        cursor: "pointer",
+        paddingBottom: 4,
+        borderBottom: tab === id ? "2px solid #1A1A1A" : "2px solid transparent",
+        fontFamily: "inherit",
+        letterSpacing: "-0.01em",
+      }}
+    >
+      {label}{count > 0 ? ` (${count})` : ""}
+    </button>
+  );
+
+  return (
+    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+          {lang === "fr" ? "Suivi des commissions" : "Commission tracker"}
+        </div>
+        <div style={{ display: "flex", gap: 18 }}>
+          {tabBtn("active", lang === "fr" ? "Actif" : "Active", activeSales.length)}
+          {tabBtn("history", lang === "fr" ? "Historique" : "History", historySales.length)}
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#9A9A9A" }}>
+          {lang === "fr" ? "Chargement…" : "Loading…"}
+        </div>
+      ) : visible.length === 0 ? (
+        <div style={{ padding: 60, textAlign: "center" }}>
+          <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: shopifyConnected || sales.length > 0 ? 0 : 16 }}>
+            {tab === "active"
+              ? shopifyConnected || sales.length > 0
+                ? lang === "fr"
+                  ? "Aucune commission en attente pour le moment."
+                  : "No pending commissions right now."
+                : lang === "fr"
+                  ? "Connectez Shopify pour commencer à suivre les commissions."
+                  : "Connect Shopify to start tracking commissions."
+              : lang === "fr"
+                ? "L'historique des commissions apparaîtra ici."
+                : "Commission history will show up here."}
+          </div>
+          {!shopifyConnected && sales.length === 0 && onConnectShopify && (
+            <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={onConnectShopify}>
+              {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div>
+          {visible.map((sale, i) => {
+            const creator = saleCreatorMeta(sale);
+            const name = creator?.full_name || creator?.handle || "Creator";
+            const handle = creator?.handle ? `@${String(creator.handle).replace(/^@/, "")}` : "";
+            const statusStyle = saleStatusColor(sale.status);
+            const orderUrl = shopifyOrderUrl(sale);
+            const ratePct = Math.round(commissionRateFromSale(sale) * 1000) / 10;
+
+            return (
+              <div
+                key={sale.id}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 14,
+                  padding: isMobile ? "16px" : "18px 20px",
+                  borderBottom: i < visible.length - 1 ? "1px solid #F5F5F5" : "none",
+                }}
+              >
+                <CreatorAvatar src={creator?.avatar_url} size={40} alt={name} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                      {name}
+                    </span>
+                    {handle && (
+                      <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{handle}</span>
+                    )}
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: statusStyle.color,
+                        background: statusStyle.bg,
+                        padding: "3px 8px",
+                        borderRadius: 999,
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {saleStatusLabel(sale.status, lang)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em", marginBottom: 4, lineHeight: 1.45 }}>
+                    {lang === "fr" ? "Vente" : "Sale"}{" "}
+                    <strong>{formatCurrency(Number(sale.order_amount) || 0, lang)}</strong>
+                    {" → "}
+                    {lang === "fr" ? "Commission" : "Commission"}{" "}
+                    <strong style={{ color: "#0047FF" }}>{formatCurrency(Number(sale.commission_amount) || 0, lang)}</strong>
+                    {ratePct > 0 && (
+                      <span style={{ color: "#9A9A9A" }}> ({ratePct}%)</span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    {sale.discount_code_used && (
+                      <span style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                        {lang === "fr" ? "Code" : "Code"}: {sale.discount_code_used}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 11, color: "#9A9A9A" }}>
+                      {formatTrackedSaleTime(sale.created_at, lang)}
+                    </span>
+                    {sale.shop_domain && sale.shop_domain !== "manual" && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#7A7A7A" }}>
+                        <img src="/shopify-logo.svg" alt="" width={14} height={14} style={{ display: "block" }} />
+                        Shopify
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0, marginTop: 4 }}>
+                  {orderUrl && (
+                    <a
+                      href={orderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#0047FF",
+                        textDecoration: "none",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {lang === "fr" ? "Voir la commande" : "View order"}
+                    </a>
+                  )}
+                  {tab === "history" && (
+                    <button
+                      type="button"
+                      onClick={() => removeHistoryItem(sale.id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "#9A9A9A",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        padding: 0,
+                        letterSpacing: "-0.01em",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "#DC2626";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "#9A9A9A";
+                      }}
+                    >
+                      {lang === "fr" ? "Supprimer" : "Remove"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OwedToCreatorsSummaryCard({
   lang,
   isMobile,
@@ -703,6 +1132,8 @@ export function PayoutsView({
   isMobile,
   userId,
   isCreator,
+  shopifyStore,
+  onConnectShopify,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
@@ -711,6 +1142,8 @@ export function PayoutsView({
   isMobile?: boolean;
   userId?: string;
   isCreator?: boolean;
+  shopifyStore?: string | null;
+  onConnectShopify?: () => void;
 }) {
   const lang = useLang();
   const [search, setSearch] = useState("");
@@ -792,6 +1225,20 @@ export function PayoutsView({
       .then(r => r.json())
       .then(data => { if (Array.isArray(data)) setCreators(data); })
       .catch(console.error);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const reloadCreators = () => {
+      fetch(`/api/creators-list?userId=${userId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setCreators(data);
+        })
+        .catch(console.error);
+    };
+    window.addEventListener(SALES_UPDATED_EVENT, reloadCreators);
+    return () => window.removeEventListener(SALES_UPDATED_EVENT, reloadCreators);
   }, [userId]);
 
   const loadCompletedPayouts = async () => {
@@ -1076,7 +1523,7 @@ export function PayoutsView({
           </div>
         </div>
 
-        <LiveSalesFeed isMobile={isMobile} />
+        <LiveSalesFeed isMobile={isMobile} userId={userId} />
 
 
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden", position: "relative" }}>
@@ -1170,18 +1617,13 @@ export function PayoutsView({
           )}
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Suivi des commissions" : "Commission tracker"}</div>
-            <div style={{ display: "flex", gap: 18 }}>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#1A1A1A", fontWeight: 500, cursor: "pointer", borderBottom: "2px solid #1A1A1A", paddingBottom: 4 }}>{lang === "fr" ? "Actif" : "Active"}</button>
-              <button type="button" style={{ background: "none", border: "none", fontSize: 13, color: "#7A7A7A", cursor: "pointer", paddingBottom: 4 }}>{lang === "fr" ? "Historique" : "History"}</button>
-            </div>
-          </div>
-          <div style={{ padding: 60, textAlign: "center" }}>
-            <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Connectez Shopify pour commencer à suivre les commissions" : "Connect Shopify to start tracking commissions"}</div>
-          </div>
-        </div>
+        <CommissionTracker
+          userId={userId}
+          shopifyStore={shopifyStore}
+          onConnectShopify={onConnectShopify}
+          lang={lang}
+          isMobile={isMobile}
+        />
 
         </>
         )}

@@ -17,6 +17,8 @@ export function SplitHeaderActions({
   menuAriaLabel,
   variant = "primary",
   size = "default",
+  menuPlacement = "below",
+  menuOffsetLeft,
 }: {
   primaryLabel: string;
   onPrimaryClick: () => void;
@@ -25,6 +27,8 @@ export function SplitHeaderActions({
   menuAriaLabel?: string;
   variant?: "primary" | "white";
   size?: "default" | "compact" | "sm";
+  menuPlacement?: "below" | "above";
+  menuOffsetLeft?: number;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -46,8 +50,17 @@ export function SplitHeaderActions({
   const dividerColor = variant === "white" ? "#E5E5E5" : "rgba(255,255,255,0.28)";
   const primaryPadding =
     size === "sm"
-      ? { paddingRight: 12, paddingLeft: 12, fontSize: 12 }
-      : { paddingRight: 18, paddingLeft: 18, fontSize: 14 };
+      ? { padding: "8px 12px", fontSize: 12 }
+      : size === "compact"
+        ? { padding: "9px 14px", fontSize: 13 }
+        : { padding: "12px 18px", fontSize: 14 };
+  const chevronPadding =
+    size === "sm"
+      ? { paddingLeft: 8, paddingRight: 8, minWidth: 32 }
+      : size === "compact"
+        ? { paddingLeft: 9, paddingRight: 9, minWidth: 36 }
+        : { paddingLeft: 11, paddingRight: 11, minWidth: 40 };
+  const chevronIconSize = size === "sm" ? 12 : size === "compact" ? 13 : 14;
 
   if (menuItems.length === 0) {
     return (
@@ -91,17 +104,15 @@ export function SplitHeaderActions({
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
           borderLeft: `1px solid ${dividerColor}`,
-          paddingLeft: size === "sm" ? 8 : 11,
-          paddingRight: size === "sm" ? 8 : 11,
-          minWidth: size === "sm" ? 32 : 40,
+          ...chevronPadding,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         <svg
-          width="14"
-          height="14"
+          width={chevronIconSize}
+          height={chevronIconSize}
           viewBox="0 0 24 24"
           fill="none"
           aria-hidden
@@ -116,8 +127,10 @@ export function SplitHeaderActions({
           className="split-header-menu"
           style={{
             position: "absolute",
-            top: "calc(100% + 10px)",
-            right: 0,
+            ...(menuPlacement === "above"
+              ? { bottom: "calc(100% + 10px)", top: "auto" }
+              : { top: "calc(100% + 10px)" }),
+            ...(menuOffsetLeft !== undefined ? { left: menuOffsetLeft, right: "auto" } : { right: 0 }),
             width: 248,
             background: "#FFFFFF",
             border: "1px solid #EFEFEF",

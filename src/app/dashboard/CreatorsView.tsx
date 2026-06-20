@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator, syncCampaignCreators } from "@/lib/db";
 import { ScriptsManager } from "./ScriptsManager";
@@ -18,6 +18,10 @@ import {
 import { UpgradeModal } from "./UpgradeModal";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorPayoutMethodFields } from "./CreatorPayoutMethodFields";
+import {
+  mergeCreatorProfileExtras,
+  saveCreatorProfileExtras,
+} from "@/lib/creator-profile-extras-storage";
 
 type CreatorStatus = "active" | "pending" | "contacted" | "declined";
 type CreatorsTab = "all" | "active" | "pending";
@@ -56,9 +60,9 @@ function mapDbCreator(c: Record<string, unknown>): ManagedCreator {
     niche: String(c.niche ?? ""),
     status: c.needs_review === false ? "active" : "pending",
     addedDate: typeof c.created_at === "string" ? c.created_at.split("T")[0] : "",
-    age: 0,
-    email: "",
-    location: "",
+    age: Number(c.age ?? 0) || 0,
+    email: typeof c.email === "string" ? c.email : "",
+    location: typeof c.location === "string" ? c.location : "",
     notes:
       typeof c.notes === "string"
         ? c.notes
@@ -490,8 +494,132 @@ function CreatorOutreachModal({ creator, onClose }: { creator: ManagedCreator; o
   );
 }
 
+function CreatorProfileStatIcon({ kind }: { kind: "followers" | "engagement" | "views" | "niche" | "location" | "age" }) {
+  const stroke = "#9A9A9A";
+  const common = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none" as const, "aria-hidden": true as const };
+  switch (kind) {
+    case "followers":
+      return (
+        <svg {...common}>
+          <path d="M16 11a4 4 0 10-8 0M12 13v8M8 21h8" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case "engagement":
+      return (
+        <svg {...common}>
+          <path d="M12 20s-7-4.5-7-10a4 4 0 017-3 4 4 0 017 3c0 5.5-7 10-7 10z" stroke={stroke} strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      );
+    case "views":
+      return (
+        <svg {...common}>
+          <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" stroke={stroke} strokeWidth="1.6" />
+          <circle cx="12" cy="12" r="3" stroke={stroke} strokeWidth="1.6" />
+        </svg>
+      );
+    case "niche":
+      return (
+        <svg {...common}>
+          <path d="M4 7h16M4 12h10M4 17h14" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+    case "location":
+      return (
+        <svg {...common}>
+          <path d="M12 21s6-5.2 6-10a6 6 0 10-12 0c0 4.8 6 10 6 10z" stroke={stroke} strokeWidth="1.6" />
+          <circle cx="12" cy="11" r="2" stroke={stroke} strokeWidth="1.6" />
+        </svg>
+      );
+    case "age":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" stroke={stroke} strokeWidth="1.6" />
+          <path d="M12 7v5l3 2" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
+  }
+}
+
+function CreatorProfileStatCard({
+  label,
+  value,
+  accent,
+  iconKind,
+  children,
+}: {
+  label: string;
+  value?: string;
+  accent: string;
+  iconKind: "followers" | "engagement" | "views" | "niche" | "location" | "age";
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: "linear-gradient(180deg, #FFFFFF 0%, #FAFAFA 100%)",
+        border: "1px solid #EFEFEF",
+        borderRadius: 14,
+        padding: "14px 14px 13px",
+        position: "relative",
+        overflow: "hidden",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+        minHeight: 88,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 3,
+          background: accent,
+        }}
+      />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 600,
+            color: "#9A9A9A",
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          {label}
+        </span>
+        <CreatorProfileStatIcon kind={iconKind} />
+      </div>
+      {children ?? (
+        <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+          {value}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const profileStatInputStyle: React.CSSProperties = {
+  width: "100%",
+  border: "1px solid #E8E8E8",
+  borderRadius: 8,
+  padding: "8px 10px",
+  fontSize: 15,
+  fontWeight: 600,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  background: "#FFFFFF",
+  letterSpacing: "-0.02em",
+  outline: "none",
+  boxSizing: "border-box",
+};
+
 function CreatorDetailModal({
   creator,
+  userId,
   onClose,
   onUpdate,
   onRemove,
@@ -499,6 +627,7 @@ function CreatorDetailModal({
   onGenerateOutreach,
 }: {
   creator: ManagedCreator;
+  userId?: string;
   onClose: () => void;
   onUpdate: (c: ManagedCreator) => void;
   onRemove: () => void;
@@ -507,74 +636,177 @@ function CreatorDetailModal({
 }) {
   const lang = useLang();
   const [localCreator, setLocalCreator] = useState(creator);
-  const [notesDraft, setNotesDraft] = useState(creator.notes);
-  const [savingNotes, setSavingNotes] = useState(false);
+  const [ageDraft, setAgeDraft] = useState(creator.age ? String(creator.age) : "");
+  const [locationDraft, setLocationDraft] = useState(creator.location || "");
+  const resolvedUserIdRef = useRef<string | undefined>(userId);
+  const ageDraftRef = useRef(ageDraft);
+  const locationDraftRef = useRef(locationDraft);
+  const localCreatorRef = useRef(localCreator);
+
+  useEffect(() => {
+    resolvedUserIdRef.current = userId;
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId || !supabase) return;
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) resolvedUserIdRef.current = user.id;
+    });
+  }, [userId]);
+
+  useEffect(() => {
+    ageDraftRef.current = ageDraft;
+  }, [ageDraft]);
+
+  useEffect(() => {
+    locationDraftRef.current = locationDraft;
+  }, [locationDraft]);
+
+  useEffect(() => {
+    localCreatorRef.current = localCreator;
+  }, [localCreator]);
 
   useEffect(() => {
     setLocalCreator(creator);
-    setNotesDraft(creator.notes);
-  }, [creator]);
+    setAgeDraft(creator.age ? String(creator.age) : "");
+    setLocationDraft(creator.location || "");
+  }, [creator.id]);
 
-  const avgViews = Math.floor(creator.followers * 0.08);
-  const notesDirty = notesDraft.trim() !== (creator.notes || "").trim();
+  const avgViews = Math.max(0, Math.floor(localCreator.followers * 0.08));
 
-  const saveNotes = async () => {
-    if (!supabase || !notesDirty) return;
-    setSavingNotes(true);
-    try {
-      const nextNotes = notesDraft.trim();
-      const { error } = await supabase.from("creators").update({ notes: nextNotes }).eq("id", creator.id);
-      if (error) {
-        console.error("Failed to save creator notes:", error);
-        return;
-      }
-      const updated = { ...localCreator, notes: nextNotes };
-      setLocalCreator(updated);
-      onUpdate(updated);
-    } finally {
-      setSavingNotes(false);
+  const flushProfileFields = useCallback(async () => {
+    let uid = resolvedUserIdRef.current ?? userId;
+    if (!uid && supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      uid = user?.id;
+      if (uid) resolvedUserIdRef.current = uid;
     }
+    if (!uid) return;
+
+    const parsedAge = parseInt(ageDraftRef.current, 10);
+    const nextAge = Number.isFinite(parsedAge) && parsedAge > 0 ? parsedAge : 0;
+    const nextLocation = locationDraftRef.current.trim();
+    const current = localCreatorRef.current;
+
+    if (nextAge === current.age && nextLocation === current.location) return;
+
+    const updated = { ...current, age: nextAge, location: nextLocation };
+    setLocalCreator(updated);
+    localCreatorRef.current = updated;
+    onUpdate(updated);
+    saveCreatorProfileExtras(uid, current.id, { age: nextAge, location: nextLocation });
+  }, [onUpdate, userId]);
+
+  const handleClose = () => {
+    void flushProfileFields();
+    onClose();
   };
 
-  const statCards = [
-    { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followers) },
-    { label: lang === "fr" ? "Engagement" : "Engagement", value: `${creator.engagement}%` },
-    { label: lang === "fr" ? "Vues moy." : "Avg Views", value: formatCount(avgViews) },
-    { label: lang === "fr" ? "Niche" : "Niche", value: creator.niche || "—" },
-    { label: lang === "fr" ? "Localisation" : "Location", value: creator.location || "—" },
-    { label: lang === "fr" ? "Âge" : "Age", value: creator.age ? String(creator.age) : "—" },
-  ];
-
   return (
-    <ModalShell onClose={onClose} maxWidth={600}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24, paddingRight: 32 }}>
-        <CreatorAvatar src={creator.avatarUrl} size={72} alt={creator.displayName} />
+    <ModalShell onClose={handleClose} maxWidth={640}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 22, paddingRight: 32 }}>
+        <CreatorAvatar src={localCreator.avatarUrl} size={72} alt={localCreator.displayName} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px", letterSpacing: "-0.03em", color: "#1A1A1A" }}>
-            {creator.displayName}
+            {localCreator.displayName}
           </h2>
-          <div style={{ fontSize: 14, color: "#0047FF", marginBottom: 10, fontWeight: 500 }}>@{creator.username}</div>
+          <div style={{ fontSize: 14, color: "#0047FF", marginBottom: 10, fontWeight: 500 }}>@{localCreator.username}</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, fontWeight: 500, background: "#F5F5F5", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize", color: "#1A1A1A" }}>
-              {creator.platform}
+            <span style={{ fontSize: 11, fontWeight: 500, background: "#F0F6FF", color: "#0047FF", padding: "4px 10px", borderRadius: 999, textTransform: "capitalize" }}>
+              {localCreator.platform}
             </span>
             <span style={{ ...statusBadgeStyle(), background: "#F5F5F5", padding: "4px 10px", borderRadius: 999 }}>
-              {statusLabel(creator.status, lang)}
+              {statusLabel(localCreator.status, lang)}
             </span>
+            {localCreator.niche && (
+              <span style={{ fontSize: 11, fontWeight: 500, background: "#ECFDF3", color: "#1FB567", padding: "4px 10px", borderRadius: 999 }}>
+                {localCreator.niche}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 20 }}>
-        {statCards.map((s) => (
-          <div key={s.label} style={{ background: "#FAFAFA", border: "1px solid #F0F0F0", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>{s.label}</div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+          {lang === "fr" ? "Performance" : "Performance"}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginBottom: 10 }}>
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Abonnés" : "Followers"}
+            value={formatCount(localCreator.followers)}
+            accent="#0047FF"
+            iconKind="followers"
+          />
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Engagement" : "Engagement"}
+            value={`${localCreator.engagement}%`}
+            accent="#FF3D8B"
+            iconKind="engagement"
+          />
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Vues moy." : "Avg Views"}
+            value={formatCount(avgViews)}
+            accent="#7C3AED"
+            iconKind="views"
+          />
+        </div>
       </div>
 
-      <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16, marginBottom: 16 }}>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 10 }}>
+          {lang === "fr" ? "Profil" : "Profile"}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Niche" : "Niche"}
+            value={localCreator.niche || "—"}
+            accent="#1FB567"
+            iconKind="niche"
+          />
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Localisation" : "Location"}
+            accent="#6366F1"
+            iconKind="location"
+          >
+            <input
+              type="text"
+              value={locationDraft}
+              onChange={(e) => setLocationDraft(e.target.value)}
+              onBlur={() => void flushProfileFields()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              placeholder={lang === "fr" ? "Paris, FR" : "Paris, FR"}
+              style={profileStatInputStyle}
+            />
+          </CreatorProfileStatCard>
+          <CreatorProfileStatCard
+            label={lang === "fr" ? "Âge" : "Age"}
+            accent="#F59E0B"
+            iconKind="age"
+          >
+            <input
+              type="number"
+              min={13}
+              max={99}
+              value={ageDraft}
+              onChange={(e) => setAgeDraft(e.target.value)}
+              onBlur={() => void flushProfileFields()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+              }}
+              placeholder={lang === "fr" ? "25" : "25"}
+              style={profileStatInputStyle}
+            />
+          </CreatorProfileStatCard>
+        </div>
+        <p style={{ fontSize: 11, color: "#9A9A9A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? "Localisation et âge modifiables — sauvegardés automatiquement." : "Location and age are editable — saved automatically."}
+        </p>
+      </div>
+
+      <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16, marginBottom: 24 }}>
         <CreatorPayoutMethodFields
           creator={localCreator}
           lang={lang}
@@ -586,38 +818,12 @@ function CreatorDetailModal({
         />
       </div>
 
-      <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16, marginBottom: 24 }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "Notes" : "Notes"}
-        </label>
-        <textarea
-          value={notesDraft}
-          onChange={(e) => setNotesDraft(e.target.value)}
-          rows={4}
-          placeholder={lang === "fr" ? "Notes internes sur ce créateur…" : "Internal notes about this creator…"}
-          style={{ ...inputStyle, lineHeight: 1.5, resize: "vertical", borderColor: "#EFEFEF" }}
-        />
-        {notesDirty && (
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button
-              type="button"
-              style={btnSecondary}
-              onClick={() => setNotesDraft(creator.notes)}
-              disabled={savingNotes}
-            >
-              {lang === "fr" ? "Annuler" : "Cancel"}
-            </button>
-            <button type="button" style={btnPrimary} onClick={() => void saveNotes()} disabled={savingNotes}>
-              {savingNotes ? (lang === "fr" ? "Enregistrement…" : "Saving…") : lang === "fr" ? "Enregistrer" : "Save notes"}
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 12, paddingTop: 16, borderTop: "1px solid #EFEFEF" }}>
+      <div style={{ display: "flex", justifyContent: "flex-start", marginTop: 12, paddingTop: 16, paddingBottom: 8, borderTop: "1px solid #EFEFEF" }}>
         <SplitHeaderActions
           variant="white"
           size="compact"
+          menuPlacement="above"
+          menuOffsetLeft={12}
           primaryLabel={lang === "fr" ? "Lancer une campagne →" : "Run campaign →"}
           onPrimaryClick={onRunCampaign}
           menuAriaLabel={lang === "fr" ? "Actions créateur" : "Creator actions"}
@@ -927,7 +1133,7 @@ export function CreatorsView({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const data = await getSavedCreators(user.id);
-      setCreators(data.map(mapDbCreator));
+      setCreators(data.map((row) => mergeCreatorProfileExtras(user.id, mapDbCreator(row as Record<string, unknown>))));
     };
     void load();
     const interval = setInterval(() => { void load(); }, 15000);
@@ -1185,7 +1391,7 @@ export function CreatorsView({
                     </div>
                     <button
                       type="button"
-                      className="hero-cta-shopify-light hero-cta-compact-sm"
+                      className="hero-cta-shopify-light hero-cta-compact"
                       style={{ width: "fit-content", alignSelf: "flex-start" }}
                       onClick={() => setDetailCreator(creator)}
                     >
@@ -1253,7 +1459,7 @@ export function CreatorsView({
                     <div style={{ fontSize: 12, color: "#7A7A7A" }}>{c.addedDate}</div>
                     <button
                       type="button"
-                      className="hero-cta-shopify-light hero-cta-compact-sm"
+                      className="hero-cta-shopify-light hero-cta-compact"
                       style={{ width: "fit-content", justifySelf: "start" }}
                       onClick={() => setDetailCreator(c)}
                     >
@@ -1316,6 +1522,7 @@ export function CreatorsView({
       {detailCreator && (
         <CreatorDetailModal
           creator={detailCreator}
+          userId={userId}
           onClose={() => setDetailCreator(null)}
           onUpdate={updateCreator}
           onRemove={() => void handleRemoveCreator(detailCreator.id, detailCreator.username)}

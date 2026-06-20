@@ -9,6 +9,7 @@ export const DASHBOARD_VIEWS = [
   "invitations",
   "analytics",
   "integrations",
+  "notes",
   "automation",
   "settings",
   "feedback",

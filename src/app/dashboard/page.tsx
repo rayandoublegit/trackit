@@ -18,7 +18,7 @@ import { AnalyticsView } from "./AnalyticsView";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
-import { SplitHeaderActions } from "./SplitHeaderActions";
+import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
@@ -40,6 +40,7 @@ import {
 } from "@/lib/plan-limits";
 import { LiveSalesFeed, PayoutsView } from "./PayoutsView";
 import { FeedbackView } from "./FeedbackView";
+import { NotesView } from "./NotesView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
 import {
@@ -793,7 +794,7 @@ function DashboardPageContent() {
         )}
         {view === "payouts" && user && (
           (canUseBasicFeatures || isCreator) ? (
-            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
+            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onConnectShopify={() => setView("integrations")} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
             <UpgradeGate feature="Payouts" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
@@ -818,6 +819,9 @@ function DashboardPageContent() {
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
           />
+        )}
+        {view === "notes" && user && (
+          <NotesView isMobile={isMobile} userId={user.id} />
         )}
         {view === "automation" && (
           canUseAutomationWorkflows(plan) ? (
@@ -2560,6 +2564,71 @@ function affiliateStatusLabel(status: string, lang: "en" | "fr"): string {
   return labels[status]?.[lang] ?? labels[status]?.en ?? status;
 }
 
+function AffiliateRowActions({
+  lang,
+  linkCopied,
+  codeCopied,
+  onCopyLink,
+  onCopyCode,
+  onRemove,
+}: {
+  lang: "en" | "fr";
+  linkCopied: boolean;
+  codeCopied: boolean;
+  onCopyLink: () => void;
+  onCopyCode: () => void;
+  onRemove: () => void;
+}) {
+  const menuItems: SplitMenuItem[] = [
+    {
+      label: codeCopied
+        ? lang === "fr"
+          ? "Code copié"
+          : "Code copied"
+        : lang === "fr"
+          ? "Copier le code"
+          : "Copy code",
+      onClick: onCopyCode,
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      ),
+    },
+    {
+      label: lang === "fr" ? "Supprimer" : "Remove",
+      onClick: onRemove,
+      danger: true,
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <SplitHeaderActions
+      variant="white"
+      size="sm"
+      primaryLabel={
+        linkCopied
+          ? lang === "fr"
+            ? "Lien copié"
+            : "Link copied"
+          : lang === "fr"
+            ? "Copier le lien"
+            : "Copy link"
+      }
+      onPrimaryClick={onCopyLink}
+      menuAriaLabel={lang === "fr" ? "Actions affilié" : "Affiliate actions"}
+      menuOffsetLeft={0}
+      menuItems={menuItems}
+    />
+  );
+}
+
 function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boolean }) {
   const lang = useLang();
   const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
@@ -2567,15 +2636,23 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
   const [panelOpen, setPanelOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<{ ref: string; kind: "link" | "code" } | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-
-  const activeAffiliateCount = affiliates.filter((a) => a.status === "Active").length;
-  const totalClicks = affiliates.reduce((sum, a) => sum + a.clicks, 0);
-  const totalConversions = affiliates.reduce((sum, a) => sum + a.conversions, 0);
-  const conversionRate = totalClicks > 0 ? `${((totalConversions / totalClicks) * 100).toFixed(1)}%` : "0%";
+  const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setAffiliates(loadAffiliates(userId));
     setAffiliatesLoaded(true);
+  }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCreators = async () => {
+      const data = await getSavedCreators(userId);
+      if (!cancelled) setCreatorAvatarMap(buildCreatorAvatarMap(data));
+    };
+    void loadCreators();
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -2625,37 +2702,19 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
         <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
       } />
         <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginTop: 12, marginBottom: 24 }}>
-          {[
-            { label: lang === "fr" ? "Affiliés actifs" : "Active affiliates", value: String(activeAffiliateCount) },
-            { label: lang === "fr" ? "Clics totaux" : "Total clicks", value: totalClicks.toLocaleString(lang === "fr" ? "fr-FR" : "en-US") },
-            { label: lang === "fr" ? "Conversions totales" : "Total conversions", value: String(totalConversions) },
-            { label: lang === "fr" ? "Taux de conversion" : "Conversion rate", value: conversionRate },
-          ].map((kpi) => (
-            <div key={kpi.label} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 14, padding: 20 }}>
-              <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>{kpi.label}</div>
-              <div style={{ fontSize: 26, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{kpi.value}</div>
-            </div>
-          ))}
-        </div>
-
         {actionMessage && (
           <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
             {actionMessage}
           </div>
         )}
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ marginTop: isMobile ? 8 : 24, background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16 }}>
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA", minWidth: isMobile ? 700 : undefined }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "14px 20px", borderBottom: "1px solid #EFEFEF", background: "#FAFAFA", minWidth: isMobile ? 520 : undefined }}>
             {[
               lang === "fr" ? "Créateur" : "Creator",
               lang === "fr" ? "Lien de parrainage" : "Referral link",
               lang === "fr" ? "Réduction" : "Discount",
-              lang === "fr" ? "Clics" : "Clicks",
-              lang === "fr" ? "Conv." : "Conv.",
-              lang === "fr" ? "Ventes" : "Sales",
-              lang === "fr" ? "Commission" : "Commission",
               lang === "fr" ? "Statut" : "Status",
               lang === "fr" ? "Action" : "Action",
             ].map((h) => (
@@ -2670,9 +2729,13 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
             const linkCopied = copiedRow?.ref === a.ref && copiedRow.kind === "link";
             const codeCopied = copiedRow?.ref === a.ref && copiedRow.kind === "code";
             return (
-              <div key={a.ref} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.7fr 0.9fr 1fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>
+              <div key={a.ref} style={{ display: "grid", gridTemplateColumns: "1.4fr 1.3fr 1fr 0.9fr 1.4fr", gap: 12, padding: "16px 20px", borderBottom: i < affiliates.length - 1 ? "1px solid #F5F5F5" : "none", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} />
+                  <CreatorAvatar
+                    src={avatarUrlForCreatorHandle(a.creator, creatorAvatarMap)}
+                    size={32}
+                    alt={a.creator}
+                  />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.creator}</div>
                     <div style={{ fontSize: 11, color: "#9A9A9A" }}>{a.platform}</div>
@@ -2680,41 +2743,16 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
                 </div>
                 <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>/r/{a.ref}</div>
                 <div style={{ fontSize: 12, color: "#1A1A1A", fontFamily: "monospace", fontWeight: 600 }}>{a.code}</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A" }}>{a.clicks.toLocaleString()}</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A" }}>{a.conversions}</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.sales.toLocaleString()}</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A" }}>${a.commission}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    type="button"
-                    title={linkCopied ? (lang === "fr" ? "Copié" : "Copied") : (lang === "fr" ? "Copier le lien" : "Copy link")}
-                    style={iconBtn}
-                    onClick={() => void copyAffiliateText(affiliateReferralLink(a.ref), a.ref, "link")}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1" stroke={linkCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7" strokeLinecap="round"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    title={codeCopied ? (lang === "fr" ? "Copié" : "Copied") : (lang === "fr" ? "Copier le code" : "Copy code")}
-                    style={iconBtn}
-                    onClick={() => void copyAffiliateText(a.code, a.ref, "code")}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke={codeCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke={codeCopied ? "#1FB567" : "#7A7A7A"} strokeWidth="1.7"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    title={lang === "fr" ? "Supprimer l'affilié" : "Remove affiliate"}
-                    style={{ ...iconBtn, color: "#C62828" }}
-                    onClick={() => handleRemoveAffiliate(a)}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M4 7h16" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
-                      <path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
-                      <path d="M7 7l1 12a1 1 0 001 1h6a1 1 0 001-1l1-12" stroke="#C62828" strokeWidth="1.7" strokeLinejoin="round" />
-                      <path d="M10 11v5M14 11v5" stroke="#C62828" strokeWidth="1.7" strokeLinecap="round" />
-                    </svg>
-                  </button>
+                <div style={{ marginLeft: -14 }}>
+                  <AffiliateRowActions
+                    lang={lang}
+                    linkCopied={linkCopied}
+                    codeCopied={codeCopied}
+                    onCopyLink={() => void copyAffiliateText(affiliateReferralLink(a.ref), a.ref, "link")}
+                    onCopyCode={() => void copyAffiliateText(a.code, a.ref, "code")}
+                    onRemove={() => handleRemoveAffiliate(a)}
+                  />
                 </div>
               </div>
             );
@@ -3094,6 +3132,7 @@ function buildSidebarNavEntries(
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
+    { id: "notes", label: lang === "fr" ? "Notes" : "Notes", view: "notes", section: "tools", iconKey: "notes", keywords: ["goals", "objectives", "aspirations", "journal", "workspace"] },
     { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {
       id: "notifications",
@@ -3150,6 +3189,8 @@ function renderSidebarNavIcon(iconKey: string) {
       return <AnalyticsIcon />;
     case "integrations":
       return <IntegrationIcon />;
+    case "notes":
+      return <NotesIcon />;
     case "automation":
       return <AutomationIcon />;
     case "notifications":
@@ -3190,6 +3231,7 @@ function PayoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" f
 function InviteIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 7l10 6 10-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function AnalyticsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>; }
 function IntegrationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
+function NotesIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function AutomationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function NotificationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function HelpIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M9.5 9a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>; }

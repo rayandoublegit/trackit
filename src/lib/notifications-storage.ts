@@ -14,7 +14,27 @@ export type NotificationItem = {
 
 const STORAGE_KEY = "trackit_notifications";
 const RESET_VERSION_KEY = "trackit_notifications_reset_v2";
+const WELCOME_MIGRATION_KEY = "trackit_notifications_welcome_migrated_v3";
 const WELCOME_SENT_PREFIX = "trackit_welcome_sent_";
+
+function welcomeNotificationBody(lang: "en" | "fr") {
+  return lang === "fr"
+    ? "Vous êtes sur Trackit. Découvrez des créateurs, lancez des campagnes et pilotez tous vos partenariats — tout depuis un seul espace."
+    : "You're on Trackit. Discover creators, launch campaigns, and run every partnership — all from one dashboard.";
+}
+
+function isWelcomeNotification(notification: NotificationItem) {
+  return (
+    notification.kind === "system" &&
+    (notification.title === "Bienvenue sur Trackit" || notification.title === "Welcome to Trackit")
+  );
+}
+
+function welcomeNotificationLang(notification: NotificationItem): "en" | "fr" {
+  if (notification.title === "Bienvenue sur Trackit") return "fr";
+  if (notification.title === "Welcome to Trackit") return "en";
+  return notification.body.toLowerCase().includes("vous") ? "fr" : "en";
+}
 
 function welcomeSentKey(userId: string) {
   return `${WELCOME_SENT_PREFIX}${userId}`;
@@ -36,6 +56,24 @@ function newNotificationId() {
   return `n_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function notificationFingerprint(
+  input: Pick<NotificationItem, "kind" | "title" | "body">
+) {
+  return `${input.kind}\0${input.title}\0${input.body}`;
+}
+
+function dedupeNotifications(items: NotificationItem[]): NotificationItem[] {
+  const seen = new Set<string>();
+  const deduped: NotificationItem[] = [];
+  for (const item of items) {
+    const fp = notificationFingerprint(item);
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    deduped.push(item);
+  }
+  return deduped;
+}
+
 function formatNotificationTime(lang: "en" | "fr") {
   return lang === "fr" ? "À l'instant" : "Just now";
 }
@@ -48,12 +86,36 @@ function dispatchNotificationsUpdated() {
   );
 }
 
+/** Updates legacy welcome notification copy for existing users (localStorage). */
+export function migrateWelcomeNotifications() {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(WELCOME_MIGRATION_KEY)) return;
+
+  const items = loadNotifications();
+  let changed = false;
+  const next = items.map((notification) => {
+    if (!isWelcomeNotification(notification)) return notification;
+    const targetBody = welcomeNotificationBody(welcomeNotificationLang(notification));
+    if (notification.body === targetBody) return notification;
+    changed = true;
+    return { ...notification, body: targetBody };
+  });
+
+  if (changed) saveNotifications(next);
+  localStorage.setItem(WELCOME_MIGRATION_KEY, "1");
+  if (changed) dispatchNotificationsUpdated();
+}
+
 /** Clears legacy mock notification data once per browser. */
 export function ensureNotificationsReset() {
   if (typeof window === "undefined") return;
-  if (localStorage.getItem(RESET_VERSION_KEY)) return;
+  if (localStorage.getItem(RESET_VERSION_KEY)) {
+    migrateWelcomeNotifications();
+    return;
+  }
   localStorage.removeItem(STORAGE_KEY);
   localStorage.setItem(RESET_VERSION_KEY, "1");
+  migrateWelcomeNotifications();
 }
 
 export function loadNotifications(): NotificationItem[] {
@@ -63,13 +125,14 @@ export function loadNotifications(): NotificationItem[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
+    const filtered = parsed.filter(
       (n): n is NotificationItem =>
         typeof n === "object" &&
         n !== null &&
         typeof (n as NotificationItem).id === "string" &&
         typeof (n as NotificationItem).title === "string"
     );
+    return dedupeNotifications(filtered);
   } catch {
     return [];
   }
@@ -77,7 +140,7 @@ export function loadNotifications(): NotificationItem[] {
 
 export function saveNotifications(items: NotificationItem[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupeNotifications(items)));
 }
 
 export function resetNotifications(): NotificationItem[] {
@@ -95,6 +158,13 @@ export function getStoredUnreadCount(): number {
 export function pushNotification(
   input: Omit<NotificationItem, "id" | "read" | "time"> & { time?: string }
 ): NotificationItem {
+  const fp = notificationFingerprint(input);
+  const existing = loadNotifications();
+  const duplicate = existing.find((n) => notificationFingerprint(n) === fp);
+  if (duplicate) {
+    return duplicate;
+  }
+
   playNotificationSound();
 
   const item: NotificationItem = {
@@ -103,7 +173,7 @@ export function pushNotification(
     read: false,
     time: input.time ?? "Just now",
   };
-  const next = [item, ...loadNotifications()];
+  const next = [item, ...existing];
   saveNotifications(next);
   dispatchNotificationsUpdated();
   return item;
@@ -205,10 +275,7 @@ export function notifyWelcomeIfNeeded(userId: string, lang: "en" | "fr"): boolea
   pushNotification({
     kind: "system",
     title: lang === "fr" ? "Bienvenue sur Trackit" : "Welcome to Trackit",
-    body:
-      lang === "fr"
-        ? "Vous venez d'entrer dans Trackit. Connectez Shopify et vous êtes prêt à démarrer."
-        : "You just entered Trackit. Connect Shopify and you're ready to go.",
+    body: welcomeNotificationBody(lang),
     time: formatNotificationTime(lang),
   });
   return true;
