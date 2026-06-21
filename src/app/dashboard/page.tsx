@@ -2189,6 +2189,8 @@ function IntegrationsView({
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
+  const [shopifyConnectOpen, setShopifyConnectOpen] = useState(false);
+  const shopifyConnectRef = useRef<HTMLDivElement>(null);
 
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
@@ -2223,6 +2225,17 @@ function IntegrationsView({
       window.history.replaceState({}, "", "/dashboard");
     }
   }, [lang]);
+
+  useEffect(() => {
+    if (!shopifyConnectOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (shopifyConnectRef.current && !shopifyConnectRef.current.contains(e.target as Node)) {
+        setShopifyConnectOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [shopifyConnectOpen]);
 
   const handleShopifyConnect = () => {
     if (!canUseShopify(plan)) {
@@ -2276,6 +2289,7 @@ function IntegrationsView({
         setConnectedShop(payload.shop || domain);
         setChangingStore(false);
         setShopToken("");
+        setShopifyConnectOpen(false);
         setConnecting(false);
         notifyShopifyConnected(lang, payload.shopName || domain);
       } catch {
@@ -2362,6 +2376,7 @@ function IntegrationsView({
                               setChangingStore(true);
                               setShopDomain("");
                               setShopError("");
+                              setShopifyConnectOpen(true);
                             }}
                             style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
                           >
@@ -2380,6 +2395,7 @@ function IntegrationsView({
                               setChangingStore(true);
                               setShopDomain(activeShop?.replace(/\.myshopify\.com$/, "") || "");
                               setShopError("");
+                              setShopifyConnectOpen(true);
                             }}
                             style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
                           >
@@ -2403,36 +2419,75 @@ function IntegrationsView({
                       </>
                     ) : (
                       <>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <input
-                            value={shopDomain}
-                            onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
-                            placeholder="votreboutique.myshopify.com"
-                            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
-                            onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
-                          />
-                          <input
-                            type="password"
-                            value={shopToken}
-                            onChange={(e) => { setShopToken(e.target.value); setShopError(""); }}
-                            placeholder={lang === "fr" ? "Token d'API Admin (shpat_...)" : "Admin API token (shpat_...)"}
-                            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
-                            onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
-                          />
-                          <button type="button" onClick={handleShopifyConnect} disabled={connecting} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0, alignSelf: "flex-start", opacity: connecting ? 0.6 : 1 }}>
-                            {connecting ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter →" : "Connect →")}
+                        <div ref={shopifyConnectRef} style={{ position: "relative", alignSelf: "flex-start" }}>
+                          <button
+                            type="button"
+                            onClick={() => setShopifyConnectOpen((open) => !open)}
+                            aria-expanded={shopifyConnectOpen}
+                            className="hero-cta-shopify hero-cta-compact-sm"
+                            style={{ flexShrink: 0, opacity: connecting ? 0.6 : 1 }}
+                          >
+                            {lang === "fr" ? "Connecter →" : "Connect →"}
                           </button>
+                          {shopifyConnectOpen && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: "calc(100% + 8px)",
+                                left: 0,
+                                width: 300,
+                                maxWidth: "calc(100vw - 48px)",
+                                background: "#FFFFFF",
+                                border: "1px solid #EFEFEF",
+                                borderRadius: 14,
+                                boxShadow: "0 16px 48px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 71, 255, 0.06)",
+                                padding: 16,
+                                zIndex: 30,
+                              }}
+                            >
+                              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+                                {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
+                              </label>
+                              <input
+                                value={shopDomain}
+                                onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
+                                placeholder="votreboutique.myshopify.com"
+                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+                                onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
+                              />
+                              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+                                {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
+                              </label>
+                              <input
+                                type="password"
+                                value={shopToken}
+                                onChange={(e) => { setShopToken(e.target.value); setShopError(""); }}
+                                placeholder={lang === "fr" ? "Token d'API Admin (shpat_...)" : "Admin API token (shpat_...)"}
+                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12 }}
+                                onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
+                              />
+                              <button
+                                type="button"
+                                onClick={handleShopifyConnect}
+                                disabled={connecting}
+                                className="hero-cta-shopify hero-cta-compact-sm"
+                                style={{ width: "100%", justifyContent: "center", opacity: connecting ? 0.6 : 1 }}
+                              >
+                                {connecting ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter →" : "Connect →")}
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {changingStore && (
                           <button
                             type="button"
-                            onClick={() => { setChangingStore(false); setShopDomain(""); setShopError(""); }}
+                            onClick={() => { setChangingStore(false); setShopDomain(""); setShopError(""); setShopifyConnectOpen(false); }}
                             style={{ background: "none", border: "none", fontSize: 12, color: "#7A7A7A", cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "inherit" }}
                           >
                             {lang === "fr" ? "Annuler" : "Cancel"}
                           </button>
                         )}
-                        <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                        <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 8, letterSpacing: "-0.01em", lineHeight: 1.45 }}>
                           {lang === "fr" ? "Creez une app personnalisee dans Shopify Admin (Parametres -> Applications et canaux de vente -> Developper des apps), activez l'API Admin avec la permission read_orders, puis collez le domaine .myshopify.com et le token d'acces ci-dessus." : "Create a custom app in Shopify Admin (Settings -> Apps and sales channels -> Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
                         </div>
                         {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
