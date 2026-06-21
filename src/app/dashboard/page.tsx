@@ -3330,12 +3330,12 @@ function buildSidebarNavEntries(
   counts: { activeCampaigns: number; savedCreators: number }
 ): SidebarNavEntry[] {
   return [
+    { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
     { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
     { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
     { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
     { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
-    { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
     { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand", "upload"] },

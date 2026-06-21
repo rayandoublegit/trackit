@@ -86,7 +86,7 @@ export default function TrackitLanding() {
   nav_login: lang === "fr" ? "Se connecter" : "Log in",
   nav_cta: lang === "fr" ? "Ouvrir thentrack.it" : "Open thentrack.it",
   hero_badge: lang === "fr" ? "Marketing d'influence, automatisé" : "Influencer marketing, automated",
-  hero_v2_soon: lang === "fr" ? "Trackit v2 arrive bientôt.." : "Trackit v2 comes soon..",
+  hero_v2_soon: lang === "fr" ? "Trackit v2 est sorti!!" : "Trackit v2 is out!!",
   hero_v2_learn_more: lang === "fr" ? "En savoir plus" : "Learn more",
   hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",

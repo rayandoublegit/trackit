@@ -5,6 +5,7 @@ export type SaleAttributionRow = {
   commission_amount?: number | null;
   campaign_id?: string | null;
   creator_id?: string | null;
+  discount_code_used?: string | null;
   created_at?: string | null;
 };
 

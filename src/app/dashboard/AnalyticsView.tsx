@@ -9,6 +9,7 @@ import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
 import { campaignStatusLabel } from "@/lib/campaign-status";
 import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { SplitHeaderActions } from "./SplitHeaderActions";
+import { CreatorAvatar } from "./CreatorAvatar";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -127,27 +128,36 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       id?: string;
       full_name?: string;
       handle?: string;
-      username?: string;
+      avatar_url?: string;
       platform?: string;
       periodRevenue?: number;
       periodCommission?: number;
       salesCount?: number;
       commissionPaid?: number;
+      commissionPaidPeriod?: number;
       roi?: number;
+      status?: string;
     };
     const source: CreatorPerfRow[] = analyticsData?.creatorsPerformance || analyticsData?.creators || [];
     const rows = source.map((c, i) => {
       const revenue = Number(c.periodRevenue ?? 0);
-      const commission = Number(c.periodCommission ?? 0);
-      const paid = Number(c.commissionPaid ?? 0);
-      const roi = Number(c.roi ?? (commission > 0 ? revenue / commission : 0));
+      const periodCommission = Number(c.periodCommission ?? 0);
+      const paidPeriod = Number(c.commissionPaidPeriod ?? 0);
+      const paidAllTime = Number(c.commissionPaid ?? 0);
+      const commission = paidPeriod > 0 ? paidPeriod : periodCommission > 0 ? periodCommission : paidAllTime;
+      const roi = Number(c.roi ?? (periodCommission > 0 ? revenue / periodCommission : 0));
+      const handle = (c.handle || "").replace(/^@/, "");
       return {
+        id: c.id || `creator-${i}`,
         rank: i + 1,
-        creator: c.full_name || c.handle || c.username || "—",
+        creator: c.full_name || (handle ? `@${handle}` : "—"),
+        handle,
+        avatar_url: c.avatar_url || null,
         platform: c.platform || "—",
         sales: revenue,
-        commission: paid > 0 ? paid : commission,
-        status: revenue > 0 ? "Active" : "Inactive",
+        salesCount: Number(c.salesCount ?? 0),
+        commission,
+        status: c.status || (revenue > 0 ? "Active" : "Inactive"),
         roi,
       };
     });
@@ -459,12 +469,29 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                       {lang === "fr" ? "Aucun créateur avec des ventes pour le moment." : "No creators with sales yet."}
                     </td>
                   </tr>
-                ) : sortedCreators.map((r: { rank: number; creator: string; platform: string; sales: number; commission: number; roi: number; status: string }, i: number) => (
-                  <tr key={`${r.rank}-${r.creator}`} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
+                ) : sortedCreators.map((r, i) => (
+                  <tr key={r.id} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500, color: "#1A1A1A", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>{r.creator}</td>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <CreatorAvatar src={r.avatar_url} size={36} alt={r.creator} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.creator}</div>
+                          {r.handle && r.creator !== `@${r.handle}` ? (
+                            <div style={{ fontSize: 12, color: "#0047FF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{r.handle}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </td>
                     <td style={{ padding: "12px 8px", color: "#7A7A7A", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.platform}</td>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.sales, lang)}</td>
+                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>
+                      <div style={{ fontWeight: 500, color: "#1A1A1A" }}>{formatCurrency(r.sales, lang)}</div>
+                      {r.salesCount > 0 ? (
+                        <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 2 }}>
+                          {r.salesCount} {lang === "fr" ? (r.salesCount > 1 ? "ventes" : "vente") : r.salesCount > 1 ? "sales" : "sale"}
+                        </div>
+                      ) : null}
+                    </td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
                     <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>{hasAdvancedAnalytics ? `${r.roi.toFixed(1)}x` : "—"}</td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}><StatusBadge lang={lang} status={r.status} /></td>
@@ -761,17 +788,36 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
+  const normalized = status.toLowerCase();
   const label =
-    status === "Active"
+    normalized === "active"
       ? lang === "fr"
         ? "Actif"
         : "Active"
-      : status === "Inactive"
+      : normalized === "inactive"
         ? lang === "fr"
           ? "Inactif"
           : "Inactive"
-        : status;
-  return <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{label}</span>;
+        : normalized === "pending"
+          ? lang === "fr"
+            ? "En attente"
+            : "Pending"
+          : normalized === "paid"
+            ? lang === "fr"
+              ? "Payé"
+              : "Paid"
+            : status;
+  const color =
+    normalized === "active" || normalized === "paid"
+      ? "#2E7D32"
+      : normalized === "pending"
+        ? "#B8860B"
+        : "#7A7A7A";
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, color, textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+      {label}
+    </span>
+  );
 }
 
 function CampaignStatus({ lang, status }: { lang: "en" | "fr"; status: string }) {

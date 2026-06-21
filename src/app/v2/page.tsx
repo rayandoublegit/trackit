@@ -29,6 +29,19 @@ function BellIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+function GetStartedCta({ lang }: { lang: "en" | "fr" }) {
+  return (
+    <>
+      <span className="hero-cta-label hero-cta-label--default">
+        {lang === "fr" ? "Commencer gratuitement" : "Get started for free"}
+      </span>
+      <span className="hero-cta-label hero-cta-label--hover">
+        {lang === "fr" ? "Gratuit !!" : "For Free!!"}
+      </span>
+    </>
+  );
+}
+
 function RemindMeLabel({ lang }: { lang: "en" | "fr" }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -312,19 +325,20 @@ export default function V2Page() {
           </h1>
           <p className="hero-sub" style={{ marginBottom: 20 }}>
             {lang === "fr"
-              ? "Trackit v2 arrive bientôt. Une expérience plus rapide, plus intelligente et plus fluide pour découvrir des créateurs, suivre vos ventes et payer vos commissions — au même endroit."
-              : "Trackit v2 is coming soon. A faster, smarter, smoother experience to find creators, track sales, and pay commissions — all in one place."}
+              ? "Trackit v2 est enfin là. Une expérience plus rapide, plus intelligente et plus fluide pour découvrir des créateurs, suivre vos ventes et payer vos commissions — au même endroit."
+              : "Trackit v2 is finally here. A faster, smarter, smoother experience to find creators, track sales, and pay commissions — all in one place."}
           </p>
-          <button
-            type="button"
+          <Link
+            href="/auth"
             className="hero-cta"
-            onClick={() => setPanelOpen(true)}
-            style={{ marginTop: 8, marginBottom: 12, border: "none", cursor: "pointer" }}
+            style={{ marginTop: 8, marginBottom: 12, border: "none", cursor: "pointer", textDecoration: "none" }}
           >
-            <RemindMeLabel lang={lang} />
-          </button>
+            <GetStartedCta lang={lang} />
+          </Link>
           <p style={{ fontSize: 13, color: SUBTEXT, margin: 0, letterSpacing: "-0.01em" }}>
-            {lang === "fr" ? "Recevez un rappel quand la v2 sort." : "Get a reminder when v2 launches."}
+            {lang === "fr"
+              ? "Commencez à trouver des créateurs, suivre vos ventes et payer vos commissions — sans carte bancaire."
+              : "Start finding creators, tracking sales, and paying commissions — no credit card required."}
           </p>
         </div>
       </section>
@@ -415,20 +429,17 @@ export default function V2Page() {
 
           <div className="affiliation-earnings-card">
             <div className="affiliation-earnings-label">
-              {lang === "fr" ? "Soyez parmi les premiers" : "Be among the first"}
+              {lang === "fr" ? "Trackit v2 est enfin là" : "Trackit v2 is finally here"}
             </div>
-            <div className="affiliation-earnings-amount">v2</div>
+            <div className="affiliation-earnings-amount">{lang === "fr" ? "Sorti!!" : "Out!!"}</div>
             <div className="affiliation-earnings-sub">
-              {lang === "fr" ? "accès anticipé · notifications en priorité" : "early access · priority updates"}
+              {lang === "fr"
+                ? "disponible maintenant · gratuit pour commencer"
+                : "available now · free to get started"}
             </div>
-            <button
-              type="button"
-              className="affiliation-earnings-cta"
-              onClick={() => setPanelOpen(true)}
-              style={{ border: "none", cursor: "pointer" }}
-            >
-              <RemindMeLabel lang={lang} />
-            </button>
+            <Link href="/auth" className="affiliation-earnings-cta">
+              {lang === "fr" ? "Commencer gratuitement →" : "Get started for free →"}
+            </Link>
           </div>
         </div>
       </section>
@@ -532,7 +543,7 @@ export default function V2Page() {
             letterSpacing: "-0.04em",
           }}
         >
-          {lang === "fr" ? "Prêt pour la suite ?" : "Ready for what's next?"}
+          {lang === "fr" ? "Prêt à commencer ?" : "Ready to get started?"}
         </h2>
         <p
           style={{
@@ -545,17 +556,16 @@ export default function V2Page() {
           }}
         >
           {lang === "fr"
-            ? "Inscrivez-vous à la liste d'attente v2 et soyez notifié en premier quand l'accès anticipé ouvre."
-            : "Join the v2 waitlist and get notified first when early access opens."}
+            ? "Commencez gratuitement avec Trackit v2 et profitez d'une expérience repensée pour gérer vos créateurs, ventes et paiements."
+            : "Get started for free with Trackit v2 and enjoy a rebuilt experience to manage creators, sales, and payouts."}
         </p>
-        <button
-          type="button"
+        <Link
+          href="/auth"
           className="hero-cta"
-          onClick={() => setPanelOpen(true)}
-          style={{ marginTop: 0, border: "none", cursor: "pointer" }}
+          style={{ marginTop: 0, border: "none", cursor: "pointer", textDecoration: "none", display: "inline-flex" }}
         >
-          <RemindMeLabel lang={lang} />
-        </button>
+          <GetStartedCta lang={lang} />
+        </Link>
       </section>
 
       {panelOpen && (

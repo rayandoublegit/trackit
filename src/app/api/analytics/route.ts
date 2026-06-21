@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
   const { data: salesData } = await supabaseAdmin
     .from("sales")
-    .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id")
+    .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id, status")
     .eq("user_id", userId);
 
   const salesRows = (salesData || []) as SaleAttributionRow[];
@@ -102,14 +102,18 @@ export async function GET(request: Request) {
   const previousPaidCommissions = sumPaidPayouts(prevStart, prevEnd);
   const totalCommissions = currentPaidCommissions;
 
-  const paidByCreator = new Map<string, number>();
+  const paidByCreatorPeriod = new Map<string, number>();
+  const paidByCreatorAllTime = new Map<string, number>();
   for (const p of payoutsData || []) {
     if (String(p.status || "").toLowerCase() !== "paid") continue;
-    const dateStr = p.paid_at || p.created_at;
-    if (!isWithinPeriod(dateStr, start, end)) continue;
     const creatorId = String(p.creator_id || "");
     if (!creatorId) continue;
-    paidByCreator.set(creatorId, (paidByCreator.get(creatorId) || 0) + (Number(p.amount) || 0));
+    const amount = Number(p.amount) || 0;
+    paidByCreatorAllTime.set(creatorId, (paidByCreatorAllTime.get(creatorId) || 0) + amount);
+    const dateStr = p.paid_at || p.created_at;
+    if (isWithinPeriod(dateStr, start, end)) {
+      paidByCreatorPeriod.set(creatorId, (paidByCreatorPeriod.get(creatorId) || 0) + amount);
+    }
   }
 
   const { data: outreachData } = await supabaseAdmin
@@ -213,41 +217,134 @@ export async function GET(request: Request) {
 
   const { data: allCreators } = await supabaseAdmin
     .from("creators")
-    .select("id, full_name, handle, username, platform, total_sales, total_earned, balance")
+    .select("id, full_name, handle, platform, avatar_url, total_sales, total_earned, balance, discount_code")
     .eq("user_id", userId);
 
+  type CreatorInfo = {
+    id: string;
+    full_name?: string;
+    handle?: string;
+    platform?: string;
+    avatar_url?: string;
+    balance?: number;
+    total_sales?: number;
+  };
+
   const creatorInfoMap = new Map(
-    (allCreators || []).map((c) => [
-      String(c.id),
-      c as { id: string; full_name?: string; handle?: string; username?: string; platform?: string },
-    ]),
+    (allCreators || []).map((c) => [String(c.id), c as CreatorInfo]),
   );
 
-  const creatorPerfMap = new Map<string, { revenue: number; commission: number; count: number }>();
-  for (const sale of periodSales) {
-    const creatorId = String(sale.creator_id || "");
-    if (!creatorId) continue;
-    const agg = creatorPerfMap.get(creatorId) || { revenue: 0, commission: 0, count: 0 };
-    agg.revenue += Number(sale.order_amount) || 0;
-    agg.commission += Number(sale.commission_amount) || 0;
-    agg.count += 1;
-    creatorPerfMap.set(creatorId, agg);
+  const handleToDiscountCode = (handle: string) => {
+    const base =
+      handle.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "CREATOR";
+    return base;
+  };
+
+  const codeToCreatorId = new Map<string, string>();
+  for (const c of allCreators || []) {
+    const id = String(c.id);
+    const code = String(c.discount_code || "").trim().toUpperCase();
+    if (code) codeToCreatorId.set(code, id);
+    const handle = String(c.handle || "").trim();
+    if (handle) codeToCreatorId.set(handleToDiscountCode(handle), id);
   }
+
+  const { data: campaignCodeLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("creator_id, campaign_id, discount_code")
+    .eq("user_id", userId);
+
+  const creatorsByCampaign = new Map<string, string[]>();
+  for (const link of campaignCodeLinks || []) {
+    const code = String(link.discount_code || "").trim().toUpperCase();
+    if (code) codeToCreatorId.set(code, String(link.creator_id));
+    const campaignId = String(link.campaign_id || "");
+    if (!campaignId) continue;
+    const list = creatorsByCampaign.get(campaignId) || [];
+    list.push(String(link.creator_id));
+    creatorsByCampaign.set(campaignId, list);
+  }
+
+  const resolveCreatorId = (sale: SaleAttributionRow): string => {
+    const direct = String(sale.creator_id || "");
+    if (direct) return direct;
+    const code = String(sale.discount_code_used || "").trim().toUpperCase();
+    if (code && code !== "MANUAL") {
+      const fromCode = codeToCreatorId.get(code);
+      if (fromCode) return fromCode;
+    }
+    const campaignId = String(sale.campaign_id || "");
+    if (campaignId) {
+      const onCampaign = creatorsByCampaign.get(campaignId) || [];
+      if (onCampaign.length === 1) return onCampaign[0];
+    }
+    return "";
+  };
+
+  const buildCreatorPerfMap = (sales: SaleAttributionRow[]) => {
+    const map = new Map<string, { revenue: number; commission: number; count: number }>();
+    for (const sale of sales) {
+      const creatorId = resolveCreatorId(sale);
+      if (!creatorId) continue;
+      const agg = map.get(creatorId) || { revenue: 0, commission: 0, count: 0 };
+      agg.revenue += Number(sale.order_amount) || 0;
+      agg.commission += Number(sale.commission_amount) || 0;
+      agg.count += 1;
+      map.set(creatorId, agg);
+    }
+    return map;
+  };
+
+  let creatorPerfMap = buildCreatorPerfMap(periodSales);
+  if (creatorPerfMap.size === 0 && salesRows.length > 0) {
+    creatorPerfMap = buildCreatorPerfMap(salesRows);
+  }
+
+  const missingCreatorIds = [...creatorPerfMap.keys()].filter((id) => !creatorInfoMap.has(id));
+  if (missingCreatorIds.length > 0) {
+    const { data: extraCreators } = await supabaseAdmin
+      .from("creators")
+      .select("id, full_name, handle, platform, avatar_url, total_sales, balance")
+      .in("id", missingCreatorIds);
+    for (const c of extraCreators || []) {
+      creatorInfoMap.set(String(c.id), c as CreatorInfo);
+    }
+  }
+
+  const deriveCreatorStatus = (
+    creator: CreatorInfo | undefined,
+    agg: { revenue: number; commission: number; count: number },
+    paidAllTime: number,
+  ): string => {
+    if (agg.count > 0 || agg.revenue > 0) {
+      const balance = Number(creator?.balance) || 0;
+      if (balance > 0) return "Pending";
+      if (paidAllTime > 0) return "Paid";
+      return "Active";
+    }
+    if (paidAllTime > 0) return "Paid";
+    if (Number(creator?.total_sales) > 0) return "Inactive";
+    return "Inactive";
+  };
 
   const creatorsPerformance = Array.from(creatorPerfMap.entries())
     .map(([id, agg]) => {
       const c = creatorInfoMap.get(id);
-      const paid = paidByCreator.get(id) || 0;
+      const paidAllTime = paidByCreatorAllTime.get(id) || 0;
+      const paidPeriod = paidByCreatorPeriod.get(id) || 0;
       return {
         id,
         full_name: c?.full_name,
         handle: c?.handle,
-        username: c?.username,
+        avatar_url: c?.avatar_url,
         platform: c?.platform || "—",
         periodRevenue: agg.revenue,
         periodCommission: agg.commission,
         salesCount: agg.count,
-        commissionPaid: paid,
+        commissionPaid: paidAllTime,
+        commissionPaidPeriod: paidPeriod,
+        balance: Number(c?.balance) || 0,
+        status: deriveCreatorStatus(c, agg, paidAllTime),
         roi: agg.commission > 0 ? agg.revenue / agg.commission : 0,
       };
     })
@@ -264,7 +361,7 @@ export async function GET(request: Request) {
 
   const platformSalesMap = new Map<string, { revenue: number; commission: number; count: number }>();
   for (const sale of periodSales) {
-    const creatorId = String(sale.creator_id || "");
+    const creatorId = resolveCreatorId(sale);
     const platform = String(creatorInfoMap.get(creatorId)?.platform || "Other").trim() || "Other";
     const agg = platformSalesMap.get(platform) || { revenue: 0, commission: 0, count: 0 };
     agg.revenue += Number(sale.order_amount) || 0;
