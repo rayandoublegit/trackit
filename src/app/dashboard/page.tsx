@@ -2186,6 +2186,8 @@ function IntegrationsView({
   const [shopToken, setShopToken] = useState("");
   const [shopError, setShopError] = useState("");
   const [connecting, setConnecting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState("");
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
@@ -2352,6 +2354,42 @@ function IntegrationsView({
                           {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
                         </div>
                         <div style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
+                        <div style={{ marginBottom: 10 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (syncing || !user?.id) return;
+                              setSyncing(true);
+                              setSyncMsg("");
+                              void (async () => {
+                                try {
+                                  const res = await fetch("/api/shopify/sync", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ userId: user?.id || "" }),
+                                  });
+                                  const payload = (await res.json().catch(() => ({}))) as { synced?: number; created?: number; error?: string };
+                                  if (!res.ok) {
+                                    setSyncMsg(payload.error || (lang === "fr" ? "La synchronisation a echoue" : "Sync failed"));
+                                  } else {
+                                    const n = payload.created ?? payload.synced ?? 0;
+                                    setSyncMsg(lang === "fr" ? `${n} vente(s) synchronisee(s)` : `${n} sale(s) synced`);
+                                  }
+                                } catch {
+                                  setSyncMsg(lang === "fr" ? "Erreur reseau" : "Network error");
+                                } finally {
+                                  setSyncing(false);
+                                }
+                              })();
+                            }}
+                            disabled={syncing}
+                            className="hero-cta-shopify hero-cta-compact-sm"
+                            style={{ opacity: syncing ? 0.6 : 1 }}
+                          >
+                            {syncing ? (lang === "fr" ? "Synchronisation..." : "Syncing...") : (lang === "fr" ? "Synchroniser les ventes" : "Sync sales")}
+                          </button>
+                          {syncMsg && <div style={{ fontSize: 12, color: "#15803d", marginTop: 6 }}>{syncMsg}</div>}
+                        </div>
                         {isMultiStore && connectedStores.length > 0 && (
                           <div style={{ marginBottom: 10 }}>
                             <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 6 }}>
