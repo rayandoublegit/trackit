@@ -2308,6 +2308,13 @@ function IntegrationsView({
         setShopifyConnectOpen(false);
         setConnecting(false);
         notifyShopifyConnected(lang, payload.shopName || domain);
+        // Active la sync auto par defaut des la connexion (enregistre le webhook).
+        setSyncEnabled(true);
+        void fetch("/api/shopify/sync-toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user?.id || "", enabled: true }),
+        }).catch(() => { /* silencieux : l'utilisateur peut toggler a la main */ });
       } catch {
         setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
         setConnecting(false);
