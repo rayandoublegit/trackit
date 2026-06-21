@@ -7,6 +7,7 @@ export const DASHBOARD_VIEWS = [
   "outreach",
   "payouts",
   "invitations",
+  "scripts",
   "analytics",
   "integrations",
   "notes",

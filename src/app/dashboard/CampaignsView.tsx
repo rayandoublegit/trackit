@@ -16,6 +16,13 @@ import { notifyCreatorPaid } from "@/lib/notifications-storage";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, formatTrendLabel, isWithinPeriod, type PeriodTrend } from "@/lib/analytics-periods";
 import { formatCurrency } from "@/lib/useCurrency";
+import {
+  compactNumberToInput,
+  formatCompactCurrency,
+  formatCompactNumber,
+  getCompactNumberInputError,
+  parseCompactNumber,
+} from "@/lib/compact-number";
 import { UpgradeModal } from "./UpgradeModal";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 
@@ -1244,6 +1251,142 @@ function Kpi({ title, value, sub, subColor }: { title: string; value: string; su
   );
 }
 
+function CompactKpi({
+  lang,
+  title,
+  sub,
+  subColor,
+  value,
+  currency,
+  onCommit,
+}: {
+  lang: "en" | "fr";
+  title: string;
+  sub: string;
+  subColor?: string;
+  value: number;
+  currency?: boolean;
+  onCommit: (next: number) => void;
+}) {
+  const [draft, setDraft] = useState(() => compactNumberToInput(value));
+  const [error, setError] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(compactNumberToInput(value));
+      setError(null);
+    }
+  }, [value, focused]);
+
+  useEffect(() => {
+    if (focused) inputRef.current?.focus();
+  }, [focused]);
+
+  const commitDraft = () => {
+    const trimmed = draft.trim();
+    const inputError = getCompactNumberInputError(trimmed, lang);
+    if (inputError) {
+      setError(inputError);
+      setDraft(compactNumberToInput(value));
+      return;
+    }
+
+    const parsed = parseCompactNumber(trimmed);
+    if (!Number.isFinite(parsed)) {
+      setError(
+        lang === "fr"
+          ? "Format invalide. Exemples : 12K, 11M, 500."
+          : "Invalid format. Examples: 12K, 11M, 500.",
+      );
+      setDraft(compactNumberToInput(value));
+      return;
+    }
+
+    setError(null);
+    onCommit(parsed);
+    setDraft(compactNumberToInput(parsed));
+  };
+
+  const displayValue = currency ? formatCompactCurrency(value, lang) : formatCompactNumber(value);
+
+  return (
+    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
+      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
+      {focused ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setError(getCompactNumberInputError(e.target.value, lang));
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            commitDraft();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.currentTarget.blur();
+            }
+          }}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            fontSize: 28,
+            fontWeight: 600,
+            color: error ? "#DC2626" : "#1A1A1A",
+            letterSpacing: "-0.04em",
+            marginBottom: error ? 4 : 6,
+            border: "none",
+            outline: "none",
+            padding: 0,
+            background: "transparent",
+            fontFamily: "inherit",
+          }}
+          aria-invalid={Boolean(error)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setDraft(compactNumberToInput(value));
+            setError(null);
+            setFocused(true);
+          }}
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: "left",
+            fontSize: 28,
+            fontWeight: 600,
+            color: "#1A1A1A",
+            letterSpacing: "-0.04em",
+            marginBottom: 6,
+            border: "none",
+            outline: "none",
+            padding: 0,
+            background: "transparent",
+            fontFamily: "inherit",
+            cursor: "text",
+          }}
+        >
+          {displayValue}
+        </button>
+      )}
+      {error && (
+        <div style={{ fontSize: 11, color: "#DC2626", marginBottom: 6, lineHeight: 1.4, letterSpacing: "-0.01em" }}>
+          {error}
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: subColor ?? "#7A7A7A", letterSpacing: "-0.01em" }}>{sub}</div>
+    </div>
+  );
+}
+
 function campaignBadgeStyle(status: CampaignStatus): React.CSSProperties {
   if (status === "Paused") {
     return {
@@ -1408,8 +1551,21 @@ function CampaignDetail({ lang, campaign, userId, plan, onBack, onUpdate, onStat
     </div>
     <div style={{ padding: isMobile ? 16 : "40px 40px 40px" }}>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <Kpi title={lang === "fr" ? "Créateurs" : "Creators"} value={String(campaign.creators ?? 0)} sub={lang === "fr" ? "dans cette campagne" : "in this campaign"} />
-        <Kpi title={lang === "fr" ? "Ventes" : "Sales"} value={formatCurrency(campaign.sales ?? 0, lang)} sub={lang === "fr" ? "revenus attribués" : "attributed revenue"} />
+        <CompactKpi
+          lang={lang}
+          title={lang === "fr" ? "Créateurs" : "Creators"}
+          sub={lang === "fr" ? "dans cette campagne" : "in this campaign"}
+          value={campaign.creators ?? 0}
+          onCommit={(next) => onUpdate({ ...campaign, creators: next })}
+        />
+        <CompactKpi
+          lang={lang}
+          title={lang === "fr" ? "Ventes" : "Sales"}
+          sub={lang === "fr" ? "revenus attribués" : "attributed revenue"}
+          value={campaign.sales ?? 0}
+          currency
+          onCommit={(next) => onUpdate({ ...campaign, sales: next })}
+        />
         <Kpi title={lang === "fr" ? "Commission" : "Commission"} value={formatCurrency(campaign.commission ?? 0, lang)} sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"} />
         <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? formatCurrency(Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)), lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "ventes générées" : "sales driven"} />
       </div>
@@ -1817,7 +1973,6 @@ function PayoutsTab({
       return;
     }
 
-    notifyCreatorPaid(lang, creator.full_name || creator.handle || "creator", amount);
     const method = creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban";
     setTimeout(() => {
       setConfirmPay({
@@ -1831,7 +1986,7 @@ function PayoutsTab({
 
   const confirmManualPayout = async () => {
     if (!confirmPay) return;
-    const { creatorId, amount, method } = confirmPay;
+    const { creatorId, amount, method, name } = confirmPay;
     setConfirmPay(null);
     setPayingId(creatorId);
 
@@ -1853,6 +2008,7 @@ function PayoutsTab({
       });
       const data = await res.json();
       if (data.ok) {
+        notifyCreatorPaid(lang, name, amount);
         setRows((prev) => {
           const withoutPending = prev.filter((row) => row.creatorId !== creatorId || row.kind !== "pending");
           const paidRow = prev.find((row) => row.creatorId === creatorId && row.kind === "pending");

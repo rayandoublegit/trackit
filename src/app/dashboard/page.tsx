@@ -15,6 +15,8 @@ import { CreatorSettings } from "./CreatorSettings";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
+import { CreatorScripts } from "./CreatorScripts";
+import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { CreatorsView } from "./CreatorsView";
@@ -41,6 +43,7 @@ import {
 import { LiveSalesFeed, PayoutsView } from "./PayoutsView";
 import { FeedbackView } from "./FeedbackView";
 import { NotesView } from "./NotesView";
+import { HomeOverviewView } from "./HomeOverviewView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
 import {
@@ -66,7 +69,7 @@ import {
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["analytics", "payouts", "settings"];
+const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "notes", "payouts", "settings"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -104,7 +107,7 @@ function DashboardPageContent() {
   const [viewReady, setViewReady] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
 
-  // Créateur : analytics, payouts et paramètres uniquement.
+  // Créateur : accueil, outils essentiels et paramètres uniquement.
   useEffect(() => {
     if (isCreator && !CREATOR_ALLOWED_VIEWS.includes(view)) {
       setView("analytics");
@@ -739,7 +742,19 @@ function DashboardPageContent() {
       </aside>
 
       <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FFFFFF" }}>
-        {view === "dashboard" && <HomeView isMobile={isMobile} fullName={profile?.full_name ?? null} username={profile?.username ?? null} gettingStarted={gettingStarted} user={user} onNavigateToDiscovery={navigateToDiscovery} />}
+        {view === "dashboard" && (
+          <HomeOverviewView
+            isMobile={isMobile}
+            isCreator={isCreator}
+            fullName={profile?.full_name ?? null}
+            username={profile?.username ?? null}
+            businessName={profile?.business_name ?? null}
+            userId={user?.id}
+            gettingStarted={gettingStarted}
+            activeCampaigns={sidebarCounts.activeCampaigns}
+            onNavigate={goToSidebarItem}
+          />
+        )}
         {view === "discovery" && (
           <DiscoveryView
             isMobile={isMobile}
@@ -801,6 +816,15 @@ function DashboardPageContent() {
         )}
         {view === "invitations" && user && (
           <InvitationsView userId={user.id} isMobile={isMobile} />
+        )}
+        {view === "scripts" && user && (
+          isCreator ? (
+            <CreatorScripts userId={user.id} isMobile={isMobile} />
+          ) : (
+            <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
+              <ScriptsManager brandId={user.id} isMobile={isMobile} standalone />
+            </div>
+          )
         )}
         {view === "analytics" && user && (
           (canUseBasicFeatures || isCreator) ? (
@@ -974,70 +998,6 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
         )}
       </div>
     </div>
-  );
-}
-
-function HomeView({ fullName, username, isMobile, gettingStarted, user, onNavigateToDiscovery }: { fullName: string | null; username: string | null; isMobile?: boolean; gettingStarted: { shopify: boolean; shopifyStore: string | null; creators: boolean; outreach: boolean; sales: boolean; creatorsCount: number; outreachCount: number; salesCount: number }; user?: User | null; onNavigateToDiscovery: () => void }) {
-  const lang = useLang();
-  const [shopifyModalOpen, setShopifyModalOpen] = useState(false);
-  const displayName = fullName?.split(" ")[0] || (username ? `@${username}` : "");
-  const welcomeGreeting = lang === "fr" ? "Bon retour" : "Welcome back";
-  const checklistSteps = [
-    { label: lang === "fr" ? "Trouver vos premiers créateurs" : "Find your first creators", completed: gettingStarted.creators },
-    { label: lang === "fr" ? "Envoyer votre premier message" : "Send first outreach", completed: gettingStarted.outreach },
-    { label: lang === "fr" ? "Suivre votre première vente" : "Track first sale", completed: gettingStarted.sales },
-  ];
-  return (
-    <>
-      <PageHeader isMobile={isMobile} title={`${welcomeGreeting}${displayName ? ", " + displayName : ""}.`} subtitle={lang === "fr" ? "Trouvez, contactez et suivez vos créateurs au même endroit." : "Find, reach and track your creators in one place."} />
-      <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
-          {[
-            { label: lang === "fr" ? "Créateurs sauvegardés" : "Saved creators", value: gettingStarted.creatorsCount },
-            { label: lang === "fr" ? "Messages envoyés" : "Messages sent", value: gettingStarted.outreachCount },
-            { label: lang === "fr" ? "Ventes suivies" : "Sales tracked", value: gettingStarted.salesCount },
-          ].map((stat, i) => (
-            <div key={i} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-              <div style={{ fontSize: 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", marginBottom: 4 }}>{stat.value}</div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: "#0047FF", borderRadius: 18, padding: isMobile ? 28 : 40, marginBottom: 24, display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: 20 }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: "#FFFFFF", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Trouvez vos prochains créateurs" : "Find your next creators"}</h2>
-            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.85)", letterSpacing: "-0.01em", margin: 0, maxWidth: 460 }}>{lang === "fr" ? "Parcourez des milliers de créateurs sélectionnés et lancez votre première campagne en quelques minutes." : "Browse thousands of curated creators and launch your first campaign in minutes."}</p>
-          </div>
-          <button type="button" onClick={onNavigateToDiscovery} style={{ background: "#FFFFFF", color: "#0047FF", border: "none", borderRadius: 12, padding: "12px 24px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-            {lang === "fr" ? "Trouver des créateurs" : "Find creators"}
-          </button>
-        </div>
-
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 16 }}>{lang === "fr" ? "Pour commencer" : "Getting started"}</h3>
-          {checklistSteps.map((step, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: i < checklistSteps.length - 1 ? "1px solid #F5F5F5" : "none" }}>
-              <div style={{
-                width: 24, height: 24, borderRadius: "50%",
-                background: step.completed ? "#0047FF" : "transparent",
-                border: step.completed ? "none" : "2px solid #DCDCDC",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                flexShrink: 0,
-                transition: "all 0.2s ease"
-              }}>
-                {step.completed && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>}
-              </div>
-              <span style={{ fontSize: 14, color: step.completed ? "#9A9A9A" : "#1A1A1A", textDecoration: step.completed ? "line-through" : "none", opacity: step.completed ? 0.6 : 1, transition: "all 0.2s ease" }}>
-                {step.label}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-      {shopifyModalOpen && (
-        <ShopifyConnectModal lang={lang} userId={user?.id} onClose={() => setShopifyModalOpen(false)} />
-      )}
-    </>
   );
 }
 
@@ -3370,14 +3330,15 @@ function buildSidebarNavEntries(
   counts: { activeCampaigns: number; savedCreators: number }
 ): SidebarNavEntry[] {
   return [
-    { id: "dashboard", label: lang === "fr" ? "Tableau de bord" : "Dashboard", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "stats"] },
     { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
     { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
     { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
     { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
+    { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
     { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
     { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
+    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand", "upload"] },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
     { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
     { id: "notes", label: lang === "fr" ? "Notes" : "Notes", view: "notes", section: "tools", iconKey: "notes", keywords: ["goals", "objectives", "aspirations", "journal", "workspace"] },
@@ -3433,6 +3394,8 @@ function renderSidebarNavIcon(iconKey: string) {
       return <PayoutIcon />;
     case "invite":
       return <InviteIcon />;
+    case "scripts":
+      return <ScriptsIcon />;
     case "analytics":
       return <AnalyticsIcon />;
     case "integrations":
@@ -3477,6 +3440,7 @@ function CampaignIcon() { return <svg width="18" height="18" viewBox="0 0 24 24"
 function MessageIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function PayoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>; }
 function InviteIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 7l10 6 10-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
+function ScriptsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function AnalyticsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>; }
 function IntegrationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function NotesIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }

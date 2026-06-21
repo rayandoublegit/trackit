@@ -30,6 +30,10 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const [saved, setSaved] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeOnboarded, setStripeOnboarded] = useState(false);
+  const [stripeLoading, setStripeLoading] = useState(true);
+  const [stripeStarting, setStripeStarting] = useState(false);
 
   const disconnectAccount = async () => {
     if (!supabase) return;
@@ -57,6 +61,56 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   }, [userId]);
 
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
+
+  useEffect(() => {
+    if (!userId) { setStripeLoading(false); return; }
+    let cancelled = false;
+    const loadStripe = async () => {
+      try {
+        const res = await fetch(`/api/creator/stripe-connect?userId=${encodeURIComponent(userId)}`);
+        const data = (await res.json().catch(() => ({}))) as { connected?: boolean; onboarded?: boolean };
+        if (!cancelled) {
+          setStripeConnected(!!data.connected);
+          setStripeOnboarded(!!data.onboarded);
+        }
+      } catch {
+        /* silencieux : on laisse l'etat par defaut (non connecte) */
+      } finally {
+        if (!cancelled) setStripeLoading(false);
+      }
+    };
+    void loadStripe();
+    // Nettoie le parametre de retour Stripe dans l'URL apres onboarding.
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("payout_connected") === "1" || params.get("payout_refresh") === "1") {
+        window.history.replaceState({}, "", "/dashboard?view=settings");
+      }
+    }
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const startStripeOnboarding = async () => {
+    if (!userId || stripeStarting) return;
+    setStripeStarting(true);
+    try {
+      const res = await fetch("/api/creator/stripe-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setError(data.error || (lang === "fr" ? "Impossible de demarrer la connexion Stripe." : "Could not start Stripe connection."));
+      setStripeStarting(false);
+    } catch {
+      setError(lang === "fr" ? "Erreur reseau." : "Network error.");
+      setStripeStarting(false);
+    }
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -164,6 +218,44 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
               </button>
             ))}
           </div>
+        </div>
+
+        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Versements" : "Payouts"}</div>
+          <p style={{ fontSize: 13, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: "0 0 18px", lineHeight: 1.5 }}>
+            {lang === "fr"
+              ? "Connectez votre compte Stripe pour recevoir vos paiements automatiquement, en toute securite."
+              : "Connect your Stripe account to receive your payments automatically and securely."}
+          </p>
+
+          {stripeLoading ? (
+            <div style={{ fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
+          ) : stripeOnboarded ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 10, background: "rgba(26,127,55,0.08)" }}>
+              <span style={{ fontSize: 15, color: "#1A7F37", fontWeight: 700 }}>&#10003;</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "#1A7F37" }}>{lang === "fr" ? "Compte Stripe connecte" : "Stripe account connected"}</div>
+                <div style={{ fontSize: 12, color: "rgba(26,127,55,0.85)" }}>{lang === "fr" ? "Vous etes pret a recevoir vos versements." : "You're ready to receive payouts."}</div>
+              </div>
+            </div>
+          ) : stripeConnected ? (
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 10, background: "rgba(180,120,0,0.08)", marginBottom: 14 }}>
+                <span style={{ fontSize: 15, color: "#B47800", fontWeight: 700 }}>&#9888;</span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#946000" }}>{lang === "fr" ? "Configuration incomplete" : "Setup incomplete"}</div>
+                  <div style={{ fontSize: 12, color: "rgba(148,96,0,0.85)" }}>{lang === "fr" ? "Terminez votre inscription Stripe pour activer les versements." : "Finish your Stripe setup to enable payouts."}</div>
+                </div>
+              </div>
+              <button type="button" onClick={() => void startStripeOnboarding()} disabled={stripeStarting} style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: stripeStarting ? "default" : "pointer", letterSpacing: "-0.01em", opacity: stripeStarting ? 0.7 : 1 }}>
+                {stripeStarting ? (lang === "fr" ? "Redirection..." : "Redirecting...") : (lang === "fr" ? "Terminer la configuration" : "Finish setup")}
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => void startStripeOnboarding()} disabled={stripeStarting} style={{ padding: "12px 20px", borderRadius: 10, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: stripeStarting ? "default" : "pointer", letterSpacing: "-0.01em", opacity: stripeStarting ? 0.7 : 1 }}>
+              {stripeStarting ? (lang === "fr" ? "Redirection..." : "Redirecting...") : (lang === "fr" ? "Connecter mon compte Stripe" : "Connect my Stripe account")}
+            </button>
+          )}
         </div>
 
         {error && (

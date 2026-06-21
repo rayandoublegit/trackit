@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { generateDiscountCode } from "@/lib/generate-discount-code";
 import { deleteCreatorById, getSavedCreators, getCampaigns, saveCreator, syncCampaignCreators } from "@/lib/db";
-import { ScriptsManager } from "./ScriptsManager";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
@@ -1472,7 +1471,6 @@ export function CreatorsView({
           )}
         </div>
 
-        <ScriptsManager brandId={userId} isMobile={isMobile} />
       </div>
 
       {importOpen && <ImportCsvModal lang={lang} onClose={() => setImportOpen(false)} />}

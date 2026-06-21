@@ -1,23 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
+import { useCreatorStats } from "@/lib/useCreatorStats";
 
 const BLUE = "#0047FF";
-
-type CreatorStats = {
-  linked: boolean;
-  brandName?: string | null;
-  discountCode?: string | null;
-  commissionRate?: number | null;
-  totalSales: number;
-  totalCommissions: number;
-  balance: number;
-  totalEarned?: number;
-  salesCount: number;
-  sales: { orderAmount: number; commissionAmount: number; date: string; discountCode: string | null }[];
-};
 
 function StatCard({ label, value, hint, accent }: { label: string; value: string; hint?: string; accent?: boolean }) {
   return (
@@ -41,28 +28,8 @@ function StepCard({ n, title, text }: { n: number; title: string; text: string }
 
 export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
-  const [stats, setStats] = useState<CreatorStats | null>(null);
-  const [firstName, setFirstName] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      if (!userId) { setLoading(false); return; }
-      try {
-        const res = await fetch(`/api/creator/stats?userId=${userId}`);
-        const data = await res.json();
-        if (!cancelled && data?.ok) {
-          setStats(data);
-          if (data.creatorName) setFirstName(String(data.creatorName).split(" ")[0]);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, [userId]);
+  const { stats, loading } = useCreatorStats(userId);
+  const firstName = stats?.creatorName?.replace(/^@/, "").split(" ")[0] ?? "";
 
   if (loading) {
     return (
@@ -139,8 +106,8 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s, i) => (
-                    <tr key={i} style={{ borderBottom: i < sales.length - 1 ? "1px solid #F5F5F5" : "none" }}>
+                  {sales.map((s) => (
+                    <tr key={s.id || `${s.date}-${s.orderAmount}`} style={{ borderBottom: "1px solid #F5F5F5" }}>
                       <td style={{ padding: "14px 22px", color: "#1A1A1A" }}>{fmtDate(s.date)}</td>
                       <td style={{ padding: "14px 22px", textAlign: "right", color: "#1A1A1A" }}>{formatCurrency(s.orderAmount, lang)}</td>
                       <td style={{ padding: "14px 22px", textAlign: "right", color: "#0047FF", fontWeight: 600 }}>{formatCurrency(s.commissionAmount, lang)}</td>

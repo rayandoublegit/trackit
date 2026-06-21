@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export type PayoutMethodType = "paypal" | "revolut" | "iban";
@@ -10,6 +10,10 @@ export type CreatorPayoutFields = {
   paypal_link?: string | null;
   revolut_link?: string | null;
   iban?: string | null;
+};
+
+export type CreatorPayoutMethodFieldsHandle = {
+  flushSave: () => Promise<CreatorPayoutFields>;
 };
 
 const payoutPanelInputStyle: React.CSSProperties = {
@@ -72,27 +76,81 @@ const PAYOUT_METHOD_OPTIONS: { id: PayoutMethodType; label: string }[] = [
   { id: "iban", label: "IBAN" },
 ];
 
-export function creatorHasPayoutDetails(c: { paypal_link?: string | null; revolut_link?: string | null; iban?: string | null }) {
-  return Boolean(c.paypal_link || c.revolut_link || c.iban);
+function stripPaypalUsername(raw: string): string {
+  let v = raw.trim();
+  if (!v) return "";
+  v = v.replace(/^https?:\/\//i, "");
+  v = v.replace(/^www\./i, "");
+  v = v.replace(/^paypal\.me\//i, "");
+  v = v.replace(/\/.*$/, "");
+  return v;
 }
 
-export function CreatorPayoutMethodFields({
-  creator,
-  lang,
-  onUpdate,
-}: {
-  creator: CreatorPayoutFields;
-  lang: "en" | "fr";
-  onUpdate: (next: CreatorPayoutFields) => void;
-}) {
+function stripRevolutUsername(raw: string): string {
+  let v = raw.trim();
+  if (!v) return "";
+  v = v.replace(/^https?:\/\//i, "");
+  v = v.replace(/^www\./i, "");
+  v = v.replace(/^revolut\.me\//i, "");
+  v = v.replace(/\/.*$/, "");
+  return v;
+}
+
+function normalizePayoutFieldValue(method: PayoutMethodType, raw: string): string {
+  if (method === "paypal") return stripPaypalUsername(raw);
+  if (method === "revolut") return stripRevolutUsername(raw);
+  return raw.trim();
+}
+
+function displayPayoutFieldValue(method: PayoutMethodType, stored: string): string {
+  if (method === "paypal") return stripPaypalUsername(stored);
+  if (method === "revolut") return stripRevolutUsername(stored);
+  return stored;
+}
+
+const PAYOUT_FIELD_PREFIX: Partial<Record<PayoutMethodType, string>> = {
+  paypal: "paypal.me/",
+  revolut: "revolut.me/",
+};
+
+export function creatorHasPayoutDetails(c: { paypal_link?: string | null; revolut_link?: string | null; iban?: string | null }) {
+  return Boolean(
+    String(c.paypal_link || "").trim() ||
+      String(c.revolut_link || "").trim() ||
+      String(c.iban || "").trim(),
+  );
+}
+
+export const CreatorPayoutMethodFields = forwardRef<
+  CreatorPayoutMethodFieldsHandle,
+  {
+    creator: CreatorPayoutFields;
+    lang: "en" | "fr";
+    onUpdate: (next: CreatorPayoutFields) => void;
+    onDraftChange?: (next: CreatorPayoutFields) => void;
+  }
+>(function CreatorPayoutMethodFields({ creator, lang, onUpdate, onDraftChange }, ref) {
   const [method, setMethod] = useState<PayoutMethodType>(() => defaultPayoutMethodType(creator));
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+
+  const fieldConfig: Record<PayoutMethodType, { key: "paypal_link" | "revolut_link" | "iban"; placeholder: string; label: string }> = {
+    paypal: { key: "paypal_link", placeholder: "username", label: "PayPal" },
+    revolut: { key: "revolut_link", placeholder: "username", label: "Revolut" },
+    iban: { key: "iban", placeholder: "FR76 1234 5678 9012 3456 7890 123", label: "IBAN" },
+  };
+  const active = fieldConfig[method];
+  const prefix = PAYOUT_FIELD_PREFIX[method];
 
   useEffect(() => {
     setMethod(defaultPayoutMethodType(creator));
     setOpen(false);
   }, [creator.id, creator.paypal_link, creator.revolut_link, creator.iban]);
+
+  useEffect(() => {
+    setInputValue(displayPayoutFieldValue(method, String(creator[active.key] || "")));
+  }, [creator, method, active.key]);
 
   useEffect(() => {
     if (!open) return;
@@ -103,21 +161,32 @@ export function CreatorPayoutMethodFields({
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
 
+  const buildCreatorWithValue = (raw: string): CreatorPayoutFields => {
+    const normalized = normalizePayoutFieldValue(method, raw);
+    return { ...creator, [active.key]: normalized || null };
+  };
+
+  const persistField = async (raw: string) => {
+    const next = buildCreatorWithValue(raw);
+    const normalized = String(next[active.key] || "");
+    const previous = String(creator[active.key] || "");
+    if (supabase && normalized !== previous) {
+      await supabase.from("creators").update({ [active.key]: normalized }).eq("id", creator.id);
+    }
+    onUpdate(next);
+    return next;
+  };
+
+  const flushSave = async () => persistField(inputValue);
+
+  useImperativeHandle(ref, () => ({ flushSave }), [creator, method, inputValue, active.key]);
+
+  const handleInputChange = (raw: string) => {
+    setInputValue(raw);
+    onDraftChange?.(buildCreatorWithValue(raw));
+  };
+
   const current = PAYOUT_METHOD_OPTIONS.find((m) => m.id === method) ?? PAYOUT_METHOD_OPTIONS[0];
-
-  const fieldConfig: Record<PayoutMethodType, { key: "paypal_link" | "revolut_link" | "iban"; placeholder: string; label: string }> = {
-    paypal: { key: "paypal_link", placeholder: "paypal.me/username", label: "PayPal" },
-    revolut: { key: "revolut_link", placeholder: "revolut.me/username", label: "Revolut" },
-    iban: { key: "iban", placeholder: "FR76 1234 5678 9012 3456 7890 123", label: "IBAN" },
-  };
-  const active = fieldConfig[method];
-  const activeValue = String(creator[active.key] || "");
-
-  const saveField = async (value: string) => {
-    if (!supabase) return;
-    await supabase.from("creators").update({ [active.key]: value }).eq("id", creator.id);
-    onUpdate({ ...creator, [active.key]: value });
-  };
 
   return (
     <div ref={rootRef}>
@@ -200,18 +269,62 @@ export function CreatorPayoutMethodFields({
       </div>
       <label>
         <span style={{ ...payoutPanelFieldLabelStyle, marginBottom: 6 }}>{active.label}</span>
-        <input
-          key={`${creator.id}-${method}`}
-          type="text"
-          defaultValue={activeValue}
-          placeholder={active.placeholder}
-          onBlur={(e) => void saveField(e.target.value)}
-          style={payoutPanelInputStyle}
-        />
+        {prefix ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "stretch",
+              border: "1px solid #EFEFEF",
+              borderRadius: 10,
+              background: "#FFFFFF",
+              overflow: "hidden",
+            }}
+          >
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "12px 0 12px 14px",
+                fontSize: 14,
+                color: "#7A7A7A",
+                letterSpacing: "-0.02em",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+                userSelect: "none",
+              }}
+            >
+              {prefix}
+            </span>
+            <input
+              type="text"
+              value={inputValue}
+              placeholder={active.placeholder}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onBlur={() => void flushSave()}
+              style={{
+                ...payoutPanelInputStyle,
+                border: "none",
+                borderRadius: 0,
+                paddingLeft: 0,
+                flex: 1,
+                minWidth: 0,
+              }}
+            />
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={inputValue}
+            placeholder={active.placeholder}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onBlur={() => void flushSave()}
+            style={payoutPanelInputStyle}
+          />
+        )}
       </label>
       <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "Sauvegarde automatique en quittant le champ" : "Auto-saves when you leave the field"}
       </p>
     </div>
   );
-}
+});

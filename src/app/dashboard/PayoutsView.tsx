@@ -26,7 +26,7 @@ import {
   loadDismissedSaleIds,
 } from "@/lib/live-sales-feed-storage";
 import { CreatorAvatar } from "./CreatorAvatar";
-import { CreatorPayoutMethodFields, creatorHasPayoutDetails } from "./CreatorPayoutMethodFields";
+import { CreatorPayoutMethodFields, creatorHasPayoutDetails, type CreatorPayoutMethodFieldsHandle } from "./CreatorPayoutMethodFields";
 
 type SalePlatform = "tiktok" | "instagram" | "youtube";
 
@@ -632,7 +632,25 @@ function creatorHasPaymentMethod(c: {
   revolut_link?: string | null;
   iban?: string | null;
 }) {
-  return Boolean(c.paypal_link || c.revolut_link || c.iban);
+  return creatorHasPayoutDetails(c);
+}
+
+function paypalUsername(raw: string) {
+  return String(raw || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/^paypal\.me\//i, "")
+    .replace(/\/.*$/, "");
+}
+
+function revolutUsername(raw: string) {
+  return String(raw || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/^revolut\.me\//i, "")
+    .replace(/\/.*$/, "");
 }
 
 function paymentMethodLabel(c: {
@@ -640,9 +658,9 @@ function paymentMethodLabel(c: {
   revolut_link?: string | null;
   iban?: string | null;
 }, lang: "en" | "fr") {
-  if (c.paypal_link) return "PayPal";
-  if (c.revolut_link) return "Revolut";
-  if (c.iban) return lang === "fr" ? "Virement" : "Bank";
+  if (paypalUsername(String(c.paypal_link || ""))) return "PayPal";
+  if (revolutUsername(String(c.revolut_link || ""))) return "Revolut";
+  if (String(c.iban || "").trim()) return lang === "fr" ? "Virement" : "Bank";
   return lang === "fr" ? "Non configuré" : "Not set";
 }
 
@@ -1165,6 +1183,7 @@ export function PayoutsView({
   const [fundAmount, setFundAmount] = useState("");
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
   const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
+  const payoutFieldsRef = useRef<CreatorPayoutMethodFieldsHandle>(null);
   const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances" | "history">("overview");
   const [completedPayouts, setCompletedPayouts] = useState<CompletedPayout[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1321,43 +1340,41 @@ export function PayoutsView({
       return;
     }
 
+    const paypal = paypalUsername(String(creator.paypal_link || ""));
+    const revolut = revolutUsername(String(creator.revolut_link || ""));
+    const iban = String(creator.iban || "").trim();
+
+    if (!paypal && !revolut && !iban) {
+      return;
+    }
+
     const payload = {
       creatorId: creator.id,
       name: creator.full_name || creator.handle || "creator",
       amount,
-      method: creator.paypal_link ? "paypal" : creator.revolut_link ? "revolut" : "iban",
+      method: paypal ? "paypal" : revolut ? "revolut" : "iban",
     };
 
-    if (creator.paypal_link) {
-      const clean = String(creator.paypal_link).replace("https://paypal.me/", "").replace("paypal.me/", "");
+    if (paypal) {
       pendingConfirmRef.current = payload;
       paymentLeftTabRef.current = false;
       pendingSinceRef.current = Date.now();
-      window.open(`https://paypal.me/${clean}/${amount}`, "_blank");
-    } else if (creator.revolut_link) {
-      const clean = String(creator.revolut_link).replace("https://revolut.me/", "").replace("revolut.me/", "");
+      window.open(`https://paypal.me/${paypal}/${amount}`, "_blank");
+    } else if (revolut) {
       pendingConfirmRef.current = payload;
       paymentLeftTabRef.current = false;
       pendingSinceRef.current = Date.now();
-      window.open(`https://revolut.me/${clean}`, "_blank");
-    } else if (creator.iban) {
-      navigator.clipboard.writeText(String(creator.iban));
+      window.open(`https://revolut.me/${revolut}`, "_blank");
+    } else if (iban) {
+      navigator.clipboard.writeText(iban);
       alert(
         lang === "fr"
           ? `IBAN copié ✓\nMontant à virer : ${formatCurrency(amount, lang)}`
           : `IBAN copied ✓\nAmount to transfer: ${formatCurrency(amount, lang)}`,
       );
       setConfirmPay(payload);
-    } else {
-      alert(
-        lang === "fr"
-          ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
-          : `${creator.full_name || creator.handle} hasn't added their payment details yet.`,
-      );
-      return;
     }
 
-    notifyCreatorPaid(lang, creator.full_name || creator.handle || "creator", amount);
     setPayMessage(
       lang === "fr"
         ? `Paiement de ${formatCurrency(amount, lang)} initié pour ${creator.full_name || creator.handle}.`
@@ -1365,9 +1382,18 @@ export function PayoutsView({
     );
   };
 
+  const paySelectedCreator = async () => {
+    if (!selectedCreatorPayout) return;
+    const updated = (await payoutFieldsRef.current?.flushSave()) ?? selectedCreatorPayout;
+    setSelectedCreatorPayout(updated);
+    setCreators((list) => list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+    if (!creatorHasPaymentMethod(updated)) return;
+    handleManualCreatorPay(updated);
+  };
+
   const confirmManualPayout = async () => {
     if (!confirmPay) return;
-    const { creatorId, amount, method } = confirmPay;
+    const { creatorId, amount, method, name } = confirmPay;
     setConfirmPay(null);
     setSelectedCreatorPayout(null);
     pendingConfirmRef.current = null;
@@ -1384,6 +1410,7 @@ export function PayoutsView({
           ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
           : `${formatCurrency(amount, lang)} marked as paid ✓`
       );
+      notifyCreatorPaid(lang, name, amount);
       setCreators((list) =>
         list.map((c) =>
           c.id === creatorId ? { ...c, balance: Math.max(0, Number(c.balance || 0) - amount) } : c
@@ -1809,8 +1836,8 @@ export function PayoutsView({
                     </span>
                   </p>
                 ) : (
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.5 }}>
-                    {lang === "fr" ? "Ajoutez un moyen de paiement ci-dessous avant de payer ce créateur." : "Add a payment method below before paying this creator."}
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#DC2626", letterSpacing: "-0.01em", lineHeight: 1.5 }}>
+                    {lang === "fr" ? "Aucun moyen de paiement renseigné — ajoutez PayPal, Revolut ou IBAN ci-dessous." : "No payment method on file — add PayPal, Revolut, or IBAN below."}
                   </p>
                 )}
               </div>
@@ -1820,11 +1847,15 @@ export function PayoutsView({
                   {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
                 </div>
                 <CreatorPayoutMethodFields
+                  ref={payoutFieldsRef}
                   creator={selectedCreatorPayout}
                   lang={lang}
                   onUpdate={(next) => {
                     setSelectedCreatorPayout(next);
                     setCreators((list) => list.map((c) => (c.id === next.id ? next : c)));
+                  }}
+                  onDraftChange={(next) => {
+                    setSelectedCreatorPayout(next);
                   }}
                 />
               </div>
@@ -1911,10 +1942,18 @@ export function PayoutsView({
 
               <button
                 type="button"
-                disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0 || payingId === selectedCreatorPayout.id}
-                onClick={() => handleManualCreatorPay(selectedCreatorPayout)}
+                disabled={
+                  !selectedCreatorPayout.balance ||
+                  selectedCreatorPayout.balance <= 0 ||
+                  payingId === selectedCreatorPayout.id ||
+                  !creatorHasPaymentMethod(selectedCreatorPayout)
+                }
+                onClick={() => void paySelectedCreator()}
                 className="hero-cta-shopify hero-cta-compact"
-                style={{ width: "100%", opacity: selectedCreatorPayout.balance > 0 ? 1 : 0.5 }}
+                style={{
+                  width: "100%",
+                  opacity: selectedCreatorPayout.balance > 0 && creatorHasPaymentMethod(selectedCreatorPayout) ? 1 : 0.5,
+                }}
               >
                 {selectedCreatorPayout.balance > 0
                   ? `${lang === "fr" ? "Payer" : "Pay"} ${formatCurrency(selectedCreatorPayout.balance, lang)}`

@@ -18,7 +18,7 @@ type Script = {
 
 type CreatorOpt = { id: string; label: string };
 
-export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobile?: boolean }) {
+export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: string; isMobile?: boolean; standalone?: boolean }) {
   const lang = useLang();
   const [scripts, setScripts] = useState<Script[]>([]);
   const [creators, setCreators] = useState<CreatorOpt[]>([]);
@@ -113,7 +113,7 @@ export function ScriptsManager({ brandId, isMobile }: { brandId?: string; isMobi
           : `${scripts.length} script${scripts.length > 1 ? "s" : ""} shared`;
 
   return (
-    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: 32 }}>
+    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: standalone ? 0 : 32 }}>
       <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div>
