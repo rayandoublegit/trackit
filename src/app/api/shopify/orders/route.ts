@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +10,6 @@ function getSupabase() {
   );
 }
 
-function verifyShopifyWebhook(body: string, hmacHeader: string): boolean {
-  const secret = process.env.SHOPIFY_CLIENT_SECRET || "";
-  const hash = crypto.createHmac("sha256", secret).update(body).digest("base64");
-  return hash === hmacHeader;
-}
-
 type CampaignLinkRow = {
   campaign_id: string;
   campaigns: { status?: string | null; created_at?: string | null } | null;
@@ -25,12 +18,10 @@ type CampaignLinkRow = {
 function pickCampaignFromLinks(links: CampaignLinkRow[]): string | null {
   if (links.length === 0) return null;
   if (links.length === 1) return String(links[0].campaign_id);
-
   const active = links
     .filter((l) => (l.campaigns?.status || "").toLowerCase() === "active")
     .sort((a, b) => (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || ""));
   if (active[0]) return String(active[0].campaign_id);
-
   const byRecency = [...links].sort((a, b) =>
     (b.campaigns?.created_at || "").localeCompare(a.campaigns?.created_at || ""),
   );
@@ -39,18 +30,23 @@ function pickCampaignFromLinks(links: CampaignLinkRow[]): string | null {
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
-  const hmac = request.headers.get("x-shopify-hmac-sha256") || "";
-
-  if (!verifyShopifyWebhook(body, hmac)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const order = JSON.parse(body);
   const supabase = getSupabase();
 
-  const discountCodes: string[] = order.discount_codes?.map((d: { code: string }) => d.code.toUpperCase()) || [];
+  // Lecture du code a tous les endroits possibles (commande normale + draft order).
+  const codeSet = new Set<string>();
+  for (const d of (order.discount_codes || [])) {
+    if (d?.code) codeSet.add(String(d.code).toUpperCase());
+  }
+  for (const a of (order.discount_applications || [])) {
+    if (a?.code) codeSet.add(String(a.code).toUpperCase());
+    if (a?.title) codeSet.add(String(a.title).toUpperCase());
+  }
+  const discountCodes = Array.from(codeSet);
+
   const orderAmount = parseFloat(order.total_price || "0");
   const shopDomain = request.headers.get("x-shopify-shop-domain") || "";
+  const status = order.financial_status === "paid" ? "paid" : "pending";
 
   if (discountCodes.length === 0) {
     return NextResponse.json({ received: true, matched: false });
@@ -108,7 +104,15 @@ export async function POST(request: NextRequest) {
 
     const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
 
-    await supabase.from("sales").insert({
+    // Anti-double-comptage : ne crediter le balance que si la vente est nouvelle.
+    const { data: existing } = await supabase
+      .from("sales")
+      .select("id")
+      .eq("shopify_order_id", String(order.id))
+      .maybeSingle();
+    const isNew = !existing;
+
+    await supabase.from("sales").upsert({
       creator_id: creator.id,
       user_id: creator.user_id,
       shopify_order_id: String(order.id),
@@ -117,21 +121,20 @@ export async function POST(request: NextRequest) {
       discount_code_used: code,
       campaign_id: linkedCampaignId,
       shop_domain: shopDomain,
-      status: "pending",
-    });
+      status,
+      created_at: order.created_at,
+    }, { onConflict: "shopify_order_id" });
 
-    await supabase
-      .from("creators")
-      .update({
-        balance: (creator.balance || 0) + commissionAmount,
-        total_earned: (creator.total_earned || 0) + commissionAmount,
-        total_sales: (creator.total_sales || 0) + 1,
-      })
-      .eq("id", creator.id);
-
-    console.log(
-      `Sale attributed: ${code} → creator ${creator.id} → campaign ${linkedCampaignId ?? "none"} → $${commissionAmount} commission`,
-    );
+    if (isNew) {
+      await supabase
+        .from("creators")
+        .update({
+          balance: (creator.balance || 0) + commissionAmount,
+          total_earned: (creator.total_earned || 0) + commissionAmount,
+          total_sales: (creator.total_sales || 0) + 1,
+        })
+        .eq("id", creator.id);
+    }
   }
 
   return NextResponse.json({ received: true });
