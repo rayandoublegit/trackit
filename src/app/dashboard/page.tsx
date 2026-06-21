@@ -870,11 +870,18 @@ function PageHeader({ title, subtitle, right, isMobile }: { title: string; subti
 
 function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; userId?: string; lang: "en" | "fr" }) {
   const [shopDomain, setShopDomain] = useState("");
+  const [token, setToken] = useState("");
   const [shopError, setShopError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!shopDomain.trim()) {
       setShopError(lang === "fr" ? "Entrez le nom de votre boutique" : "Please enter your store name");
+      return;
+    }
+    if (!token.trim()) {
+      setShopError(lang === "fr" ? "Collez votre token d'API Admin" : "Paste your Admin API token");
       return;
     }
     setShopError("");
@@ -884,7 +891,27 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
     name = name.replace(/\..*/, "");
     name = name.replace(/[^a-z0-9-]/g, "");
     const domain = `${name}.myshopify.com`;
-    window.location.href = `/api/shopify/install?shop=${domain}&user_id=${userId || ""}`;
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/shopify/connect-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: userId || "", shop: domain, accessToken: token.trim() }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shopName?: string };
+      if (!res.ok || !payload.ok) {
+        setShopError(payload.error || (lang === "fr" ? "Connexion echouee" : "Connection failed"));
+        setLoading(false);
+        return;
+      }
+      setDone(payload.shopName || domain);
+      setLoading(false);
+      setTimeout(() => { window.location.reload(); }, 1200);
+    } catch {
+      setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
+      setLoading(false);
+    }
   };
 
   return (
@@ -893,7 +920,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
       onClick={onClose}
     >
       <div
-        style={{ background: "#FFFFFF", borderRadius: 16, padding: 32, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}
+        style={{ background: "#FFFFFF", borderRadius: 16, padding: 32, maxWidth: 460, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)", maxHeight: "90vh", overflowY: "auto" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
@@ -905,31 +932,46 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
         </h3>
         <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
           {lang === "fr"
-            ? "Entrez l'URL de votre boutique .myshopify.com pour autoriser Trackit."
-            : "Enter your .myshopify.com store URL to authorize Trackit."}
+            ? "Creez une app personnalisee dans Shopify Admin (Parametres - Applications et canaux de vente - Developper des apps), activez l'API Admin avec read_orders, et collez le domaine + le token ci-dessous."
+            : "Create a custom app in Shopify Admin (Settings - Apps and sales channels - Develop apps), enable the Admin API with read_orders, then paste the domain + token below."}
         </p>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "URL de la boutique" : "Store URL"}
-        </label>
-        <input
-          type="text"
-          value={shopDomain}
-          onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
-          placeholder="yourstore.myshopify.com"
-          onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 8 }}
-          autoFocus
-        />
-        <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 16px", lineHeight: 1.45 }}>
-          {lang === "fr"
-            ? "Trouvez-la dans Shopify Admin → Paramètres → Domaines."
-            : "Find it in Shopify Admin → Settings → Domains."}
-        </p>
-        {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
-        <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} style={{ width: "100%", justifyContent: "center" }}>
-          <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
-          {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
-        </button>
+        {done ? (
+          <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: 16, textAlign: "center" }}>
+            <p style={{ fontSize: 14, color: "#15803D", margin: 0, fontWeight: 600 }}>
+              {lang === "fr" ? `Connecte a ${done}` : `Connected to ${done}`}
+            </p>
+          </div>
+        ) : (
+          <>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
+            </label>
+            <input
+              type="text"
+              value={shopDomain}
+              onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
+              placeholder="votreboutique.myshopify.com"
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 14 }}
+              autoFocus
+            />
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
+            </label>
+            <input
+              type="password"
+              value={token}
+              onChange={(e) => { setToken(e.target.value); setShopError(""); }}
+              placeholder="shpat_..."
+              onKeyDown={(e) => e.key === "Enter" && handleConnect()}
+              style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", marginBottom: 16 }}
+            />
+            {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
+            <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} disabled={loading} style={{ width: "100%", justifyContent: "center", opacity: loading ? 0.6 : 1 }}>
+              <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
+              {loading ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter Shopify" : "Connect Shopify")}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2141,7 +2183,9 @@ function IntegrationsView({
 }) {
   const lang = useLang();
   const [shopDomain, setShopDomain] = useState("");
+  const [shopToken, setShopToken] = useState("");
   const [shopError, setShopError] = useState("");
+  const [connecting, setConnecting] = useState(false);
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
@@ -2200,7 +2244,11 @@ function IntegrationsView({
       return;
     }
     if (!shopDomain.trim()) {
-      setShopError("Please enter your store name");
+      setShopError(lang === "fr" ? "Entrez le domaine de votre boutique" : "Please enter your store name");
+      return;
+    }
+    if (!shopToken.trim()) {
+      setShopError(lang === "fr" ? "Collez votre token d'API Admin Shopify" : "Paste your Shopify Admin API token");
       return;
     }
     setShopError("");
@@ -2210,7 +2258,31 @@ function IntegrationsView({
     name = name.replace(/\..*/, "");
     name = name.replace(/[^a-z0-9-]/g, "");
     const domain = `${name}.myshopify.com`;
-    window.location.href = `/api/shopify/install?shop=${domain}&user_id=${user?.id || ""}`;
+
+    setConnecting(true);
+    void (async () => {
+      try {
+        const res = await fetch("/api/shopify/connect-manual", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user?.id || "", shop: domain, accessToken: shopToken.trim() }),
+        });
+        const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shop?: string; shopName?: string };
+        if (!res.ok || !payload.ok) {
+          setShopError(payload.error || (lang === "fr" ? "Connexion echouee" : "Connection failed"));
+          setConnecting(false);
+          return;
+        }
+        setConnectedShop(payload.shop || domain);
+        setChangingStore(false);
+        setShopToken("");
+        setConnecting(false);
+        notifyShopifyConnected(lang, payload.shopName || domain);
+      } catch {
+        setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
+        setConnecting(false);
+      }
+    })();
   };
 
   const apps = [
@@ -2331,16 +2403,24 @@ function IntegrationsView({
                       </>
                     ) : (
                       <>
-                        <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <input
                             value={shopDomain}
                             onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
-                            placeholder="yourstore.myshopify.com"
-                            style={{ flex: 1, padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                            placeholder="votreboutique.myshopify.com"
+                            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
                             onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
                           />
-                          <button type="button" onClick={handleShopifyConnect} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0 }}>
-                            {lang === "fr" ? "Connecter →" : "Connect →"}
+                          <input
+                            type="password"
+                            value={shopToken}
+                            onChange={(e) => { setShopToken(e.target.value); setShopError(""); }}
+                            placeholder={lang === "fr" ? "Token d'API Admin (shpat_...)" : "Admin API token (shpat_...)"}
+                            style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box" }}
+                            onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
+                          />
+                          <button type="button" onClick={handleShopifyConnect} disabled={connecting} className="hero-cta-shopify hero-cta-compact-sm" style={{ flexShrink: 0, alignSelf: "flex-start", opacity: connecting ? 0.6 : 1 }}>
+                            {connecting ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter →" : "Connect →")}
                           </button>
                         </div>
                         {changingStore && (
@@ -2353,7 +2433,7 @@ function IntegrationsView({
                           </button>
                         )}
                         <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 4, letterSpacing: "-0.01em" }}>
-                          {lang === "fr" ? "Utilisez votre URL .myshopify.com. Trouvez-la dans Shopify Admin → Paramètres → Domaines." : "Use your .myshopify.com URL. Find it in Shopify Admin → Settings → Domains."}
+                          {lang === "fr" ? "Creez une app personnalisee dans Shopify Admin (Parametres -> Applications et canaux de vente -> Developper des apps), activez l'API Admin avec la permission read_orders, puis collez le domaine .myshopify.com et le token d'acces ci-dessus." : "Create a custom app in Shopify Admin (Settings -> Apps and sales channels -> Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
                         </div>
                         {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
                       </>
