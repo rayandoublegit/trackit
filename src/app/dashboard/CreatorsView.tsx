@@ -42,9 +42,9 @@ type ManagedCreator = {
   location: string;
   notes: string;
   avatarUrl?: string;
-  paypal_link?: string;
-  revolut_link?: string;
-  iban?: string;
+  paypal_link?: string | null;
+  revolut_link?: string | null;
+  iban?: string | null;
   campaignIds: string[];
 };
 
