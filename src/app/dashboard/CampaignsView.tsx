@@ -49,6 +49,7 @@ type SavedCreatorOption = {
   avatar_url?: string;
   platform?: string;
   commission_rate?: number;
+  discount_code?: string;
 };
 
 type SaleRow = {
@@ -171,6 +172,7 @@ function mapSavedCreator(row: Record<string, unknown>): SavedCreatorOption {
     avatar_url: typeof row.avatar_url === "string" ? row.avatar_url : undefined,
     platform: typeof row.platform === "string" ? row.platform : undefined,
     commission_rate: Number(row.commission_rate ?? 10) || 10,
+    discount_code: typeof row.discount_code === "string" ? row.discount_code : undefined,
   };
 }
 
@@ -2057,6 +2059,7 @@ type AddedCampaignCreator = {
   platform?: string;
   commissionType: "percent" | "flat";
   commissionRate: string;
+  discountCode?: string;
 };
 
 function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | "fr") {
@@ -2156,6 +2159,7 @@ function NewCampaignModal({
         platform: creator.platform,
         commissionType: "percent",
         commissionRate: String(creator.commission_rate ?? 10),
+        discountCode: creator.discount_code,
       },
     ]);
     setPickerId("");
@@ -2395,7 +2399,12 @@ function NewCampaignModal({
                           <CreatorAvatar src={entry.avatar_url} size={36} alt={label} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{label}</div>
-                            <div style={{ fontSize: 12, color: "#7A7A7A" }}>{handleLabel}</div>
+                            <div style={{ fontSize: 12, color: "#7A7A7A", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                              <span>{handleLabel}</span>
+                              {entry.discountCode ? (
+                                <span style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#E8EEFC", borderRadius: 6, padding: "1px 6px", letterSpacing: "0.02em" }}>{entry.discountCode}</span>
+                              ) : null}
+                            </div>
                           </div>
                           <button
                             type="button"
