@@ -164,24 +164,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Also register webhook if not done yet
-  await fetch(
-    `https://${profile.shopify_store}/admin/api/2024-01/webhooks.json`,
-    {
-      method: "POST",
-      headers: {
-        "X-Shopify-Access-Token": profile.shopify_access_token,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        webhook: {
-          topic: "orders/create",
-          address: `${process.env.NEXT_PUBLIC_APP_URL}/api/shopify/orders`,
-          format: "json",
-        },
-      }),
-    }
-  );
-
+  // L'enregistrement du webhook est gere par /api/shopify/sync-toggle (toggle on/off).
+  // Cette route ne fait plus que du rattrapage ponctuel ("Re-synchroniser maintenant").
   return NextResponse.json({ synced, orders: orders.length });
 }
