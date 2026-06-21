@@ -3007,6 +3007,15 @@ function AddAffiliatePanel({
     const link = affiliateReferralLink(ref);
     setGenerated({ ref, code, link });
     setCopied(null);
+    // Persiste le code promo sur le createur pour que l'attribution des ventes
+    // (Shopify sync + ventes manuelles) retrouve le createur via creators.discount_code.
+    if (selected?.id && userId && code) {
+      void fetch("/api/affiliates/set-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, creatorId: selected.id, code }),
+      }).catch(() => { /* silencieux : l'UI continue */ });
+    }
   };
 
   const copyText = async (text: string, kind: "link" | "code") => {
