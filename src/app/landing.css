@@ -1863,22 +1863,20 @@ body { padding-top: 80px; }
   width: 22px; height: 22px; border-radius: 50%;
   border: 1.5px solid #ccc; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.why-grid:has(.wcheck-blue:hover) .wcheck-blue {
+  transform: scale(1.18);
 }
 .wcheck svg { width: 12px; height: 12px; }
 .wcheck svg path { stroke: #bbb; stroke-width: 1.5; fill: none; }
-.why-col:not(.right) .why-list li:first-child .wcheck {
-  background: rgba(31,181,103,0.25);
-  border-color: #1FB567;
+.wcheck-blue {
+  background: var(--blue);
+  border-color: var(--blue);
 }
-.why-col:not(.right) .why-list li:first-child .wcheck svg path {
-  stroke: #1FB567;
-}
-.right .wcheck {
-  background: rgba(31,181,103,0.25);
-  border-color: #1FB567;
-}
-.right .wcheck svg path {
-  stroke: #1FB567;
+.wcheck-blue svg path {
+  stroke: #FFFFFF;
 }
 
 /* ===== PRICING ===== */

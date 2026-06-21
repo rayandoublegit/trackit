@@ -107,7 +107,7 @@ export default function TrackitLanding() {
   feat_2_title: lang === "fr" ? "Génération de Messages IA" : "AI Outreach Generation",
   feat_2_desc: lang === "fr" ? "Arrêtez d'envoyer des DMs copiés-collés. Trackit génère un message personnalisé pour chaque créateur." : "Stop sending generic copy-paste DMs. Trackit generates a personalized outreach message for every creator based on their content style and your product. Higher response rates. Less work.",
   feat_3_title: lang === "fr" ? "Suivi Automatique des Ventes" : "Automatic Sale Tracking",
-  feat_3_desc: lang === "fr" ? "Connectez votre boutique Shopify. Chaque créateur reçoit un lien de suivi unique. Chaque vente attribuée automatiquement." : "Connect your Shopify store. Every creator gets a unique tracking link or discount code. Every sale attributed automatically in real time. No manual tracking. No guessing.",
+  feat_3_desc: lang === "fr" ? "Chaque créateur reçoit un lien ou un code promo unique. Chaque vente lui est attribuée automatiquement, en temps réel. Plus de tableurs. Plus d'approximations." : "Every creator gets a unique tracking link or discount code. Every sale they drive is attributed automatically in real time. No spreadsheets. No guesswork.",
   feat_4_title: lang === "fr" ? "Paiement des Commissions en Un Clic" : "One Click Commission Payouts",
   feat_4_desc: lang === "fr" ? "Voyez exactement ce que chaque créateur a gagné. Cliquez. L'argent va directement sur leur compte." : "See exactly what every creator earned. Hit send. Money goes directly to their account. No bank transfers. No PayPal drama. No spreadsheet math.",
   pain_title: lang === "fr" ? "Vous faites ça" : "You've been doing",
@@ -854,7 +854,7 @@ export default function TrackitLanding() {
 
         <div className="dashboard-wrap fade-up fade-up-delay-3">
           <video
-            src="https://res.cloudinary.com/dasl7u0qw/video/upload/v1779393974/0521_2_t1qlql.mov"
+            src="https://res.cloudinary.com/dqsk5btgz/video/upload/v1782010377/0521_2_wt1c3c.mov"
             autoPlay
             loop
             muted
@@ -1519,9 +1519,9 @@ export default function TrackitLanding() {
                 t.trad_8,
                 t.trad_9,
                 t.trad_10,
-              ].map((item) => (
+              ].map((item, i) => (
                 <li key={String(item)}>
-                  <span className="wcheck">
+                  <span className={i === 0 ? "wcheck wcheck-blue" : "wcheck"}>
                     <svg viewBox="0 0 10 10">
                       <path d="M2 5 L4 7 L8 3" />
                     </svg>
@@ -1547,7 +1547,7 @@ export default function TrackitLanding() {
                 t.trackit_10,
               ].map((item) => (
                 <li key={String(item)}>
-                  <span className="wcheck">
+                  <span className="wcheck wcheck-blue">
                     <svg viewBox="0 0 10 10">
                       <path d="M2 5 L4 7 L8 3" />
                     </svg>
