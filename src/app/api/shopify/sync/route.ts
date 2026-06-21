@@ -93,7 +93,18 @@ export async function POST(request: NextRequest) {
 
   let synced = 0;
   for (const order of orders) {
-    const codes: string[] = order.discount_codes?.map((d: any) => d.code.toUpperCase()) || [];
+    // Shopify expose le code de reduction a plusieurs endroits selon le type de
+    // commande (commande normale vs draft order "Mark as paid"). On collecte
+    // partout pour ne rien rater.
+    const codeSet = new Set<string>();
+    for (const d of (order.discount_codes || [])) {
+      if (d?.code) codeSet.add(String(d.code).toUpperCase());
+    }
+    for (const a of (order.discount_applications || [])) {
+      if (a?.code) codeSet.add(String(a.code).toUpperCase());
+      if (a?.title) codeSet.add(String(a.title).toUpperCase());
+    }
+    const codes: string[] = Array.from(codeSet);
     for (const code of codes) {
       // Campaign code wins; else fall back to the creator's own code.
       const campaignLink = campaignCodeMap.get(code);
