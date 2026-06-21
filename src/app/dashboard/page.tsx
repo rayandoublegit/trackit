@@ -2188,6 +2188,8 @@ function IntegrationsView({
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
+  const [syncEnabled, setSyncEnabled] = useState(false);
+  const [togglingSync, setTogglingSync] = useState(false);
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
@@ -2210,6 +2212,18 @@ function IntegrationsView({
           .map((r) => r.shop_domain as string)
           .filter(Boolean);
         if (domains.length > 0) setConnectedStores(domains);
+      });
+  }, [user?.id, connectedShop, shopifyStore]);
+
+  useEffect(() => {
+    if (!user?.id || !supabase) return;
+    void supabase
+      .from("shopify_stores")
+      .select("sync_enabled")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setSyncEnabled(!!data.sync_enabled);
       });
   }, [user?.id, connectedShop, shopifyStore]);
 
@@ -2354,6 +2368,51 @@ function IntegrationsView({
                           {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
                         </div>
                         <div style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", border: "1px solid #EFEFEF", borderRadius: 12, marginBottom: 10, background: "#FFFFFF" }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                              {lang === "fr" ? "Synchronisation automatique" : "Automatic sync"}
+                            </div>
+                            <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 2, letterSpacing: "-0.01em" }}>
+                              {lang === "fr" ? "Chaque nouvelle vente Shopify remonte automatiquement dans Trackit." : "Every new Shopify sale flows into Trackit automatically."}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={syncEnabled}
+                            disabled={togglingSync || !user?.id}
+                            onClick={() => {
+                              if (togglingSync || !user?.id) return;
+                              const next = !syncEnabled;
+                              setSyncEnabled(next);
+                              setTogglingSync(true);
+                              setSyncMsg("");
+                              void (async () => {
+                                try {
+                                  const res = await fetch("/api/shopify/sync-toggle", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ userId: user?.id || "", enabled: next }),
+                                  });
+                                  const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+                                  if (!res.ok || !payload.ok) {
+                                    setSyncEnabled(!next);
+                                    setSyncMsg(payload.error || (lang === "fr" ? "Echec de la mise a jour" : "Update failed"));
+                                  }
+                                } catch {
+                                  setSyncEnabled(!next);
+                                  setSyncMsg(lang === "fr" ? "Erreur reseau" : "Network error");
+                                } finally {
+                                  setTogglingSync(false);
+                                }
+                              })();
+                            }}
+                            style={{ position: "relative", width: 44, height: 26, borderRadius: 999, border: "none", flexShrink: 0, cursor: togglingSync ? "default" : "pointer", background: syncEnabled ? "#0047FF" : "#D4D4D8", opacity: togglingSync ? 0.6 : 1, transition: "background 0.15s", padding: 0 }}
+                          >
+                            <span style={{ position: "absolute", top: 3, left: syncEnabled ? 21 : 3, width: 20, height: 20, borderRadius: "50%", background: "#FFFFFF", boxShadow: "0 1px 3px rgba(0,0,0,0.2)", transition: "left 0.15s" }} />
+                          </button>
+                        </div>
                         <div style={{ marginBottom: 10 }}>
                           <button
                             type="button"
@@ -2386,7 +2445,7 @@ function IntegrationsView({
                             className="hero-cta-shopify hero-cta-compact-sm"
                             style={{ opacity: syncing ? 0.6 : 1 }}
                           >
-                            {syncing ? (lang === "fr" ? "Synchronisation..." : "Syncing...") : (lang === "fr" ? "Synchroniser les ventes" : "Sync sales")}
+                            {syncing ? (lang === "fr" ? "Synchronisation..." : "Syncing...") : (lang === "fr" ? "Re-synchroniser maintenant" : "Re-sync now")}
                           </button>
                           {syncMsg && <div style={{ fontSize: 12, color: "#15803d", marginTop: 6 }}>{syncMsg}</div>}
                         </div>
