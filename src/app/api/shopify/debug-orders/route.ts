@@ -17,26 +17,57 @@ export async function POST(request: NextRequest) {
     .select("shopify_store, shopify_access_token")
     .eq("id", userId)
     .single();
-
   if (!profile?.shopify_store || !profile?.shopify_access_token) {
-    return NextResponse.json({ error: "No Shopify store connected" }, { status: 400 });
+    return NextResponse.json({ error: "No store" }, { status: 400 });
   }
+
+  const { data: creators } = await supabaseAdmin
+    .from("creators")
+    .select("id, discount_code, commission_rate")
+    .eq("user_id", userId)
+    .not("discount_code", "is", null);
+
+  const discountMap = new Map(
+    (creators || []).map((c: any) => [c.discount_code?.toUpperCase(), c])
+  );
 
   const ordersRes = await fetch(
     `https://${profile.shopify_store}/admin/api/2024-01/orders.json?status=any&limit=10`,
     { headers: { "X-Shopify-Access-Token": profile.shopify_access_token } }
   );
-  const json = await ordersRes.json();
-  const orders = json.orders || [];
+  const { orders } = await ordersRes.json();
 
-  const summary = orders.map((o: any) => ({
-    id: o.id,
-    name: o.name,
-    total_price: o.total_price,
-    financial_status: o.financial_status,
-    discount_codes: o.discount_codes,
-    discount_applications: o.discount_applications,
-  }));
+  const trace: any[] = [];
+  for (const order of orders || []) {
+    const codes: string[] = (order.discount_codes || []).map((d: any) => String(d.code).toUpperCase());
+    for (const code of codes) {
+      const creator: any = discountMap.get(code);
+      if (!creator) { trace.push({ code, matched: false }); continue; }
 
-  return NextResponse.json({ count: orders.length, http: ordersRes.status, orders: summary });
+      const orderAmount = parseFloat(order.total_price || "0");
+      const commissionRate = creator.commission_rate || 10;
+      const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
+
+      const row = {
+        creator_id: creator.id,
+        user_id: userId,
+        shopify_order_id: String(order.id),
+        order_amount: orderAmount,
+        commission_amount: commissionAmount,
+        discount_code_used: code,
+        campaign_id: null,
+        shop_domain: profile.shopify_store,
+        status: order.financial_status === "paid" ? "paid" : "pending",
+        created_at: order.created_at,
+      };
+
+      const { error } = await supabaseAdmin
+        .from("sales")
+        .upsert(row, { onConflict: "shopify_order_id" });
+
+      trace.push({ code, matched: true, upsertError: error ? error.message : null, row });
+    }
+  }
+
+  return NextResponse.json({ discountMapKeys: Array.from(discountMap.keys()), trace });
 }
