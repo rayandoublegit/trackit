@@ -12,6 +12,7 @@ import {
   type CampaignSalesMeta,
   type SaleAttributionRow,
 } from "@/lib/campaign-sales-attribution";
+import { dedupeCampaignRows, normalizeCampaignStatus } from "@/lib/campaign-status";
 
 export const dynamic = "force-dynamic";
 
@@ -312,29 +313,40 @@ export async function GET(request: Request) {
     creatorCountByCampaign.set(cid, (creatorCountByCampaign.get(cid) || 0) + 1);
   }
 
-  const campaignPeriodMap = new Map<string, { sales: number; commissions: number }>();
-  for (const sale of periodSales) {
+  const campaignTotalsMap = new Map<string, { sales: number; commissions: number }>();
+  for (const sale of salesRows) {
     const campaignId = attributeSaleToCampaign(sale, creatorCounts, campaignMeta);
     if (!campaignId) continue;
-    const agg = campaignPeriodMap.get(campaignId) || { sales: 0, commissions: 0 };
+    const agg = campaignTotalsMap.get(campaignId) || { sales: 0, commissions: 0 };
     agg.sales += Number(sale.order_amount) || 0;
     agg.commissions += Number(sale.commission_amount) || 0;
-    campaignPeriodMap.set(campaignId, agg);
+    campaignTotalsMap.set(campaignId, agg);
   }
 
-  const campaignsData = (campaignsRaw || []).map((c) => {
-    const cid = String(c.id);
-    const agg = campaignPeriodMap.get(cid) || { sales: 0, commissions: 0 };
-    const creatorCount = creatorCountByCampaign.get(cid) || 0;
-    const roi = agg.commissions > 0 ? agg.sales / agg.commissions : 0;
-    return {
-      ...c,
-      creatorCount,
-      totalSales: agg.sales,
-      totalCommissions: agg.commissions,
-      roi,
-    };
-  });
+  const campaignsData = dedupeCampaignRows((campaignsRaw || []) as Array<Record<string, unknown>>)
+    .map((c) => {
+      const cid = String(c.id);
+      const agg = campaignTotalsMap.get(cid) || { sales: 0, commissions: 0 };
+      const creatorCount = creatorCountByCampaign.get(cid) || 0;
+      const roi = agg.commissions > 0 ? agg.sales / agg.commissions : 0;
+      return {
+        id: cid,
+        name: String(c.name ?? ""),
+        platform: String(c.platform ?? ""),
+        status: normalizeCampaignStatus(String(c.status ?? "draft")),
+        start_date: typeof c.start_date === "string" ? c.start_date : null,
+        created_at: typeof c.created_at === "string" ? c.created_at : null,
+        creatorCount,
+        totalSales: agg.sales,
+        totalCommissions: agg.commissions,
+        roi,
+      };
+    })
+    .sort((a, b) => {
+      const aDate = String(a.start_date || a.created_at || "");
+      const bDate = String(b.start_date || b.created_at || "");
+      return bDate.localeCompare(aDate);
+    });
 
   const hasData =
     shopifyConnected ||

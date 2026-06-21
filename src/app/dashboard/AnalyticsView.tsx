@@ -6,7 +6,8 @@ import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
-import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
+import { campaignStatusLabel } from "@/lib/campaign-status";
+import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 
 const btnPrimary: React.CSSProperties = {
@@ -109,10 +110,12 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
     window.addEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
     window.addEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
+    window.addEventListener(CAMPAIGNS_UPDATED_EVENT, refreshAnalytics);
     return () => {
       window.removeEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
       window.removeEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
       window.removeEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
+      window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, refreshAnalytics);
     };
   }, [userId, range]);
 
@@ -531,14 +534,14 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                     {lang === "fr" ? "Aucune campagne pour le moment." : "No campaigns yet."}
                   </td>
                 </tr>
-              ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string; start_date?: string; creatorCount?: number; totalSales?: number; totalCommissions?: number; roi?: number }) => (
+              ) : campaignRows.map((c: { id?: string; name?: string; platform?: string; status?: string; created_at?: string | null; start_date?: string | null; creatorCount?: number; totalSales?: number; totalCommissions?: number; roi?: number }) => (
                 <tr key={c.id || c.name} style={{ borderBottom: "1px solid #F5F5F5" }}>
                   <td style={{ padding: "12px 8px", fontWeight: 500 }}>{c.name || "—"}</td>
                   <td style={{ padding: "12px 8px" }}>{c.creatorCount ?? 0}</td>
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalSales ?? 0, lang)}</td>
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalCommissions ?? 0, lang)}</td>
                   <td style={{ padding: "12px 8px" }}>{c.roi && c.roi > 0 ? `${c.roi.toFixed(1)}x` : "—"}</td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{(c.start_date || c.created_at)?.split("T")[0] ?? "—"}</td>
+                  <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{formatCampaignStartDate(c.start_date || c.created_at, lang)}</td>
                   <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={String(c.status || "Draft")} /></td>
                 </tr>
               ))}
@@ -772,13 +775,18 @@ function StatusBadge({ lang, status }: { lang: "en" | "fr"; status: string }) {
 }
 
 function CampaignStatus({ lang, status }: { lang: "en" | "fr"; status: string }) {
-  const map: Record<string, { en: string; fr: string }> = {
-    Active: { en: "Active", fr: "Actif" },
-    Paused: { en: "Paused", fr: "En pause" },
-    Completed: { en: "Completed", fr: "Terminé" },
-  };
-  const s = map[status] ?? map.Completed;
-  return <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{lang === "fr" ? s.fr : s.en}</span>;
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+      {campaignStatusLabel(status, lang)}
+    </span>
+  );
+}
+
+function formatCampaignStartDate(value: string | null | undefined, lang: "en" | "fr") {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value.split("T")[0] ?? "—";
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function MiniStat({ label, value, large }: { label: string; value: string; large?: boolean }) {

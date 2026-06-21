@@ -13,7 +13,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { notifyCreatorPaid } from "@/lib/notifications-storage";
-import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
+import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, formatTrendLabel, isWithinPeriod, type PeriodTrend } from "@/lib/analytics-periods";
 import { formatCurrency } from "@/lib/useCurrency";
 import { UpgradeModal } from "./UpgradeModal";
@@ -591,6 +591,7 @@ export function CampaignsView({
         const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
         setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
         notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
+        dispatchCampaignsUpdated();
         setModalOpen(false);
       }
     } finally {
@@ -601,6 +602,7 @@ export function CampaignsView({
   const handleStatusChange = async (campaignId: string, status: CampaignStatus) => {
     await updateCampaignStatus(campaignId, status.toLowerCase());
     setCampaigns((list) => list.map((c) => (c.id === campaignId ? { ...c, status } : c)));
+    dispatchCampaignsUpdated();
   };
 
   const handleUpdateCampaign = async (campaignId: string, campaignData: {
@@ -643,6 +645,7 @@ export function CampaignsView({
       ),
     );
     setEditCampaignId(null);
+    dispatchCampaignsUpdated();
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
@@ -664,6 +667,7 @@ export function CampaignsView({
     setCampaigns((list) => list.filter((c) => c.id !== campaignId));
     if (detailId === campaignId) setDetailId(null);
     if (editCampaignId === campaignId) setEditCampaignId(null);
+    dispatchCampaignsUpdated();
   };
 
   const editingCampaign = editCampaignId ? campaigns.find((c) => c.id === editCampaignId) ?? null : null;
