@@ -45,11 +45,11 @@ export function NotesView({ isMobile, userId }: { isMobile?: boolean; userId?: s
         title={lang === "fr" ? "Notes" : "Notes"}
         subtitle={
           lang === "fr"
-            ? "Comme le Dashboard Mac : post-it pour vos objectifs, aspirations et priorités créateurs."
-            : "Like Mac Dashboard stickies: jot down goals, aspirations, and creator priorities."
+            ? "Un espace libre pour noter vos objectifs, idées et priorités créateurs."
+            : "A free space to jot down your goals, ideas, and creator priorities."
         }
       />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 16 : 32 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 16 : 32, width: "100%", boxSizing: "border-box" }}>
         <WorkspaceNotes userId={userId} isMobile={isMobile} variant="page" />
       </div>
     </>
