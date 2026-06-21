@@ -6,8 +6,6 @@ import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
-  getDiscoveryLanguage,
-  getDiscoveryLocation,
   setDiscoveryPrefs,
   type DiscoveryLanguage,
   type DiscoveryLocation,
@@ -1906,28 +1904,32 @@ export function DiscoveryView({
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [location, setLocation] = useState<DiscoveryLocation>(() => getDiscoveryLocation());
-  const [language, setLanguage] = useState<DiscoveryLanguage>(() => getDiscoveryLanguage());
+  const [location, setLocation] = useState<DiscoveryLocation>("FR");
+  const [language, setLanguage] = useState<DiscoveryLanguage>("french");
 
   useEffect(() => {
     setFollowers("");
     setEngagement("");
   }, [lang]);
 
-  const handleLocationChange = (next: string) => {
-    const loc = next as DiscoveryLocation;
-    const nextLanguage: DiscoveryLanguage = loc === "FR" ? "french" : "english";
-    setLocation(loc);
-    setLanguage(nextLanguage);
-    setDiscoveryPrefs(loc, nextLanguage);
+  useEffect(() => {
+    if (location !== "FR" || language !== "french") {
+      setLocation("FR");
+      setLanguage("french");
+      setDiscoveryPrefs("FR", "french");
+    }
+  }, [location, language]);
+
+  const handleLocationChange = (_next: string) => {
+    setLocation("FR");
+    setLanguage("french");
+    setDiscoveryPrefs("FR", "french");
   };
 
-  const handleLanguageChange = (next: string) => {
-    const nextLanguage = next as DiscoveryLanguage;
-    const nextLocation: DiscoveryLocation = nextLanguage === "french" ? "FR" : "US";
-    setLanguage(nextLanguage);
-    setLocation(nextLocation);
-    setDiscoveryPrefs(nextLocation, nextLanguage);
+  const handleLanguageChange = (_next: string) => {
+    setLocation("FR");
+    setLanguage("french");
+    setDiscoveryPrefs("FR", "french");
   };
 
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -2506,19 +2508,13 @@ export function DiscoveryView({
               label={lang === "fr" ? "Localisation" : "Location"}
               value={location}
               onChange={handleLocationChange}
-              options={[
-                { value: "FR", label: lang === "fr" ? "France" : "France" },
-                { value: "US", label: lang === "fr" ? "États-Unis" : "United States" },
-              ]}
+              options={[{ value: "FR", label: "France" }]}
             />
             <FilterSelect
               label={lang === "fr" ? "Langue" : "Language"}
               value={language}
               onChange={handleLanguageChange}
-              options={[
-                { value: "french", label: lang === "fr" ? "Français" : "French" },
-                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
-              ]}
+              options={[{ value: "french", label: lang === "fr" ? "Français" : "French" }]}
             />
           </div>
         </div>

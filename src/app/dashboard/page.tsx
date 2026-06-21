@@ -34,6 +34,8 @@ import {
   canUseAutomationWorkflows,
   canUseFullAutomationAgent,
   canUseShopify,
+  canInviteCreators,
+  canUseScripts,
   isGrowthOrAbove,
   isScalePlan,
   maxShopifyStores,
@@ -815,15 +817,21 @@ function DashboardPageContent() {
           )
         )}
         {view === "invitations" && user && (
-          <InvitationsView userId={user.id} isMobile={isMobile} />
+          canInviteCreators(plan) ? (
+            <InvitationsView userId={user.id} isMobile={isMobile} />
+          ) : (
+            <UpgradeGate feature="Invitations" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
+          )
         )}
         {view === "scripts" && user && (
           isCreator ? (
             <CreatorScripts userId={user.id} isMobile={isMobile} />
-          ) : (
+          ) : canUseScripts(plan) ? (
             <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
               <ScriptsManager brandId={user.id} isMobile={isMobile} standalone />
             </div>
+          ) : (
+            <UpgradeGate feature="Scripts" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
           )
         )}
         {view === "analytics" && user && (

@@ -161,6 +161,19 @@ export function canUseAdvancedAnalytics(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
+/** Pro + Scale only: invite creators, creator portal access, brand-side scripts. */
+export function canInviteCreators(plan: PlanTier): boolean {
+  return isProOrAbove(plan);
+}
+
+export function canUseCreatorPortal(plan: PlanTier): boolean {
+  return isProOrAbove(plan);
+}
+
+export function canUseScripts(plan: PlanTier): boolean {
+  return isProOrAbove(plan);
+}
+
 /** Pro + Scale only: Shopify integration + per-creator sales tracking. */
 export function canUseShopify(plan: PlanTier): boolean {
   return isProOrAbove(plan);
