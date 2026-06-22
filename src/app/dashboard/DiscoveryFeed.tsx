@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import { FREE_FEED_VISIBLE } from "@/lib/creator-value";
 import type { FeedCreator } from "@/lib/discovery-feed";
+import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -69,13 +70,13 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-function FeedCard({ creator }: { creator: FeedCreator }) {
+function FeedCard({ creator, onOpen }: { creator: FeedCreator; onOpen?: () => void }) {
   const top = creator.valueScore >= 80;
   const active = daysAgoLabel(creator.lastPostAt);
   const rentaColor = creator.valueScore >= 70 ? "#15803D" : creator.valueScore >= 40 ? "#B45309" : "#9A1F1F";
   const rentaBg = creator.valueScore >= 70 ? "#F0FDF4" : creator.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
   return (
-    <div style={{ background: "#FFF", border: "0.5px solid #EFEFEF", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column" }}>
+    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #EFEFEF", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", cursor: onOpen ? "pointer" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
         <img src={creator.avatarUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
           onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
@@ -110,7 +111,7 @@ function FeedCard({ creator }: { creator: FeedCreator }) {
         <span style={{ flex: 1, fontSize: 11, color: creator.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {creator.email ? `✉ ${creator.email}` : "Contact via DM"}
         </span>
-        <button type="button" style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Sauver</button>
+        <button type="button" onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Sauver</button>
       </div>
     </div>
   );
@@ -174,6 +175,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
   const [fNiche, setFNiche] = useState("");
   const [fMinEng, setFMinEng] = useState(0);
   const [filterPaywall, setFilterPaywall] = useState(false);
+  const [selected, setSelected] = useState<FeedCreator | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -227,7 +229,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
             return (
               <div key={c.username} aria-hidden={locked || undefined}
                 style={locked ? { filter: "blur(6px)", opacity: 0.55, pointerEvents: "none" } : undefined}>
-                <FeedCard creator={c} />
+                <FeedCard creator={c} onOpen={() => setSelected(c)} />
               </div>
             );
           })}
@@ -253,6 +255,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
           onClose={() => setFilterPaywall(false)}
         />
       )}
+
+      <CreatorDetailDrawer creator={selected} plan={plan} onClose={() => setSelected(null)} onUpgrade={onUpgrade} />
     </div>
   );
 }
