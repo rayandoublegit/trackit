@@ -44,7 +44,9 @@ export async function POST(request: Request) {
     q = q.or(f.nicheTokens.map((w) => `niches.cs.{${w}}`).join(","));
   }
   if (f.language) q = q.eq("language", f.language);
-  if (f.countryCode) q = q.eq("country_code", f.countryCode);
+  // Lenient country: the chosen country OR creators we haven't geolocated yet
+  // (country_code is best-effort), so a market filter never zeroes out a filling DB.
+  if (f.countryCode) q = q.or(`country_code.eq.${f.countryCode},country_code.is.null`);
   if (f.activeSince) q = q.gte("last_post_at", f.activeSince);
   if (f.hasEmail) q = q.not("email", "is", null);
   for (const s of f.excludeStatuses) q = q.neq("quality_status", s);

@@ -37,6 +37,38 @@ export interface NormalizedFilters {
   sort: Array<{ column: string; ascending: boolean }>;
 }
 
+// The UI sends human labels (e.g. "french", "France"), but enrichment stores ISO
+// codes (language = ISO 639-1 like "fr", country_code = ISO 3166-1 alpha-2 like
+// "FR"). Map labels to codes so the equality filters actually match real rows.
+const LANGUAGE_ALIASES: Record<string, string> = {
+  french: "fr", francais: "fr", "français": "fr",
+  english: "en", anglais: "en",
+  spanish: "es", espanol: "es", "español": "es",
+  german: "de", allemand: "de", italian: "it", italien: "it",
+  portuguese: "pt", portugais: "pt", dutch: "nl", arabic: "ar",
+};
+const COUNTRY_ALIASES: Record<string, string> = {
+  france: "FR", "united states": "US", usa: "US", "etats-unis": "US",
+  "united kingdom": "GB", uk: "GB", "royaume-uni": "GB",
+  germany: "DE", allemagne: "DE", spain: "ES", espagne: "ES",
+  italy: "IT", italie: "IT", brazil: "BR", "brésil": "BR", canada: "CA",
+};
+const SKIP_VALUES = new Set(["", "all", "tous", "toutes", "any"]);
+
+function normalizeLanguage(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const r = raw.toLowerCase().trim();
+  if (SKIP_VALUES.has(r)) return undefined;
+  return LANGUAGE_ALIASES[r] ?? r; // already an ISO code (e.g. "fr") passes through
+}
+
+function normalizeCountry(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  const r = raw.toLowerCase().trim();
+  if (SKIP_VALUES.has(r)) return undefined;
+  return COUNTRY_ALIASES[r] ?? raw.toUpperCase().slice(0, 2);
+}
+
 export function normalizeDiscoveryFilters(
   p: DiscoverySearchParams,
   nowMs: number = Date.now()
@@ -59,8 +91,8 @@ export function normalizeDiscoveryFilters(
     followers: { gte: Number(p.minFollowers ?? 0), lte: Number(p.maxFollowers ?? 100_000_000) },
     minEngagement: Number(p.minEngagement ?? 0),
     minViews: Number(p.minViews ?? 0),
-    language: p.language ? String(p.language).toLowerCase().trim() : undefined,
-    countryCode: p.countryCode ? String(p.countryCode).toUpperCase().slice(0, 2) : undefined,
+    language: normalizeLanguage(p.language),
+    countryCode: normalizeCountry(p.countryCode),
     activeSince: p.activeWithinDays ? new Date(nowMs - p.activeWithinDays * 86_400_000).toISOString() : undefined,
     minAuthenticity: gate.minAuthenticity,
     excludeStatuses: gate.excludeStatuses,

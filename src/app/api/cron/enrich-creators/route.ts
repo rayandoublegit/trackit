@@ -31,10 +31,10 @@ export async function GET(request: Request) {
     .order("enriched_at", { ascending: true, nullsFirst: true })
     .limit(budget);
 
-  let enriched = 0;
-  let failed = 0;
-  for (const t of targets || []) {
-    const username = t.username as string;
+  const list = (targets || []).map((t) => t.username as string);
+  const concurrency = Math.min(Math.max(Number(process.env.ENRICH_CONCURRENCY ?? 5), 1), 12);
+
+  async function enrichOne(username: string): Promise<"enriched" | "failed"> {
     try {
       const [profileRaw, videosRaw] = await Promise.all([
         fetchTikTokProfileRaw(username),
@@ -59,16 +59,28 @@ export async function GET(request: Request) {
       }
 
       await supabaseAdmin.from("creators_index").upsert({ ...row, ...classMerge }, { onConflict: "username" });
-      enriched++;
+      return "enriched";
     } catch {
       await supabaseAdmin
         .from("creators_index")
         .update({ enrichment_status: "failed", enriched_at: new Date().toISOString() })
         .eq("username", username);
-      failed++;
+      return "failed";
     }
-    await new Promise((r) => setTimeout(r, 200));
   }
 
-  return NextResponse.json({ ok: true, budget, picked: targets?.length || 0, enriched, failed });
+  // Bounded concurrency: a fully sequential loop can't fit the budget inside
+  // maxDuration (~3s/creator x 270 >> 300s). Process in parallel chunks instead.
+  let enriched = 0;
+  let failed = 0;
+  for (let i = 0; i < list.length; i += concurrency) {
+    const chunk = list.slice(i, i + concurrency);
+    const results = await Promise.all(chunk.map(enrichOne));
+    for (const r of results) {
+      if (r === "enriched") enriched++;
+      else failed++;
+    }
+  }
+
+  return NextResponse.json({ ok: true, budget, concurrency, picked: list.length, enriched, failed });
 }

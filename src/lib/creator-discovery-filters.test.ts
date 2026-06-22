@@ -34,4 +34,18 @@ describe("normalizeDiscoveryFilters", () => {
   it("hasEmail flag", () => {
     expect(normalizeDiscoveryFilters({ niche: "x", hasEmail: true }, NOW).hasEmail).toBe(true);
   });
+
+  it("maps UI language labels to ISO codes (so filters match real data)", () => {
+    expect(normalizeDiscoveryFilters({ niche: "x", language: "french" }, NOW).language).toBe("fr");
+    expect(normalizeDiscoveryFilters({ niche: "x", language: "English" }, NOW).language).toBe("en");
+    expect(normalizeDiscoveryFilters({ niche: "x", language: "fr" }, NOW).language).toBe("fr"); // already ISO
+  });
+
+  it("maps country labels to ISO codes and treats 'all' as no filter", () => {
+    expect(normalizeDiscoveryFilters({ niche: "x", countryCode: "France" }, NOW).countryCode).toBe("FR");
+    expect(normalizeDiscoveryFilters({ niche: "x", countryCode: "FR" }, NOW).countryCode).toBe("FR");
+    const none = normalizeDiscoveryFilters({ niche: "x", language: "all", countryCode: "Tous" }, NOW);
+    expect(none.language).toBeUndefined();
+    expect(none.countryCode).toBeUndefined();
+  });
 });
