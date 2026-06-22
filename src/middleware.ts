@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 
 export async function middleware(request: NextRequest) {
+  // Local preview bypass (env-gated via NEXT_PUBLIC_DEV_BYPASS_PLAN, never set in prod).
+  if (DEV_BYPASS_PLAN) return NextResponse.next();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 

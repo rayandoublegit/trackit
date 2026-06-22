@@ -20,6 +20,7 @@ import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
+import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
@@ -213,6 +214,12 @@ function DashboardPageContent() {
   }, [loading, user?.id, lang]);
 
   useEffect(() => {
+    if (DEV_BYPASS_PLAN) {
+      setUser({ id: "00000000-0000-0000-0000-000000000000" } as User);
+      setProfile({ full_name: "Preview", username: "preview", avatar_url: null, business_name: null, shopify_store: null, plan: DEV_BYPASS_PLAN });
+      setLoading(false);
+      return;
+    }
     if (!supabase) { setLoading(false); router.replace("/auth"); return; }
     void supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       try {
