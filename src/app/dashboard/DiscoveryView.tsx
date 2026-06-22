@@ -58,6 +58,12 @@ type Creator = {
   location?: string | null;
   countryCode?: string | null;
   videoThumbnails?: VideoThumbnail[];
+  // New fields returned by /api/discovery
+  authenticityScore?: number | null;
+  qualityStatus?: string | null;
+  lastPostAt?: string | null;
+  postFrequency?: number | null;
+  engagementByFollower?: number | null;
 };
 
 type OutreachModalTab = "generate" | "templates" | "send";
@@ -1570,6 +1576,64 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
         </div>
       </div>
 
+      {(creator.authenticityScore != null || creator.lastPostAt) && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {creator.authenticityScore != null && (
+            <span
+              title={lang === "fr" ? "Score d'authenticité" : "Authenticity score"}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 11,
+                fontWeight: 600,
+                color: creator.authenticityScore >= 70 ? "#059669" : creator.authenticityScore >= 40 ? "#D97706" : "#DC2626",
+                background: creator.authenticityScore >= 70 ? "#ECFDF5" : creator.authenticityScore >= 40 ? "#FFFBEB" : "#FEF2F2",
+                border: `1px solid ${creator.authenticityScore >= 70 ? "#A7F3D0" : creator.authenticityScore >= 40 ? "#FDE68A" : "#FECACA"}`,
+                padding: "4px 9px",
+                borderRadius: 999,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6"/>
+              </svg>
+              {lang === "fr" ? `Qualité ${creator.authenticityScore}` : `Quality ${creator.authenticityScore}`}
+            </span>
+          )}
+          {creator.lastPostAt && (
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 11,
+                fontWeight: 500,
+                color: "#7A7A7A",
+                background: "#F5F5F5",
+                border: "1px solid #EFEFEF",
+                padding: "4px 9px",
+                borderRadius: 999,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6"/>
+                <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+              </svg>
+              {(() => {
+                const days = Math.floor((Date.now() - new Date(creator.lastPostAt).getTime()) / 86400000);
+                if (days <= 0) return lang === "fr" ? "Actif aujourd'hui" : "Active today";
+                if (days === 1) return lang === "fr" ? "Actif hier" : "Active yesterday";
+                if (days < 30) return lang === "fr" ? `Actif il y a ${days} j` : `Active ${days}d ago`;
+                return lang === "fr" ? `Actif il y a ${Math.floor(days / 30)} mois` : `Active ${Math.floor(days / 30)}mo ago`;
+              })()}
+            </span>
+          )}
+        </div>
+      )}
+
       {creator.bio && (
         <p
           style={{
@@ -1906,6 +1970,10 @@ export function DiscoveryView({
   const [engagement, setEngagement] = useState("");
   const [location, setLocation] = useState<DiscoveryLocation>("FR");
   const [language, setLanguage] = useState<DiscoveryLanguage>("french");
+  const [minViews, setMinViews] = useState("");
+  const [activeWithinDays, setActiveWithinDays] = useState("");
+  const [qualityGateOn, setQualityGateOn] = useState(true);
+  const [hasEmail, setHasEmail] = useState(false);
 
   useEffect(() => {
     setFollowers("");
@@ -2328,6 +2396,9 @@ export function DiscoveryView({
       const { min: minFollowers, max: maxFollowers } = followerBounds[activeFollowers] ?? { min: 0 };
       const minEngagement = parseInt(engagement, 10) || 0;
 
+      const minViewsNum = parseInt(minViews, 10) || 0;
+      const activeWithinDaysNum = parseInt(activeWithinDays, 10) || 0;
+
       const res = await fetch("/api/discovery", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2339,6 +2410,10 @@ export function DiscoveryView({
           minEngagement,
           location,
           language,
+          ...(minViewsNum > 0 ? { minViews: minViewsNum } : {}),
+          ...(activeWithinDaysNum > 0 ? { activeWithinDays: activeWithinDaysNum } : {}),
+          includeLowQuality: !qualityGateOn,
+          ...(hasEmail ? { hasEmail: true } : {}),
         }),
       });
 
@@ -2516,6 +2591,80 @@ export function DiscoveryView({
               onChange={handleLanguageChange}
               options={[{ value: "french", label: lang === "fr" ? "Français" : "French" }]}
             />
+            <FilterSelect
+              label={lang === "fr" ? "Vues min" : "Min views"}
+              value={minViews}
+              onChange={setMinViews}
+              options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
+                { value: "10000", label: "10K+" },
+                { value: "50000", label: "50K+" },
+                { value: "100000", label: "100K+" },
+              ]}
+            />
+            <FilterSelect
+              label={lang === "fr" ? "Activité" : "Activity"}
+              value={activeWithinDays}
+              onChange={setActiveWithinDays}
+              options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
+                { value: "7", label: lang === "fr" ? "7 j" : "7 d" },
+                { value: "30", label: lang === "fr" ? "30 j" : "30 d" },
+                { value: "90", label: lang === "fr" ? "90 j" : "90 d" },
+              ]}
+            />
+            <div>
+              <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Qualité vérifiée" : "Verified quality"}
+              </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  ...filterSelectStyle,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={qualityGateOn}
+                  onChange={(e) => setQualityGateOn(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                  {qualityGateOn
+                    ? (lang === "fr" ? "Activée" : "On")
+                    : (lang === "fr" ? "Désactivée" : "Off")}
+                </span>
+              </label>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Avec email" : "Has email"}
+              </div>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  ...filterSelectStyle,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={hasEmail}
+                  onChange={(e) => setHasEmail(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: "pointer", flexShrink: 0 }}
+                />
+                <span style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                  {hasEmail
+                    ? (lang === "fr" ? "Requis" : "Required")
+                    : (lang === "fr" ? "Tous" : "All")}
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
