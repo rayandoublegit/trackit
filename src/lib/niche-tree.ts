@@ -32,3 +32,19 @@ export function buildSeedTargets(): { query: string; tags: string[] }[] {
   }
   return targets;
 }
+
+// Deterministic rotating slice so the daily discovery cron covers all targets
+// over several days without re-querying everything each run.
+export function getDailySlice<T>(items: T[], dayIndex: number, sliceSize: number): T[] {
+  if (items.length === 0 || sliceSize <= 0) return [];
+  const size = Math.min(sliceSize, items.length);
+  const start = ((dayIndex * size) % items.length + items.length) % items.length;
+  const out: T[] = [];
+  for (let i = 0; i < size; i++) out.push(items[(start + i) % items.length]);
+  return out;
+}
+
+// Whole-day index in UTC, used to advance the rotating slice each day.
+export function dayIndexUTC(nowMs: number = Date.now()): number {
+  return Math.floor(nowMs / 86_400_000);
+}
