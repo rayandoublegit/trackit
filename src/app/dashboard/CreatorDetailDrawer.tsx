@@ -9,6 +9,7 @@ import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
   listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
 } from "@/lib/workspace-client";
+import type { ContentAnalysis } from "@/lib/creator-content-analysis";
 
 export type CreatorDetail = FeedCreator & {
   avgLikes?: number; avgComments?: number; avgShares?: number;
@@ -113,6 +114,8 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
   const [detail, setDetail] = useState<CreatorDetail | null>(creator);
   const [playing, setPlaying] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
+  const [analysis, setAnalysis] = useState<ContentAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [stage, setStageState] = useState("saved");
   const [notesVal, setNotesVal] = useState("");
@@ -212,6 +215,20 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // AI content analysis of the creator's video frames (paid; cached server-side).
+  useEffect(() => {
+    if (!creator || !isPaid) { setAnalysis(null); return; }
+    let cancelled = false;
+    setAnalysis(null);
+    setAnalysisLoading(true);
+    fetch(`/api/creator/${encodeURIComponent(creator.username)}/analyze`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setAnalysis(d?.analysis ?? null); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAnalysisLoading(false); });
+    return () => { cancelled = true; };
+  }, [creator, isPaid]);
 
   const videos = useMemo(() => {
     if (!detail) return [];
@@ -356,6 +373,30 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
             {videos.map((v) => (
               <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} />
             ))}
+          </div>
+        )}
+
+        {isPaid && (
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Analyse du contenu (IA)</div>
+            {analysisLoading && !analysis ? (
+              <div style={{ fontSize: 13, color: "#9A9A9A", background: "#F7F7F8", borderRadius: 10, padding: 12 }}>Analyse des vidéos en cours…</div>
+            ) : analysis ? (
+              <div style={{ background: "#F7F7F8", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55 }}>{analysis.summary}</div>
+                {analysis.themes.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {analysis.themes.map((t) => <span key={t} style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", padding: "2px 9px", borderRadius: 20 }}>{t}</span>)}
+                  </div>
+                )}
+                {analysis.style && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>Style :</span> {analysis.style}</div>}
+                {analysis.production && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>Production :</span> {analysis.production}</div>}
+                {analysis.brandFit && <div style={{ fontSize: 12.5, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>🎯 <span style={{ fontWeight: 600 }}>Fit marque :</span> {analysis.brandFit}</div>}
+                {!analysis.brandSafe && <div style={{ fontSize: 12, color: "#9A1F1F", background: "#FEF2F2", borderRadius: 8, padding: "6px 10px" }}>⚠ Contenu potentiellement sensible pour une marque.</div>}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "#9A9A9A" }}>Analyse indisponible pour ce créateur.</div>
+            )}
           </div>
         )}
 
