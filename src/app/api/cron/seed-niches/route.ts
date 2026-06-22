@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { buildSeedTargets } from "@/lib/niche-tree";
+import { buildSeedTargets, getDailySlice, dayIndexUTC } from "@/lib/niche-tree";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -12,13 +12,6 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function estimateEngagement(followers: number): number {
-  if (followers < 10000) return 8.0;
-  if (followers < 50000) return 6.5;
-  if (followers < 200000) return 5.0;
-  if (followers < 1000000) return 3.5;
-  return 2.0;
-}
 
 const AVATAR_BUCKET = "avatars";
 
@@ -95,18 +88,19 @@ async function seedTarget(query: string, tags: string[], pages: number) {
             avatar_url: stored || remote || fallback,
             platform: "TikTok",
             followers,
-            engagement_rate: estimateEngagement(followers),
-            avg_views: Math.floor(followers * 0.1),
             bio: String(u.signature || ""),
             niches: tags.map(t => t.toLowerCase()),
             video_thumbnails: [],
             last_scraped_at: new Date().toISOString(),
+            enrichment_status: "pending",
           };
         })
       );
 
       if (upserts.length > 0) {
-        await supabaseAdmin.from("creators_index").upsert(upserts, { onConflict: "username" });
+        await supabaseAdmin
+          .from("creators_index")
+          .upsert(upserts, { onConflict: "username", ignoreDuplicates: true });
         seeded += upserts.length;
       }
 
@@ -132,7 +126,13 @@ export async function GET(request: Request) {
   const only = searchParams.get("only");
 
   let targets = buildSeedTargets();
-  if (only) targets = targets.filter(t => t.tags.includes(only));
+  if (only) {
+    targets = targets.filter((t) => t.tags.includes(only));
+  } else {
+    // Rotate a slice each day so we don't re-query all ~180 niches daily.
+    const slice = Math.min(Math.max(Number(searchParams.get("slice") || 40), 1), targets.length);
+    targets = getDailySlice(targets, dayIndexUTC(), slice);
+  }
 
   let total = 0;
   for (const t of targets) {
