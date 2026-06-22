@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
-import { getDevSampleCreators } from "@/lib/dev-sample-creators";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -105,7 +104,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // 3) Last resort (no API key configured): dev sample data.
-  const creators = getDevSampleCreators(body.niche, f);
-  return NextResponse.json({ creators, source: "dev-mock", count: creators.length });
+  // No DB match and no live source configured -> empty result.
+  return NextResponse.json({ creators: [], count: 0 });
 }
