@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { fetchTikTokProfileRaw, fetchTikTokVideosRaw, parseProfile, parseVideos, extractCaptions } from "@/lib/scrapecreators";
+import { fetchTikTokProfileRaw, fetchTikTokVideosRaw, parseProfile, parseVideos, parseVideosRich, extractCaptions } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
 import { classifyCreator } from "@/lib/creator-classify";
 
@@ -42,7 +42,8 @@ export async function GET(request: Request) {
       ]);
       const profile = parseProfile(profileRaw);
       const videos = parseVideos(videosRaw);
-      const row = buildEnrichmentRow(username, profile, videos);
+      const rich = parseVideosRich(videosRaw);
+      const row = buildEnrichmentRow(username, profile, videos, Date.now(), rich);
 
       let classMerge: Record<string, unknown> = {};
       try {

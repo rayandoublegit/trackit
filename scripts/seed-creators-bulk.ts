@@ -7,6 +7,7 @@ import {
   fetchTikTokVideosRaw,
   parseProfile,
   parseVideos,
+  parseVideosRich,
   extractCaptions,
 } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
@@ -62,7 +63,8 @@ async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<
     const followers = profile.followers || Number(u.follower_count || 0);
     if (followers < MIN_FOLLOWERS) return "skip";
     const videos = parseVideos(vRaw);
-    const row = buildEnrichmentRow(username, { ...profile, followers }, videos);
+    const rich = parseVideosRich(vRaw);
+    const row = buildEnrichmentRow(username, { ...profile, followers }, videos, Date.now(), rich);
 
     // Classification: Claude if a key is present, else infer from the localized term.
     let extra: Record<string, unknown> = {

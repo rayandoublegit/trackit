@@ -51,6 +51,47 @@ export function parseVideos(raw: any): VideoStat[] {
   });
 }
 
+export interface RichVideo {
+  id: string;
+  cover: string; // animated WebP (dynamic_cover) preferred, renderable
+  shareUrl: string;
+  playCount: number;
+  likeCount: number;
+  commentCount: number;
+  shareCount: number;
+  createTime: number; // unix seconds
+  desc: string;
+  isAd: boolean;
+}
+
+// Richer per-video data for the in-app detail view (thumbnails + embed + stats).
+export function parseVideosRich(raw: any): RichVideo[] {
+  const list = (raw?.aweme_list ?? []) as any[];
+  return list.map((a) => {
+    const st = a?.statistics ?? {};
+    const v = a?.video ?? {};
+    const cover =
+      v.dynamic_cover?.url_list?.[0] ??
+      v.ai_dynamic_cover?.url_list?.[0] ??
+      v.origin_cover?.url_list?.[0] ??
+      v.cover?.url_list?.[0] ??
+      "";
+    const shareUrl = a?.share_url ?? a?.share_info?.share_url ?? "";
+    return {
+      id: String(a?.aweme_id ?? ""),
+      cover: String(cover),
+      shareUrl: String(shareUrl),
+      playCount: Number(st.play_count ?? 0),
+      likeCount: Number(st.digg_count ?? 0),
+      commentCount: Number(st.comment_count ?? 0),
+      shareCount: Number(st.share_count ?? 0),
+      createTime: Number(a?.create_time ?? 0),
+      desc: String(a?.desc ?? ""),
+      isAd: Boolean(a?.is_ad),
+    };
+  });
+}
+
 export function extractCaptions(raw: any): string[] {
   const list = (raw?.aweme_list ?? []) as any[];
   return list.map((a) => String(a?.desc ?? "")).filter(Boolean);
