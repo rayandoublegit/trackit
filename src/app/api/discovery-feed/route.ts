@@ -18,7 +18,9 @@ export async function GET(req: NextRequest) {
     minEngagement: num("minEngagement"),
     country: p.get("country") || undefined,
     language: p.get("language") || undefined,
-    sort: p.get("sort") === "engagement" ? "engagement" : "followers",
+    sort: (["value", "followers", "engagement"].includes(p.get("sort") || "")
+      ? (p.get("sort") as "value" | "followers" | "engagement")
+      : "value"),
   };
   const offset = Math.max(0, Number(p.get("offset")) || 0);
   const limit = Math.min(48, Math.max(1, Number(p.get("limit")) || 24));

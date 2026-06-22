@@ -146,13 +146,20 @@ function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen
   );
 }
 
-function FilterBar({ isPaid, values, onChange, onLocked }: {
+function FilterBar({ isPaid, values, onChange, onLocked, sort, onSort }: {
   isPaid: boolean; values: FilterState; onChange: (key: string, v: string) => void; onLocked: () => void;
+  sort: string; onSort: (v: "value" | "followers" | "engagement") => void;
 }) {
   const selStyle: React.CSSProperties = { padding: "9px 13px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 13, color: "#1A1A1A", background: "#FFF", fontFamily: "inherit", cursor: "pointer" };
   const guard = isPaid ? undefined : (e: React.SyntheticEvent) => { e.preventDefault(); onLocked(); };
   return (
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
+      <select aria-label="Trier" style={{ ...selStyle, fontWeight: 600 }} value={isPaid ? sort : "value"} onMouseDown={guard} onKeyDown={guard}
+        onChange={(e) => { if (!isPaid) { e.preventDefault(); onLocked(); return; } onSort(e.target.value as "value" | "followers" | "engagement"); }}>
+        <option value="value">Tri : Rentabilité</option>
+        <option value="followers">Tri : Abonnés</option>
+        <option value="engagement">Tri : Engagement</option>
+      </select>
       {FILTERS.map((f) => (
         <select key={f.key} aria-label={f.label} style={selStyle} onMouseDown={guard} onKeyDown={guard}
           value={isPaid ? (values[f.key] || f.options[0]) : f.options[0]}
@@ -192,8 +199,9 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
   const [error, setError] = useState<string | null>(null);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
+  const [sort, setSort] = useState<"value" | "followers" | "engagement">("value");
 
-  const params = useMemo(() => toParams(filters), [filters]);
+  const params = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
 
   const fetchPage = useCallback(async (off: number, replace: boolean) => {
     const qs = new URLSearchParams({ ...params, offset: String(off), limit: String(LIMIT) }).toString();
@@ -238,7 +246,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
       <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 20px" }}>Trouve les meilleurs créateurs — aperçu complet du compte, vidéos et analyse de rentabilité.</p>
 
       <FilterBar isPaid={isPaid} values={filters} onLocked={() => setFilterPaywall(true)}
-        onChange={(key, v) => setFilters((prev) => ({ ...prev, [key]: v }))} />
+        onChange={(key, v) => setFilters((prev) => ({ ...prev, [key]: v }))}
+        sort={sort} onSort={setSort} />
 
       {loading && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Chargement du feed…</div>}
       {!loading && error && <div style={{ color: "#dc2626", fontSize: 14 }}>Erreur : {error}</div>}
