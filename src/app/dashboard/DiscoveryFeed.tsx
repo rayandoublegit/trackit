@@ -63,16 +63,16 @@ function toParams(f: FilterState): Record<string, string> {
 }
 
 function VideoPreview({ creator }: { creator: FeedCreator }) {
-  const vids = (creator.topVideos || []).filter((v) => v.cover).slice(0, 3);
+  const vids = (creator.topVideos || []).filter((v) => v.cover).slice(0, 4);
   if (vids.length === 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
       {vids.map((v, i) => (
-        <div key={v.id || i} style={{ position: "relative", aspectRatio: "9 / 16", borderRadius: 10, overflow: "hidden",
+        <div key={v.id || i} style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden",
           background: `#111 url("${proxy(v.cover)}") center / cover no-repeat` }}>
-          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.92)", fontSize: 22 }}>▶</span>
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.9)", fontSize: 16 }}>▶</span>
           {v.playCount > 0 && (
-            <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 11, fontWeight: 600, color: "#FFF", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{fmt(v.playCount)}</span>
+            <span style={{ position: "absolute", left: 4, bottom: 4, fontSize: 10, fontWeight: 600, color: "#FFF", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{fmt(v.playCount)}</span>
           )}
         </div>
       ))}
