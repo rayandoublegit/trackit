@@ -207,7 +207,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
 
   const items = isPaid ? creators : creators.slice(0, FREE_VISIBLE + 2);
   const hasMoreFree = !isPaid && creators.length > FREE_VISIBLE;
-  const gridCols = isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))";
+  const gridCols = isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))";
 
   return (
     <div style={{ padding: isMobile ? "56px 16px 40px" : "40px", background: "#FFF", minHeight: "100vh" }}>
