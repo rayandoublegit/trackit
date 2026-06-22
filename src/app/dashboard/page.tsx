@@ -20,6 +20,7 @@ import { CreatorScripts } from "./CreatorScripts";
 import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
+import { DiscoveryFeed } from "./DiscoveryFeed";
 import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
@@ -780,13 +781,14 @@ function DashboardPageContent() {
           />
         )}
         {view === "discovery" && (
-          <DiscoveryView
+          <DiscoveryFeed
             isMobile={isMobile}
             plan={plan}
-            onUpgrade={handleUpgradeBasic}
-            onUpgradePro={handleUpgradePro}
-            onUpgradeScale={handleUpgradeScale}
-            onNavigateToOutreachSend={navigateToOutreachSend}
+            onUpgrade={() => {
+              if (plan === "free") void handleUpgradeBasic();
+              else if (plan === "basic") void handleUpgradePro();
+              else void handleUpgradeScale();
+            }}
           />
         )}
         {view === "creators" && (
