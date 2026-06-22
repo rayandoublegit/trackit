@@ -5,6 +5,7 @@ import type { PlanTier } from "@/lib/plan-limits";
 import { FREE_FEED_VISIBLE } from "@/lib/creator-value";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
+import { saveCreator } from "@/lib/workspace-client";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -70,7 +71,8 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
   );
 }
 
-function FeedCard({ creator, onOpen }: { creator: FeedCreator; onOpen?: () => void }) {
+function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen?: () => void; onUpgrade?: () => void }) {
+  const [saved, setSaved] = useState(false);
   const top = creator.valueScore >= 80;
   const active = daysAgoLabel(creator.lastPostAt);
   const rentaColor = creator.valueScore >= 70 ? "#15803D" : creator.valueScore >= 40 ? "#B45309" : "#9A1F1F";
@@ -111,7 +113,17 @@ function FeedCard({ creator, onOpen }: { creator: FeedCreator; onOpen?: () => vo
         <span style={{ flex: 1, fontSize: 11, color: creator.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {creator.email ? `✉ ${creator.email}` : "Contact via DM"}
         </span>
-        <button type="button" onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>Sauver</button>
+        <button type="button"
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (saved) return;
+            const r = await saveCreator(creator);
+            if (r.error) { if (r.status === 402) onUpgrade?.(); return; }
+            setSaved(true);
+          }}
+          style={{ fontSize: 12, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+          {saved ? "✓ Sauvé" : "Sauver"}
+        </button>
       </div>
     </div>
   );
@@ -229,7 +241,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
             return (
               <div key={c.username} aria-hidden={locked || undefined}
                 style={locked ? { filter: "blur(6px)", opacity: 0.55, pointerEvents: "none" } : undefined}>
-                <FeedCard creator={c} onOpen={() => setSelected(c)} />
+                <FeedCard creator={c} onOpen={() => setSelected(c)} onUpgrade={onUpgrade} />
               </div>
             );
           })}
