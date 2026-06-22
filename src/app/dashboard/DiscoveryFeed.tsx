@@ -14,16 +14,6 @@ function fmt(n: number): string {
   return String(Math.round(n));
 }
 
-function daysAgoLabel(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (d <= 0) return "actif aujourd'hui";
-  if (d === 1) return "actif hier";
-  if (d < 30) return `actif il y a ${d} j`;
-  if (d < 365) return `actif il y a ${Math.floor(d / 30)} mois`;
-  return null;
-}
-
 function Lock({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
@@ -66,25 +56,14 @@ function VideoPreview({ creator }: { creator: FeedCreator }) {
   const vids = (creator.topVideos || []).filter((v) => v.cover).slice(0, 4);
   if (vids.length === 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+    <div style={{ display: "flex", gap: 5 }}>
       {vids.map((v, i) => (
-        <div key={v.id || i} style={{ position: "relative", aspectRatio: "1 / 1", borderRadius: 8, overflow: "hidden",
-          background: `#111 url("${proxy(v.cover)}") center / cover no-repeat` }}>
-          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.9)", fontSize: 16 }}>▶</span>
-          {v.playCount > 0 && (
-            <span style={{ position: "absolute", left: 4, bottom: 4, fontSize: 10, fontWeight: 600, color: "#FFF", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{fmt(v.playCount)}</span>
-          )}
+        <div key={v.id || i} title={v.playCount ? `${fmt(v.playCount)} vues` : undefined}
+          style={{ width: 38, aspectRatio: "9 / 16", borderRadius: 5, flexShrink: 0, position: "relative",
+            background: `#111 url("${proxy(v.cover)}") center / cover no-repeat` }}>
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.8)", fontSize: 11 }}>▶</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function MiniStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div style={{ background: "#F7F7F8", borderRadius: 10, padding: "8px 10px" }}>
-      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: accent ? "#0047FF" : "#1A1A1A" }}>{value}</div>
     </div>
   );
 }
@@ -92,53 +71,43 @@ function MiniStat({ label, value, accent }: { label: string; value: string; acce
 function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen?: () => void; onUpgrade?: () => void }) {
   const [saved, setSaved] = useState(false);
   const c = creator;
-  const active = daysAgoLabel(c.lastPostAt);
   const rentaColor = c.valueScore >= 70 ? "#15803D" : c.valueScore >= 40 ? "#B45309" : "#9A1F1F";
   const rentaBg = c.valueScore >= 70 ? "#F0FDF4" : c.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
+  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=120&bold=true&rounded=true`;
   return (
-    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #ECECEC", borderRadius: 16, padding: 16, cursor: "pointer", display: "flex", flexDirection: "column", gap: 13 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-        <img src={c.avatarUrl ? proxy(c.avatarUrl) : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=160&bold=true&rounded=true`} alt="" width={52} height={52} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
-          onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = "1"; i.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=160&bold=true&rounded=true`; } }} />
+    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #ECECEC", borderRadius: 14, padding: 14, cursor: "pointer", display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <img src={c.avatarUrl ? proxy(c.avatarUrl) : fallback} alt="" width={42} height={42} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
+          onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = "1"; i.src = fallback; } }} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.displayName}</span>
-          </div>
-          <div style={{ fontSize: 12.5, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            @{c.username}{c.countryCode ? ` · ${c.countryCode}` : ""}{c.language && c.language !== "unknown" ? ` · ${c.language}` : ""}
-          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.displayName}</div>
+          <div style={{ fontSize: 12, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{c.username}{c.countryCode ? ` · ${c.countryCode}` : ""}</div>
         </div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: rentaColor, background: rentaBg, padding: "5px 9px", borderRadius: 9, whiteSpace: "nowrap" }}>Renta {c.valueScore}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: rentaColor, background: rentaBg, padding: "4px 8px", borderRadius: 8, whiteSpace: "nowrap" }}>R {c.valueScore}</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</span>
-        <span style={{ fontSize: 12.5, color: "#9A9A9A" }}>abonnés</span>
-        <span style={{ fontSize: 11, color: "#0047FF", background: "#E8EEFC", padding: "2px 9px", borderRadius: 20, textTransform: "capitalize" }}>{c.primaryNiche || c.niche}</span>
-        {c.valueScore >= 80 && <span style={{ fontSize: 11, fontWeight: 600, color: "#92400E", background: "#FEF3C7", padding: "2px 9px", borderRadius: 20 }}>★ Top ROI</span>}
-        {active && <span style={{ fontSize: 11, color: "#15803D", background: "#F0FDF4", padding: "2px 9px", borderRadius: 20 }}>{active}</span>}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 19, fontWeight: 700, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</span>
+        <span style={{ fontSize: 12, color: "#9A9A9A" }}>abonnés</span>
+        <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "2px 8px", borderRadius: 20, textTransform: "capitalize" }}>{c.primaryNiche || c.niche}</span>
       </div>
-
-      {c.bio && (
-        <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.bio}</div>
-      )}
 
       <VideoPreview creator={c} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 7 }}>
-        <MiniStat label="Engagement" value={`${c.engagementRate}%`} />
-        <MiniStat label="Vues moy." value={fmt(c.avgViews)} />
-        <MiniStat label="CPM est." value={`$${c.estCpm}`} accent />
-        <MiniStat label="Authenticité" value={`${c.authenticityScore}`} />
+      <div style={{ fontSize: 11.5, color: "#5A5A5A", display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{c.engagementRate}%</b> eng.</span>
+        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{fmt(c.avgViews)}</b> vues</span>
+        <span><b style={{ color: "#0047FF", fontWeight: 600 }}>${c.estCpm}</b> CPM</span>
+        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{c.authenticityScore}</b> auth.</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ flex: 1, fontSize: 12, color: c.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderTop: "0.5px solid #F0F0F0", paddingTop: 9 }}>
+        <span style={{ fontSize: 11, color: c.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "58%" }}>
           {c.email ? `✉ ${c.email}` : "Contact via DM"}
         </span>
         <button type="button"
           onClick={async (e) => { e.stopPropagation(); if (saved) return; const r = await saveCreator(c); if (r.error) { if (r.status === 402) onUpgrade?.(); return; } setSaved(true); }}
-          style={{ fontSize: 13, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 9, padding: "8px 16px", cursor: "pointer" }}>
+          style={{ fontSize: 12, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", flexShrink: 0 }}>
           {saved ? "✓ Sauvé" : "Sauver"}
         </button>
       </div>
