@@ -1,6 +1,7 @@
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
+import { getDevSampleCreators } from "@/lib/dev-sample-creators";
 import { createClient } from "@supabase/supabase-js";
 import {
   estimatedCostPerPost,
@@ -86,12 +87,20 @@ export async function buildFeed(opts: { limitPerNiche?: number } = {}): Promise<
     const limit = Number(opts.limitPerNiche ?? process.env.FEED_LIMIT_PER_NICHE ?? 3);
     for (const niche of feedNiches()) {
       try {
-        const part = await liveSearchAndEnrich(niche, normalizeDiscoveryFilters({ niche }), { limit });
+        // No hard quality gate for the feed — the value/rentabilité ranking
+        // already sinks low-value (inflated) creators to the bottom.
+        const part = await liveSearchAndEnrich(niche, normalizeDiscoveryFilters({ niche, includeLowQuality: true }), { limit });
         pool.push(...part);
       } catch {
         // skip a niche on error
       }
     }
+  }
+
+  // Local preview fallback: no DB and no live data (e.g. ScrapeCreators credits
+  // exhausted) -> show sample creators so the feed stays explorable offline.
+  if (pool.length === 0 && !hasDb) {
+    pool = getDevSampleCreators("", normalizeDiscoveryFilters({ niche: "", includeLowQuality: true }));
   }
 
   const ranked = rankFeed(pool);
