@@ -119,6 +119,10 @@ function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen
         {active && <span style={{ fontSize: 11, color: "#15803D", background: "#F0FDF4", padding: "2px 9px", borderRadius: 20 }}>{active}</span>}
       </div>
 
+      {c.bio && (
+        <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{c.bio}</div>
+      )}
+
       <VideoPreview creator={c} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 7 }}>
