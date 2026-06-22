@@ -41,12 +41,27 @@ export async function GET(req: NextRequest) {
     });
     if (!upstream.ok) return new NextResponse("upstream error", { status: 502 });
     const buf = await upstream.arrayBuffer();
-    const contentType = upstream.headers.get("content-type") || "image/jpeg";
-    return new NextResponse(buf, {
+    let contentType = upstream.headers.get("content-type") || "image/jpeg";
+    let body: BodyInit = buf;
+
+    // TikTok serves many avatars as HEIC, which browsers can't render. Decode to
+    // JPEG on the fly (pure-JS, cached downstream) so real profile photos show.
+    if (/image\/hei[cf]/i.test(contentType) || /\.heic(\?|$)/i.test(url)) {
+      try {
+        const convert = (await import("heic-convert")).default;
+        const jpeg = await convert({ buffer: Buffer.from(buf), format: "JPEG", quality: 0.82 });
+        body = new Uint8Array(jpeg);
+        contentType = "image/jpeg";
+      } catch {
+        /* keep original bytes if decode fails */
+      }
+    }
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         "content-type": contentType,
-        "cache-control": "public, max-age=86400, immutable",
+        "cache-control": "public, max-age=604800, immutable",
       },
     });
   } catch {

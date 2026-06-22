@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
-import { FREE_FEED_VISIBLE } from "@/lib/creator-value";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 import { saveCreator } from "@/lib/workspace-client";
+
+const proxy = (u?: string) => (!u ? "" : u.includes("/api/img-proxy") ? u : `/api/img-proxy?url=${encodeURIComponent(u)}`);
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -19,7 +20,8 @@ function daysAgoLabel(iso: string | null): string | null {
   if (d <= 0) return "actif aujourd'hui";
   if (d === 1) return "actif hier";
   if (d < 30) return `actif il y a ${d} j`;
-  return `actif il y a ${Math.floor(d / 30)} mois`;
+  if (d < 365) return `actif il y a ${Math.floor(d / 30)} mois`;
+  return null;
 }
 
 function Lock({ size = 14 }: { size?: number }) {
@@ -31,97 +33,108 @@ function Lock({ size = 14 }: { size?: number }) {
   );
 }
 
-const FILTERS: { label: string; options: string[] }[] = [
-  { label: "Niche", options: ["Toutes niches", "Fitness", "Beauté", "Food", "Mode", "Tech", "Finance"] },
-  { label: "Plateforme", options: ["Toutes", "TikTok", "Instagram", "YouTube"] },
-  { label: "Abonnés", options: ["Tous", "< 50k", "50k – 500k", "500k – 2M", "2M+"] },
-  { label: "Engagement", options: ["Tous", "≥ 3%", "≥ 6%", "≥ 9%"] },
-  { label: "Localisation", options: ["Tous pays", "France", "USA", "UK", "Allemagne", "Brésil"] },
-  { label: "Langue", options: ["Toutes", "Français", "Anglais", "Espagnol"] },
+const FILTERS: { key: string; label: string; options: string[] }[] = [
+  { key: "niche", label: "Niche", options: ["Toutes niches", "Fitness", "Beauté", "Food", "Mode", "Tech", "Finance", "Voyage", "Gaming"] },
+  { key: "platform", label: "Plateforme", options: ["Toutes", "TikTok", "Instagram", "YouTube"] },
+  { key: "followers", label: "Abonnés", options: ["Tous", "< 50k", "50k – 500k", "500k – 2M", "2M+"] },
+  { key: "engagement", label: "Engagement", options: ["Tous", "≥ 3%", "≥ 6%", "≥ 9%"] },
+  { key: "country", label: "Localisation", options: ["Tous pays", "France", "USA", "UK", "Allemagne", "Brésil"] },
+  { key: "language", label: "Langue", options: ["Toutes", "Français", "Anglais", "Espagnol"] },
 ];
 
-function VideoStrip({ creator }: { creator: FeedCreator }) {
-  const vids = (creator.videoThumbnails || []).slice(0, 3);
+type FilterState = Record<string, string>;
+
+function toParams(f: FilterState): Record<string, string> {
+  const p: Record<string, string> = {};
+  if (f.niche) p.niche = f.niche;
+  if (f.platform && f.platform !== "TikTok") p.platform = f.platform; // all data is TikTok -> no-op
+  if (f.followers === "< 50k") p.maxFollowers = "50000";
+  else if (f.followers === "50k – 500k") { p.minFollowers = "50000"; p.maxFollowers = "500000"; }
+  else if (f.followers === "500k – 2M") { p.minFollowers = "500000"; p.maxFollowers = "2000000"; }
+  else if (f.followers === "2M+") p.minFollowers = "2000000";
+  if (f.engagement === "≥ 3%") p.minEngagement = "3";
+  else if (f.engagement === "≥ 6%") p.minEngagement = "6";
+  else if (f.engagement === "≥ 9%") p.minEngagement = "9";
+  const C: Record<string, string> = { France: "FR", USA: "US", UK: "GB", Allemagne: "DE", "Brésil": "BR" };
+  if (C[f.country]) p.country = C[f.country];
+  const L: Record<string, string> = { "Français": "fr", Anglais: "en", Espagnol: "es" };
+  if (L[f.language]) p.language = L[f.language];
+  return p;
+}
+
+function VideoPreview({ creator }: { creator: FeedCreator }) {
+  const vids = (creator.topVideos || []).filter((v) => v.cover).slice(0, 3);
   if (vids.length === 0) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginBottom: 12 }}>
-      {vids.map((v, i) => {
-        const Wrapper = v.url ? "a" : "div";
-        const props = v.url ? { href: v.url, target: "_blank", rel: "noopener noreferrer" } : {};
-        return (
-          <Wrapper key={i} {...props} style={{ aspectRatio: "9 / 16", borderRadius: 8, position: "relative", display: "block",
-            background: v.thumbnail ? `url("${v.thumbnail}") center / cover no-repeat` : "#F0F0F0" }}>
-            {v.views > 0 && (
-              <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "5px 6px", fontSize: 10, fontWeight: 600,
-                color: "#FFF", background: "linear-gradient(transparent, rgba(0,0,0,0.7))" }}>{fmt(v.views)} vues</span>
-            )}
-          </Wrapper>
-        );
-      })}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+      {vids.map((v, i) => (
+        <div key={v.id || i} style={{ position: "relative", aspectRatio: "9 / 16", borderRadius: 10, overflow: "hidden",
+          background: `#111 url("${proxy(v.cover)}") center / cover no-repeat` }}>
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.92)", fontSize: 22 }}>▶</span>
+          {v.playCount > 0 && (
+            <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 11, fontWeight: 600, color: "#FFF", textShadow: "0 1px 3px rgba(0,0,0,0.9)" }}>{fmt(v.playCount)}</span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function MiniStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div>
-      <div style={{ fontSize: 10, color: "#9A9A9A", marginBottom: 1 }}>{label}</div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: accent ? "#0047FF" : "#1A1A1A" }}>{value}</div>
+    <div style={{ background: "#F7F7F8", borderRadius: 10, padding: "8px 10px" }}>
+      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: accent ? "#0047FF" : "#1A1A1A" }}>{value}</div>
     </div>
   );
 }
 
 function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen?: () => void; onUpgrade?: () => void }) {
   const [saved, setSaved] = useState(false);
-  const top = creator.valueScore >= 80;
-  const active = daysAgoLabel(creator.lastPostAt);
-  const rentaColor = creator.valueScore >= 70 ? "#15803D" : creator.valueScore >= 40 ? "#B45309" : "#9A1F1F";
-  const rentaBg = creator.valueScore >= 70 ? "#F0FDF4" : creator.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
+  const c = creator;
+  const active = daysAgoLabel(c.lastPostAt);
+  const rentaColor = c.valueScore >= 70 ? "#15803D" : c.valueScore >= 40 ? "#B45309" : "#9A1F1F";
+  const rentaBg = c.valueScore >= 70 ? "#F0FDF4" : c.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
   return (
-    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #EFEFEF", borderRadius: 14, padding: 14, display: "flex", flexDirection: "column", cursor: onOpen ? "pointer" : "default" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-        <img src={creator.avatarUrl} alt="" width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
-          onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
+    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #ECECEC", borderRadius: 16, padding: 16, cursor: "pointer", display: "flex", flexDirection: "column", gap: 13 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <img src={c.avatarUrl ? proxy(c.avatarUrl) : `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=160&bold=true&rounded=true`} alt="" width={52} height={52} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
+          onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = "1"; i.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=160&bold=true&rounded=true`; } }} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{creator.displayName}</div>
-          <div style={{ fontSize: 11, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            @{creator.username}{creator.countryCode ? ` · ${creator.countryCode}` : ""}
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.displayName}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            @{c.username}{c.countryCode ? ` · ${c.countryCode}` : ""}{c.language && c.language !== "unknown" ? ` · ${c.language}` : ""}
           </div>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: rentaColor, background: rentaBg, padding: "4px 8px", borderRadius: 8, whiteSpace: "nowrap" }}>Renta {creator.valueScore}</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: rentaColor, background: rentaBg, padding: "5px 9px", borderRadius: 9, whiteSpace: "nowrap" }}>Renta {c.valueScore}</span>
       </div>
 
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 11 }}>
-        <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "2px 8px", borderRadius: 20, textTransform: "capitalize" }}>{creator.primaryNiche || creator.niche}</span>
-        <span style={{ fontSize: 10, color: "#7A7A7A", background: "#F5F5F5", padding: "2px 8px", borderRadius: 20, textTransform: "capitalize" }}>{creator.valueTier}</span>
-        {top && <span style={{ fontSize: 10, fontWeight: 600, color: "#92400E", background: "#FEF3C7", padding: "2px 8px", borderRadius: 20 }}>★ Top ROI</span>}
-        {active && <span style={{ fontSize: 10, color: "#15803D", background: "#F0FDF4", padding: "2px 8px", borderRadius: 20 }}>{active}</span>}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 22, fontWeight: 700, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</span>
+        <span style={{ fontSize: 12.5, color: "#9A9A9A" }}>abonnés</span>
+        <span style={{ fontSize: 11, color: "#0047FF", background: "#E8EEFC", padding: "2px 9px", borderRadius: 20, textTransform: "capitalize" }}>{c.primaryNiche || c.niche}</span>
+        {c.valueScore >= 80 && <span style={{ fontSize: 11, fontWeight: 600, color: "#92400E", background: "#FEF3C7", padding: "2px 9px", borderRadius: 20 }}>★ Top ROI</span>}
+        {active && <span style={{ fontSize: 11, color: "#15803D", background: "#F0FDF4", padding: "2px 9px", borderRadius: 20 }}>{active}</span>}
       </div>
 
-      <VideoStrip creator={creator} />
+      <VideoPreview creator={c} />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px 8px", marginBottom: 11 }}>
-        <Stat label="Abonnés" value={fmt(creator.followersCount)} />
-        <Stat label="Engagement" value={`${creator.engagementRate}%`} />
-        <Stat label="Vues moy." value={fmt(creator.avgViews)} />
-        <Stat label="CPM est." value={`$${creator.estCpm}`} accent />
-        <Stat label="Coût/post" value={`$${fmt(creator.estCostPerPost)}`} />
-        <Stat label="Posts/sem." value={creator.postFrequency ? String(creator.postFrequency) : "—"} />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 7 }}>
+        <MiniStat label="Engagement" value={`${c.engagementRate}%`} />
+        <MiniStat label="Vues moy." value={fmt(c.avgViews)} />
+        <MiniStat label="CPM est." value={`$${c.estCpm}`} accent />
+        <MiniStat label="Authenticité" value={`${c.authenticityScore}`} />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "auto" }}>
-        <span style={{ flex: 1, fontSize: 11, color: creator.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {creator.email ? `✉ ${creator.email}` : "Contact via DM"}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ flex: 1, fontSize: 12, color: c.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {c.email ? `✉ ${c.email}` : "Contact via DM"}
         </span>
         <button type="button"
-          onClick={async (e) => {
-            e.stopPropagation();
-            if (saved) return;
-            const r = await saveCreator(creator);
-            if (r.error) { if (r.status === 402) onUpgrade?.(); return; }
-            setSaved(true);
-          }}
-          style={{ fontSize: 12, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 8, padding: "6px 12px", cursor: "pointer" }}>
+          onClick={async (e) => { e.stopPropagation(); if (saved) return; const r = await saveCreator(c); if (r.error) { if (r.status === 402) onUpgrade?.(); return; } setSaved(true); }}
+          style={{ fontSize: 13, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 9, padding: "8px 16px", cursor: "pointer" }}>
           {saved ? "✓ Sauvé" : "Sauver"}
         </button>
       </div>
@@ -129,35 +142,17 @@ function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen
   );
 }
 
-function FilterBar({ isPaid, onLockedInteract, onNicheChange, onEngChange, nicheValue, engValue }: {
-  isPaid: boolean;
-  onLockedInteract: () => void;
-  onNicheChange: (v: string) => void;
-  onEngChange: (v: number) => void;
-  nicheValue: string;
-  engValue: number;
+function FilterBar({ isPaid, values, onChange, onLocked }: {
+  isPaid: boolean; values: FilterState; onChange: (key: string, v: string) => void; onLocked: () => void;
 }) {
-  const selStyle: React.CSSProperties = { padding: "8px 12px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 13, color: "#1A1A1A", background: "#FFF", fontFamily: "inherit", cursor: "pointer" };
-  // Free users SEE every filter, fully styled and clickable — but interacting
-  // with any of them opens the paywall instead of filtering.
-  const guard = isPaid ? undefined : (e: React.SyntheticEvent) => { e.preventDefault(); onLockedInteract(); };
+  const selStyle: React.CSSProperties = { padding: "9px 13px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 13, color: "#1A1A1A", background: "#FFF", fontFamily: "inherit", cursor: "pointer" };
+  const guard = isPaid ? undefined : (e: React.SyntheticEvent) => { e.preventDefault(); onLocked(); };
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 24 }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
       {FILTERS.map((f) => (
-        <select
-          key={f.label}
-          aria-label={f.label}
-          style={selStyle}
-          defaultValue={f.options[0]}
-          onMouseDown={guard}
-          onKeyDown={guard}
-          onChange={(e) => {
-            if (!isPaid) { e.preventDefault(); onLockedInteract(); return; }
-            if (f.label === "Niche") onNicheChange(e.target.value === FILTERS[0].options[0] ? "" : e.target.value);
-            if (f.label === "Engagement") onEngChange(e.target.value === "≥ 3%" ? 3 : e.target.value === "≥ 6%" ? 6 : e.target.value === "≥ 9%" ? 9 : 0);
-          }}
-          value={isPaid && f.label === "Niche" ? (nicheValue || f.options[0]) : isPaid && f.label === "Engagement" ? (engValue ? `≥ ${engValue}%` : f.options[0]) : undefined}
-        >
+        <select key={f.key} aria-label={f.label} style={selStyle} onMouseDown={guard} onKeyDown={guard}
+          value={isPaid ? (values[f.key] || f.options[0]) : f.options[0]}
+          onChange={(e) => { if (!isPaid) { e.preventDefault(); onLocked(); return; } onChange(f.key, e.target.value === f.options[0] ? "" : e.target.value); }}>
           {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       ))}
@@ -179,93 +174,108 @@ function PaywallModal({ title, body, onUpgrade, onClose }: { title: string; body
   );
 }
 
+const FREE_VISIBLE = 6;
+const LIMIT = 24;
+
 export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void }) {
   const isPaid = plan !== "free";
   const [creators, setCreators] = useState<FeedCreator[]>([]);
+  const [filters, setFilters] = useState<FilterState>({ niche: "", platform: "", followers: "", engagement: "", country: "", language: "" });
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fNiche, setFNiche] = useState("");
-  const [fMinEng, setFMinEng] = useState(0);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
+
+  const params = useMemo(() => toParams(filters), [filters]);
+
+  const fetchPage = useCallback(async (off: number, replace: boolean) => {
+    const qs = new URLSearchParams({ ...params, offset: String(off), limit: String(LIMIT) }).toString();
+    const r = await fetch(`/api/discovery-feed?${qs}`);
+    const d = await r.json();
+    const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
+    setError(d.error || null);
+    setCreators((prev) => (replace ? list : [...prev, ...list]));
+    setHasMore(!!d.hasMore);
+    setOffset(off + list.length);
+  }, [params]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch("/api/discovery-feed")
-      .then((r) => r.json())
-      .then((d) => { if (!cancelled) { setCreators(Array.isArray(d.creators) ? d.creators : []); setError(d.error || null); } })
-      .catch(() => { if (!cancelled) setError("network"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+    fetchPage(0, true).catch(() => { if (!cancelled) setError("network"); }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [fetchPage]);
 
-  const list = useMemo(() => {
-    if (!isPaid) return creators;
-    return creators.filter((c) => {
-      if (fNiche && !`${c.primaryNiche} ${c.niche}`.toLowerCase().includes(fNiche.toLowerCase())) return false;
-      if (fMinEng && c.engagementRate < fMinEng) return false;
-      return true;
-    });
-  }, [creators, isPaid, fNiche, fMinEng]);
+  // Auto-load more on scroll near the bottom (paid). Re-binds on offset change
+  // so the closure always fetches the right page.
+  useEffect(() => {
+    if (!isPaid || !hasMore || loading || loadingMore) return;
+    const onScroll = () => {
+      const el = document.scrollingElement || document.documentElement;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 900) {
+        setLoadingMore(true);
+        fetchPage(offset, false).finally(() => setLoadingMore(false));
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isPaid, hasMore, loading, loadingMore, offset, fetchPage]);
 
-  const gridCols = isMobile ? "1fr" : "repeat(auto-fill, minmax(290px, 1fr))";
-  // One continuous grid: free users see FREE_FEED_VISIBLE sharp, then the rest
-  // blurred in the SAME grid (so the last sharp row never leaves a gap), with a
-  // gradient + "Discover more" overlay anchored at the bottom.
-  const items = isPaid ? list : list.slice(0, FREE_FEED_VISIBLE + 9);
-  const hasMore = !isPaid && list.length > FREE_FEED_VISIBLE;
+  const items = isPaid ? creators : creators.slice(0, FREE_VISIBLE + 2);
+  const hasMoreFree = !isPaid && creators.length > FREE_VISIBLE;
+  const gridCols = isMobile ? "1fr" : "repeat(2, minmax(0, 1fr))";
 
   return (
     <div style={{ padding: isMobile ? "56px 16px 40px" : "40px", background: "#FFF", minHeight: "100vh" }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0 }}>Discovery</h1>
-      <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 20px" }}>Les meilleurs créateurs, classés par rentabilité.</p>
+      <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 20px" }}>Trouve les meilleurs créateurs — aperçu complet du compte, vidéos et analyse de rentabilité.</p>
 
-      <FilterBar
-        isPaid={isPaid}
-        onLockedInteract={() => setFilterPaywall(true)}
-        onNicheChange={setFNiche}
-        onEngChange={setFMinEng}
-        nicheValue={fNiche}
-        engValue={fMinEng}
-      />
+      <FilterBar isPaid={isPaid} values={filters} onLocked={() => setFilterPaywall(true)}
+        onChange={(key, v) => setFilters((prev) => ({ ...prev, [key]: v }))} />
 
       {loading && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Chargement du feed…</div>}
       {!loading && error && <div style={{ color: "#dc2626", fontSize: 14 }}>Erreur : {error}</div>}
-      {!loading && !error && list.length === 0 && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Aucun créateur.</div>}
+      {!loading && !error && creators.length === 0 && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Aucun créateur pour ces filtres.</div>}
 
       <div style={{ position: "relative" }}>
         <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 16 }}>
           {items.map((c, i) => {
-            const locked = !isPaid && i >= FREE_FEED_VISIBLE;
+            const locked = !isPaid && i >= FREE_VISIBLE;
             return (
-              <div key={c.username} aria-hidden={locked || undefined}
-                style={locked ? { filter: "blur(6px)", opacity: 0.55, pointerEvents: "none" } : undefined}>
+              <div key={c.username} aria-hidden={locked || undefined} style={locked ? { filter: "blur(7px)", opacity: 0.5, pointerEvents: "none" } : undefined}>
                 <FeedCard creator={c} onOpen={() => setSelected(c)} onUpgrade={onUpgrade} />
               </div>
             );
           })}
         </div>
 
-        {hasMore && (
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 380, background: "linear-gradient(rgba(255,255,255,0), #FFF 60%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 36, pointerEvents: "none" }}>
-            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
+        {hasMoreFree && (
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(rgba(255,255,255,0), #FFF 62%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 40, pointerEvents: "none" }}>
+            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 34px", textAlign: "center", maxWidth: 400, boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
-              <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Discover more</div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 16, lineHeight: 1.5 }}>Des centaines d&apos;autres créateurs t&apos;attendent. Débloque tout le feed et les filtres avec un plan payant.</div>
+              <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Des milliers de créateurs t&apos;attendent</div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 16, lineHeight: 1.5 }}>Débloque tout le feed, les filtres et le défilement illimité avec un plan payant.</div>
               <button type="button" onClick={onUpgrade} style={{ background: "#0047FF", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passer au plan payant</button>
             </div>
           </div>
         )}
       </div>
 
+      {isPaid && hasMore && !loading && (
+        <div style={{ textAlign: "center", padding: "28px 0 8px" }}>
+          <button type="button" disabled={loadingMore}
+            onClick={() => { setLoadingMore(true); fetchPage(offset, false).finally(() => setLoadingMore(false)); }}
+            style={{ fontSize: 14, fontWeight: 600, color: "#0047FF", background: "#FFF", border: "1px solid #D6E0FF", borderRadius: 12, padding: "12px 28px", cursor: loadingMore ? "default" : "pointer" }}>
+            {loadingMore ? "Chargement…" : "Charger plus de créateurs"}
+          </button>
+        </div>
+      )}
+
       {filterPaywall && (
-        <PaywallModal
-          title="Le filtrage est payant"
-          body="Filtrer par niche, abonnés, engagement, pays ou langue est réservé aux plans payants. Passe à un plan payant pour cibler précisément."
-          onUpgrade={onUpgrade}
-          onClose={() => setFilterPaywall(false)}
-        />
+        <PaywallModal title="Le filtrage est payant" body="Filtrer par niche, abonnés, engagement, pays ou langue est réservé aux plans payants." onUpgrade={onUpgrade} onClose={() => setFilterPaywall(false)} />
       )}
 
       <CreatorDetailDrawer creator={selected} plan={plan} onClose={() => setSelected(null)} onUpgrade={onUpgrade} />

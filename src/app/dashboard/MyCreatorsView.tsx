@@ -16,6 +16,8 @@ function fmt(n: number): string {
   return String(Math.round(n));
 }
 
+const proxy = (u?: string) => (!u ? "" : u.includes("/api/img-proxy") ? u : `/api/img-proxy?url=${encodeURIComponent(u)}`);
+
 function rowToCreator(r: SavedRow): FeedCreator {
   if (r.snapshot && typeof r.snapshot === "object" && (r.snapshot as Record<string, unknown>).username) {
     return r.snapshot as unknown as FeedCreator;
@@ -40,7 +42,7 @@ function MiniCard({ r, onOpen, draggable }: { r: SavedRow; onOpen: () => void; d
       onClick={onOpen}
       style={{ background: "#FFF", border: "0.5px solid #EFEFEF", borderRadius: 12, padding: 12, cursor: "pointer", display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <img src={r.avatar_url} alt="" width={36} height={36} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
+        <img src={r.avatar_url ? proxy(r.avatar_url) : `https://ui-avatars.com/api/?name=${encodeURIComponent(r.display_name || r.creator_username)}&background=eef1f8&color=4a6cf7&size=120&bold=true&rounded=true`} alt="" width={36} height={36} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
           onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = "1"; i.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(r.display_name || r.creator_username)}&background=e5e5e5&color=9a9a9a&size=120&bold=true&rounded=true`; } }} />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.display_name}</div>

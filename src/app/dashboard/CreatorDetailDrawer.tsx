@@ -10,16 +10,10 @@ import {
   listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
 } from "@/lib/workspace-client";
 
-type TopVideo = {
-  id: string; cover: string; shareUrl: string;
-  playCount: number; likeCount: number; commentCount: number; shareCount: number;
-  createTime: number; desc: string;
-};
-
 export type CreatorDetail = FeedCreator & {
   avgLikes?: number; avgComments?: number; avgShares?: number;
   viewsPerFollower?: number; postsAnalyzed?: number;
-  niches?: string[]; topVideos?: TopVideo[];
+  niches?: string[];
 };
 
 function fmt(n: number): string {
@@ -258,7 +252,7 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
         </div>
 
         <div style={{ display: "flex", gap: 13, alignItems: "flex-start", marginBottom: 16 }}>
-          <img src={d.avatarUrl} alt="" width={62} height={62} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
+          <img src={d.avatarUrl ? proxied(d.avatarUrl) : `https://ui-avatars.com/api/?name=${encodeURIComponent(d.displayName || d.username)}&background=eef1f8&color=4a6cf7&size=200&bold=true&rounded=true`} alt="" width={62} height={62} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
             onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(d.displayName || d.username)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A" }}>{d.displayName}</div>
