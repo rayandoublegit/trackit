@@ -1,6 +1,7 @@
 export const DASHBOARD_VIEWS = [
   "dashboard",
   "discovery",
+  "my-creators",
   "creators",
   "campaigns",
   "affiliates",

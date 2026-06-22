@@ -20,6 +20,7 @@ import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryView } from "./DiscoveryView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
+import { MyCreatorsView } from "./MyCreatorsView";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
@@ -767,6 +768,17 @@ function DashboardPageContent() {
         )}
         {view === "discovery" && (
           <DiscoveryFeed
+            isMobile={isMobile}
+            plan={plan}
+            onUpgrade={() => {
+              if (plan === "free") void handleUpgradeBasic();
+              else if (plan === "basic") void handleUpgradePro();
+              else void handleUpgradeScale();
+            }}
+          />
+        )}
+        {view === "my-creators" && (
+          <MyCreatorsView
             isMobile={isMobile}
             plan={plan}
             onUpgrade={() => {
@@ -3349,6 +3361,7 @@ function buildSidebarNavEntries(
   return [
     { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
     { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
+    { id: "my-creators", label: lang === "fr" ? "Pipeline" : "Pipeline", view: "my-creators", section: "main", iconKey: "creators", keywords: ["saved", "folders", "pipeline", "crm", "sauvegardés", "dossiers", "contacté", "signé"] },
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
     { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
     { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },

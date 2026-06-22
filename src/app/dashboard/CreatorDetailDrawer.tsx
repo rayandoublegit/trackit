@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { videoEmbedUrl } from "@/lib/creator-video";
+import { PIPELINE_STAGES } from "@/lib/pipeline";
+import {
+  listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
+  listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
+} from "@/lib/workspace-client";
 
 type TopVideo = {
   id: string; cover: string; shareUrl: string;
@@ -103,16 +108,87 @@ function VideoTile({ v, playing, onPlay, isPaid, onUpgrade }: {
   );
 }
 
-export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade }: {
+export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorkspaceChange }: {
   creator: FeedCreator | null;
   plan: PlanTier;
   onClose: () => void;
   onUpgrade: () => void;
+  onWorkspaceChange?: () => void;
 }) {
   const isPaid = plan !== "free";
   const [detail, setDetail] = useState<CreatorDetail | null>(creator);
   const [playing, setPlaying] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [stage, setStageState] = useState("saved");
+  const [notesVal, setNotesVal] = useState("");
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [inFolders, setInFolders] = useState<Set<string>>(new Set());
+  const [folderOpen, setFolderOpen] = useState(false);
+  const [newFolder, setNewFolder] = useState("");
+
+  useEffect(() => {
+    if (!creator) return;
+    let cancelled = false;
+    (async () => {
+      const [rows, f] = await Promise.all([listSaved(), listFolders()]);
+      if (cancelled) return;
+      const mine = rows.find((r) => r.creator_username === creator.username);
+      setSaved(!!mine);
+      setStageState(mine?.pipeline_status || "saved");
+      setNotesVal(mine?.notes || "");
+      setFolders(f.folders);
+      setInFolders(new Set(f.items.filter((i) => i.creator_username === creator.username).map((i) => i.folder_id)));
+      setFolderOpen(false);
+    })();
+    return () => { cancelled = true; };
+  }, [creator]);
+
+  const ensureSaved = async () => {
+    if (saved || !creator) return true;
+    const res = await saveCreator(creator);
+    if (res.error) { if (res.status === 402) onUpgrade(); return false; }
+    setSaved(true);
+    onWorkspaceChange?.();
+    return true;
+  };
+  const onSaveToggle = async () => {
+    if (!creator) return;
+    if (saved) { await unsave(creator.username); setSaved(false); setInFolders(new Set()); }
+    else { await ensureSaved(); }
+    onWorkspaceChange?.();
+  };
+  const onStageChange = async (v: string) => {
+    if (!creator) return;
+    setStageState(v);
+    if (!(await ensureSaved())) return;
+    await apiSetStage(creator.username, v);
+    onWorkspaceChange?.();
+  };
+  const toggleFolder = async (f: FolderRow) => {
+    if (!creator) return;
+    if (inFolders.has(f.id)) {
+      await removeFromFolder(f.id, creator.username);
+      setInFolders((s) => { const n = new Set(s); n.delete(f.id); return n; });
+    } else {
+      if (!(await ensureSaved())) return;
+      await addToFolder(f.id, creator.username);
+      setInFolders((s) => new Set(s).add(f.id));
+    }
+    onWorkspaceChange?.();
+  };
+  const onCreateFolder = async () => {
+    const name = newFolder.trim();
+    if (!name) return;
+    const f = await createFolder(name);
+    setNewFolder("");
+    if (f) { setFolders((arr) => [...arr, f]); await toggleFolder(f); }
+  };
+  const onNotesBlur = async () => {
+    if (!creator || !saved) return;
+    await apiSetNotes(creator.username, notesVal);
+    onWorkspaceChange?.();
+  };
 
   useEffect(() => {
     setDetail(creator);
@@ -200,6 +276,44 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade }: {
           </div>
         </div>
 
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={onSaveToggle}
+            style={{ fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: 8, padding: "8px 14px",
+              border: saved ? "1px solid #15803D" : "1px solid #0047FF", color: saved ? "#15803D" : "#FFF", background: saved ? "#F0FDF4" : "#0047FF" }}>
+            {saved ? "✓ Sauvegardé" : "+ Sauver"}
+          </button>
+          <div style={{ position: "relative" }}>
+            <button type="button" onClick={() => (isPaid ? setFolderOpen((o) => !o) : onUpgrade())}
+              style={{ fontSize: 13, cursor: "pointer", borderRadius: 8, padding: "8px 12px", border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A" }}>
+              📁 Dossiers{inFolders.size ? ` (${inFolders.size})` : ""} ▾
+            </button>
+            {folderOpen && isPaid && (
+              <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 10, background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 10, padding: 10, width: 230, boxShadow: "0 8px 24px rgba(0,0,0,0.14)" }}>
+                {folders.length === 0 && <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>Aucun dossier encore.</div>}
+                {folders.map((f) => (
+                  <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13, cursor: "pointer" }}>
+                    <input type="checkbox" checked={inFolders.has(f.id)} onChange={() => toggleFolder(f)} />
+                    {f.name}
+                  </label>
+                ))}
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <input value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCreateFolder(); }}
+                    placeholder="Nouveau dossier" style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #E5E5E5", borderRadius: 8, fontFamily: "inherit", boxSizing: "border-box" }} />
+                  <button type="button" onClick={onCreateFolder} style={{ fontSize: 14, cursor: "pointer", border: "1px solid #E5E5E5", borderRadius: 8, background: "#FFF", padding: "0 10px" }}>+</button>
+                </div>
+              </div>
+            )}
+          </div>
+          {isPaid ? (
+            <select value={stage} onChange={(e) => onStageChange(e.target.value)} aria-label="Étape pipeline"
+              style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A", cursor: "pointer", fontFamily: "inherit" }}>
+              {PIPELINE_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          ) : (
+            <button type="button" onClick={onUpgrade} style={{ fontSize: 13, cursor: "pointer", borderRadius: 8, padding: "8px 12px", border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A" }}>Étape ▾</button>
+          )}
+        </div>
+
         {d.bio && <p style={{ fontSize: 13, color: "#5A5A5A", lineHeight: 1.5, margin: "0 0 16px" }}>{d.bio}</p>}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 20 }}>
@@ -248,6 +362,15 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade }: {
             {videos.map((v) => (
               <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} />
             ))}
+          </div>
+        )}
+
+        {isPaid && (
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Note privée</div>
+            <textarea value={notesVal} onChange={(e) => setNotesVal(e.target.value)} onBlur={onNotesBlur}
+              placeholder={saved ? "Tes notes sur ce créateur…" : "Sauvegarde le créateur pour ajouter une note."}
+              style={{ width: "100%", minHeight: 70, fontSize: 13, padding: 10, border: "1px solid #E5E5E5", borderRadius: 10, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
           </div>
         )}
       </div>
