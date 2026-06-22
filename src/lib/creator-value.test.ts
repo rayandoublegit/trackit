@@ -53,5 +53,5 @@ describe("valueScore", () => {
 });
 
 describe("FREE_FEED_VISIBLE", () => {
-  it("is 9", () => expect(FREE_FEED_VISIBLE).toBe(9));
+  it("defaults to 15 (screen-filling) when unset", () => expect(FREE_FEED_VISIBLE).toBe(15));
 });

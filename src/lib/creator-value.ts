@@ -1,4 +1,6 @@
-export const FREE_FEED_VISIBLE = 9;
+// How many creators a free user sees before the "Discover more" paywall.
+// Tunable via env to fill the screen; defaults high so the free feed feels full.
+export const FREE_FEED_VISIBLE = Number(process.env.NEXT_PUBLIC_FREE_FEED_VISIBLE) || 15;
 
 export type ValueTier = "nano" | "micro" | "mid" | "macro" | "mega";
 
