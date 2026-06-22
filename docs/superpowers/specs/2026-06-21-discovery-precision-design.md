@@ -223,15 +223,20 @@ garder la qualité.
 
 ---
 
-## 9. Coût / crédits
+## 9. Coût / crédits — plan ScrapeCreators **Pro = 25 000 crédits/mois**
 
-- Découverte ≈ 1 crédit / niche / page. Enrichissement ≈ 2 crédits / créateur.
-- 3 000 créateurs ≈ **6 000-9 000 crédits** one-time, + refresh quotidien.
-- Le plan gratuit (100 crédits) ne couvre que les tests. Le budget cron
-  (`ENRICH_BUDGET_PER_RUN`) se cale sur le **volume de crédits mensuel**.
-- Classification Claude Haiku en batch = négligeable.
-- ⚠️ **Open question** : volume de crédits ScrapeCreators mensuel cible
-  (détermine la vitesse de remplissage et le budget cron).
+- Coûts unitaires : découverte ≈ 1 crédit/niche/page ; enrichissement ≈ 2
+  crédits/créateur ; classification Claude Haiku = négligeable.
+- **Allocation (25 000/mois ≈ 833/jour)** : ~20 % de buffer pour les recherches
+  live des utilisateurs + retries → reste **~670 crédits/jour** pour les crons :
+  - Découverte : ~120/jour (tranche tournante de ~30-40 requêtes → couvre les
+    ~180 cibles en quelques jours).
+  - Enrichissement : ~540/jour ÷ 2 = **`ENRICH_BUDGET_PER_RUN` ≈ 270 créateurs/jour**.
+- **Ramp** : ~3 000 enrichis en ~11 j, ~5 000 en ~18 j. **Steady-state** : une
+  base de 5 000 se rafraîchit intégralement tous les ~18 j (~1,6×/mois).
+- ⏳ **Statut** : plan Pro pris **plus tard**. **Maintenant ~96 crédits gratuits**
+  → on développe et teste tout **hors-ligne (mocks)** + un **smoke live de
+  quelques créateurs** ; le **seed complet attend l'activation du plan Pro**.
 
 ---
 
@@ -274,7 +279,8 @@ Tests d'abord sur les **fonctions pures** (sans réseau, données mockées) :
 ---
 
 ## 13. Open questions / hypothèses
-1. **Volume de crédits ScrapeCreators mensuel** (→ budget cron & vitesse). *En attente.*
+1. ~~Volume de crédits mensuel~~ → **Résolu : Pro = 25 000/mois** (souscription à
+   venir ; ~96 crédits gratuits en attendant). Budget cron : `ENRICH_BUDGET_PER_RUN ≈ 270/jour`.
 2. **Schéma live exact de `creators_index`** à confirmer avant la migration.
 3. **Définition d'engagement par défaut affichée** : par vue (retenu) vs par
    abonné — on stocke les deux, on affiche "par vue".
