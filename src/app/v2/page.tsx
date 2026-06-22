@@ -215,14 +215,100 @@ export default function V2Page() {
     },
   ];
 
-  const highlights = [
-    lang === "fr" ? "Dashboard repensé" : "Redesigned dashboard",
-    lang === "fr" ? "Découverte IA améliorée" : "Improved AI discovery",
-    lang === "fr" ? "Automatisations plus rapides" : "Faster automations",
-    lang === "fr" ? "Payouts & solde refaits" : "Rebuilt payouts & balance",
-    lang === "fr" ? "Workflow Find → Track → Pay" : "Find → Track → Pay workflow",
-    lang === "fr" ? "Performance & vitesse" : "Performance & speed",
-  ];
+  const highlights: { title: string; desc: string }[] =
+    lang === "fr"
+      ? [
+          {
+            title: "Page Accueil",
+            desc: "Vue d'ensemble avec KPIs, actions rapides et suivi des ventes — marque et créateur.",
+          },
+          {
+            title: "Notes",
+            desc: "Un espace libre pour vos objectifs, idées et priorités créateurs.",
+          },
+          {
+            title: "Invitations",
+            desc: "Invitez vos créateurs par lien et connectez-les à votre marque en quelques clics.",
+          },
+          {
+            title: "Scripts",
+            desc: "Uploadez briefs et scripts — vos créateurs les retrouvent directement dans leur dashboard.",
+          },
+          {
+            title: "Analytiques branchées",
+            desc: "Top créateurs, ventes, commissions payées et ROI sur de vraies données.",
+          },
+          {
+            title: "Paiements refaits",
+            desc: "Solde, historique des ventes et payouts plus clairs pour tout le monde.",
+          },
+          {
+            title: "Découverte IA améliorée",
+            desc: "Meilleurs matchs créateurs, filtres affinés et résultats plus pertinents.",
+          },
+          {
+            title: "Campagnes & KPIs",
+            desc: "Suivi par campagne avec notation compacte (K/M) et performance par créateur.",
+          },
+          {
+            title: "Fiabilité des données",
+            desc: "Attribution des ventes, sync Shopify et chiffres plus cohérents partout.",
+          },
+          {
+            title: "Workflow Find → Track → Pay",
+            desc: "Du premier contact au paiement, sans changer d'outil.",
+          },
+          {
+            title: "Automatisations plus rapides",
+            desc: "Relances et workflows pour scaler votre outreach sans friction.",
+          },
+        ]
+      : [
+          {
+            title: "Home overview",
+            desc: "KPIs, quick actions, and sales tracking — for brands and creators in one place.",
+          },
+          {
+            title: "Notes",
+            desc: "A free space for your goals, ideas, and creator priorities.",
+          },
+          {
+            title: "Invitations",
+            desc: "Send an invite link and onboard creators to your brand in a few clicks.",
+          },
+          {
+            title: "Scripts",
+            desc: "Upload briefs and scripts — creators get them right in their dashboard.",
+          },
+          {
+            title: "Wired analytics",
+            desc: "Top creators, sales, commissions paid, and ROI on real data.",
+          },
+          {
+            title: "Rebuilt payouts",
+            desc: "Clearer balance, sales history, and payouts for brands and creators.",
+          },
+          {
+            title: "Improved AI discovery",
+            desc: "Better creator matches, sharper filters, and more relevant results.",
+          },
+          {
+            title: "Campaigns & KPIs",
+            desc: "Per-campaign tracking with compact K/M notation and creator performance.",
+          },
+          {
+            title: "Data reliability",
+            desc: "Sales attribution, Shopify sync, and consistent numbers across the app.",
+          },
+          {
+            title: "Find → Track → Pay workflow",
+            desc: "From first outreach to payout — without switching tools.",
+          },
+          {
+            title: "Faster automations",
+            desc: "Follow-ups and workflows to scale outreach with less manual work.",
+          },
+        ];
 
   const submitWaitlist = async () => {
     if (!canSubmit || submitting) return;
@@ -393,17 +479,17 @@ export default function V2Page() {
           </h2>
           <p style={{ fontSize: 14, color: SUBTEXT, margin: "0 0 28px", letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Une refonte complète autour de votre workflow : Find it, Track it, Pay it."
-              : "A full redesign built around your workflow: Find it, Track it, Pay it."}
+              ? "Bien plus qu'une refonte visuelle : nouveaux outils, données branchées et corrections partout."
+              : "More than a visual refresh: new tools, wired data, and fixes across the board."}
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
             {highlights.map((item) => (
               <div
-                key={item}
+                key={item.title}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: 10,
                   padding: "12px 14px",
                   background: "#FAFAFA",
@@ -418,18 +504,24 @@ export default function V2Page() {
                     borderRadius: "50%",
                     background: BLUE,
                     flexShrink: 0,
+                    marginTop: 6,
                   }}
                 />
-                <span style={{ fontSize: 14, fontWeight: 500, color: TEXT, letterSpacing: "-0.02em" }}>
-                  {item}
-                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, letterSpacing: "-0.02em" }}>
+                    {item.title}
+                  </div>
+                  <div style={{ fontSize: 13, color: SUBTEXT, marginTop: 4, lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                    {item.desc}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
           <div className="affiliation-earnings-card">
             <div className="affiliation-earnings-label">
-              {lang === "fr" ? "Trackit v2 est enfin là" : "Trackit v2 is finally here"}
+              {lang === "fr" ? "Trackit v2 est enfin" : "Trackit v2 is finally"}
             </div>
             <div className="affiliation-earnings-amount">{lang === "fr" ? "Sorti!!" : "Out!!"}</div>
             <div className="affiliation-earnings-sub">
