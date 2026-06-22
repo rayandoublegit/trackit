@@ -14,4 +14,6 @@ export const DEV_BYPASS_AUTH =
 
 // Fake premium identity used while the bypass is active.
 export const DEV_BYPASS_USER_ID = "00000000-0000-0000-0000-000000000000";
-export const DEV_BYPASS_PLAN = "pro";
+// Plan for the dev-bypass user. Default "free" so the discovery paywall is
+// visible; set NEXT_PUBLIC_DEV_BYPASS_PLAN=pro in .env.local to test unlocked.
+export const DEV_BYPASS_PLAN = process.env.NEXT_PUBLIC_DEV_BYPASS_PLAN || "free";
