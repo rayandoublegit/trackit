@@ -1968,8 +1968,8 @@ export function DiscoveryView({
   const [platform, setPlatform] = useState("tiktok");
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
-  const [location, setLocation] = useState<DiscoveryLocation>("FR");
-  const [language, setLanguage] = useState<DiscoveryLanguage>("french");
+  const [location, setLocation] = useState<DiscoveryLocation>("");
+  const [language, setLanguage] = useState<DiscoveryLanguage>("");
   const [minViews, setMinViews] = useState("");
   const [activeWithinDays, setActiveWithinDays] = useState("");
   const [qualityGateOn, setQualityGateOn] = useState(true);
@@ -1980,24 +1980,16 @@ export function DiscoveryView({
     setEngagement("");
   }, [lang]);
 
-  useEffect(() => {
-    if (location !== "FR" || language !== "french") {
-      setLocation("FR");
-      setLanguage("french");
-      setDiscoveryPrefs("FR", "french");
-    }
-  }, [location, language]);
-
-  const handleLocationChange = (_next: string) => {
-    setLocation("FR");
-    setLanguage("french");
-    setDiscoveryPrefs("FR", "french");
+  const handleLocationChange = (next: string) => {
+    const loc = next as DiscoveryLocation;
+    setLocation(loc);
+    setDiscoveryPrefs(loc, language);
   };
 
-  const handleLanguageChange = (_next: string) => {
-    setLocation("FR");
-    setLanguage("french");
-    setDiscoveryPrefs("FR", "french");
+  const handleLanguageChange = (next: string) => {
+    const lang = next as DiscoveryLanguage;
+    setLanguage(lang);
+    setDiscoveryPrefs(location, lang);
   };
 
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -2583,13 +2575,29 @@ export function DiscoveryView({
               label={lang === "fr" ? "Localisation" : "Location"}
               value={location}
               onChange={handleLocationChange}
-              options={[{ value: "FR", label: "France" }]}
+              options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
+                { value: "FR", label: "France" },
+                { value: "US", label: lang === "fr" ? "États-Unis" : "United States" },
+                { value: "GB", label: lang === "fr" ? "Royaume-Uni" : "United Kingdom" },
+                { value: "DE", label: lang === "fr" ? "Allemagne" : "Germany" },
+                { value: "ES", label: lang === "fr" ? "Espagne" : "Spain" },
+                { value: "BR", label: lang === "fr" ? "Brésil" : "Brazil" },
+                { value: "CA", label: "Canada" },
+              ]}
             />
             <FilterSelect
               label={lang === "fr" ? "Langue" : "Language"}
               value={language}
               onChange={handleLanguageChange}
-              options={[{ value: "french", label: lang === "fr" ? "Français" : "French" }]}
+              options={[
+                { value: "", label: lang === "fr" ? "Tous" : "All" },
+                { value: "french", label: lang === "fr" ? "Français" : "French" },
+                { value: "english", label: lang === "fr" ? "Anglais" : "English" },
+                { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
+                { value: "german", label: lang === "fr" ? "Allemand" : "German" },
+                { value: "portuguese", label: lang === "fr" ? "Portugais" : "Portuguese" },
+              ]}
             />
             <FilterSelect
               label={lang === "fr" ? "Vues min" : "Min views"}

@@ -1,6 +1,6 @@
 export type AppLang = "en" | "fr";
-export type DiscoveryLocation = "FR" | "US";
-export type DiscoveryLanguage = "french" | "english";
+export type DiscoveryLocation = "" | "FR" | "US" | "GB" | "DE" | "ES" | "BR" | "CA";
+export type DiscoveryLanguage = "" | "french" | "english" | "spanish" | "german" | "portuguese";
 
 export const TRACKIT_LANG_KEY = "trackit_lang";
 export const TRACKIT_DISCOVERY_LOCATION_KEY = "trackit_discovery_location";
@@ -34,17 +34,19 @@ export function setAppLang(lang: AppLang): void {
 }
 
 export function getDiscoveryLocation(): DiscoveryLocation {
-  if (typeof window === "undefined") return "US";
+  if (typeof window === "undefined") return "";
   const stored = localStorage.getItem(TRACKIT_DISCOVERY_LOCATION_KEY);
-  if (stored === "FR" || stored === "US") return stored;
-  return getAppLang() === "fr" ? "FR" : "US";
+  const valid: DiscoveryLocation[] = ["", "FR", "US", "GB", "DE", "ES", "BR", "CA"];
+  if (stored !== null && valid.includes(stored as DiscoveryLocation)) return stored as DiscoveryLocation;
+  return "";
 }
 
 export function getDiscoveryLanguage(): DiscoveryLanguage {
-  if (typeof window === "undefined") return "english";
+  if (typeof window === "undefined") return "";
   const stored = localStorage.getItem(TRACKIT_DISCOVERY_LANGUAGE_KEY);
-  if (stored === "french" || stored === "english") return stored;
-  return getAppLang() === "fr" ? "french" : "english";
+  const valid: DiscoveryLanguage[] = ["", "french", "english", "spanish", "german", "portuguese"];
+  if (stored !== null && valid.includes(stored as DiscoveryLanguage)) return stored as DiscoveryLanguage;
+  return "";
 }
 
 export function setDiscoveryPrefs(location: DiscoveryLocation, language: DiscoveryLanguage): void {
@@ -53,7 +55,7 @@ export function setDiscoveryPrefs(location: DiscoveryLocation, language: Discove
   localStorage.setItem(TRACKIT_DISCOVERY_LANGUAGE_KEY, language);
   if (location === "FR" || language === "french") {
     localStorage.setItem(TRACKIT_LANG_KEY, "fr");
-  } else if (location === "US" && language === "english") {
+  } else if ((location === "US" || location === "GB" || location === "CA") && (language === "english" || language === "")) {
     localStorage.setItem(TRACKIT_LANG_KEY, "en");
   }
   notifyLocaleUpdated();
@@ -64,7 +66,7 @@ export function applyAppLocale(lang: AppLang): void {
     setDiscoveryPrefs("FR", "french");
     return;
   }
-  setDiscoveryPrefs("US", "english");
+  setDiscoveryPrefs("", "");
 }
 
 /** Keep language / discovery filters when signing out. */
