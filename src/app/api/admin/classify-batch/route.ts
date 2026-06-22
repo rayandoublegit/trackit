@@ -10,10 +10,14 @@ export const maxDuration = 60;
 // key). Paginated via ?offset=&limit=. Keeps existing values where Claude is
 // unsure (null) so coverage never drops.
 export async function GET(req: NextRequest) {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key || req.headers.get("x-admin-key") !== key) {
+  const provided = (req.headers.get("x-admin-key") || "").trim();
+  const allowed = [process.env.ADMIN_TOKEN, process.env.SUPABASE_SERVICE_ROLE_KEY]
+    .filter(Boolean)
+    .map((k) => (k as string).trim());
+  if (!provided || !allowed.includes(provided)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "no anthropic key" }, { status: 503 });
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key);
 
