@@ -196,8 +196,11 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
   }, [creators, isPaid, fNiche, fMinEng]);
 
   const gridCols = isMobile ? "1fr" : "repeat(auto-fill, minmax(290px, 1fr))";
-  const sharp = isPaid ? list : list.slice(0, FREE_FEED_VISIBLE);
-  const blurred = !isPaid ? list.slice(FREE_FEED_VISIBLE, FREE_FEED_VISIBLE + 9) : [];
+  // One continuous grid: free users see FREE_FEED_VISIBLE sharp, then the rest
+  // blurred in the SAME grid (so the last sharp row never leaves a gap), with a
+  // gradient + "Discover more" overlay anchored at the bottom.
+  const items = isPaid ? list : list.slice(0, FREE_FEED_VISIBLE + 9);
+  const hasMore = !isPaid && list.length > FREE_FEED_VISIBLE;
 
   return (
     <div style={{ padding: isMobile ? "56px 16px 40px" : "40px", background: "#FFF", minHeight: "100vh" }}>
@@ -217,25 +220,30 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
       {!loading && error && <div style={{ color: "#dc2626", fontSize: 14 }}>Erreur : {error}</div>}
       {!loading && !error && list.length === 0 && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Aucun créateur.</div>}
 
-      <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 16 }}>
-        {sharp.map((c) => <FeedCard key={c.username} creator={c} />)}
-      </div>
+      <div style={{ position: "relative" }}>
+        <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 16 }}>
+          {items.map((c, i) => {
+            const locked = !isPaid && i >= FREE_FEED_VISIBLE;
+            return (
+              <div key={c.username} aria-hidden={locked || undefined}
+                style={locked ? { filter: "blur(6px)", opacity: 0.55, pointerEvents: "none" } : undefined}>
+                <FeedCard creator={c} />
+              </div>
+            );
+          })}
+        </div>
 
-      {!isPaid && blurred.length > 0 && (
-        <div style={{ position: "relative", marginTop: 16 }}>
-          <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 16, filter: "blur(6px)", opacity: 0.5, pointerEvents: "none" }} aria-hidden="true">
-            {blurred.map((c) => <FeedCard key={c.username} creator={c} />)}
-          </div>
-          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 12px 32px rgba(0,0,0,0.12)" }}>
+        {hasMore && (
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 380, background: "linear-gradient(rgba(255,255,255,0), #FFF 60%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 36, pointerEvents: "none" }}>
+            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
               <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Discover more</div>
               <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 16, lineHeight: 1.5 }}>Des centaines d&apos;autres créateurs t&apos;attendent. Débloque tout le feed et les filtres avec un plan payant.</div>
               <button type="button" onClick={onUpgrade} style={{ background: "#0047FF", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passer au plan payant</button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {filterPaywall && (
         <PaywallModal
