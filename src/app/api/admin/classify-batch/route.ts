@@ -18,8 +18,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key || !process.env.NEXT_PUBLIC_SUPABASE_URL) return NextResponse.json({ error: "no db" }, { status: 503 });
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "no anthropic key" }, { status: 503 });
-  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key);
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, key);
 
   const p = req.nextUrl.searchParams;
   const offset = Math.max(0, Number(p.get("offset")) || 0);
