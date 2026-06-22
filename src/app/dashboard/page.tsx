@@ -9,6 +9,7 @@ import { avatarUrlForCreatorHandle, buildCreatorAvatarMap } from "@/lib/creator-
 import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
+import { DEV_BYPASS_AUTH, DEV_BYPASS_USER_ID, DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
@@ -212,6 +213,27 @@ function DashboardPageContent() {
   }, [loading, user?.id, lang]);
 
   useEffect(() => {
+    // Local dev-only: skip auth and render as a premium (Pro) user. Off in prod.
+    if (DEV_BYPASS_AUTH) {
+      setUser({
+        id: DEV_BYPASS_USER_ID,
+        email: "dev@local.test",
+        app_metadata: {},
+        user_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+      } as unknown as User);
+      setProfile({
+        full_name: "Dev User",
+        username: "dev",
+        avatar_url: null,
+        business_name: "Dev Workspace",
+        shopify_store: null,
+        plan: DEV_BYPASS_PLAN,
+      });
+      setLoading(false);
+      return;
+    }
     if (!supabase) { setLoading(false); router.replace("/auth"); return; }
     void supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       try {

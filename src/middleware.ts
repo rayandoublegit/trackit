@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { DEV_BYPASS_AUTH } from "@/lib/dev-bypass";
 
 export async function middleware(request: NextRequest) {
+  // Local dev-only: skip all auth gating (see src/lib/dev-bypass.ts). Off in prod.
+  if (DEV_BYPASS_AUTH) return NextResponse.next();
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
