@@ -59,6 +59,7 @@ import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/no
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
+import { clearUserSessionStorage } from "@/lib/locale-preferences";
 import { loadAffiliates, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
   loadDashboardView,
@@ -442,6 +443,14 @@ function DashboardPageContent() {
     if (isMobile) setMobileSidebarOpen(false);
   };
 
+  const handleSignOut = useCallback(async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut({ scope: "global" });
+    clearUserSessionStorage();
+    if (isMobile) setMobileSidebarOpen(false);
+    window.location.href = "/auth";
+  }, [isMobile]);
+
   const navigateToDiscovery = () => {
     goToSidebarItem("discovery");
   };
@@ -535,6 +544,22 @@ function DashboardPageContent() {
       ))}
     </>
   );
+
+  const renderMainNavSection = () => {
+    const items = filteredSidebarNav.filter((item) => item.section === "main");
+    if (items.length === 0) return null;
+    return (
+      <>
+        <SidebarItem
+          collapsed={sidebarCollapsed}
+          icon={<LogoutIcon />}
+          label={lang === "fr" ? "Se déconnecter" : "Sign out"}
+          onClick={() => void handleSignOut()}
+        />
+        {renderSidebarNavItems(items)}
+      </>
+    );
+  };
 
   const renderNavSection = (section: Exclude<SidebarNavSection, "footer">, extraTopPadding?: boolean) => {
     const items = filteredSidebarNav.filter((item) => item.section === section);
@@ -700,7 +725,7 @@ function DashboardPageContent() {
             </>
           ) : (
             <>
-              {renderNavSection("main")}
+              {renderMainNavSection()}
               {renderNavSection("tools", true)}
               {renderNavSection("workspace", true)}
             </>
@@ -3441,6 +3466,7 @@ function SidebarItem({ collapsed, icon, label, active, badge, onClick }: { colla
 }
 
 function HomeIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1V11z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
+function LogoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function SearchIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function CreatorsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function AffiliateIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 17l6-10M7 8a2 2 0 100-4 2 2 0 000 4zM17 20a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
