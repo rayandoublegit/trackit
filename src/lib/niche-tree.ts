@@ -22,12 +22,32 @@ export const NICHE_TREE: Record<string, string[]> = {
 };
 
 // Returns [...all niche queries to seed], each as { query, tags }
+// French-market search queries per canonical niche. The query is what we send to
+// ScrapeCreators (French keywords surface French creators); the tags are our
+// canonical niche taxonomy so discovery/filtering stays consistent.
+export const FR_NICHE_QUERIES: Record<string, string[]> = {
+  fitness: ["musculation", "coach sportif", "fitness français", "prise de masse", "perte de poids", "transformation physique", "salle de sport", "programme musculation", "street workout", "crossfit france"],
+  food: ["recette facile", "cuisine française", "recette healthy", "patisserie maison", "meal prep français", "recette rapide", "cuisine du monde", "batch cooking", "recette gourmande", "food français"],
+  beauty: ["routine soin visage", "maquillage français", "skincare france", "soin cheveux", "grwm français", "conseils beauté", "nail art", "makeup tuto", "peau acne", "routine cheveux"],
+  fashion: ["mode française", "outfit du jour", "streetwear france", "conseils mode", "friperie france", "mode homme", "mode femme", "tenue inspo", "haul vetements", "style vestimentaire"],
+  travel: ["voyage pas cher", "destination voyage", "roadtrip france", "voyage solo", "astuces voyage", "vanlife france", "city trip", "bon plan voyage", "voyage en famille", "globe trotter"],
+  pets: ["education chien", "soin animaux", "dressage chien", "vie de chat", "conseils chien", "animaux de compagnie", "toilettage chien", "comportement chien", "adoption animal", "nutrition animale"],
+  lifestyle: ["productivite", "developpement personnel", "routine matinale", "organisation", "minimalisme", "vie quotidienne", "morning routine", "self care français", "vlog quotidien", "vie etudiante"],
+  finance: ["investissement bourse", "finance personnelle", "crypto monnaie", "budget", "epargne", "argent", "investir immobilier", "independance financiere", "business en ligne", "education financiere"],
+  tech: ["test gadget", "intelligence artificielle", "tech français", "review smartphone", "high tech", "applications utiles", "setup bureau", "astuce tech", "iphone android", "domotique"],
+  home: ["decoration interieur", "diy maison", "rangement maison", "amenagement interieur", "plantes interieur", "deco inspiration", "renovation maison", "home staging", "menage astuce", "petit espace"],
+  parenting: ["vie de maman", "vie de papa", "conseils parents", "grossesse", "education enfant", "astuce parent", "maman solo", "bebe conseils", "famille nombreuse", "routine bebe"],
+  wellness: ["sante mentale", "meditation", "yoga français", "nutrition", "complement alimentaire", "bien etre", "developpement spirituel", "sommeil", "gestion stress", "naturopathie"],
+  business: ["entrepreneur français", "marketing digital", "ecommerce france", "side business", "freelance", "creer entreprise", "business en ligne", "agence marketing", "dropshipping france", "startup"],
+};
+
 export function buildSeedTargets(): { query: string; tags: string[] }[] {
+  // FR-first: each French query is tagged with its canonical niche so discovery
+  // (which filters language === "fr") serves these to French Shopify brands.
   const targets: { query: string; tags: string[] }[] = [];
-  for (const [parent, subs] of Object.entries(NICHE_TREE)) {
-    targets.push({ query: parent, tags: [parent] });
-    for (const sub of subs) {
-      targets.push({ query: sub, tags: [sub, parent] });
+  for (const [niche, queries] of Object.entries(FR_NICHE_QUERIES)) {
+    for (const query of queries) {
+      targets.push({ query, tags: [niche] });
     }
   }
   return targets;
