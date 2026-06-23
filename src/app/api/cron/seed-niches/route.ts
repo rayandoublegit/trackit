@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const SC_API_KEY = process.env.SCRAPECREATORS_API_KEY;
-const MIN_FOLLOWERS = 5000; // drop junk/spam accounts
+const MIN_FOLLOWERS = 10_000; // FR market: 10k floor
+const MAX_FOLLOWERS = 1_000_000; // 1M ceiling per ICP
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -73,7 +74,10 @@ async function seedTarget(query: string, tags: string[], pages: number) {
       const { users, nextCursor } = await fetchPage(query, cursor);
       if (users.length === 0) break;
 
-      const filtered = users.filter(u => Number(u.follower_count || 0) >= MIN_FOLLOWERS);
+      const filtered = users.filter(u => {
+        const f = Number(u.follower_count || 0);
+        return f >= MIN_FOLLOWERS && f <= MAX_FOLLOWERS;
+      });
       const upserts = await Promise.all(
         filtered.map(async u => {
           const followers = Number(u.follower_count || 0);
