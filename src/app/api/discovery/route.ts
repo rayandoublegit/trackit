@@ -41,6 +41,47 @@ export async function POST(request: Request) {
   // 1) DB-first: enriched creators already in creators_index (fast + free).
   if (hasDb) {
     const supabaseAdmin = getSupabaseAdmin();
+
+    // Shared mapper so curated + scraped rows render identically.
+    const mapRow = (c: any) => ({
+      username: c.username,
+      displayName: c.display_name,
+      avatarUrl: c.avatar_url,
+      followersCount: c.followers,
+      engagementRate: Number(c.engagement_rate ?? 0),
+      engagementByFollower: Number(c.engagement_by_follower ?? 0),
+      avgViews: c.avg_views ?? 0,
+      postFrequency: Number(c.post_frequency ?? 0),
+      lastPostAt: c.last_post_at,
+      authenticityScore: c.authenticity_score ?? null,
+      qualityStatus: c.quality_status,
+      platform: c.platform,
+      bio: c.bio,
+      email: c.email,
+      niche: body.niche,
+      primaryNiche: c.primary_niche,
+      language: c.language,
+      location: c.location,
+      countryCode: c.country_code || resolveCreatorCountryCode(c.location, c.language),
+      videoThumbnails: c.video_thumbnails || [],
+      curated: Array.isArray(c.niches) && c.niches.includes("curated"),
+    });
+
+    // 1a) Curated picks first (hand-added). They may still be "pending" and
+    // platform casing can differ ("TikTok" vs "tiktok"), so we don't apply the
+    // enriched/platform/metric gates to them. Language is still respected.
+    let cq = supabaseAdmin
+      .from("creators_index")
+      .select("*")
+      .contains("niches", ["curated"])
+      .gte("followers", f.followers.gte)
+      .lte("followers", f.followers.lte);
+    if (f.language) cq = cq.eq("language", f.language);
+    const { data: curatedData } = await cq
+      .order("followers", { ascending: false })
+      .limit(30);
+
+    // 1b) Scraped + enriched creators (existing behavior).
     let q = supabaseAdmin
       .from("creators_index")
       .select("*")
@@ -56,7 +97,6 @@ export async function POST(request: Request) {
       q = q.or(f.nicheTokens.map((w) => `niches.cs.{${w}}`).join(","));
     }
     if (f.language) q = q.eq("language", f.language);
-    // Lenient country: the chosen country OR creators not yet geolocated.
     if (f.countryCode) q = q.or(`country_code.eq.${f.countryCode},country_code.is.null`);
     if (f.activeSince) q = q.gte("last_post_at", f.activeSince);
     if (f.hasEmail) q = q.not("email", "is", null);
@@ -64,30 +104,22 @@ export async function POST(request: Request) {
     for (const s of f.sort) q = q.order(s.column, { ascending: s.ascending });
 
     const { data, error } = await q.limit(30);
-    if (!error && data && data.length > 0) {
-      const creators = data.map((c) => ({
-        username: c.username,
-        displayName: c.display_name,
-        avatarUrl: c.avatar_url,
-        followersCount: c.followers,
-        engagementRate: Number(c.engagement_rate),
-        engagementByFollower: Number(c.engagement_by_follower ?? 0),
-        avgViews: c.avg_views,
-        postFrequency: Number(c.post_frequency ?? 0),
-        lastPostAt: c.last_post_at,
-        authenticityScore: c.authenticity_score,
-        qualityStatus: c.quality_status,
-        platform: c.platform,
-        bio: c.bio,
-        email: c.email,
-        niche: body.niche,
-        primaryNiche: c.primary_niche,
-        language: c.language,
-        location: c.location,
-        countryCode: c.country_code || resolveCreatorCountryCode(c.location, c.language),
-        videoThumbnails: c.video_thumbnails || [],
-      }));
-      return NextResponse.json({ creators, source: "db", count: creators.length });
+
+    // Merge: curated first, then scraped, dedup by username, cap at 30.
+    const curatedRows = (curatedData ?? []).map(mapRow);
+    const scrapedRows = (!error && data ? data : []).map(mapRow);
+    const seen = new Set<string>();
+    const merged = [];
+    for (const row of [...curatedRows, ...scrapedRows]) {
+      const key = (row.username || "").toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(row);
+      if (merged.length >= 30) break;
+    }
+
+    if (merged.length > 0) {
+      return NextResponse.json({ creators: merged, source: "db", count: merged.length });
     }
     // DB empty for this niche -> fall through to live on-demand (cold niche).
   }
