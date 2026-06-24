@@ -53,15 +53,11 @@ export function setDiscoveryPrefs(location: DiscoveryLocation, language: Discove
   if (typeof window === "undefined") return;
   localStorage.setItem(TRACKIT_DISCOVERY_LOCATION_KEY, location);
   localStorage.setItem(TRACKIT_DISCOVERY_LANGUAGE_KEY, language);
-  if (location === "FR" || language === "french") {
-    localStorage.setItem(TRACKIT_LANG_KEY, "fr");
-  } else if ((location === "US" || location === "GB" || location === "CA") && (language === "english" || language === "")) {
-    localStorage.setItem(TRACKIT_LANG_KEY, "en");
-  }
   notifyLocaleUpdated();
 }
 
 export function applyAppLocale(lang: AppLang): void {
+  setAppLang(lang);
   if (lang === "fr") {
     setDiscoveryPrefs("FR", "french");
     return;

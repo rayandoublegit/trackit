@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./fonts.module.css";
 import "./landing.css";
@@ -40,8 +41,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {PRELOAD_FONTS.map((href) => (
           <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
-        <script
-          type="text/javascript"
+      </head>
+      <body>
+        {children}
+        <Script
+          id="microsoft-clarity"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
@@ -50,8 +55,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     })(window, document, "clarity", "script", "wycxeotj7b");`,
           }}
         />
-      </head>
-      <body>{children}
         <Analytics />
       </body>
     </html>

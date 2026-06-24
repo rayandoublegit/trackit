@@ -1,0 +1,24 @@
+---
+description: Preset letter-spacing when user asks to tighten text (réduire l'écart entre les lettres)
+globs: src/app/landing.css,src/app/hero-doodles.css,src/components/TrackitLanding.tsx
+alwaysApply: true
+---
+
+# Letter-spacing — preset utilisateur
+
+Quand l'utilisateur demande de **réduire l'écart entre les lettres** (ou formulation équivalente : « resserrer les lettres », « réduire le letter-spacing »), appliquer **exactement** ce preset :
+
+```css
+letter-spacing: -0.025em;
+```
+
+## Règles
+
+- Utiliser `-0.025em` sur l'élément ou le sélecteur ciblé par la demande — pas une autre valeur arbitraire.
+- Si l'élément a déjà un `letter-spacing`, **remplacer** par `-0.025em` (ne pas cumuler).
+- Ne pas modifier `line-height` sauf si l'utilisateur parle explicitement d'**espacement entre les lignes**.
+- Préférer `em` (pas `px`) pour rester cohérent avec le reste de `landing.css`.
+
+## Référence
+
+Première application validée : `.why-list li` dans `landing.css`.

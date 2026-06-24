@@ -4,6 +4,8 @@ import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
+import { TaglineIcon } from "@/components/TaglineIcon";
 import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 
@@ -64,8 +66,6 @@ export default function TrackitLanding() {
   const heroDoodleRef = useRef<HTMLImageElement>(null);
   const heroCursorRef = useRef<HTMLImageElement>(null);
   const heroMoneyRef = useRef<HTMLImageElement>(null);
-  const heroBadge1Ref = useRef<HTMLDivElement>(null);
-  const heroBadge2Ref = useRef<HTMLDivElement>(null);
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [trackitAnnual, setTrackitAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
@@ -96,8 +96,9 @@ export default function TrackitLanding() {
   hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
   hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
-  hero_bank: lang === "fr" ? "0€ de Virements Bancaires Manuels" : `${formatCurrency(0, lang)} Manual Bank Transfers`,
-  section_does_everything: lang === "fr" ? "Trackit fait tout." : "Trackit does everything.",
+  hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatCurrency(0, lang)} Manual Bank`,
+  hero_bank_line2: lang === "fr" ? "Bancaires Manuels" : "Transfers",
+  section_does_everything: lang === "fr" ? "Trackit fait tout" : "Trackit does everything",
   section_in_one_place: lang === "fr" ? "Au même endroit" : "In one place",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
   feat_1_title: lang === "fr" ? "Recherche Intelligente de Créateurs" : "Smart Creator Discovery",
@@ -116,9 +117,10 @@ export default function TrackitLanding() {
   pain_2_desc: lang === "fr" ? "Chaque mois vous calculez manuellement qui a gagné quoi et envoyez des virements PayPal individuels. Ça prend une journée entière." : "Every month you manually calculate who earned what and send individual PayPal transfers. It takes a full day and you still make mistakes.",
   pain_3_title: lang === "fr" ? "Outils enterprise inabordables." : "Enterprise tools you can't afford.",
   pain_3_desc: lang === "fr" ? "Modash est à 299€/mois. Aspire à 500€/mois. Vous avez juste besoin de quelque chose qui fonctionne sans ruiner votre budget." : `Modash is ${formatCurrency(299, lang)}/month. Aspire is ${formatCurrency(500, lang)}/month. You're a lean brand. You just need something that works without breaking the bank.`,
-  process_title: lang === "fr" ? "⇄ Processus" : "⇄ Process",
+  process_title: lang === "fr" ? "Processus" : "Process",
   process_sub_line1: lang === "fr" ? "De zéro à votre première" : "From zero to first creator",
-  process_sub_line2: lang === "fr" ? "campagne créateur en 10" : "campaign in 10 minutes",
+  process_sub_line2: lang === "fr" ? "Campagne créateur" : "campaign in 10 minutes",
+  process_sub_line3: lang === "fr" ? "en 10 minutes" : "",
   process_sub2: lang === "fr" ? "Quatre étapes simples. Pas d'agence. Pas de contrat enterprise." : "Four simple steps. No agency. No enterprise contract. No complexity.",
   process_1: lang === "fr" ? "Connectez votre boutique Shopify." : "Connect your Shopify store.",
   process_1_sub: lang === "fr" ? "60 secondes. Un clic. C'est fait." : "60 seconds. One click. Done.",
@@ -128,8 +130,10 @@ export default function TrackitLanding() {
   process_3_sub: lang === "fr" ? "Un clic. Message généré. Prêt à envoyer." : "One click. Message generated. Ready to send.",
   process_4: lang === "fr" ? "Suivez les ventes et payez les commissions." : "Track sales and pay commissions.",
   process_4_sub: lang === "fr" ? "Chaque vente suivie. Chaque commission payée automatiquement." : "Every sale tracked. Every commission paid automatically.",
-  why_title: lang === "fr" ? "Pourquoi Trackit" : "Why Trackit",
-  why_sub: lang === "fr" ? "Conçu pour les marques comme la vôtre." : "Built for brands like yours.",
+  why_title: lang === "fr" ? "Pourquoi Trackit ?" : "Why Trackit?",
+  why_sub: lang === "fr" ? "Conçu pour les marques comme la vôtre" : "Built for brands like yours",
+  why_sub_line1: lang === "fr" ? "Conçu pour les marques" : "",
+  why_sub_line2: lang === "fr" ? "comme la vôtre" : "",
   why_sub2: lang === "fr" ? "Pas pour les entreprises" : "Not for enterprise",
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : `Every other tool was built for agencies with 10 people and ${formatCurrency(500, lang)}/month budgets. Trackit was built for lean Shopify brands who need results not complexity.`,
   pricing_title: lang === "fr" ? "Des tarifs simples. Sans surprises" : "Simple pricing. No surprises",
@@ -329,8 +333,12 @@ export default function TrackitLanding() {
   };
 
   const switchLandingLang = (next: "en" | "fr") => {
+    if (next === lang) {
+      setLangOpen(false);
+      return;
+    }
     applyAppLocale(next);
-    window.location.href = `${window.location.pathname}${window.location.search}`;
+    setLangOpen(false);
   };
 
   useEffect(() => {
@@ -368,9 +376,6 @@ export default function TrackitLanding() {
     const heroCursor = heroCursorRef.current;
     const heroMoney = heroMoneyRef.current;
 
-    const badge1 = heroBadge1Ref.current;
-    const badge2 = heroBadge2Ref.current;
-
     const onScroll = () => {
       const scrollY = window.scrollY;
       if (heroDoodle) {
@@ -381,22 +386,6 @@ export default function TrackitLanding() {
       }
       if (heroMoney) {
         heroMoney.style.transform = `rotate(-10deg) translateY(${-scrollY * 0.45}px)`;
-      }
-      if (badge1 && badge2) {
-        const zoomScale = 1.08;
-        const firstThreshold = 28;
-        const secondThreshold = 72;
-        let badge1Scale = 1;
-        let badge2Scale = 1;
-
-        if (scrollY >= secondThreshold) {
-          badge2Scale = zoomScale;
-        } else if (scrollY >= firstThreshold) {
-          badge1Scale = zoomScale;
-        }
-
-        badge1.style.transform = `scale(${badge1Scale})`;
-        badge2.style.transform = `scale(${badge2Scale})`;
       }
     };
 
@@ -758,15 +747,15 @@ export default function TrackitLanding() {
           alt=""
         />
         <img
-          ref={heroCursorRef}
-          src="https://i.ibb.co/G4SvBCXp/cursortransparent.png"
-          className={lang === "fr" ? "hero-cursor hero-cursor--fr" : "hero-cursor"}
-          alt=""
-        />
-        <img
           ref={heroMoneyRef}
           src="https://i.ibb.co/ZznDLJMC/moneytransparent.png"
           className={lang === "fr" ? "hero-money hero-money--fr" : "hero-money"}
+          alt=""
+        />
+        <img
+          ref={heroCursorRef}
+          src="https://i.ibb.co/G4SvBCXp/cursortransparent.png"
+          className={lang === "fr" ? "hero-cursor hero-cursor--fr" : "hero-cursor"}
           alt=""
         />
         <div className="hero-content">
@@ -790,18 +779,24 @@ export default function TrackitLanding() {
           <span className="hero-cta-label hero-cta-label--hover">{t.hero_cta_hover}</span>
         </a>
 
-        <div className="hero-badges fade-up fade-up-delay-5">
-          <div className="badge" ref={heroBadge1Ref}>
+        <div className={`hero-badges${lang === "fr" ? " hero-badges--fr" : ""}`}>
+          <div className="badge">
+            <HeroBadgeLaurel side="left" />
             <span className="badge-text">
               {t.hero_commission}
               <br />
               {t.hero_automated}
             </span>
+            <HeroBadgeLaurel side="right" />
           </div>
-          <div className="badge" ref={heroBadge2Ref}>
+          <div className="badge">
+            <HeroBadgeLaurel side="left" />
             <span className="badge-text">
-              {t.hero_bank}
+              {t.hero_bank_line1}
+              <br />
+              {t.hero_bank_line2}
             </span>
+            <HeroBadgeLaurel side="right" />
           </div>
         </div>
         <HeroTrustedTicker lang={lang} />
@@ -811,13 +806,13 @@ export default function TrackitLanding() {
       {/* TRACKIT SECTION */}
       <section className="section" id="features">
         <div className="tagline fade-up">
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /> Trackit
+          <TaglineIcon variant="features" />
+          Trackit
         </div>
         <h2 className="section-title fade-up fade-up-delay-1">
           <span className="section-title-line">{t.section_does_everything}</span>
           <span className="section-title-line section-title-line--tight">
             {t.section_in_one_place}
-            <span className="section-title-dot">.</span>
           </span>
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
@@ -1106,19 +1101,22 @@ export default function TrackitLanding() {
 
       {/* PROCESS */}
       <section className="section" id="process">
-        <div className="tagline fade-up">{t.process_title}</div>
+        <div className="tagline fade-up">
+          <TaglineIcon variant="process" />
+          {t.process_title}
+        </div>
         <h2 className={`section-title fade-up fade-up-delay-1${lang === "en" ? " process-title--en" : " process-title--fr"}`}>
           {lang === "fr" ? (
             <>
               <span className="process-title-line">{t.process_sub_line1}</span>
-              <span className="process-title-line process-title-line--tight">{t.process_sub_line2}</span>
-              <span className="process-title-line process-title-line--minutes">minutes<span className="section-title-dot">.</span></span>
+              <span className="process-title-line process-title-line--second">{t.process_sub_line2}</span>
+              <span className="process-title-line process-title-line--third">{t.process_sub_line3}</span>
             </>
           ) : (
             <>
               <span className="process-title-line">{t.process_sub_line1}</span>
               <span className="process-title-line process-title-line--tight">
-                {t.process_sub_line2}<span className="section-title-dot">.</span>
+                {t.process_sub_line2}
               </span>
             </>
           )}
@@ -1296,11 +1294,11 @@ export default function TrackitLanding() {
                 </div>
                 <div className="inf-count">
                   <div className="inf-num">24</div>
-                  <div className="inf-avatars">
-                    <div className="av" />
-                    <div className="av" />
-                    <div className="av" />
-                  </div>
+                  <img
+                    className="inf-brand"
+                    src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+                    alt="Trackit"
+                  />
                 </div>
                 <div className="inf-btn">Reach out →</div>
                 <br />
@@ -1374,48 +1372,57 @@ export default function TrackitLanding() {
 
           <div className="process-card fade-up fade-up-delay-3">
             <div className="process-mockup">
-              <div className="pay-grid">
-                <div className="pay-cell e" />
-                <div className="pay-cell e" />
-                <div className="pay-cell">
+              <div className="pay-panel">
+                <div className="pay-panel-header">
                   <img
-                    className="pay-logo"
-                    src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg"
-                    alt="PayPal"
+                    className="pay-panel-brand"
+                    src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+                    alt="Trackit"
                   />
+                  <div className="pay-panel-header-row">
+                    <span className="pay-panel-badge">
+                      <span className="pay-panel-dot" aria-hidden="true" />
+                      Commission paid
+                    </span>
+                    <span className="pay-panel-amount">€248.00</span>
+                  </div>
                 </div>
-                <div className="pay-cell">
-                  <img
-                    className="pay-logo"
-                    src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg"
-                    alt="Mastercard"
-                  />
-                </div>
-                <div className="pay-cell e" />
-                <div className="pay-cell">
-                  <img
-                    className="pay-logo"
-                    src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg"
-                    alt="Google Pay"
-                  />
-                </div>
-                <div className="pay-cell e" />
-                <div className="pay-cell d">
-                  <img
-                    className="pay-logo"
-                    src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg"
-                    alt="Stripe"
-                  />
-                </div>
-                <div className="pay-cell e" />
-                <div className="pay-cell e" />
-                <div className="pay-cell e" />
-                <div className="pay-cell d">
-                  <img
-                    className="pay-logo pay-logo-apple"
-                    src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg"
-                    alt="Apple Pay"
-                  />
+                <div className="pay-grid">
+                  <div className="pay-cell">
+                    <img
+                      className="pay-logo"
+                      src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg"
+                      alt="PayPal"
+                    />
+                  </div>
+                  <div className="pay-cell">
+                    <img
+                      className="pay-logo"
+                      src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg"
+                      alt="Mastercard"
+                    />
+                  </div>
+                  <div className="pay-cell">
+                    <img
+                      className="pay-logo"
+                      src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg"
+                      alt="Google Pay"
+                    />
+                  </div>
+                  <div className="pay-cell">
+                    <img
+                      className="pay-logo pay-logo-stripe"
+                      src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg"
+                      alt="Stripe"
+                    />
+                  </div>
+                  <div className="pay-cell">
+                    <img
+                      className="pay-logo pay-logo-apple"
+                      src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg"
+                      alt="Apple Pay"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1457,19 +1464,26 @@ export default function TrackitLanding() {
       <section className="section" id="why">
         <div className="why-intro">
           <div className="tagline fade-up">
-            <span className="tagline-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 9a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.2-1.5 2.4v.5" stroke="white" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                <circle cx="12" cy="18" r="1.3" fill="white"/>
-              </svg>
-            </span>
+            <TaglineIcon variant="why" />
             {t.why_title}
           </div>
-          <h2 className="section-title fade-up fade-up-delay-1">
-            {t.why_sub}
-            <span className="why-title-line why-title-line--third">
-              {t.why_sub2}<span className="section-title-dot">.</span>
-            </span>
+          <h2 className={`section-title fade-up fade-up-delay-1${lang === "fr" ? " why-section-title--fr" : " why-section-title--en"}`}>
+            {lang === "fr" ? (
+              <>
+                <span className="why-title-line">{t.why_sub_line1}</span>
+                <span className="why-title-line why-title-line--second">{t.why_sub_line2}</span>
+                <span className="why-title-line why-title-line--third">
+                  {t.why_sub2}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="why-title-line">{t.why_sub}</span>
+                <span className="why-title-line why-title-line--second">
+                  {t.why_sub2}
+                </span>
+              </>
+            )}
           </h2>
           <p className="section-sub fade-up fade-up-delay-2">
             {t.why_desc}
@@ -1504,7 +1518,13 @@ export default function TrackitLanding() {
             </ul>
           </div>
           <div className="why-col right fade-up fade-up-delay-4">
-            <h3>Trackit</h3>
+            <h3 className="why-col-logo-wrap">
+              <img
+                src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+                alt="Trackit"
+                className="why-col-logo"
+              />
+            </h3>
             <ul className="why-list">
               {[
                 t.trackit_1,
@@ -1535,16 +1555,10 @@ export default function TrackitLanding() {
       {/* PRICING */}
       <section className="section" id="pricing">
         <div className="tagline fade-up">
-          <span className="tagline-icon tagline-icon-jar">
-            <svg width="18" height="20" viewBox="0 0 24 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <line x1="6" y1="2.5" x2="18" y2="2.5" stroke="#0047FF" strokeWidth="2.4" strokeLinecap="round"/>
-              <line x1="6" y1="6.5" x2="18" y2="6.5" stroke="#0047FF" strokeWidth="2.4" strokeLinecap="round"/>
-              <rect x="3" y="9" width="18" height="15" rx="2.5" fill="#0047FF"/>
-            </svg>
-          </span>
+          <TaglineIcon variant="pricing" />
           {t.nav_pricing}
         </div>
-        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}<span className="section-title-dot">.</span></h2>
+        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}.</h2>
         <p className="section-sub fade-up fade-up-delay-2">
           {t.pricing_sub}
         </p>

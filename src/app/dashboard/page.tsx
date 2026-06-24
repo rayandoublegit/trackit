@@ -717,13 +717,13 @@ function DashboardPageContent() {
         </nav>
 
         {!isSidebarSearching && (
-          <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
+        <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
             {renderSidebarNavItems(
               sidebarNavEntries.filter((item) =>
                 item.section === "footer" && (!isCreator || item.view === "settings")
               )
             )}
-          </div>
+        </div>
         )}
 
         {!isCreator && (
@@ -979,7 +979,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
           <img src="/shopify-logo.svg" alt="Shopify" width={44} height={50} style={{ display: "block" }} />
           <button type="button" onClick={onClose} aria-label="Close" style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "#7A7A7A", lineHeight: 1 }}>×</button>
-        </div>
+          </div>
         <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
         </h3>
@@ -1020,12 +1020,12 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
             />
             {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
             <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} disabled={loading} style={{ width: "100%", justifyContent: "center", opacity: loading ? 0.6 : 1 }}>
-              <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
+            <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
               {loading ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter Shopify" : "Connect Shopify")}
-            </button>
+          </button>
           </>
         )}
-      </div>
+        </div>
     </div>
   );
 }
@@ -1185,7 +1185,7 @@ function OutreachMessageEditor({
               ? "Structure avancée"
               : "Advanced structure"}
         </button>
-      </div>
+              </div>
 
       {creatorName ? (
         <p style={{ fontSize: 11, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "-0.01em" }}>
@@ -1212,7 +1212,7 @@ function OutreachMessageEditor({
               placeholder={lang === "fr" ? "Partenariat avec {{brand}}" : "Partnership with {{brand}}"}
               style={panelInputStyle}
             />
-          </div>
+            </div>
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
             <textarea
@@ -1222,7 +1222,7 @@ function OutreachMessageEditor({
               placeholder="Hey {{name}},"
               style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
             />
-          </div>
+        </div>
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
             <textarea
@@ -1232,7 +1232,7 @@ function OutreachMessageEditor({
               placeholder={lang === "fr" ? "Votre pitch…" : "Your pitch…"}
               style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
             />
-          </div>
+      </div>
           <div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
             <input
@@ -1312,7 +1312,7 @@ function OutreachPanelShell({
           <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
-        </div>
+          </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>{children}</div>
         {footer && <div style={{ padding: "16px 24px 24px", borderTop: "1px solid #EFEFEF" }}>{footer}</div>}
       </aside>
@@ -1539,7 +1539,7 @@ function OutreachView({
         </div>
 
         <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} refreshKey={historyRefreshKey} />
-      </div>
+        </div>
 
       {panel === "import" && (
         <ImportTemplatePanel
@@ -1748,7 +1748,7 @@ function BulkImportTemplatesPanel({
           <input type="file" accept=".csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
         </label>
         {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
-      </div>
+          </div>
       <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>Columns: name, subject, opening, body, cta</p>
       {error && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 8 }}>{error}</p>}
     </OutreachPanelShell>
@@ -1777,7 +1777,7 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
             {lang === "fr" ? "Sauvegarder le modèle" : "Save template"}
           </button>
           <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
-        </div>
+            </div>
       }
     >
       <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
@@ -1822,16 +1822,16 @@ function SeeTemplatesPanel({
                       {lang === "fr" ? "Importé" : "Imported"}
                     </span>
                   )}
-                </div>
+              </div>
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
               </div>
               <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
                 {buildOutreachPreview(messageFromTemplate(t), t.cta)}
               </div>
-            </div>
+              </div>
           ))}
-        </div>
-      )}
+            </div>
+          )}
       <button type="button" style={{ ...btnSecondary, width: "100%", marginTop: 20 }} onClick={onCreate}>{lang === "fr" ? "+ Créer un modèle" : "+ Create template"}</button>
     </OutreachPanelShell>
   );
@@ -1895,9 +1895,9 @@ function InfluencerPicker({
             key={inf.handle}
             type="button"
             onClick={() => toggle(inf.handle)}
-            style={{
-              display: "flex",
-              alignItems: "center",
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
               gap: 12,
               padding: "12px 14px",
               borderRadius: 10,
@@ -1910,17 +1910,17 @@ function InfluencerPicker({
             }}
           >
             <CreatorAvatar src={inf.avatarUrl} size={32} alt={inf.handle} />
-            <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{inf.handle}</div>
               <div style={{ fontSize: 11, color: "#9A9A9A" }}>{inf.platform}</div>
-            </div>
+                  </div>
             <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#0047FF" : "#D0D0D0"}`, background: on ? "#0047FF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round"/></svg>}
             </div>
-          </button>
+                  </button>
         );
       })}
-    </div>
+                </div>
   );
 }
 
@@ -1958,7 +1958,7 @@ function TemplateSelect({
           + Create new template
         </button>
       )}
-    </div>
+          </div>
   );
 }
 
@@ -2355,7 +2355,7 @@ function IntegrationsView({
                         : lang === "fr"
                           ? "Automatisation visuelle avancée"
                           : "Advanced visual automation"}
-                </div>
+              </div>
                 {app.name === "Shopify" && (
                   <div style={{ marginTop: 10 }}>
                     {isShopifyConnected ? (
@@ -2455,9 +2455,9 @@ function IntegrationsView({
                             {connectedStores.map((domain) => (
                               <div key={domain} style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 4 }}>
                                 {domain}
-                              </div>
-                            ))}
-                          </div>
+            </div>
+          ))}
+        </div>
                         )}
                         {canAddAnotherShopifyStore(
                           plan,

@@ -1709,18 +1709,18 @@ function CreatorsTab({
         ) : (
           rows.map((row) => (
             <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-              <td style={{ padding: "14px" }}>
+            <td style={{ padding: "14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <CreatorAvatar src={row.avatar_url} size={32} alt={row.full_name || row.handle} />
                   <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
                 </div>
-              </td>
+            </td>
               <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
               <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
               <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
               <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.salesAmount, lang)}</td>
               <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.commission, lang)}</td>
-            </tr>
+          </tr>
           ))
         )}
       </Table>
@@ -2082,8 +2082,8 @@ function PayoutsTab({
             </tr>
           ) : (
             rows.map((row) => (
-              <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                <td style={{ padding: "14px" }}>
+          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+            <td style={{ padding: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <CreatorAvatar src={row.avatar_url} size={32} alt={row.creatorName} />
                     <div>
@@ -2093,9 +2093,9 @@ function PayoutsTab({
                       ) : null}
                     </div>
                   </div>
-                </td>
+            </td>
                 <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCurrency(row.amount, lang)}</td>
-                <td style={{ padding: "14px" }}>
+            <td style={{ padding: "14px" }}>
                   <span
                     style={{
                       fontSize: 12,
@@ -2117,12 +2117,12 @@ function PayoutsTab({
                   ) : (
                     <span style={{ color: "#9A9A9A", fontSize: 12 }}>—</span>
                   )}
-                </td>
-              </tr>
+            </td>
+          </tr>
             ))
           )}
-        </Table>
-      </Card>
+      </Table>
+    </Card>
 
       {confirmPay && (
         <div
@@ -2366,8 +2366,8 @@ function NewCampaignModal({
       const primaryRate = addedCreators.length > 0 ? clampRate(addedCreators[0].commissionRate) : 10;
 
       await onCreate({
-        name: name || "Untitled Campaign",
-        description,
+      name: name || "Untitled Campaign",
+      description,
         platform,
         startDate: normalizeDate(start),
         endDate: normalizeDate(end),
@@ -2560,7 +2560,7 @@ function NewCampaignModal({
                               {entry.discountCode ? (
                                 <span style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#E8EEFC", borderRadius: 6, padding: "1px 6px", letterSpacing: "0.02em" }}>{entry.discountCode}</span>
                               ) : null}
-                            </div>
+                    </div>
                           </div>
                           <button
                             type="button"
