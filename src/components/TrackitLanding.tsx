@@ -86,8 +86,6 @@ export default function TrackitLanding() {
   nav_login: lang === "fr" ? "Se connecter" : "Log in",
   nav_cta: lang === "fr" ? "Ouvrir thentrack.it" : "Open thentrack.it",
   hero_badge: lang === "fr" ? "Marketing d'influence, automatisé" : "Influencer marketing, automated",
-  hero_v2_soon: lang === "fr" ? "Trackit v2 est sorti!!" : "Trackit v2 is out!!",
-  hero_v2_learn_more: lang === "fr" ? "En savoir plus" : "Learn more",
   hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
   hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
@@ -771,38 +769,6 @@ export default function TrackitLanding() {
           className={lang === "fr" ? "hero-money hero-money--fr" : "hero-money"}
           alt=""
         />
-        <div className="hero-v2-pill-wrap fade-up">
-          <a href="/v2" className="hero-v2-pill">
-            <span className="hero-v2-pill-primary">{t.hero_v2_soon}</span>
-            <span className="hero-v2-pill-secondary">
-              {t.hero_v2_learn_more}
-              <svg
-                className="hero-v2-pill-icon"
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden
-              >
-                <path
-                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M15 3h6v6M10 14L21 3"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </span>
-          </a>
-        </div>
-
         <div className="hero-content">
           <h1 className="hero-headline">
           <span className="hero-line-wrap fade-up">{t.hero_title_1}</span>
