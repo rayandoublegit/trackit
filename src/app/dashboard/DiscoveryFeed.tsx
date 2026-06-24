@@ -140,6 +140,49 @@ function FilterBar({ isPaid, values, onChange, onLocked, sort, onSort }: {
   );
 }
 
+function UpgradeCtaButton({ onClick, fullWidth }: { onClick: () => void; fullWidth?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hero-cta-shopify hero-cta-compact"
+      style={{
+        width: fullWidth ? "100%" : undefined,
+        padding: "12px 16px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 12,
+        justifyContent: "center",
+        fontFamily: "inherit",
+      }}
+    >
+      <span
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          background: "rgba(255,255,255,0.18)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#FFFFFF" />
+        </svg>
+      </span>
+      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", flex: fullWidth ? 1 : undefined }}>
+        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Débloquer le feed complet</span>
+        <span style={{ fontSize: 11.5, fontWeight: 400, opacity: 0.88, letterSpacing: "-0.01em", marginTop: 2 }}>Filtres avancés · scroll illimité</span>
+      </span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.92 }}>
+        <path d="M5 12h14M13 6l6 6-6 6" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </button>
+  );
+}
+
 function PaywallModal({ title, body, onUpgrade, onClose }: { title: string; body: string; onUpgrade: () => void; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
@@ -147,8 +190,8 @@ function PaywallModal({ title, body, onUpgrade, onClose }: { title: string; body
         <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}><Lock size={24} /></div>
         <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 7 }}>{title}</div>
         <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.5 }}>{body}</div>
-        <button type="button" onClick={onUpgrade} style={{ background: "#0047FF", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%" }}>Passer à un plan payant</button>
-        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 13, marginTop: 12, cursor: "pointer" }}>Plus tard</button>
+        <UpgradeCtaButton onClick={onUpgrade} fullWidth />
+        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: "inherit" }}>Plus tard</button>
       </div>
     </div>
   );
@@ -236,11 +279,11 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
 
         {hasMoreFree && (
           <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(rgba(255,255,255,0), #FFF 62%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 40, pointerEvents: "none" }}>
-            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 34px", textAlign: "center", maxWidth: 400, boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
+            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 28px 24px", textAlign: "center", maxWidth: 420, width: "min(100%, 420px)", boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
-              <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>Des milliers de créateurs t&apos;attendent</div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 16, lineHeight: 1.5 }}>Débloque tout le feed, les filtres et le défilement illimité avec un plan payant.</div>
-              <button type="button" onClick={onUpgrade} style={{ background: "#0047FF", color: "#FFF", border: "none", borderRadius: 12, padding: "12px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Passer au plan payant</button>
+              <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6, letterSpacing: "-0.03em" }}>Des milliers de créateurs t&apos;attendent</div>
+              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.55, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>Accède à tout le feed, aux filtres avancés et au défilement illimité.</div>
+              <UpgradeCtaButton onClick={onUpgrade} fullWidth />
             </div>
           </div>
         )}

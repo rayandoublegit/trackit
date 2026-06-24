@@ -3361,7 +3361,6 @@ function buildSidebarNavEntries(
   return [
     { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
     { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
-    { id: "my-creators", label: lang === "fr" ? "Pipeline" : "Pipeline", view: "my-creators", section: "main", iconKey: "creators", keywords: ["saved", "folders", "pipeline", "crm", "sauvegardés", "dossiers", "contacté", "signé"] },
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
     { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
     { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
