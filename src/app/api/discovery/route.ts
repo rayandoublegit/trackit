@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     let q = supabaseAdmin
       .from("creators_index")
       .select("*")
-      .eq("platform", f.platform)
+      .eq("platform", (f.platform || "").toLowerCase())
       .eq("enrichment_status", "enriched")
       .gte("followers", f.followers.gte)
       .lte("followers", f.followers.lte)
@@ -108,14 +108,28 @@ export async function POST(request: Request) {
     // Merge: curated first, then scraped, dedup by username, cap at 30.
     const curatedRows = (curatedData ?? []).map(mapRow);
     const scrapedRows = (!error && data ? data : []).map(mapRow);
+    // 50/50 mix: aim for 15 curated + 15 scraped. If one side is short, fill
+    // the remaining slots from the other so we always return up to 30.
+    const CAP = 30, HALF = 15;
     const seen = new Set<string>();
-    const merged = [];
-    for (const row of [...curatedRows, ...scrapedRows]) {
-      const key = (row.username || "").toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      merged.push(row);
-      if (merged.length >= 30) break;
+    const dedup = (rows: any[]) => rows.filter((r) => {
+      const k = (r.username || "").toLowerCase();
+      if (!k || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    const curatedU = dedup(curatedRows);
+    const scrapedU = dedup(scrapedRows);
+    const merged = [
+      ...curatedU.slice(0, HALF),
+      ...scrapedU.slice(0, CAP - Math.min(curatedU.length, HALF)),
+    ].slice(0, CAP);
+    // Top up if still under cap (e.g. curated had > 15 and scraped ran out).
+    if (merged.length < CAP) {
+      for (const r of [...curatedU, ...scrapedU]) {
+        if (merged.length >= CAP) break;
+        if (!merged.includes(r)) merged.push(r);
+      }
     }
 
     if (merged.length > 0) {
