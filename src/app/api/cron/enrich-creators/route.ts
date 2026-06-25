@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   let sel = supabaseAdmin
     .from("creators_index")
     .select("username")
-    .eq("platform", "TikTok")
+    .eq("platform", "tiktok")
     .neq("enrichment_status", "failed");
   // Optional FR-priority pass: only creators already tagged French (e.g. curated
   // picks awaiting enrichment). Lets us fill the FR discovery feed in one run.
@@ -51,21 +51,39 @@ export async function GET(request: Request) {
       const row = buildEnrichmentRow(username, profile, videos, Date.now(), rich);
 
       let classMerge: Record<string, unknown> = {};
+      let classified = false;
       try {
         const c = await classifyCreator({ displayName: profile.displayName, bio: profile.bio, captions: extractCaptions(videosRaw) });
-        classMerge = {
-          primary_niche: c.primaryNiche,
-          niches: Array.from(new Set([...c.niches, c.primaryNiche])),
-          language: c.language,
-          country_code: c.countryCode,
-          email: c.email,
-        };
+        // Only count as classified if we actually got a language back. A null
+        // language means the model call failed or returned empty -> don't mark
+        // the creator enriched, or it falls out of the queue with no data.
+        if (c && c.language) {
+          classMerge = {
+            primary_niche: c.primaryNiche,
+            niches: Array.from(new Set([...c.niches, c.primaryNiche])),
+            language: c.language,
+            country_code: c.countryCode,
+            email: c.email,
+          };
+          classified = true;
+        }
       } catch {
-        // classification is best-effort; metrics still get saved
+        // classification failed; fall through, creator stays re-enrichable
       }
 
-      await supabaseAdmin.from("creators_index").upsert({ ...row, ...classMerge }, { onConflict: "username" });
-      return "enriched";
+      if (classified) {
+        // Full success: metrics + classification, mark enriched.
+        await supabaseAdmin.from("creators_index").upsert({ ...row, ...classMerge }, { onConflict: "username" });
+        return "enriched";
+      }
+
+      // Classification missing: save the scraped metrics so we don't re-scrape
+      // for nothing, but force status back to pending (NOT enriched) and clear
+      // enriched_at so the next run re-picks this creator and retries the model.
+      await supabaseAdmin
+        .from("creators_index")
+        .upsert({ ...row, enrichment_status: "pending", enriched_at: null }, { onConflict: "username" });
+      return "failed";
     } catch {
       await supabaseAdmin
         .from("creators_index")
