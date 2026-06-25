@@ -21,13 +21,18 @@ export async function GET(request: Request) {
   }
   const { searchParams } = new URL(request.url);
   const budget = Math.min(Math.max(Number(searchParams.get("budget") || DEFAULT_BUDGET), 1), 1000);
+  const onlyFr = searchParams.get("onlyFr") === "1";
 
   // pending first (enriched_at null), then stalest enriched — single ordering.
-  const { data: targets } = await supabaseAdmin
+  let sel = supabaseAdmin
     .from("creators_index")
     .select("username")
     .eq("platform", "TikTok")
-    .neq("enrichment_status", "failed")
+    .neq("enrichment_status", "failed");
+  // Optional FR-priority pass: only creators already tagged French (e.g. curated
+  // picks awaiting enrichment). Lets us fill the FR discovery feed in one run.
+  if (onlyFr) sel = sel.eq("language", "fr");
+  const { data: targets } = await sel
     .order("enriched_at", { ascending: true, nullsFirst: true })
     .limit(budget);
 
