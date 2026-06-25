@@ -79,7 +79,7 @@ export async function POST(request: Request) {
     if (f.language) cq = cq.eq("language", f.language);
     const { data: curatedData } = await cq
       .order("followers", { ascending: false })
-      .limit(30);
+      .limit(100);
 
     // 1b) Scraped + enriched creators (existing behavior).
     let q = supabaseAdmin
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     for (const s of f.excludeStatuses) q = q.neq("quality_status", s);
     for (const s of f.sort) q = q.order(s.column, { ascending: s.ascending });
 
-    const { data, error } = await q.limit(30);
+    const { data, error } = await q.limit(100);
 
     // Merge: curated first, then scraped, dedup by username, cap at 30.
     const curatedRows = (curatedData ?? []).map(mapRow);
@@ -118,8 +118,18 @@ export async function POST(request: Request) {
       seen.add(k);
       return true;
     });
-    const curatedU = dedup(curatedRows);
-    const scrapedU = dedup(scrapedRows);
+    // Fisher-Yates shuffle so each refresh surfaces a fresh random sample
+    // from the quality pool (good creators, different order every time).
+    const shuffle = (arr: any[]) => {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+    const curatedU = shuffle(dedup(curatedRows));
+    const scrapedU = shuffle(dedup(scrapedRows));
     const merged = [
       ...curatedU.slice(0, HALF),
       ...scrapedU.slice(0, CAP - Math.min(curatedU.length, HALF)),
