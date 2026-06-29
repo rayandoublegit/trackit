@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
-import { resolvePlanFromCheckout } from "@/lib/checkout";
+import { checkoutPlanMetadata, resolvePlanFromCheckout } from "@/lib/checkout";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
 
@@ -11,29 +11,21 @@ function errMessage(e: unknown): string {
 
 export async function POST(request: Request) {
   try {
-    console.log("Checkout: starting");
-
     const stripeKey = process.env.STRIPE_SECRET_KEY;
-    console.log("Checkout: stripe key exists?", !!stripeKey);
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-    console.log("Checkout: NEXT_PUBLIC_APP_URL set?", !!appUrl, appUrl ?? "(missing)");
 
     if (!stripeKey) {
       return NextResponse.json({ error: "Missing Stripe key" }, { status: 500 });
     }
 
     if (!appUrl) {
-      console.error(
-        "Checkout: NEXT_PUBLIC_APP_URL is missing — success/cancel URLs will be invalid"
-      );
+      console.error("Checkout: NEXT_PUBLIC_APP_URL is missing — success/cancel URLs will be invalid");
     }
 
     const stripe = new Stripe(stripeKey);
     const body = await request.json();
-    console.log("Checkout: body", body);
 
-    const { priceId, userId, email, analysisId, currency, cancelUrl } = body as {
+    const { priceId, userId, email, analysisId, cancelUrl } = body as {
       priceId?: string;
       userId?: string;
       email?: string;
@@ -46,6 +38,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing priceId" }, { status: 400 });
     }
 
+    const resolvedPlan = resolvePlanFromCheckout(priceId);
+    if (resolvedPlan === "free") {
+      return NextResponse.json({ error: "Unknown or invalid price" }, { status: 400 });
+    }
+
     const base = (appUrl ?? "http://localhost:3000").replace(/\/$/, "");
 
     const sparkPriceId = process.env.STRIPE_SPARK_PRICE_ID?.trim();
@@ -53,13 +50,7 @@ export async function POST(request: Request) {
     const isOneShot = priceId === "price_1TQzvsFC3qsxzaqxr3ydKYDS";
     const oneShotSuccessUrl = `${base}/analyze?oneshot=true`;
 
-    const resolvedPlan = resolvePlanFromCheckout(priceId);
-    const planMeta =
-      resolvedPlan === "basic"
-        ? "growth"
-        : resolvedPlan === "free"
-          ? "growth"
-          : resolvedPlan;
+    const planMeta = checkoutPlanMetadata(resolvedPlan);
 
     const checkoutSuccessBase =
       analysisId && String(analysisId).trim()
@@ -117,7 +108,6 @@ export async function POST(request: Request) {
       cancel_url: cancelUrl ?? `${base}/dashboard?view=billing`,
     });
 
-    console.log("Checkout: session created", session.url);
     return NextResponse.json({ url: session.url });
   } catch (e: unknown) {
     const message = errMessage(e);

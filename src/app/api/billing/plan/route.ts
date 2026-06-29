@@ -6,7 +6,10 @@ import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   getActiveSubscriptionInfo,
+  mapStripeSubscriptionStatus,
   resolveStripeCustomerId,
+  subscriptionGrantsPaidAccess,
+  syncProfileSubscription,
   type BillingInterval,
 } from "@/lib/stripe-billing";
 
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("plan")
+    .select("plan, subscription_active")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
   let nextBillingDate: number | null = null;
   let priceId: string | null = null;
   let currency: string | null = null;
-  let hasActiveSubscription = false;
+  let hasActiveSubscription = Boolean(profile?.subscription_active);
 
   try {
     const stripe = new Stripe(stripeKey);
@@ -81,6 +84,15 @@ export async function GET(request: NextRequest) {
         priceId = subscriptionInfo.priceId;
         currency = subscriptionInfo.currency;
         hasActiveSubscription = ACTIVE_STATUSES.has(subscriptionInfo.status);
+
+        if (normalizePlan(profile?.plan) !== plan || !profile?.subscription_active) {
+          await syncProfileSubscription(admin, user.id, {
+            plan,
+            subscriptionStatus: mapStripeSubscriptionStatus(subscriptionInfo.status),
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: subscriptionInfo.subscriptionId,
+          });
+        }
       } else {
         const subscriptions = await stripe.subscriptions.list({
           customer: customerId,
@@ -102,8 +114,26 @@ export async function GET(request: NextRequest) {
             activeSub.metadata?.plan
           );
           hasActiveSubscription = true;
-        } else {
+
+          if (normalizePlan(profile?.plan) !== plan || !profile?.subscription_active) {
+            await syncProfileSubscription(admin, user.id, {
+              plan,
+              subscriptionStatus: mapStripeSubscriptionStatus(activeSub.status),
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: subscriptionGrantsPaidAccess(activeSub.status)
+                ? activeSub.id
+                : null,
+            });
+          }
+        } else if (hasActiveSubscription || plan !== "free") {
           plan = "free";
+          hasActiveSubscription = false;
+          await syncProfileSubscription(admin, user.id, {
+            plan: "free",
+            subscriptionStatus: "inactive",
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: null,
+          });
         }
       }
     }

@@ -95,19 +95,27 @@ export function resolvePlanFromCheckout(
   metadataPlan?: string | null
 ): PlanTier {
   const meta = normalizePlan(metadataPlan);
-  if (meta !== "free") return meta;
-  if (!priceId) return "free";
+  if (!priceId) return meta;
+
   if (SCALE_PRICE_IDS().includes(priceId)) return "scale";
   if (PRO_PRICE_IDS().includes(priceId)) return "pro";
   if (GROWTH_PRICE_IDS().includes(priceId)) return "basic";
-  return "basic";
+
+  return meta;
+}
+
+export function checkoutPlanMetadata(plan: PlanTier): string {
+  if (plan === "basic") return "growth";
+  return plan;
 }
 
 // Growth ($19/mo)
 export function getGrowthPriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID!;
+  if (annual) {
+    return currency === "eur"
+      ? process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID!
+      : process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID!;
+  }
   return currency === "eur"
     ? process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID!
     : process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID!;
@@ -115,9 +123,11 @@ export function getGrowthPriceId(currency: "usd" | "eur" = "usd", annual = false
 
 // Pro ($39/mo)
 export function getProPriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID!;
+  if (annual) {
+    return currency === "eur"
+      ? process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID!
+      : process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID!;
+  }
   return currency === "eur"
     ? process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID!
     : process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID!;
@@ -125,9 +135,11 @@ export function getProPriceId(currency: "usd" | "eur" = "usd", annual = false): 
 
 // Scale ($99/mo)
 export function getScalePriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID!;
+  if (annual) {
+    return currency === "eur"
+      ? process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID!
+      : process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID!;
+  }
   return currency === "eur"
     ? process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID!
     : process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID!;

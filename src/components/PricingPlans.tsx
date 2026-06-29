@@ -98,6 +98,7 @@ function PricingCard({
   pill,
   disabled,
   annualPill,
+  ctaLoading,
 }: {
   lang: "fr" | "en";
   name: string;
@@ -113,6 +114,7 @@ function PricingCard({
   pill?: string;
   disabled?: boolean;
   annualPill?: string;
+  ctaLoading?: boolean;
 }) {
   return (
     <div className={`pricing-wrap${highlight ? " pricing-wrap-hero" : ""}`}>
@@ -154,10 +156,10 @@ function PricingCard({
           type="button"
           onClick={onClick}
           className={ctaClassName ?? "pricing-cta"}
-          disabled={disabled}
+          disabled={disabled || ctaLoading}
           style={disabled ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", cursor: "default", transform: "none", transition: "none" } : undefined}
         >
-          {ctaLabel}
+          {ctaLoading ? (lang === "fr" ? "Paiement…" : "Paying…") : ctaLabel}
         </button>
       </div>
     </div>
@@ -203,6 +205,7 @@ export function PricingPlans({
   const [growthAnnual, setGrowthAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
   const [scaleAnnual, setScaleAnnual] = useState(false);
+  const [payingTier, setPayingTier] = useState<PaidTier | null>(null);
 
   const currency = lang === "fr" ? "eur" : "usd";
   const plan = normalizePlan(currentPlan);
@@ -274,11 +277,13 @@ export function PricingPlans({
     }
 
     const priceId = priceIdForTier(tier, currency, annual);
-    if (!priceId) {
+    if (!priceId?.trim()) {
       alert("Pricing not configured. Please contact support.");
       return;
     }
 
+    setPayingTier(tier);
+    try {
     let resolvedUserId = userId;
     let resolvedEmail = userEmail;
     if (!resolvedUserId) {
@@ -308,6 +313,9 @@ export function PricingPlans({
     const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
     if (data.url) window.location.href = data.url;
     else alert(data.error || "Could not start checkout");
+    } finally {
+      setPayingTier(null);
+    }
   };
 
   const growthAction = planAction(plan, "basic", subscriptionInterval, growthAnnual);
@@ -328,7 +336,6 @@ export function PricingPlans({
       : lang === "fr"
         ? "Je préfère rester en free"
         : "I'd rather stay free";
-  const defaultPaidCta = lang === "fr" ? "Commencer" : "Get Started";
 
   const growthCta =
     paidCtaLabel ??
@@ -384,6 +391,7 @@ export function PricingPlans({
           ctaLabel={growthCta}
           onClick={() => void startCheckout("basic", growthAnnual)}
           disabled={!paidCtaLabel && growthAction === "current"}
+          ctaLoading={payingTier === "basic"}
           annualPill={lang === "fr" ? "−20% annuel" : "Save 20% annual"}
         />
 
@@ -400,6 +408,7 @@ export function PricingPlans({
           ctaClassName="pricing-cta pricing-cta-hero"
           highlight
           disabled={!paidCtaLabel && proAction === "current"}
+          ctaLoading={payingTier === "pro"}
         />
 
         <PricingCard
@@ -415,6 +424,7 @@ export function PricingPlans({
           ctaClassName="pricing-cta pricing-cta-dark"
           pill={lang === "fr" ? "Pour les agences" : "For agencies"}
           disabled={!paidCtaLabel && scaleAction === "current"}
+          ctaLoading={payingTier === "scale"}
         />
 
         <div className="pricing-wrap pricing-wrap-full">
