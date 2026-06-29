@@ -90,6 +90,13 @@ export async function resolveCreatorAvatarRemoteUrl(
   storedUrl?: string | null
 ): Promise<string | null> {
   const stored = storedUrl?.trim() || "";
+  const storedIsStable =
+    stored && !isUiAvatarsUrl(stored) && isAllowedImageHost(stored) && !isTikTokCdnUrl(stored);
+  if (storedIsStable) return stored;
+
+  const fresh = await fetchFreshAvatarUrl(username);
+  if (fresh) return fresh;
+
   if (stored && !isUiAvatarsUrl(stored) && isAllowedImageHost(stored)) return stored;
-  return fetchFreshAvatarUrl(username);
+  return null;
 }

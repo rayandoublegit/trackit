@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { normalizeCreatorHandle, resolveCreatorAvatarUrl } from "@/lib/creator-avatar";
-import { isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { isTikTokCdnUrl, isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
 function ProfileIcon({ size }: { size: number }) {
   const iconSize = Math.round(size * 0.52);
@@ -20,6 +20,25 @@ function cleanAvatarSrc(src?: string | null): string {
   const url = resolveCreatorAvatarUrl(src);
   if (!url || isUiAvatarsUrl(url)) return "";
   return url;
+}
+
+function isStableAvatarUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return host.includes("supabase.co") || url.includes("/storage/v1/object/public/");
+  } catch {
+    return false;
+  }
+}
+
+/** Prefer the avatar API for expiring CDN URLs so each handle resolves to the right photo. */
+function pickAvatarSource(cleanSrc: string, resolvedUsername: string): AvatarSource {
+  if (!cleanSrc && !resolvedUsername) return "none";
+  if (!resolvedUsername) return cleanSrc ? "src" : "none";
+  if (!cleanSrc) return "api";
+  if (isStableAvatarUrl(cleanSrc)) return "src";
+  if (isTikTokCdnUrl(cleanSrc)) return "api";
+  return "src";
 }
 
 export function CreatorAvatar({
@@ -40,11 +59,10 @@ export function CreatorAvatar({
   const resolvedUsername = normalizeCreatorHandle(username ?? handle);
   const cleanSrc = cleanAvatarSrc(src);
 
-  const initialSource: AvatarSource = cleanSrc ? "src" : resolvedUsername ? "api" : "none";
-  const [source, setSource] = useState<AvatarSource>(initialSource);
+  const [source, setSource] = useState<AvatarSource>(() => pickAvatarSource(cleanSrc, resolvedUsername));
 
   useEffect(() => {
-    setSource(cleanSrc ? "src" : resolvedUsername ? "api" : "none");
+    setSource(pickAvatarSource(cleanSrc, resolvedUsername));
   }, [resolvedUsername, cleanSrc]);
 
   const imgSrc =
@@ -59,7 +77,7 @@ export function CreatorAvatar({
       setSource("api");
       return;
     }
-    if (source === "api" && cleanSrc) {
+    if (source === "api" && cleanSrc && isStableAvatarUrl(cleanSrc)) {
       setSource("src");
       return;
     }
@@ -89,7 +107,7 @@ export function CreatorAvatar({
 
   return (
     <img
-      key={`${source}:${imgSrc}`}
+      key={`${resolvedUsername}:${source}:${imgSrc}`}
       src={imgSrc}
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
