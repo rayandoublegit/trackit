@@ -2127,10 +2127,10 @@ export function DiscoveryView({
       .maybeSingle();
     if (!data) return null;
 
-    // free = lifetime pool (never refills). basic = monthly pool (resets 30 days
-    // after discoveries_reset_at). Pro/Scale never reach this code (no cap).
+    // free = lifetime pool (never refills). basic/pro = monthly pool (resets 30 days
+    // after discoveries_reset_at). Scale never reaches this code (no cap).
     let used = data.discoveries_used || 0;
-    if (plan === "basic") {
+    if (plan === "basic" || plan === "pro") {
       const resetAt = data.discoveries_reset_at ? new Date(data.discoveries_reset_at).getTime() : 0;
       const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
       if (!resetAt || Date.now() - resetAt >= THIRTY_DAYS) {

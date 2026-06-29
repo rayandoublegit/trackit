@@ -2,6 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
+import {
+  getDailyDiscoveryLimit,
+  getResultsPerSearchLimit,
+  getVisibleDiscoveryResults,
+  hasDiscoveryDailyCap,
+  hasUnlimitedSearchResults,
+} from "@/lib/plan-limits";
+import {
+  discoveryResetRemainingMs,
+  formatDiscoveryResetCountdown,
+  incrementDiscoveryQuota,
+  syncDiscoveryQuota,
+} from "@/lib/discovery-quota";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { creatorMatchesNicheFilter } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
@@ -758,14 +771,104 @@ function PaywallModal({ lang, title, body, onUpgrade, onClose }: { lang: "en" | 
   );
 }
 
+function DiscoveryGateOverlay({
+  lang,
+  title,
+  subtitle,
+  countdown,
+  ctaLabel,
+  onUpgrade,
+}: {
+  lang: "en" | "fr";
+  title: string;
+  subtitle: string;
+  countdown: string;
+  ctaLabel: string;
+  onUpgrade: () => void;
+}) {
+  const t = discoveryCopy(lang);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        zIndex: 10,
+        padding: "20px 20px 150px",
+      }}
+    >
+      <div
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #EFEFEF",
+          borderRadius: 20,
+          padding: "32px 40px",
+          textAlign: "center",
+          maxWidth: 400,
+          boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
+        }}
+      >
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 14,
+            background: "rgba(0,71,255,0.08)",
+            margin: "0 auto 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Lock size={24} />
+        </div>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px" }}>{title}</h3>
+        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 6px", lineHeight: 1.5 }}>{subtitle}</p>
+        {countdown ? (
+          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>{t.discoveryResetIn(countdown)}</p>
+        ) : (
+          <div style={{ marginBottom: 18 }} />
+        )}
+        <button
+          type="button"
+          onClick={onUpgrade}
+          style={{
+            background: "#0047FF",
+            color: "#FFFFFF",
+            border: "none",
+            borderRadius: 10,
+            padding: "12px 24px",
+            fontSize: 14,
+            fontWeight: 500,
+            fontFamily: "inherit",
+            cursor: "pointer",
+            letterSpacing: "-0.02em",
+            width: "100%",
+          }}
+        >
+          {ctaLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 const FREE_VISIBLE = 6;
-const LIMIT = 24;
+const SCALE_PAGE_LIMIT = 48;
 
 export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
   const lang = useLang();
   const { navState, navigate, goBack } = useDashboardNavigation();
   const t = discoveryCopy(lang);
   const isPaid = plan !== "free";
+  const resultsPerSearch = getResultsPerSearchLimit(plan);
+  const pageLimit = resultsPerSearch ?? SCALE_PAGE_LIMIT;
+  const discoveryLimit = getDailyDiscoveryLimit(plan);
+  const hasDiscoveryCap = hasDiscoveryDailyCap(plan);
+  const unlimitedResults = hasUnlimitedSearchResults(plan);
   const [creators, setCreators] = useState<FeedCreator[]>([]);
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [product, setProduct] = useState("");
@@ -779,6 +882,10 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const [error, setError] = useState<string | null>(null);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
+  const [discoveriesUsed, setDiscoveriesUsed] = useState(0);
+  const [discoveriesResetAt, setDiscoveriesResetAt] = useState<Date | null>(null);
+  const [showDiscoveryGate, setShowDiscoveryGate] = useState(false);
+  const [resetCountdown, setResetCountdown] = useState("");
 
   const openCreator = (creator: FeedCreator) => {
     setSelected(creator);
@@ -801,9 +908,26 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
 
   const apiParams = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
 
-  const fetchPage = useCallback(async (off: number, replace: boolean) => {
+  const discoverAndFetch = useCallback(async (off: number, replace: boolean) => {
     const gen = fetchGenRef.current;
-    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(LIMIT) }).toString();
+
+    if (hasDiscoveryCap && discoveryLimit != null) {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+      if (!quota) return;
+      setDiscoveriesUsed(quota.used);
+      setDiscoveriesResetAt(quota.resetAt);
+      if (quota.blocked) {
+        setShowDiscoveryGate(true);
+        return;
+      }
+      setShowDiscoveryGate(false);
+    }
+
+    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(pageLimit) }).toString();
     const r = await fetch(`/api/discovery-feed?${qs}`);
     const d = await r.json();
     if (gen !== fetchGenRef.current) return;
@@ -818,9 +942,21 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         return true;
       });
     });
-    setHasMore(!!d.hasMore);
+    setHasMore(unlimitedResults && !!d.hasMore);
     setOffset(off + list.length);
-  }, [apiParams]);
+
+    if (hasDiscoveryCap && discoveryLimit != null) {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const latestQuota = await syncDiscoveryQuota(supabase, user.id, plan);
+      const usedBefore = latestQuota?.used ?? 0;
+      const next = await incrementDiscoveryQuota(supabase, user.id, plan, usedBefore);
+      setDiscoveriesUsed(next);
+      if (next >= discoveryLimit) setShowDiscoveryGate(true);
+    }
+  }, [apiParams, pageLimit, plan, discoveryLimit, hasDiscoveryCap, unlimitedResults]);
 
   useEffect(() => {
     fetchGenRef.current += 1;
@@ -830,11 +966,58 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     setHasMore(true);
     setLoading(true);
     setError(null);
-    fetchPage(0, true)
+    discoverAndFetch(0, true)
       .catch(() => { if (!cancelled) setError("network"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [fetchPage]);
+  }, [discoverAndFetch]);
+
+  useEffect(() => {
+    if (!hasDiscoveryCap) return;
+    void (async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+      if (!quota) return;
+      setDiscoveriesUsed(quota.used);
+      setDiscoveriesResetAt(quota.resetAt);
+      setShowDiscoveryGate(quota.blocked);
+    })();
+  }, [plan, hasDiscoveryCap]);
+
+  useEffect(() => {
+    if (!hasDiscoveryCap || !showDiscoveryGate) {
+      setResetCountdown("");
+      return;
+    }
+    const tick = async () => {
+      const ms = discoveryResetRemainingMs(discoveriesResetAt, plan);
+      if (ms == null) {
+        setResetCountdown("");
+        return;
+      }
+      if (ms <= 0) {
+        const { supabase } = await import("@/lib/supabase");
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+        if (quota) {
+          setDiscoveriesUsed(quota.used);
+          setDiscoveriesResetAt(quota.resetAt);
+          setShowDiscoveryGate(quota.blocked);
+        }
+        setResetCountdown("");
+        return;
+      }
+      setResetCountdown(formatDiscoveryResetCountdown(ms, lang));
+    };
+    void tick();
+    const id = setInterval(() => { void tick(); }, 60_000);
+    return () => clearInterval(id);
+  }, [showDiscoveryGate, discoveriesResetAt, plan, lang, hasDiscoveryCap]);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -858,22 +1041,40 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   };
 
   useEffect(() => {
-    if (!isPaid || !hasMore || loading || loadingMore) return;
+    if (!unlimitedResults || !hasMore || loading || loadingMore) return;
     const el = mainRef.current;
     if (!el) return;
     const onScroll = () => {
       if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) {
         setLoadingMore(true);
-        fetchPage(offset, false).finally(() => setLoadingMore(false));
+        discoverAndFetch(offset, false).finally(() => setLoadingMore(false));
       }
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [isPaid, hasMore, loading, loadingMore, offset, fetchPage]);
+  }, [unlimitedResults, hasMore, loading, loadingMore, offset, discoverAndFetch]);
 
   const filtered = useMemo(() => applyClientFilters(creators, filters, savedUsernames), [creators, filters, savedUsernames]);
-  const items = isPaid ? filtered : filtered.slice(0, FREE_VISIBLE + 2);
-  const hasMoreFree = !isPaid && filtered.length > FREE_VISIBLE;
+  const visibleCreators = useMemo(() => getVisibleDiscoveryResults(plan, filtered), [plan, filtered]);
+  const items = isPaid ? visibleCreators : visibleCreators.slice(0, FREE_VISIBLE + 2);
+  const hasMoreFree = !isPaid && visibleCreators.length > FREE_VISIBLE;
+  const displayCount = resultsPerSearch != null ? Math.min(filtered.length, resultsPerSearch) : filtered.length;
+  const cappedNote = resultsPerSearch != null ? t.resultsCappedAt(resultsPerSearch) : "";
+
+  const discoveryUpgradePlan = plan === "free" ? "Growth" : plan === "basic" ? "Pro" : "Scale";
+  const discoveryLimitSubtitle =
+    plan === "basic"
+      ? t.discoveryLimitSubtitleBasic
+      : plan === "pro"
+        ? t.discoveryLimitSubtitlePro
+        : t.discoveryLimitSubtitleFree;
+
+  const refreshDiscovery = () => {
+    if (showDiscoveryGate) return;
+    setLoading(true);
+    const off = unlimitedResults ? 0 : Math.floor(Math.random() * 12) * pageLimit;
+    void discoverAndFetch(off, true).finally(() => setLoading(false));
+  };
 
   const refreshWorkspace = useCallback(async () => {
     const [rows, f] = await Promise.all([listSaved(), listFolders()]);
@@ -959,47 +1160,89 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               flexWrap: "wrap",
             }}
           >
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
-              {loading ? t.loading : t.creatorCount(filtered.length)}
-            </p>
-            {!isMobile && (
-              <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                {(["followers", "engagement"] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => {
-                      if (!isPaid) { setFilterPaywall(true); return; }
-                      setSort(key);
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      fontFamily: "inherit",
-                      cursor: "pointer",
-                      color: sort === key ? "#1A1A1A" : "#9A9A9A",
-                      fontWeight: sort === key ? 600 : 400,
-                      fontSize: 11,
-                      padding: 0,
-                    }}
-                  >
-                    {key === "followers" ? t.followers : "ER%"}
-                    {sort === key ? " ↓" : ""}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div style={{ minWidth: 0 }}>
+              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+                {loading ? t.loading : `${t.creatorCount(displayCount)}${cappedNote}`}
+              </p>
+              {hasDiscoveryCap && discoveryLimit != null && (
+                <p style={{ fontSize: 11, color: "#9A9A9A", margin: "4px 0 0", letterSpacing: "-0.01em" }}>
+                  {plan === "free"
+                    ? t.discoveriesRemainingLifetime(discoveriesUsed, discoveryLimit)
+                    : t.discoveriesRemaining(discoveriesUsed, discoveryLimit)}
+                </p>
+              )}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="hero-cta-raised-light hero-cta-compact"
+                onClick={refreshDiscovery}
+                disabled={loading || showDiscoveryGate}
+                style={{ opacity: loading || showDiscoveryGate ? 0.55 : 1 }}
+              >
+                {t.refreshResults}
+              </button>
+              {!isMobile && (
+                <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                  {(["followers", "engagement"] as const).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        if (!isPaid) { setFilterPaywall(true); return; }
+                        setSort(key);
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        fontFamily: "inherit",
+                        cursor: "pointer",
+                        color: sort === key ? "#1A1A1A" : "#9A9A9A",
+                        fontWeight: sort === key ? 600 : 400,
+                        fontSize: 11,
+                        padding: 0,
+                      }}
+                    >
+                      {key === "followers" ? t.followers : "ER%"}
+                      {sort === key ? " ↓" : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
-          {!loading && !error && filtered.length === 0 && (
+          {!loading && !error && filtered.length === 0 && showDiscoveryGate && discoveryLimit != null && (
+            <div style={{ position: "relative", minHeight: 320 }}>
+              <DiscoveryGateOverlay
+                lang={lang}
+                title={t.discoveryLimitTitle(discoveryLimit)}
+                subtitle={discoveryLimitSubtitle}
+                countdown={resetCountdown}
+                ctaLabel={t.discoveryUpgradeCta(discoveryUpgradePlan)}
+                onUpgrade={onUpgrade}
+              />
+            </div>
+          )}
+          {!loading && !error && filtered.length === 0 && !showDiscoveryGate && (
             <div style={{ background: "#FFF", border: "1px dashed #E5E5E5", borderRadius: 12, padding: 48, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
               {t.noCreators}
             </div>
           )}
 
           <div style={{ position: "relative" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                filter: showDiscoveryGate ? "blur(6px)" : "none",
+                pointerEvents: showDiscoveryGate ? "none" : "auto",
+                userSelect: showDiscoveryGate ? "none" : "auto",
+                transition: "filter 0.3s",
+              }}
+            >
               {items.map((c, i) => {
                 const locked = !isPaid && i >= FREE_VISIBLE;
                 return (
@@ -1023,7 +1266,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               })}
             </div>
 
-            {hasMoreFree && (
+            {hasMoreFree && !showDiscoveryGate && (
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 380, background: "linear-gradient(rgba(245,245,245,0), #F5F5F5 65%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 32, pointerEvents: "none" }}>
                 <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 28px 24px", textAlign: "center", maxWidth: 420, width: "min(100%, 420px)", boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
                   <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
@@ -1033,14 +1276,24 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
                 </div>
               </div>
             )}
+            {showDiscoveryGate && items.length > 0 && discoveryLimit != null && (
+              <DiscoveryGateOverlay
+                lang={lang}
+                title={t.discoveryLimitTitle(discoveryLimit)}
+                subtitle={discoveryLimitSubtitle}
+                countdown={resetCountdown}
+                ctaLabel={t.discoveryUpgradeCta(discoveryUpgradePlan)}
+                onUpgrade={onUpgrade}
+              />
+            )}
           </div>
 
-          {isPaid && hasMore && !loading && (
+          {unlimitedResults && hasMore && !loading && (
             <div style={{ textAlign: "center", padding: "24px 0 8px" }}>
               <button
                 type="button"
                 disabled={loadingMore}
-                onClick={() => { setLoadingMore(true); fetchPage(offset, false).finally(() => setLoadingMore(false)); }}
+                onClick={() => { setLoadingMore(true); discoverAndFetch(offset, false).finally(() => setLoadingMore(false)); }}
                 style={{
                   fontSize: 13,
                   fontWeight: 600,

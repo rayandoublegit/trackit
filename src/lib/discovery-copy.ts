@@ -68,6 +68,28 @@ export function discoveryCopy(lang: Lang) {
       ? "Filtrer par niche, plateforme, abonnés, engagement, pays, langue et plus est réservé aux plans payants."
       : "Filtering by niche, platform, followers, engagement, country, language, and more is available on paid plans.",
     morePlatformsComing: fr ? "Plus de plateformes bientôt" : "More platforms coming soon",
+    refreshResults: fr ? "Relancer la recherche" : "Refresh results",
+    discoveriesRemaining: (used: number, limit: number) =>
+      fr ? `${used}/${limit} découvertes ce mois` : `${used}/${limit} discoveries this month`,
+    discoveriesRemainingLifetime: (used: number, limit: number) =>
+      fr ? `${used}/${limit} découvertes utilisées` : `${used}/${limit} discoveries used`,
+    resultsCappedAt: (limit: number) =>
+      fr ? ` (limité à ${limit} par recherche)` : ` (capped at ${limit} per search)`,
+    discoveryLimitTitle: (limit: number) =>
+      fr ? `Vous avez utilisé vos ${limit} découvertes` : `You've used your ${limit} discoveries`,
+    discoveryLimitSubtitleBasic: fr
+      ? "Passez à Pro pour 50 découvertes/mois et 25 résultats par recherche."
+      : "Upgrade to Pro for 50 discoveries/month and 25 results per search.",
+    discoveryLimitSubtitleFree: fr
+      ? "Passez à Growth pour 20 découvertes/mois et 10 résultats par recherche."
+      : "Upgrade to Growth for 20 discoveries/month and 10 results per search.",
+    discoveryLimitSubtitlePro: fr
+      ? "Passez à Scale pour des découvertes et résultats illimités."
+      : "Upgrade to Scale for unlimited discoveries and results.",
+    discoveryResetIn: (countdown: string) =>
+      fr ? `Réinitialisation dans ${countdown}` : `Resets in ${countdown}`,
+    discoveryUpgradeCta: (planName: string) =>
+      fr ? `Passer à ${planName} →` : `Upgrade to ${planName} →`,
     loadMore: fr ? "Charger plus" : "Load more",
     // Drawer
     back: fr ? "← Retour" : "← Back",
