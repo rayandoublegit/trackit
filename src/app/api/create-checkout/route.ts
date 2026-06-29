@@ -61,12 +61,16 @@ export async function POST(request: Request) {
           ? "growth"
           : resolvedPlan;
 
-    const successUrl =
+    const checkoutSuccessBase =
       analysisId && String(analysisId).trim()
         ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
         : isOneShot
           ? oneShotSuccessUrl
           : `${base}/dashboard?view=billing&upgraded=true`;
+
+    const successUrl = checkoutSuccessBase.includes("?")
+      ? `${checkoutSuccessBase}&session_id={CHECKOUT_SESSION_ID}`
+      : `${checkoutSuccessBase}?session_id={CHECKOUT_SESSION_ID}`;
 
     let stripeCustomerId: string | null = null;
     if (userId) {

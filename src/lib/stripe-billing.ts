@@ -358,3 +358,139 @@ export async function clearSubscription(
     subscriptionId: subscription.id,
   });
 }
+
+export type SyncedPlanResult = {
+  plan: PlanTier;
+  subscriptionInfo: ActiveSubscriptionInfo | null;
+};
+
+/** Pull active Stripe subscription and persist plan on profiles. */
+export async function syncSubscriptionPlanForUser(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  userId: string,
+  email?: string | null
+): Promise<SyncedPlanResult> {
+  const customerId = await resolveStripeCustomerId(
+    supabase,
+    stripe,
+    userId,
+    email
+  );
+
+  if (!customerId) {
+    await syncProfileSubscription(supabase, userId, {
+      plan: "free",
+      subscriptionStatus: "inactive",
+    });
+    return { plan: "free", subscriptionInfo: null };
+  }
+
+  const subscriptionInfo = await getActiveSubscriptionInfo(stripe, customerId);
+  if (subscriptionInfo) {
+    const subscription = await stripe.subscriptions.retrieve(
+      subscriptionInfo.subscriptionId
+    );
+    await syncFromStripeSubscription(
+      supabase,
+      stripe,
+      subscription,
+      userId
+    );
+    return { plan: subscriptionInfo.plan, subscriptionInfo };
+  }
+
+  await syncProfileSubscription(supabase, userId, {
+    plan: "free",
+    subscriptionStatus: "inactive",
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: null,
+  });
+  return { plan: "free", subscriptionInfo: null };
+}
+
+/** After Checkout redirect — verify session and sync plan (webhook fallback). */
+export async function syncFromCheckoutSession(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  sessionId: string,
+  userId: string
+): Promise<SyncedPlanResult | null> {
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ["subscription", "line_items.data.price"],
+  });
+
+  const sessionUserId =
+    session.metadata?.userId ?? session.client_reference_id ?? null;
+  if (sessionUserId && sessionUserId !== userId) {
+    return null;
+  }
+
+  if (session.status !== "complete") {
+    return null;
+  }
+
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : session.subscription?.id ?? null;
+
+  if (subscriptionId) {
+    const subscription =
+      typeof session.subscription === "object" && session.subscription
+        ? session.subscription
+        : await stripe.subscriptions.retrieve(subscriptionId);
+
+    if (!subscription.metadata?.userId) {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: {
+          ...subscription.metadata,
+          userId,
+          plan: session.metadata?.plan ?? subscription.metadata?.plan ?? "",
+        },
+      });
+    }
+
+    await syncFromStripeSubscription(
+      supabase,
+      stripe,
+      subscription,
+      userId
+    );
+
+    const customerId =
+      typeof session.customer === "string"
+        ? session.customer
+        : session.customer?.id ?? null;
+    const subscriptionInfo = customerId
+      ? await getActiveSubscriptionInfo(stripe, customerId)
+      : null;
+
+    return {
+      plan: planFromSubscription(subscription),
+      subscriptionInfo,
+    };
+  }
+
+  const lineItems = await stripe.checkout.sessions.listLineItems(sessionId, {
+    expand: ["data.price"],
+  });
+  const rawPrice = lineItems.data[0]?.price;
+  const priceId =
+    typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? null;
+  const plan = resolvePlanFromCheckout(priceId, session.metadata?.plan);
+
+  const customerId =
+    typeof session.customer === "string"
+      ? session.customer
+      : session.customer?.id ?? null;
+
+  await syncProfileSubscription(supabase, userId, {
+    plan,
+    subscriptionStatus: "active",
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: null,
+  });
+
+  return { plan, subscriptionInfo: null };
+}

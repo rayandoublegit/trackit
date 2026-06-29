@@ -100,3 +100,30 @@ export function emailFromRow(snapshot: Record<string, unknown> | null | undefine
   }
   return "";
 }
+
+function normalizeEmailHandle(handle?: string | null): string {
+  return (handle ?? "").replace(/^@/, "").trim().toLowerCase();
+}
+
+export function buildCreatorEmailMap(
+  rows: Array<{
+    creator_username?: string | null;
+    handle?: string | null;
+    username?: string | null;
+    snapshot?: unknown;
+    email?: string | null;
+  }>,
+): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const row of rows) {
+    const handle = normalizeEmailHandle(row.creator_username ?? row.handle ?? row.username);
+    if (!handle) continue;
+    const snap =
+      row.snapshot && typeof row.snapshot === "object"
+        ? (row.snapshot as Record<string, unknown>)
+        : null;
+    const email = emailFromRow(snap) || (typeof row.email === "string" ? row.email.trim() : "");
+    if (email) map[handle] = email;
+  }
+  return map;
+}

@@ -1,54 +1,46 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import {
+  buildOutreachGenerationPrompt,
+  parseOutreachGenerationResponse,
+} from "@/lib/outreach-ai-prompt";
 
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request: Request) {
   const { creator, brand, tone, platform, lang } = await request.json();
 
-  const toneMap: Record<string, string> = {
-    casual: "casual and friendly, like a real person not a marketer",
-    professional: "professional and respectful",
-    friendly: "warm and enthusiastic",
-    direct: "direct and concise, no fluff"
-  };
+  if (!creator?.username || !brand?.trim()) {
+    return NextResponse.json({ error: "Missing creator or brand" }, { status: 400 });
+  }
+
+  const prompt = buildOutreachGenerationPrompt({
+    creator: {
+      displayName: String(creator.displayName ?? creator.username ?? ""),
+      username: String(creator.username ?? "").replace(/^@/, ""),
+      platform: String(creator.platform ?? ""),
+      niche: String(creator.niche ?? ""),
+      followersCount: Number(creator.followersCount ?? 0) || 0,
+      engagementRate: Number(creator.engagementRate ?? 0) || 0,
+      bio: String(creator.bio ?? ""),
+    },
+    brand: String(brand).trim(),
+    tone: String(tone ?? "casual"),
+    platform: String(platform ?? "TikTok DM"),
+    lang: String(lang ?? "en"),
+  });
 
   const message = await getAnthropic().messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
-    messages: [
-      {
-        role: "user",
-        content: `You are a brand outreach specialist. Write a personalized creator outreach message.
-
-Creator info:
-- Name: ${creator.displayName}
-- Handle: @${creator.username}
-- Platform: ${creator.platform}
-- Niche: ${creator.niche}
-- Followers: ${creator.followersCount}
-- Engagement rate: ${creator.engagementRate}%
-- Bio: ${creator.bio}
-
-Brand info:
-- Product/brand: ${brand}
-- Platform to send on: ${platform}
-- Tone: ${toneMap[tone] || toneMap.casual}
-
-Write a short personalized outreach message (max 150 words). 
-- Reference something specific about their content or niche
-- Mention the partnership opportunity naturally
-- End with a clear but soft call to action
-- Do NOT use generic phrases like "I love your content"
-- Sound like a real founder, not a marketing team
-- No hashtags, no emojis unless tone is casual
-- Write the message in ${lang === "fr" ? "French" : "English"}.
-
-Output only the message text, nothing else.`
-      }
-    ]
+    max_tokens: 800,
+    messages: [{ role: "user", content: prompt }],
   });
 
-  const text = message.content[0].type === "text" ? message.content[0].text : "";
-  return NextResponse.json({ message: text });
+  const raw = message.content[0].type === "text" ? message.content[0].text : "";
+  const parsed = parseOutreachGenerationResponse(raw, String(platform ?? ""));
+
+  return NextResponse.json({
+    message: parsed.message,
+    subject: parsed.subject ?? null,
+  });
 }

@@ -5,9 +5,20 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators, saveOutreach } from "@/lib/db";
 import { dispatchOutreachHistoryUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
 import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
-import { avatarUrlForCreatorHandle, buildCreatorAvatarMap } from "@/lib/creator-avatar";
+import { avatarUrlForCreatorHandle, buildCreatorAvatarMap, normalizeCreatorHandle } from "@/lib/creator-avatar";
+import { buildCreatorEmailMap } from "@/lib/creator-crm";
+import {
+  buildOutreachMailtoUrl,
+  isValidEmailAddress,
+  resolveCreatorEmail,
+  resolveSelectedCreatorEmails,
+  sendOutreachEmail,
+} from "@/lib/outreach-email";
+import type { FeedCreator } from "@/lib/discovery-feed";
+import { listSaved } from "@/lib/workspace-client";
 import {
   selectionCardStyle,
+  selectionPillColors,
   selectionTextMuted,
   selectionTextPrimary,
   selectionTextSubtle,
@@ -195,7 +206,7 @@ function DashboardPageContent() {
     if (!supabase) return;
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("full_name, username, avatar_url, business_name")
+      .select("full_name, username, avatar_url, business_name, plan")
       .eq("id", userId)
       .maybeSingle();
     if (!profileData) return;
@@ -207,7 +218,7 @@ function DashboardPageContent() {
       avatar_url,
       business_name: profileData.business_name,
       shopify_store: prev?.shopify_store ?? null,
-      plan: prev?.plan ?? "free",
+      plan: normalizePlan(profileData.plan),
     }));
   }, []);
 
@@ -331,28 +342,37 @@ function DashboardPageContent() {
 
   useEffect(() => {
     if (!user?.id || loading || searchParams.get("upgraded") !== "true") return;
-    const client = supabase;
-    if (!client) return;
 
     let cancelled = false;
-    const refreshPlan = async () => {
-      const { data } = await client
-        .from("profiles")
-        .select("plan, subscription_status")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (cancelled || !data) return;
-      setProfile((prev) =>
-        prev ? { ...prev, plan: normalizePlan(data.plan) } : prev
-      );
+    const sessionId = searchParams.get("session_id");
+
+    const syncPlan = async () => {
+      try {
+        const res = await fetch("/api/billing/sync-plan", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessionId || undefined }),
+        });
+        const data = (await res.json()) as { plan?: string };
+        if (cancelled || !res.ok || !data.plan) return;
+        const nextPlan = normalizePlan(data.plan);
+        setProfile((prev) => (prev ? { ...prev, plan: nextPlan } : prev));
+        window.dispatchEvent(
+          new CustomEvent("trackit-plan-updated", { detail: { plan: nextPlan } })
+        );
+      } catch {
+        /* retry on next poll */
+      }
     };
 
-    void refreshPlan();
-    const t1 = window.setTimeout(() => void refreshPlan(), 2000);
-    const t2 = window.setTimeout(() => void refreshPlan(), 5000);
+    void syncPlan();
+    const t1 = window.setTimeout(() => void syncPlan(), 2000);
+    const t2 = window.setTimeout(() => void syncPlan(), 5000);
 
     const url = new URL(window.location.href);
     url.searchParams.delete("upgraded");
+    url.searchParams.delete("session_id");
     window.history.replaceState({}, "", `${url.pathname}${url.search}`);
 
     return () => {
@@ -487,12 +507,14 @@ function DashboardPageContent() {
     goToSidebarItem("discovery");
   };
 
-  const navigateToOutreachSend = (creator?: { username: string; platform: string }) => {
+  const navigateToOutreachSend = (creator?: FeedCreator | { username: string; platform: string; email?: string | null }) => {
     const handle = creator ? creatorHandleForOutreach(creator.username) : undefined;
+    const creatorEmail = creator?.email?.trim() || undefined;
     setOutreachSendRequest({
       key: Date.now(),
       creatorHandle: handle || undefined,
-      dmPlatform: creator ? dmPlatformFromCreatorPlatform(creator.platform) : undefined,
+      creatorEmail,
+      dmPlatform: creatorEmail ? "Email" : creator ? dmPlatformFromCreatorPlatform(creator.platform) : undefined,
     });
     navigate({ view: "outreach" });
     if (isMobile) setMobileSidebarOpen(false);
@@ -846,12 +868,12 @@ export default function DashboardPage() {
   );
 }
 
-function PageHeader({ title, subtitle, right, isMobile }: { title: string; subtitle?: string; right?: React.ReactNode; isMobile?: boolean }) {
+function PageHeader({ title, subtitle, right, isMobile, dense }: { title: string; subtitle?: string; right?: React.ReactNode; isMobile?: boolean; dense?: boolean }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+          <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
           {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
         </div>
         {right && <div style={{ marginTop: 8, flexShrink: 0 }}>{right}</div>}
@@ -986,6 +1008,7 @@ const OUTREACH_DM_PLATFORMS = ["Instagram", "TikTok", "YouTube", "Twitter", "Ema
 type OutreachSendRequest = {
   key: number;
   creatorHandle?: string;
+  creatorEmail?: string;
   dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
 };
 
@@ -1007,6 +1030,23 @@ function defaultOutreachDraftMessage(lang: "en" | "fr"): string {
   return lang === "fr"
     ? "Salut {{name}} 👋\n\nJe suis tombé sur ton contenu et j'aimerais te proposer une collaboration. Tu serais partant pour en discuter ?"
     : "Hey {{name}} 👋\n\nI came across your content and would love to explore a collaboration. Open to chatting?";
+}
+
+function defaultEmailOutreachFields(lang: "en" | "fr"): OutreachMessageFields {
+  return {
+    subject: lang === "fr" ? "Partenariat avec {{brand}}" : "Partnership with {{brand}}",
+    opening: "",
+    body:
+      lang === "fr"
+        ? "Bonjour {{name}},\n\nJe suis tombé sur ton contenu et j'aimerais te proposer une collaboration. Tu serais partante pour en discuter ?"
+        : "Hi {{name}},\n\nI came across your content and would love to explore a collaboration. Open to chatting?",
+    cta: "",
+  };
+}
+
+function emailBodyFromFields(fields: OutreachMessageFields, name = "there") {
+  const main = messageFromTemplate(fields);
+  return buildOutreachPreview(main, fields.cta, name);
 }
 
 function outreachProfileUrl(
@@ -1032,7 +1072,7 @@ function outreachProfileUrl(
   if (platform === "Email") {
     const subject = options?.subject ?? "";
     const body = options?.body ?? "";
-    return `mailto:${encodeURIComponent(clean)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return buildOutreachMailtoUrl({ recipients: [clean], subject, body });
   }
   return null;
 }
@@ -1105,12 +1145,15 @@ function OutreachMessageEditor({
   value,
   onChange,
   creatorName = "",
+  layout = "panel",
 }: {
   lang: "en" | "fr";
   value: OutreachMessageFields;
   onChange: (next: OutreachMessageFields) => void;
   creatorName?: string;
+  layout?: OutreachFormLayout;
 }) {
+  const styles = outreachFormStyles(layout);
   const [detailed, setDetailed] = useState(() => templateHasStructuredFields(value));
   const display = personalizeOutreachFields(value, creatorName);
 
@@ -1141,12 +1184,12 @@ function OutreachMessageEditor({
   };
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 6 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Message" : "Message"}</label>
+    <div style={{ marginBottom: layout === "page" ? styles.sectionGap : 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: layout === "page" ? 10 : 6 }}>
+        <label style={{ ...styles.fieldLabel, margin: 0 }}>{lang === "fr" ? "Outreach" : "Outreach"}</label>
         <button
           type="button"
-          className="hero-cta-shopify-light hero-cta-compact-sm"
+          className={layout === "page" ? "hero-cta-shopify-light hero-cta-compact" : "hero-cta-shopify-light hero-cta-compact-sm"}
           onClick={toggleDetailed}
           style={{ flexShrink: 0 }}
         >
@@ -1161,7 +1204,7 @@ function OutreachMessageEditor({
               </div>
 
       {creatorName ? (
-        <p style={{ fontSize: 11, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "-0.01em" }}>
+        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "#6B7280", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
           {lang === "fr" ? `Personnalisé pour @${creatorName}` : `Personalized for @${creatorName}`}
         </p>
       ) : null}
@@ -1170,54 +1213,111 @@ function OutreachMessageEditor({
         <textarea
           value={[messageFromTemplate(display), display.cta].filter(Boolean).join("\n\n")}
           onChange={(e) => updateFields(outreachFieldsFromMessage(e.target.value))}
-          rows={12}
-          placeholder={lang === "fr" ? "Écrivez votre message ici…" : "Write your message here…"}
-          style={panelMessageStyle}
+          rows={layout === "page" ? 14 : 12}
+          placeholder={lang === "fr" ? "Écrivez votre outreach ici…" : "Write your outreach here…"}
+          style={styles.message}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: layout === "page" ? 18 : 14 }}>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Sujet" : "Subject"}</label>
+            <label style={{ display: "block", ...styles.fieldLabel }}>{lang === "fr" ? "Sujet" : "Subject"}</label>
             <input
               type="text"
               value={display.subject}
               onChange={(e) => setField("subject", e.target.value)}
               placeholder={lang === "fr" ? "Partenariat avec {{brand}}" : "Partnership with {{brand}}"}
-              style={panelInputStyle}
+              style={styles.input}
             />
             </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
+            <label style={{ display: "block", ...styles.fieldLabel }}>{lang === "fr" ? "Introduction" : "Opening"}</label>
             <textarea
               value={display.opening}
               onChange={(e) => setField("opening", e.target.value)}
-              rows={2}
+              rows={3}
               placeholder="Hey {{name}},"
-              style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
+              style={{ ...styles.input, resize: "vertical", lineHeight: 1.5 }}
             />
         </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Message principal" : "Main message"}</label>
+            <label style={{ display: "block", ...styles.fieldLabel }}>{lang === "fr" ? "Corps principal" : "Main body"}</label>
             <textarea
               value={display.body}
               onChange={(e) => setField("body", e.target.value)}
-              rows={6}
+              rows={layout === "page" ? 8 : 6}
               placeholder={lang === "fr" ? "Votre pitch…" : "Your pitch…"}
-              style={{ ...panelInputStyle, resize: "vertical", lineHeight: 1.5 }}
+              style={{ ...styles.input, resize: "vertical", lineHeight: 1.5 }}
             />
       </div>
           <div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
+            <label style={{ display: "block", ...styles.fieldLabel }}>{lang === "fr" ? "Appel à l'action" : "Call to action"}</label>
             <input
               type="text"
               value={display.cta}
               onChange={(e) => setField("cta", e.target.value)}
               placeholder={lang === "fr" ? "Seriez-vous ouvert à un échange rapide ?" : "Would you be open to a quick chat?"}
-              style={panelInputStyle}
+              style={styles.input}
             />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function OutreachEmailEditor({
+  lang,
+  value,
+  onChange,
+  creatorName = "",
+  layout = "panel",
+}: {
+  lang: "en" | "fr";
+  value: OutreachMessageFields;
+  onChange: (next: OutreachMessageFields) => void;
+  creatorName?: string;
+  layout?: OutreachFormLayout;
+}) {
+  const styles = outreachFormStyles(layout);
+  const display = personalizeOutreachFields(value, creatorName);
+
+  const updateFields = (next: OutreachMessageFields) => {
+    onChange(depersonalizeOutreachFields(next, creatorName));
+  };
+
+  const setField = <K extends keyof OutreachMessageFields>(key: K, next: OutreachMessageFields[K]) => {
+    updateFields({ ...display, [key]: next });
+  };
+
+  return (
+    <div style={{ marginBottom: layout === "page" ? styles.sectionGap : 16 }}>
+      <label style={{ display: "block", ...styles.fieldLabel }}>
+        {lang === "fr" ? "Objet" : "Subject"}
+      </label>
+      <input
+        type="text"
+        value={display.subject}
+        onChange={(e) => setField("subject", e.target.value)}
+        placeholder={lang === "fr" ? "Partenariat avec {{brand}}" : "Partnership with {{brand}}"}
+        style={{ ...styles.input, fontWeight: 500, marginBottom: 16 }}
+      />
+
+      {creatorName ? (
+        <p style={{ fontSize: layout === "page" ? 13 : 11, color: "#6B7280", margin: "0 0 10px", letterSpacing: "-0.01em" }}>
+          {lang === "fr" ? `Personnalisé pour @${creatorName}` : `Personalized for @${creatorName}`}
+        </p>
+      ) : null}
+
+      <label style={{ display: "block", ...styles.fieldLabel }}>
+        {lang === "fr" ? "Message" : "Message"}
+      </label>
+      <textarea
+        value={display.body}
+        onChange={(e) => setField("body", e.target.value)}
+        rows={layout === "page" ? 16 : 14}
+        placeholder={lang === "fr" ? "Rédigez votre email ici…" : "Write your email here…"}
+        style={styles.message}
+      />
     </div>
   );
 }
@@ -1240,6 +1340,77 @@ const panelMessageStyle: React.CSSProperties = {
   minHeight: 240,
   lineHeight: 1.55,
 };
+
+const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
+const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
+
+const outreachFieldInput: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "14px 16px",
+  borderRadius: 10,
+  border: "1px solid #D1D5DB",
+  fontSize: 15,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  letterSpacing: "-0.02em",
+  background: "#FFF",
+  outline: "none",
+};
+
+const outreachMessageStyle: React.CSSProperties = {
+  ...outreachFieldInput,
+  resize: "vertical",
+  minHeight: 200,
+  lineHeight: 1.55,
+};
+
+const outreachPagePrimaryBtn: React.CSSProperties = {
+  ...btnPrimary,
+  padding: "12px 20px",
+  fontSize: 15,
+  borderRadius: 10,
+};
+
+const outreachPageSecondaryBtn: React.CSSProperties = {
+  ...btnSecondary,
+  padding: "12px 20px",
+  fontSize: 15,
+  borderRadius: 10,
+};
+
+type OutreachFormLayout = "panel" | "page";
+
+function outreachFormStyles(layout: OutreachFormLayout) {
+  if (layout === "page") {
+    return {
+      sectionTitle: { fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 } as React.CSSProperties,
+      sectionHint: { fontSize: 14, color: "#6B7280", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" } as React.CSSProperties,
+      fieldLabel: { fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 } as React.CSSProperties,
+      subtleLabel: { fontSize: 13, fontWeight: 500, color: "#6B7280", marginBottom: 8 } as React.CSSProperties,
+      input: outreachFieldInput,
+      message: outreachMessageStyle,
+      sectionGap: 32,
+      pill: {
+        ...btnSecondary,
+        padding: "11px 18px",
+        fontSize: 14,
+        minHeight: 42,
+        lineHeight: 1.25,
+      } as React.CSSProperties,
+    };
+  }
+  return {
+    sectionTitle: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
+    sectionHint: { fontSize: 13, color: "#7A7A7A", margin: "0 0 8px", lineHeight: 1.45 } as React.CSSProperties,
+    fieldLabel: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
+    subtleLabel: { fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 } as React.CSSProperties,
+    input: panelInputStyle,
+    message: panelMessageStyle,
+    sectionGap: 20,
+    pill: { ...btnSecondary, padding: "6px 12px", fontSize: 12 } as React.CSSProperties,
+  };
+}
 
 function newTemplateId() {
   return `tpl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -1311,7 +1482,8 @@ function OutreachHeaderActions({
 }) {
   return (
     <SplitHeaderActions
-      primaryLabel={lang === "fr" ? "Envoyer un message" : "Send outreach"}
+      variant="white"
+      primaryLabel={lang === "fr" ? "Contacter" : "Contact"}
       onPrimaryClick={onSend}
       sectionLabel={lang === "fr" ? "Modèles" : "Templates"}
       menuAriaLabel={lang === "fr" ? "Plus d'actions" : "More actions"}
@@ -1384,6 +1556,7 @@ function OutreachView({
   const [sendTemplateId, setSendTemplateId] = useState<string | null>(null);
   const [sendPrefill, setSendPrefill] = useState<{
     creatorHandle?: string;
+    creatorEmail?: string;
     dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -1400,6 +1573,7 @@ function OutreachView({
     setSendTemplateId(null);
     setSendPrefill({
       creatorHandle: openSendRequest.creatorHandle,
+      creatorEmail: openSendRequest.creatorEmail,
       dmPlatform: openSendRequest.dmPlatform,
     });
     setPanel("send");
@@ -1420,9 +1594,31 @@ function OutreachView({
     setPanel("send");
   };
 
+  if (panel === "send") {
+    return (
+      <>
+        <SendOutreachPanel
+          templates={templates}
+          plan={plan}
+          isMobile={isMobile}
+          initialTemplateId={sendTemplateId}
+          initialCreatorHandle={sendPrefill?.creatorHandle}
+          initialCreatorEmail={sendPrefill?.creatorEmail}
+          initialDmPlatform={sendPrefill?.dmPlatform}
+          onClose={closePanel}
+          onSent={() => {
+            setHistoryRefreshKey((k) => k + 1);
+            closePanel();
+          }}
+        />
+        {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+      </>
+    );
+  }
+
   return (
     <>
-      <PageHeader isMobile={isMobile} title={lang === "fr" ? "Messages" : "Outreach"} subtitle={lang === "fr" ? "Envoyez des messages personnalisés et gérez les relances automatiquement" : "Send personalized messages and manage follow-ups automatically"} right={
+      <PageHeader isMobile={isMobile} dense title="Outreach" subtitle={lang === "fr" ? "Rédigez des outreach personnalisés et gérez les relances automatiquement" : "Send personalized outreach and manage follow-ups automatically"} right={
         <OutreachHeaderActions
           lang={lang}
           onSend={() => { setSendTemplateId(null); setPanel("send"); }}
@@ -1464,52 +1660,12 @@ function OutreachView({
           }}
         />
       } />
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+      <div style={{ padding: isMobile ? "0 16px 16px" : "0 40px 40px" }}>
         {toast && (
           <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
             {toast}
           </div>
         )}
-
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20, position: "relative" }}>
-          {!canUseAutoFollowUp(plan) && (
-            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.88)", backdropFilter: "blur(2px)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-              <div style={{ textAlign: "center", maxWidth: 320 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>
-                  {lang === "fr" ? "Relances automatiques — Pro" : "Automated follow-ups — Pro"}
-                </p>
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>
-                  {lang === "fr" ? "Passez à Pro pour programmer des relances automatiques." : "Upgrade to Pro to schedule automatic follow-ups."}
-                </p>
-                <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => void onUpgradePro?.()}>
-                  {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
-                </button>
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: isMobile ? "wrap" : undefined, gap: isMobile ? 8 : undefined, opacity: canUseAutoFollowUp(plan) ? 1 : 0.5 }}>
-            <div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0, marginBottom: 4 }}>{lang === "fr" ? "Relance automatique" : "Automated follow-up"}</h3>
-              <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>{lang === "fr" ? "Votre prochaine relance est dans 3 jours" : "Your next follow-up is in 3 days"}</p>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <button type="button" style={btnSecondary} disabled={!canUseAutoFollowUp(plan)} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Voir la relance" : "Review follow-up"}</button>
-              <Toggle on={canUseAutoFollowUp(plan)} onChange={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} />
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 10, opacity: canUseAutoFollowUp(plan) ? 1 : 0.5 }}>
-            {[
-              { day: lang === "fr" ? "JOUR 1" : "DAY 1", label: lang === "fr" ? "Message initial" : "Initial message" },
-              { day: lang === "fr" ? "JOUR 3" : "DAY 3", label: lang === "fr" ? "Relance douce" : "Soft follow-up" },
-              { day: lang === "fr" ? "JOUR 7" : "DAY 7", label: lang === "fr" ? "Relance finale" : "Final follow-up" },
-            ].map((step, i) => (
-              <div key={i} style={{ flex: 1, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16, opacity: canUseAutoFollowUp(plan) ? 0.6 : 0.35, cursor: "default" }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 6 }}>{step.day}</div>
-                <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{step.label}</div>
-              </div>
-            ))}
-          </div>
-        </div>
 
         <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} refreshKey={historyRefreshKey} />
         </div>
@@ -1550,25 +1706,6 @@ function OutreachView({
           onClose={closePanel}
           onUse={(id) => openSendWithTemplate(id)}
           onCreate={() => setPanel("create")}
-        />
-      )}
-      {panel === "send" && (
-        <SendOutreachPanel
-          templates={templates}
-          plan={plan}
-          initialTemplateId={sendTemplateId}
-          initialCreatorHandle={sendPrefill?.creatorHandle}
-          initialDmPlatform={sendPrefill?.dmPlatform}
-          onClose={closePanel}
-          onSent={() => {
-            setHistoryRefreshKey((k) => k + 1);
-            showToast(
-              lang === "fr"
-                ? "Message copié — ouvrez le DM et collez (Cmd+V) ✓"
-                : "Message copied — open their DMs and paste (Cmd+V) ✓",
-            );
-            closePanel();
-          }}
         />
       )}
       {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
@@ -1625,7 +1762,7 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
   return (
     <OutreachPanelShell
       title={lang === "fr" ? "Importer un modèle" : "Import template"}
-      subtitle={lang === "fr" ? "Collez votre message depuis n'importe où — nous le transformerons en modèle réutilisable." : "Paste your message from anywhere — we'll turn it into a reusable template."}
+      subtitle={lang === "fr" ? "Collez votre outreach depuis n'importe où — nous le transformerons en modèle réutilisable." : "Paste your outreach from anywhere — we'll turn it into a reusable template."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1635,7 +1772,7 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
       }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Message" : "Message"}</label>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Outreach" : "Outreach"}</label>
         <button type="button" onClick={() => void handlePaste()} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" strokeWidth="1.7"/></svg>
           {lang === "fr" ? "Coller" : "Paste"}
@@ -1741,7 +1878,7 @@ function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave:
   return (
     <OutreachPanelShell
       title={lang === "fr" ? "Créer un modèle" : "Create template"}
-      subtitle={lang === "fr" ? "Écrivez votre message en un bloc, ou utilisez la structure avancée pour détailler chaque section." : "Write your message in one block, or use advanced structure to split each section."}
+      subtitle={lang === "fr" ? "Écrivez votre outreach en un bloc, ou utilisez la structure avancée pour détailler chaque section." : "Write your outreach in one block, or use advanced structure to split each section."}
       onClose={onClose}
       footer={
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1780,7 +1917,7 @@ function SeeTemplatesPanel({
     name === "Collab intro" ? (lang === "fr" ? "Intro collaboration" : "Collab intro") : name;
 
   return (
-    <OutreachPanelShell title={lang === "fr" ? "Modèles" : "Templates"} subtitle={lang === "fr" ? "Vos modèles de messages sauvegardés et importés." : "Your saved and imported outreach templates."} onClose={onClose}>
+    <OutreachPanelShell title={lang === "fr" ? "Modèles" : "Templates"} subtitle={lang === "fr" ? "Vos modèles d'outreach sauvegardés et importés." : "Your saved and imported outreach templates."} onClose={onClose}>
       {templates.length === 0 ? (
         <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0 }}>
           {lang === "fr"
@@ -1817,11 +1954,18 @@ function SeeTemplatesPanel({
 function InfluencerPicker({
   selected,
   onChange,
+  layout = "panel",
+  emailMode = false,
+  emailMap = {},
 }: {
   selected: string[];
   onChange: (handles: string[]) => void;
+  layout?: OutreachFormLayout;
+  emailMode?: boolean;
+  emailMap?: Record<string, string>;
 }) {
   const lang = useLang();
+  const styles = outreachFormStyles(layout);
   const [influencers, setInfluencers] = useState<{ handle: string; platform: string; avatarUrl: string }[]>([]);
 
   useEffect(() => {
@@ -1845,9 +1989,12 @@ function InfluencerPicker({
     onChange(selected.includes(handle) ? selected.filter((h) => h !== handle) : [...selected, handle]);
   };
 
+  const creatorsWithEmail = influencers.filter((inf) => resolveCreatorEmail(inf.handle, emailMap));
+  const selectableInfluencers = emailMode ? creatorsWithEmail : influencers;
+
   if (influencers.length === 0 && selected.length === 0) {
     return (
-      <div style={{ padding: 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: 13, color: "#9A9A9A", textAlign: "center" }}>
+      <div style={{ padding: layout === "page" ? 20 : 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: layout === "page" ? 14 : 13, color: "#6B7280", textAlign: "center", lineHeight: 1.5 }}>
         {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis Découverte ou Créateurs." : "No saved creators yet. Add creators from Discovery or Creators."}
       </div>
     );
@@ -1856,16 +2003,32 @@ function InfluencerPicker({
   const extraSelected = selected.filter((handle) => !influencers.some((inf) => inf.handle === handle));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: layout === "page" ? 10 : 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Influenceurs" : "Influencers"}</span>
-        {influencers.length > 0 && (
+        <span style={styles.subtleLabel}>{lang === "fr" ? "Influenceurs" : "Influencers"}</span>
+        {selectableInfluencers.length > 0 && (
           <button
             type="button"
-            style={{ fontSize: 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-            onClick={() => onChange(selected.length === influencers.length ? [] : influencers.map((i) => i.handle))}
+            style={{ fontSize: layout === "page" ? 13 : 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+            onClick={() =>
+              onChange(
+                selected.length === selectableInfluencers.length
+                  ? []
+                  : selectableInfluencers.map((i) => i.handle),
+              )
+            }
           >
-            {selected.length === influencers.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
+            {selected.length === selectableInfluencers.length
+              ? lang === "fr"
+                ? "Tout désélectionner"
+                : "Clear all"
+              : emailMode
+                ? lang === "fr"
+                  ? "Sélectionner avec email"
+                  : "Select with email"
+                : lang === "fr"
+                  ? "Tout sélectionner"
+                  : "Select all"}
           </button>
         )}
       </div>
@@ -1876,14 +2039,14 @@ function InfluencerPicker({
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "12px 14px",
+            padding: layout === "page" ? "14px 16px" : "12px 14px",
             borderRadius: 10,
             ...selectionCardStyle(true),
           }}
         >
-          <CreatorAvatar username={handle} displayName={handle} size={32} alt={handle} />
+          <CreatorAvatar username={handle} displayName={handle} size={layout === "page" ? 40 : 32} alt={handle} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: "#FFFFFF" }}>{handle}</div>
+            <div style={{ fontSize: layout === "page" ? 14 : 13, fontWeight: 500, color: "#FFFFFF" }}>{handle}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{lang === "fr" ? "Sélectionné" : "Selected"}</div>
           </div>
           <button
@@ -1897,11 +2060,14 @@ function InfluencerPicker({
       ))}
       {influencers.map((inf) => {
         const on = selected.includes(inf.handle);
+        const email = resolveCreatorEmail(inf.handle, emailMap);
+        const missingEmail = emailMode && !email;
         return (
           <button
             key={inf.handle}
             type="button"
-            onClick={() => toggle(inf.handle)}
+            onClick={() => !missingEmail && toggle(inf.handle)}
+            disabled={missingEmail}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1909,20 +2075,27 @@ function InfluencerPicker({
               padding: "12px 14px",
               borderRadius: 10,
               ...selectionCardStyle(on, { unselectedBackground: "#FFFFFF" }),
-              cursor: "pointer",
+              cursor: missingEmail ? "not-allowed" : "pointer",
+              opacity: missingEmail ? 0.55 : 1,
               fontFamily: "inherit",
               textAlign: "left",
               width: "100%",
             }}
           >
-            <CreatorAvatar username={inf.handle} displayName={inf.handle} src={inf.avatarUrl} size={32} alt={inf.handle} />
+            <CreatorAvatar username={inf.handle} displayName={inf.handle} src={inf.avatarUrl} size={layout === "page" ? 40 : 32} alt={inf.handle} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: selectionTextPrimary(on) }}>{inf.handle}</div>
-              <div style={{ fontSize: 11, color: selectionTextMuted(on) }}>{inf.platform}</div>
+              <div style={{ fontSize: layout === "page" ? 14 : 13, fontWeight: 500, color: selectionTextPrimary(on) }}>{inf.handle}</div>
+              <div style={{ fontSize: layout === "page" ? 12 : 11, color: selectionTextMuted(on) }}>
+                {emailMode
+                  ? email || (lang === "fr" ? "Aucun email" : "No email")
+                  : inf.platform}
+              </div>
                   </div>
+            {!missingEmail && (
             <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#FFFFFF" : "#D0D0D0"}`, background: on ? "#FFFFFF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={TRACKIT_SELECTION_BLUE} strokeWidth="2.5" strokeLinecap="round"/></svg>}
             </div>
+            )}
                   </button>
         );
       })}
@@ -1935,24 +2108,27 @@ function TemplateSelect({
   value,
   onChange,
   onCreateNew,
+  layout = "panel",
 }: {
   templates: OutreachTemplate[];
   value: string;
   onChange: (id: string) => void;
   onCreateNew?: () => void;
+  layout?: OutreachFormLayout;
 }) {
   const lang = useLang();
+  const styles = outreachFormStyles(layout);
   const applyTemplate = (id: string) => onChange(id);
   const templateDisplayName = (name: string) =>
     name === "Collab intro" ? (lang === "fr" ? "Intro collaboration" : "Collab intro") : name;
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Modèle" : "Template"}</label>
+    <div style={{ marginBottom: layout === "page" ? styles.sectionGap : 20 }}>
+      <label style={{ display: "block", ...styles.fieldLabel }}>{lang === "fr" ? "Modèle" : "Template"}</label>
       <select
         value={value}
         onChange={(e) => applyTemplate(e.target.value)}
-        style={{ ...panelInputStyle, cursor: "pointer", marginBottom: 8 }}
+        style={{ ...styles.input, cursor: "pointer", marginBottom: 8 }}
       >
         <option value="">{lang === "fr" ? "Aucun modèle — écrire depuis zéro" : "No template — write from scratch"}</option>
         {templates.map((t) => (
@@ -1973,7 +2149,9 @@ function SendOutreachPanel({
   plan,
   initialTemplateId,
   initialCreatorHandle,
+  initialCreatorEmail,
   initialDmPlatform,
+  isMobile,
   onClose,
   onSent,
 }: {
@@ -1981,30 +2159,48 @@ function SendOutreachPanel({
   plan: PlanTier;
   initialTemplateId: string | null;
   initialCreatorHandle?: string;
+  initialCreatorEmail?: string;
   initialDmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
+  isMobile?: boolean;
   onClose: () => void;
-  onSent: (count: number) => void;
+  onSent: (mode: "email" | "dm") => void;
 }) {
   const lang = useLang();
+  const pageStyles = outreachFormStyles("page");
   const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>(() =>
     initialCreatorHandle ? [initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`] : []
   );
   const [dmPlatform, setDmPlatform] = useState<(typeof OUTREACH_DM_PLATFORMS)[number]>(
     initialDmPlatform ?? "Instagram"
   );
+  const isEmail = dmPlatform === "Email";
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
-  const [fields, setFields] = useState<OutreachMessageFields>(() =>
-    outreachFieldsFromMessage(initialCreatorHandle ? defaultOutreachDraftMessage(lang) : ""),
-  );
+  const [fields, setFields] = useState<OutreachMessageFields>(() => {
+    if (initialDmPlatform === "Email") return defaultEmailOutreachFields(lang);
+    return outreachFieldsFromMessage(initialCreatorHandle ? defaultOutreachDraftMessage(lang) : "");
+  });
+  const [senderEmail, setSenderEmail] = useState("");
+  const [creatorEmailOverrides, setCreatorEmailOverrides] = useState<Record<string, string>>({});
   const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
+  const [creatorEmailMap, setCreatorEmailMap] = useState<Record<string, string>>({});
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCreators = async () => {
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const data = await getSavedCreators(user.id);
-      setCreatorAvatarMap(buildCreatorAvatarMap(data));
+      if (user.email) setSenderEmail(user.email);
+      const [savedRows, legacyCreators] = await Promise.all([
+        listSaved(),
+        getSavedCreators(user.id),
+      ]);
+      setCreatorAvatarMap(buildCreatorAvatarMap(legacyCreators));
+      setCreatorEmailMap({
+        ...buildCreatorEmailMap(legacyCreators),
+        ...buildCreatorEmailMap(savedRows),
+      });
     };
     void loadCreators();
   }, []);
@@ -2029,33 +2225,150 @@ function SendOutreachPanel({
         initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`,
       ]);
       setFields((prev) => {
-        if (messageFromTemplate(prev).trim()) return prev;
-        return outreachFieldsFromMessage(defaultOutreachDraftMessage(lang));
+        if (messageFromTemplate(prev).trim() || prev.subject.trim()) return prev;
+        return initialDmPlatform === "Email"
+          ? defaultEmailOutreachFields(lang)
+          : outreachFieldsFromMessage(defaultOutreachDraftMessage(lang));
       });
     }
     if (initialDmPlatform) setDmPlatform(initialDmPlatform);
-  }, [initialCreatorHandle, initialDmPlatform, lang]);
+    if (initialCreatorEmail?.trim() && initialCreatorHandle) {
+      const key = normalizeCreatorHandle(initialCreatorHandle);
+      if (key) {
+        setCreatorEmailOverrides((prev) => ({ ...prev, [key]: initialCreatorEmail.trim() }));
+      }
+    }
+  }, [initialCreatorHandle, initialCreatorEmail, initialDmPlatform, lang]);
 
-  const creatorName = outreachCreatorName(selectedInfluencers[0]);
-  const previewName = creatorName || "there";
-  const fullPreview = previewFromFields(fields, previewName);
+  useEffect(() => {
+    if (dmPlatform !== "Email") return;
+    setFields((prev) => {
+      if (prev.subject.trim() || messageFromTemplate(prev).trim()) return prev;
+      return defaultEmailOutreachFields(lang);
+    });
+  }, [dmPlatform, lang]);
 
-  const canSend = selectedInfluencers.length > 0 && messageFromTemplate(fields).trim();
+  useEffect(() => {
+    if (!isEmail) return;
+    setCreatorEmailOverrides((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const handle of selectedInfluencers) {
+        const key = normalizeCreatorHandle(handle);
+        if (!key || next[key]?.trim()) continue;
+        const fromMap = creatorEmailMap[key] || (key === normalizeCreatorHandle(initialCreatorHandle) ? initialCreatorEmail?.trim() : "");
+        if (fromMap) {
+          next[key] = fromMap;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [selectedInfluencers, creatorEmailMap, initialCreatorEmail, initialCreatorHandle, isEmail]);
+
+  const resolvedRecipients = useMemo(
+    () => resolveSelectedCreatorEmails(selectedInfluencers, creatorEmailMap, creatorEmailOverrides),
+    [selectedInfluencers, creatorEmailMap, creatorEmailOverrides],
+  );
+
+  const missingEmailHandles = useMemo(
+    () =>
+      selectedInfluencers.filter(
+        (handle) => !resolveCreatorEmail(handle, creatorEmailMap, creatorEmailOverrides),
+      ),
+    [selectedInfluencers, creatorEmailMap, creatorEmailOverrides],
+  );
+
+  const isBatchEmail = resolvedRecipients.length > 1;
+  const creatorName = isBatchEmail ? "" : outreachCreatorName(selectedInfluencers[0]);
+  const previewName = isBatchEmail ? "there" : creatorName || "there";
+  const emailSubjectPreview =
+    personalizeOutreachText(fields.subject, previewName).trim() ||
+    (lang === "fr" ? "Partenariat" : "Partnership");
+  const emailBodyPreview = emailBodyFromFields(fields, previewName);
+  const fullPreview = isEmail ? emailBodyPreview : previewFromFields(fields, previewName);
+
+  const persistOutreachHistory = async () => {
+    let userId: string | null = null;
+    if (supabase) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
+    }
+
+    if (!userId) return;
+
+    const followUpDate = canUseAutoFollowUp(plan) ? followUpIn3Days() : null;
+
+    for (const influencerHandle of selectedInfluencers) {
+      const name = outreachCreatorName(influencerHandle);
+      const copiedMessage = isEmail
+        ? `${lang === "fr" ? "Objet" : "Subject"}: ${personalizeOutreachText(fields.subject, name || "there").trim() || emailSubjectPreview}\n\n${emailBodyFromFields(fields, name || "there")}`
+        : previewFromFields(fields, name || "there");
+      const handleClean = influencerHandle.replace(/^@/, "");
+      const payload = {
+        creator_username: name || handleClean,
+        creator_display_name: influencerHandle,
+        creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
+        platform: dmPlatform,
+        message: copiedMessage,
+        status: "sent",
+        follow_up_date: followUpDate,
+      };
+      const saved = await saveOutreach(userId, payload);
+      if (!saved) {
+        appendStoredOutreachEntry(userId, payload);
+      }
+      notifyOutreachSent(lang, influencerHandle, userId);
+    }
+    dispatchOutreachHistoryUpdated();
+  };
+
+  const canSend = isEmail
+    ? resolvedRecipients.length > 0 &&
+      isValidEmailAddress(senderEmail) &&
+      emailSubjectPreview.trim() &&
+      emailBodyPreview.trim() &&
+      !sendingEmail
+    : selectedInfluencers.length > 0 && messageFromTemplate(fields).trim();
 
   const handleSend = () => {
     if (!canSend) return;
 
-    const messageText = fullPreview;
+    if (isEmail) {
+      setSendingEmail(true);
+      setSendError(null);
+      void (async () => {
+        const recipients = resolvedRecipients.map((r) => r.email);
+        const result = await sendOutreachEmail({
+          fromEmail: senderEmail.trim(),
+          subject: emailSubjectPreview,
+          body: emailBodyPreview,
+          recipients,
+        });
+
+        if (!result.ok) {
+          setSendError(result.error);
+          setSendingEmail(false);
+          return;
+        }
+
+        if (result.mode !== "api" && result.composeUrl) {
+          window.open(result.composeUrl, "_blank", "noopener,noreferrer");
+        }
+
+        await persistOutreachHistory();
+        setSendingEmail(false);
+        onSent("email");
+      })();
+      return;
+    }
+
     const handle = selectedInfluencers[0].replace(/^@/, "").trim();
     if (!handle) return;
 
-    const emailSubject =
-      personalizeOutreachText(fields.subject, previewName).trim() ||
-      personalizeOutreachText(messageFromTemplate(fields), previewName).split("\n").find((line) => line.trim())?.trim().slice(0, 80) ||
-      (lang === "fr" ? "Partenariat" : "Partnership");
-
+    const messageText = fullPreview;
     const profileUrl = outreachProfileUrl(dmPlatform, handle, {
-      subject: emailSubject,
+      subject: emailSubjectPreview,
       body: messageText,
     });
     if (profileUrl) {
@@ -2068,39 +2381,8 @@ function SendOutreachPanel({
       } catch {
         /* clipboard may be unavailable */
       }
-
-      let userId: string | null = null;
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id ?? null;
-      }
-
-      if (userId) {
-        const followUpDate = canUseAutoFollowUp(plan) ? followUpIn3Days() : null;
-
-        for (const influencerHandle of selectedInfluencers) {
-          const name = outreachCreatorName(influencerHandle);
-          const copiedMessage = previewFromFields(fields, name || "there");
-          const handleClean = influencerHandle.replace(/^@/, "");
-          const payload = {
-            creator_username: name || handleClean,
-            creator_display_name: influencerHandle,
-            creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
-            platform: dmPlatform,
-            message: copiedMessage,
-            status: "sent",
-            follow_up_date: followUpDate,
-          };
-          const saved = await saveOutreach(userId, payload);
-          if (!saved) {
-            appendStoredOutreachEntry(userId, payload);
-          }
-          notifyOutreachSent(lang, influencerHandle, userId);
-        }
-        dispatchOutreachHistoryUpdated();
-      }
-
-      onSent(selectedInfluencers.length);
+      await persistOutreachHistory();
+      onSent("dm");
     })();
   };
 
@@ -2121,48 +2403,223 @@ function SendOutreachPanel({
             ? lang === "fr"
               ? "Envoyer via Twitter"
               : "Send via Twitter"
-            : lang === "fr"
-              ? `Envoyer via ${dmPlatform}`
-              : `Send via ${dmPlatform}`;
+            : dmPlatform === "Email"
+              ? sendingEmail
+                ? lang === "fr"
+                  ? "Envoi en cours…"
+                  : "Sending…"
+                : isBatchEmail
+                  ? lang === "fr"
+                    ? `Envoyer à ${resolvedRecipients.length} créateurs`
+                    : `Send to ${resolvedRecipients.length} creators`
+                  : lang === "fr"
+                    ? "Envoyer par email"
+                    : "Send via Email"
+              : lang === "fr"
+                ? `Envoyer via ${dmPlatform}`
+                : `Send via ${dmPlatform}`;
+
+  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const contentMax = 720;
 
   return (
-    <OutreachPanelShell
-      title={lang === "fr" ? "Envoyer un message" : "Send outreach"}
-      subtitle={lang === "fr" ? "Choisissez où envoyer le DM, sélectionnez des influenceurs, puis modifiez votre message." : "Choose where to send the DM, pick influencers, then edit your message."}
-      onClose={onClose}
-      footer={
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 4px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-            {lang === "fr"
-              ? "En cliquant sur Envoyer, le message est copié — il ne reste plus qu’à le coller dans le DM du créateur."
-              : "When you click Send, your message is copied to the clipboard — just paste it into their DMs."}
-          </p>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={handleSend}>{sendViaLabel}</button>
-          <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
-        </div>
-      }
-    >
-      <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Envoyer un DM sur" : "Send DM on"}</label>
-      <select
-        value={dmPlatform}
-        onChange={(e) => setDmPlatform(e.target.value as (typeof OUTREACH_DM_PLATFORMS)[number])}
-        style={{ ...panelInputStyle, marginBottom: 20, cursor: "pointer" }}
-      >
-        {OUTREACH_DM_PLATFORMS.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
+      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
+        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
+          {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : (lang === "fr" ? "Envoyer un outreach" : "Send outreach")}
+        </h1>
+        <p style={{ ...pageStyles.sectionHint, marginBottom: 36 }}>
+          {isEmail
+            ? lang === "fr"
+              ? "Utilisez l'email de votre marque, sélectionnez un ou plusieurs créateurs avec email, puis rédigez votre message."
+              : "Use your brand email, select one or more creators with an email, then write your message."
+            : lang === "fr"
+              ? "Choisissez où envoyer le DM, sélectionnez des influenceurs, puis modifiez votre outreach."
+              : "Choose where to send the DM, pick influencers, then edit your outreach."}
+        </p>
 
-      <InfluencerPicker selected={selectedInfluencers} onChange={setSelectedInfluencers} />
-      <TemplateSelect templates={templates} value={templateId} onChange={applyTemplateById} />
-      <OutreachMessageEditor key={templateId || "send-scratch"} lang={lang} value={fields} onChange={setFields} creatorName={creatorName} />
-      {fullPreview && (
-        <div style={{ padding: 14, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Preview · {dmPlatform}</div>
-          <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{fullPreview}</div>
+        <div style={{ marginBottom: pageStyles.sectionGap }}>
+          <div style={pageStyles.fieldLabel}>
+            {isEmail ? (lang === "fr" ? "Canal" : "Channel") : lang === "fr" ? "Envoyer un DM sur" : "Send DM on"}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {OUTREACH_DM_PLATFORMS.map((p) => {
+              const on = dmPlatform === p;
+              const pill = selectionPillColors(on);
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setDmPlatform(p)}
+                  style={{
+                    ...pageStyles.pill,
+                    background: pill.background,
+                    color: pill.color,
+                    borderColor: pill.borderColor,
+                  }}
+                >
+                  {p}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      )}
-    </OutreachPanelShell>
+
+        {isEmail && (
+          <div style={{ marginBottom: pageStyles.sectionGap }}>
+            <label style={{ display: "block", ...pageStyles.fieldLabel }}>
+              {lang === "fr" ? "Email de la marque" : "Brand email"}
+            </label>
+            <input
+              type="email"
+              value={senderEmail}
+              onChange={(e) => setSenderEmail(e.target.value)}
+              placeholder="vous@marque.com"
+              style={pageStyles.input}
+              autoComplete="email"
+            />
+            <p style={{ fontSize: 13, color: "#6B7280", margin: "8px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              {lang === "fr"
+                ? "L'envoi se fait depuis cette adresse. Connectez-vous à Gmail ou Outlook avec ce compte si une fenêtre s'ouvre."
+                : "Sending happens from this address. Sign in to Gmail or Outlook with this account if a window opens."}
+            </p>
+          </div>
+        )}
+
+        <div style={{ marginBottom: pageStyles.sectionGap }}>
+          <div style={pageStyles.fieldLabel}>{lang === "fr" ? "Créateurs" : "Creators"}</div>
+          <InfluencerPicker
+            layout="page"
+            emailMode={isEmail}
+            emailMap={{ ...creatorEmailMap, ...creatorEmailOverrides }}
+            selected={selectedInfluencers}
+            onChange={setSelectedInfluencers}
+          />
+        </div>
+
+        {isEmail && resolvedRecipients.length > 0 && (
+          <div style={{ marginBottom: pageStyles.sectionGap }}>
+            <div style={pageStyles.fieldLabel}>
+              {isBatchEmail
+                ? lang === "fr"
+                  ? `Destinataires (${resolvedRecipients.length})`
+                  : `Recipients (${resolvedRecipients.length})`
+                : lang === "fr"
+                  ? "Destinataire"
+                  : "Recipient"}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {resolvedRecipients.map((row, index) => (
+                <div
+                  key={row.handle}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #EFEFEF",
+                    background: "#FAFAFA",
+                  }}
+                >
+                  <CreatorAvatar username={row.handle} displayName={row.handle} size={36} alt={row.handle} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{row.handle}</div>
+                    <div style={{ fontSize: 12, color: "#6B7280" }}>
+                      {index === 0
+                        ? lang === "fr"
+                          ? "À"
+                          : "To"
+                        : lang === "fr"
+                          ? "Cc"
+                          : "Cc"}
+                    </div>
+                  </div>
+                  <input
+                    type="email"
+                    value={creatorEmailOverrides[normalizeCreatorHandle(row.handle)] ?? row.email}
+                    onChange={(e) => {
+                      const key = normalizeCreatorHandle(row.handle);
+                      setCreatorEmailOverrides((prev) => ({ ...prev, [key]: e.target.value }));
+                    }}
+                    style={{ ...pageStyles.input, flex: 1, minWidth: 0, maxWidth: 280 }}
+                    autoComplete="off"
+                  />
+                </div>
+              ))}
+            </div>
+            {isBatchEmail && (
+              <p style={{ fontSize: 13, color: "#6B7280", margin: "10px 0 0", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+                {lang === "fr"
+                  ? "Envoi groupé : le premier créateur en destinataire principal, les autres en copie (Cc)."
+                  : "Batch send: first creator as primary recipient, others in Cc."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {isEmail && missingEmailHandles.length > 0 && (
+          <p style={{ margin: `0 0 ${pageStyles.sectionGap}px`, fontSize: 13, color: "#1A1A1A", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? `${missingEmailHandles.length} créateur${missingEmailHandles.length > 1 ? "s" : ""} sélectionné${missingEmailHandles.length > 1 ? "s" : ""} sans email — non inclus dans l'envoi.`
+              : `${missingEmailHandles.length} selected creator${missingEmailHandles.length > 1 ? "s" : ""} without email — excluded from send.`}
+          </p>
+        )}
+
+        <TemplateSelect layout="page" templates={templates} value={templateId} onChange={applyTemplateById} />
+
+        {isEmail ? (
+          <OutreachEmailEditor key={templateId || "send-email"} layout="page" lang={lang} value={fields} onChange={setFields} creatorName={creatorName} />
+        ) : (
+          <OutreachMessageEditor key={templateId || "send-scratch"} layout="page" lang={lang} value={fields} onChange={setFields} creatorName={creatorName} />
+        )}
+
+        {fullPreview && (
+          <div style={{ padding: 18, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, marginBottom: pageStyles.sectionGap }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+              {lang === "fr" ? "Aperçu" : "Preview"} · {dmPlatform}
+            </div>
+            {isEmail ? (
+              <>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+                  {emailSubjectPreview}
+                </div>
+                <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{emailBodyPreview}</div>
+              </>
+            ) : (
+              <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{fullPreview}</div>
+            )}
+          </div>
+        )}
+
+        {isBatchEmail && isEmail && (
+          <p style={{ fontSize: 13, color: "#6B7280", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Mode lot : le message utilise une formule générique ({{name}} → there) pour tous les destinataires."
+              : "Batch mode: the message uses a generic greeting ({{name}} → there) for all recipients."}
+          </p>
+        )}
+
+        <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+          {isEmail
+            ? lang === "fr"
+              ? "En cliquant sur Envoyer, votre messagerie s'ouvre (Gmail, Outlook ou Mail) avec les destinataires et le message pré-remplis — l'email part bien depuis l'adresse de la marque ci-dessus."
+              : "When you click Send, your mail app opens (Gmail, Outlook, or Mail) with recipients and message pre-filled — the email is sent from your brand address above."
+            : lang === "fr"
+              ? "En cliquant sur Envoyer, l'outreach est copié — il ne reste plus qu'à le coller dans le DM du créateur."
+              : "When you click Send, your outreach is copied to the clipboard — just paste it into their DMs."}
+        </p>
+
+        {sendError && (
+          <p style={{ fontSize: 13, color: "#DC2626", margin: "0 0 16px", lineHeight: 1.5 }}>{sendError}</p>
+        )}
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button type="button" style={{ ...outreachPagePrimaryBtn, opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={handleSend}>{sendViaLabel}</button>
+          <button type="button" style={outreachPageSecondaryBtn} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -3791,8 +4248,6 @@ function Toggle({ on, onChange }: { on: boolean; onChange?: () => void }) {
   return track;
 }
 
-const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
-const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
 function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
@@ -3886,7 +4341,7 @@ function buildSidebarNavEntries(
       ],
     },
     // Outreach ("Messages") — hidden from sidebar for now; view + OutreachView kept in codebase
-    // { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
+    // { id: "outreach", label: "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["outreach", "dm", "email", "follow up"] },
     {
       id: "payouts",
       label: "Pay it",

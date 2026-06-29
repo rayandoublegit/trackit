@@ -263,6 +263,10 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
   const pad = isMobile ? "24px 16px 48px" : "32px 40px 48px";
 
   useEffect(() => {
+    if (planProp) setCurrentPlan(planProp);
+  }, [planProp]);
+
+  useEffect(() => {
     let cancelled = false;
 
     const loadPlan = async () => {
@@ -371,10 +375,20 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
     const onVisible = () => {
       if (document.visibilityState === "visible") refreshBilling();
     };
+    const onPlanUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ plan?: string }>).detail;
+      if (detail?.plan) {
+        setCurrentPlan(normalizePlan(detail.plan));
+      }
+      refreshBilling();
+    };
+
     window.addEventListener("focus", refreshBilling);
+    window.addEventListener("trackit-plan-updated", onPlanUpdated);
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("focus", refreshBilling);
+      window.removeEventListener("trackit-plan-updated", onPlanUpdated);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
