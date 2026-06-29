@@ -259,6 +259,9 @@ export function discoveryCopy(lang: Lang) {
     nicheBeauty: fr ? "Beauté" : "Beauty",
     nicheFashion: fr ? "Mode" : "Fashion",
     nicheTravel: fr ? "Voyage" : "Travel",
+    nicheLifestyle: fr ? "Lifestyle" : "Lifestyle",
+    nicheWellness: fr ? "Bien-être" : "Wellness",
+    nicheBusiness: fr ? "Business" : "Business",
   };
 }
 

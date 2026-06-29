@@ -77,8 +77,8 @@ const EMPTY_FILTERS: FilterState = {
   followersFrom: "",
   followersTo: "",
   engagement: "",
-  country: "",
-  language: "",
+  country: "FR",
+  language: "fr",
   age: "",
   viewsFrom: "",
   viewsTo: "",
@@ -112,6 +112,7 @@ function toParams(f: FilterState): Record<string, string> {
   if (f.followersFrom && FOLLOWER_VAL[f.followersFrom]) p.minFollowers = String(FOLLOWER_VAL[f.followersFrom]);
   if (f.followersTo && FOLLOWER_VAL[f.followersTo]) p.maxFollowers = String(FOLLOWER_VAL[f.followersTo]);
   if (f.engagement === "3+") p.minEngagement = "3";
+  else if (f.engagement === "12+") p.minEngagement = "12";
   else if (f.engagement === "6+") p.minEngagement = "6";
   else if (f.engagement === "9+") p.minEngagement = "9";
   const C: Record<string, string> = { FR: "FR", US: "US", GB: "GB", DE: "DE", BR: "BR", ES: "ES", CA: "CA" };
@@ -381,14 +382,16 @@ function FilterSidebar({
           onChange={(v) => onChange({ niche: v })}
           options={[
             { value: "", label: t.allNiches },
-            { value: "Fitness", label: "Fitness" },
-            { value: "Beauté", label: t.nicheBeauty },
-            { value: "Food", label: "Food" },
-            { value: "Mode", label: t.nicheFashion },
-            { value: "Tech", label: "Tech" },
-            { value: "Finance", label: "Finance" },
-            { value: "Voyage", label: t.nicheTravel },
-            { value: "Gaming", label: "Gaming" },
+            { value: "lifestyle", label: t.nicheLifestyle },
+            { value: "fitness", label: "Fitness" },
+            { value: "food", label: "Food" },
+            { value: "travel", label: t.nicheTravel },
+            { value: "fashion", label: t.nicheFashion },
+            { value: "beauty", label: t.nicheBeauty },
+            { value: "wellness", label: t.nicheWellness },
+            { value: "tech", label: "Tech" },
+            { value: "gaming", label: "Gaming" },
+            { value: "business", label: t.nicheBusiness },
           ]}
         />
         <FilterSelect
@@ -401,20 +404,6 @@ function FilterSidebar({
             { value: "", label: t.all },
             { value: "FR", label: t.france },
             { value: "US", label: t.unitedStates },
-          ]}
-        />
-        <FilterSelect
-          label={t.age}
-          value={filters.age}
-          disabled={lock}
-          onLocked={onLocked}
-          onChange={(v) => onChange({ age: v })}
-          options={[
-            { value: "", label: t.all },
-            { value: "18-24", label: "18–24" },
-            { value: "25-34", label: "25–34" },
-            { value: "35-44", label: "35–44" },
-            { value: "45+", label: "45+" },
           ]}
         />
         <FilterSelect
@@ -449,8 +438,7 @@ function FilterSidebar({
               { value: "50k", label: "50K" },
               { value: "100k", label: "100K" },
               { value: "500k", label: "500K" },
-              { value: "1m", label: "1M" },
-              { value: "2m", label: "2M" },
+              { value: "1m", label: "1M+" },
             ]}
           />
           <FilterSelect
@@ -464,9 +452,7 @@ function FilterSidebar({
               { value: "50k", label: "50K" },
               { value: "100k", label: "100K" },
               { value: "500k", label: "500K" },
-              { value: "1m", label: "1M" },
-              { value: "2m", label: "2M" },
-              { value: "10m", label: "10M+" },
+              { value: "1m", label: "1M+" },
             ]}
           />
         </div>
@@ -481,6 +467,7 @@ function FilterSidebar({
             { value: "3+", label: "≥ 3%" },
             { value: "6+", label: "≥ 6%" },
             { value: "9+", label: "≥ 9%" },
+            { value: "12+", label: "≥ 12%" },
           ]}
         />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
