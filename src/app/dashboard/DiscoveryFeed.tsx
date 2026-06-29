@@ -271,17 +271,16 @@ function FilterSidebar({
       style={{
         width: isMobile ? "100%" : 300,
         flexShrink: 0,
-        alignSelf: isMobile ? "stretch" : "flex-start",
-        position: isMobile ? undefined : "sticky",
-        top: 0,
+        alignSelf: "stretch",
         background: "#FFFFFF",
         borderRight: isMobile ? "none" : "1px solid #EFEFEF",
         borderBottom: isMobile ? "1px solid #EFEFEF" : "none",
-        height: isMobile ? "auto" : "100dvh",
-        maxHeight: isMobile ? undefined : "100dvh",
+        height: isMobile ? "auto" : "100%",
+        maxHeight: isMobile ? undefined : "100%",
+        minHeight: isMobile ? undefined : 0,
         overflowY: isMobile ? "visible" : "auto",
         overflowX: "hidden",
-        padding: isMobile ? "56px 16px 20px" : "24px 20px 40px",
+        padding: isMobile ? "56px 16px 20px" : "24px 20px 48px",
         boxSizing: "border-box",
         WebkitOverflowScrolling: "touch",
       }}
@@ -837,7 +836,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         minHeight: isMobile ? "100vh" : 0,
         overflow: "hidden",
         background: "#F5F5F5",
-        alignItems: isMobile ? "stretch" : "flex-start",
+        alignItems: "stretch",
       }}
     >
       <FilterSidebar
