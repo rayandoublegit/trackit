@@ -153,7 +153,7 @@ function PricingCard({
           onClick={onClick}
           className={ctaClassName ?? "pricing-cta"}
           disabled={disabled}
-          style={disabled ? { background: "#F5F5F5", color: "#1A1A1A", borderColor: "#E8E8E8", cursor: "default" } : undefined}
+          style={disabled ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", boxShadow: "none", cursor: "default" } : undefined}
         >
           {ctaLabel}
         </button>
@@ -394,7 +394,7 @@ function PricingPageContent() {
                 type="button"
                 className="pricing-cta"
                 onClick={handleStayFree}
-                style={currentPlan === "free" ? { background: "#F5F5F5" } : undefined}
+                style={currentPlan === "free" ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", boxShadow: "none" } : undefined}
               >
                 {currentPlan === "free" ? (lang === "fr" ? "Plan actuel" : "Current plan") : (lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free")}
               </button>
