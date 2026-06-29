@@ -177,14 +177,12 @@ export function creatorMatchesNicheFilter(
 }
 
 function nicheOrClause(label: string): string | null {
+  // STRICT: on ne matche que le tag de niche exact en base (catalogue propre).
+  // Fini le matching flou par tokens (sport/style/"ia ") qui faisait remonter
+  // une niche dans une autre (ex: fashion dans fitness).
   const key = resolveNicheKey(label);
-  const tokens = nicheTokensFor(key);
-  const clauses: string[] = [];
-  for (const t of tokens) {
-    clauses.push(`primary_niche.ilike.%${t}%`);
-    if (/^[a-z0-9]+$/i.test(t)) clauses.push(`niches.cs.{${t}}`);
-  }
-  return [...new Set(clauses)].join(",");
+  if (!key) return null;
+  return `niches.cs.{${key}}`;
 }
 
 function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
@@ -245,9 +243,7 @@ export async function buildFeedPage(
     ({ data, error } = await build().order("followers", { ascending: false }).range(offset, offset + limit - 1));
   }
   if (error || !data) return { creators: [], hasMore: false };
-  let creators = data.map(dbRowToFeedCreator);
-  if (filters.niche) {
-    creators = creators.filter((c) => creatorMatchesNicheFilter(c, filters.niche!));
-  }
+  // La query DB a deja filtre par tag strict: pas de re-filtre JS qui rognerait la page.
+  const creators = data.map(dbRowToFeedCreator);
   return { creators, hasMore: data.length === limit };
 }

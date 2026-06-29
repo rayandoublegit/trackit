@@ -72,8 +72,7 @@ const inputStyle: React.CSSProperties = {
 type FilterState = {
   niche: string;
   platform: string;
-  followersFrom: string;
-  followersTo: string;
+  followersRange: string;
   engagement: string;
   country: string;
   language: string;
@@ -88,8 +87,7 @@ type FilterState = {
 const EMPTY_FILTERS: FilterState = {
   niche: "",
   platform: "tiktok",
-  followersFrom: "",
-  followersTo: "",
+  followersRange: "",
   engagement: "",
   country: "FR",
   language: "fr",
@@ -101,15 +99,11 @@ const EMPTY_FILTERS: FilterState = {
   hideSaved: false,
 };
 
-/** Default Find it browse (all niches, no performance/search filters). */
+/** Performance / search filters (not niche or geo). Triggers refresh + discovery quota. */
 function hasActiveSearchFilters(f: FilterState): boolean {
-  if (f.niche) return true;
-  if (f.followersFrom || f.followersTo || f.engagement || f.viewsFrom || f.viewsTo || f.age) return true;
+  if (f.followersRange || f.engagement || f.viewsFrom || f.viewsTo || f.age) return true;
   if (f.search.trim()) return true;
   if (f.hasEmail || f.hideSaved) return true;
-  if (f.platform !== EMPTY_FILTERS.platform) return true;
-  if (f.country !== EMPTY_FILTERS.country) return true;
-  if (f.language !== EMPTY_FILTERS.language) return true;
   return false;
 }
 
@@ -119,15 +113,18 @@ function languageFromCountry(country: string): string | null {
   return null;
 }
 
-const FOLLOWER_VAL: Record<string, number> = {
-  "10k": 10_000,
-  "50k": 50_000,
-  "100k": 100_000,
-  "500k": 500_000,
-  "1m": 1_000_000,
-  "2m": 2_000_000,
-  "10m": 10_000_000,
+const FOLLOWER_RANGES: Record<string, { min: number; max?: number }> = {
+  "1-10k": { min: 0, max: 10_000 },
+  "10-100k": { min: 10_001, max: 100_000 },
+  "100-500k": { min: 100_001, max: 500_000 },
+  "500k+": { min: 500_001 },
 };
+
+function followerRangeBounds(range: string): { min?: number; max?: number } {
+  const b = FOLLOWER_RANGES[range];
+  if (!b) return {};
+  return { min: b.min, max: b.max };
+}
 
 const VIEWS_VAL: Record<string, number> = {
   "10k": 10_000,
@@ -141,8 +138,9 @@ function toParams(f: FilterState): Record<string, string> {
   const p: Record<string, string> = {};
   if (f.niche) p.niche = f.niche;
   if (f.platform && f.platform !== "tiktok") p.platform = f.platform;
-  if (f.followersFrom && FOLLOWER_VAL[f.followersFrom]) p.minFollowers = String(FOLLOWER_VAL[f.followersFrom]);
-  if (f.followersTo && FOLLOWER_VAL[f.followersTo]) p.maxFollowers = String(FOLLOWER_VAL[f.followersTo]);
+  const followers = followerRangeBounds(f.followersRange);
+  if (followers.min != null) p.minFollowers = String(followers.min);
+  if (followers.max != null) p.maxFollowers = String(followers.max);
   if (f.engagement === "3+") p.minEngagement = "3";
   else if (f.engagement === "12+") p.minEngagement = "12";
   else if (f.engagement === "6+") p.minEngagement = "6";
@@ -158,7 +156,7 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
   let out = list;
 
   if (f.niche) {
-    out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
+    // Niche deja filtree server-side (tag strict). Pas de re-filtre client qui rognerait la liste.
   }
 
   if (f.platform) {
@@ -174,11 +172,12 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
     out = out.filter((c) => (c.language || "").toLowerCase() === f.language);
   }
 
-  if (f.followersFrom && FOLLOWER_VAL[f.followersFrom]) {
-    out = out.filter((c) => c.followersCount >= FOLLOWER_VAL[f.followersFrom]);
+  const followers = followerRangeBounds(f.followersRange);
+  if (followers.min != null) {
+    out = out.filter((c) => c.followersCount >= followers.min!);
   }
-  if (f.followersTo && FOLLOWER_VAL[f.followersTo]) {
-    out = out.filter((c) => c.followersCount <= FOLLOWER_VAL[f.followersTo]);
+  if (followers.max != null) {
+    out = out.filter((c) => c.followersCount <= followers.max!);
   }
 
   if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
@@ -535,37 +534,20 @@ function FilterSidebar({
 
       <SectionTitle>{t.performance}</SectionTitle>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <FilterSelect
-            label={t.followersFrom}
-            value={filters.followersFrom}
-            disabled={lock}
-            onLocked={onLocked}
-            onChange={(v) => onChange({ followersFrom: v })}
-            options={[
-              { value: "", label: t.all },
-              { value: "10k", label: "10K" },
-              { value: "50k", label: "50K" },
-              { value: "100k", label: "100K" },
-              { value: "500k", label: "500K" },
-              { value: "1m", label: "1M+" },
-            ]}
-          />
-          <FilterSelect
-            label={t.followersTo}
-            value={filters.followersTo}
-            disabled={lock}
-            onLocked={onLocked}
-            onChange={(v) => onChange({ followersTo: v })}
-            options={[
-              { value: "", label: t.all },
-              { value: "50k", label: "50K" },
-              { value: "100k", label: "100K" },
-              { value: "500k", label: "500K" },
-              { value: "1m", label: "1M+" },
-            ]}
-          />
-        </div>
+        <FilterSelect
+          label={t.followers}
+          value={filters.followersRange}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ followersRange: v })}
+          options={[
+            { value: "", label: t.all },
+            { value: "1-10k", label: "1–10K" },
+            { value: "10-100k", label: "10–100K" },
+            { value: "100-500k", label: "100–500K" },
+            { value: "500k+", label: "500K+" },
+          ]}
+        />
         <FilterSelect
           label={t.engagementRate}
           value={filters.engagement}
@@ -876,6 +858,7 @@ function DiscoveryGateOverlay({
 
 const FREE_VISIBLE = 6;
 const SCALE_PAGE_LIMIT = 48;
+const FETCH_CHUNK = 25;
 
 export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
   const lang = useLang();
@@ -925,17 +908,16 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const batchIndexRef = useRef(0);
   const poolHasMoreRef = useRef(true);
 
-  const isBrowseMode = useMemo(() => !hasActiveSearchFilters(filters), [filters]);
-  const searchPageLimit = resultsPerSearch ?? SCALE_PAGE_LIMIT;
-  const fetchPageLimit = isBrowseMode ? SCALE_PAGE_LIMIT : searchPageLimit;
+  const isCatalogMode = useMemo(() => !hasActiveSearchFilters(filters), [filters]);
+  const planResultCap = resultsPerSearch;
 
   const apiParams = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
 
   const discoverAndFetch = useCallback(async (off: number, replace: boolean): Promise<{ count: number; hasMore: boolean }> => {
     const gen = fetchGenRef.current;
-    const countsTowardQuota = !isBrowseMode && hasDiscoveryCap && discoveryLimit != null;
+    const countsTowardQuota = !isCatalogMode && hasDiscoveryCap && discoveryLimit != null;
 
-    if (countsTowardQuota) {
+    if (countsTowardQuota && replace) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: 0, hasMore: false };
       const { data: { user } } = await supabase.auth.getUser();
@@ -949,36 +931,48 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         return { count: 0, hasMore: false };
       }
       setShowDiscoveryGate(false);
-    } else if (isBrowseMode) {
+    } else if (isCatalogMode) {
       setShowDiscoveryGate(false);
     }
 
-    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(fetchPageLimit) }).toString();
+    if (planResultCap != null && !unlimitedResults && off >= planResultCap) {
+      return { count: 0, hasMore: false };
+    }
+
+    const requestLimit =
+      planResultCap != null && !unlimitedResults
+        ? Math.min(FETCH_CHUNK, planResultCap - off)
+        : FETCH_CHUNK;
+
+    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(requestLimit) }).toString();
     const r = await fetch(`/api/discovery-feed?${qs}`);
     const d = await r.json();
     if (gen !== fetchGenRef.current) return { count: 0, hasMore: false };
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
-    const shuffled = shuffleFeedCreators(list);
-    const hasMore = !!d.hasMore;
-    poolHasMoreRef.current = hasMore;
+    const rows = replace && !isCatalogMode ? shuffleFeedCreators(list) : list;
+    const apiHasMore = !!d.hasMore;
+    poolHasMoreRef.current = apiHasMore;
     setError(d.error || null);
     setCreators((prev) => {
-      const merged = replace ? shuffled : [...prev, ...shuffled];
+      const merged = replace ? rows : [...prev, ...rows];
       const seen = new Set<string>();
-      return merged.filter((c) => {
+      const deduped = merged.filter((c) => {
         if (!c.username || seen.has(c.username)) return false;
         seen.add(c.username);
         return true;
       });
+      return deduped;
     });
-    setHasMore((isBrowseMode || unlimitedResults) && hasMore);
-    setOffset(off + shuffled.length);
+    const nextOffset = off + rows.length;
+    const hitPlanCap = planResultCap != null && !unlimitedResults && nextOffset >= planResultCap;
+    setHasMore(!hitPlanCap && apiHasMore);
+    setOffset(nextOffset);
 
-    if (countsTowardQuota) {
+    if (countsTowardQuota && replace) {
       const { supabase } = await import("@/lib/supabase");
-      if (!supabase) return { count: shuffled.length, hasMore };
+      if (!supabase) return { count: rows.length, hasMore: !hitPlanCap && apiHasMore };
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { count: shuffled.length, hasMore };
+      if (!user) return { count: rows.length, hasMore: !hitPlanCap && apiHasMore };
       const latestQuota = await syncDiscoveryQuota(supabase, user.id, plan);
       const usedBefore = latestQuota?.used ?? 0;
       const next = await incrementDiscoveryQuota(supabase, user.id, plan, usedBefore);
@@ -986,8 +980,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (next >= discoveryLimit!) setShowDiscoveryGate(true);
     }
 
-    return { count: shuffled.length, hasMore };
-  }, [apiParams, fetchPageLimit, plan, discoveryLimit, hasDiscoveryCap, unlimitedResults, isBrowseMode]);
+    return { count: rows.length, hasMore: !hitPlanCap && apiHasMore };
+  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, unlimitedResults, isCatalogMode, planResultCap]);
 
   useEffect(() => {
     fetchGenRef.current += 1;
@@ -1074,7 +1068,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   };
 
   useEffect(() => {
-    if ((!isBrowseMode && !unlimitedResults) || !hasMore || loading || loadingMore) return;
+    if (!hasMore || loading || loadingMore) return;
     const el = mainRef.current;
     if (!el) return;
     const onScroll = () => {
@@ -1085,19 +1079,16 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [isBrowseMode, unlimitedResults, hasMore, loading, loadingMore, offset, discoverAndFetch]);
+  }, [hasMore, loading, loadingMore, offset, discoverAndFetch]);
 
   const filtered = useMemo(() => applyClientFilters(creators, filters, savedUsernames), [creators, filters, savedUsernames]);
-  const visibleCreators = useMemo(
-    () => (isBrowseMode ? filtered : getVisibleDiscoveryResults(plan, filtered)),
-    [isBrowseMode, plan, filtered]
-  );
+  const visibleCreators = useMemo(() => getVisibleDiscoveryResults(plan, filtered), [plan, filtered]);
   const items = isPaid ? visibleCreators : visibleCreators.slice(0, FREE_VISIBLE + 2);
   const hasMoreFree = !isPaid && visibleCreators.length > FREE_VISIBLE;
-  const displayCount = isBrowseMode || resultsPerSearch == null
-    ? filtered.length
-    : Math.min(filtered.length, resultsPerSearch);
-  const cappedNote = !isBrowseMode && resultsPerSearch != null ? t.resultsCappedAt(resultsPerSearch) : "";
+  const displayCount =
+    planResultCap != null ? Math.min(filtered.length, planResultCap) : filtered.length;
+  const cappedNote = planResultCap != null ? t.resultsCappedAt(planResultCap) : "";
+  const discoveryGateActive = showDiscoveryGate && !isCatalogMode;
 
   const discoveryUpgradePlan = plan === "free" ? "Growth" : plan === "basic" ? "Pro" : "Scale";
   const discoveryLimitSubtitle =
@@ -1108,18 +1099,19 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         : t.discoveryLimitSubtitleFree;
 
   const refreshDiscovery = () => {
-    if (isBrowseMode || showDiscoveryGate) return;
+    if (loading) return;
     setLoading(true);
     void (async () => {
       try {
+        const cap = planResultCap ?? SCALE_PAGE_LIMIT;
         if (unlimitedResults) {
-          const off = Math.floor(Math.random() * 12) * searchPageLimit;
+          const off = Math.floor(Math.random() * 12) * FETCH_CHUNK;
           await discoverAndFetch(off, true);
           return;
         }
 
         let nextBatch = batchIndexRef.current + 1;
-        let off = nextBatch * searchPageLimit;
+        let off = nextBatch * cap;
 
         if (!poolHasMoreRef.current && nextBatch > 0) {
           nextBatch = 0;
@@ -1230,26 +1222,17 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
                 {loading ? t.loading : `${t.creatorCount(displayCount)}${cappedNote}`}
               </p>
-              {hasDiscoveryCap && discoveryLimit != null && !isBrowseMode && (
-                <p style={{ fontSize: 11, color: "#9A9A9A", margin: "4px 0 0", letterSpacing: "-0.01em" }}>
-                  {plan === "free"
-                    ? t.discoveriesRemainingLifetime(discoveriesUsed, discoveryLimit)
-                    : t.discoveriesRemaining(discoveriesUsed, discoveryLimit)}
-                </p>
-              )}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              {!isBrowseMode && (
-                <button
-                  type="button"
-                  className="hero-cta-raised-light"
-                  onClick={refreshDiscovery}
-                  disabled={loading || showDiscoveryGate}
-                  style={{ padding: "12px 20px", fontSize: 15, opacity: loading || showDiscoveryGate ? 0.55 : 1 }}
-                >
-                  {t.refreshResults}
-                </button>
-              )}
+              <button
+                type="button"
+                className="hero-cta-raised-light"
+                onClick={refreshDiscovery}
+                disabled={loading}
+                style={{ padding: "12px 20px", fontSize: 15, opacity: loading ? 0.55 : 1 }}
+              >
+                {t.refreshResults}
+              </button>
               {!isMobile && (
                 <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
                   {(["followers", "engagement"] as const).map((key) => (
@@ -1281,7 +1264,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
           </div>
 
           {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
-          {!loading && !error && filtered.length === 0 && !isBrowseMode && showDiscoveryGate && discoveryLimit != null && (
+          {!loading && !error && filtered.length === 0 && discoveryGateActive && discoveryLimit != null && (
             <div style={{ position: "relative", minHeight: 320 }}>
               <DiscoveryGateOverlay
                 lang={lang}
@@ -1293,7 +1276,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               />
             </div>
           )}
-          {!loading && !error && filtered.length === 0 && !showDiscoveryGate && (
+          {!loading && !error && filtered.length === 0 && !discoveryGateActive && (
             <div style={{ background: "#FFF", border: "1px dashed #E5E5E5", borderRadius: 12, padding: 48, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
               {t.noCreators}
             </div>
@@ -1305,9 +1288,9 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
                 display: "flex",
                 flexDirection: "column",
                 gap: 8,
-                filter: showDiscoveryGate ? "blur(6px)" : "none",
-                pointerEvents: showDiscoveryGate ? "none" : "auto",
-                userSelect: showDiscoveryGate ? "none" : "auto",
+                filter: discoveryGateActive ? "blur(6px)" : "none",
+                pointerEvents: discoveryGateActive ? "none" : "auto",
+                userSelect: discoveryGateActive ? "none" : "auto",
                 transition: "filter 0.3s",
               }}
             >
@@ -1334,7 +1317,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               })}
             </div>
 
-            {hasMoreFree && !showDiscoveryGate && (
+            {hasMoreFree && !discoveryGateActive && (
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 380, background: "linear-gradient(rgba(245,245,245,0), #F5F5F5 65%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 32, pointerEvents: "none" }}>
                 <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 28px 24px", textAlign: "center", maxWidth: 420, width: "min(100%, 420px)", boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
                   <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
@@ -1344,7 +1327,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
                 </div>
               </div>
             )}
-            {showDiscoveryGate && !isBrowseMode && items.length > 0 && discoveryLimit != null && (
+            {discoveryGateActive && items.length > 0 && discoveryLimit != null && (
               <DiscoveryGateOverlay
                 lang={lang}
                 title={t.discoveryLimitTitle(discoveryLimit)}
@@ -1356,7 +1339,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
             )}
           </div>
 
-          {(isBrowseMode || unlimitedResults) && hasMore && !loading && (
+          {hasMore && !loading && (
             <div style={{ textAlign: "center", padding: "24px 0 8px" }}>
               <button
                 type="button"
