@@ -1,21 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { saveCampaign, getCampaigns, getSavedCreators, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
-import { notifyCampaignCreated } from "@/lib/notifications-storage";
+import { PlatformBrandIcon } from "./PlatformBrandIcon";
+import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
+import { primeNotificationSound } from "@/lib/notification-sound";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
   canUseManualPayouts,
   getMaxActiveCampaigns,
+  getMaxManagedCreators,
   hasReachedCampaignLimit,
+  canUseShopify,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { notifyCreatorPaid } from "@/lib/notifications-storage";
-import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated } from "@/lib/outreach-history-events";
+import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
+import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, formatTrendLabel, isWithinPeriod, type PeriodTrend } from "@/lib/analytics-periods";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, formatCurrencyWithCode, type DisplayCurrency } from "@/lib/useCurrency";
 import {
   compactNumberToInput,
   formatCompactCurrency,
@@ -25,10 +29,56 @@ import {
 } from "@/lib/compact-number";
 import { UpgradeModal } from "./UpgradeModal";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import { isDetailTab } from "@/lib/dashboard-navigation";
+import { avatarFromDiscoverySavedRow, buildAvatarByHandleFromSavedRows } from "@/lib/creator-avatar";
+import {
+  enrichCreatorsWithAvatars,
+  enrichCreatorsWithSavedAvatarsClient,
+} from "@/lib/enrich-creator-avatars";
+import {
+  COMMISSION_NOT_CONFIGURED_CODE,
+  commissionNotConfiguredMessage,
+  commissionRateFromDiscoverySnapshot,
+  normalizeCreatorHandle,
+} from "@/lib/managed-creator-commission";
+import {
+  selectionAccentText,
+  selectionCardStyle,
+  selectionTextMuted,
+  selectionTextPrimary,
+  selectionTextSecondary,
+} from "@/lib/selection-card-styles";
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
-type DetailTab = "creators" | "payouts" | "settings";
+type BoardTab = "active" | "drafts" | "finished";
+type CampaignSort = "recent" | "name";
+type DetailTab = "creators" | "analytics";
+type CampaignDateRange = { start: string; end: string };
+
+type CampaignAnalyticsExport = {
+  campaignName: string;
+  dateRange: CampaignDateRange;
+  currency: DisplayCurrency;
+  rows: CampaignCreatorRow[];
+  totals: { sales: number; commission: number };
+  pendingPayouts: number;
+  roi: number | null;
+};
+
+type CampaignCreatorRow = {
+  id: string;
+  handle: string;
+  full_name?: string;
+  avatar_url?: string;
+  platform?: string;
+  salesCount: number;
+  salesAmount: number;
+  commission: number;
+  commissionPaid: number;
+  roi: number | null;
+};
 
 type Campaign = {
   id: string;
@@ -47,6 +97,7 @@ type Campaign = {
   commissionRate?: number;
   autoPayout?: boolean;
   creatorIds?: string[];
+  createdAt?: string;
 };
 
 type SavedCreatorOption = {
@@ -134,6 +185,7 @@ function mapDbCampaign(
     commissionRate: Number(row.commission_rate ?? 10),
     autoPayout: Boolean(row.auto_payout ?? false),
     creatorIds: ids,
+    createdAt: typeof row.created_at === "string" ? row.created_at : undefined,
   };
 }
 
@@ -190,6 +242,45 @@ function campaignRowFingerprint(row: Record<string, unknown>): string {
   return `${name}|${platform}|${minute}`;
 }
 
+async function fetchCampaignBoardData(resolvedUserId: string): Promise<{
+  campaigns: Campaign[];
+  sales: SaleRow[];
+  creators: CreatorBalanceRow[];
+}> {
+  const [campaignData, salesResult, creatorsResult, creatorCounts] = await Promise.all([
+    getCampaigns(resolvedUserId),
+    supabase!
+      .from("sales")
+      .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+      .eq("user_id", resolvedUserId),
+    supabase!.from("creators").select("balance").eq("user_id", resolvedUserId),
+    getCampaignCreatorCounts(resolvedUserId),
+  ]);
+
+  const campaignMeta: Record<string, CampaignSalesMeta> = {};
+  for (const row of campaignData) {
+    campaignMeta[String(row.id)] = {
+      status: String(row.status ?? ""),
+      created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+    };
+  }
+
+  const salesRows = (salesResult.data || []) as SaleRow[];
+  const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, campaignMeta);
+
+  return {
+    campaigns: dedupeCampaignRows(campaignData).map((row) =>
+      mapDbCampaign(
+        row as Record<string, unknown>,
+        creatorCounts[String(row.id)] ?? [],
+        salesTotals[String(row.id)],
+      ),
+    ),
+    sales: salesRows,
+    creators: (creatorsResult.data || []) as CreatorBalanceRow[],
+  };
+}
+
 function dedupeCampaignRows<T extends Record<string, unknown>>(rows: T[]): T[] {
   const seenIds = new Set<string>();
   const seenFingerprints = new Set<string>();
@@ -230,6 +321,25 @@ function pickCampaignForCreatorSale(
   return byRecency[0] ?? null;
 }
 
+function resolveSaleCampaignId(
+  sale: SaleRow,
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+): string | null {
+  if (sale.campaign_id) return String(sale.campaign_id);
+  if (!sale.creator_id) return null;
+  return pickCampaignForCreatorSale(String(sale.creator_id), creatorCounts, campaignMeta);
+}
+
+function isSaleAttributedToCampaign(
+  sale: SaleRow,
+  campaignId: string,
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+): boolean {
+  return resolveSaleCampaignId(sale, creatorCounts, campaignMeta) === campaignId;
+}
+
 function computeCampaignSalesTotals(
   sales: SaleRow[],
   creatorCounts: Record<string, string[]>,
@@ -246,14 +356,8 @@ function computeCampaignSalesTotals(
   for (const sale of sales) {
     const orderAmount = Number(sale.order_amount) || 0;
     const commissionAmount = Number(sale.commission_amount) || 0;
-    if (sale.campaign_id) {
-      add(String(sale.campaign_id), orderAmount, commissionAmount);
-      continue;
-    }
-    if (sale.creator_id) {
-      const campaignId = pickCampaignForCreatorSale(String(sale.creator_id), creatorCounts, campaignMeta);
-      if (campaignId) add(campaignId, orderAmount, commissionAmount);
-    }
+    const attributedId = resolveSaleCampaignId(sale, creatorCounts, campaignMeta);
+    if (attributedId) add(attributedId, orderAmount, commissionAmount);
   }
 
   return totals;
@@ -264,9 +368,10 @@ type CreatorCampaignStats = { salesCount: number; salesAmount: number; commissio
 function computeCreatorStatsForCampaign(
   sales: SaleRow[],
   campaignId: string,
-  creatorIds: string[],
+  _creatorIds: string[],
   creatorCounts: Record<string, string[]>,
   campaignMeta: Record<string, CampaignSalesMeta>,
+  dateBounds?: { start: Date; end: Date },
 ): Record<string, CreatorCampaignStats> {
   const totals: Record<string, CreatorCampaignStats> = {};
 
@@ -279,31 +384,305 @@ function computeCreatorStatsForCampaign(
 
   for (const sale of sales) {
     if (!sale.creator_id) continue;
-    const creatorId = String(sale.creator_id);
-    if (!creatorIds.includes(creatorId)) continue;
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
 
-    let attributedCampaignId: string | null = sale.campaign_id ? String(sale.campaign_id) : null;
-    if (!attributedCampaignId) {
-      attributedCampaignId = pickCampaignForCreatorSale(creatorId, creatorCounts, campaignMeta);
-    }
-    if (attributedCampaignId !== campaignId) continue;
-
-    add(creatorId, Number(sale.order_amount) || 0, Number(sale.commission_amount) || 0);
+    add(String(sale.creator_id), Number(sale.order_amount) || 0, Number(sale.commission_amount) || 0);
   }
 
   return totals;
 }
 
-type CampaignCreatorRow = {
-  id: string;
-  handle: string;
-  full_name?: string;
-  avatar_url?: string;
-  platform?: string;
-  salesCount: number;
-  salesAmount: number;
-  commission: number;
+function computeCampaignPeriodTotals(
+  sales: SaleRow[],
+  campaignId: string,
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+  dateBounds?: { start: Date; end: Date },
+): { sales: number; commission: number } {
+  let salesTotal = 0;
+  let commissionTotal = 0;
+
+  for (const sale of sales) {
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
+    salesTotal += Number(sale.order_amount) || 0;
+    commissionTotal += Number(sale.commission_amount) || 0;
+  }
+
+  return { sales: salesTotal, commission: commissionTotal };
+}
+
+function computeCampaignScopedSalesTrend(
+  sales: SaleRow[],
+  campaignId: string,
+  _creatorIds: string[],
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+  now = new Date(),
+  customBounds?: { start: Date; end: Date },
+): PeriodTrend {
+  const belongsToCampaign = (sale: SaleRow) =>
+    isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta);
+
+  const sumInPeriod = (start: Date, end: Date) =>
+    sales
+      .filter((sale) => belongsToCampaign(sale) && isWithinPeriod(sale.created_at, start, end))
+      .reduce((sum, sale) => sum + (Number(sale.order_amount) || 0), 0);
+
+  if (customBounds) {
+    const durationMs = customBounds.end.getTime() - customBounds.start.getTime();
+    const prevEnd = new Date(customBounds.start.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - durationMs);
+    prevStart.setHours(0, 0, 0, 0);
+    prevEnd.setHours(23, 59, 59, 999);
+    return computeTrend(sumInPeriod(customBounds.start, customBounds.end), sumInPeriod(prevStart, prevEnd));
+  }
+
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const prevMonthEnd = new Date(monthStart);
+  prevMonthEnd.setDate(0);
+  prevMonthEnd.setHours(23, 59, 59, 999);
+  const prevMonthStart = new Date(prevMonthEnd.getFullYear(), prevMonthEnd.getMonth(), 1);
+
+  return computeTrend(sumInPeriod(monthStart, monthEnd), sumInPeriod(prevMonthStart, prevMonthEnd));
+}
+
+function sumCommissionByCreator(sales: SaleRow[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const sale of sales) {
+    if (!sale.creator_id) continue;
+    const id = String(sale.creator_id);
+    map.set(id, (map.get(id) || 0) + (Number(sale.commission_amount) || 0));
+  }
+  return map;
+}
+
+function sumPaidByCreator(
+  payouts: Array<{ creator_id?: string | null; amount?: number | null; status?: string | null }>,
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const payout of payouts) {
+    if (String(payout.status || "").toLowerCase() !== "paid") continue;
+    const id = String(payout.creator_id || "");
+    if (!id) continue;
+    map.set(id, (map.get(id) || 0) + (Number(payout.amount) || 0));
+  }
+  return map;
+}
+
+function attributePaidToCampaignScope(
+  commissionPaidAllTime: number,
+  campaignCommission: number,
+  totalCommissionAllCampaigns: number,
+): number {
+  if (commissionPaidAllTime <= 0 || campaignCommission <= 0 || totalCommissionAllCampaigns <= 0) return 0;
+  return commissionPaidAllTime * (campaignCommission / totalCommissionAllCampaigns);
+}
+
+function computeCreatorBrandCost(campaignCommission: number, campaignCommissionPaid: number): number {
+  if (campaignCommissionPaid > 0) return campaignCommissionPaid;
+  return campaignCommission;
+}
+
+function computeCreatorCampaignRoi(revenue: number, brandCost: number): number | null {
+  if (revenue <= 0 || brandCost <= 0) return null;
+  return revenue / brandCost;
+}
+
+function formatCampaignRoi(roi: number | null | undefined): string {
+  if (roi == null || roi <= 0) return "—";
+  return `${roi.toFixed(1)}x`;
+}
+
+function resolveCampaignCreatorIds(
+  campaign: Campaign,
+  creatorCounts: Record<string, string[]>,
+): string[] {
+  const ids = (campaign.creatorIds?.length ? campaign.creatorIds : creatorCounts[campaign.id] ?? []).map(String);
+  return [...new Set(ids)];
+}
+
+type CampaignAnalyticsSnapshot = {
+  rows: CampaignCreatorRow[];
+  monthRows: CampaignCreatorRow[];
+  totals: { sales: number; commission: number };
+  salesTrend: PeriodTrend;
+  creatorCount: number;
+  pendingPayouts: number;
+  pendingCreatorCount: number;
+  activeCreators: number;
+  roi: number | null;
 };
+
+async function fetchCampaignAnalyticsSnapshot(
+  campaign: Campaign,
+  resolvedUserId: string,
+  dateBounds?: { start: Date; end: Date },
+): Promise<CampaignAnalyticsSnapshot> {
+  const [creatorCounts, campaignData, salesResult] = await Promise.all([
+    getCampaignCreatorCounts(resolvedUserId),
+    getCampaigns(resolvedUserId),
+    supabase!
+      .from("sales")
+      .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+      .eq("user_id", resolvedUserId),
+  ]);
+
+  const resolvedCreatorIds = resolveCampaignCreatorIds(campaign, creatorCounts);
+
+  let payoutsData: Array<{ creator_id?: string | null; amount?: number | null; status?: string | null }> = [];
+  if (resolvedCreatorIds.length > 0) {
+    const { data: payoutRows } = await supabase!
+      .from("payouts")
+      .select("creator_id, amount, status")
+      .eq("user_id", resolvedUserId)
+      .in("creator_id", resolvedCreatorIds);
+    payoutsData = payoutRows || [];
+  }
+
+  const campaignMeta: Record<string, CampaignSalesMeta> = {};
+  for (const row of campaignData) {
+    campaignMeta[String(row.id)] = {
+      status: String(row.status ?? ""),
+      created_at: typeof row.created_at === "string" ? row.created_at : undefined,
+    };
+  }
+
+  const salesRows = (salesResult.data || []) as SaleRow[];
+  const paidByCreator = sumPaidByCreator(payoutsData);
+  const totalCommissionByCreator = sumCommissionByCreator(salesRows);
+
+  const stats = computeCreatorStatsForCampaign(
+    salesRows,
+    campaign.id,
+    resolvedCreatorIds,
+    creatorCounts,
+    campaignMeta,
+    dateBounds,
+  );
+
+  const displayCreatorIds = [
+    ...new Set([...resolvedCreatorIds, ...Object.keys(stats)]),
+  ];
+
+  let creatorProfiles: { id: string; handle: string; full_name?: string; avatar_url?: string; platform?: string }[] = [];
+  if (displayCreatorIds.length > 0) {
+    const { data: creatorResult } = await supabase!
+      .from("creators")
+      .select("id, handle, full_name, avatar_url, platform")
+      .eq("user_id", resolvedUserId)
+      .in("id", displayCreatorIds);
+    creatorProfiles = await enrichCreatorsWithSavedAvatarsClient(
+      supabase!,
+      resolvedUserId,
+      (creatorResult || []) as typeof creatorProfiles,
+    );
+  }
+
+  const creatorMap = new Map(creatorProfiles.map((c) => [String(c.id), c]));
+
+  const buildCreatorRow = (id: string, s: CreatorCampaignStats): CampaignCreatorRow => {
+    const c = creatorMap.get(id);
+    const commissionPaid = attributePaidToCampaignScope(
+      paidByCreator.get(id) || 0,
+      s.commission,
+      totalCommissionByCreator.get(id) || 0,
+    );
+    const brandCost = computeCreatorBrandCost(s.commission, commissionPaid);
+    return {
+      id,
+      handle: c?.handle ?? "—",
+      full_name: c?.full_name,
+      avatar_url: c?.avatar_url ?? undefined,
+      platform: c?.platform,
+      salesCount: s.salesCount,
+      salesAmount: s.salesAmount,
+      commission: s.commission,
+      commissionPaid,
+      roi: computeCreatorCampaignRoi(s.salesAmount, brandCost),
+    };
+  };
+
+  const rows: CampaignCreatorRow[] = displayCreatorIds.map((id) =>
+    buildCreatorRow(id, stats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 }),
+  );
+  rows.sort((a, b) => b.salesAmount - a.salesAmount);
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const monthStats = computeCreatorStatsForCampaign(
+    salesRows,
+    campaign.id,
+    resolvedCreatorIds,
+    creatorCounts,
+    campaignMeta,
+    { start: monthStart, end: monthEnd },
+  );
+  const monthCreatorIds = [...new Set([...resolvedCreatorIds, ...Object.keys(monthStats)])];
+  const monthRows: CampaignCreatorRow[] = monthCreatorIds
+    .map((id) => {
+      const row = buildCreatorRow(id, monthStats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 });
+      return {
+        ...row,
+        roi: computeCreatorCampaignRoi(row.salesAmount, row.commission),
+      };
+    })
+    .filter((row) => row.salesAmount > 0)
+    .sort((a, b) => b.salesAmount - a.salesAmount);
+
+  const activeCreators = rows.filter((row) => row.salesAmount > 0).length;
+
+  const totals = computeCampaignPeriodTotals(
+    salesRows,
+    campaign.id,
+    creatorCounts,
+    campaignMeta,
+    dateBounds,
+  );
+
+  let pendingPayouts = 0;
+  let pendingCreatorCount = 0;
+  if (resolvedCreatorIds.length > 0) {
+    const { data: creatorRows } = await supabase!
+      .from("creators")
+      .select("balance")
+      .eq("user_id", resolvedUserId)
+      .in("id", resolvedCreatorIds);
+    pendingPayouts = (creatorRows || []).reduce((sum, row) => sum + (Number(row.balance) || 0), 0);
+    pendingCreatorCount = (creatorRows || []).filter((row) => (Number(row.balance) || 0) > 0).length;
+  }
+
+  const salesTrend = computeCampaignScopedSalesTrend(
+    salesRows,
+    campaign.id,
+    resolvedCreatorIds,
+    creatorCounts,
+    campaignMeta,
+    new Date(),
+    dateBounds,
+  );
+
+  const totalBrandCost = rows.reduce(
+    (sum, row) => sum + computeCreatorBrandCost(row.commission, row.commissionPaid),
+    0,
+  );
+  const roi = computeCreatorCampaignRoi(totals.sales, totalBrandCost);
+
+  return {
+    rows,
+    monthRows,
+    totals,
+    salesTrend,
+    creatorCount: resolvedCreatorIds.length,
+    pendingPayouts,
+    pendingCreatorCount,
+    activeCreators,
+    roi,
+  };
+}
 
 type PayableCreator = {
   id: string;
@@ -451,6 +830,154 @@ function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
   return labels[status]?.[lang] ?? labels[status]?.en ?? status;
 }
 
+function toDateBounds(range: CampaignDateRange): { start: Date; end: Date } {
+  const normalized = normalizeCampaignDateRange(range);
+  const start = new Date(`${normalized.start}T00:00:00`);
+  const end = new Date(`${normalized.end}T23:59:59.999`);
+  return { start, end };
+}
+
+function normalizeCampaignDateRange(range: CampaignDateRange): CampaignDateRange {
+  const today = new Date().toISOString().slice(0, 10);
+  let start = range.start || today;
+  let end = range.end || today;
+  if (start > end) {
+    start = end;
+  }
+  return { start, end };
+}
+
+function defaultCampaignDateRange(campaign: Campaign): CampaignDateRange {
+  const today = new Date().toISOString().slice(0, 10);
+  const created = campaign.createdAt?.slice(0, 10);
+  const campaignStart = toDateInputValue(campaign.startRaw ?? campaign.start);
+  let start = created || campaignStart || today;
+  if (campaignStart && campaignStart < start) start = campaignStart;
+  if (start > today) start = created || today;
+  return normalizeCampaignDateRange({ start, end: today });
+}
+
+function formatShortCampaignDate(isoDate: string, lang: "en" | "fr"): string {
+  const date = new Date(`${isoDate}T12:00:00`);
+  return date.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatCampaignDateRangeLabel(range: CampaignDateRange, lang: "en" | "fr"): string {
+  const today = new Date().toISOString().slice(0, 10);
+  const endLabel = range.end === today
+    ? lang === "fr"
+      ? "Aujourd'hui"
+      : "Today"
+    : formatShortCampaignDate(range.end, lang);
+  return `${formatShortCampaignDate(range.start, lang)} - ${endLabel}`;
+}
+
+function useClickOutside(ref: RefObject<HTMLElement | null>, active: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!active) return;
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [active, onClose, ref]);
+}
+
+function ChevronDownIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M8 10l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function campaignExportFilename(campaignName: string, extension: "csv" | "xlsx") {
+  const slug = campaignName.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "campaign";
+  const date = new Date().toISOString().split("T")[0];
+  return `trackit-campaign-${slug}-${date}.${extension}`;
+}
+
+function downloadExportFile(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function exportCampaignAnalyticsCsv(data: CampaignAnalyticsExport) {
+  const rows: (string | number)[][] = [
+    ["Campaign", data.campaignName],
+    ["Date range", `${data.dateRange.start} - ${data.dateRange.end}`],
+    ["Currency", data.currency],
+    ["Metric", "Value"],
+    ["Total sales", data.totals.sales],
+    ["Total commission", data.totals.commission],
+    ["Pending payouts", data.pendingPayouts],
+    ["ROI", formatCampaignRoi(data.roi)],
+    [],
+    ["Creator", "Handle", "Platform", "Sales count", "Revenue", "Commission", "Commission paid", "ROI"],
+    ...data.rows.map((row) => [
+      row.full_name || row.handle || "",
+      row.handle || "",
+      row.platform || "",
+      row.salesCount,
+      row.salesAmount,
+      row.commission,
+      row.commissionPaid,
+      formatCampaignRoi(row.roi),
+    ]),
+  ];
+
+  const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n")}`;
+  downloadExportFile(
+    campaignExportFilename(data.campaignName, "csv"),
+    new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+  );
+}
+
+async function exportCampaignAnalyticsExcel(data: CampaignAnalyticsExport) {
+  const XLSX = await import("xlsx");
+  const summary = [
+    ["Campaign", data.campaignName],
+    ["Date range", `${data.dateRange.start} - ${data.dateRange.end}`],
+    ["Currency", data.currency],
+    ["Total sales", data.totals.sales],
+    ["Total commission", data.totals.commission],
+    ["Pending payouts", data.pendingPayouts],
+    ["ROI", formatCampaignRoi(data.roi)],
+  ];
+  const creators = [
+    ["Creator", "Handle", "Platform", "Sales count", "Revenue", "Commission", "Commission paid", "ROI"],
+    ...data.rows.map((row) => [
+      row.full_name || row.handle || "",
+      row.handle || "",
+      row.platform || "",
+      row.salesCount,
+      row.salesAmount,
+      row.commission,
+      row.commissionPaid,
+      formatCampaignRoi(row.roi),
+    ]),
+  ];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summary), "Summary");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(creators), "Creators");
+  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+  downloadExportFile(
+    campaignExportFilename(data.campaignName, "xlsx"),
+    new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+  );
+}
+
 export function CampaignsView({
   plan,
   onUpgrade,
@@ -458,6 +985,7 @@ export function CampaignsView({
   onUpgradeScale,
   isMobile,
   userId,
+  shopifyStore,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
@@ -465,19 +993,29 @@ export function CampaignsView({
   onUpgradeScale?: () => void;
   isMobile?: boolean;
   userId?: string;
+  shopifyStore?: string | null;
 }) {
   const lang = useLang();
+  const { navState, navigate, goBack } = useDashboardNavigation();
+  const shopifyConnected = canUseShopify(plan) && Boolean(shopifyStore?.trim());
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<CampaignFilter>("all");
+  const [boardTab, setBoardTab] = useState<BoardTab>("active");
+  const [sortOrder, setSortOrder] = useState<CampaignSort>("recent");
   const [search, setSearch] = useState("");
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editCampaignId, setEditCampaignId] = useState<string | null>(null);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const creatingCampaignRef = useRef(false);
+
+  const campaignNav = navState.view === "campaigns" ? navState.campaign : undefined;
+  const modalOpen = campaignNav?.type === "new";
+  const addCreatorsId = campaignNav?.type === "addCreators" ? campaignNav.id : null;
+  const addSaleId = campaignNav?.type === "addSale" ? campaignNav.id : null;
+  const editId = campaignNav?.type === "edit" ? campaignNav.id : null;
+  const detailId = campaignNav?.type === "detail" ? campaignNav.id : null;
+  const detailInitialTab =
+    campaignNav?.type === "detail" && isDetailTab(campaignNav.tab) ? campaignNav.tab : "analytics";
 
   const tryOpenNewCampaign = () => {
     if (plan === "free") {
@@ -488,8 +1026,23 @@ export function CampaignsView({
       setUpgradeModalOpen(true);
       return;
     }
-    setModalOpen(true);
+    navigate({ view: "campaigns", campaign: { type: "new" } });
   };
+
+  const refreshCampaignBoard = useCallback(async () => {
+    if (!supabase) return;
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+    if (!resolvedUserId) return;
+
+    const board = await fetchCampaignBoardData(resolvedUserId);
+    setCampaigns(board.campaigns);
+    setSales(board.sales);
+    setCreators(board.creators);
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -512,35 +1065,11 @@ export function CampaignsView({
       }
 
       try {
-        const [campaignData, salesResult, creatorsResult, creatorCounts] = await Promise.all([
-          getCampaigns(resolvedUserId),
-          supabase.from("sales").select("order_amount, commission_amount, created_at, campaign_id, creator_id").eq("user_id", resolvedUserId),
-          supabase.from("creators").select("balance").eq("user_id", resolvedUserId),
-          getCampaignCreatorCounts(resolvedUserId),
-        ]);
+        const board = await fetchCampaignBoardData(resolvedUserId);
         if (cancelled) return;
-
-        const campaignMeta: Record<string, CampaignSalesMeta> = {};
-        for (const row of campaignData) {
-          campaignMeta[String(row.id)] = {
-            status: String(row.status ?? ""),
-            created_at: typeof row.created_at === "string" ? row.created_at : undefined,
-          };
-        }
-        const salesRows = (salesResult.data || []) as SaleRow[];
-        const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, campaignMeta);
-
-        setCampaigns(
-          dedupeCampaignRows(campaignData).map((row) =>
-            mapDbCampaign(
-              row as Record<string, unknown>,
-              creatorCounts[String(row.id)] ?? [],
-              salesTotals[String(row.id)],
-            ),
-          ),
-        );
-        setSales(salesRows);
-        setCreators(creatorsResult.data || []);
+        setCampaigns(board.campaigns);
+        setSales(board.sales);
+        setCreators(board.creators);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -552,12 +1081,31 @@ export function CampaignsView({
     };
   }, [userId]);
 
+  useEffect(() => {
+    const onBoardRefresh = () => void refreshCampaignBoard();
+    window.addEventListener(SALES_UPDATED_EVENT, onBoardRefresh);
+    window.addEventListener(CAMPAIGNS_UPDATED_EVENT, onBoardRefresh);
+    return () => {
+      window.removeEventListener(SALES_UPDATED_EVENT, onBoardRefresh);
+      window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, onBoardRefresh);
+    };
+  }, [refreshCampaignBoard]);
+
+  const handleManualSaleAdded = useCallback(async (saleDate?: string) => {
+    await refreshCampaignBoard();
+    dispatchSalesUpdated();
+    dispatchPayoutsUpdated();
+    if (saleDate) {
+      sessionStorage.setItem("trackit_last_sale_date", saleDate.slice(0, 10));
+    }
+  }, [refreshCampaignBoard]);
+
   const kpiStats = useMemo(
     () => computeCampaignKpis(campaigns, sales, creators),
     [campaigns, sales, creators],
   );
 
-  const handleCreateCampaign = async (campaignData: {
+  type CampaignFormData = {
     name: string;
     description?: string;
     platform: string;
@@ -568,7 +1116,114 @@ export function CampaignsView({
     autoPayout?: boolean;
     creatorIds?: string[];
     creatorCommissions?: { creatorId: string; commission_rate: number }[];
-  }) => {
+  };
+
+  const persistCampaignCreators = async (
+    resolvedUserId: string,
+    campaignId: string,
+    campaignData: CampaignFormData,
+  ) => {
+    const creatorIds = campaignData.creatorIds ?? [];
+    await syncCampaignCreators(resolvedUserId, campaignId, creatorIds);
+    for (const entry of campaignData.creatorCommissions ?? []) {
+      await supabase!
+        .from("creators")
+        .update({ commission_rate: entry.commission_rate })
+        .eq("id", entry.creatorId)
+        .eq("user_id", resolvedUserId);
+    }
+    return creatorIds;
+  };
+
+  const handleSaveDraft = async (campaignData: CampaignFormData, draftId?: string): Promise<string | null> => {
+    if (!supabase) return null;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const dbPayload = {
+      name: campaignData.name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),
+      description: campaignData.description,
+      platform: campaignData.platform || "All",
+      start_date: campaignData.startDate,
+      end_date: campaignData.endDate,
+      commission_type: campaignData.commissionType || "percentage",
+      commission_rate: campaignData.commissionRate || 10,
+      auto_payout: campaignData.autoPayout || false,
+      status: "draft",
+    };
+
+    let savedId = draftId ?? null;
+    if (draftId) {
+      const updated = await updateCampaign(draftId, dbPayload);
+      if (!updated) return null;
+      savedId = draftId;
+      const creatorIds = await persistCampaignCreators(user.id, savedId, campaignData);
+      const mapped = mapDbCampaign(updated as Record<string, unknown>, creatorIds);
+      mapped.status = "Draft";
+      setCampaigns((prev) =>
+        prev.map((c) => (c.id === savedId ? { ...mapped, sales: c.sales, commission: c.commission } : c)),
+      );
+    } else {
+      const saved = await saveCampaign(user.id, dbPayload);
+      if (!saved) return null;
+      savedId = String(saved.id);
+      const creatorIds = await persistCampaignCreators(user.id, savedId, campaignData);
+      const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
+      mapped.status = "Draft";
+      setCampaigns((prev) => (prev.some((c) => c.id === savedId) ? prev : [mapped, ...prev]));
+    }
+
+    dispatchCampaignsUpdated();
+    return savedId;
+  };
+
+  const handleLaunchDraft = async (draftId: string, campaignData: CampaignFormData) => {
+    if (creatingCampaignRef.current) return;
+    creatingCampaignRef.current = true;
+
+    try {
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const dbPayload = {
+        name: campaignData.name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),
+        description: campaignData.description,
+        platform: campaignData.platform || "All",
+        start_date: campaignData.startDate,
+        end_date: campaignData.endDate,
+        commission_type: campaignData.commissionType || "percentage",
+        commission_rate: campaignData.commissionRate || 10,
+        auto_payout: campaignData.autoPayout || false,
+        status: "active",
+      };
+
+      const updated = await updateCampaign(draftId, dbPayload);
+      if (!updated) {
+        alert(lang === "fr" ? "Impossible de lancer la campagne." : "Could not launch the campaign.");
+        return;
+      }
+
+      const creatorIds = await persistCampaignCreators(user.id, draftId, campaignData);
+      const mapped = mapDbCampaign(updated as Record<string, unknown>, creatorIds);
+      mapped.status = "Active";
+
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.id === draftId
+            ? { ...mapped, sales: c.sales, commission: c.commission }
+            : c,
+        ),
+      );
+      notifyCampaignCreated(lang, mapped.name, user.id);
+      dispatchCampaignsUpdated();
+      navigate({ view: "campaigns", campaign: { type: "detail", id: draftId, tab: "creators" } }, { replace: true });
+    } finally {
+      creatingCampaignRef.current = false;
+    }
+  };
+
+  const handleCreateCampaign = async (campaignData: CampaignFormData) => {
     if (creatingCampaignRef.current) return;
     creatingCampaignRef.current = true;
 
@@ -588,28 +1243,73 @@ export function CampaignsView({
         status: "active",
       });
       if (saved) {
-        const creatorIds = campaignData.creatorIds ?? [];
-        await syncCampaignCreators(user.id, String(saved.id), creatorIds);
-        for (const entry of campaignData.creatorCommissions ?? []) {
-          await supabase
-            .from("creators")
-            .update({ commission_rate: entry.commission_rate })
-            .eq("id", entry.creatorId)
-            .eq("user_id", user.id);
-        }
-        const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
+      const creatorIds = campaignData.creatorIds ?? [];
+      await syncCampaignCreators(user.id, String(saved.id), creatorIds);
+      for (const entry of campaignData.creatorCommissions ?? []) {
+        await supabase
+          .from("creators")
+          .update({ commission_rate: entry.commission_rate })
+          .eq("id", entry.creatorId)
+          .eq("user_id", user.id);
+      }
+      const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
         setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
-        notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"));
+        notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"), user.id);
         dispatchCampaignsUpdated();
-        setModalOpen(false);
+        navigate({ view: "campaigns" }, { replace: true });
       }
     } finally {
       creatingCampaignRef.current = false;
     }
   };
 
+  const handleAddCreatorsToCampaign = async (
+    campaignId: string,
+    campaignData: {
+      creatorIds: string[];
+      creatorCommissions: { creatorId: string; commission_rate: number }[];
+    },
+  ) => {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const finalIds = [...new Set(campaignData.creatorIds.map(String))];
+    const ok = await syncCampaignCreators(user.id, campaignId, finalIds);
+    if (!ok) {
+      alert(lang === "fr" ? "Impossible d'ajouter les créateurs." : "Could not add creators.");
+      return;
+    }
+
+    for (const entry of campaignData.creatorCommissions) {
+      await supabase
+        .from("creators")
+        .update({ commission_rate: entry.commission_rate })
+        .eq("id", entry.creatorId)
+        .eq("user_id", user.id);
+    }
+
+    setCampaigns((list) =>
+      list.map((c) =>
+        c.id === campaignId
+          ? {
+              ...c,
+              creatorIds: finalIds,
+              creators: finalIds.length,
+            }
+          : c,
+      ),
+    );
+    dispatchCampaignsUpdated();
+    navigate({ view: "campaigns", campaign: { type: "detail", id: campaignId, tab: "creators" } }, { replace: true });
+  };
+
   const handleStatusChange = async (campaignId: string, status: CampaignStatus) => {
-    await updateCampaignStatus(campaignId, status.toLowerCase());
+    const ok = await updateCampaignStatus(campaignId, status.toLowerCase());
+    if (!ok) {
+      alert(lang === "fr" ? "Impossible de mettre à jour le statut de la campagne." : "Could not update the campaign status.");
+      return;
+    }
     setCampaigns((list) => list.map((c) => (c.id === campaignId ? { ...c, status } : c)));
     dispatchCampaignsUpdated();
   };
@@ -624,6 +1324,7 @@ export function CampaignsView({
     commissionRate: number;
     autoPayout: boolean;
     creatorIds: string[];
+    creatorCommissions?: { creatorId: string; commission_rate: number }[];
   }) => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
@@ -642,6 +1343,13 @@ export function CampaignsView({
     if (!updated) return;
 
     await syncCampaignCreators(user.id, campaignId, campaignData.creatorIds);
+    for (const entry of campaignData.creatorCommissions ?? []) {
+      await supabase
+        .from("creators")
+        .update({ commission_rate: entry.commission_rate })
+        .eq("id", entry.creatorId)
+        .eq("user_id", user.id);
+    }
     setCampaigns((list) =>
       list.map((c) =>
         c.id === campaignId
@@ -653,8 +1361,8 @@ export function CampaignsView({
           : c,
       ),
     );
-    setEditCampaignId(null);
     dispatchCampaignsUpdated();
+    navigate({ view: "campaigns", campaign: { type: "detail", id: campaignId } }, { replace: true });
   };
 
   const handleDeleteCampaign = async (campaignId: string) => {
@@ -674,14 +1382,161 @@ export function CampaignsView({
     }
 
     setCampaigns((list) => list.filter((c) => c.id !== campaignId));
-    if (detailId === campaignId) setDetailId(null);
-    if (editCampaignId === campaignId) setEditCampaignId(null);
+    if (detailId === campaignId) navigate({ view: "campaigns" }, { replace: true });
+    if (editId === campaignId) navigate({ view: "campaigns" }, { replace: true });
     dispatchCampaignsUpdated();
   };
 
-  const editingCampaign = editCampaignId ? campaigns.find((c) => c.id === editCampaignId) ?? null : null;
+  const handleDeleteAllCampaigns = async () => {
+    const toDelete = campaigns.filter((c) => c.status === "Completed");
+    if (toDelete.length === 0) return;
+
+    const confirmed = window.confirm(
+      lang === "fr"
+        ? `Supprimer les ${toDelete.length} campagne${toDelete.length > 1 ? "s" : ""} terminée${toDelete.length > 1 ? "s" : ""} ?\n\nCette action est définitive.`
+        : `Delete all ${toDelete.length} completed campaign${toDelete.length > 1 ? "s" : ""}?\n\nThis cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    const results = await Promise.all(toDelete.map((c) => deleteCampaign(c.id)));
+    const failed = results.filter((ok) => !ok).length;
+    const deletedIds = new Set(
+      toDelete.filter((_, index) => results[index]).map((c) => c.id),
+    );
+
+    if (deletedIds.size === 0) {
+      alert(lang === "fr" ? "Impossible de supprimer les campagnes." : "Could not delete campaigns.");
+      return;
+    }
+
+    setCampaigns((list) => list.filter((c) => !deletedIds.has(c.id)));
+    if (detailId && deletedIds.has(detailId)) navigate({ view: "campaigns" }, { replace: true });
+    if (editId && deletedIds.has(editId)) navigate({ view: "campaigns" }, { replace: true });
+    dispatchCampaignsUpdated();
+
+    if (failed > 0) {
+      alert(
+        lang === "fr"
+          ? `${failed} campagne${failed > 1 ? "s" : ""} n'ont pas pu être supprimée${failed > 1 ? "s" : ""}.`
+          : `${failed} campaign${failed > 1 ? "s" : ""} could not be deleted.`,
+      );
+    }
+  };
+
+  const openCampaign = (id: string, tab: DetailTab = "analytics") => {
+    const campaign = campaigns.find((c) => c.id === id);
+    if (campaign?.status === "Draft") {
+      openEditCampaign(id);
+      return;
+    }
+    navigate({ view: "campaigns", campaign: { type: "detail", id, tab } });
+  };
+
+  const openEditCampaign = (id: string) => {
+    navigate({ view: "campaigns", campaign: { type: "edit", id } });
+  };
 
   const selected = campaigns.find((c) => c.id === detailId) ?? null;
+
+  useEffect(() => {
+    if (!loading && detailId && !selected) {
+      navigate({ view: "campaigns" }, { replace: true });
+    }
+  }, [loading, detailId, selected, navigate]);
+
+  if (modalOpen) {
+    return (
+      <NewCampaignOnboarding
+        lang={lang}
+        userId={userId}
+        plan={plan}
+        isMobile={isMobile}
+        onClose={goBack}
+        onCreate={handleCreateCampaign}
+        onSaveDraft={handleSaveDraft}
+        onLaunchDraft={handleLaunchDraft}
+      />
+    );
+  }
+
+  if (addSaleId) {
+    const addSaleCampaign = campaigns.find((c) => c.id === addSaleId) ?? null;
+    if (!addSaleCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+      return null;
+    }
+    return (
+      <AddSaleOnboarding
+        lang={lang}
+        userId={userId}
+        campaign={addSaleCampaign}
+        isMobile={isMobile}
+        onClose={() =>
+          navigate({ view: "campaigns", campaign: { type: "detail", id: addSaleId, tab: "analytics" } }, { replace: true })
+        }
+        onSuccess={handleManualSaleAdded}
+      />
+    );
+  }
+
+  if (addCreatorsId) {
+    const addCreatorsCampaign = campaigns.find((c) => c.id === addCreatorsId) ?? null;
+    if (!addCreatorsCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+      return null;
+    }
+    return (
+      <NewCampaignOnboarding
+        mode="addCreators"
+        existingCampaign={addCreatorsCampaign}
+        lang={lang}
+        userId={userId}
+        plan={plan}
+        isMobile={isMobile}
+        onClose={() =>
+          navigate({ view: "campaigns", campaign: { type: "detail", id: addCreatorsId } }, { replace: true })
+        }
+        onCreate={handleCreateCampaign}
+        onAddCreators={(data) => handleAddCreatorsToCampaign(addCreatorsId, data)}
+      />
+    );
+  }
+
+  if (editId) {
+    if (loading) {
+      return (
+        <>
+          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
+          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
+        </>
+      );
+    }
+    const editCampaign = campaigns.find((c) => c.id === editId) ?? null;
+    if (!editCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+      return null;
+    }
+    return (
+      <NewCampaignOnboarding
+        mode="edit"
+        existingCampaign={editCampaign}
+        lang={lang}
+        userId={userId}
+        plan={plan}
+        isMobile={isMobile}
+        onClose={() =>
+          navigate(
+            { view: "campaigns", ...(editCampaign.status === "Draft" ? {} : { campaign: { type: "detail", id: editId } }) },
+            { replace: true },
+          )
+        }
+        onCreate={handleCreateCampaign}
+        onUpdate={(data) => handleUpdateCampaign(editId, data)}
+        onSaveDraft={handleSaveDraft}
+        onLaunchDraft={handleLaunchDraft}
+      />
+    );
+  }
 
   if (selected) {
     return (
@@ -692,20 +1547,22 @@ export function CampaignsView({
           userId={userId}
           plan={plan}
           campaign={selected}
-          onBack={() => setDetailId(null)}
+          initialTab={detailInitialTab}
+          onBack={goBack}
+          onTabChange={(tab) =>
+            navigate({ view: "campaigns", campaign: { type: "detail", id: selected.id, tab } }, { replace: true })
+          }
           onUpdate={(c) => setCampaigns((list) => list.map((x) => (x.id === c.id ? c : x)))}
           onStatusChange={handleStatusChange}
-          onEdit={setEditCampaignId}
+          onEdit={openEditCampaign}
           onDelete={(id) => void handleDeleteCampaign(id)}
+          onAddCreators={() =>
+            navigate({ view: "campaigns", campaign: { type: "addCreators", id: selected.id } })
+          }
+          onAddSale={() =>
+            navigate({ view: "campaigns", campaign: { type: "addSale", id: selected.id } })
+          }
         />
-        {editingCampaign && (
-          <EditCampaignModal
-            lang={lang}
-            campaign={editingCampaign}
-            onClose={() => setEditCampaignId(null)}
-            onSave={(data) => void handleUpdateCampaign(editingCampaign.id, data)}
-          />
-        )}
       </>
     );
   }
@@ -722,21 +1579,7 @@ export function CampaignsView({
   if (campaigns.length === 0) {
     return (
       <>
-        <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
-        <div style={{ padding: 80, textAlign: "center" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Aucune campagne pour l'instant." : "No campaigns yet."}</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>
-            {lang === "fr" ? "Créez votre première campagne pour commencer à suivre les performances et les commissions." : "Create your first campaign to start tracking creator performance and commissions."}
-          </p>
-          <button type="button" className="hero-cta-glass" onClick={tryOpenNewCampaign}>
-            <span style={{ display: "inline-flex", alignItems: "baseline" }}>
-              Track it
-              <span className="brand-dot" aria-hidden />
-            </span>
-          </button>
-        </div>
-        {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={handleCreateCampaign} />}
+        <CampaignsEmptyState lang={lang} isMobile={isMobile} onNew={tryOpenNewCampaign} />
         {upgradeModalOpen && (
           <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
         )}
@@ -746,30 +1589,23 @@ export function CampaignsView({
 
   return (
     <>
-      <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters />
-      <CampaignsList
-        isMobile={isMobile}
+      <CampaignsBoard
         lang={lang}
+        isMobile={isMobile}
         campaigns={campaigns}
         kpiStats={kpiStats}
-        filter={filter}
-        setFilter={setFilter}
+        plan={plan}
+        shopifyConnected={shopifyConnected}
+        boardTab={boardTab}
+        setBoardTab={setBoardTab}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
         search={search}
         setSearch={setSearch}
-        onView={setDetailId}
-        onDelete={(id) => void handleDeleteCampaign(id)}
-        onStatusChange={handleStatusChange}
-        onEdit={setEditCampaignId}
+        onNew={tryOpenNewCampaign}
+        onOpenCampaign={openCampaign}
+        onDeleteAll={() => void handleDeleteAllCampaigns()}
       />
-      {editingCampaign && (
-        <EditCampaignModal
-          lang={lang}
-          campaign={editingCampaign}
-          onClose={() => setEditCampaignId(null)}
-          onSave={(data) => void handleUpdateCampaign(editingCampaign.id, data)}
-        />
-      )}
-      {modalOpen && <NewCampaignModal lang={lang} userId={userId} onClose={() => setModalOpen(false)} onCreate={handleCreateCampaign} />}
       {upgradeModalOpen && (
         <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
       )}
@@ -845,6 +1681,306 @@ function CampaignUpgradeModal({
   );
 }
 
+const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+
+function CampaignsEmptyState({
+  lang,
+  isMobile,
+  onNew,
+}: {
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  onNew: () => void;
+}) {
+  const pad = isMobile ? "56px 16px 48px" : "48px 48px 64px";
+
+  const shopifyIcon = (
+    <img src="/shopify-logo.svg" alt="" width={22} height={22} style={{ display: "block", objectFit: "contain" }} />
+  );
+
+  const features: { icon: React.ReactNode; title: string; description: string }[] =
+    lang === "fr"
+      ? [
+          {
+            icon: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M4 7h16M4 12h10M4 17h14" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="19" cy="12" r="2.5" stroke="#1A1A1A" strokeWidth="1.8" />
+              </svg>
+            ),
+            title: "Trackers par créateur",
+            description:
+              "Codes promo, hashtags, mentions et liens UTM — chaque créateur a ses trackers dédiés pour mesurer l'impact réel de son contenu.",
+          },
+          {
+            icon: shopifyIcon,
+            title: "Ventes & commissions",
+            description:
+              "Synchronisez Shopify ou ajoutez des ventes manuellement. Les commissions se calculent automatiquement, prêtes à être versées.",
+          },
+          {
+            icon: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M3 3v18h18" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M7 14l4-4 3 3 5-6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ),
+            title: "Analytics en temps réel",
+            description:
+              "Revenus générés, ROI et performance par créateur — filtrez par période et exportez vos données en un clic.",
+          },
+        ]
+      : [
+          {
+            icon: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M4 7h16M4 12h10M4 17h14" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                <circle cx="19" cy="12" r="2.5" stroke="#1A1A1A" strokeWidth="1.8" />
+              </svg>
+            ),
+            title: "Per-creator trackers",
+            description:
+              "Promo codes, hashtags, mentions and UTM links — each creator gets dedicated trackers to measure real content impact.",
+          },
+          {
+            icon: shopifyIcon,
+            title: "Sales & commissions",
+            description:
+              "Sync Shopify or add sales manually. Commissions are calculated automatically and ready to pay out.",
+          },
+          {
+            icon: (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M3 3v18h18" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M7 14l4-4 3 3 5-6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ),
+            title: "Real-time analytics",
+            description:
+              "Revenue, ROI and per-creator performance — filter by date range and export your data in one click.",
+          },
+        ];
+
+  const mockCreators =
+    lang === "fr"
+      ? [
+          { name: "@sarah.creates", detail: "Code SUMMER20", amount: "€ 4 230", pill: "Actif", pillBg: "#E8F5E9", pillColor: "#2E7D32" },
+          { name: "@mike.style", detail: "Hashtag #Trackit", amount: "€ 3 890", pill: "Top perf.", pillBg: "#E3F2FD", pillColor: "#1565C0" },
+          { name: "@luna.beauty", detail: "Lien UTM", amount: "€ 2 150", pill: "En cours", pillBg: "#F3F4F6", pillColor: "#6B7280" },
+        ]
+      : [
+          { name: "@sarah.creates", detail: "Code SUMMER20", amount: "€ 4,230", pill: "Active", pillBg: "#E8F5E9", pillColor: "#2E7D32" },
+          { name: "@mike.style", detail: "Hashtag #Trackit", amount: "€ 3,890", pill: "Top perf.", pillBg: "#E3F2FD", pillColor: "#1565C0" },
+          { name: "@luna.beauty", detail: "UTM link", amount: "€ 2,150", pill: "In progress", pillBg: "#F3F4F6", pillColor: "#6B7280" },
+        ];
+
+  const avatarColors = ["#F9A8D4", "#93C5FD", "#C4B5FD"];
+
+  return (
+    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+      <div style={{ padding: pad, maxWidth: 1120, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? 40 : 56,
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontSize: isMobile ? 32 : 38,
+                fontWeight: 700,
+                color: "#1A1A1A",
+                margin: "0 0 32px",
+                letterSpacing: "-0.04em",
+                lineHeight: 1.1,
+              }}
+            >
+              {lang === "fr" ? (
+                <>
+                  Lancez votre
+                  <br />
+                  première campagne
+                </>
+              ) : (
+                <>
+                  Launch your
+                  <br />
+                  first campaign
+                </>
+              )}
+            </h1>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginBottom: 40 }}>
+              {features.map((f) => (
+                <div key={f.title} style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 10,
+                      background: "#F9FAFB",
+                      border: "1px solid #F0F0F0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {f.icon}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                      {f.title}
+                    </p>
+                    <p style={{ fontSize: 14, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+                      {f.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button type="button" className="hero-cta-shopify" onClick={onNew} style={{ fontSize: 15, padding: "12px 24px" }}>
+              {lang === "fr" ? "Créez une nouvelle campagne" : "Create a new campaign"}
+            </button>
+          </div>
+
+          <div
+            style={{
+              position: "relative",
+              borderRadius: 28,
+              background: "linear-gradient(145deg, #0047FF 0%, #0038CC 55%, #002D99 100%)",
+              padding: isMobile ? "32px 20px" : "40px 32px",
+              minHeight: isMobile ? 320 : 420,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 24,
+                right: 32,
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.12)",
+                filter: "blur(2px)",
+              }}
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                bottom: 32,
+                left: 24,
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.08)",
+              }}
+            />
+
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                maxWidth: 340,
+                background: "#FFFFFF",
+                borderRadius: 20,
+                boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
+                padding: "28px 24px 20px",
+                border: "1px solid rgba(255,255,255,0.8)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+                <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: isMobile ? 48 : 64, objectFit: "contain" }} />
+              </div>
+
+              <p style={{ fontSize: 12, color: "#9CA3AF", margin: "0 0 4px", letterSpacing: "-0.01em" }}>
+                {lang === "fr" ? "Revenus générés" : "Revenue generated"}
+              </p>
+              <p
+                style={{
+                  fontSize: 32,
+                  fontWeight: 700,
+                  color: "#1A1A1A",
+                  margin: "0 0 24px",
+                  letterSpacing: "-0.04em",
+                }}
+              >
+                € 24 580
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {mockCreators.map((c, i) => (
+                  <div
+                    key={c.name}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 0",
+                      borderTop: i === 0 ? "1px solid #F3F4F6" : undefined,
+                      borderBottom: i < mockCreators.length - 1 ? "1px solid #F3F4F6" : undefined,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        background: avatarColors[i],
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#FFF",
+                      }}
+                    >
+                      {c.name.charAt(1).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
+                        {c.name}
+                      </p>
+                      <p style={{ fontSize: 12, color: "#9CA3AF", margin: 0 }}>{c.detail}</p>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px" }}>{c.amount}</p>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: "3px 8px",
+                          borderRadius: 999,
+                          background: c.pillBg,
+                          color: c.pillColor,
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        {c.pill}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CampaignsLoadingState({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
   return (
     <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
@@ -878,6 +2014,356 @@ function CampaignsLoadingState({ lang, isMobile }: { lang: "en" | "fr"; isMobile
         }}
       >
         {lang === "fr" ? "Chargement des campagnes…" : "Loading campaigns…"}
+      </div>
+    </div>
+  );
+}
+
+function formatStartedLabel(startRaw: string | undefined, startLabel: string, lang: "en" | "fr"): string {
+  const iso = toDateInputValue(startRaw || startLabel || "");
+  if (!iso) return lang === "fr" ? "Non démarrée" : "Not started";
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return startLabel || (lang === "fr" ? "Non démarrée" : "Not started");
+  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return lang === "fr" ? `Démarrée le ${date}` : `Started ${date}`;
+}
+
+function platformsForCampaign(platform: string): string[] {
+  const p = platform.toLowerCase();
+  if (p.includes("all") || !p.trim()) return ["tiktok", "instagram"];
+  const list: string[] = [];
+  if (p.includes("tiktok")) list.push("tiktok");
+  if (p.includes("instagram")) list.push("instagram");
+  if (p.includes("youtube")) list.push("youtube");
+  return list.length > 0 ? list : ["tiktok"];
+}
+
+function CampaignMetric({ icon, value }: { icon: React.ReactNode; value: string }) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6B7280" }}>
+      {icon}
+      <span style={{ color: "#374151", fontWeight: 500 }}>{value}</span>
+    </div>
+  );
+}
+
+function CampaignsBoard({
+  lang,
+  isMobile,
+  campaigns,
+  kpiStats,
+  plan,
+  shopifyConnected,
+  boardTab,
+  setBoardTab,
+  sortOrder,
+  setSortOrder,
+  search,
+  setSearch,
+  onNew,
+  onOpenCampaign,
+  onDeleteAll,
+}: {
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  campaigns: Campaign[];
+  kpiStats: CampaignKpiStats;
+  plan: PlanTier;
+  shopifyConnected: boolean;
+  boardTab: BoardTab;
+  setBoardTab: (t: BoardTab) => void;
+  sortOrder: CampaignSort;
+  setSortOrder: (s: CampaignSort) => void;
+  search: string;
+  setSearch: (s: string) => void;
+  onNew: () => void;
+  onOpenCampaign: (id: string) => void;
+  onDeleteAll: () => void;
+}) {
+  const pad = isMobile ? "56px 16px 24px" : "40px 40px 48px";
+
+  const tabCounts = useMemo(
+    () => ({
+      active: campaigns.filter((c) => c.status === "Active" || c.status === "Paused").length,
+      drafts: campaigns.filter((c) => c.status === "Draft").length,
+      finished: campaigns.filter((c) => c.status === "Completed").length,
+    }),
+    [campaigns],
+  );
+
+  const creatorsInCampaigns = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of campaigns) {
+      for (const id of c.creatorIds ?? []) ids.add(id);
+    }
+    return ids.size;
+  }, [campaigns]);
+
+  const creatorPool = getMaxManagedCreators(plan) ?? Math.max(kpiStats.totalCreators, creatorsInCampaigns);
+  const creatorPct = creatorPool > 0 ? Math.round((creatorsInCampaigns / creatorPool) * 100) : 0;
+
+  const filtered = useMemo(() => {
+    let list = [...campaigns];
+    if (boardTab === "active") list = list.filter((c) => c.status === "Active" || c.status === "Paused");
+    if (boardTab === "drafts") list = list.filter((c) => c.status === "Draft");
+    if (boardTab === "finished") list = list.filter((c) => c.status === "Completed");
+    const q = search.trim().toLowerCase();
+    if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
+    list.sort((a, b) => {
+      if (sortOrder === "name") return a.name.localeCompare(b.name);
+      return (b.createdAt || "").localeCompare(a.createdAt || "");
+    });
+    return list;
+  }, [campaigns, boardTab, search, sortOrder]);
+
+  const boardTabs: { id: BoardTab; label: string; count: number }[] = [
+    { id: "active", label: lang === "fr" ? "Actives" : "Active", count: tabCounts.active },
+    { id: "drafts", label: lang === "fr" ? "Brouillons" : "Drafts", count: tabCounts.drafts },
+    { id: "finished", label: lang === "fr" ? "Terminées" : "Finished", count: tabCounts.finished },
+  ];
+
+  return (
+    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+      <div style={{ padding: pad }}>
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", margin: 0, marginBottom: 6, letterSpacing: "-0.03em", maxWidth: 520 }}>
+            Track it
+          </h1>
+          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 520, lineHeight: 1.5 }}>
+            {lang === "fr"
+              ? "Gérez vos campagnes et suivez les performances et commissions de vos créateurs."
+              : "Manage your campaigns and track creator performance and commissions."}
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: 16,
+            borderBottom: "1px solid #E5E7EB",
+            marginBottom: 24,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", gap: 28, overflowX: "auto", minWidth: 0 }}>
+            {boardTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setBoardTab(tab.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "0 0 12px",
+                  marginBottom: -1,
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  fontWeight: boardTab === tab.id ? 600 : 400,
+                  color: boardTab === tab.id ? "#1A1A1A" : "#9CA3AF",
+                  cursor: "pointer",
+                  borderBottom: boardTab === tab.id ? "2px solid #1A1A1A" : "2px solid transparent",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginBottom: 8 }}>
+            <button
+              type="button"
+              className="hero-cta-shopify"
+              onClick={onNew}
+              style={{ padding: "12px 22px", fontSize: 15 }}
+            >
+              {lang === "fr" ? "+ Créer une campagne" : "+ Create campaign"}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 24 }}>
+          <div
+            style={{
+              flex: isMobile ? "1 1 100%" : "1 1 280px",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              border: "1px solid #E5E7EB",
+              borderRadius: 10,
+              padding: "10px 14px",
+              background: "#FFF",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="11" cy="11" r="7" stroke="#9CA3AF" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={lang === "fr" ? "Rechercher une campagne par titre" : "Search campaigns by title"}
+              style={{ border: "none", outline: "none", flex: 1, fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", background: "transparent" }}
+            />
+          </div>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as CampaignSort)}
+            style={{
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid #E5E7EB",
+              fontSize: 14,
+              fontFamily: "inherit",
+              color: "#1A1A1A",
+              background: "#FFF",
+              cursor: "pointer",
+            }}
+          >
+            <option value="recent">{lang === "fr" ? "Récemment créées" : "Recently created"}</option>
+            <option value="name">{lang === "fr" ? "Nom (A-Z)" : "Name (A-Z)"}</option>
+          </select>
+          {boardTab === "finished" && tabCounts.finished > 0 && (
+            <button
+              type="button"
+              onClick={onDeleteAll}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid #FECACA",
+                fontSize: 14,
+                fontFamily: "inherit",
+                fontWeight: 500,
+                color: "#DC2626",
+                background: "#FFF",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {lang === "fr" ? "Supprimer toutes les campagnes" : "Delete all campaigns"}
+            </button>
+          )}
+          <div style={{ marginLeft: isMobile ? 0 : "auto", fontSize: 13, color: "#6B7280", width: isMobile ? "100%" : "auto" }}>
+            {lang === "fr"
+              ? `${creatorsInCampaigns} sur ${creatorPool} créateurs (${creatorPct} %) ajoutés aux campagnes`
+              : `${creatorsInCampaigns} of ${creatorPool} creators (${creatorPct}%) added to campaigns`}
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div style={{ padding: "48px 24px", textAlign: "center", color: "#9CA3AF", fontSize: 14, border: "1px solid #E5E7EB", borderRadius: 12 }}>
+            {boardTab === "drafts"
+              ? lang === "fr"
+                ? "Aucun brouillon. Commencez une campagne et quittez pour la retrouver ici."
+                : "No drafts yet. Start a campaign and leave to resume it here."
+              : lang === "fr"
+                ? "Aucune campagne dans cet onglet."
+                : "No campaigns in this tab."}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {filtered.map((campaign) => {
+              const platforms = platformsForCampaign(campaign.platform);
+              const posted = 0;
+              const totalCreators = campaign.creators ?? 0;
+              const views = 0;
+              const engagement = 0;
+              const clicks = 0;
+              const salesLabel = shopifyConnected ? formatCurrency(campaign.sales ?? 0, lang) : "—";
+
+              return (
+                <button
+                  key={campaign.id}
+                  type="button"
+                  onClick={() => onOpenCampaign(campaign.id)}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    textAlign: "left",
+                    border: "1px solid #E5E7EB",
+                    borderRadius: 12,
+                    background: "#FFFFFF",
+                    padding: "18px 20px",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#D1D5DB";
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#E5E7EB";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{campaign.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      {campaign.status === "Draft" && (
+                        <span title={lang === "fr" ? "Brouillon" : "Draft"} style={{ color: "#9CA3AF", display: "flex" }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" strokeWidth="1.8" />
+                            <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                            <path d="M4 4l16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
+                        </span>
+                      )}
+                      {platforms.map((p) => (
+                        <PlatformBrandIcon key={p} platform={p} size={18} />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", fontSize: 13, color: "#6B7280" }}>
+                    <span>{formatStartedLabel(campaign.startRaw, campaign.start, lang)}</span>
+                    <span>
+                      {lang === "fr"
+                        ? `${posted} sur ${totalCreators} publié${totalCreators > 1 ? "s" : ""}`
+                        : `${posted} out of ${totalCreators} posted`}
+                    </span>
+                    <CampaignMetric
+                      icon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M2 12C4.5 7 8 4 12 4s7.5 3 10 8c-2.5 5-6 8-10 8S4.5 17 2 12z" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <circle cx="12" cy="12" r="2.5" fill="#9CA3AF" />
+                        </svg>
+                      }
+                      value={String(views)}
+                    />
+                    <CampaignMetric
+                      icon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M12 20.5s-6.5-4.2-6.5-9.1a4.1 4.1 0 017.4-2.8A4.1 4.1 0 0118.5 11.4c0 4.9-6.5 9.1-6.5 9.1z" stroke="#9CA3AF" strokeWidth="1.8" />
+                        </svg>
+                      }
+                      value={`${engagement}%`}
+                    />
+                    <CampaignMetric
+                      icon={
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                          <path d="M5 4l6 6-6 6V4zM14 6h6v12h-6" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
+                        </svg>
+                      }
+                      value={String(clicks)}
+                    />
+                    {shopifyConnected && (
+                      <CampaignMetric
+                        icon={
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+                            <path d="M7 8h13l-1.2 11H6.2L5 4h4l1 4z" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
+                          </svg>
+                        }
+                        value={salesLabel}
+                      />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1387,42 +2873,110 @@ function CompactKpi({
   );
 }
 
-function campaignBadgeStyle(status: CampaignStatus): React.CSSProperties {
-  if (status === "Paused") {
-    return {
-      display: "inline-block",
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#7A7A7A",
-      background: "#ECECEC",
-      border: "1px solid #D9D9D9",
-      borderRadius: 6,
-      padding: "4px 8px",
-      letterSpacing: "-0.01em",
-    };
+function getCampaignStatusTheme(status: CampaignStatus): { color: string; background: string; boxShadow: string } {
+  switch (status) {
+    case "Active":
+      return {
+        color: "#0369A1",
+        background: "rgba(3, 105, 161, 0.1)",
+        boxShadow: "0 6px 18px rgba(3, 105, 161, 0.14), inset 0 -3px 0 rgba(3, 105, 161, 0.12)",
+      };
+    case "Paused":
+      return {
+        color: "#C2410C",
+        background: "rgba(194, 65, 12, 0.1)",
+        boxShadow: "0 6px 18px rgba(194, 65, 12, 0.14), inset 0 -3px 0 rgba(194, 65, 12, 0.12)",
+      };
+    case "Completed":
+      return {
+        color: "#15803D",
+        background: "rgba(21, 128, 61, 0.1)",
+        boxShadow: "0 6px 18px rgba(21, 128, 61, 0.14), inset 0 -3px 0 rgba(21, 128, 61, 0.12)",
+      };
+    case "Draft":
+    default:
+      return {
+        color: "#52525B",
+        background: "rgba(82, 82, 91, 0.1)",
+        boxShadow: "0 6px 18px rgba(82, 82, 91, 0.12), inset 0 -3px 0 rgba(82, 82, 91, 0.1)",
+      };
   }
+}
+
+function CampaignStatusIcon({ status, size = 16 }: { status: CampaignStatus; size?: number }) {
+  const stroke = 1.75;
   if (status === "Active") {
-    return {
-      display: "inline-block",
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#1A1A1A",
-      letterSpacing: "-0.01em",
-    };
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth={stroke} strokeDasharray="3.5 3.5" />
+      </svg>
+    );
   }
-  return {
-    display: "inline-block",
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#9A9A9A",
-    letterSpacing: "-0.01em",
-  };
+  if (status === "Paused") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 5.5 19.5 19.5H4.5L12 5.5z"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinejoin="round"
+        />
+        <path d="M12 10v4" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" />
+        <circle cx="12" cy="17" r="0.9" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (status === "Completed") {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth={stroke} />
+        <path d="M8.5 12.2 10.8 14.5 15.8 9.5" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth={stroke} />
+      <path d="M12 8v4.2l2.6 1.6" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CampaignStatusPill({
+  lang,
+  status,
+}: {
+  lang: "en" | "fr";
+  status: CampaignStatus;
+}) {
+  const theme = getCampaignStatusTheme(status);
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "7px 14px",
+        borderRadius: 14,
+        background: theme.background,
+        color: theme.color,
+        fontSize: 13,
+        fontWeight: 500,
+        fontFamily: "inherit",
+        letterSpacing: "-0.02em",
+        lineHeight: 1.1,
+        whiteSpace: "nowrap",
+        boxShadow: theme.boxShadow,
+      }}
+    >
+      <CampaignStatusIcon status={status} size={16} />
+      {campaignStatusLabel(status, lang)}
+    </span>
+  );
 }
 
 function CampaignBadge({ lang, status }: { lang: "en" | "fr"; status: CampaignStatus }) {
-  return (
-    <span style={campaignBadgeStyle(status)}>{campaignStatusLabel(status, lang)}</span>
-  );
+  return <CampaignStatusPill lang={lang} status={status} />;
 }
 
 function Card({ title, children }: { title?: string; children: React.ReactNode }) {
@@ -1493,54 +3047,555 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-function CampaignDetail({ lang, campaign, userId, plan, onBack, onUpdate, onStatusChange, onEdit, onDelete, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; onBack: () => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; isMobile?: boolean }) {
-  const [tab, setTab] = useState<DetailTab>("creators");
-  const detailTabs: { id: DetailTab; label: string }[] = [
-    { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
-    { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts" },
-    { id: "settings", label: lang === "fr" ? "Paramètres" : "Settings" },
-  ];
+function CampaignDetailToolbar({
+  lang,
+  campaign,
+  isMobile,
+  currency,
+  setCurrency,
+  dateRange,
+  setDateRange,
+  onBack,
+  onStatusChange,
+  onEdit,
+  onAddCreators,
+  onAddSale,
+  onExport,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  isMobile?: boolean;
+  currency: DisplayCurrency;
+  setCurrency: (value: DisplayCurrency) => void;
+  dateRange: CampaignDateRange;
+  setDateRange: (value: CampaignDateRange) => void;
+  onBack: () => void;
+  onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
+  onEdit: (id: string) => void;
+  onAddCreators: () => void;
+  onAddSale: () => void;
+  onExport: (format: "csv" | "xlsx") => void | Promise<void>;
+}) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside(statusRef, statusOpen, () => setStatusOpen(false));
+  useClickOutside(currencyRef, currencyOpen, () => setCurrencyOpen(false));
+  useClickOutside(dateRef, dateOpen, () => setDateOpen(false));
+  useClickOutside(moreRef, moreOpen, () => setMoreOpen(false));
 
   const isPaused = campaign.status === "Paused";
+  const statusOptions: CampaignStatus[] = ["Active", "Paused", "Completed", "Draft"];
+
+  const dropdownPanel: CSSProperties = {
+    position: "absolute",
+    top: "calc(100% + 6px)",
+    right: 0,
+    minWidth: 180,
+    background: "#FFF",
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
+    zIndex: 30,
+    padding: 6,
+  };
+
+  const menuItemStyle: CSSProperties = {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    border: "none",
+    background: "transparent",
+    padding: "10px 12px",
+    borderRadius: 8,
+    fontSize: 14,
+    fontFamily: "inherit",
+    color: "#1A1A1A",
+    cursor: "pointer",
+  };
+
+  const toolbarControl: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    border: "none",
+    background: "transparent",
+    padding: "6px 4px",
+    fontSize: 14,
+    fontFamily: "inherit",
+    color: "#1A1A1A",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: isMobile ? "stretch" : "center",
+        justifyContent: "space-between",
+        gap: 16,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, minWidth: 0, flex: 1 }}>
+        <span
+          role="link"
+          tabIndex={0}
+          onClick={onBack}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onBack();
+            }
+          }}
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "#7A7A7A",
+            cursor: "pointer",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {lang === "fr" ? "← Retour aux campagnes" : "← Back to campaigns"}
+        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", minWidth: 0 }}>
+        <h1
+          style={{
+            fontSize: isMobile ? 24 : 28,
+            fontWeight: 600,
+            color: isPaused ? "#9CA3AF" : "#1A1A1A",
+            margin: 0,
+            letterSpacing: "-0.03em",
+          }}
+        >
+          {campaign.name}
+        </h1>
+
+        <div ref={statusRef} style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setStatusOpen((open) => !open)}
+            style={{
+              border: "none",
+              background: "transparent",
+              padding: 0,
+              cursor: "pointer",
+              display: "inline-flex",
+              fontFamily: "inherit",
+            }}
+          >
+            <CampaignStatusPill lang={lang} status={campaign.status} />
+          </button>
+          {statusOpen && (
+            <div style={{ ...dropdownPanel, right: "auto", left: 0, minWidth: 196, padding: 8 }}>
+              {statusOptions.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  style={{
+                    display: "flex",
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    background: campaign.status === status ? "rgba(0, 0, 0, 0.04)" : "transparent",
+                    padding: "6px 8px",
+                    borderRadius: 10,
+                    fontFamily: "inherit",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setStatusOpen(false);
+                    if (status !== campaign.status) void onStatusChange(campaign.id, status);
+                  }}
+                >
+                  <CampaignStatusPill lang={lang} status={status} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#9CA3AF", fontSize: 13 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M8 12.5l2.5 2.5L16 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span>{lang === "fr" ? "Contenu à jour" : "Content is up to date"}</span>
+        </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14, flexWrap: "wrap" }}>
+        <div ref={currencyRef} style={{ position: "relative" }}>
+          <button type="button" onClick={() => setCurrencyOpen((open) => !open)} style={toolbarControl}>
+            {currency}
+            <ChevronDownIcon />
+          </button>
+          {currencyOpen && (
+            <div style={dropdownPanel}>
+              {(["USD", "EUR"] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  style={{
+                    ...menuItemStyle,
+                    fontWeight: currency === code ? 600 : 400,
+                    background: currency === code ? "#F5F5F5" : "transparent",
+                  }}
+                  onClick={() => {
+                    setCurrency(code);
+                    setCurrencyOpen(false);
+                  }}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div ref={dateRef} style={{ position: "relative" }}>
+          <button type="button" onClick={() => setDateOpen((open) => !open)} style={toolbarControl}>
+            {formatCampaignDateRangeLabel(dateRange, lang)}
+            <ChevronDownIcon />
+          </button>
+          {dateOpen && (
+            <div style={{ ...dropdownPanel, minWidth: 280, padding: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
+                    {lang === "fr" ? "Début" : "Start"}
+                  </div>
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    max={dateRange.end}
+                    onChange={(e) => setDateRange(normalizeCampaignDateRange({ ...dateRange, start: e.target.value }))}
+                    style={dateInputStyle}
+                  />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
+                    {lang === "fr" ? "Fin" : "End"}
+                  </div>
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    min={dateRange.start}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setDateRange(normalizeCampaignDateRange({ ...dateRange, end: e.target.value }))}
+                    style={dateInputStyle}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDateOpen(false)}
+                style={{ ...btnSecondary, width: "100%", marginTop: 12, padding: "8px 12px", fontSize: 13 }}
+              >
+                {lang === "fr" ? "Appliquer" : "Apply"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div ref={moreRef} style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setMoreOpen((open) => !open)}
+            aria-label={lang === "fr" ? "Plus d'actions" : "More actions"}
+            style={{ ...toolbarControl, padding: "6px 8px" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </button>
+          {moreOpen && (
+            <div style={dropdownPanel}>
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setMoreOpen(false);
+                  void onExport("xlsx");
+                }}
+              >
+                {lang === "fr" ? "Exporter Excel" : "Export Excel"}
+              </button>
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setMoreOpen(false);
+                  void onExport("csv");
+                }}
+              >
+                {lang === "fr" ? "Exporter CSV" : "Export CSV"}
+              </button>
+              {campaign.status !== "Completed" && (
+                <>
+                  <div style={{ height: 1, background: "#EFEFEF", margin: "4px 0" }} />
+                  <button
+                    type="button"
+                    style={menuItemStyle}
+                    onClick={() => {
+                      setMoreOpen(false);
+                      void onStatusChange(campaign.id, "Completed");
+                    }}
+                  >
+                    {lang === "fr" ? "Terminer la campagne" : "Finish campaign"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onEdit(campaign.id)}
+          aria-label={lang === "fr" ? "Modifier la campagne" : "Edit campaign"}
+          style={{
+            border: "none",
+            background: "transparent",
+            padding: 6,
+            cursor: "pointer",
+            color: "#1A1A1A",
+            display: "inline-flex",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+            <path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "stretch" }}>
+          <button
+            type="button"
+            className="hero-cta-raised-light"
+            onClick={onAddSale}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
+          </button>
+          <button
+            type="button"
+            className="hero-cta-raised-light"
+            onClick={onAddCreators}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onAddSale, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onAddSale: () => void; isMobile?: boolean }) {
+  const [tab, setTab] = useState<DetailTab>(initialTab);
+  const [currency, setCurrency] = useState<DisplayCurrency>(lang === "fr" ? "EUR" : "USD");
+  const [dateRange, setDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
+  const [analytics, setAnalytics] = useState<CampaignAnalyticsSnapshot | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [campaign.id, initialTab]);
+
+  useEffect(() => {
+    setDateRange(defaultCampaignDateRange(campaign));
+  }, [campaign.id, campaign.startRaw, campaign.start, campaign.createdAt]);
+
+  useEffect(() => {
+    const lastSaleDate = sessionStorage.getItem("trackit_last_sale_date");
+    if (!lastSaleDate) return;
+    sessionStorage.removeItem("trackit_last_sale_date");
+    setDateRange((prev) =>
+      normalizeCampaignDateRange({
+        start: lastSaleDate < prev.start ? lastSaleDate : prev.start,
+        end: lastSaleDate > prev.end ? lastSaleDate : prev.end,
+      }),
+    );
+  }, [campaign.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setAnalyticsLoading(true);
+      if (!supabase) {
+        if (!cancelled) {
+          setAnalytics(null);
+          setAnalyticsLoading(false);
+        }
+        return;
+      }
+
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) {
+            setAnalytics(null);
+            setAnalyticsLoading(false);
+          }
+          return;
+        }
+        resolvedUserId = user.id;
+      }
+
+      try {
+        const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId);
+        if (!cancelled) setAnalytics(snapshot);
+      } catch {
+        if (!cancelled) {
+          setAnalytics({
+            rows: [],
+            monthRows: [],
+            totals: { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 },
+            salesTrend: { current: 0, previous: 0, changePct: 0, direction: "flat" },
+            creatorCount: campaign.creators ?? campaign.creatorIds?.length ?? 0,
+            pendingPayouts: 0,
+            pendingCreatorCount: 0,
+            activeCreators: 0,
+            roi: null,
+          });
+        }
+      } finally {
+        if (!cancelled) setAnalyticsLoading(false);
+      }
+    };
+
+    void load();
+    const onRefresh = () => void load();
+    window.addEventListener(SALES_UPDATED_EVENT, onRefresh);
+    window.addEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
+    window.addEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SALES_UPDATED_EVENT, onRefresh);
+      window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
+      window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
+    };
+  }, [campaign, userId]);
+
+  const detailTabs: { id: DetailTab; label: string }[] = [
+    { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
+    { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
+  ];
+
+  const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
+  const creatorCount = analytics?.creatorCount ?? campaign.creators ?? campaign.creatorIds?.length ?? 0;
+  const totals = analytics?.totals ?? { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 };
+  const avgPerCreator = creatorCount > 0 ? totals.sales / creatorCount : 0;
+  const netRevenue = Math.max(0, totals.sales - totals.commission);
+  const roi = analytics?.roi ?? computeCreatorCampaignRoi(
+    totals.sales,
+    (analytics?.rows ?? []).reduce(
+      (sum, row) => sum + computeCreatorBrandCost(row.commission, row.commissionPaid),
+      0,
+    ),
+  );
+  const pendingPayouts = analytics?.pendingPayouts ?? 0;
+  const pendingCreatorCount = analytics?.pendingCreatorCount ?? 0;
+  const activeCreators = analytics?.activeCreators ?? 0;
+  const salesTrendSub = formatSalesTrendSub(
+    analytics?.salesTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" },
+    lang,
+  );
+  const pendingPayoutsSub =
+    pendingPayouts > 0
+      ? lang === "fr"
+        ? `${pendingCreatorCount} créateur${pendingCreatorCount > 1 ? "s" : ""} à payer`
+        : `${pendingCreatorCount} creator${pendingCreatorCount > 1 ? "s" : ""} to pay`
+      : formatPendingPayoutsSub(0, lang);
+
+  const handleExport = async (format: "csv" | "xlsx") => {
+    if (!supabase) return;
+
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      resolvedUserId = user?.id;
+    }
+    if (!resolvedUserId) {
+      alert(lang === "fr" ? "Session expirée." : "Session expired.");
+      return;
+    }
+
+    try {
+      const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, toDateBounds(dateRange));
+      const data: CampaignAnalyticsExport = {
+        campaignName: campaign.name,
+        dateRange,
+        currency,
+        rows: snapshot.rows,
+        totals: snapshot.totals,
+        pendingPayouts: snapshot.pendingPayouts,
+        roi: snapshot.roi,
+      };
+      if (format === "csv") {
+        exportCampaignAnalyticsCsv(data);
+      } else {
+        await exportCampaignAnalyticsExcel(data);
+      }
+    } catch (error) {
+      console.error("Campaign analytics export failed:", error);
+      alert(lang === "fr" ? "Impossible d'exporter les analytiques." : "Could not export analytics.");
+    }
+  };
 
   return (
   <>
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: 0, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: isPaused ? "#F7F7F7" : "#FFF" }}>
-      <button type="button" onClick={onBack} style={{ ...btnSecondary, marginBottom: 16, padding: "8px 12px", fontSize: 12 }}>{lang === "fr" ? "← Retour aux campagnes" : "← Back to campaigns"}</button>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
-        <div>
-          <h1 style={{ fontSize: 28, fontWeight: 600, color: isPaused ? "#9A9A9A" : "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.04em" }}>{campaign.name}</h1>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", fontSize: 13, color: "#7A7A7A" }}>
-            <CampaignBadge lang={lang} status={campaign.status} />
-            <span>{campaign.platform}</span>
-            <span>{campaign.start} – {campaign.end}</span>
-          </div>
-        </div>
-        <CampaignDetailActions
-          lang={lang}
-          campaign={campaign}
-          onEdit={onEdit}
-          onStatusChange={onStatusChange}
-        />
-      </div>
-      <div style={{ display: "flex", gap: 28, overflowX: "auto", marginTop: 20 }}>
+    <div style={{ padding: headerPad, borderBottom: "1px solid #E5E7EB", background: "#FFFFFF" }}>
+      <CampaignDetailToolbar
+        lang={lang}
+        campaign={campaign}
+        isMobile={isMobile}
+        currency={currency}
+        setCurrency={setCurrency}
+        dateRange={dateRange}
+        setDateRange={setDateRange}
+        onBack={onBack}
+        onStatusChange={onStatusChange}
+        onEdit={onEdit}
+        onAddCreators={onAddCreators}
+        onAddSale={onAddSale}
+        onExport={handleExport}
+      />
+      <div style={{ display: "flex", gap: 28, overflowX: "auto", marginTop: 28 }}>
         {detailTabs.map((t) => (
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id);
+              onTabChange?.(t.id);
+            }}
             style={{
               background: "none",
               border: "none",
-              padding: "12px 0",
+              padding: "0 0 12px",
+              marginBottom: -1,
               fontSize: 14,
               fontFamily: "inherit",
-              color: tab === t.id ? "#1A1A1A" : "#7A7A7A",
-              fontWeight: tab === t.id ? 500 : 400,
-              letterSpacing: "-0.02em",
+              fontWeight: tab === t.id ? 600 : 400,
+              color: tab === t.id ? "#1A1A1A" : "#9CA3AF",
               cursor: "pointer",
               borderBottom: tab === t.id ? "2px solid #1A1A1A" : "2px solid transparent",
-              marginBottom: -1,
               whiteSpace: "nowrap",
             }}
           >
@@ -1549,31 +3604,91 @@ function CampaignDetail({ lang, campaign, userId, plan, onBack, onUpdate, onStat
         ))}
       </div>
     </div>
-    <div style={{ padding: isMobile ? 16 : "40px 40px 40px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <CompactKpi
-          lang={lang}
-          title={lang === "fr" ? "Créateurs" : "Creators"}
-          sub={lang === "fr" ? "dans cette campagne" : "in this campaign"}
-          value={campaign.creators ?? 0}
-          onCommit={(next) => onUpdate({ ...campaign, creators: next })}
-        />
-        <CompactKpi
-          lang={lang}
-          title={lang === "fr" ? "Ventes" : "Sales"}
-          sub={lang === "fr" ? "revenus attribués" : "attributed revenue"}
-          value={campaign.sales ?? 0}
-          currency
-          onCommit={(next) => onUpdate({ ...campaign, sales: next })}
-        />
-        <Kpi title={lang === "fr" ? "Commission" : "Commission"} value={formatCurrency(campaign.commission ?? 0, lang)} sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"} />
-        <Kpi title="Avg per Creator" value={(campaign.creators ?? 0) ? formatCurrency(Math.round((campaign.sales ?? 0) / (campaign.creators ?? 0)), lang) : formatCurrency(0, lang)} sub={lang === "fr" ? "ventes générées" : "sales driven"} />
-      </div>
+    <div style={{ padding: isMobile ? 16 : "32px 40px 40px", background: "#FFFFFF" }}>
       {tab === "creators" && (
-        <CreatorsTab lang={lang} campaign={campaign} userId={userId} onAddCreator={() => onEdit(campaign.id)} />
+        <CreatorsTab
+          lang={lang}
+          campaign={campaign}
+          rows={analytics?.rows ?? []}
+          loading={analyticsLoading}
+          currency={currency}
+          onAddCreator={onAddCreators}
+        />
       )}
-      {tab === "payouts" && <PayoutsTab lang={lang} campaign={campaign} userId={userId} plan={plan} />}
-      {tab === "settings" && <SettingsTab lang={lang} campaign={campaign} onUpdate={onUpdate} onDelete={() => void onDelete(campaign.id)} />}
+      {tab === "analytics" && (
+        <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        <Kpi
+          title={lang === "fr" ? "Créateurs" : "Creators"}
+          value={String(creatorCount)}
+          sub={lang === "fr" ? "dans cette campagne" : "in this campaign"}
+        />
+        <Kpi
+          title={lang === "fr" ? "Ventes" : "Sales"}
+          value={formatCurrencyWithCode(totals.sales, currency)}
+          sub={salesTrendSub.text}
+          subColor={salesTrendSub.color}
+        />
+        <Kpi
+          title={lang === "fr" ? "Commission" : "Commission"}
+          value={formatCurrencyWithCode(totals.commission, currency)}
+          sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"}
+        />
+        <Kpi
+          title={lang === "fr" ? "Moyenne par créateur" : "Avg per Creator"}
+          value={formatCurrencyWithCode(avgPerCreator, currency)}
+          sub={lang === "fr" ? "ventes générées" : "sales driven"}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <Kpi
+          title={lang === "fr" ? "Revenus nets" : "Net revenue"}
+          value={formatCurrencyWithCode(netRevenue, currency)}
+          sub={lang === "fr" ? "après commissions" : "after commissions"}
+        />
+        <Kpi
+          title={lang === "fr" ? "Paiements en attente" : "Pending payouts"}
+          value={formatCurrencyWithCode(pendingPayouts, currency)}
+          sub={pendingPayoutsSub}
+        />
+        <Kpi
+          title="ROI"
+          value={formatCampaignRoi(roi)}
+          sub={lang === "fr" ? "revenus / coût créateur" : "revenue / creator cost"}
+        />
+        <Kpi
+          title={lang === "fr" ? "Créateurs actifs" : "Active creators"}
+          value={String(activeCreators)}
+          sub={lang === "fr" ? `sur ${creatorCount} dans la campagne` : `of ${creatorCount} in campaign`}
+        />
+      </div>
+
+        <AnalyticsTab
+          lang={lang}
+          campaign={campaign}
+          isMobile={isMobile}
+          currency={currency}
+          rows={analytics?.rows ?? []}
+          monthRows={analytics?.monthRows ?? []}
+          loading={analyticsLoading}
+        />
+        </>
+      )}
     </div>
   </>
   );
@@ -1582,110 +3697,18 @@ function CampaignDetail({ lang, campaign, userId, plan, onBack, onUpdate, onStat
 function CreatorsTab({
   lang,
   campaign,
-  userId,
+  rows,
+  loading,
+  currency,
   onAddCreator,
 }: {
   lang: "en" | "fr";
   campaign: Campaign;
-  userId?: string;
+  rows: CampaignCreatorRow[];
+  loading: boolean;
+  currency: DisplayCurrency;
   onAddCreator: () => void;
 }) {
-  const [rows, setRows] = useState<CampaignCreatorRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      if (!supabase) {
-        if (!cancelled) setLoading(false);
-        return;
-      }
-
-      let resolvedUserId = userId;
-      if (!resolvedUserId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          if (!cancelled) setLoading(false);
-          return;
-        }
-        resolvedUserId = user.id;
-      }
-
-      const creatorIds = campaign.creatorIds ?? [];
-      if (creatorIds.length === 0) {
-        if (!cancelled) {
-          setRows([]);
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const [creatorResult, salesResult, creatorCounts, campaignData] = await Promise.all([
-          supabase
-            .from("creators")
-            .select("id, handle, full_name, avatar_url, platform")
-            .eq("user_id", resolvedUserId)
-            .in("id", creatorIds),
-          supabase
-            .from("sales")
-            .select("order_amount, commission_amount, campaign_id, creator_id")
-            .eq("user_id", resolvedUserId),
-          getCampaignCreatorCounts(resolvedUserId),
-          getCampaigns(resolvedUserId),
-        ]);
-        if (cancelled) return;
-
-        const campaignMeta: Record<string, CampaignSalesMeta> = {};
-        for (const row of campaignData) {
-          campaignMeta[String(row.id)] = {
-            status: String(row.status ?? ""),
-            created_at: typeof row.created_at === "string" ? row.created_at : undefined,
-          };
-        }
-
-        const stats = computeCreatorStatsForCampaign(
-          (salesResult.data || []) as SaleRow[],
-          campaign.id,
-          creatorIds,
-          creatorCounts,
-          campaignMeta,
-        );
-
-        const creatorMap = new Map(
-          (creatorResult.data || []).map((c) => [String(c.id), c as { id: string; handle: string; full_name?: string; avatar_url?: string; platform?: string }]),
-        );
-
-        const nextRows: CampaignCreatorRow[] = creatorIds.map((id) => {
-          const c = creatorMap.get(id);
-          const s = stats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 };
-          return {
-            id,
-            handle: c?.handle ?? "—",
-            full_name: c?.full_name,
-            avatar_url: c?.avatar_url,
-            platform: c?.platform,
-            salesCount: s.salesCount,
-            salesAmount: s.salesAmount,
-            commission: s.commission,
-          };
-        });
-
-        nextRows.sort((a, b) => b.salesAmount - a.salesAmount);
-        setRows(nextRows);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [campaign.id, campaign.creatorIds, userId]);
-
   const headers = [
     lang === "fr" ? "Créateur" : "Creator",
     lang === "fr" ? "Pseudo" : "Handle",
@@ -1711,15 +3734,21 @@ function CreatorsTab({
             <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <CreatorAvatar src={row.avatar_url} size={32} alt={row.full_name || row.handle} />
+                  <CreatorAvatar
+                    src={row.avatar_url}
+                    username={row.handle}
+                    displayName={row.full_name}
+                    size={32}
+                    alt={row.full_name || row.handle}
+                  />
                   <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
                 </div>
             </td>
               <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
               <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
               <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
-              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.salesAmount, lang)}</td>
-              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrency(row.commission, lang)}</td>
+              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
+              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
           </tr>
           ))
         )}
@@ -1728,6 +3757,201 @@ function CreatorsTab({
         <BtnSm onClick={onAddCreator}>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
       </div>
     </Card>
+  );
+}
+
+function CampaignCreatorRankBadge({ rank }: { rank: number }) {
+  const colors: Record<number, string> = { 1: "#D4AF37", 2: "#9E9E9E", 3: "#CD7F32" };
+  return <span style={{ fontWeight: 600, color: colors[rank] ?? "#9A9A9A" }}>#{rank}</span>;
+}
+
+function CampaignCreatorStatusBadge({ lang, active }: { lang: "en" | "fr"; active: boolean }) {
+  const label = active ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Inactif" : "Inactive";
+  const bg = active ? "#E8F5E9" : "#F5F5F5";
+  const color = active ? "#2E7D32" : "#9A9A9A";
+  return (
+    <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 500, background: bg, color }}>
+      {label}
+    </span>
+  );
+}
+
+function AnalyticsTab({
+  lang,
+  campaign,
+  isMobile,
+  currency,
+  rows,
+  monthRows,
+  loading,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  isMobile?: boolean;
+  currency: DisplayCurrency;
+  rows: CampaignCreatorRow[];
+  monthRows: CampaignCreatorRow[];
+  loading: boolean;
+}) {
+  const headers = [
+    lang === "fr" ? "Créateur" : "Creator",
+    lang === "fr" ? "Ventes" : "Sales",
+    lang === "fr" ? "Revenus" : "Revenue",
+    lang === "fr" ? "Commission" : "Commission",
+    "ROI",
+  ];
+
+  const monthHeaders = [
+    lang === "fr" ? "Rang" : "Rank",
+    lang === "fr" ? "Créateur" : "Creator",
+    lang === "fr" ? "Plateforme" : "Platform",
+    lang === "fr" ? "Ventes générées" : "Sales driven",
+    lang === "fr" ? "Commission" : "Commission",
+    "ROI",
+    lang === "fr" ? "Statut" : "Status",
+  ];
+
+  const emptyMessage =
+    rows.length === 0
+      ? lang === "fr"
+        ? "Ajoutez des créateurs à cette campagne pour voir les analytiques."
+        : "Add creators to this campaign to see analytics."
+      : lang === "fr"
+        ? "Aucune vente attribuée à cette campagne pour le moment."
+        : "No sales attributed to this campaign yet.";
+
+  const monthEmptyMessage =
+    lang === "fr"
+      ? "Aucune vente ce mois pour cette campagne."
+      : "No sales this month for this campaign yet.";
+
+  return (
+    <>
+      <div style={{ marginBottom: 20 }}>
+      <Card title={lang === "fr" ? "Meilleurs créateurs ce mois" : "Top creators this month"}>
+        <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 640 : undefined }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+                {monthHeaders.map((header) => (
+                  <th key={header} style={{ padding: "12px 14px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                    {lang === "fr" ? "Chargement…" : "Loading…"}
+                  </td>
+                </tr>
+              ) : monthRows.length === 0 ? (
+                <tr>
+                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                    {monthEmptyMessage}
+                  </td>
+                </tr>
+              ) : (
+                monthRows.map((row, index) => {
+                  const displayName = row.full_name || row.handle || "—";
+                  const handle = row.handle ? row.handle.replace(/^@/, "") : "";
+                  return (
+                    <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                      <td style={{ padding: "14px" }}>
+                        <CampaignCreatorRankBadge rank={index + 1} />
+                      </td>
+                      <td style={{ padding: "14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <CreatorAvatar
+                            src={row.avatar_url}
+                            username={row.handle}
+                            displayName={row.full_name}
+                            size={36}
+                            alt={displayName}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {displayName}
+                            </div>
+                            {handle && handle !== row.full_name ? (
+                              <div style={{ fontSize: 12, color: "#0047FF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                @{handle}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
+                      <td style={{ padding: "14px" }}>
+                        <div style={{ fontWeight: 500, color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</div>
+                        {row.salesCount > 0 ? (
+                          <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 2 }}>
+                            {row.salesCount}{" "}
+                            {lang === "fr" ? (row.salesCount > 1 ? "ventes" : "vente") : row.salesCount > 1 ? "sales" : "sale"}
+                          </div>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+                      <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCampaignRoi(row.roi)}</td>
+                      <td style={{ padding: "14px" }}>
+                        <CampaignCreatorStatusBadge lang={lang} active={row.salesAmount > 0} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      </div>
+
+      <Card title={lang === "fr" ? "Performance par créateur" : "Performance by creator"}>
+        <Table headers={headers}>
+          {loading ? (
+            <tr>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                {lang === "fr" ? "Chargement…" : "Loading…"}
+              </td>
+            </tr>
+          ) : rows.length === 0 ? (
+            <tr>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            rows.map((row) => (
+                <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                  <td style={{ padding: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <CreatorAvatar
+                    src={row.avatar_url}
+                    username={row.handle}
+                    displayName={row.full_name}
+                    size={32}
+                    alt={row.full_name || row.handle}
+                  />
+                      <div>
+                        <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                        {row.handle && row.handle !== row.full_name ? (
+                          <div style={{ fontSize: 12, color: "#9A9A9A" }}>@{row.handle.replace(/^@/, "")}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
+                  <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
+                  <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+                  <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCampaignRoi(row.roi)}</td>
+                </tr>
+            ))
+          )}
+        </Table>
+      </Card>
+    </>
   );
 }
 
@@ -1809,6 +4033,21 @@ function PayoutsTab({
 
         if (cancelled) return;
 
+        const enrichedCreators = await enrichCreatorsWithSavedAvatarsClient(
+          supabase,
+          resolvedUserId,
+          (creatorResult.data || []) as Array<{
+            id: string;
+            handle: string;
+            full_name?: string;
+            avatar_url?: string;
+            balance?: number;
+            paypal_link?: string;
+            revolut_link?: string;
+            iban?: string;
+          }>,
+        );
+
         const campaignMeta: Record<string, CampaignSalesMeta> = {};
         for (const row of campaignData) {
           campaignMeta[String(row.id)] = {
@@ -1826,13 +4065,13 @@ function PayoutsTab({
         );
 
         const creatorMap = new Map(
-          (creatorResult.data || []).map((c) => [
+          enrichedCreators.map((c) => [
             String(c.id),
             c as {
               id: string;
               handle: string;
               full_name?: string;
-              avatar_url?: string;
+              avatar_url?: string | null;
               balance?: number;
               paypal_link?: string;
               revolut_link?: string;
@@ -1847,7 +4086,7 @@ function PayoutsTab({
             id,
             handle: c?.handle ?? "—",
             full_name: c?.full_name,
-            avatar_url: c?.avatar_url,
+            avatar_url: c?.avatar_url ?? undefined,
             balance: Number(c?.balance) || 0,
             campaignCommission: stats[id]?.commission ?? 0,
             paypal_link: c?.paypal_link,
@@ -1906,7 +4145,7 @@ function PayoutsTab({
             creatorId,
             creatorName: fromCampaign?.full_name || fromCampaign?.handle || "—",
             creatorHandle: fromCampaign?.handle || "",
-            avatar_url: fromCampaign?.avatar_url,
+            avatar_url: fromCampaign?.avatar_url ?? undefined,
             amount: Number(p.amount) || 0,
             status: String(p.status ?? "paid"),
             dueDate,
@@ -2008,7 +4247,7 @@ function PayoutsTab({
       });
       const data = await res.json();
       if (data.ok) {
-        notifyCreatorPaid(lang, name, amount);
+        notifyCreatorPaid(lang, name, amount, resolvedUserId);
         setRows((prev) => {
           const withoutPending = prev.filter((row) => row.creatorId !== creatorId || row.kind !== "pending");
           const paidRow = prev.find((row) => row.creatorId === creatorId && row.kind === "pending");
@@ -2085,7 +4324,13 @@ function PayoutsTab({
           <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <CreatorAvatar src={row.avatar_url} size={32} alt={row.creatorName} />
+                    <CreatorAvatar
+                      src={row.avatar_url}
+                      username={row.creatorHandle}
+                      displayName={row.creatorName}
+                      size={32}
+                      alt={row.creatorName}
+                    />
                     <div>
                       <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.creatorName}</span>
                       {row.creatorHandle && row.creatorHandle !== row.creatorName ? (
@@ -2152,7 +4397,7 @@ function PayoutsTab({
               <button type="button" onClick={() => setConfirmPay(null)} style={{ ...btnSecondary, flex: 1 }}>
                 {lang === "fr" ? "Annuler" : "Cancel"}
               </button>
-              <button type="button" onClick={() => void confirmManualPayout()} style={{ ...btnPrimary, flex: 1 }}>
+              <button type="button" onClick={() => { primeNotificationSound(); void confirmManualPayout(); }} style={{ ...btnPrimary, flex: 1 }}>
                 {lang === "fr" ? "Confirmer" : "Confirm"}
               </button>
             </div>
@@ -2163,12 +4408,29 @@ function PayoutsTab({
   );
 }
 
-function SettingsTab({ lang, campaign, onUpdate, onDelete }: { lang: "en" | "fr"; campaign: Campaign; onUpdate: (c: Campaign) => void; onDelete: () => void }) {
+function SettingsTab({
+  lang,
+  campaign,
+  onUpdate,
+  onDelete,
+  onEdit,
+  onStatusChange,
+}: {
+  lang: "en" | "fr";
+  campaign: Campaign;
+  onUpdate: (c: Campaign) => void;
+  onDelete: () => void;
+  onEdit: (id: string) => void;
+  onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
+}) {
   const [autoPayout, setAutoPayout] = useState(true);
   const [trackClicks, setTrackClicks] = useState(true);
 
   return (
     <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
+        <CampaignDetailActions lang={lang} campaign={campaign} onEdit={onEdit} onStatusChange={onStatusChange} />
+      </div>
       <Card title={lang === "fr" ? "Détails de la campagne" : "Campaign details"}>
         <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
           <input type="text" defaultValue={campaign.name} style={inputStyle} onBlur={(e) => onUpdate({ ...campaign, name: e.target.value })} />
@@ -2200,12 +4462,6 @@ function SettingsTab({ lang, campaign, onUpdate, onDelete }: { lang: "en" | "fr"
   );
 }
 
-const NEW_CAMPAIGN_STEPS = [
-  { en: "Basics", fr: "Informations" },
-  { en: "Add creators", fr: "Ajouter des créateurs" },
-  { en: "Review & launch", fr: "Vérifier et lancer" },
-] as const;
-
 type AddedCampaignCreator = {
   key: string;
   creatorId?: string;
@@ -2225,14 +4481,563 @@ function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | 
   return `${clampRate(entry.commissionRate)}%`;
 }
 
-function NewCampaignModal({
+function InfoHint({ title }: { title: string }) {
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid #D1D5DB", color: "#9A9A9A", fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0 }}>
+      i
+    </span>
+  );
+}
+
+function normalizeHandle(raw: string): string {
+  return raw.trim().replace(/^@/, "").toLowerCase();
+}
+
+function parseHandlesFromText(text: string): string[] {
+  const tokens = text.split(/[\n,;\t]+/).map((t) => normalizeHandle(t)).filter(Boolean);
+  return [...new Set(tokens)];
+}
+
+function parseHandlesFromCsv(text: string): string[] {
+  const lines = text.split(/\r?\n/).filter((line) => line.trim());
+  const handles: string[] = [];
+  for (const line of lines) {
+    const first = line.split(/[,;\t]/)[0]?.trim() ?? "";
+    if (!first || /^username$/i.test(first) || /^handle$/i.test(first)) continue;
+    handles.push(normalizeHandle(first));
+  }
+  return [...new Set(handles.filter(Boolean))];
+}
+
+function buildCampaignDescription(
+  hashtags: string,
+  flags: { flagMissingTags: boolean; flagMissingDisclosure: boolean; trackAllCreatorContent: boolean },
+): string {
+  return JSON.stringify({ version: 1, hashtags, ...flags });
+}
+
+function parseCampaignDescription(description?: string): {
+  hashtags: string;
+  flagMissingTags: boolean;
+  flagMissingDisclosure: boolean;
+  trackAllCreatorContent: boolean;
+} {
+  const defaults = {
+    hashtags: "",
+    flagMissingTags: false,
+    flagMissingDisclosure: false,
+    trackAllCreatorContent: true,
+  };
+  if (!description?.trim()) return defaults;
+  try {
+    const parsed = JSON.parse(description) as Partial<typeof defaults & { version?: number }>;
+    if (parsed && typeof parsed === "object" && "hashtags" in parsed) {
+      return {
+        hashtags: typeof parsed.hashtags === "string" ? parsed.hashtags : "",
+        flagMissingTags: Boolean(parsed.flagMissingTags),
+        flagMissingDisclosure: Boolean(parsed.flagMissingDisclosure),
+        trackAllCreatorContent: parsed.trackAllCreatorContent !== false,
+      };
+    }
+  } catch {
+    return { ...defaults, hashtags: description };
+  }
+  return defaults;
+}
+
+function creatorEntryFromSaved(creator: SavedCreatorOption): AddedCampaignCreator {
+  const handleKey = normalizeHandle(creator.handle);
+  return {
+    key: creator.id || `findit-${handleKey}`,
+    creatorId: creator.id || undefined,
+    handle: creator.handle,
+    displayName: creator.full_name,
+    avatar_url: creator.avatar_url,
+    platform: creator.platform,
+    commissionType: "percent",
+    commissionRate: String(creator.commission_rate ?? 10),
+    discountCode: creator.discount_code,
+  };
+}
+
+function creatorEntryFromDbRow(row: {
+  id: string;
+  handle: string;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  platform?: string | null;
+  commission_rate?: number | null;
+  discount_code?: string | null;
+}): AddedCampaignCreator {
+  return {
+    key: String(row.id),
+    creatorId: String(row.id),
+    handle: row.handle,
+    displayName: row.full_name ?? undefined,
+    avatar_url: row.avatar_url ?? undefined,
+    platform: row.platform ?? undefined,
+    commissionType: "percent",
+    commissionRate: String(row.commission_rate ?? 10),
+    discountCode: row.discount_code ?? undefined,
+  };
+}
+
+function avatarFromSavedRow(row: SavedRow): string | undefined {
+  const url = avatarFromDiscoverySavedRow({
+    avatar_url: row.avatar_url,
+    snapshot: row.snapshot,
+  });
+  return url || undefined;
+}
+
+function mergeFindItCreators(savedRows: SavedRow[], dbCreators: SavedCreatorOption[]): SavedCreatorOption[] {
+  const dbByHandle = new Map(dbCreators.map((c) => [normalizeHandle(c.handle), c]));
+  const merged = new Map<string, SavedCreatorOption>();
+
+  for (const row of savedRows) {
+    const handle = row.creator_username;
+    const key = normalizeHandle(handle);
+    const db = dbByHandle.get(key);
+    const avatar = avatarFromSavedRow(row) || db?.avatar_url;
+    merged.set(key, {
+      id: db?.id ?? "",
+      handle,
+      full_name: row.display_name || db?.full_name,
+      avatar_url: avatar,
+      platform: row.platform || db?.platform,
+      commission_rate: db?.commission_rate ?? 10,
+      discount_code: db?.discount_code,
+    });
+  }
+
+  return Array.from(merged.values());
+}
+
+async function ensureCreatorIdForFindItRow(row: SavedRow): Promise<string | null> {
+  const created = await saveCreator("", {
+    username: row.creator_username,
+    display_name: row.display_name,
+    avatar_url: avatarFromSavedRow(row) || row.avatar_url,
+    platform: row.platform ?? "tiktok",
+    followers_count: row.followers,
+    engagement_rate: row.engagement_rate,
+    avg_views: 0,
+    bio: "",
+    niche: row.primary_niche ?? "",
+  });
+  return created?.id ? String(created.id) : null;
+}
+
+const onboardingFieldInput: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "14px 16px",
+  borderRadius: 10,
+  border: "1px solid #D1D5DB",
+  fontSize: 15,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  letterSpacing: "-0.02em",
+  background: "#FFF",
+  outline: "none",
+};
+
+const onboardingTextarea: React.CSSProperties = {
+  ...onboardingFieldInput,
+  minHeight: 160,
+  resize: "vertical",
+  lineHeight: 1.5,
+};
+
+const onboardingPrimaryBtn: React.CSSProperties = {
+  ...btnPrimary,
+  padding: "12px 20px",
+  fontSize: 15,
+  borderRadius: 10,
+};
+
+const onboardingSecondaryBtn: React.CSSProperties = {
+  ...btnSecondary,
+  padding: "12px 20px",
+  fontSize: 15,
+  borderRadius: 10,
+};
+
+function AddSaleOnboarding({
   lang,
   userId,
+  campaign,
+  isMobile,
   onClose,
-  onCreate,
+  onSuccess,
 }: {
   lang: "en" | "fr";
   userId?: string;
+  campaign: Campaign;
+  isMobile?: boolean;
+  onClose: () => void;
+  onSuccess?: (saleDate?: string) => void | Promise<void>;
+}) {
+  const [creators, setCreators] = useState<
+    { id: string; handle: string; full_name?: string; avatar_url?: string }[]
+  >([]);
+  const [commissionByCreatorId, setCommissionByCreatorId] = useState<Record<string, number>>({});
+  const [loadingCreators, setLoadingCreators] = useState(true);
+  const [creatorId, setCreatorId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"error" | "success">("error");
+  const { navigate } = useDashboardNavigation();
+
+  const amountCurrency = lang === "fr" ? "EUR" : "USD";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      setLoadingCreators(true);
+      if (!supabase) {
+        if (!cancelled) setLoadingCreators(false);
+        return;
+      }
+
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (!cancelled) setLoadingCreators(false);
+          return;
+        }
+        resolvedUserId = user.id;
+      }
+
+      const creatorIds = campaign.creatorIds ?? [];
+      if (creatorIds.length === 0) {
+        if (!cancelled) {
+          setCreators([]);
+          setLoadingCreators(false);
+        }
+        return;
+      }
+
+      const { data } = await supabase
+        .from("creators")
+        .select("id, handle, full_name, avatar_url")
+        .eq("user_id", resolvedUserId)
+        .in("id", creatorIds);
+
+      if (cancelled) return;
+
+      const rows = (data || []) as { id: string; handle: string; full_name?: string; avatar_url?: string }[];
+
+      const { data: savedRows } = await supabase
+        .from("discovery_saved")
+        .select("creator_username, avatar_url, snapshot")
+        .eq("user_id", resolvedUserId);
+
+      const avatarByHandle = buildAvatarByHandleFromSavedRows(savedRows ?? []);
+      const enrichedRows = enrichCreatorsWithAvatars(rows, avatarByHandle);
+
+      const commissionByHandle = new Map<string, number>();
+      for (const row of savedRows || []) {
+        const rate = commissionRateFromDiscoverySnapshot(
+          (row as { snapshot?: unknown }).snapshot
+        );
+        if (rate != null) {
+          commissionByHandle.set(
+            normalizeCreatorHandle(String((row as { creator_username?: string }).creator_username || "")),
+            rate
+          );
+        }
+      }
+
+      const commissionMap: Record<string, number> = {};
+      for (const creator of enrichedRows) {
+        const rate = commissionByHandle.get(normalizeCreatorHandle(creator.handle || ""));
+        if (rate != null) commissionMap[creator.id] = rate;
+      }
+
+      setCreators(enrichedRows);
+      setCommissionByCreatorId(commissionMap);
+      if (rows[0]?.id) setCreatorId(enrichedRows[0]?.id ?? rows[0].id);
+      setLoadingCreators(false);
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.creatorIds, campaign.id, userId]);
+
+  const submit = async () => {
+    if (!creatorId || !amount || submitting) return;
+    primeNotificationSound();
+    setSubmitting(true);
+    setMessage("");
+
+    try {
+      let resolvedUserId = userId;
+      if (!resolvedUserId && supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      }
+      if (!resolvedUserId) {
+        setMessageTone("error");
+        setMessage(lang === "fr" ? "Session expirée." : "Session expired.");
+        setSubmitting(false);
+        return;
+      }
+
+      const res = await fetch("/api/sales/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: resolvedUserId,
+          creatorId,
+          amount,
+          date: saleDate || undefined,
+          campaignId: campaign.id,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        errorFr?: string;
+        code?: string;
+        commissionAmount?: number;
+      };
+
+      if (data.ok) {
+        const selectedCreator = creators.find((c) => c.id === creatorId);
+        const creatorName =
+          selectedCreator?.full_name?.trim() ||
+          selectedCreator?.handle?.trim() ||
+          (lang === "fr" ? "un créateur" : "a creator");
+        const orderTotal = Number.parseFloat(amount) || 0;
+        notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, resolvedUserId);
+        setMessageTone("success");
+        setMessage(
+          lang === "fr"
+            ? `Vente ajoutée — ${formatCurrencyWithCode(data.commissionAmount ?? 0, amountCurrency)} de commission créditée`
+            : `Sale added — ${formatCurrencyWithCode(data.commissionAmount ?? 0, amountCurrency)} commission credited`,
+        );
+        await onSuccess?.(saleDate || undefined);
+        setTimeout(() => onClose(), 900);
+        return;
+      }
+
+      setMessageTone("error");
+      setMessage(
+        data.code === COMMISSION_NOT_CONFIGURED_CODE
+          ? commissionNotConfiguredMessage(lang)
+          : (lang === "fr" ? data.errorFr : undefined) || data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale")
+      );
+    } catch {
+      setMessageTone("error");
+      setMessage(lang === "fr" ? "Erreur réseau" : "Network error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const contentMax = 720;
+  const selectedCommission = creatorId ? commissionByCreatorId[creatorId] : undefined;
+  const hasSelectedCommission = selectedCommission != null;
+  const canSubmit = Boolean(creatorId && amount && !submitting && hasSelectedCommission);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
+      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
+        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+          {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
+        </h1>
+        <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 32px", lineHeight: 1.5 }}>
+          {lang === "fr"
+            ? `Enregistrez une vente pour la campagne « ${campaign.name} ». La commission est calculée automatiquement.`
+            : `Record a sale for "${campaign.name}". Commission is calculated automatically.`}
+        </p>
+
+        {loadingCreators ? (
+          <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
+        ) : creators.length === 0 ? (
+          <div style={{ marginBottom: 28 }}>
+            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5 }}>
+              {lang === "fr"
+                ? "Ajoutez d'abord des créateurs à cette campagne avant d'enregistrer une vente."
+                : "Add creators to this campaign before recording a sale."}
+            </p>
+            <button type="button" style={onboardingSecondaryBtn} onClick={onClose}>
+              {lang === "fr" ? "Retour à la campagne" : "Back to campaign"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+                {lang === "fr" ? "Créateur" : "Creator"}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {creators.map((creator) => {
+                  const selected = creatorId === creator.id;
+                  const commission = commissionByCreatorId[creator.id];
+                  return (
+                    <button
+                      key={creator.id}
+                      type="button"
+                      onClick={() => setCreatorId(creator.id)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "12px 14px",
+                        borderRadius: 10,
+                        ...selectionCardStyle(selected),
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      <CreatorAvatar
+                        src={creator.avatar_url}
+                        username={creator.handle}
+                        displayName={creator.full_name}
+                        size={36}
+                        alt={creator.full_name || creator.handle}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: selectionTextPrimary(selected) }}>
+                          {creator.full_name || creator.handle || "—"}
+                        </div>
+                        {creator.handle ? (
+                          <div style={{ fontSize: 13, color: selectionTextSecondary(selected) }}>@{creator.handle.replace(/^@/, "")}</div>
+                        ) : null}
+                      </div>
+                      {commission != null ? (
+                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#15803D", whiteSpace: "nowrap" }}>
+                          {commission}%
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 12, color: selectionAccentText(selected), whiteSpace: "nowrap" }}>
+                          {lang === "fr" ? "Commission manquante" : "No commission"}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {creatorId && !hasSelectedCommission ? (
+              <div
+                style={{
+                  marginBottom: 24,
+                  padding: "14px 16px",
+                  borderRadius: 10,
+                  border: "1px solid #EFEFEF",
+                  background: "#FFFFFF",
+                }}
+              >
+                <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5 }}>
+                  {commissionNotConfiguredMessage(lang)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => navigate({ view: "creators" })}
+                  style={{
+                    border: "none",
+                    background: "#0047FF",
+                    color: "#FFFFFF",
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  {lang === "fr" ? "Ouvrir Find it → Gérer" : "Open Find it → Manage"}
+                </button>
+              </div>
+            ) : null}
+
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+                {lang === "fr" ? `Montant de la commande (${amountCurrency})` : `Order amount (${amountCurrency})`}
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={lang === "fr" ? "149,90" : "149.90"}
+                style={onboardingFieldInput}
+              />
+            </div>
+
+            <div style={{ marginBottom: 32 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+                {lang === "fr" ? "Date de la vente" : "Sale date"}
+              </div>
+              <input
+                type="date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+                style={dateInputStyle}
+              />
+            </div>
+
+            {message ? (
+              <p
+                style={{
+                  fontSize: 14,
+                  color: messageTone === "success" ? "#15803D" : "#C0392B",
+                  margin: "0 0 20px",
+                }}
+              >
+                {message}
+              </p>
+            ) : null}
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button type="button" style={onboardingPrimaryBtn} disabled={!canSubmit} onClick={() => void submit()}>
+                {submitting ? (lang === "fr" ? "Ajout…" : "Adding…") : lang === "fr" ? "Ajouter la vente" : "Add sale"}
+              </button>
+              <button type="button" style={onboardingSecondaryBtn} onClick={onClose} disabled={submitting}>
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NewCampaignOnboarding({
+  lang,
+  userId,
+  plan,
+  isMobile,
+  mode = "create",
+  existingCampaign,
+  onClose,
+  onCreate,
+  onAddCreators,
+  onUpdate,
+  onSaveDraft,
+  onLaunchDraft,
+}: {
+  lang: "en" | "fr";
+  userId?: string;
+  plan: PlanTier;
+  isMobile?: boolean;
+  mode?: "create" | "addCreators" | "edit";
+  existingCampaign?: Campaign;
   onClose: () => void;
   onCreate: (campaignData: {
     name: string;
@@ -2246,21 +5051,184 @@ function NewCampaignModal({
     creatorIds: string[];
     creatorCommissions: { creatorId: string; commission_rate: number }[];
   }) => void | Promise<void>;
+  onAddCreators?: (data: {
+    creatorIds: string[];
+    creatorCommissions: { creatorId: string; commission_rate: number }[];
+  }) => void | Promise<void>;
+  onUpdate?: (campaignData: {
+    name: string;
+    description?: string;
+    platform: string;
+    startDate?: string;
+    endDate?: string;
+    commissionType: string;
+    commissionRate: number;
+    autoPayout: boolean;
+    creatorIds: string[];
+    creatorCommissions: { creatorId: string; commission_rate: number }[];
+  }) => void | Promise<void>;
+  onSaveDraft?: (campaignData: {
+    name: string;
+    description?: string;
+    platform: string;
+    startDate?: string;
+    endDate?: string;
+    commissionType: string;
+    commissionRate: number;
+    autoPayout: boolean;
+    creatorIds: string[];
+    creatorCommissions: { creatorId: string; commission_rate: number }[];
+  }, draftId?: string) => Promise<string | null>;
+  onLaunchDraft?: (draftId: string, campaignData: {
+    name: string;
+    description?: string;
+    platform: string;
+    startDate?: string;
+    endDate?: string;
+    commissionType: string;
+    commissionRate: number;
+    autoPayout: boolean;
+    creatorIds: string[];
+    creatorCommissions: { creatorId: string; commission_rate: number }[];
+  }) => void | Promise<void>;
 }) {
-  const [step, setStep] = useState(0);
+  const isAddCreatorsMode = mode === "addCreators";
+  const isEditMode = mode === "edit";
+  const isDraftMode = isEditMode && existingCampaign?.status === "Draft";
+  const isCreateMode = mode === "create";
+  const [step, setStep] = useState<0 | 1>(() => {
+    if (isAddCreatorsMode) return 1;
+    if (mode === "edit" && existingCampaign?.status === "Draft" && (existingCampaign.creatorIds?.length ?? 0) > 0) {
+      return 1;
+    }
+    return 0;
+  });
   const [launching, setLaunching] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftId, setDraftId] = useState<string | undefined>(
+    isDraftMode ? existingCampaign?.id : undefined,
+  );
   const [name, setName] = useState("");
-  const [platform, setPlatform] = useState("TikTok");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
-  const [description, setDescription] = useState("");
+  const [hashtags, setHashtags] = useState("");
+  const [flagMissingTags, setFlagMissingTags] = useState(false);
+  const [flagMissingDisclosure, setFlagMissingDisclosure] = useState(false);
+  const [trackAllCreatorContent, setTrackAllCreatorContent] = useState(true);
+  const [start, setStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [addedCreators, setAddedCreators] = useState<AddedCampaignCreator[]>([]);
   const [savedCreators, setSavedCreators] = useState<SavedCreatorOption[]>([]);
+  const [findItRows, setFindItRows] = useState<SavedRow[]>([]);
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [folderItems, setFolderItems] = useState<FolderItem[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
-  const [pickerId, setPickerId] = useState("");
-  const [manualHandle, setManualHandle] = useState("");
-  const [manualCommissionType, setManualCommissionType] = useState<"percent" | "flat">("percent");
-  const [manualCommissionRate, setManualCommissionRate] = useState("10");
+  const [selectedListIds, setSelectedListIds] = useState<string[]>([]);
+  const [listsOpen, setListsOpen] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [manualSearchNotFound, setManualSearchNotFound] = useState(false);
+  const csvRef = useRef<HTMLInputElement>(null);
+  const listsRef = useRef<HTMLDivElement>(null);
+  const initialCampaignCreatorIdsRef = useRef<Set<string>>(new Set());
+  const hasPreloadedCampaignCreatorsRef = useRef(false);
+  const hasPrefilledCampaignRef = useRef(false);
+
+  const maxCreators = getMaxManagedCreators(plan);
+  const remainingSlots =
+    maxCreators != null ? Math.max(0, maxCreators - addedCreators.length) : null;
+
+  const creatorStepSubtitle = useMemo(() => {
+    if (loadingCreators) {
+      return lang === "fr" ? "Chargement de vos créateurs…" : "Loading your creators…";
+    }
+    if (findItRows.length === 0) {
+      return lang === "fr"
+        ? "Aucun créateur sauvegardé. Ajoutez-en depuis Find it avant de lancer une campagne."
+        : "No saved creators yet. Add some from Find it before launching a campaign.";
+    }
+    if (maxCreators == null) {
+      return lang === "fr"
+        ? "Sélectionnez des créateurs parmi ceux sauvegardés dans Find it."
+        : "Select creators from those you saved in Find it.";
+    }
+    const selected = addedCreators.length;
+    const remaining = remainingSlots ?? 0;
+    return lang === "fr"
+      ? `${selected} sélectionné${selected > 1 ? "s" : ""} · jusqu'à ${maxCreators} par campagne${remaining > 0 ? ` (${remaining} restant${remaining > 1 ? "s" : ""})` : ""}`
+      : `${selected} selected · up to ${maxCreators} per campaign${remaining > 0 ? ` (${remaining} remaining)` : ""}`;
+  }, [loadingCreators, findItRows.length, maxCreators, addedCreators.length, remainingSlots, lang, isAddCreatorsMode, existingCampaign?.creatorIds?.length]);
+
+  useEffect(() => {
+    if ((!isAddCreatorsMode && !isEditMode) || !existingCampaign) return;
+    initialCampaignCreatorIdsRef.current = new Set((existingCampaign.creatorIds ?? []).map(String));
+  }, [isAddCreatorsMode, isEditMode, existingCampaign]);
+
+  useEffect(() => {
+    if (!isEditMode || !existingCampaign || hasPrefilledCampaignRef.current) return;
+    const parsed = parseCampaignDescription(existingCampaign.description);
+    setName(existingCampaign.name);
+    setHashtags(parsed.hashtags);
+    setFlagMissingTags(parsed.flagMissingTags);
+    setFlagMissingDisclosure(parsed.flagMissingDisclosure);
+    setTrackAllCreatorContent(parsed.trackAllCreatorContent);
+    const startValue = toDateInputValue(existingCampaign.startRaw ?? existingCampaign.start);
+    if (startValue) setStart(startValue);
+    hasPrefilledCampaignRef.current = true;
+  }, [isEditMode, existingCampaign]);
+
+  useEffect(() => {
+    if ((!isAddCreatorsMode && !isEditMode) || !existingCampaign || loadingCreators || hasPreloadedCampaignCreatorsRef.current) return;
+
+    const creatorIds = (existingCampaign.creatorIds ?? []).map(String);
+    if (creatorIds.length === 0) {
+      hasPreloadedCampaignCreatorsRef.current = true;
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadExistingCampaignCreators = async () => {
+      if (!supabase) return;
+
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      }
+      if (!resolvedUserId) return;
+
+      const { data } = await supabase
+        .from("creators")
+        .select("id, handle, full_name, avatar_url, platform, commission_rate, discount_code")
+        .eq("user_id", resolvedUserId)
+        .in("id", creatorIds);
+
+      if (cancelled) return;
+
+      const byId = new Map(
+        (data || []).map((row) => {
+          const creator = row as {
+            id: string;
+            handle: string;
+            full_name?: string | null;
+            avatar_url?: string | null;
+            platform?: string | null;
+            commission_rate?: number | null;
+            discount_code?: string | null;
+          };
+          return [String(creator.id), creatorEntryFromDbRow(creator)] as const;
+        }),
+      );
+      const ordered = creatorIds
+        .map((id) => byId.get(id))
+        .filter((entry): entry is AddedCampaignCreator => Boolean(entry));
+
+      setAddedCreators(ordered);
+      hasPreloadedCampaignCreatorsRef.current = true;
+    };
+
+    void loadExistingCampaignCreators();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAddCreatorsMode, isEditMode, existingCampaign?.id, existingCampaign?.creatorIds, loadingCreators, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2279,9 +5247,17 @@ function NewCampaignModal({
         if (!cancelled) setLoadingCreators(false);
         return;
       }
-      const data = await getSavedCreators(resolvedUserId);
+      const [data, savedRows, folderData] = await Promise.all([
+        getSavedCreators(resolvedUserId),
+        listSaved(),
+        listFolders(),
+      ]);
       if (!cancelled) {
-        setSavedCreators(data.map((row) => mapSavedCreator(row as Record<string, unknown>)));
+        const dbCreators = data.map((row) => mapSavedCreator(row as Record<string, unknown>));
+        setSavedCreators(dbCreators);
+        setFindItRows(savedRows);
+        setFolders(folderData.folders);
+        setFolderItems(folderData.items);
         setLoadingCreators(false);
       }
     };
@@ -2291,647 +5267,692 @@ function NewCampaignModal({
     };
   }, [userId]);
 
-  const savedById = useMemo(
-    () => new Map(savedCreators.map((creator) => [creator.id, creator])),
-    [savedCreators],
+  useEffect(() => {
+    if (!listsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (listsRef.current && !listsRef.current.contains(e.target as Node)) setListsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [listsOpen]);
+
+  const findItCreators = useMemo(
+    () => mergeFindItCreators(findItRows, savedCreators),
+    [findItRows, savedCreators],
   );
 
-  const availableSavedCreators = savedCreators.filter(
-    (creator) => !addedCreators.some((entry) => entry.creatorId === creator.id),
-  );
+  const findItRowByHandle = useMemo(() => {
+    const map = new Map<string, SavedRow>();
+    for (const row of findItRows) map.set(normalizeHandle(row.creator_username), row);
+    return map;
+  }, [findItRows]);
 
-  const addSavedCreator = () => {
-    if (!pickerId) return;
-    const creator = savedById.get(pickerId);
-    if (!creator || addedCreators.some((entry) => entry.creatorId === creator.id)) return;
-    setAddedCreators((list) => [
-      ...list,
+  const savedByHandle = useMemo(() => {
+    const map = new Map<string, SavedCreatorOption>();
+    for (const c of findItCreators) map.set(normalizeHandle(c.handle), c);
+    return map;
+  }, [findItCreators]);
+
+  const listOptions = useMemo(() => {
+    const allUsernames = findItRows.map((row) => normalizeHandle(row.creator_username));
+    const opts: { id: string; label: string; usernames: string[] }[] = [
       {
-        key: creator.id,
-        creatorId: creator.id,
-        handle: creator.handle,
-        displayName: creator.full_name,
-        avatar_url: creator.avatar_url,
-        platform: creator.platform,
-        commissionType: "percent",
-        commissionRate: String(creator.commission_rate ?? 10),
-        discountCode: creator.discount_code,
+        id: "__all__",
+        label: lang === "fr" ? "Tous les créateurs" : "All creators",
+        usernames: allUsernames,
       },
-    ]);
-    setPickerId("");
+      ...folders.map((f) => ({
+        id: f.id,
+        label: f.name,
+        usernames: folderItems
+          .filter((item) => item.folder_id === f.id)
+          .map((item) => normalizeHandle(item.creator_username)),
+      })),
+    ];
+    return opts.filter((o) => o.id === "__all__" || o.usernames.length > 0);
+  }, [folders, folderItems, findItRows, lang]);
+
+  const addHandles = (handles: string[], source: "manual" | "csv" = "manual") => {
+    if (handles.length === 0) {
+      if (source === "manual") setManualSearchNotFound(false);
+      return { added: 0, missing: 0 };
+    }
+
+    let added = 0;
+    let missing = 0;
+
+    setAddedCreators((prev) => {
+      const next = [...prev];
+      const seen = new Set(prev.map((e) => e.creatorId || normalizeHandle(e.handle)));
+      for (const handle of handles) {
+        if (maxCreators != null && next.length >= maxCreators) break;
+        const creator = savedByHandle.get(handle);
+        if (!creator) {
+          missing += 1;
+          continue;
+        }
+        const dedupeKey = creator.id || handle;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        next.push(creatorEntryFromSaved(creator));
+        added += 1;
+      }
+      return next;
+    });
+
+    if (source === "manual") {
+      setManualSearchNotFound(missing > 0);
+      if (added > 0 && missing === 0) setUsernameDraft("");
+    }
+
+    return { added, missing };
   };
 
-  const addManualCreator = () => {
-    const normalized = manualHandle.trim().replace(/^@/, "");
-    if (!normalized) return;
-    const key = `manual-${normalized.toLowerCase()}`;
-    if (addedCreators.some((entry) => entry.key === key)) return;
-    setAddedCreators((list) => [
-      ...list,
-      {
-        key,
-        handle: normalized,
-        commissionType: manualCommissionType,
-        commissionRate: manualCommissionRate,
-      },
-    ]);
-    setManualHandle("");
+  const toggleList = (listId: string) => {
+    setSelectedListIds((prev) => {
+      const next = prev.includes(listId) ? prev.filter((id) => id !== listId) : [...prev, listId];
+      const usernames = new Set<string>();
+      for (const id of next) {
+        const list = listOptions.find((o) => o.id === id);
+        list?.usernames.forEach((u) => usernames.add(u));
+      }
+
+      if (isAddCreatorsMode) {
+        setAddedCreators((prevCreators) => {
+          const merged = new Map<string, AddedCampaignCreator>();
+          for (const entry of prevCreators) {
+            merged.set(entry.creatorId || normalizeHandle(entry.handle), entry);
+          }
+          for (const username of usernames) {
+            const creator = savedByHandle.get(username);
+            if (!creator) continue;
+            const dedupeKey = creator.id || username;
+            if (!merged.has(dedupeKey)) {
+              merged.set(dedupeKey, creatorEntryFromSaved(creator));
+            }
+          }
+          const nextCreators = Array.from(merged.values());
+          return nextCreators.slice(0, maxCreators ?? nextCreators.length);
+        });
+        setManualSearchNotFound(false);
+        return next;
+      }
+
+      const nextCreators: AddedCampaignCreator[] = [];
+      for (const u of usernames) {
+        const creator = savedByHandle.get(u);
+        if (creator) {
+          const dedupeKey = creator.id || u;
+          if (!nextCreators.some((e) => (e.creatorId || normalizeHandle(e.handle)) === dedupeKey)) {
+            nextCreators.push(creatorEntryFromSaved(creator));
+          }
+        }
+      }
+      setAddedCreators(nextCreators.slice(0, maxCreators ?? nextCreators.length));
+      setManualSearchNotFound(false);
+      return next;
+    });
+  };
+
+  const applyUsernames = () => {
+    const handles = parseHandlesFromText(usernameDraft);
+    addHandles(handles, "manual");
+  };
+
+  const onCsvSelected = async (file: File | undefined) => {
+    if (!file) return;
+    const text = await file.text();
+    const result = addHandles(parseHandlesFromCsv(text), "csv");
+    if (result.missing > 0 && result.added === 0) {
+      setManualSearchNotFound(true);
+    } else if (result.added > 0) {
+      setManualSearchNotFound(false);
+    }
+    if (csvRef.current) csvRef.current.value = "";
   };
 
   const removeCreator = (key: string) => {
     setAddedCreators((list) => list.filter((entry) => entry.key !== key));
   };
 
-  const updateCreatorField = (
-    key: string,
-    field: "commissionType" | "commissionRate",
-    value: string,
-  ) => {
-    setAddedCreators((list) =>
-      list.map((entry) => (entry.key === key ? { ...entry, [field]: value } : entry)),
+  const canLaunch =
+    addedCreators.length > 0 &&
+    addedCreators.every(
+      (entry) => entry.creatorId || findItRowByHandle.has(normalizeHandle(entry.handle)),
     );
+
+  const hasDraftContent = () =>
+    name.trim().length > 0 ||
+    hashtags.trim().length > 0 ||
+    addedCreators.length > 0 ||
+    step > 0;
+
+  const resolveCreatorPayload = async () => {
+    const creatorIds: string[] = [];
+    const creatorCommissions: { creatorId: string; commission_rate: number }[] = [];
+
+    for (const entry of addedCreators) {
+      let creatorId = entry.creatorId;
+      if (!creatorId) {
+        const row = findItRowByHandle.get(normalizeHandle(entry.handle));
+        if (!row) continue;
+        creatorId = (await ensureCreatorIdForFindItRow(row)) ?? undefined;
+      }
+      if (!creatorId) continue;
+      creatorIds.push(creatorId);
+      creatorCommissions.push({
+        creatorId,
+        commission_rate: clampRate(entry.commissionRate),
+      });
+    }
+
+    return { creatorIds, creatorCommissions };
+  };
+
+  const buildCampaignPayload = async () => {
+    const { creatorIds, creatorCommissions } = await resolveCreatorPayload();
+    const primaryRate = creatorCommissions.length > 0 ? creatorCommissions[0].commission_rate : 10;
+    return {
+      name: name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),
+      description: buildCampaignDescription(hashtags, { flagMissingTags, flagMissingDisclosure, trackAllCreatorContent }),
+      platform: isEditMode && existingCampaign?.platform ? existingCampaign.platform : "All",
+      startDate: normalizeDate(start),
+      endDate: isEditMode ? existingCampaign?.endRaw ?? normalizeDate(existingCampaign?.end) : undefined,
+      commissionType: isEditMode && existingCampaign?.commissionType ? existingCampaign.commissionType : "percentage",
+      commissionRate: isEditMode && existingCampaign?.commissionRate != null ? existingCampaign.commissionRate : primaryRate,
+      autoPayout: isEditMode ? Boolean(existingCampaign?.autoPayout) : false,
+      creatorIds,
+      creatorCommissions,
+    };
+  };
+
+  const persistDraft = async () => {
+    if (isAddCreatorsMode || !onSaveDraft || !hasDraftContent()) return draftId ?? null;
+    setSavingDraft(true);
+    try {
+      const payload = await buildCampaignPayload();
+      const savedId = await onSaveDraft(payload, draftId ?? existingCampaign?.id);
+      if (savedId) setDraftId(savedId);
+      return savedId;
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleClose = async () => {
+    if ((isCreateMode || isDraftMode) && onSaveDraft && hasDraftContent()) {
+      await persistDraft();
+    }
+    onClose();
   };
 
   const launch = async () => {
-    if (launching) return;
+    if (launching || !canLaunch) return;
     setLaunching(true);
     try {
-      const creatorIds = addedCreators.filter((entry) => entry.creatorId).map((entry) => entry.creatorId!);
-      const creatorCommissions = addedCreators
-        .filter((entry) => entry.creatorId)
-        .map((entry) => ({
-          creatorId: entry.creatorId!,
-          commission_rate: clampRate(entry.commissionRate),
-        }));
-      const primaryRate = addedCreators.length > 0 ? clampRate(addedCreators[0].commissionRate) : 10;
+      const payload = await buildCampaignPayload();
+      if (payload.creatorIds.length === 0) return;
 
-      await onCreate({
-      name: name || "Untitled Campaign",
-      description,
-        platform,
-        startDate: normalizeDate(start),
-        endDate: normalizeDate(end),
-        commissionType: "percentage",
-        commissionRate: primaryRate,
-        autoPayout: false,
-        creatorIds,
-        creatorCommissions,
-      });
+      if (isAddCreatorsMode && onAddCreators) {
+        await onAddCreators({
+          creatorIds: payload.creatorIds,
+          creatorCommissions: payload.creatorCommissions,
+        });
+        return;
+      }
+
+      if (isDraftMode && onLaunchDraft && existingCampaign?.id) {
+        await onLaunchDraft(existingCampaign.id, payload);
+        return;
+      }
+
+      if (isEditMode && onUpdate) {
+        await onUpdate(payload);
+        return;
+      }
+
+      await onCreate(payload);
     } finally {
       setLaunching(false);
     }
   };
 
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={onClose}>
-      <div style={{ background: "#FFF", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ padding: "24px 24px 0", borderBottom: "1px solid #EFEFEF" }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.03em" }}>
-            {lang === "fr" ? "Nouvelle campagne" : "New Campaign"}
-          </h2>
-          <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-            {NEW_CAMPAIGN_STEPS.map((label, i) => (
-              <div
-                key={label.en}
-                style={{
-                  fontSize: 12,
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  background: i === step ? "#0047FF" : i < step ? "#E8EEFC" : "#F5F5F5",
-                  color: i === step ? "#FFF" : i < step ? "#0047FF" : "#9A9A9A",
-                  fontWeight: i === step ? 500 : 400,
-                }}
-              >
-                {i + 1}. {lang === "fr" ? label.fr : label.en}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ padding: 24 }}>
-          {step === 0 && (
-            <>
-              <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={lang === "fr" ? "Nom de la campagne" : "Campaign name"} style={inputStyle} />
-              </Field>
-              <Field label={lang === "fr" ? "Plateforme" : "Platform"}>
-                <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
-                  {["TikTok", "Instagram", "YouTube", "TikTok + Instagram", "All"].map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </Field>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Field label={lang === "fr" ? "Date de début" : "Start date"}>
-                  <input
-                    type="date"
-                    value={start}
-                    onChange={(e) => setStart(e.target.value)}
-                    style={dateInputStyle}
-                  />
-                </Field>
-                <Field label={lang === "fr" ? "Date de fin" : "End date"}>
-                  <input
-                    type="date"
-                    value={end}
-                    min={start || undefined}
-                    onChange={(e) => setEnd(e.target.value)}
-                    style={dateInputStyle}
-                  />
-                </Field>
-              </div>
-              <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} placeholder={lang === "fr" ? "Objectifs et notes…" : "Campaign goals and notes..."} />
-              </Field>
-            </>
-          )}
-
-          {step === 1 && (
-            <>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px", lineHeight: 1.45 }}>
-                {lang === "fr"
-                  ? "Ajoutez des créateurs sauvegardés ou saisissez un pseudo. La commission est préremplie depuis le profil du créateur, modifiable pour chacun."
-                  : "Add saved creators or enter a handle manually. Commission is prefilled from each creator’s profile and can be edited per person."}
-              </p>
-
-              <Field label={lang === "fr" ? "Créateurs sauvegardés" : "Saved creators"}>
-                {loadingCreators ? (
-                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
-                ) : savedCreators.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-                    {lang === "fr" ? "Aucun créateur sauvegardé." : "No saved creators yet."}
-                  </p>
-                ) : availableSavedCreators.length === 0 ? (
-                  <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-                    {lang === "fr" ? "Tous vos créateurs sauvegardés sont déjà ajoutés." : "All saved creators are already added."}
-                  </p>
-                ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <select value={pickerId} onChange={(e) => setPickerId(e.target.value)} style={{ ...inputStyle, flex: 1 }}>
-                      <option value="">{lang === "fr" ? "Choisir un créateur…" : "Select a creator…"}</option>
-                      {availableSavedCreators.map((creator) => (
-                        <option key={creator.id} value={creator.id}>
-                          {(creator.full_name || creator.handle) + ` (@${creator.handle.replace(/^@/, "")})`}
-                        </option>
-                      ))}
-                    </select>
-                    <button type="button" style={{ ...btnPrimary, flexShrink: 0 }} onClick={addSavedCreator} disabled={!pickerId}>
-                      {lang === "fr" ? "Ajouter" : "Add"}
-                    </button>
-                  </div>
-                )}
-              </Field>
-
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", margin: "20px 0 12px" }}>
-                {lang === "fr" ? "Ou ajouter manuellement" : "Or add manually"}
-              </div>
-
-              <Field label={lang === "fr" ? "Pseudo" : "Handle"}>
-                <input
-                  type="text"
-                  value={manualHandle}
-                  onChange={(e) => setManualHandle(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addManualCreator())}
-                  placeholder="@creator"
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label={lang === "fr" ? "Type de commission" : "Commission type"}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {(["percent", "flat"] as const).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setManualCommissionType(t)}
-                      style={{
-                        flex: 1,
-                        padding: "10px 12px",
-                        borderRadius: 10,
-                        border: manualCommissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
-                        background: manualCommissionType === t ? "#E8EEFC" : "#FFF",
-                        fontSize: 13,
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                        color: "#1A1A1A",
-                      }}
-                    >
-                      {t === "percent"
-                        ? lang === "fr" ? "% de vente" : "% of sale"
-                        : lang === "fr" ? "Montant fixe" : "Flat per sale"}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              <Field label={manualCommissionType === "percent" ? (lang === "fr" ? "Taux (%)" : "Rate (%)") : lang === "fr" ? "Montant fixe" : "Flat amount"}>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <input
-                    type="text"
-                    value={manualCommissionRate}
-                    onChange={(e) => setManualCommissionRate(e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
-                  />
-                  <button type="button" style={btnPrimary} onClick={addManualCreator} disabled={!manualHandle.trim()}>
-                    {lang === "fr" ? "Ajouter" : "Add"}
-                  </button>
-                </div>
-              </Field>
-
-              {addedCreators.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
-                  {addedCreators.map((entry) => {
-                    const label = entry.displayName || entry.handle;
-                    const handleLabel = `@${entry.handle.replace(/^@/, "")}`;
-                    return (
-                      <div
-                        key={entry.key}
-                        style={{
-                          padding: "12px",
-                          background: "#FAFAFA",
-                          borderRadius: 12,
-                          border: "1px solid #EFEFEF",
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                          <CreatorAvatar src={entry.avatar_url} size={36} alt={label} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{label}</div>
-                            <div style={{ fontSize: 12, color: "#7A7A7A", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                              <span>{handleLabel}</span>
-                              {entry.discountCode ? (
-                                <span style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#E8EEFC", borderRadius: 6, padding: "1px 6px", letterSpacing: "0.02em" }}>{entry.discountCode}</span>
-                              ) : null}
-                    </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeCreator(entry.key)}
-                            style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}
-                          >
-                            {lang === "fr" ? "Retirer" : "Remove"}
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <div style={{ display: "flex", gap: 6, flex: 1 }}>
-                            {(["percent", "flat"] as const).map((t) => (
-                              <button
-                                key={t}
-                                type="button"
-                                onClick={() => updateCreatorField(entry.key, "commissionType", t)}
-                                style={{
-                                  flex: 1,
-                                  padding: "8px 10px",
-                                  borderRadius: 8,
-                                  border: entry.commissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
-                                  background: entry.commissionType === t ? "#E8EEFC" : "#FFF",
-                                  fontSize: 12,
-                                  fontFamily: "inherit",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {t === "percent" ? "%" : lang === "fr" ? "Fixe" : "Flat"}
-                              </button>
-                            ))}
-                          </div>
-                          <input
-                            type="text"
-                            value={entry.commissionRate}
-                            onChange={(e) => updateCreatorField(entry.key, "commissionRate", e.target.value)}
-                            style={{ ...inputStyle, width: 88, flexShrink: 0 }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p style={{ fontSize: 13, color: "#9A9A9A", margin: "8px 0 0" }}>
-                  {lang === "fr" ? "Aucun créateur ajouté pour l'instant." : "No creators added yet."}
-                </p>
-              )}
-            </>
-          )}
-
-          {step === 2 && (
-            <div style={{ fontSize: 14, color: "#1A1A1A", lineHeight: 1.6 }}>
-              <p style={{ margin: "0 0 16px", fontWeight: 500 }}>{lang === "fr" ? "Vérifier votre campagne" : "Review your campaign"}</p>
-              <div style={{ background: "#FAFAFA", borderRadius: 12, padding: 16, border: "1px solid #EFEFEF" }}>
-                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Nom :" : "Name:"}</strong> {name || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign")}</div>
-                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Plateforme :" : "Platform:"}</strong> {platform}</div>
-                <div style={{ marginBottom: 8 }}><strong>{lang === "fr" ? "Dates :" : "Dates:"}</strong> {formatDateLabel(start, lang) || "—"} – {formatDateLabel(end, lang) || "—"}</div>
-                <div style={{ marginBottom: addedCreators.length > 0 ? 12 : 0 }}>
-                  <strong>{lang === "fr" ? "Créateurs :" : "Creators:"}</strong> {addedCreators.length}
-                </div>
-                {addedCreators.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {addedCreators.map((entry) => (
-                      <div key={entry.key} style={{ fontSize: 13, padding: "8px 10px", background: "#FFF", borderRadius: 8, border: "1px solid #EFEFEF" }}>
-                        @{entry.handle.replace(/^@/, "")} · {formatCreatorCommissionLabel(entry, lang)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={{ padding: "16px 24px 24px", display: "flex", justifyContent: "space-between", gap: 12, borderTop: "1px solid #EFEFEF" }}>
-          <button type="button" style={btnSecondary} onClick={step === 0 ? onClose : () => setStep((s) => s - 1)}>
-            {step === 0 ? (lang === "fr" ? "Annuler" : "Cancel") : lang === "fr" ? "Retour" : "Back"}
-          </button>
-          {step < NEW_CAMPAIGN_STEPS.length - 1 ? (
-            <button type="button" style={btnPrimary} onClick={() => setStep((s) => s + 1)} disabled={step === 0 && !name.trim()}>
-              {lang === "fr" ? "Continuer →" : "Continue →"}
-            </button>
-          ) : (
-            <button type="button" style={btnPrimary} onClick={() => void launch()} disabled={launching}>
-              {launching
-                ? lang === "fr"
-                  ? "Création…"
-                  : "Creating…"
-                : lang === "fr"
-                  ? "Lancer la campagne →"
-                  : "Launch campaign →"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type EditCampaignPayload = {
-  name: string;
-  description?: string;
-  platform: string;
-  startDate?: string;
-  endDate?: string;
-  commissionType: string;
-  commissionRate: number;
-  autoPayout: boolean;
-  creatorIds: string[];
-};
-
-function EditCampaignModal({
-  lang,
-  campaign,
-  onClose,
-  onSave,
-}: {
-  lang: "en" | "fr";
-  campaign: Campaign;
-  onClose: () => void;
-  onSave: (data: EditCampaignPayload) => void | Promise<void>;
-}) {
-  const initialCommissionType = campaign.commissionType === "flat" ? "flat" : "percent";
-  const [name, setName] = useState(campaign.name);
-  const [platform, setPlatform] = useState(campaign.platform || "TikTok");
-  const [start, setStart] = useState(toDateInputValue(campaign.startRaw ?? campaign.start));
-  const [end, setEnd] = useState(toDateInputValue(campaign.endRaw ?? campaign.end));
-  const [description, setDescription] = useState(campaign.description ?? "");
-  const [commissionRate, setCommissionRate] = useState(String(campaign.commissionRate ?? 10));
-  const [commissionType, setCommissionType] = useState<"percent" | "flat">(initialCommissionType);
-  const [autoPayout, setAutoPayout] = useState(Boolean(campaign.autoPayout));
-  const [assignedIds, setAssignedIds] = useState<string[]>(campaign.creatorIds ?? []);
-  const [savedCreators, setSavedCreators] = useState<SavedCreatorOption[]>([]);
-  const [loadingCreators, setLoadingCreators] = useState(true);
-  const [pickerId, setPickerId] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
-      if (!supabase) {
-        setLoadingCreators(false);
-        return;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoadingCreators(false);
-        return;
-      }
-      const data = await getSavedCreators(user.id);
-      setSavedCreators(data.map((row) => mapSavedCreator(row as Record<string, unknown>)));
-      setLoadingCreators(false);
-    };
-    void load();
-  }, []);
-
-  const savedById = useMemo(
-    () => new Map(savedCreators.map((creator) => [creator.id, creator])),
-    [savedCreators],
-  );
-  const availableCreators = savedCreators.filter((creator) => !assignedIds.includes(creator.id));
-
-  const addCreator = () => {
-    if (!pickerId || assignedIds.includes(pickerId)) return;
-    setAssignedIds((prev) => [...prev, pickerId]);
-    setPickerId("");
-  };
-
-  const removeCreator = (creatorId: string) => {
-    setAssignedIds((prev) => prev.filter((id) => id !== creatorId));
-  };
-
-  const submit = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-    try {
-      await onSave({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        platform,
-        startDate: normalizeDate(start),
-        endDate: normalizeDate(end),
-        commissionType: commissionType === "percent" ? "percentage" : "flat",
-        commissionRate: clampRate(commissionRate),
-        autoPayout,
-        creatorIds: assignedIds,
-      });
-    } finally {
-      setSaving(false);
+  const continueToCreators = async () => {
+    setStep(1);
+    if (isCreateMode || isDraftMode) {
+      await persistDraft();
     }
   };
 
-  return (
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: "#FFF", borderRadius: 16, width: "100%", maxWidth: 520, maxHeight: "90vh", overflow: "auto", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ padding: "24px 24px 0", borderBottom: "1px solid #EFEFEF" }}>
-          <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-            {lang === "fr" ? "Modifier la campagne" : "Edit campaign"}
-          </h2>
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px" }}>
-            {lang === "fr" ? "Mettez à jour les informations de votre campagne." : "Update your campaign details."}
-          </p>
-        </div>
+  const exitLabel =
+    isCreateMode || isDraftMode
+      ? lang === "fr"
+        ? "Enregistrer et quitter"
+        : "Save and exit"
+      : lang === "fr"
+        ? "Annuler"
+        : "Cancel";
 
-        <div style={{ padding: 24 }}>
-          <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
-          </Field>
-          <Field label={lang === "fr" ? "Plateforme" : "Platform"}>
-            <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={inputStyle}>
-              {["TikTok", "Instagram", "YouTube", "TikTok + Instagram", "All"].map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </Field>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            <Field label={lang === "fr" ? "Date de début" : "Start date"}>
-              <input
-                type="date"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                style={dateInputStyle}
+  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const contentMax = 720;
+
+  const listsLabel =
+    selectedListIds.length === 0
+      ? lang === "fr"
+        ? "Sélectionner une ou plusieurs listes"
+        : "Select one or multiple lists"
+      : selectedListIds
+          .map((id) => listOptions.find((o) => o.id === id)?.label)
+          .filter(Boolean)
+          .join(", ");
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
+      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
+        {step === 0 ? (
+          <>
+            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 36px", letterSpacing: "-0.03em" }}>
+              {isDraftMode
+                ? lang === "fr"
+                  ? "Reprendre le brouillon"
+                  : "Resume draft"
+                : isEditMode
+                ? lang === "fr"
+                  ? "Modifier la campagne"
+                  : "Edit campaign"
+                : lang === "fr"
+                  ? "Créer une campagne"
+                  : "Create campaign"}
+            </h1>
+
+            <div style={{ marginBottom: 28 }}>
+              <div
+                style={{
+                  border: "1px solid #0047FF",
+                  borderRadius: 10,
+                  padding: "4px 14px",
+                  boxShadow: "0 0 0 1px rgba(0,71,255,0.08)",
+                }}
+              >
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={lang === "fr" ? "Nommez votre campagne" : "Name your campaign"}
+                  style={{ width: "100%", border: "none", outline: "none", fontSize: 15, fontFamily: "inherit", padding: "12px 0", background: "transparent", boxSizing: "border-box" }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                  {lang === "fr"
+                    ? "Définir des hashtags, mentions ou mots-clés pour suivre le contenu"
+                    : "Set hashtags, mentions, or keywords to track content"}
+                </span>
+                <InfoHint
+                  title={
+                    lang === "fr"
+                      ? "Le contenu contenant ces hashtags ou mentions sera attribué à cette campagne."
+                      : "Content containing these hashtags or mentions will be attributed to this campaign."
+                  }
+                />
+              </div>
+              <textarea
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value)}
+                placeholder={lang === "fr" ? "#hashtags, @mentions, mots-clés" : "#hashtags, @mentions, keywords"}
+                style={onboardingTextarea}
               />
-            </Field>
-            <Field label={lang === "fr" ? "Date de fin" : "End date"}>
-              <input
-                type="date"
-                value={end}
-                min={start || undefined}
-                onChange={(e) => setEnd(e.target.value)}
-                style={dateInputStyle}
-              />
-            </Field>
-          </div>
-          <Field label={lang === "fr" ? "Description (optionnel)" : "Description (optional)"}>
-            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-          </Field>
-          <Field label={lang === "fr" ? "Type de commission" : "Commission type"}>
-            <div style={{ display: "flex", gap: 8 }}>
-              {(["percent", "flat"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setCommissionType(t)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: commissionType === t ? "2px solid #0047FF" : "1px solid #E5E5E5",
-                    background: commissionType === t ? "#E8EEFC" : "#FFF",
-                    fontSize: 13,
-                    fontFamily: "inherit",
-                    cursor: "pointer",
-                    color: "#1A1A1A",
-                  }}
-                >
-                  {t === "percent"
-                    ? lang === "fr" ? "% de vente" : "% of sale"
-                    : lang === "fr" ? "Montant fixe" : "Flat per sale"}
-                </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 32 }}>
+              {[
+                {
+                  checked: flagMissingTags,
+                  onChange: setFlagMissingTags,
+                  label:
+                    lang === "fr"
+                      ? "Signaler les publications sans hashtags, mentions ou mots-clés requis"
+                      : "Flag posts missing required hashtags, mentions, or keywords",
+                  hint:
+                    lang === "fr"
+                      ? "Les créateurs seront alertés si leur contenu ne contient pas les éléments requis."
+                      : "Creators will be flagged when their content is missing required tracking elements.",
+                },
+                {
+                  checked: flagMissingDisclosure,
+                  onChange: setFlagMissingDisclosure,
+                  label: lang === "fr" ? "Signaler les publications sans mention publicitaire" : "Flag posts missing ad disclosure",
+                  hint:
+                    lang === "fr"
+                      ? "Détecte les publications sans divulgation publicitaire (#ad, #sponsored, etc.)."
+                      : "Detects posts without ad disclosure (#ad, #sponsored, etc.).",
+                },
+                {
+                  checked: trackAllCreatorContent,
+                  onChange: setTrackAllCreatorContent,
+                  label:
+                    lang === "fr"
+                      ? "Suivre tout le contenu des créateurs sélectionnés dans un onglet séparé"
+                      : "Track all content from selected creators in a separate tab",
+                  hint:
+                    lang === "fr"
+                      ? "Toutes les publications des créateurs de la campagne seront suivies, pas seulement celles avec vos mots-clés."
+                      : "All posts from campaign creators will be tracked, not only those matching your keywords.",
+                },
+              ].map((row) => (
+                <label key={row.label} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={row.checked}
+                    onChange={(e) => row.onChange(e.target.checked)}
+                    style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0047FF" }}
+                  />
+                  <span style={{ flex: 1, fontSize: 14, color: "#1A1A1A", lineHeight: 1.45 }}>
+                    {row.label}{" "}
+                    <InfoHint title={row.hint} />
+                  </span>
+                </label>
               ))}
             </div>
-          </Field>
-          <Field label={commissionType === "percent" ? (lang === "fr" ? "Taux de commission (%)" : "Commission rate (%)") : lang === "fr" ? "Montant fixe" : "Flat amount"}>
-            <input type="text" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} style={inputStyle} />
-          </Field>
-          <div style={{ marginTop: 4, marginBottom: 20 }}>
-            <Toggle
-              on={autoPayout}
-              onChange={setAutoPayout}
-              label={lang === "fr" ? "Paiement automatique des commissions" : "Auto-pay commissions"}
-            />
-          </div>
 
-          <Field label={lang === "fr" ? `Créateurs (${assignedIds.length})` : `Creators (${assignedIds.length})`}>
-            {assignedIds.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-                {assignedIds.map((creatorId) => {
-                  const creator = savedById.get(creatorId);
-                  const label = creator?.full_name || creator?.handle || creatorId;
-                  const handle = creator?.handle ? `@${creator.handle.replace(/^@/, "")}` : "";
-                  return (
+            <div style={{ marginBottom: 40 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                  {lang === "fr" ? "Commencer à collecter le contenu le" : "Start collecting content on"}
+                </span>
+                <InfoHint
+                  title={
+                    lang === "fr"
+                      ? "Seul le contenu publié à partir de cette date sera suivi."
+                      : "Only content published from this date onward will be tracked."
+                  }
+                />
+              </div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 10, border: "1px solid #D1D5DB", borderRadius: 10, padding: "10px 14px" }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="3" y="5" width="18" height="16" rx="2" stroke="#6B7280" strokeWidth="1.8" />
+                  <path d="M8 3v4M16 3v4M3 10h18" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="date"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  style={{ border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", background: "transparent" }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button type="button" style={onboardingPrimaryBtn} disabled={!name.trim() || savingDraft} onClick={() => void continueToCreators()}>
+                {isDraftMode
+                  ? lang === "fr"
+                    ? "Continuer le brouillon"
+                    : "Continue draft"
+                  : isEditMode
+                  ? lang === "fr"
+                    ? "Continuer vers les créateurs"
+                    : "Continue to creators"
+                  : lang === "fr"
+                    ? "Sélectionner des créateurs pour démarrer"
+                    : "Select creators to start campaign"}
+              </button>
+              <button type="button" style={onboardingSecondaryBtn} onClick={() => void handleClose()} disabled={savingDraft}>
+                {exitLabel}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+              {isAddCreatorsMode
+                ? lang === "fr"
+                  ? "Ajouter des créateurs"
+                  : "Add creators"
+                : isEditMode
+                  ? lang === "fr"
+                    ? "Mettre à jour les créateurs"
+                    : "Update creators"
+                  : lang === "fr"
+                    ? "Sélectionner des créateurs"
+                    : "Select creators"}
+            </h1>
+            {isAddCreatorsMode && existingCampaign ? (
+              <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 28px", lineHeight: 1.5 }}>
+                {(existingCampaign.creatorIds?.length ?? 0) > 0
+                  ? lang === "fr"
+                    ? `${existingCampaign.creatorIds?.length} créateur${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} déjà dans « ${existingCampaign.name} ». Ajoutez-en d'autres ou mettez la liste à jour.`
+                    : `${existingCampaign.creatorIds?.length} creator${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} already in "${existingCampaign.name}". Add more or update the list.`
+                  : lang === "fr"
+                    ? `Ajoutez des créateurs à la campagne « ${existingCampaign.name} ».`
+                    : `Add creators to "${existingCampaign.name}".`}
+              </p>
+            ) : (
+              <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
+              <div ref={listsRef} style={{ position: "relative", flex: 1, minWidth: 220 }}>
+                <button
+                  type="button"
+                  onClick={() => setListsOpen((v) => !v)}
+                  style={{
+                    ...onboardingFieldInput,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 8,
+                    cursor: "pointer",
+                    textAlign: "left",
+                    color: selectedListIds.length ? "#1A1A1A" : "#9CA3AF",
+                  }}
+                >
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listsLabel}</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0 }}>
+                    <path d="M8 10l4 4 4-4" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {listsOpen && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 6px)",
+                      left: 0,
+                      right: 0,
+                      background: "#FFF",
+                      border: "1px solid #E5E7EB",
+                      borderRadius: 10,
+                      boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
+                      zIndex: 20,
+                      maxHeight: 280,
+                      overflowY: "auto",
+                      padding: 6,
+                    }}
+                  >
+                    {loadingCreators ? (
+                      <div style={{ padding: 12, fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
+                    ) : listOptions.length === 0 ? (
+                      <div style={{ padding: 12, fontSize: 13, color: "#9A9A9A" }}>
+                        {lang === "fr" ? "Aucune liste. Ajoutez des créateurs dans Gérer." : "No lists yet. Add creators in Manage."}
+                      </div>
+                    ) : (
+                      listOptions.map((list) => (
+                        <label
+                          key={list.id}
+                          style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, cursor: "pointer" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedListIds.includes(list.id)}
+                            onChange={() => toggleList(list.id)}
+                            style={{ width: 16, height: 16, accentColor: "#0047FF" }}
+                          />
+                          <span style={{ flex: 1, fontSize: 14, color: "#1A1A1A" }}>{list.label}</span>
+                          <span style={{ fontSize: 12, color: "#9A9A9A" }}>{list.usernames.length}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <button type="button" style={{ ...onboardingSecondaryBtn, flexShrink: 0 }} onClick={() => csvRef.current?.click()}>
+                {lang === "fr" ? "Importer CSV" : "Import CSV"}
+              </button>
+              <input ref={csvRef} type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={(e) => void onCsvSelected(e.target.files?.[0])} />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+                {lang === "fr" ? "Saisir ou coller des @pseudos" : "Write or copy-paste @usernames"}
+              </div>
+              <textarea
+                value={usernameDraft}
+                onChange={(e) => {
+                  setUsernameDraft(e.target.value);
+                  if (manualSearchNotFound) setManualSearchNotFound(false);
+                }}
+                onBlur={applyUsernames}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    applyUsernames();
+                  }
+                }}
+                placeholder={lang === "fr" ? "Ajouter @pseudo" : "Add @username"}
+                style={{ ...onboardingTextarea, minHeight: 140 }}
+              />
+              {manualSearchNotFound && (
+                <p style={{ fontSize: 14, color: "#9CA3AF", margin: "10px 0 0" }}>
+                  {lang === "fr"
+                    ? "Nous n'avons pas trouvé de créateurs correspondant à cette recherche"
+                    : "We couldn't find any creators matching this search"}
+                </p>
+              )}
+              <p style={{ fontSize: 13, color: "#9CA3AF", margin: "8px 0 0" }}>
+                {lang === "fr"
+                  ? "Seuls les créateurs sauvegardés dans Find it peuvent être ajoutés."
+                  : "Only creators saved in Find it can be added."}
+              </p>
+            </div>
+
+            {addedCreators.length > 0 && (
+              <div style={{ marginBottom: 32 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 12 }}>
+                  {isAddCreatorsMode
+                    ? lang === "fr"
+                      ? `${addedCreators.length} créateur${addedCreators.length > 1 ? "s" : ""} dans la sélection`
+                      : `${addedCreators.length} creator${addedCreators.length > 1 ? "s" : ""} selected`
+                    : lang === "fr"
+                      ? `${addedCreators.length} créateur(s) sélectionné(s)`
+                      : `${addedCreators.length} creator(s) selected`}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {addedCreators.map((entry) => {
+                    const isExistingInCampaign = Boolean(
+                      entry.creatorId && initialCampaignCreatorIdsRef.current.has(entry.creatorId),
+                    );
+                    return (
                     <div
-                      key={creatorId}
+                      key={entry.key}
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 10,
-                        padding: "10px 12px",
-                        background: "#FAFAFA",
-                        border: "1px solid #EFEFEF",
+                        gap: 12,
+                        padding: "12px 14px",
+                        border: "1px solid #E5E7EB",
                         borderRadius: 10,
+                        background: "#FAFAFA",
                       }}
                     >
-                      <CreatorAvatar src={creator?.avatar_url} size={32} alt={label} />
+                      <CreatorAvatar
+                        src={entry.avatar_url}
+                        username={entry.handle.replace(/^@/, "")}
+                        displayName={entry.displayName}
+                        size={36}
+                        alt={entry.displayName || entry.handle}
+                      />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A" }}>{label}</div>
-                        {handle && <div style={{ fontSize: 12, color: "#7A7A7A" }}>{handle}</div>}
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{entry.displayName || entry.handle}</div>
+                          {isAddCreatorsMode && isExistingInCampaign ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: "#0369A1",
+                                background: "rgba(3, 105, 161, 0.1)",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                              }}
+                            >
+                              {lang === "fr" ? "Dans la campagne" : "In campaign"}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#6B7280" }}>@{entry.handle.replace(/^@/, "")}</div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeCreator(creatorId)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "#DC2626",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontFamily: "inherit",
-                          fontWeight: 500,
-                        }}
+                        onClick={() => removeCreator(entry.key)}
+                        style={{ border: "none", background: "transparent", color: "#9CA3AF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
                       >
                         {lang === "fr" ? "Retirer" : "Remove"}
                       </button>
                     </div>
                   );
-                })}
+                  })}
+                </div>
               </div>
-            ) : (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 12px" }}>
-                {lang === "fr" ? "Aucun créateur assigné à cette campagne." : "No creators assigned to this campaign yet."}
-              </p>
             )}
 
-            {loadingCreators ? (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
-            ) : savedCreators.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-                {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis l’onglet Créateurs." : "No saved creators yet. Add creators from the Creators tab."}
-              </p>
-            ) : availableCreators.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-                {lang === "fr" ? "Tous vos créateurs sont déjà dans cette campagne." : "All your saved creators are already in this campaign."}
-              </p>
-            ) : (
-              <div style={{ display: "flex", gap: 8 }}>
-                <select
-                  value={pickerId}
-                  onChange={(e) => setPickerId(e.target.value)}
-                  style={{ ...inputStyle, flex: 1 }}
-                >
-                  <option value="">
-                    {lang === "fr" ? "Choisir un créateur sauvegardé…" : "Select a saved creator…"}
-                  </option>
-                  {availableCreators.map((creator) => (
-                    <option key={creator.id} value={creator.id}>
-                      {(creator.full_name || creator.handle) + (creator.handle ? ` (@${creator.handle.replace(/^@/, "")})` : "")}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" style={{ ...btnPrimary, flexShrink: 0 }} onClick={addCreator} disabled={!pickerId}>
-                  {lang === "fr" ? "Ajouter" : "Add"}
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button type="button" style={onboardingPrimaryBtn} disabled={launching || !canLaunch} onClick={() => void launch()}>
+                {launching
+                  ? isAddCreatorsMode
+                    ? lang === "fr"
+                      ? "Ajout…"
+                      : "Adding…"
+                    : isDraftMode
+                      ? lang === "fr"
+                        ? "Lancement…"
+                        : "Launching…"
+                    : isEditMode
+                      ? lang === "fr"
+                        ? "Enregistrement…"
+                        : "Saving…"
+                      : lang === "fr"
+                        ? "Création…"
+                        : "Creating…"
+                  : isAddCreatorsMode
+                    ? lang === "fr"
+                      ? "Enregistrer les créateurs"
+                      : "Save creators"
+                    : isDraftMode
+                      ? lang === "fr"
+                        ? "Lancer la campagne"
+                        : "Launch campaign"
+                    : isEditMode
+                      ? lang === "fr"
+                        ? "Enregistrer les modifications"
+                        : "Save changes"
+                      : lang === "fr"
+                        ? "Démarrer la campagne"
+                        : "Start campaign"}
+              </button>
+              {!isAddCreatorsMode && (
+                <button type="button" style={onboardingSecondaryBtn} onClick={() => setStep(0)}>
+                  {lang === "fr" ? "Retour" : "Back"}
                 </button>
-              </div>
-            )}
-          </Field>
-        </div>
-
-        <div style={{ padding: "16px 24px 24px", display: "flex", justifyContent: "flex-end", gap: 12, borderTop: "1px solid #EFEFEF" }}>
-          <button type="button" style={btnSecondary} onClick={onClose} disabled={saving}>
-            {lang === "fr" ? "Annuler" : "Cancel"}
-          </button>
-          <button type="button" style={btnPrimary} onClick={() => void submit()} disabled={!name.trim() || saving}>
-            {saving ? (lang === "fr" ? "Enregistrement…" : "Saving…") : lang === "fr" ? "Enregistrer" : "Save changes"}
-          </button>
-        </div>
+              )}
+              <button type="button" style={onboardingSecondaryBtn} onClick={() => void handleClose()} disabled={savingDraft || launching}>
+                {exitLabel}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

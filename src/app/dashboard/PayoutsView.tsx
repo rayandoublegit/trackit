@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { CreatorPaymentInfo } from "./CreatorPaymentInfo";
@@ -18,15 +18,17 @@ import {
   type PaymentMethod,
 } from "./usePaymentMethods";
 import { notifyCreatorPaid, notifyFundsAdded } from "@/lib/notifications-storage";
+import { primeNotificationSound } from "@/lib/notification-sound";
 import { dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import {
-  dismissCommissionHistoryItems,
   dismissSaleFeedItems,
-  loadDismissedCommissionHistoryIds,
   loadDismissedSaleIds,
 } from "@/lib/live-sales-feed-storage";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CreatorPayoutMethodFields, creatorHasPayoutDetails, type CreatorPayoutMethodFieldsHandle } from "./CreatorPayoutMethodFields";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import { PayItWelcomeLoading, PayItWelcomeView, usePayItActivity } from "./PayItWelcomeView";
+import { PlatformBrandIcon } from "./PlatformBrandIcon";
 
 type SalePlatform = "tiktok" | "instagram" | "youtube";
 
@@ -37,16 +39,19 @@ type SaleNotification = {
   commissionRate: number;
   platform: SalePlatform;
   minutesAgo: number;
+  createdAt: string;
   isNew?: boolean;
 };
+
+type SaleFeedSection = "today" | "yesterday" | "earlier";
 
 const btnOutline: React.CSSProperties = {
   background: "#FFFFFF",
   color: "#1A1A1A",
   border: "1px solid #E5E5E5",
   borderRadius: 10,
-  padding: "8px 14px",
-  fontSize: 13,
+  padding: "10px 16px",
+  fontSize: 14,
   fontWeight: 500,
   fontFamily: "inherit",
   cursor: "pointer",
@@ -63,6 +68,41 @@ function splitShares(amount: number, commissionRate: number) {
   return { creatorShare, brandShare };
 }
 
+function saleFeedSection(minutesAgo: number): SaleFeedSection {
+  if (minutesAgo < 24 * 60) return "today";
+  if (minutesAgo < 48 * 60) return "yesterday";
+  return "earlier";
+}
+
+function saleFeedSectionLabel(section: SaleFeedSection, lang: "en" | "fr") {
+  if (section === "today") return lang === "fr" ? "Aujourd'hui" : "Today";
+  if (section === "yesterday") return lang === "fr" ? "Hier" : "Yesterday";
+  return lang === "fr" ? "Plus tôt" : "Earlier";
+}
+
+function formatSaleFeedTime(createdAt: string, lang: "en" | "fr") {
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return "—";
+  const mins = minutesAgoFromIso(createdAt);
+  const section = saleFeedSection(mins);
+  const time = d.toLocaleTimeString(lang === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
+  if (section === "today") return time;
+  if (section === "yesterday") return lang === "fr" ? `Hier · ${time}` : `Yesterday · ${time}`;
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function groupSalesBySection(sales: SaleNotification[]) {
+  const order: SaleFeedSection[] = ["today", "yesterday", "earlier"];
+  const groups = new Map<SaleFeedSection, SaleNotification[]>();
+  for (const section of order) groups.set(section, []);
+  for (const sale of sales) {
+    groups.get(saleFeedSection(sale.minutesAgo))?.push(sale);
+  }
+  return order
+    .map((section) => ({ section, items: groups.get(section) ?? [] }))
+    .filter((group) => group.items.length > 0);
+}
+
 function formatRelativeTime(minutesAgo: number, lang: "en" | "fr") {
   if (minutesAgo < 1) return "Just now";
   if (minutesAgo === 1) return lang === "fr" ? "il y a 1 minute" : "1 minute ago";
@@ -76,6 +116,45 @@ function platformLabel(platform: SalePlatform) {
   if (platform === "tiktok") return "TikTok";
   if (platform === "instagram") return "Instagram";
   return "YouTube";
+}
+
+function salePlatformLogoSrc(platform: SalePlatform): string | null {
+  if (platform === "instagram") return "/instagram-logo.svg";
+  if (platform === "tiktok") return "/tiktok-logo.svg";
+  return null;
+}
+
+function SalePlatformLogo({ platform }: { platform: SalePlatform }) {
+  const label = platformLabel(platform);
+  const logoSrc = salePlatformLogoSrc(platform);
+  const outer = 20;
+  const inner = 16;
+
+  if (logoSrc) {
+    return (
+      <span
+        style={{
+          width: outer,
+          height: outer,
+          borderRadius: "50%",
+          overflow: "hidden",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+        title={label}
+      >
+        <img src={logoSrc} alt={label} width={inner} height={inner} style={{ display: "block", objectFit: "contain" }} />
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }} title={label}>
+      <PlatformBrandIcon platform={platform} size={inner} />
+    </span>
+  );
 }
 
 type TrackedSale = {
@@ -120,25 +199,6 @@ function commissionRateFromSale(sale: TrackedSale) {
   return order > 0 ? commission / order : 0;
 }
 
-function formatTrackedSaleTime(iso: string, lang: "en" | "fr") {
-  const mins = minutesAgoFromIso(iso);
-  if (mins < 60 * 24) return formatRelativeTime(mins, lang);
-  return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function shopifyOrderUrl(sale: TrackedSale) {
-  const orderId = sale.shopify_order_id;
-  const domain = sale.shop_domain;
-  if (!orderId || !domain || orderId.startsWith("manual_")) return null;
-  const shop = domain.includes(".") ? domain : `${domain}.myshopify.com`;
-  return `https://${shop}/admin/orders/${orderId}`;
-}
-
 async function fetchTrackedSales(userId: string): Promise<TrackedSale[]> {
   const { supabase } = await import("@/lib/supabase");
   if (!supabase) return [];
@@ -167,6 +227,7 @@ function mapSaleToNotification(row: TrackedSale, isNew: boolean): SaleNotificati
     commissionRate: commissionRateFromSale(row),
     platform: salePlatformFromCreator(creator?.platform),
     minutesAgo: minutesAgoFromIso(row.created_at),
+    createdAt: row.created_at,
     isNew,
   };
 }
@@ -233,55 +294,93 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
   };
 
   const list = useMemo(() => notifications, [notifications]);
+  const groupedSales = useMemo(() => groupSalesBySection(list), [list]);
+
+  const thStyle: React.CSSProperties = {
+    padding: "16px 22px",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#6B7280",
+    textAlign: "left",
+    borderBottom: "1px solid #EFEFEF",
+    background: "#FFFFFF",
+    whiteSpace: "nowrap",
+    letterSpacing: "-0.01em",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: "18px 22px",
+    fontSize: 15,
+    color: "#1A1A1A",
+    borderBottom: "1px solid #F5F5F5",
+    verticalAlign: "middle",
+    letterSpacing: "-0.02em",
+  };
+
+  const sectionRowStyle: React.CSSProperties = {
+    padding: "10px 22px",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#6B7280",
+    background: "#FAFAFA",
+    borderBottom: "1px solid #EFEFEF",
+    letterSpacing: "-0.01em",
+  };
+
+  const headerLinkStyle: React.CSSProperties = {
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: 13,
+    color: "#6B7280",
+    cursor: "pointer",
+    fontFamily: "inherit",
+    letterSpacing: "-0.01em",
+  };
 
   return (
     <>
       <style>{`
-        @keyframes salePulse {
-          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(31, 181, 103, 0.5); }
-          50% { opacity: 0.65; transform: scale(1.15); box-shadow: 0 0 0 4px rgba(31, 181, 103, 0.15); }
-        }
-        @keyframes saleSlideIn {
-          from { opacity: 0; transform: translateY(-14px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes saleRowIn {
+          from { opacity: 0; background: #F5F8FF; }
+          to { opacity: 1; background: #FFFFFF; }
         }
       `}</style>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-          <div>
-            <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px" }}>{lang === "fr" ? "Flux des ventes en direct" : "Live sales feed"}</h2>
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Chaque vente suivie depuis vos créateurs en temps réel." : "Every sale tracked from your creators in real time."}</p>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: isMobile ? "wrap" : undefined }}>
-            <button
-              type="button"
-              onClick={() => setPaused((p) => !p)}
-              style={{
-                ...btnOutline,
-                background: paused ? "#F5F5F5" : "#FFFFFF",
-                color: paused ? "#7A7A7A" : "#1A1A1A",
-              }}
-            >
-              {paused ? "Resume feed" : lang === "fr" ? "Mettre en pause" : "Pause feed"}
+      <div style={{ marginBottom: 36 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            marginBottom: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+            {lang === "fr" ? "Ventes en direct" : "Live sales"}
+          </h2>
+          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+            <button type="button" onClick={() => setPaused((p) => !p)} style={headerLinkStyle}>
+              {paused ? (lang === "fr" ? "Reprendre" : "Resume") : lang === "fr" ? "Pause" : "Pause"}
             </button>
             <button
               type="button"
               onClick={clearNotifications}
               disabled={list.length === 0}
               style={{
-                ...btnOutline,
-                color: list.length === 0 ? "#C4C4C4" : "#7A7A7A",
-                opacity: list.length === 0 ? 0.5 : 1,
+                ...headerLinkStyle,
+                opacity: list.length === 0 ? 0.4 : 1,
                 cursor: list.length === 0 ? "not-allowed" : "pointer",
               }}
             >
-              {lang === "fr" ? "Supprimer les notifications" : "Remove notifications"}
+              {lang === "fr" ? "Tout effacer" : "Clear all"}
             </button>
           </div>
         </div>
 
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto" }}>
           {paused && (
             <div
               style={{
@@ -291,156 +390,101 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "rgba(250,250,250,0.75)",
-                borderRadius: 12,
+                background: "rgba(255,255,255,0.82)",
                 pointerEvents: "none",
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.02em" }}>Feed paused</span>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.02em" }}>
+                {lang === "fr" ? "Flux en pause" : "Feed paused"}
+              </span>
             </div>
           )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, opacity: paused ? 0.45 : 1, transition: "opacity 0.2s ease" }}>
-            {list.length === 0 ? (
-              <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 10, padding: 32, textAlign: "center", fontSize: 13, color: "#9A9A9A" }}>
-                {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
-              </div>
-            ) : (
-              list.map((sale) => {
-                const { creatorShare, brandShare } = splitShares(sale.amount, sale.commissionRate);
-                return (
-                  <SaleNotificationCard
-                    key={sale.id}
-                    lang={lang}
-                    sale={sale}
-                    creatorShare={creatorShare}
-                    brandShare={brandShare}
-                    animateIn={!!sale.isNew}
-                    onRemove={() => removeNotification(sale.id)}
-                  />
-                );
-              })
-            )}
-          </div>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 640 : undefined, opacity: paused ? 0.45 : 1, transition: "opacity 0.2s ease" }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>{lang === "fr" ? "Créateur" : "Creator"}</th>
+                <th style={thStyle}>{lang === "fr" ? "Plateforme" : "Platform"}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{lang === "fr" ? "Vente" : "Sale"}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{lang === "fr" ? "Commission" : "Commission"}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{lang === "fr" ? "Date" : "Date"}</th>
+                <th style={{ ...thStyle, width: 44 }} aria-label={lang === "fr" ? "Actions" : "Actions"} />
+              </tr>
+            </thead>
+            <tbody>
+              {list.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                    {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
+                  </td>
+                </tr>
+              ) : (
+                groupedSales.map(({ section, items }) => (
+                  <Fragment key={section}>
+                    <tr>
+                      <td colSpan={6} style={sectionRowStyle}>
+                        {saleFeedSectionLabel(section, lang)}
+                      </td>
+                    </tr>
+                    {items.map((sale) => {
+                      const { creatorShare } = splitShares(sale.amount, sale.commissionRate);
+                      return (
+                        <tr
+                          key={sale.id}
+                          style={{
+                            background: "#FFFFFF",
+                            animation: sale.isNew ? "saleRowIn 0.6s ease-out" : undefined,
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#FAFAFA";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#FFFFFF";
+                          }}
+                        >
+                          <td style={{ ...tdStyle, fontWeight: 500 }}>@{sale.creatorHandle}</td>
+                          <td style={tdStyle}>
+                            <SalePlatformLogo platform={sale.platform} />
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
+                            {formatCurrency(sale.amount, lang)}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right" }}>
+                            {formatCurrency(creatorShare, lang)}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "#6B7280", fontSize: 14 }}>
+                            {formatSaleFeedTime(sale.createdAt, lang)}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", paddingLeft: 8, paddingRight: 16 }}>
+                            <button
+                              type="button"
+                              onClick={() => removeNotification(sale.id)}
+                              aria-label={lang === "fr" ? "Supprimer" : "Remove"}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#9CA3AF",
+                                fontSize: 18,
+                                lineHeight: 1,
+                                cursor: "pointer",
+                                padding: 0,
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </>
-  );
-}
-
-function SaleNotificationCard({
-  lang,
-  sale,
-  creatorShare,
-  brandShare,
-  animateIn,
-  onRemove,
-}: {
-  lang: "en" | "fr";
-  sale: SaleNotification;
-  creatorShare: number;
-  brandShare: number;
-  animateIn: boolean;
-  onRemove: () => void;
-}) {
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: "#FFFFFF",
-        borderRadius: 10,
-        padding: 16,
-        border: "1px solid #EFEFEF",
-        borderLeft: "3px solid #1FB567",
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 12,
-        boxShadow: hovered ? "0 4px 16px rgba(0,0,0,0.06)" : "none",
-        transition: "box-shadow 0.2s ease",
-        animation: animateIn ? "saleSlideIn 0.35s ease-out" : undefined,
-      }}
-    >
-      <div
-        style={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          background: "#1FB567",
-          flexShrink: 0,
-          marginTop: 6,
-          animation: "salePulse 1.6s ease-in-out infinite",
-        }}
-      />
-      <img src="/shopify-logo.svg" alt="" width={20} height={20} style={{ display: "block", flexShrink: 0, objectFit: "contain" }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-          {lang === "fr" ? "Une vente de" : "A sale of"} {formatCurrency(sale.amount, lang)} {lang === "fr" ? "vient d'arriver" : "just dropped"}
-        </div>
-        <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 8, lineHeight: 1.45 }}>
-          {lang === "fr" ? "Répartition :" : "Split:"} {formatCurrency(creatorShare, lang)} {lang === "fr" ? "pour" : "for"} @{sale.creatorHandle} · {formatCurrency(brandShare, lang)} {lang === "fr" ? "conservé" : "kept"}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: "#9A9A9A" }}>{formatRelativeTime(sale.minutesAgo, lang)}</span>
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: "#1A1A1A",
-              background: "#F0F0F0",
-              padding: "3px 8px",
-              borderRadius: 999,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {platformLabel(sale.platform)}
-          </span>
-        </div>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-        <button
-          type="button"
-          style={{
-            background: "none",
-            border: "none",
-            color: "#9A9A9A",
-            fontSize: 12,
-            fontWeight: 500,
-            fontFamily: "inherit",
-            cursor: "pointer",
-            padding: "4px 0",
-            letterSpacing: "-0.01em",
-          }}
-        >
-          {lang === "fr" ? "Voir la commande" : "View order"}
-        </button>
-        <button
-          type="button"
-          onClick={onRemove}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#9A9A9A",
-            fontSize: 12,
-            fontWeight: 500,
-            fontFamily: "inherit",
-            cursor: "pointer",
-            padding: "4px 0",
-            letterSpacing: "-0.01em",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "#DC2626";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "#9A9A9A";
-          }}
-        >
-          {lang === "fr" ? "Supprimer la notification" : "Remove notification"}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -690,288 +734,502 @@ function payoutMethodLabel(transferId: string | null | undefined, lang: "en" | "
   return lang === "fr" ? "Manuel" : "Manual";
 }
 
-function formatPayoutDate(iso: string | null | undefined, lang: "en" | "fr") {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+type PayoutTableSortKey = "name" | "balance" | "payment" | "earned" | "sales";
+
+type PayoutTableCreator = {
+  id: string;
+  full_name?: string;
+  handle?: string;
+  username?: string;
+  avatar_url?: string;
+  platform?: string | null;
+  followers?: number | null;
+  engagement_rate?: number | null;
+  discount_code?: string | null;
+  balance?: number;
+  total_earned?: number;
+  total_sales?: number;
+  paypal_link?: string | null;
+  revolut_link?: string | null;
+  iban?: string | null;
+};
+
+function fmtFollowerCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 100_000 ? 0 : 1)}K`;
+  return String(Math.round(n));
 }
 
-function saleStatusLabel(status: string | null | undefined, lang: "en" | "fr") {
-  const s = String(status || "pending").toLowerCase();
-  if (s === "paid") return lang === "fr" ? "Payée" : "Paid";
-  return lang === "fr" ? "En attente" : "Pending";
+function PayoutSortArrows({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
+  return (
+    <span style={{ display: "inline-flex", flexDirection: "column", marginLeft: 4, verticalAlign: "middle" }} aria-hidden>
+      <svg width="8" height="5" viewBox="0 0 8 5" style={{ opacity: active && dir === "asc" ? 1 : 0.35 }}>
+        <path d="M4 0L7.5 4.5H0.5L4 0z" fill="currentColor" />
+      </svg>
+      <svg width="8" height="5" viewBox="0 0 8 5" style={{ opacity: active && dir === "desc" ? 1 : 0.35, marginTop: 1 }}>
+        <path d="M4 5L0.5 0.5H7.5L4 5z" fill="currentColor" />
+      </svg>
+    </span>
+  );
 }
 
-function saleStatusColor(status: string | null | undefined) {
-  const s = String(status || "pending").toLowerCase();
-  if (s === "paid") return { bg: "#ECFDF3", color: "#1FB567" };
-  return { bg: "#FFF7ED", color: "#D97706" };
-}
-
-function CommissionTracker({
-  userId,
-  shopifyStore,
-  onConnectShopify,
+function CreatorsPayoutTable({
+  creators,
   lang,
   isMobile,
+  onSelectCreator,
 }: {
-  userId?: string;
-  shopifyStore?: string | null;
-  onConnectShopify?: () => void;
+  creators: PayoutTableCreator[];
   lang: "en" | "fr";
   isMobile?: boolean;
+  onSelectCreator: (creator: PayoutTableCreator) => void;
 }) {
-  const [sales, setSales] = useState<TrackedSale[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"active" | "history">("active");
-  const [dismissedHistoryIds, setDismissedHistoryIds] = useState<Set<string>>(new Set());
+  const [sort, setSort] = useState<{ key: PayoutTableSortKey; dir: "asc" | "desc" }>({
+    key: "balance",
+    dir: "desc",
+  });
 
-  useEffect(() => {
-    if (!userId) return;
-    setDismissedHistoryIds(loadDismissedCommissionHistoryIds(userId));
-  }, [userId]);
-
-  const removeHistoryItem = (saleId: string) => {
-    if (!userId) return;
-    const next = dismissCommissionHistoryItems(userId, [saleId]);
-    setDismissedHistoryIds(next);
+  const thStyle: React.CSSProperties = {
+    padding: "20px 22px",
+    fontSize: 15,
+    fontWeight: 600,
+    color: "#1A1A1A",
+    textAlign: "left",
+    borderBottom: "1px solid #EFEFEF",
+    background: "#FFFFFF",
+    whiteSpace: "nowrap",
+    cursor: "pointer",
+    userSelect: "none",
   };
 
-  useEffect(() => {
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
+  const tdStyle: React.CSSProperties = {
+    padding: "20px 22px",
+    fontSize: 16,
+    color: "#1A1A1A",
+    borderBottom: "1px solid #F5F5F5",
+    verticalAlign: "middle",
+  };
 
-    const load = async () => {
-      const rows = await fetchTrackedSales(userId);
-      if (!cancelled) {
-        setSales(rows);
-        setLoading(false);
+  const toggleSort = (key: PayoutTableSortKey) => {
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "balance" ? "desc" : "asc" },
+    );
+  };
+
+  const sortedCreators = useMemo(() => {
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...creators].sort((a, b) => {
+      if (sort.key === "name") {
+        const aName = String(a.full_name || a.handle || a.username || "").toLowerCase();
+        const bName = String(b.full_name || b.handle || b.username || "").toLowerCase();
+        return aName.localeCompare(bName) * dir;
       }
-    };
+      if (sort.key === "balance") {
+        return ((Number(a.balance) || 0) - (Number(b.balance) || 0)) * dir;
+      }
+      if (sort.key === "payment") {
+        return paymentMethodLabel(a, lang).localeCompare(paymentMethodLabel(b, lang)) * dir;
+      }
+      if (sort.key === "earned") {
+        return ((Number(a.total_earned) || 0) - (Number(b.total_earned) || 0)) * dir;
+      }
+      return ((Number(a.total_sales) || 0) - (Number(b.total_sales) || 0)) * dir;
+    });
+  }, [creators, sort, lang]);
 
-    void load();
-    const onUpdate = () => void load();
-    window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
-    const interval = window.setInterval(load, 25000);
-    return () => {
-      cancelled = true;
-      window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
-      window.clearInterval(interval);
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId || !shopifyStore) return;
-    let cancelled = false;
-    void fetch("/api/shopify/sync", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    })
-      .then(() => {
-        if (!cancelled) dispatchSalesUpdated();
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, shopifyStore]);
-
-  const activeSales = useMemo(
-    () => sales.filter((s) => String(s.status || "pending").toLowerCase() === "pending"),
-    [sales],
-  );
-  const historySales = useMemo(
-    () =>
-      sales.filter(
-        (s) =>
-          String(s.status || "pending").toLowerCase() !== "pending" &&
-          !dismissedHistoryIds.has(s.id),
-      ),
-    [sales, dismissedHistoryIds],
-  );
-  const visible = tab === "active" ? activeSales : historySales;
-  const shopifyConnected = !!shopifyStore;
-
-  const tabBtn = (id: "active" | "history", label: string, count: number) => (
-    <button
-      type="button"
-      onClick={() => setTab(id)}
-      style={{
-        background: "none",
-        border: "none",
-        fontSize: 13,
-        color: tab === id ? "#1A1A1A" : "#7A7A7A",
-        fontWeight: tab === id ? 500 : 400,
-        cursor: "pointer",
-        paddingBottom: 4,
-        borderBottom: tab === id ? "2px solid #1A1A1A" : "2px solid transparent",
-        fontFamily: "inherit",
-        letterSpacing: "-0.01em",
-      }}
-    >
-      {label}{count > 0 ? ` (${count})` : ""}
-    </button>
-  );
+  const columns: { key: PayoutTableSortKey; label: string }[] = [
+    { key: "name", label: lang === "fr" ? "Créateur" : "Creator" },
+    { key: "balance", label: lang === "fr" ? "Montant dû" : "Amount owed" },
+    { key: "payment", label: lang === "fr" ? "Type de paiement" : "Payment type" },
+    { key: "earned", label: lang === "fr" ? "Total gagné" : "Total earned" },
+    { key: "sales", label: lang === "fr" ? "Ventes" : "Sales" },
+  ];
 
   return (
-    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 20px", borderBottom: "1px solid #EFEFEF", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-          {lang === "fr" ? "Suivi des commissions" : "Commission tracker"}
-        </div>
-        <div style={{ display: "flex", gap: 18 }}>
-          {tabBtn("active", lang === "fr" ? "Actif" : "Active", activeSales.length)}
-          {tabBtn("history", lang === "fr" ? "Historique" : "History", historySales.length)}
-        </div>
-      </div>
+    <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto", marginBottom: 36 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 720 : undefined }}>
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key} style={thStyle} onClick={() => toggleSort(col.key)}>
+                {col.label}
+                <PayoutSortArrows active={sort.key === col.key} dir={sort.dir} />
+              </th>
+            ))}
+            <th style={{ ...thStyle, cursor: "default", width: 56 }}>{lang === "fr" ? "Actions" : "Actions"}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedCreators.length === 0 ? (
+            <tr>
+              <td colSpan={columns.length + 1} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                {lang === "fr" ? "Aucun créateur pour le moment." : "No creators yet."}
+              </td>
+            </tr>
+          ) : (
+            sortedCreators.map((creator) => {
+              const name = creator.full_name || creator.handle || creator.username || "Creator";
+              const handle = creator.handle || creator.username || "";
+              const balance = Number(creator.balance) || 0;
+              const methodLabel = paymentMethodLabel(creator, lang);
 
-      {loading ? (
-        <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#9A9A9A" }}>
-          {lang === "fr" ? "Chargement…" : "Loading…"}
-        </div>
-      ) : visible.length === 0 ? (
-        <div style={{ padding: 60, textAlign: "center" }}>
-          <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: shopifyConnected || sales.length > 0 ? 0 : 16 }}>
-            {tab === "active"
-              ? shopifyConnected || sales.length > 0
-                ? lang === "fr"
-                  ? "Aucune commission en attente pour le moment."
-                  : "No pending commissions right now."
-                : lang === "fr"
-                  ? "Connectez Shopify pour commencer à suivre les commissions."
-                  : "Connect Shopify to start tracking commissions."
-              : lang === "fr"
-                ? "L'historique des commissions apparaîtra ici."
-                : "Commission history will show up here."}
-          </div>
-          {!shopifyConnected && sales.length === 0 && onConnectShopify && (
-            <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={onConnectShopify}>
-              {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div>
-          {visible.map((sale, i) => {
-            const creator = saleCreatorMeta(sale);
-            const name = creator?.full_name || creator?.handle || "Creator";
-            const handle = creator?.handle ? `@${String(creator.handle).replace(/^@/, "")}` : "";
-            const statusStyle = saleStatusColor(sale.status);
-            const orderUrl = shopifyOrderUrl(sale);
-            const ratePct = Math.round(commissionRateFromSale(sale) * 1000) / 10;
-
-            return (
-              <div
-                key={sale.id}
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 14,
-                  padding: isMobile ? "16px" : "18px 20px",
-                  borderBottom: i < visible.length - 1 ? "1px solid #F5F5F5" : "none",
-                }}
-              >
-                <CreatorAvatar src={creator?.avatar_url} size={40} alt={name} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                      {name}
-                    </span>
-                    {handle && (
-                      <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{handle}</span>
-                    )}
+              return (
+                <tr
+                  key={creator.id}
+                  onClick={() => onSelectCreator(creator)}
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#FAFAFA";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#FFFFFF";
+                  }}
+                >
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <CreatorAvatar src={creator.avatar_url} username={creator.handle} displayName={name} size={40} alt={name} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 500, letterSpacing: "-0.02em" }}>{name}</div>
+                        {handle && (
+                          <div style={{ fontSize: 14, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 2 }}>
+                            @{String(handle).replace(/^@/, "")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 600, color: "#1A1A1A" }}>
+                    {formatCurrency(balance, lang)}
+                  </td>
+                  <td style={tdStyle}>
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 14,
                         fontWeight: 600,
-                        color: statusStyle.color,
-                        background: statusStyle.bg,
-                        padding: "3px 8px",
-                        borderRadius: 999,
+                        color: "#1A1A1A",
                         letterSpacing: "-0.01em",
                       }}
                     >
-                      {saleStatusLabel(sale.status, lang)}
+                      {methodLabel}
                     </span>
-                  </div>
-                  <div style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em", marginBottom: 4, lineHeight: 1.45 }}>
-                    {lang === "fr" ? "Vente" : "Sale"}{" "}
-                    <strong>{formatCurrency(Number(sale.order_amount) || 0, lang)}</strong>
-                    {" → "}
-                    {lang === "fr" ? "Commission" : "Commission"}{" "}
-                    <strong style={{ color: "#0047FF" }}>{formatCurrency(Number(sale.commission_amount) || 0, lang)}</strong>
-                    {ratePct > 0 && (
-                      <span style={{ color: "#9A9A9A" }}> ({ratePct}%)</span>
+                  </td>
+                  <td style={tdStyle}>{formatCurrency(Number(creator.total_earned) || 0, lang)}</td>
+                  <td style={tdStyle}>{creator.total_sales ?? 0}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+                    {balance > 0 && (
+                      <button
+                        type="button"
+                        aria-label={lang === "fr" ? `Payer ${name}` : `Pay ${name}`}
+                        onClick={() => onSelectCreator(creator)}
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          padding: 6,
+                          color: "#1A1A1A",
+                        }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                          <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
                     )}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                    {sale.discount_code_used && (
-                      <span style={{ fontSize: 11, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                        {lang === "fr" ? "Code" : "Code"}: {sale.discount_code_used}
-                      </span>
-                    )}
-                    <span style={{ fontSize: 11, color: "#9A9A9A" }}>
-                      {formatTrackedSaleTime(sale.created_at, lang)}
-                    </span>
-                    {sale.shop_domain && sale.shop_domain !== "manual" && (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#7A7A7A" }}>
-                        <img src="/shopify-logo.svg" alt="" width={14} height={14} style={{ display: "block" }} />
-                        Shopify
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0, marginTop: 4 }}>
-                  {orderUrl && (
-                    <a
-                      href={orderUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        color: "#0047FF",
-                        textDecoration: "none",
-                        letterSpacing: "-0.01em",
-                      }}
-                    >
-                      {lang === "fr" ? "Voir la commande" : "View order"}
-                    </a>
-                  )}
-                  {tab === "history" && (
-                    <button
-                      type="button"
-                      onClick={() => removeHistoryItem(sale.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "#9A9A9A",
-                        fontSize: 12,
-                        fontWeight: 500,
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                        padding: 0,
-                        letterSpacing: "-0.01em",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "#DC2626";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "#9A9A9A";
-                      }}
-                    >
-                      {lang === "fr" ? "Supprimer" : "Remove"}
-                    </button>
-                  )}
-                </div>
-              </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+type PayoutOverviewStats = {
+  totalOwed: number;
+  pendingCreators: number;
+  readyToPay: number;
+  missingPaymentDetails: number;
+  totalCommissionsEarned: number;
+  totalTrackedSales: number;
+  totalPaid: number;
+  completedPaymentsCount: number;
+  timeline: CommissionDayBucket[];
+  breakdown: {
+    earned: number;
+    paid: number;
+    pending: number;
+  };
+};
+
+type CommissionDayBucket = {
+  dateKey: string;
+  earned: number;
+  paid: number;
+};
+
+function dayKeyFromIso(iso: string | null | undefined) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function buildCommissionTimeline(
+  sales: TrackedSale[],
+  completedPayouts: CompletedPayout[],
+  dayCount = 30,
+): CommissionDayBucket[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const buckets: CommissionDayBucket[] = [];
+  for (let i = dayCount - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    buckets.push({
+      dateKey: dayKeyFromIso(d.toISOString()) ?? "",
+      earned: 0,
+      paid: 0,
+    });
+  }
+
+  const byDay = new Map(buckets.map((bucket) => [bucket.dateKey, bucket]));
+
+  for (const sale of sales) {
+    const key = dayKeyFromIso(sale.created_at);
+    const bucket = key ? byDay.get(key) : undefined;
+    if (bucket) bucket.earned = round2(bucket.earned + (Number(sale.commission_amount) || 0));
+  }
+
+  for (const payout of completedPayouts) {
+    const key = dayKeyFromIso(payout.paid_at || payout.created_at);
+    const bucket = key ? byDay.get(key) : undefined;
+    if (bucket) bucket.paid = round2(bucket.paid + (Number(payout.amount) || 0));
+  }
+
+  return buckets;
+}
+
+type PayoutOverviewPeriod = "today" | "7d" | "30d" | "all";
+
+const PAYOUT_OVERVIEW_PERIODS: PayoutOverviewPeriod[] = ["today", "7d", "30d", "all"];
+
+function payoutOverviewPeriodLabel(period: PayoutOverviewPeriod, lang: "en" | "fr") {
+  if (period === "today") return lang === "fr" ? "Aujourd'hui" : "Today";
+  if (period === "7d") return lang === "fr" ? "7 derniers jours" : "Last 7 days";
+  if (period === "30d") return lang === "fr" ? "30 derniers jours" : "Last 30 days";
+  return lang === "fr" ? "Globalité" : "All time";
+}
+
+function saleDayKey(sale: TrackedSale) {
+  return dayKeyFromIso(sale.created_at);
+}
+
+function isSaleInPeriod(sale: TrackedSale, period: PayoutOverviewPeriod) {
+  const key = saleDayKey(sale);
+  if (!key) return false;
+  if (period === "all") return true;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const saleDate = new Date(`${key}T12:00:00`);
+  if (Number.isNaN(saleDate.getTime())) return false;
+
+  if (period === "today") return key === dayKeyFromIso(today.toISOString());
+
+  const dayCount = period === "7d" ? 7 : 30;
+  const start = new Date(today);
+  start.setDate(start.getDate() - (dayCount - 1));
+  return saleDate >= start && saleDate <= today;
+}
+
+function countSalesInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod) {
+  return sales.filter((sale) => isSaleInPeriod(sale, period)).length;
+}
+
+function sumCommissionsInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod) {
+  return round2(
+    sales
+      .filter((sale) => isSaleInPeriod(sale, period))
+      .reduce((sum, sale) => sum + (Number(sale.commission_amount) || 0), 0),
+  );
+}
+
+function allTimeDayCount(sales: TrackedSale[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let earliest: Date | null = null;
+
+  for (const sale of sales) {
+    const key = saleDayKey(sale);
+    if (!key) continue;
+    const d = new Date(`${key}T12:00:00`);
+    if (Number.isNaN(d.getTime())) continue;
+    if (!earliest || d < earliest) earliest = d;
+  }
+
+  if (!earliest) return 30;
+  const span = Math.ceil((today.getTime() - earliest.getTime()) / 86400000) + 1;
+  return Math.min(90, Math.max(7, span));
+}
+
+function buildTodayHourlyTimeline(
+  sales: TrackedSale[],
+  completedPayouts: CompletedPayout[],
+): CommissionDayBucket[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = dayKeyFromIso(today.toISOString()) ?? "";
+
+  const buckets: CommissionDayBucket[] = Array.from({ length: 24 }, (_, hour) => ({
+    dateKey: `${todayKey}T${String(hour).padStart(2, "0")}`,
+    earned: 0,
+    paid: 0,
+  }));
+
+  for (const sale of sales) {
+    const key = saleDayKey(sale);
+    if (key !== todayKey) continue;
+    const hour = new Date(sale.created_at).getHours();
+    if (hour >= 0 && hour < 24) {
+      buckets[hour].earned = round2(buckets[hour].earned + (Number(sale.commission_amount) || 0));
+    }
+  }
+
+  for (const payout of completedPayouts) {
+    const key = dayKeyFromIso(payout.paid_at || payout.created_at);
+    if (key !== todayKey) continue;
+    const hour = new Date(payout.paid_at || payout.created_at || "").getHours();
+    if (hour >= 0 && hour < 24) {
+      buckets[hour].paid = round2(buckets[hour].paid + (Number(payout.amount) || 0));
+    }
+  }
+
+  return buckets;
+}
+
+function buildOverviewTimeline(
+  sales: TrackedSale[],
+  completedPayouts: CompletedPayout[],
+  period: PayoutOverviewPeriod,
+): CommissionDayBucket[] {
+  if (period === "today") return buildTodayHourlyTimeline(sales, completedPayouts);
+  if (period === "7d") return buildCommissionTimeline(sales, completedPayouts, 7);
+  if (period === "30d") return buildCommissionTimeline(sales, completedPayouts, 30);
+  return buildCommissionTimeline(sales, completedPayouts, allTimeDayCount(sales));
+}
+
+function formatTimelineAxisLabel(dateKey: string, lang: "en" | "fr", period: PayoutOverviewPeriod) {
+  if (!dateKey) return "—";
+  if (period === "today" && dateKey.includes("T")) {
+    const hour = Number(dateKey.split("T")[1]);
+    if (!Number.isFinite(hour)) return dateKey;
+    const d = new Date();
+    d.setHours(hour, 0, 0, 0);
+    return d.toLocaleTimeString(lang === "fr" ? "fr-FR" : "en-US", { hour: "numeric", minute: "2-digit" });
+  }
+  return formatTimelineDayLabel(dateKey, lang);
+}
+
+function PayoutOverviewPeriodSelect({
+  value,
+  onChange,
+  lang,
+}: {
+  value: PayoutOverviewPeriod;
+  onChange: (period: PayoutOverviewPeriod) => void;
+  lang: "en" | "fr";
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          padding: 0,
+          fontSize: 13,
+          color: "#6B7280",
+          letterSpacing: "-0.01em",
+          cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        {payoutOverviewPeriodLabel(value, lang)}
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true" style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="#6B7280" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          style={{
+            position: "absolute",
+            top: "calc(100% + 8px)",
+            right: 0,
+            minWidth: 180,
+            background: "#FFFFFF",
+            border: "1px solid #EFEFEF",
+            borderRadius: 12,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
+            padding: 6,
+            zIndex: 40,
+          }}
+        >
+          {PAYOUT_OVERVIEW_PERIODS.map((period) => {
+            const active = period === value;
+            return (
+              <button
+                key={period}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(period);
+                  setOpen(false);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  background: active ? "#F5F5F5" : "transparent",
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "9px 10px",
+                  fontSize: 13,
+                  color: "#1A1A1A",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {payoutOverviewPeriodLabel(period, lang)}
+              </button>
             );
           })}
         </div>
@@ -980,129 +1238,405 @@ function CommissionTracker({
   );
 }
 
-function OwedToCreatorsSummaryCard({
+function formatTimelineDayLabel(dateKey: string, lang: "en" | "fr") {
+  if (!dateKey) return "—";
+  const d = new Date(`${dateKey}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
+}
+
+function computePayoutOverviewStats(
+  creators: PayoutTableCreator[],
+  completedPayouts: CompletedPayout[],
+  sales: TrackedSale[] = [],
+): PayoutOverviewStats {
+  const pending = creators.filter((c) => (Number(c.balance) || 0) > 0);
+  const totalOwed = pending.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
+  const readyToPay = pending.filter((c) => creatorHasPayoutDetails(c)).length;
+  const missingPaymentDetails = pending.length - readyToPay;
+  const totalCommissionsEarned = creators.reduce((sum, c) => sum + (Number(c.total_earned) || 0), 0);
+  const totalTrackedSales = creators.reduce((sum, c) => sum + (Number(c.total_sales) || 0), 0);
+  const totalPaid = completedPayouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const timeline = buildCommissionTimeline(sales, completedPayouts);
+
+  return {
+    totalOwed,
+    pendingCreators: pending.length,
+    readyToPay,
+    missingPaymentDetails,
+    totalCommissionsEarned,
+    totalTrackedSales,
+    totalPaid,
+    completedPaymentsCount: completedPayouts.length,
+    timeline,
+    breakdown: {
+      earned: totalCommissionsEarned,
+      paid: totalPaid,
+      pending: totalOwed,
+    },
+  };
+}
+
+function buildCumulativeValues(buckets: CommissionDayBucket[]) {
+  let sum = 0;
+  return buckets.map((bucket) => {
+    sum = round2(sum + bucket.earned);
+    return sum;
+  });
+}
+
+function buildSmoothLinePath(points: { x: number; y: number }[]) {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const cpx = (prev.x + curr.x) / 2;
+    d += ` C ${cpx} ${prev.y}, ${cpx} ${curr.y}, ${curr.x} ${curr.y}`;
+  }
+  return d;
+}
+
+const PAYOUT_CHART_BLUE = "#0047FF";
+
+function PayoutCommissionChart({
+  buckets,
   lang,
   isMobile,
-  balance,
-  creators,
-  autoPayoutMonthly,
+  period,
 }: {
+  buckets: CommissionDayBucket[];
   lang: "en" | "fr";
   isMobile?: boolean;
-  balance: number;
-  creators: { balance?: number; total_earned?: number; total_sales?: number; paypal_link?: string; revolut_link?: string; iban?: string }[];
-  autoPayoutMonthly: boolean;
+  period: PayoutOverviewPeriod;
 }) {
-  const pending = creators.filter((c) => (Number(c.balance) || 0) > 0);
-  const readyCount = pending.filter(creatorHasPayoutDetails).length;
-  const missingCount = pending.length - readyCount;
-  const totalEarned = creators.reduce((sum, c) => sum + (Number(c.total_earned) || 0), 0);
-  const totalSales = creators.reduce((sum, c) => sum + (Number(c.total_sales) || 0), 0);
-  const totalPaid = Math.max(totalEarned - balance, 0);
+  const cumulative = useMemo(() => buildCumulativeValues(buckets), [buckets]);
+  const chartW = 640;
+  const chartH = 96;
+  const padX = 2;
+  const padY = 10;
+  const innerW = chartW - padX * 2;
+  const innerH = chartH - padY * 2;
+  const maxY = Math.max(...cumulative, 0.01);
+  const baselineY = padY + innerH;
 
-  const nextPayoutLabel = (() => {
-    if (!autoPayoutMonthly) return lang === "fr" ? "Manuel" : "Manual";
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    return next.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short" });
-  })();
+  const points = cumulative.map((value, index) => ({
+    x: padX + (index / Math.max(buckets.length - 1, 1)) * innerW,
+    y: padY + innerH - (value / maxY) * innerH,
+  }));
 
-  const subtitle =
-    balance <= 0
-      ? lang === "fr"
-        ? "Tous les soldes sont à jour"
-        : "All balances are settled"
-      : lang === "fr"
-        ? `${pending.length} créateur${pending.length > 1 ? "s" : ""} en attente · ${readyCount} prêt${readyCount > 1 ? "s" : ""} à payer`
-        : `${pending.length} creator${pending.length > 1 ? "s" : ""} pending · ${readyCount} ready to pay`;
-
-  const stat = (label: string, value: string) => (
-    <div>
-      <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>{value}</div>
-      <div style={{ fontSize: 10, opacity: 0.75, marginTop: 4, letterSpacing: "-0.01em", lineHeight: 1.3 }}>{label}</div>
-    </div>
-  );
+  const linePath = buildSmoothLinePath(points);
+  const areaPath =
+    points.length > 0
+      ? `${linePath} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`
+      : "";
+  const flatLine = `M ${padX} ${baselineY} L ${padX + innerW} ${baselineY}`;
+  const hasActivity = cumulative.some((value, index) => value > 0 || buckets[index]?.earned > 0);
 
   return (
-    <div
-      style={{
-        background: "#0047FF",
-        color: "#FFFFFF",
-        borderRadius: 16,
-        padding: 28,
-        flex: isMobile ? undefined : 1.4,
-        width: isMobile ? "100%" : undefined,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
-        textAlign: "left",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 12, marginBottom: 6 }}>
-        <div style={{ fontSize: 12, opacity: 0.8, letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "À verser aux créateurs" : "Owed to creators"}
-        </div>
-        {pending.length > 0 && (
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-              background: "rgba(255,255,255,0.16)",
-              border: "1px solid rgba(255,255,255,0.22)",
-              borderRadius: 999,
-              padding: "3px 10px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {lang === "fr"
-              ? `${pending.length} en attente`
-              : `${pending.length} pending`}
-          </span>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+      <svg
+        viewBox={`0 0 ${chartW} ${chartH}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={lang === "fr" ? "Évolution cumulative des commissions" : "Cumulative commission trend"}
+        style={{ width: "100%", height: isMobile ? 88 : 112, display: "block" }}
+      >
+        <defs>
+          <linearGradient id="payoutCommissionFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0.14" />
+            <stop offset="100%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        {!hasActivity ? (
+          <path d={flatLine} fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+        ) : (
+          <>
+            <path d={areaPath} fill="url(#payoutCommissionFill)" />
+            <path d={linePath} fill="none" stroke={PAYOUT_CHART_BLUE} strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+          </>
         )}
-      </div>
-
-      <div style={{ fontSize: 40, fontWeight: 600, letterSpacing: "-0.04em", lineHeight: 1 }}>
-        {formatCurrency(balance, lang)}
-      </div>
-
-      <div style={{ fontSize: 13, opacity: 0.88, marginTop: 10, letterSpacing: "-0.01em", lineHeight: 1.45 }}>
-        {subtitle}
-      </div>
-
-      {missingCount > 0 && (
-        <div style={{ fontSize: 12, opacity: 0.82, marginTop: 6, letterSpacing: "-0.01em" }}>
-          {lang === "fr"
-            ? `${missingCount} créateur${missingCount > 1 ? "s" : ""} sans coordonnées de paiement`
-            : `${missingCount} creator${missingCount > 1 ? "s" : ""} missing payment details`}
-        </div>
-      )}
-
-      <div style={{ width: "100%", height: 1, background: "rgba(255,255,255,0.18)", margin: "18px 0 16px" }} />
-
+      </svg>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: "16px 24px",
-          width: "100%",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 12,
+          fontSize: 11,
+          color: "#9CA3AF",
+          letterSpacing: "-0.01em",
+          marginTop: 10,
         }}
       >
-        {stat(lang === "fr" ? "Commissions totales" : "Total commissions", formatCurrency(totalEarned, lang))}
-        {stat(lang === "fr" ? "Déjà versé" : "Already paid", formatCurrency(totalPaid, lang))}
-        {stat(lang === "fr" ? "Ventes trackées" : "Tracked sales", String(totalSales))}
-        {stat(lang === "fr" ? "Prochain versement" : "Next payout", nextPayoutLabel)}
+        <span>{formatTimelineAxisLabel(buckets[0]?.dateKey ?? "", lang, period)}</span>
+        <span>{formatTimelineAxisLabel(buckets[buckets.length - 1]?.dateKey ?? "", lang, period)}</span>
       </div>
     </div>
   );
 }
 
-function PayoutsPageHeader({ title, subtitle, isMobile }: { title: string; subtitle?: string; isMobile?: boolean }) {
+function StripeOverviewSideMetric({
+  label,
+  value,
+  hint,
+  hintColor,
+  showDivider = true,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  hintColor?: string;
+  showDivider?: boolean;
+}) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
-      <div>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
-        {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+    <div style={{ paddingBottom: showDivider ? 24 : 0, marginBottom: showDivider ? 24 : 0, borderBottom: showDivider ? "1px solid #EFEFEF" : "none" }}>
+      <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
+        {value}
+      </div>
+      {hint && (
+        <div style={{ fontSize: 12, color: hintColor ?? "#1A1A1A", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 8 }}>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PayoutOverviewMetric({
+  label,
+  value,
+  hint,
+  hintColor,
+  large,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  hintColor?: string;
+  large?: boolean;
+}) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 12 }}>{label}</div>
+      <div
+        style={{
+          fontSize: large ? 36 : 30,
+          fontWeight: 600,
+          color: "#1A1A1A",
+          letterSpacing: "-0.04em",
+          lineHeight: 1.05,
+          marginBottom: hint ? 10 : 0,
+        }}
+      >
+        {value}
+      </div>
+      {hint && (
+        <div style={{ fontSize: 12, color: hintColor ?? "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>{hint}</div>
+      )}
+    </div>
+  );
+}
+
+function PayoutsOverviewPanel({
+  stats,
+  sales,
+  completedPayouts,
+  lang,
+  isMobile,
+}: {
+  stats: PayoutOverviewStats;
+  sales: TrackedSale[];
+  completedPayouts: CompletedPayout[];
+  lang: "en" | "fr";
+  isMobile?: boolean;
+}) {
+  const [period, setPeriod] = useState<PayoutOverviewPeriod>("30d");
+
+  const timeline = useMemo(
+    () => buildOverviewTimeline(sales, completedPayouts, period),
+    [sales, completedPayouts, period],
+  );
+
+  const periodCommission = useMemo(() => {
+    if (period === "all") return stats.totalCommissionsEarned;
+    return sumCommissionsInPeriod(sales, period);
+  }, [period, sales, stats.totalCommissionsEarned]);
+
+  const periodSalesCount = useMemo(() => {
+    if (period === "all") return stats.totalTrackedSales;
+    return countSalesInPeriod(sales, period);
+  }, [period, sales, stats.totalTrackedSales]);
+
+  const commissionsLabel =
+    period === "all"
+      ? lang === "fr"
+        ? "Commissions totales"
+        : "Total commissions"
+      : lang === "fr"
+        ? "Commissions générées"
+        : "Commissions earned";
+
+  const commissionsSub =
+    periodSalesCount === 0
+      ? period === "today"
+        ? lang === "fr"
+          ? "Aucune commission aujourd'hui"
+          : "No commissions today"
+        : lang === "fr"
+          ? "Aucune vente sur cette période"
+          : "No sales in this period"
+      : period === "all"
+        ? lang === "fr"
+          ? `${periodSalesCount} vente${periodSalesCount > 1 ? "s" : ""} trackée${periodSalesCount > 1 ? "s" : ""}`
+          : `${periodSalesCount} tracked sale${periodSalesCount > 1 ? "s" : ""}`
+        : lang === "fr"
+          ? `${periodSalesCount} vente${periodSalesCount > 1 ? "s" : ""} sur la période`
+          : `${periodSalesCount} sale${periodSalesCount > 1 ? "s" : ""} in period`;
+  const pendingSub =
+    stats.pendingCreators === 0
+      ? lang === "fr"
+        ? "Tous les soldes sont à jour"
+        : "All balances are settled"
+      : lang === "fr"
+        ? `${stats.pendingCreators} créateur${stats.pendingCreators > 1 ? "s" : ""} en attente`
+        : `${stats.pendingCreators} creator${stats.pendingCreators > 1 ? "s" : ""} pending`;
+
+  const readySub =
+    stats.pendingCreators === 0
+      ? lang === "fr"
+        ? "Aucun paiement en attente"
+        : "No payouts pending"
+      : stats.missingPaymentDetails === 0
+        ? lang === "fr"
+          ? `${stats.readyToPay} prêt${stats.readyToPay > 1 ? "s" : ""} à payer`
+          : `${stats.readyToPay} ready to pay`
+        : lang === "fr"
+          ? `${stats.readyToPay} prêt${stats.readyToPay > 1 ? "s" : ""} · ${stats.missingPaymentDetails} sans coordonnées`
+          : `${stats.readyToPay} ready · ${stats.missingPaymentDetails} missing details`;
+
+  const paidSub =
+    stats.completedPaymentsCount === 0
+      ? lang === "fr"
+        ? "Aucun paiement enregistré"
+        : "No payments recorded yet"
+      : lang === "fr"
+        ? `${stats.completedPaymentsCount} paiement${stats.completedPaymentsCount > 1 ? "s" : ""} effectué${stats.completedPaymentsCount > 1 ? "s" : ""}`
+        : `${stats.completedPaymentsCount} payment${stats.completedPaymentsCount > 1 ? "s" : ""} completed`;
+
+  return (
+    <div
+      style={{
+        marginBottom: isMobile ? 56 : 72,
+        paddingBottom: isMobile ? 32 : 40,
+        borderBottom: "1px solid #EFEFEF",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 220px",
+          gap: isMobile ? 32 : 48,
+          alignItems: "stretch",
+        }}
+      >
+        <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              gap: 24,
+              flexWrap: "wrap",
+              marginBottom: 8,
+            }}
+          >
+            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em" }}>
+              {commissionsLabel}
+            </div>
+            <PayoutOverviewPeriodSelect value={period} onChange={setPeriod} lang={lang} />
+          </div>
+
+          <div style={{ marginBottom: 4 }}>
+            <div
+              style={{
+                fontSize: isMobile ? 32 : 36,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                letterSpacing: "-0.04em",
+                lineHeight: 1.05,
+              }}
+            >
+              {formatCurrency(periodCommission, lang)}
+            </div>
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 8 }}>
+              {commissionsSub}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minHeight: isMobile ? 88 : 112, marginTop: 8 }}>
+            <PayoutCommissionChart buckets={timeline} lang={lang} isMobile={isMobile} period={period} />
+          </div>
+        </div>
+
+        <div
+          style={{
+            borderTop: isMobile ? "1px solid #EFEFEF" : "none",
+            borderLeft: isMobile ? "none" : "1px solid #EFEFEF",
+            paddingTop: isMobile ? 28 : 0,
+            paddingLeft: isMobile ? 0 : 32,
+            minWidth: 0,
+          }}
+        >
+          <StripeOverviewSideMetric
+            label={lang === "fr" ? "À verser" : "Amount owed"}
+            value={formatCurrency(stats.totalOwed, lang)}
+            hint={pendingSub}
+          />
+          <StripeOverviewSideMetric
+            label={lang === "fr" ? "Déjà versé" : "Already paid"}
+            value={formatCurrency(stats.totalPaid, lang)}
+            hint={paidSub}
+            showDivider={false}
+          />
+          <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 4 }}>
+            {readySub}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PayoutsPageHeader({
+  title,
+  subtitle,
+  isMobile,
+  trailing,
+}: {
+  title: string;
+  subtitle?: string;
+  isMobile?: boolean;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 16, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: trailing && isMobile ? "flex-start" : "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <h1 style={{ fontSize: isMobile ? 26 : 34, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+          {subtitle && <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+        </div>
+        {trailing}
       </div>
     </div>
   );
@@ -1112,6 +1646,341 @@ function PayoutsToggle({ on }: { on: boolean }) {
   return (
     <div style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
       <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
+    </div>
+  );
+}
+
+const payoutPagePrimaryBtn: React.CSSProperties = {
+  background: "#0047FF",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 10,
+  padding: "12px 20px",
+  fontSize: 15,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const payoutPageSecondaryBtn: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#1A1A1A",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "12px 20px",
+  fontSize: 15,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+function CreatorPayoutPage({
+  creator,
+  lang,
+  isMobile,
+  plan,
+  userId,
+  payingId,
+  registeringId,
+  payoutFieldsRef,
+  onCreatorChange,
+  onClose,
+  onPayManual,
+  onPayStripe,
+  onConnectStripeBank,
+}: {
+  creator: PayoutTableCreator & { stripe_account_id?: string | null; email?: string | null; total_earned?: number; total_sales?: number };
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  plan: PlanTier;
+  userId?: string;
+  payingId: string | null;
+  registeringId: string | null;
+  payoutFieldsRef: React.RefObject<CreatorPayoutMethodFieldsHandle | null>;
+  onCreatorChange: (next: PayoutTableCreator) => void;
+  onClose: () => void;
+  onPayManual: () => void | Promise<void>;
+  onPayStripe: () => void | Promise<void>;
+  onConnectStripeBank: () => void | Promise<void>;
+}) {
+  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const contentMax = 840;
+  const pagePrimaryBtn: React.CSSProperties = {
+    ...payoutPagePrimaryBtn,
+    padding: "16px 28px",
+    fontSize: 17,
+    borderRadius: 12,
+  };
+  const pageSecondaryBtn: React.CSSProperties = {
+    ...payoutPageSecondaryBtn,
+    padding: "16px 28px",
+    fontSize: 17,
+    borderRadius: 12,
+  };
+  const name = creator.full_name || creator.handle || creator.username || "Creator";
+  const handle = creator.handle || creator.username || "";
+  const balance = Number(creator.balance) || 0;
+  const platform = salePlatformFromCreator(creator.platform);
+  const followers = Number(creator.followers) || 0;
+  const engagement = Number(creator.engagement_rate) || 0;
+  const discountCode = creator.discount_code?.trim() || null;
+  const email = creator.email?.trim() || null;
+
+  const canPayManual = balance > 0 && creatorHasPaymentMethod(creator) && payingId !== creator.id;
+
+  const metaChipStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 13,
+    color: "#4B5563",
+    letterSpacing: "-0.01em",
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
+      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
+        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 28px", letterSpacing: "-0.03em" }}>
+          {lang === "fr" ? "Payer le créateur" : "Pay creator"}
+        </h1>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            gap: isMobile ? 14 : 18,
+            marginBottom: 32,
+            padding: isMobile ? "16px" : "20px 22px",
+            border: "1px solid #EFEFEF",
+            borderRadius: 16,
+            background: "#FAFAFA",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 14 : 18, flex: 1, minWidth: 0 }}>
+          <CreatorAvatar
+            src={creator.avatar_url}
+            username={creator.handle}
+            displayName={name}
+            size={isMobile ? 56 : 64}
+            alt={name}
+          />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+                marginBottom: 8,
+              }}
+            >
+              <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
+                {name}
+              </div>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E5E5",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#1A1A1A",
+                }}
+              >
+                <SalePlatformLogo platform={platform} />
+                {platformLabel(platform)}
+              </span>
+            </div>
+
+            {handle && (
+              <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 10 }}>
+                @{String(handle).replace(/^@/, "")}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: isMobile ? "8px 14px" : "10px 18px", alignItems: "center" }}>
+              {followers > 0 && (
+                <span style={metaChipStyle}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" />
+                    <circle cx="9" cy="7" r="4" stroke="#9A9A9A" strokeWidth="1.8" />
+                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" />
+                  </svg>
+                  {fmtFollowerCount(followers)} {lang === "fr" ? "abonnés" : "followers"}
+                </span>
+              )}
+              {engagement > 0 && (
+                <span style={metaChipStyle}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M3 17l5-5 4 4 8-8" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {engagement.toFixed(1)}% {lang === "fr" ? "engagement" : "engagement"}
+                </span>
+              )}
+              {(creator.total_sales ?? 0) > 0 && (
+                <span style={metaChipStyle}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6z" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  {creator.total_sales} {lang === "fr" ? "vente(s)" : "sale(s)"}
+                </span>
+              )}
+              {discountCode && (
+                <span
+                  style={{
+                    ...metaChipStyle,
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                    background: "#F0F6FF",
+                    color: "#0047FF",
+                    fontWeight: 600,
+                  }}
+                >
+                  {lang === "fr" ? "Code" : "Code"} · {discountCode}
+                </span>
+              )}
+            </div>
+
+            {email && (
+              <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 10, letterSpacing: "-0.01em" }}>
+                {email}
+              </div>
+            )}
+          </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={!canPayManual}
+            onClick={() => void onPayManual()}
+            style={{
+              ...pagePrimaryBtn,
+              background: "#1A1A1A",
+              flexShrink: 0,
+              alignSelf: isMobile ? "stretch" : "center",
+              opacity: canPayManual ? 1 : 0.5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {payingId === creator.id
+              ? lang === "fr"
+                ? "Paiement…"
+                : "Paying…"
+              : balance > 0
+                ? `${lang === "fr" ? "Payer" : "Pay"} ${formatCurrency(balance, lang)}`
+                : lang === "fr"
+                  ? "Payer"
+                  : "Pay"}
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 36 }}>
+          <div style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: "24px 26px", background: "#FAFAFA" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10, textTransform: "uppercase" }}>
+              {lang === "fr" ? "Solde à payer" : "Balance owed"}
+            </div>
+            <div style={{ fontSize: 42, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
+              {formatCurrency(balance, lang)}
+            </div>
+          </div>
+          <div style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: "24px 26px", background: "#FAFAFA" }}>
+            <div style={{ fontSize: 17, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.75 }}>
+              <div>
+                <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Total gagné" : "Total earned"}</span>
+                {" · "}
+                <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{formatCurrency(Number(creator.total_earned) || 0, lang)}</span>
+              </div>
+              <div>
+                <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Ventes" : "Sales"}</span>
+                {" · "}
+                <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{creator.total_sales || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Méthode de paiement actuelle" : "Current payment method"}
+          </div>
+          {creatorHasPaymentMethod(creator) ? (
+            <p style={{ margin: 0, fontSize: 17, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.55 }}>
+              <span style={{ fontWeight: 600 }}>{paymentMethodLabel(creator, lang)}</span>
+              <span style={{ color: "#7A7A7A" }}> · </span>
+              <span style={{ wordBreak: "break-all" }}>
+                {creator.paypal_link || creator.revolut_link || creator.iban}
+              </span>
+            </p>
+          ) : (
+            <p style={{ margin: 0, fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
+              {lang === "fr"
+                ? "Aucun moyen de paiement renseigné. Ajoutez PayPal, Revolut ou IBAN ci-dessous."
+                : "No payment method on file. Add PayPal, Revolut, or IBAN below."}
+            </p>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 44 }}>
+          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 18, letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
+          </div>
+          <CreatorPayoutMethodFields
+            ref={payoutFieldsRef}
+            creator={creator}
+            lang={lang}
+            size="large"
+            onUpdate={onCreatorChange}
+            onDraftChange={onCreatorChange}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12, flexWrap: "wrap" }}>
+          {creator.stripe_account_id ? (
+            <button
+              type="button"
+              disabled={balance <= 0 || payingId === creator.id}
+              onClick={() => void onPayStripe()}
+              style={{
+                ...pagePrimaryBtn,
+                opacity: balance > 0 ? 1 : 0.5,
+                width: isMobile ? "100%" : undefined,
+              }}
+            >
+              {payingId === creator.id
+                ? lang === "fr"
+                  ? "Virement en cours…"
+                  : "Sending transfer…"
+                : `${lang === "fr" ? "Payer par virement Stripe" : "Pay via Stripe transfer"} · ${formatCurrency(balance, lang)}`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={registeringId === creator.id}
+              onClick={() => void onConnectStripeBank()}
+              style={{ ...pageSecondaryBtn, width: isMobile ? "100%" : undefined }}
+            >
+              {registeringId === creator.id
+                ? lang === "fr"
+                  ? "Ouverture…"
+                  : "Opening…"
+                : lang === "fr"
+                  ? "Connecter un compte bancaire (Stripe)"
+                  : "Connect bank account (Stripe)"}
+            </button>
+          )}
+
+          <button type="button" onClick={onClose} style={{ ...pageSecondaryBtn, width: isMobile ? "100%" : undefined }}>
+            {lang === "fr" ? "Retour" : "Back"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1164,30 +2033,24 @@ export function PayoutsView({
   onConnectShopify?: () => void;
 }) {
   const lang = useLang();
-  const [search, setSearch] = useState("");
+  const { navState, navigate } = useDashboardNavigation();
+  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
+  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const payoutCreatorId =
+    navState.view === "payouts" && navState.payout?.type === "creator" ? navState.payout.id : null;
   const [creators, setCreators] = useState<any[]>([]);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [payMessage, setPayMessage] = useState<string | null>(null);
-  const balance = creators.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
-  const {
-    defaultMethod: defaultPaymentMethod,
-    hasPaymentMethod: hasBillingPaymentMethod,
-    openManage: openBillingPaymentManage,
-  } = usePaymentMethods();
-  const [payoutModal, setPayoutModal] = useState<"addFunds" | null>(null);
   const [confirmPay, setConfirmPay] = useState<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
   const pendingConfirmRef = useRef<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
   const paymentLeftTabRef = useRef(false);
   const pendingSinceRef = useRef(0);
-  const [fundAmount, setFundAmount] = useState("");
   const [autoPayoutMonthly, setAutoPayoutMonthly] = useState(false);
-  const [selectedCreatorPayout, setSelectedCreatorPayout] = useState<any>(null);
+  const [activeCreator, setActiveCreator] = useState<any>(null);
   const payoutFieldsRef = useRef<CreatorPayoutMethodFieldsHandle>(null);
-  const [payoutsTab, setPayoutsTab] = useState<"overview" | "balances" | "history">("overview");
   const [completedPayouts, setCompletedPayouts] = useState<CompletedPayout[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historySearch, setHistorySearch] = useState("");
+  const [trackedSales, setTrackedSales] = useState<TrackedSale[]>([]);
   const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active">("none");
   const [connectLoading, setConnectLoading] = useState(false);
 
@@ -1260,8 +2123,31 @@ export function PayoutsView({
     return () => window.removeEventListener(SALES_UPDATED_EVENT, reloadCreators);
   }, [userId]);
 
+  useEffect(() => {
+    if (!payoutCreatorId) {
+      setActiveCreator(null);
+      return;
+    }
+    const found = creators.find((c) => c.id === payoutCreatorId);
+    if (found) setActiveCreator(found);
+  }, [payoutCreatorId, creators]);
+
+  useEffect(() => {
+    if (!payoutCreatorId || creators.length === 0) return;
+    if (!creators.some((c) => c.id === payoutCreatorId)) {
+      navigate({ view: "payouts" }, { replace: true });
+    }
+  }, [payoutCreatorId, creators, navigate]);
+
+  const openCreatorPayout = (creator: PayoutTableCreator) => {
+    navigate({ view: "payouts", payout: { type: "creator", id: creator.id } });
+  };
+
+  const closeCreatorPayout = () => {
+    navigate({ view: "payouts" }, { replace: true });
+  };
+
   const loadCompletedPayouts = async () => {
-    setHistoryLoading(true);
     try {
       const res = await fetch("/api/payouts/history", { cache: "no-store" });
       if (!res.ok) return;
@@ -1269,14 +2155,30 @@ export function PayoutsView({
       setCompletedPayouts(Array.isArray(data.payouts) ? data.payouts : []);
     } catch (e) {
       console.error(e);
-    } finally {
-      setHistoryLoading(false);
     }
   };
 
   useEffect(() => {
     if (!userId) return;
     void loadCompletedPayouts();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const loadSales = async () => {
+      const rows = await fetchTrackedSales(userId);
+      if (!cancelled) setTrackedSales(rows);
+    };
+
+    void loadSales();
+    const onUpdate = () => void loadSales();
+    window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -1303,30 +2205,9 @@ export function PayoutsView({
     };
   }, []);
 
-  const creatorsPendingPayout = useMemo(
-    () => creators.filter((c) => (Number(c.balance) || 0) > 0),
-    [creators]
-  );
-
-  const q = search.trim().toLowerCase();
-  const filteredPending = creatorsPendingPayout.filter((c) => {
-    if (!q) return true;
-    const name = String(c.full_name || c.handle || "").toLowerCase();
-    const handle = String(c.handle || c.username || "").toLowerCase();
-    return name.includes(q) || handle.includes(q);
-  });
-
-  const historyQuery = historySearch.trim().toLowerCase();
-  const filteredCompletedPayouts = completedPayouts.filter((payout) => {
-    if (!historyQuery) return true;
-    const name = String(payout.creator?.full_name || payout.creator?.handle || "").toLowerCase();
-    const handle = String(payout.creator?.handle || "").toLowerCase();
-    return name.includes(historyQuery) || handle.includes(historyQuery);
-  });
-
-  const completedPayoutsTotal = completedPayouts.reduce(
-    (sum, payout) => sum + (Number(payout.amount) || 0),
-    0
+  const payoutOverviewStats = useMemo(
+    () => computePayoutOverviewStats(creators, completedPayouts, trackedSales),
+    [creators, completedPayouts, trackedSales],
   );
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
@@ -1383,9 +2264,9 @@ export function PayoutsView({
   };
 
   const paySelectedCreator = async () => {
-    if (!selectedCreatorPayout) return;
-    const updated = (await payoutFieldsRef.current?.flushSave()) ?? selectedCreatorPayout;
-    setSelectedCreatorPayout(updated);
+    if (!activeCreator) return;
+    const updated = (await payoutFieldsRef.current?.flushSave()) ?? activeCreator;
+    setActiveCreator(updated);
     setCreators((list) => list.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
     if (!creatorHasPaymentMethod(updated)) return;
     handleManualCreatorPay(updated);
@@ -1395,7 +2276,7 @@ export function PayoutsView({
     if (!confirmPay) return;
     const { creatorId, amount, method, name } = confirmPay;
     setConfirmPay(null);
-    setSelectedCreatorPayout(null);
+    closeCreatorPayout();
     pendingConfirmRef.current = null;
 
     const res = await fetch("/api/payouts/manual", {
@@ -1410,7 +2291,7 @@ export function PayoutsView({
           ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
           : `${formatCurrency(amount, lang)} marked as paid ✓`
       );
-      notifyCreatorPaid(lang, name, amount);
+      notifyCreatorPaid(lang, name, amount, userId);
       setCreators((list) =>
         list.map((c) =>
           c.id === creatorId ? { ...c, balance: Math.max(0, Number(c.balance || 0) - amount) } : c
@@ -1424,20 +2305,38 @@ export function PayoutsView({
   };
 
 
-  const handleAddFunds = () => {
-    const amount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
-    if (!amount || amount <= 0) return;
-    setFundAmount("");
-    setPayoutModal(null);
-    setPayMessage(`${formatCurrency(amount, lang)} added to your balance.`);
-    notifyFundsAdded(lang, amount);
-  };
-
-  const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
-  const canAddFunds = hasBillingPaymentMethod && parsedFundAmount > 0;
-  const chargingLabel = defaultPaymentMethod
-    ? formatPaymentLabelShort(defaultPaymentMethod, lang)
-    : null;
+  const confirmPayModal = confirmPay ? (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+          alt="Trackit"
+          style={{ height: 96, width: "auto", display: "block", margin: "0 auto 20px", objectFit: "contain" }}
+        />
+        <h3 style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+          {lang === "fr" ? "Le virement a été effectué ?" : "Did you complete the transfer?"}
+        </h3>
+        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 6px", lineHeight: 1.5 }}>
+          {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
+          <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
+          {lang === "fr" ? "à" : "to"}{" "}
+          <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+        </p>
+        <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
+          {lang === "fr"
+            ? "Si vous confirmez, le paiement est enregistré et le solde du créateur est remis à zéro."
+            : "If you confirm, the payment is recorded and the creator's balance is reset."}
+        </p>
+        <button type="button" onClick={() => { primeNotificationSound(); void confirmManualPayout(); }} style={{ width: "100%", padding: "13px 0", background: "#1A1A1A", color: "#FFFFFF", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
+          {lang === "fr" ? "Oui, virement effectué ✓" : "Yes, transfer completed ✓"}
+        </button>
+        <button type="button" onClick={() => { setConfirmPay(null); pendingConfirmRef.current = null; paymentLeftTabRef.current = false; }} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+          {lang === "fr" ? "Non, pas encore" : "No, not yet"}
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   if (isCreator) {
     return (
@@ -1448,49 +2347,103 @@ export function PayoutsView({
     );
   }
 
-  if (isCreator) {
+  if (payItWelcomeLoading) {
+    return <PayItWelcomeLoading isMobile={isMobile} />;
+  }
+
+  if (showPayItWelcome && !payoutCreatorId && !payItWelcomeBypass) {
+    return (
+      <PayItWelcomeView
+        isMobile={isMobile}
+        variant="overview"
+        onPrimary={() => setPayItWelcomeBypass(true)}
+      />
+    );
+  }
+
+  if (payoutCreatorId && activeCreator) {
     return (
       <>
-        <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Vos commissions et vos coordonnées de virement" : "Your commissions and payout details"} />
-        <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
+        <CreatorPayoutPage
+          creator={activeCreator}
+          lang={lang}
+          isMobile={isMobile}
+          plan={plan}
+          userId={userId}
+          payingId={payingId}
+          registeringId={registeringId}
+          payoutFieldsRef={payoutFieldsRef}
+          onCreatorChange={(next) => {
+            setActiveCreator(next);
+            setCreators((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+          }}
+          onClose={closeCreatorPayout}
+          onPayManual={() => void paySelectedCreator()}
+          onPayStripe={async () => {
+            if (!canUseManualPayouts(plan as PlanTier)) {
+              alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
+              return;
+            }
+            const amount = Number(activeCreator.balance) || 0;
+            if (!amount || amount <= 0) return;
+            primeNotificationSound();
+            setPayingId(activeCreator.id);
+            try {
+              const res = await fetch("/api/payouts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, creatorId: activeCreator.id, amount }),
+              });
+              const data = await res.json();
+              if (data.success) {
+                setPayMessage(
+                  lang === "fr"
+                    ? `Virement de ${formatCurrency(amount, lang)} envoyé à ${activeCreator.full_name || activeCreator.handle}.`
+                    : `Transfer of ${formatCurrency(amount, lang)} sent to ${activeCreator.full_name || activeCreator.handle}.`,
+                );
+                notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
+                const r = await fetch(`/api/creators-list?userId=${userId}`);
+                const list = await r.json();
+                if (Array.isArray(list)) setCreators(list);
+                void loadCompletedPayouts();
+                dispatchPayoutsUpdated();
+                closeCreatorPayout();
+              } else {
+                alert(data.error || "Payout failed");
+              }
+            } catch {
+              alert("Payout failed");
+            } finally {
+              setPayingId(null);
+            }
+          }}
+          onConnectStripeBank={async () => {
+            setRegisteringId(activeCreator.id);
+            try {
+              const res = await fetch("/api/payouts/connect", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ creatorId: activeCreator.id, email: activeCreator.email }),
+              });
+              const data = await res.json();
+              if (data.url) window.open(data.url, "_blank");
+              else alert(data.error || "Could not start bank connection");
+            } catch {
+              alert("Could not start bank connection");
+            } finally {
+              setRegisteringId(null);
+            }
+          }}
+        />
+        {confirmPayModal}
       </>
     );
   }
 
   return (
     <>
-      <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Suivez les commissions et payez les créateurs automatiquement lors des ventes Shopify" : "Track commissions and pay creators automatically when Shopify sales come in"} />
-      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, background: "#FFFFFF" }}>
-        <div style={{ display: "flex", gap: 4, marginBottom: 0, borderBottom: "1px solid #EFEFEF", paddingBottom: 0 }}>
-          {[
-            { id: "overview", label: lang === "fr" ? "Aperçu" : "Overview" },
-            { id: "balances", label: lang === "fr" ? "Soldes des créateurs" : "Creator Balances" },
-            { id: "history", label: lang === "fr" ? "Paiements effectués" : "Completed payments" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setPayoutsTab(tab.id as "overview" | "balances" | "history")}
-              style={{
-                padding: "10px 16px",
-                background: "none",
-                border: "none",
-                borderBottom: payoutsTab === tab.id ? "2px solid #0047FF" : "2px solid transparent",
-                color: payoutsTab === tab.id ? "#0047FF" : "#7A7A7A",
-                fontWeight: payoutsTab === tab.id ? 600 : 400,
-                fontSize: 14,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                letterSpacing: "-0.02em",
-                marginBottom: -1,
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : 56, position: "relative" }}>
+      <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Aperçu" : "Overview"} />
+      <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 40px 40px", position: "relative" }}>
         {!canUseManualPayouts(plan as PlanTier) && (
           <div
             style={{
@@ -1535,25 +2488,31 @@ export function PayoutsView({
           </div>
         )}
 
-        {payoutsTab === "overview" && (
-        <>
-        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 20, marginBottom: 20 }}>
-          <OwedToCreatorsSummaryCard
-            lang={lang}
-            isMobile={isMobile}
-            balance={balance}
-            creators={creators}
-            autoPayoutMonthly={autoPayoutMonthly}
-          />
-          <div style={{ width: isMobile ? "100%" : undefined, flex: isMobile ? undefined : 1 }}>
-            <PayoutsWorkspacePaymentCard />
+        {payMessage && (
+          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F0F6FF", border: "1px solid #D6E4FF", borderRadius: 10, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
+            {payMessage}
           </div>
-        </div>
+        )}
+
+        <PayoutsOverviewPanel
+          stats={payoutOverviewStats}
+          sales={trackedSales}
+          completedPayouts={completedPayouts}
+          lang={lang}
+          isMobile={isMobile}
+        />
+
+        <CreatorsPayoutTable
+          creators={creators}
+          lang={lang}
+          isMobile={isMobile}
+          onSelectCreator={openCreatorPayout}
+        />
 
         <LiveSalesFeed isMobile={isMobile} userId={userId} />
 
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 20, overflow: "hidden", position: "relative" }}>
+        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 36, overflow: "hidden", position: "relative" }}>
           {!canUseAutoPayouts(plan as PlanTier) && (
             <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
               <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
@@ -1564,12 +2523,12 @@ export function PayoutsView({
               </p>
             </div>
           )}
-          <div style={{ padding: 20, display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ flex: 1, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
                 {lang === "fr" ? "Paiement automatique" : "Automatic payout"}
               </div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
                 {lang === "fr"
                   ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement."
                   : "On the 1st of every month, all creators with a positive balance are paid automatically."}
@@ -1644,505 +2603,1011 @@ export function PayoutsView({
           )}
         </div>
 
-        <CommissionTracker
-          userId={userId}
-          shopifyStore={shopifyStore}
-          onConnectShopify={onConnectShopify}
-          lang={lang}
+      {confirmPayModal}
+
+      </div>
+    </>
+  );
+}
+
+function walletBalanceStorageKey(userId: string) {
+  return `trackit_wallet_balance_${userId}`;
+}
+
+function loadWalletBalance(userId: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(walletBalanceStorageKey(userId));
+    if (!raw) return 0;
+    const value = parseFloat(raw);
+    return Number.isFinite(value) && value > 0 ? round2(value) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveWalletBalance(userId: string, amount: number) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(walletBalanceStorageKey(userId), String(round2(amount)));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+type TransactionKind = "commission" | "payout";
+type TransactionFilter = "all" | TransactionKind;
+
+type TransactionRow = {
+  id: string;
+  kind: TransactionKind;
+  date: string;
+  creatorHandle: string;
+  creatorName?: string | null;
+  avatarUrl?: string | null;
+  platform?: string | null;
+  amount: number;
+  saleAmount?: number;
+  method?: string;
+};
+
+function buildTransactionRows(sales: TrackedSale[], payouts: CompletedPayout[], lang: "en" | "fr"): TransactionRow[] {
+  const rows: TransactionRow[] = [];
+
+  for (const sale of sales) {
+    const creator = saleCreatorMeta(sale);
+    const handle = String(creator?.handle || creator?.full_name || "creator").replace(/^@/, "");
+    rows.push({
+      id: `sale-${sale.id}`,
+      kind: "commission",
+      date: sale.created_at,
+      creatorHandle: handle,
+      creatorName: creator?.full_name,
+      avatarUrl: creator?.avatar_url,
+      platform: creator?.platform,
+      amount: Number(sale.commission_amount) || 0,
+      saleAmount: Number(sale.order_amount) || 0,
+    });
+  }
+
+  for (const payout of payouts) {
+    rows.push({
+      id: `payout-${payout.id}`,
+      kind: "payout",
+      date: payout.paid_at || payout.created_at || new Date(0).toISOString(),
+      creatorHandle: String(payout.creator?.handle || payout.creator?.full_name || "creator").replace(/^@/, ""),
+      creatorName: payout.creator?.full_name,
+      avatarUrl: payout.creator?.avatar_url,
+      platform: payout.creator?.platform,
+      amount: Number(payout.amount) || 0,
+      method: payoutMethodLabel(payout.stripe_transfer_id, lang),
+    });
+  }
+
+  return rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+function transactionMonthKey(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "unknown";
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatTransactionMonthLabel(monthKey: string, lang: "en" | "fr") {
+  if (monthKey === "unknown") return "—";
+  const [year, month] = monthKey.split("-").map(Number);
+  const d = new Date(year, (month || 1) - 1, 1);
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "long", year: "numeric" });
+}
+
+function formatTransactionDate(iso: string, lang: "en" | "fr") {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function groupTransactionsByMonth(rows: TransactionRow[]) {
+  const groups = new Map<string, TransactionRow[]>();
+  for (const row of rows) {
+    const key = transactionMonthKey(row.date);
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+  return [...groups.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, items]) => ({ key, items }));
+}
+
+function transactionKindLabel(kind: TransactionKind, lang: "en" | "fr") {
+  if (kind === "commission") return lang === "fr" ? "Commission" : "Commission";
+  return lang === "fr" ? "Paiement" : "Payout";
+}
+
+function formatTransactionAmount(row: TransactionRow, lang: "en" | "fr") {
+  const value = formatCurrency(row.amount, lang);
+  return row.kind === "payout" ? `−${value}` : value;
+}
+
+export function TransactionsView({
+  userId,
+  isMobile,
+  isCreator,
+}: {
+  userId?: string;
+  isMobile?: boolean;
+  isCreator?: boolean;
+}) {
+  const lang = useLang();
+  const { navigate } = useDashboardNavigation();
+  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
+  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const [sales, setSales] = useState<TrackedSale[]>([]);
+  const [payouts, setPayouts] = useState<CompletedPayout[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<TransactionFilter>("all");
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [saleRows, payoutRes] = await Promise.all([
+          fetchTrackedSales(userId),
+          fetch("/api/payouts/history", { cache: "no-store" }).then((r) => r.json()),
+        ]);
+        if (cancelled) return;
+        setSales(saleRows);
+        const payoutRows = (payoutRes as { payouts?: CompletedPayout[] }).payouts;
+        setPayouts(Array.isArray(payoutRows) ? payoutRows : []);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    const onUpdate = () => void load();
+    window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
+    };
+  }, [userId]);
+
+  const rows = useMemo(() => buildTransactionRows(sales, payouts, lang), [sales, payouts, lang]);
+
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (filter !== "all" && row.kind !== filter) return false;
+      if (!query) return true;
+      const name = String(row.creatorName || row.creatorHandle || "").toLowerCase();
+      const handle = String(row.creatorHandle || "").toLowerCase();
+      return name.includes(query) || handle.includes(query);
+    });
+  }, [rows, filter, search]);
+
+  const groupedRows = useMemo(() => groupTransactionsByMonth(filteredRows), [filteredRows]);
+
+  const thStyle: React.CSSProperties = {
+    padding: "16px 22px",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#6B7280",
+    textAlign: "left",
+    borderBottom: "1px solid #EFEFEF",
+    background: "#FFFFFF",
+    whiteSpace: "nowrap",
+    letterSpacing: "-0.01em",
+  };
+
+  const tdStyle: React.CSSProperties = {
+    padding: "18px 22px",
+    fontSize: 15,
+    color: "#1A1A1A",
+    borderBottom: "1px solid #F5F5F5",
+    verticalAlign: "middle",
+    letterSpacing: "-0.02em",
+  };
+
+  const sectionRowStyle: React.CSSProperties = {
+    padding: "10px 22px",
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#6B7280",
+    background: "#FAFAFA",
+    borderBottom: "1px solid #EFEFEF",
+    letterSpacing: "-0.01em",
+  };
+
+  const filterBtn = (id: TransactionFilter, label: string) => (
+    <button
+      type="button"
+      onClick={() => setFilter(id)}
+      style={{
+        background: "none",
+        border: "none",
+        padding: "0 0 8px",
+        fontSize: 14,
+        fontWeight: filter === id ? 600 : 400,
+        color: filter === id ? "#1A1A1A" : "#7A7A7A",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "-0.02em",
+        borderBottom: filter === id ? "2px solid #1A1A1A" : "2px solid transparent",
+      }}
+    >
+      {label}
+    </button>
+  );
+
+  if (isCreator) {
+    return (
+      <>
+        <PayoutsPageHeader
           isMobile={isMobile}
+          title="Payments"
+          subtitle={
+            lang === "fr"
+              ? "Historique de vos commissions et paiements reçus"
+              : "History of your commissions and received payouts"
+          }
         />
+        <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
+      </>
+    );
+  }
 
-        </>
-        )}
+  if (payItWelcomeLoading) {
+    return <PayItWelcomeLoading isMobile={isMobile} />;
+  }
 
-        {payoutsTab === "balances" && (
-        <>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-              {lang === "fr" ? "Payer les créateurs" : "Pay creators"}
-            </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 14 }}>
-              {creatorsPendingPayout.length === 0
-                ? (lang === "fr" ? "Aucun solde en attente de paiement" : "No balances awaiting payment")
-                : lang === "fr"
-                  ? `${creatorsPendingPayout.length} créateur${creatorsPendingPayout.length > 1 ? "s" : ""} à payer`
-                  : `${creatorsPendingPayout.length} creator${creatorsPendingPayout.length > 1 ? "s" : ""} to pay`}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={lang === "fr" ? "Rechercher par nom ou pseudo..." : "Search by name or handle..."}
-                style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
-              />
-            </div>
+  if (showPayItWelcome && !payItWelcomeBypass) {
+    return (
+      <PayItWelcomeView
+        isMobile={isMobile}
+        variant="transactions"
+        onPrimary={() => setPayItWelcomeBypass(true)}
+      />
+    );
+  }
+
+  const resetFilters = () => {
+    setFilter("all");
+    setSearch("");
+  };
+
+  return (
+    <>
+      <PayoutsPageHeader
+        isMobile={isMobile}
+        title="Payments"
+        trailing={
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="hero-cta-raised-light"
+            style={{ padding: "15px 24px", fontSize: 17 }}
+          >
+            {lang === "fr" ? "Réinitialiser" : "Reset"}
+          </button>
+        }
+      />
+      <div style={{ padding: isMobile ? "12px 16px 32px" : "16px 40px 48px", background: "#FFFFFF" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+            {filterBtn("all", lang === "fr" ? "Toutes" : "All")}
+            {filterBtn("commission", lang === "fr" ? "Commissions" : "Commissions")}
+            {filterBtn("payout", lang === "fr" ? "Paiements" : "Payouts")}
           </div>
-
-          {payMessage && (
-            <div style={{ margin: "14px 20px 0", padding: "12px 14px", background: "#F0F6FF", border: "1px solid #D6E4FF", borderRadius: 10, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
-              {payMessage}
-            </div>
-          )}
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {filteredPending.length === 0 ? (
-              <div style={{ padding: 48, textAlign: "center" }}>
-                <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: 6 }}>
-                  {creatorsPendingPayout.length === 0
-                    ? (lang === "fr" ? "Tous les soldes sont à jour" : "All balances are settled")
-                    : (lang === "fr" ? "Aucun créateur ne correspond à votre recherche" : "No creators match your search")}
-                </div>
-                {creatorsPendingPayout.length === 0 && (
-                  <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                    {lang === "fr" ? "Les créateurs avec un solde apparaîtront ici." : "Creators with a balance will appear here."}
-                  </div>
-                )}
-              </div>
-            ) : (
-              filteredPending.map((creator, i) => (
-                <button
-                  key={creator.id}
-                  type="button"
-                  onClick={() => setSelectedCreatorPayout(creator)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    width: "100%",
-                    padding: "16px 20px",
-                    border: "none",
-                    borderBottom: i < filteredPending.length - 1 ? "1px solid #F5F5F5" : "none",
-                    background: "#FFFFFF",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    textAlign: "left",
-                    transition: "background 0.15s",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#FAFAFA"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "#FFFFFF"; }}
-                >
-                  <CreatorAvatar src={creator.avatar_url} size={44} alt={creator.full_name || creator.handle || ""} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                      {creator.full_name || creator.handle}
-                    </div>
-                    <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 2 }}>
-                      @{creator.handle || creator.username}
-                    </div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: creatorHasPaymentMethod(creator) ? "#1A1A1A" : "#B45309", marginTop: 6, letterSpacing: "-0.01em" }}>
-                      {paymentMethodLabel(creator, lang)}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#0047FF", letterSpacing: "-0.02em" }}>
-                      {formatCurrency(Number(creator.balance) || 0, lang)}
-                    </div>
-                    <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>
-                      {lang === "fr" ? "À payer" : "Owed"}
-                    </div>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" strokeWidth="2" style={{ flexShrink: 0 }} aria-hidden><path d="M9 18l6-6-6-6"/></svg>
-                </button>
-              ))
-            )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px", minWidth: isMobile ? "100%" : 280 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={lang === "fr" ? "Rechercher un créateur..." : "Search a creator..."}
+              style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
+            />
           </div>
         </div>
 
-      {selectedCreatorPayout && (
+        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 720 : undefined }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>{lang === "fr" ? "Date" : "Date"}</th>
+                <th style={thStyle}>{lang === "fr" ? "Créateur" : "Creator"}</th>
+                <th style={thStyle}>{lang === "fr" ? "Type" : "Type"}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                    {lang === "fr" ? "Chargement…" : "Loading…"}
+                  </td>
+                </tr>
+              ) : filteredRows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                    {rows.length === 0
+                      ? lang === "fr"
+                        ? "Vos transactions apparaîtront ici."
+                        : "Your transactions will appear here."
+                      : lang === "fr"
+                        ? "Aucune transaction ne correspond à votre recherche."
+                        : "No transactions match your search."}
+                  </td>
+                </tr>
+              ) : (
+                groupedRows.map(({ key, items }) => (
+                  <Fragment key={key}>
+                    <tr>
+                      <td colSpan={4} style={sectionRowStyle}>
+                        {formatTransactionMonthLabel(key, lang)}
+                      </td>
+                    </tr>
+                    {items.map((row) => {
+                      const name = row.creatorName || row.creatorHandle || (lang === "fr" ? "Créateur" : "Creator");
+                      return (
+                        <tr
+                          key={row.id}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#FAFAFA";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#FFFFFF";
+                          }}
+                        >
+                          <td style={{ ...tdStyle, color: "#6B7280", fontSize: 14, whiteSpace: "nowrap" }}>
+                            {formatTransactionDate(row.date, lang)}
+                          </td>
+                          <td style={tdStyle}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                              <CreatorAvatar src={row.avatarUrl} username={row.creatorHandle} displayName={name} size={36} alt={name} />
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontWeight: 500, letterSpacing: "-0.02em" }}>{name}</div>
+                                {row.creatorHandle && (
+                                  <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 2 }}>@{row.creatorHandle}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ ...tdStyle, color: "#6B7280", fontSize: 14 }}>
+                            {transactionKindLabel(row.kind, lang)}
+                            {row.kind === "payout" && row.method ? ` · ${row.method}` : ""}
+                            {row.kind === "commission" && row.saleAmount
+                              ? ` · ${formatCurrency(row.saleAmount, lang)}`
+                              : ""}
+                          </td>
+                          <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, whiteSpace: "nowrap" }}>
+                            {formatTransactionAmount(row, lang)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const TRACKIT_BLUE = "#0047FF";
+
+function TrackitWalletCard({
+  lang,
+  isMobile,
+  loading,
+  error,
+  defaultMethod,
+  hasPaymentMethod,
+  onManage,
+}: {
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  loading: boolean;
+  error: string | null;
+  defaultMethod: PaymentMethod | null;
+  hasPaymentMethod: boolean;
+  onManage: () => void;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 20,
+        padding: isMobile ? 22 : 28,
+        minHeight: isMobile ? 190 : 220,
+        background: "linear-gradient(145deg, #0047FF 0%, #002FA8 100%)",
+        boxShadow: "0 16px 48px rgba(0,71,255,0.22)",
+        color: "#FFFFFF",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: -48,
+          right: -48,
+          width: 180,
+          height: 180,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.07)",
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          bottom: -32,
+          left: -32,
+          width: 120,
+          height: 120,
+          borderRadius: "50%",
+          background: "rgba(255,255,255,0.05)",
+        }}
+      />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+          <div>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                opacity: 0.72,
+                marginBottom: 6,
+              }}
+            >
+              {lang === "fr" ? "Carte de paiement" : "Payment card"}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.04em" }}>Trackit</div>
+          </div>
+          {hasPaymentMethod && defaultMethod && (
+            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", opacity: 0.9 }}>
+              {defaultMethod.brand.toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {loading ? (
+          <div style={{ fontSize: 14, opacity: 0.8, letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Chargement…" : "Loading…"}
+          </div>
+        ) : error ? (
+          <div style={{ fontSize: 13, opacity: 0.95, lineHeight: 1.5 }}>{error}</div>
+        ) : !hasPaymentMethod || !defaultMethod ? (
+          <>
+            <div
+              style={{
+                width: 44,
+                height: 32,
+                borderRadius: 6,
+                background: "rgba(255,255,255,0.18)",
+                marginBottom: 16,
+              }}
+            />
+            <div style={{ fontSize: 15, opacity: 0.88, letterSpacing: "-0.02em", lineHeight: 1.5, marginBottom: 4 }}>
+              {lang === "fr"
+                ? "Ajoutez une carte pour alimenter votre solde et payer vos créateurs."
+                : "Add a card to fund your balance and pay creators."}
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                width: 44,
+                height: 32,
+                borderRadius: 6,
+                background: "linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 100%)",
+                marginBottom: 20,
+              }}
+            />
+            <div
+              style={{
+                fontSize: isMobile ? 20 : 22,
+                fontWeight: 500,
+                letterSpacing: "0.14em",
+                marginBottom: 16,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              ···· ···· ···· {defaultMethod.last4}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, opacity: 0.75, letterSpacing: "-0.01em" }}>
+              <span>{formatPaymentLabelShort(defaultMethod, lang)}</span>
+              <span>
+                {lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div style={{ position: "relative", zIndex: 1, marginTop: 20 }}>
+        <button
+          type="button"
+          onClick={onManage}
+          className="hero-cta-raised-light"
+          style={{ padding: "12px 20px", fontSize: 14, width: isMobile ? "100%" : "auto" }}
+        >
+          {!hasPaymentMethod
+            ? lang === "fr"
+              ? "Ajouter une carte"
+              : "Add card"
+            : lang === "fr"
+              ? "Mettre à jour la carte"
+              : "Update card"}
+        </button>
+        <p style={{ fontSize: 11, opacity: 0.65, margin: "10px 0 0", letterSpacing: "-0.01em", lineHeight: 1.4 }}>
+          {lang === "fr"
+            ? "Même carte que pour votre abonnement Trackit."
+            : "Same card as your Trackit subscription."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function BalanceView({
+  userId,
+  isMobile,
+  isCreator,
+}: {
+  userId?: string;
+  isMobile?: boolean;
+  isCreator?: boolean;
+}) {
+  const lang = useLang();
+  const { navigate } = useDashboardNavigation();
+  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome, refresh: refreshPayItActivity } = usePayItActivity(userId);
+  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [creators, setCreators] = useState<PayoutTableCreator[]>([]);
+  const [addFundsOpen, setAddFundsOpen] = useState(false);
+  const [fundAmount, setFundAmount] = useState("");
+  const [payMessage, setPayMessage] = useState<string | null>(null);
+  const {
+    defaultMethod: defaultPaymentMethod,
+    hasPaymentMethod: hasBillingPaymentMethod,
+    loading: billingLoading,
+    error: billingError,
+    openManage: openBillingPaymentManage,
+  } = usePaymentMethods();
+
+  useEffect(() => {
+    if (!userId) return;
+    setWalletBalance(loadWalletBalance(userId));
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || isCreator) return;
+    fetch(`/api/creators-list?userId=${userId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setCreators(data);
+      })
+      .catch(console.error);
+  }, [userId, isCreator]);
+
+  const owedTotal = useMemo(
+    () => creators.filter((c) => (Number(c.balance) || 0) > 0).reduce((sum, c) => sum + (Number(c.balance) || 0), 0),
+    [creators],
+  );
+
+  const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+  const canAddFunds = hasBillingPaymentMethod && parsedFundAmount > 0;
+  const chargingLabel = defaultPaymentMethod ? formatPaymentLabelShort(defaultPaymentMethod, lang) : null;
+
+  const handleAddFunds = () => {
+    if (!userId) return;
+    primeNotificationSound();
+    const amount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+    if (!amount || amount <= 0) return;
+    const nextBalance = round2(walletBalance + amount);
+    setWalletBalance(nextBalance);
+    saveWalletBalance(userId, nextBalance);
+    setFundAmount("");
+    setAddFundsOpen(false);
+    setPayMessage(
+      lang === "fr"
+        ? `${formatCurrency(amount, lang)} ajoutés à votre solde.`
+        : `${formatCurrency(amount, lang)} added to your balance.`,
+    );
+    notifyFundsAdded(lang, amount, userId);
+    void refreshPayItActivity();
+  };
+
+  const openAddFunds = (presetAmount?: number) => {
+    if (presetAmount != null) setFundAmount(String(presetAmount));
+    setAddFundsOpen(true);
+  };
+
+  const balanceHint =
+    owedTotal > walletBalance
+      ? lang === "fr"
+        ? `${formatCurrency(owedTotal - walletBalance, lang)} à ajouter pour couvrir les commissions`
+        : `${formatCurrency(owedTotal - walletBalance, lang)} needed to cover commissions`
+      : lang === "fr"
+        ? "Prêt pour les prochains paiements"
+        : "Ready for upcoming payouts";
+
+  const owedHint =
+    owedTotal > 0
+      ? lang === "fr"
+        ? "Montants dus aux créateurs"
+        : "Amounts due to creators"
+      : lang === "fr"
+        ? "Aucune commission en attente"
+        : "No commissions pending";
+
+  if (isCreator) {
+    return (
+      <>
+        <PayoutsPageHeader
+          isMobile={isMobile}
+          title={lang === "fr" ? "Solde" : "Balance"}
+          subtitle={
+            lang === "fr"
+              ? "Vos commissions et vos coordonnées de virement"
+              : "Your commissions and payout details"
+          }
+        />
+        <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
+      </>
+    );
+  }
+
+  if (payItWelcomeLoading) {
+    return <PayItWelcomeLoading isMobile={isMobile} />;
+  }
+
+  if (showPayItWelcome && !payItWelcomeBypass) {
+    return (
+      <PayItWelcomeView
+        isMobile={isMobile}
+        variant="balance"
+        onPrimary={() => {
+          setPayItWelcomeBypass(true);
+          openAddFunds();
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <PayoutsPageHeader
+        isMobile={isMobile}
+        title={lang === "fr" ? "Solde" : "Balance"}
+        subtitle={
+          lang === "fr"
+            ? "Alimentez votre compte pour payer les créateurs"
+            : "Fund your account to pay creators"
+        }
+      />
+      <div
+        style={{
+          padding: isMobile ? "12px 16px 32px" : "16px 40px 48px",
+          background: "#FFFFFF",
+          minHeight: "calc(100vh - 120px)",
+        }}
+      >
+        {payMessage && (
+          <div
+            style={{
+              marginBottom: 24,
+              padding: "12px 16px",
+              background: "#F0FFF4",
+              border: "1px solid #C6F6D5",
+              borderRadius: 12,
+              fontSize: 14,
+              color: "#1A1A1A",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {payMessage}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 340px",
+            gap: isMobile ? 20 : 24,
+            marginBottom: 20,
+            alignItems: "stretch",
+          }}
+        >
+          <div
+            style={{
+              border: "1px solid #EFEFEF",
+              borderRadius: 16,
+              padding: isMobile ? 22 : 28,
+              background: "#FFFFFF",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10 }}>
+              {lang === "fr" ? "Solde disponible" : "Available balance"}
+            </div>
+            <div
+              style={{
+                fontSize: isMobile ? 36 : 44,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                letterSpacing: "-0.04em",
+                lineHeight: 1.05,
+                marginBottom: 10,
+              }}
+            >
+              {formatCurrency(walletBalance, lang)}
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: owedTotal > walletBalance ? TRACKIT_BLUE : "#9A9A9A",
+                letterSpacing: "-0.01em",
+                lineHeight: 1.45,
+              }}
+            >
+              {balanceHint}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 12,
+                marginTop: 28,
+                paddingTop: 28,
+                borderTop: "1px solid #EFEFEF",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => openAddFunds()}
+                className="hero-cta-raised-light"
+                style={{ padding: "15px 24px", fontSize: 17 }}
+              >
+                {lang === "fr" ? "Ajouter des fonds" : "Add funds"}
+              </button>
+              {owedTotal > 0 && (
+                <button
+                  type="button"
+                  onClick={() => navigate({ view: "payouts" })}
+                  style={{ ...payoutPageSecondaryBtn, padding: "15px 24px", fontSize: 15 }}
+                >
+                  {lang === "fr" ? "Voir les paiements" : "View payouts"}
+                </button>
+              )}
+            </div>
+
+            {hasBillingPaymentMethod && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 10 }}>
+                  {lang === "fr" ? "Montants rapides" : "Quick amounts"}
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {[50, 100, 250, 500].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => openAddFunds(amt)}
+                      style={{
+                        ...payoutPageSecondaryBtn,
+                        padding: "8px 14px",
+                        fontSize: 13,
+                        borderRadius: 999,
+                      }}
+                    >
+                      {formatCurrency(amt, lang)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <TrackitWalletCard
+            lang={lang}
+            isMobile={isMobile}
+            loading={billingLoading}
+            error={billingError}
+            defaultMethod={defaultPaymentMethod}
+            hasPaymentMethod={hasBillingPaymentMethod}
+            onManage={openBillingPaymentManage}
+          />
+        </div>
+
+        <div
+          style={{
+            border: "1px solid #EFEFEF",
+            borderRadius: 16,
+            padding: isMobile ? 20 : 24,
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "stretch" : "center",
+            justifyContent: "space-between",
+            gap: isMobile ? 16 : 24,
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 8 }}>
+              {lang === "fr" ? "Commissions à verser" : "Commissions owed"}
+            </div>
+            <div
+              style={{
+                fontSize: isMobile ? 28 : 32,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                letterSpacing: "-0.04em",
+                lineHeight: 1.05,
+                marginBottom: 6,
+              }}
+            >
+              {formatCurrency(owedTotal, lang)}
+            </div>
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{owedHint}</div>
+          </div>
+          {owedTotal > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate({ view: "payouts" })}
+              className="hero-cta-raised-light"
+              style={{ padding: "12px 20px", fontSize: 14, flexShrink: 0, alignSelf: isMobile ? "stretch" : "center" }}
+            >
+              {lang === "fr" ? "Payer les créateurs" : "Pay creators"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {addFundsOpen && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            zIndex: 1000,
+            background: "rgba(0,0,0,0.4)",
             display: "flex",
-            alignItems: isMobile ? "flex-end" : "center",
+            alignItems: "center",
             justifyContent: "center",
-            padding: isMobile ? 0 : 24,
+            zIndex: 1000,
+            padding: 24,
           }}
-          onClick={() => setSelectedCreatorPayout(null)}
+          onClick={() => setAddFundsOpen(false)}
         >
           <div
             style={{
               background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
-              borderRadius: isMobile ? "20px 20px 0 0" : 16,
-              width: "100%",
+              borderRadius: 16,
+              padding: 28,
               maxWidth: 440,
-              maxHeight: isMobile ? "92vh" : "90vh",
-              display: "flex",
-              flexDirection: "column",
+              width: "100%",
               boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: "22px 24px 20px", borderBottom: "1px solid #EFEFEF", display: "flex", alignItems: "flex-start", gap: 14, flexShrink: 0 }}>
-              <CreatorAvatar src={selectedCreatorPayout.avatar_url} size={52} alt={selectedCreatorPayout.full_name || selectedCreatorPayout.handle || ""} />
-              <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
-                  {selectedCreatorPayout.full_name || selectedCreatorPayout.handle}
-                </div>
-                <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 4 }}>
-                  @{selectedCreatorPayout.handle || selectedCreatorPayout.username}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedCreatorPayout(null)}
-                aria-label={lang === "fr" ? "Fermer" : "Close"}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", fontSize: 22, lineHeight: 1, fontFamily: "inherit", padding: 4, marginTop: -2 }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div style={{ flex: 1, overflow: "auto", padding: "24px 24px 8px" }}>
-              <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 16, paddingBottom: 20, borderBottom: "1px solid #F5F5F5" }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8, textTransform: "uppercase", fontWeight: 600 }}>
-                    {lang === "fr" ? "Solde à payer" : "Balance owed"}
-                  </div>
-                  <div style={{ fontSize: 36, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
-                    {formatCurrency(Number(selectedCreatorPayout.balance) || 0, lang)}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.6 }}>
-                  <div>
-                    <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Total gagné" : "Total earned"}</span>
-                    {" "}
-                    <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{formatCurrency(selectedCreatorPayout.total_earned || 0, lang)}</span>
-                  </div>
-                  <div>
-                    <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Ventes" : "Sales"}</span>
-                    {" "}
-                    <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{selectedCreatorPayout.total_sales || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 28 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8, letterSpacing: "-0.02em" }}>
-                  {lang === "fr" ? "Méthode de paiement" : "Payment method"}
-                </div>
-                {creatorHasPaymentMethod(selectedCreatorPayout) ? (
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                    {paymentMethodLabel(selectedCreatorPayout, lang)}
-                    <span style={{ fontWeight: 400, color: "#7A7A7A" }}> · </span>
-                    <span style={{ fontWeight: 400, color: "#1A1A1A", wordBreak: "break-all" }}>
-                      {selectedCreatorPayout.paypal_link || selectedCreatorPayout.revolut_link || selectedCreatorPayout.iban}
-                    </span>
-                  </p>
-                ) : (
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#DC2626", letterSpacing: "-0.01em", lineHeight: 1.5 }}>
-                    {lang === "fr" ? "Aucun moyen de paiement renseigné — ajoutez PayPal, Revolut ou IBAN ci-dessous." : "No payment method on file — add PayPal, Revolut, or IBAN below."}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 14, letterSpacing: "-0.02em" }}>
-                  {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
-                </div>
-                <CreatorPayoutMethodFields
-                  ref={payoutFieldsRef}
-                  creator={selectedCreatorPayout}
-                  lang={lang}
-                  onUpdate={(next) => {
-                    setSelectedCreatorPayout(next);
-                    setCreators((list) => list.map((c) => (c.id === next.id ? next : c)));
-                  }}
-                  onDraftChange={(next) => {
-                    setSelectedCreatorPayout(next);
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ padding: "16px 24px 24px", borderTop: "1px solid #EFEFEF", flexShrink: 0, background: "#FFFFFF" }}>
-              {selectedCreatorPayout.stripe_account_id ? (
-                <button
-                  type="button"
-                  disabled={!selectedCreatorPayout.balance || selectedCreatorPayout.balance <= 0 || payingId === selectedCreatorPayout.id}
-                  onClick={async () => {
-                    if (!canUseManualPayouts(plan as PlanTier)) {
-                      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
-                      return;
-                    }
-                    const amount = selectedCreatorPayout.balance;
-                    if (!amount || amount <= 0) return;
-                    setPayingId(selectedCreatorPayout.id);
-                    try {
-                      const res = await fetch("/api/payouts", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userId, creatorId: selectedCreatorPayout.id, amount }),
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        setPayMessage(
-                          lang === "fr"
-                            ? `Virement de ${formatCurrency(amount, lang)} envoyé à ${selectedCreatorPayout.full_name || selectedCreatorPayout.handle}.`
-                            : `Transfer of ${formatCurrency(amount, lang)} sent to ${selectedCreatorPayout.full_name || selectedCreatorPayout.handle}.`
-                        );
-                        notifyCreatorPaid(lang, selectedCreatorPayout.full_name || selectedCreatorPayout.handle || "creator", amount);
-                        const r = await fetch(`/api/creators-list?userId=${userId}`);
-                        const list = await r.json();
-                        if (Array.isArray(list)) setCreators(list);
-                        void loadCompletedPayouts();
-                        dispatchPayoutsUpdated();
-                        setSelectedCreatorPayout(null);
-                      } else {
-                        alert(data.error || "Payout failed");
-                      }
-                    } catch {
-                      alert("Payout failed");
-                    } finally {
-                      setPayingId(null);
-                    }
-                  }}
-                  className="hero-cta-shopify-light hero-cta-compact"
-                  style={{ width: "100%", marginBottom: 8, opacity: selectedCreatorPayout.balance > 0 ? 1 : 0.5 }}
-                >
-                  {payingId === selectedCreatorPayout.id
-                    ? (lang === "fr" ? "Virement en cours…" : "Sending transfer…")
-                    : `${lang === "fr" ? "Payer par virement Stripe" : "Pay via Stripe transfer"} · ${formatCurrency(selectedCreatorPayout.balance || 0, lang)}`}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={registeringId === selectedCreatorPayout.id}
-                  onClick={async () => {
-                    setRegisteringId(selectedCreatorPayout.id);
-                    try {
-                      const res = await fetch("/api/payouts/connect", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ creatorId: selectedCreatorPayout.id, email: selectedCreatorPayout.email }),
-                      });
-                      const data = await res.json();
-                      if (data.url) window.open(data.url, "_blank");
-                      else alert(data.error || "Could not start bank connection");
-                    } catch {
-                      alert("Could not start bank connection");
-                    } finally {
-                      setRegisteringId(null);
-                    }
-                  }}
-                  className="hero-cta-shopify-light hero-cta-compact"
-                  style={{ width: "100%", marginBottom: 8 }}
-                >
-                  {registeringId === selectedCreatorPayout.id
-                    ? (lang === "fr" ? "Ouverture…" : "Opening…")
-                    : (lang === "fr" ? "Connecter un compte bancaire (Stripe)" : "Connect bank account (Stripe)")}
-                </button>
-              )}
-
-              <button
-                type="button"
-                disabled={
-                  !selectedCreatorPayout.balance ||
-                  selectedCreatorPayout.balance <= 0 ||
-                  payingId === selectedCreatorPayout.id ||
-                  !creatorHasPaymentMethod(selectedCreatorPayout)
-                }
-                onClick={() => void paySelectedCreator()}
-                className="hero-cta-shopify hero-cta-compact"
-                style={{
-                  width: "100%",
-                  opacity: selectedCreatorPayout.balance > 0 && creatorHasPaymentMethod(selectedCreatorPayout) ? 1 : 0.5,
-                }}
-              >
-                {selectedCreatorPayout.balance > 0
-                  ? `${lang === "fr" ? "Payer" : "Pay"} ${formatCurrency(selectedCreatorPayout.balance, lang)}`
-                  : (lang === "fr" ? "Aucun solde à payer" : "No balance to pay")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-        </>
-        )}
-
-        {payoutsTab === "history" && (
-        <>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
-              {lang === "fr" ? "Paiements effectués" : "Completed payments"}
-            </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 14 }}>
-              {completedPayouts.length === 0
-                ? (lang === "fr" ? "Aucun paiement enregistré pour le moment" : "No payments recorded yet")
-                : lang === "fr"
-                  ? `${completedPayouts.length} paiement${completedPayouts.length > 1 ? "s" : ""} · ${formatCurrency(completedPayoutsTotal, lang)} versés au total`
-                  : `${completedPayouts.length} payment${completedPayouts.length > 1 ? "s" : ""} · ${formatCurrency(completedPayoutsTotal, lang)} paid in total`}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px" }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder={lang === "fr" ? "Rechercher par nom ou pseudo..." : "Search by name or handle..."}
-                style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {historyLoading ? (
-              <div style={{ padding: 48, textAlign: "center", fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
-                {lang === "fr" ? "Chargement…" : "Loading…"}
-              </div>
-            ) : filteredCompletedPayouts.length === 0 ? (
-              <div style={{ padding: 48, textAlign: "center" }}>
-                <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", marginBottom: 6 }}>
-                  {completedPayouts.length === 0
-                    ? (lang === "fr" ? "Vos paiements confirmés apparaîtront ici" : "Your confirmed payments will appear here")
-                    : (lang === "fr" ? "Aucun paiement ne correspond à votre recherche" : "No payments match your search")}
-                </div>
-                {completedPayouts.length === 0 && (
-                  <div style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                    {lang === "fr"
-                      ? "PayPal, Revolut, IBAN et Stripe Connect sont enregistrés automatiquement."
-                      : "PayPal, Revolut, IBAN and Stripe Connect payouts are recorded automatically."}
-                  </div>
-                )}
-              </div>
-            ) : (
-              filteredCompletedPayouts.map((payout, i) => {
-                const creatorName = payout.creator?.full_name || payout.creator?.handle || (lang === "fr" ? "Créateur" : "Creator");
-                const creatorHandle = payout.creator?.handle || "";
-                const method = payoutMethodLabel(payout.stripe_transfer_id, lang);
-                return (
-                  <div
-                    key={payout.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 14,
-                      width: "100%",
-                      padding: "16px 20px",
-                      borderBottom: i < filteredCompletedPayouts.length - 1 ? "1px solid #F5F5F5" : "none",
-                      background: "#FFFFFF",
-                    }}
-                  >
-                    <CreatorAvatar src={payout.creator?.avatar_url} size={44} alt={creatorName} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-                        {creatorName}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 3 }}>
-                        {creatorHandle ? `@${creatorHandle}` : "—"}
-                        {payout.creator?.platform ? ` · ${payout.creator.platform}` : ""}
-                      </div>
-                      <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", marginTop: 4 }}>
-                        {formatPayoutDate(payout.paid_at || payout.created_at, lang)}
-                        {" · "}
-                        {method}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                        {formatCurrency(Number(payout.amount) || 0, lang)}
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", marginTop: 4, letterSpacing: "-0.01em" }}>
-                        {lang === "fr" ? "Payé" : "Paid"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-        </>
-        )}
-
-      {confirmPay && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-              alt="Trackit"
-              style={{ height: 96, width: "auto", display: "block", margin: "0 auto 20px", objectFit: "contain" }}
-            />
-            <h3 style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-              {lang === "fr" ? "Le virement a été effectué ?" : "Did you complete the transfer?"}
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>
+              {lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}
             </h3>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 6px", lineHeight: 1.5 }}>
-              {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
-              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
-              {lang === "fr" ? "à" : "to"}{" "}
-              <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>
+              {lang === "fr" ? "Solde actuel :" : "Current balance:"} {formatCurrency(walletBalance, lang)}
             </p>
-            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
-              {lang === "fr"
-                ? "Si vous confirmez, le paiement est enregistré et le solde du créateur est remis à zéro."
-                : "If you confirm, the payment is recorded and the creator's balance is reset."}
-            </p>
-            <button type="button" onClick={() => void confirmManualPayout()} style={{ width: "100%", padding: "13px 0", background: "#1A1A1A", color: "#FFFFFF", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
-              {lang === "fr" ? "Oui, virement effectué ✓" : "Yes, transfer completed ✓"}
-            </button>
-            <button type="button" onClick={() => { setConfirmPay(null); pendingConfirmRef.current = null; paymentLeftTabRef.current = false; }} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-              {lang === "fr" ? "Non, pas encore" : "No, not yet"}
-            </button>
-          </div>
-        </div>
-      )}
-      {payoutModal === "addFunds" && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={() => setPayoutModal(null)}>
-          <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 440, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>{lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}</h3>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>Current balance: {formatCurrency(balance, lang)}</p>
             {!hasBillingPaymentMethod ? (
               <>
-                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0" }}>
+                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0", lineHeight: 1.5 }}>
                   {lang === "fr"
-                    ? "Ajoutez la carte utilisée pour votre abonnement (facturation Stripe) avant d'alimenter votre solde."
-                    : "Add the card used for your subscription (Stripe billing) before you can fund your balance."}
+                    ? "Ajoutez d'abord votre carte Trackit bleue pour débiter votre solde."
+                    : "Add your Trackit payment card first to fund your balance."}
                 </p>
-                <button
-                  type="button"
-                  onClick={openBillingPaymentManage}
-                  style={{ ...payoutsBtnPrimary, width: "100%" }}
-                >
-                  {lang === "fr" ? "Ouvrir la facturation" : "Open billing"}
+                <button type="button" onClick={openBillingPaymentManage} className="hero-cta-raised-light" style={{ padding: "14px 20px", fontSize: 15, width: "100%" }}>
+                  {lang === "fr" ? "Ajouter une carte" : "Add card"}
                 </button>
               </>
             ) : (
               <>
-                <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>Charging {chargingLabel}</p>
-                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>Amount to add</label>
+                <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>
+                  {lang === "fr" ? "Débit sur" : "Charging"} {chargingLabel}
+                </p>
+                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>
+                  {lang === "fr" ? "Montant à ajouter" : "Amount to add"}
+                </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>$</span>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{lang === "fr" ? "€" : "$"}</span>
                   <input
                     type="text"
                     inputMode="decimal"
                     value={fundAmount}
                     onChange={(e) => setFundAmount(e.target.value)}
                     placeholder="0.00"
-                    style={{ flex: 1, boxSizing: "border-box", padding: "12px 14px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 18, fontFamily: "inherit", color: "#1A1A1A", letterSpacing: "-0.02em" }}
+                    style={{
+                      flex: 1,
+                      boxSizing: "border-box",
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      border: "1px solid #E5E5E5",
+                      fontSize: 18,
+                      fontFamily: "inherit",
+                      color: "#1A1A1A",
+                      letterSpacing: "-0.02em",
+                    }}
                   />
                 </div>
                 <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
                   {[50, 100, 250, 500].map((amt) => (
-                    <button key={amt} type="button" onClick={() => setFundAmount(String(amt))} style={{ ...payoutsBtnSecondary, padding: "6px 12px", fontSize: 12 }}>{formatCurrency(amt, lang)}</button>
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setFundAmount(String(amt))}
+                      style={{ ...payoutPageSecondaryBtn, padding: "6px 12px", fontSize: 12, borderRadius: 999 }}
+                    >
+                      {formatCurrency(amt, lang)}
+                    </button>
                   ))}
                 </div>
-                <button type="button" onClick={handleAddFunds} disabled={!canAddFunds} style={{ ...payoutsBtnPrimary, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}>Add funds</button>
+                <button
+                  type="button"
+                  onClick={handleAddFunds}
+                  disabled={!canAddFunds}
+                  className="hero-cta-raised-light"
+                  style={{ padding: "14px 20px", fontSize: 15, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}
+                >
+                  {lang === "fr" ? "Ajouter des fonds" : "Add funds"}
+                </button>
               </>
             )}
-            <button type="button" onClick={() => setPayoutModal(null)} style={{ ...payoutsBtnSecondary, width: "100%", marginTop: 10 }}>Cancel</button>
+            <button
+              type="button"
+              onClick={() => setAddFundsOpen(false)}
+              style={{ ...payoutPageSecondaryBtn, width: "100%", marginTop: 10 }}
+            >
+              {lang === "fr" ? "Annuler" : "Cancel"}
+            </button>
           </div>
         </div>
       )}
-
-      </div>
     </>
   );
 }

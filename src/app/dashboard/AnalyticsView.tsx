@@ -10,6 +10,15 @@ import { campaignStatusLabel } from "@/lib/campaign-status";
 import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import {
+  COMMISSION_NOT_CONFIGURED_CODE,
+  commissionNotConfiguredMessage,
+  commissionRateFromDiscoverySnapshot,
+  normalizeCreatorHandle,
+} from "@/lib/managed-creator-commission";
+import { notifySaleRecorded } from "@/lib/notifications-storage";
+import { primeNotificationSound } from "@/lib/notification-sound";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -38,6 +47,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
+  const { navigate } = useDashboardNavigation();
 
   if (isCreator) {
     return <CreatorAnalytics userId={userId} isMobile={isMobile} />;
@@ -76,6 +86,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ userId }),
             });
+            dispatchSalesUpdated();
             data = await fetchAnalytics(range);
           } catch {
             // Keep first analytics payload if sync fails
@@ -200,7 +211,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     | undefined;
 
   const [showSaleModal, setShowSaleModal] = useState(false);
-  const [saleCreators, setSaleCreators] = useState<{ id: string; label: string }[]>([]);
+  const [saleCreators, setSaleCreators] = useState<{ id: string; label: string; handle: string; commission?: number }[]>([]);
   const [saleCreatorId, setSaleCreatorId] = useState("");
   const [saleAmount, setSaleAmount] = useState("");
   const [saleDate, setSaleDate] = useState("");
@@ -212,12 +223,31 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     setShowSaleModal(true);
     setSaleMsg("");
     try {
-      const res = await fetch(`/api/creators-list?userId=${userId}`);
-      const data = await res.json();
-      const list = (data.creators || data || []).map((c: { id: string; full_name?: string; handle?: string }) => ({
-        id: c.id,
-        label: c.full_name || c.handle || c.id,
-      }));
+      const [creatorsRes, savedRes] = await Promise.all([
+        fetch(`/api/creators-list?userId=${userId}`),
+        fetch("/api/saved", { cache: "no-store" }),
+      ]);
+      const data = await creatorsRes.json();
+      const savedData = savedRes.ok ? await savedRes.json() : { rows: [] };
+
+      const commissionByHandle = new Map<string, number>();
+      for (const row of savedData.rows || []) {
+        const rate = commissionRateFromDiscoverySnapshot(row.snapshot);
+        if (rate != null) {
+          commissionByHandle.set(normalizeCreatorHandle(String(row.creator_username || "")), rate);
+        }
+      }
+
+      const list = (data.creators || data || []).map((c: { id: string; full_name?: string; handle?: string }) => {
+        const handle = c.handle || "";
+        const commission = commissionByHandle.get(normalizeCreatorHandle(handle));
+        return {
+          id: c.id,
+          label: c.full_name || handle || c.id,
+          handle,
+          commission,
+        };
+      });
       setSaleCreators(list);
       if (list.length > 0) setSaleCreatorId(list[0].id);
     } catch {
@@ -227,6 +257,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
 
   const submitManualSale = async () => {
     if (!saleCreatorId || !saleAmount) return;
+    primeNotificationSound();
     setSaleBusy(true);
     setSaleMsg("");
     try {
@@ -237,6 +268,12 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       });
       const data = await res.json();
       if (data.ok) {
+        const selectedCreator = saleCreators.find((c) => c.id === saleCreatorId);
+        const creatorName = selectedCreator?.label?.trim() || (lang === "fr" ? "un créateur" : "a creator");
+        const orderTotal = Number.parseFloat(saleAmount) || 0;
+        if (userId) {
+          notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, userId);
+        }
         setSaleMsg(lang === "fr" ? `Vente ajoutée — ${data.commissionAmount}€ de commission créditée` : `Sale added — ${data.commissionAmount}€ commission credited`);
         dispatchSalesUpdated();
         setTimeout(() => {
@@ -244,7 +281,11 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
           setSaleBusy(false);
         }, 1200);
       } else {
-        setSaleMsg(data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale"));
+        setSaleMsg(
+          data.code === COMMISSION_NOT_CONFIGURED_CODE
+            ? commissionNotConfiguredMessage(lang)
+            : (lang === "fr" ? data.errorFr : undefined) || data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale")
+        );
         setSaleBusy(false);
       }
     } catch {
@@ -252,6 +293,9 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
       setSaleBusy(false);
     }
   };
+
+  const selectedSaleCreator = saleCreators.find((c) => c.id === saleCreatorId);
+  const hasSaleCommission = selectedSaleCreator?.commission != null;
 
   const saleModal = showSaleModal ? (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => !saleBusy && setShowSaleModal(false)}>
@@ -261,8 +305,30 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Créateur" : "Creator"}</label>
         <select value={saleCreatorId} onChange={(e) => setSaleCreatorId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12 }}>
           {saleCreators.length === 0 && <option value="">{lang === "fr" ? "Aucun créateur géré" : "No managed creators"}</option>}
-          {saleCreators.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          {saleCreators.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.label}
+              {c.commission != null ? ` (${c.commission}%)` : lang === "fr" ? " — commission manquante" : " — no commission"}
+            </option>
+          ))}
         </select>
+        {saleCreatorId && !hasSaleCommission ? (
+          <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, border: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+            <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.45 }}>
+              {commissionNotConfiguredMessage(lang)}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setShowSaleModal(false);
+                navigate({ view: "creators" });
+              }}
+              style={{ border: "none", background: "#0047FF", color: "#fff", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
+            >
+              {lang === "fr" ? "Ouvrir Find it → Gérer" : "Open Find it → Manage"}
+            </button>
+          </div>
+        ) : null}
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Montant de la commande (€)" : "Order amount (€)"}</label>
         <input type="number" min="0" step="0.01" value={saleAmount} onChange={(e) => setSaleAmount(e.target.value)} placeholder="149.90" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Date (optionnel)" : "Date (optional)"}</label>
@@ -278,10 +344,10 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
             </select>
           </>
         )}
-        {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
+        {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") || saleMsg.includes("commission credited") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button type="button" disabled={saleBusy} onClick={() => setShowSaleModal(false)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
-          <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>
+          <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>
         </div>
       </div>
     </div>
@@ -474,7 +540,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <CreatorAvatar src={r.avatar_url} size={36} alt={r.creator} />
+                        <CreatorAvatar src={r.avatar_url} username={r.handle} displayName={r.creator} size={36} alt={r.creator} />
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontWeight: 500, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.creator}</div>
                           {r.handle && r.creator !== `@${r.handle}` ? (

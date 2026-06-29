@@ -20,15 +20,34 @@ export function formatPaymentLabelShort(method: PaymentMethod, lang: "en" | "fr"
     : `${method.brand} ···· ${method.last4}`;
 }
 
-export function usePaymentMethods() {
-  const [methods, setMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasStripeCustomer, setHasStripeCustomer] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type SharedPaymentMethodsSnapshot = {
+  methods: PaymentMethod[];
+  hasStripeCustomer: boolean;
+  error: string | null;
+  loading: boolean;
+};
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+let sharedSnapshot: SharedPaymentMethodsSnapshot = {
+  methods: [],
+  hasStripeCustomer: false,
+  error: null,
+  loading: true,
+};
+
+let inflight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notifyListeners() {
+  listeners.forEach((listener) => listener());
+}
+
+async function fetchSharedPaymentMethods() {
+  if (inflight) return inflight;
+
+  sharedSnapshot = { ...sharedSnapshot, loading: true, error: null };
+  notifyListeners();
+
+  inflight = (async () => {
     try {
       const res = await fetch("/api/billing/payment-methods", {
         credentials: "include",
@@ -41,39 +60,77 @@ export function usePaymentMethods() {
       if (!res.ok) {
         throw new Error(data.error ?? "Failed to load payment methods");
       }
-      setMethods(data.methods ?? []);
-      setHasStripeCustomer(Boolean(data.hasStripeCustomer));
+      sharedSnapshot = {
+        methods: data.methods ?? [],
+        hasStripeCustomer: Boolean(data.hasStripeCustomer),
+        error: null,
+        loading: false,
+      };
     } catch (err) {
-      setMethods([]);
-      setHasStripeCustomer(false);
-      setError(err instanceof Error ? err.message : "Failed to load payment methods");
+      sharedSnapshot = {
+        methods: [],
+        hasStripeCustomer: false,
+        error: err instanceof Error ? err.message : "Failed to load payment methods",
+        loading: false,
+      };
     } finally {
-      setLoading(false);
+      notifyListeners();
     }
+  })().finally(() => {
+    inflight = null;
+  });
+
+  return inflight;
+}
+
+export function refreshPaymentMethods() {
+  return fetchSharedPaymentMethods();
+}
+
+export function usePaymentMethods() {
+  const [, bump] = useState(0);
+
+  useEffect(() => {
+    const listener = () => bump((n) => n + 1);
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   }, []);
 
   useEffect(() => {
-    void refresh();
+    void fetchSharedPaymentMethods();
     const onFocus = () => {
-      void refresh();
+      void fetchSharedPaymentMethods();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void fetchSharedPaymentMethods();
     };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [refresh]);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await fetchSharedPaymentMethods();
+  }, []);
 
   const openManage = useCallback(() => {
     void openStripeBillingPortal();
   }, []);
 
-  const defaultMethod = getDefaultPaymentMethod(methods);
+  const defaultMethod = getDefaultPaymentMethod(sharedSnapshot.methods);
 
   return {
-    methods,
+    methods: sharedSnapshot.methods,
     defaultMethod,
-    loading,
-    error,
-    hasStripeCustomer,
-    hasPaymentMethod: methods.length > 0,
+    loading: sharedSnapshot.loading,
+    error: sharedSnapshot.error,
+    hasStripeCustomer: sharedSnapshot.hasStripeCustomer,
+    hasPaymentMethod: sharedSnapshot.methods.length > 0,
     manageInBilling: true,
     refresh,
     openManage,

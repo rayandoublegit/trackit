@@ -25,25 +25,27 @@ function OverviewHeader({
 }: {
   isMobile?: boolean;
   title: string;
-  subtitle: string;
+  subtitle?: string;
 }) {
   return (
     <div
       style={{
-        paddingTop: isMobile ? 56 : 40,
+        paddingTop: isMobile ? 56 : subtitle ? 40 : 28,
         paddingRight: isMobile ? 16 : 40,
-        paddingBottom: isMobile ? 16 : 28,
+        paddingBottom: isMobile ? 16 : subtitle ? 28 : 16,
         paddingLeft: isMobile ? 16 : 40,
         borderBottom: "1px solid #EFEFEF",
         background: "#FFFFFF",
       }}
     >
-      <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
+      <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 8 : 0 }}>
         {title}
       </h1>
-      <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
-        {subtitle}
-      </p>
+      {subtitle ? (
+        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+          {subtitle}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -320,17 +322,8 @@ function CreatorHomeOverview({
       <OverviewHeader
         isMobile={isMobile}
         title={firstName ? (lang === "fr" ? `Bonjour, ${firstName}` : `Hi, ${firstName}`) : lang === "fr" ? "Accueil" : "Home"}
-        subtitle={
-          stats?.brandName
-            ? lang === "fr"
-              ? `Partenariat avec ${stats.brandName} — vos ventes et commissions.`
-              : `Partnership with ${stats.brandName} — your sales and commissions.`
-            : lang === "fr"
-              ? "Vue d'ensemble de votre activité créateur."
-              : "Overview of your creator activity."
-        }
       />
-      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32 }}>
+      <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 16 : 24 }}>
         {error && (
           <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", fontSize: 13, color: "#DC2626" }}>
             {error}

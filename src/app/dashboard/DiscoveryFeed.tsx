@@ -1,12 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
-import { saveCreator } from "@/lib/workspace-client";
-
-const proxy = (u?: string) => (!u ? "" : u.includes("/api/img-proxy") ? u : `/api/img-proxy?url=${encodeURIComponent(u)}`);
+import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
+import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
+import { SaveCreatorDropdown } from "@/app/dashboard/SaveCreatorDropdown";
+import { useLang } from "@/lib/useLang";
+import { discoveryCopy } from "@/lib/discovery-copy";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -23,124 +26,627 @@ function Lock({ size = 14 }: { size?: number }) {
   );
 }
 
-const FILTERS: { key: string; label: string; options: string[] }[] = [
-  { key: "niche", label: "Niche", options: ["Toutes niches", "Fitness", "Beauté", "Food", "Mode", "Tech", "Finance", "Voyage", "Gaming"] },
-  { key: "platform", label: "Plateforme", options: ["Toutes", "TikTok", "Instagram", "YouTube"] },
-  { key: "followers", label: "Abonnés", options: ["Tous", "< 50k", "50k – 500k", "500k – 2M", "2M+"] },
-  { key: "engagement", label: "Engagement", options: ["Tous", "≥ 3%", "≥ 6%", "≥ 9%"] },
-  { key: "country", label: "Localisation", options: ["Tous pays", "France", "USA", "UK", "Allemagne", "Brésil"] },
-  { key: "language", label: "Langue", options: ["Toutes", "Français", "Anglais", "Espagnol"] },
-];
+const filterSelectStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  background: "#FFFFFF",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "9px 12px",
+  fontSize: 13,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  cursor: "pointer",
+  letterSpacing: "-0.01em",
+  boxSizing: "border-box",
+};
 
-type FilterState = Record<string, string>;
+const inputStyle: React.CSSProperties = {
+  display: "block",
+  width: "100%",
+  background: "#FFFFFF",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "9px 12px",
+  fontSize: 13,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  letterSpacing: "-0.01em",
+  boxSizing: "border-box",
+};
+
+type FilterState = {
+  niche: string;
+  platform: string;
+  followersFrom: string;
+  followersTo: string;
+  engagement: string;
+  country: string;
+  language: string;
+  age: string;
+  viewsFrom: string;
+  viewsTo: string;
+  search: string;
+  hasEmail: boolean;
+  hideSaved: boolean;
+};
+
+const EMPTY_FILTERS: FilterState = {
+  niche: "",
+  platform: "tiktok",
+  followersFrom: "",
+  followersTo: "",
+  engagement: "",
+  country: "",
+  language: "",
+  age: "",
+  viewsFrom: "",
+  viewsTo: "",
+  search: "",
+  hasEmail: false,
+  hideSaved: false,
+};
+
+const FOLLOWER_VAL: Record<string, number> = {
+  "10k": 10_000,
+  "50k": 50_000,
+  "100k": 100_000,
+  "500k": 500_000,
+  "1m": 1_000_000,
+  "2m": 2_000_000,
+  "10m": 10_000_000,
+};
+
+const VIEWS_VAL: Record<string, number> = {
+  "10k": 10_000,
+  "50k": 50_000,
+  "100k": 100_000,
+  "500k": 500_000,
+  "1m": 1_000_000,
+};
 
 function toParams(f: FilterState): Record<string, string> {
   const p: Record<string, string> = {};
   if (f.niche) p.niche = f.niche;
-  if (f.platform && f.platform !== "TikTok") p.platform = f.platform; // all data is TikTok -> no-op
-  if (f.followers === "< 50k") p.maxFollowers = "50000";
-  else if (f.followers === "50k – 500k") { p.minFollowers = "50000"; p.maxFollowers = "500000"; }
-  else if (f.followers === "500k – 2M") { p.minFollowers = "500000"; p.maxFollowers = "2000000"; }
-  else if (f.followers === "2M+") p.minFollowers = "2000000";
-  if (f.engagement === "≥ 3%") p.minEngagement = "3";
-  else if (f.engagement === "≥ 6%") p.minEngagement = "6";
-  else if (f.engagement === "≥ 9%") p.minEngagement = "9";
-  const C: Record<string, string> = { France: "FR", USA: "US", UK: "GB", Allemagne: "DE", "Brésil": "BR" };
+  if (f.platform && f.platform !== "tiktok") p.platform = f.platform;
+  if (f.followersFrom && FOLLOWER_VAL[f.followersFrom]) p.minFollowers = String(FOLLOWER_VAL[f.followersFrom]);
+  if (f.followersTo && FOLLOWER_VAL[f.followersTo]) p.maxFollowers = String(FOLLOWER_VAL[f.followersTo]);
+  if (f.engagement === "3+") p.minEngagement = "3";
+  else if (f.engagement === "6+") p.minEngagement = "6";
+  else if (f.engagement === "9+") p.minEngagement = "9";
+  const C: Record<string, string> = { FR: "FR", US: "US", GB: "GB", DE: "DE", BR: "BR", ES: "ES", CA: "CA" };
   if (C[f.country]) p.country = C[f.country];
-  const L: Record<string, string> = { "Français": "fr", Anglais: "en", Espagnol: "es" };
+  const L: Record<string, string> = { fr: "fr", en: "en", es: "es", de: "de", pt: "pt" };
   if (L[f.language]) p.language = L[f.language];
   return p;
 }
 
-function VideoPreview({ creator }: { creator: FeedCreator }) {
-  const vids = (creator.topVideos || []).filter((v) => v.cover).slice(0, 4);
-  if (vids.length === 0) return null;
+function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<string>): FeedCreator[] {
+  let out = list;
+  const q = f.search.trim().toLowerCase().replace(/^@/, "");
+  if (q) {
+    out = out.filter(
+      (c) =>
+        c.username.toLowerCase().includes(q) ||
+        c.displayName.toLowerCase().includes(q) ||
+        (c.email?.toLowerCase().includes(q) ?? false)
+    );
+  }
+  if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
+  if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
+  if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => c.avgViews >= VIEWS_VAL[f.viewsFrom]);
+  if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => c.avgViews <= VIEWS_VAL[f.viewsTo]);
+  return out;
+}
+
+function estimateEngagement(c: FeedCreator) {
+  return Math.round((c.followersCount * c.engagementRate) / 100);
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  disabled,
+  onLocked,
+}: {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  onLocked?: () => void;
+}) {
+  const guard = disabled ? (e: React.SyntheticEvent) => { e.preventDefault(); onLocked?.(); } : undefined;
   return (
-    <div style={{ display: "flex", gap: 5 }}>
-      {vids.map((v, i) => (
-        <div key={v.id || i} title={v.playCount ? `${fmt(v.playCount)} vues` : undefined}
-          style={{ width: 38, aspectRatio: "9 / 16", borderRadius: 5, flexShrink: 0, position: "relative",
-            background: `#111 url("${proxy(v.cover)}") center / cover no-repeat` }}>
-          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.8)", fontSize: 11 }}>▶</span>
-        </div>
-      ))}
+    <div>
+      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
+      <select
+        value={value}
+        onChange={(e) => {
+          if (disabled) { onLocked?.(); return; }
+          onChange(e.target.value);
+        }}
+        onMouseDown={guard}
+        onKeyDown={guard}
+        style={{ ...filterSelectStyle, opacity: disabled ? 0.65 : 1 }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
 
-function FeedCard({ creator, onOpen, onUpgrade }: { creator: FeedCreator; onOpen?: () => void; onUpgrade?: () => void }) {
-  const [saved, setSaved] = useState(false);
-  const c = creator;
-  const rentaColor = c.valueScore >= 70 ? "#15803D" : c.valueScore >= 40 ? "#B45309" : "#9A1F1F";
-  const rentaBg = c.valueScore >= 70 ? "#F0FDF4" : c.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
-  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.displayName || c.username)}&background=eef1f8&color=4a6cf7&size=120&bold=true&rounded=true`;
+function FilterToggle({
+  label,
+  checked,
+  onChange,
+  disabled,
+  onLocked,
+  onLabel,
+  offLabel,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+  onLocked?: () => void;
+  onLabel: string;
+  offLabel: string;
+}) {
   return (
-    <div onClick={onOpen} style={{ background: "#FFF", border: "0.5px solid #ECECEC", borderRadius: 14, padding: 14, cursor: "pointer", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <img src={c.avatarUrl ? proxy(c.avatarUrl) : fallback} alt="" width={42} height={42} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
-          onError={(e) => { const i = e.currentTarget; if (!i.dataset.fb) { i.dataset.fb = "1"; i.src = fallback; } }} />
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.displayName}</div>
-          <div style={{ fontSize: 12, color: "#9A9A9A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>@{c.username}{c.countryCode ? ` · ${c.countryCode}` : ""}</div>
+    <div>
+      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
+      <label
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          ...filterSelectStyle,
+          cursor: disabled ? "not-allowed" : "pointer",
+          opacity: disabled ? 0.65 : 1,
+        }}
+        onClick={(e) => {
+          if (disabled) { e.preventDefault(); onLocked?.(); }
+        }}
+      >
+        <span style={{ fontSize: 13, color: "#1A1A1A", flex: 1, marginRight: 8 }}>{checked ? onLabel : offLabel}</span>
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => {
+            if (disabled) { onLocked?.(); return; }
+            onChange(e.target.checked);
+          }}
+          style={{ width: 15, height: 15, cursor: disabled ? "not-allowed" : "pointer", flexShrink: 0, marginLeft: 4 }}
+        />
+      </label>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 4 }}>
+      {children}
+    </div>
+  );
+}
+
+function FilterSidebar({
+  lang,
+  isPaid,
+  filters,
+  product,
+  onProductChange,
+  onProductBlur,
+  onChange,
+  onLocked,
+  isMobile,
+}: {
+  lang: "en" | "fr";
+  isPaid: boolean;
+  filters: FilterState;
+  product: string;
+  onProductChange: (v: string) => void;
+  onProductBlur: () => void;
+  onChange: (patch: Partial<FilterState>) => void;
+  onLocked: () => void;
+  isMobile?: boolean;
+}) {
+  const t = discoveryCopy(lang);
+  const lock = !isPaid;
+  const platforms = [
+    { id: "instagram", label: "Instagram" },
+    { id: "tiktok", label: "TikTok" },
+    { id: "youtube", label: "YouTube" },
+  ] as const;
+
+  return (
+    <aside
+      style={{
+        width: isMobile ? "100%" : 300,
+        flexShrink: 0,
+        alignSelf: isMobile ? "stretch" : "flex-start",
+        position: isMobile ? undefined : "sticky",
+        top: 0,
+        background: "#FFFFFF",
+        borderRight: isMobile ? "none" : "1px solid #EFEFEF",
+        borderBottom: isMobile ? "1px solid #EFEFEF" : "none",
+        height: isMobile ? "auto" : "100dvh",
+        maxHeight: isMobile ? undefined : "100dvh",
+        overflowY: isMobile ? "visible" : "auto",
+        overflowX: "hidden",
+        padding: isMobile ? "56px 16px 20px" : "24px 20px 40px",
+        boxSizing: "border-box",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      <h1 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: "0 0 4px" }}>{t.findItTitle}</h1>
+      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 20px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+        {t.findItSubtitle}
+      </p>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.yourProduct}</div>
+        <input
+          type="text"
+          value={product}
+          onChange={(e) => onProductChange(e.target.value)}
+          onBlur={onProductBlur}
+          placeholder={t.productPlaceholder}
+          style={inputStyle}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+        {platforms.map((p) => {
+          const active = filters.platform === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                if (lock) { onLocked(); return; }
+                onChange({ platform: p.id });
+              }}
+              style={{
+                padding: "7px 14px",
+                borderRadius: 999,
+                border: active ? "1px solid #1A1A1A" : "1px solid #E5E5E5",
+                background: active ? "#1A1A1A" : "#FFFFFF",
+                color: active ? "#FFFFFF" : "#1A1A1A",
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: "inherit",
+                cursor: lock ? "not-allowed" : "pointer",
+                opacity: lock ? 0.65 : 1,
+                letterSpacing: "-0.01em",
+              }}
+            >
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.search}</div>
+        <div style={{ position: "relative" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.45 }}>
+            <circle cx="11" cy="11" r="7" stroke="#1A1A1A" strokeWidth="1.8" />
+            <path d="M21 21l-4.35-4.35" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            value={filters.search}
+            onChange={(e) => onChange({ search: e.target.value })}
+            placeholder={t.searchPlaceholder}
+            style={{ ...inputStyle, paddingLeft: 34 }}
+          />
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: rentaColor, background: rentaBg, padding: "4px 8px", borderRadius: 8, whiteSpace: "nowrap" }}>R {c.valueScore}</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "baseline", gap: 7, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 19, fontWeight: 700, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</span>
-        <span style={{ fontSize: 12, color: "#9A9A9A" }}>abonnés</span>
-        <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "2px 8px", borderRadius: 20, textTransform: "capitalize" }}>{c.primaryNiche || c.niche}</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <FilterToggle
+          label={t.emailAvailable}
+          checked={filters.hasEmail}
+          onChange={(v) => onChange({ hasEmail: v })}
+          disabled={lock}
+          onLocked={onLocked}
+          onLabel={t.required}
+          offLabel={t.all}
+        />
+        <FilterToggle
+          label={t.hideSaved}
+          checked={filters.hideSaved}
+          onChange={(v) => onChange({ hideSaved: v })}
+          disabled={lock}
+          onLocked={onLocked}
+          onLabel={t.enabled}
+          offLabel={t.disabled}
+        />
       </div>
 
-      <VideoPreview creator={c} />
-
-      <div style={{ fontSize: 11.5, color: "#5A5A5A", display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{c.engagementRate}%</b> eng.</span>
-        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{fmt(c.avgViews)}</b> vues</span>
-        <span><b style={{ color: "#0047FF", fontWeight: 600 }}>${c.estCpm}</b> CPM</span>
-        <span><b style={{ color: "#1A1A1A", fontWeight: 600 }}>{c.authenticityScore}</b> auth.</span>
+      <SectionTitle>{t.demographics}</SectionTitle>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
+        <FilterSelect
+          label={t.niche}
+          value={filters.niche}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ niche: v })}
+          options={[
+            { value: "", label: t.allNiches },
+            { value: "Fitness", label: "Fitness" },
+            { value: "Beauté", label: t.nicheBeauty },
+            { value: "Food", label: "Food" },
+            { value: "Mode", label: t.nicheFashion },
+            { value: "Tech", label: "Tech" },
+            { value: "Finance", label: "Finance" },
+            { value: "Voyage", label: t.nicheTravel },
+            { value: "Gaming", label: "Gaming" },
+          ]}
+        />
+        <FilterSelect
+          label={t.location}
+          value={filters.country}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ country: v })}
+          options={[
+            { value: "", label: t.all },
+            { value: "FR", label: t.france },
+            { value: "US", label: t.unitedStates },
+          ]}
+        />
+        <FilterSelect
+          label={t.age}
+          value={filters.age}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ age: v })}
+          options={[
+            { value: "", label: t.all },
+            { value: "18-24", label: "18–24" },
+            { value: "25-34", label: "25–34" },
+            { value: "35-44", label: "35–44" },
+            { value: "45+", label: "45+" },
+          ]}
+        />
+        <FilterSelect
+          label={t.language}
+          value={filters.language}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ language: v })}
+          options={[
+            { value: "", label: t.allLanguages },
+            { value: "fr", label: t.french },
+            { value: "en", label: t.english },
+            { value: "es", label: t.spanish },
+            { value: "de", label: t.german },
+            { value: "pt", label: t.portuguese },
+          ]}
+        />
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderTop: "0.5px solid #F0F0F0", paddingTop: 9 }}>
-        <span style={{ fontSize: 11, color: c.email ? "#15803D" : "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "58%" }}>
-          {c.email ? `✉ ${c.email}` : "Contact via DM"}
-        </span>
-        <button type="button"
-          onClick={async (e) => { e.stopPropagation(); if (saved) return; const r = await saveCreator(c); if (r.error) { if (r.status === 402) onUpgrade?.(); return; } setSaved(true); }}
-          style={{ fontSize: 12, fontWeight: 600, color: saved ? "#15803D" : "#0047FF", background: saved ? "#F0FDF4" : "#FFF", border: `1px solid ${saved ? "#86EFAC" : "#E5E5E5"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", flexShrink: 0 }}>
-          {saved ? "✓ Sauvé" : "Sauver"}
+      <SectionTitle>{t.performance}</SectionTitle>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <FilterSelect
+            label={t.followersFrom}
+            value={filters.followersFrom}
+            disabled={lock}
+            onLocked={onLocked}
+            onChange={(v) => onChange({ followersFrom: v })}
+            options={[
+              { value: "", label: t.all },
+              { value: "10k", label: "10K" },
+              { value: "50k", label: "50K" },
+              { value: "100k", label: "100K" },
+              { value: "500k", label: "500K" },
+              { value: "1m", label: "1M" },
+              { value: "2m", label: "2M" },
+            ]}
+          />
+          <FilterSelect
+            label={t.followersTo}
+            value={filters.followersTo}
+            disabled={lock}
+            onLocked={onLocked}
+            onChange={(v) => onChange({ followersTo: v })}
+            options={[
+              { value: "", label: t.all },
+              { value: "50k", label: "50K" },
+              { value: "100k", label: "100K" },
+              { value: "500k", label: "500K" },
+              { value: "1m", label: "1M" },
+              { value: "2m", label: "2M" },
+              { value: "10m", label: "10M+" },
+            ]}
+          />
+        </div>
+        <FilterSelect
+          label={t.engagementRate}
+          value={filters.engagement}
+          disabled={lock}
+          onLocked={onLocked}
+          onChange={(v) => onChange({ engagement: v })}
+          options={[
+            { value: "", label: t.all },
+            { value: "3+", label: "≥ 3%" },
+            { value: "6+", label: "≥ 6%" },
+            { value: "9+", label: "≥ 9%" },
+          ]}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <FilterSelect
+            label={t.viewsFrom}
+            value={filters.viewsFrom}
+            disabled={lock}
+            onLocked={onLocked}
+            onChange={(v) => onChange({ viewsFrom: v })}
+            options={[
+              { value: "", label: t.all },
+              { value: "10k", label: "10K" },
+              { value: "50k", label: "50K" },
+              { value: "100k", label: "100K" },
+              { value: "500k", label: "500K" },
+            ]}
+          />
+          <FilterSelect
+            label={t.viewsTo}
+            value={filters.viewsTo}
+            disabled={lock}
+            onLocked={onLocked}
+            onChange={(v) => onChange({ viewsTo: v })}
+            options={[
+              { value: "", label: t.all },
+              { value: "50k", label: "50K" },
+              { value: "100k", label: "100K" },
+              { value: "500k", label: "500K" },
+              { value: "1m", label: "1M+" },
+            ]}
+          />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function FeedListRow({
+  lang,
+  creator,
+  saved,
+  inFolders,
+  folders,
+  isPaid,
+  onOpen,
+  onWorkspaceChange,
+  onSavedOptimistic,
+  onFoldersOptimistic,
+  onUpgrade,
+  compact,
+}: {
+  lang: "en" | "fr";
+  creator: FeedCreator;
+  saved: boolean;
+  inFolders: Set<string>;
+  folders: FolderRow[];
+  isPaid: boolean;
+  onOpen: () => void;
+  onWorkspaceChange: () => void;
+  onSavedOptimistic: (username: string, saved: boolean) => void;
+  onFoldersOptimistic: (username: string, folderId: string, inFolder: boolean) => void;
+  onUpgrade?: () => void;
+  compact?: boolean;
+}) {
+  const c = creator;
+  const t = discoveryCopy(lang);
+  const engagement = estimateEngagement(c);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: compact ? 10 : 16,
+        padding: compact ? "12px 14px" : "14px 20px",
+        background: "#FFFFFF",
+        border: "1px solid #EFEFEF",
+        borderRadius: 12,
+        transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
+        e.currentTarget.style.borderColor = "#E0E0E0";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.borderColor = "#EFEFEF";
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 200px", minWidth: 0 }}>
+        <CreatorAvatar username={c.username} src={c.avatarUrl} displayName={c.displayName} size={44} alt={c.displayName} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {c.displayName}
+            </span>
+            {c.authenticityScore >= 60 && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-label={t.verified} style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" fill="#0047FF" />
+                <path d="M8 12.5l2.5 2.5L16 9" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            @{c.username}
+          </div>
+        </div>
+      </div>
+
+      {!compact && (
+        <>
+          <div style={{ flex: "0 0 90px", textAlign: "right" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{t.followers}</div>
+          </div>
+          <div style={{ flex: "0 0 70px", textAlign: "right" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{c.engagementRate}%</div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>ER</div>
+          </div>
+          <div style={{ flex: "0 0 80px", textAlign: "right" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(engagement)}</div>
+            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{t.engagementShort}</div>
+          </div>
+        </>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: compact ? 0 : "auto" }}>
+        <SaveCreatorDropdown
+          lang={lang}
+          creator={c}
+          saved={saved}
+          inFolders={inFolders}
+          folders={folders}
+          isPaid={isPaid}
+          onUpgrade={onUpgrade}
+          onWorkspaceChange={onWorkspaceChange}
+          onSavedOptimistic={onSavedOptimistic}
+          onFoldersOptimistic={onFoldersOptimistic}
+        />
+        <button
+          type="button"
+          onClick={onOpen}
+          style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: "#1A1A1A",
+            background: "#FFFFFF",
+            border: "1px solid #E5E5E5",
+            borderRadius: 10,
+            padding: "8px 14px",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            letterSpacing: "-0.01em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t.view}
         </button>
       </div>
     </div>
   );
 }
 
-function FilterBar({ isPaid, values, onChange, onLocked, sort, onSort }: {
-  isPaid: boolean; values: FilterState; onChange: (key: string, v: string) => void; onLocked: () => void;
-  sort: string; onSort: (v: "value" | "followers" | "engagement") => void;
-}) {
-  const selStyle: React.CSSProperties = { padding: "9px 13px", borderRadius: 10, border: "1px solid #E5E5E5", fontSize: 13, color: "#1A1A1A", background: "#FFF", fontFamily: "inherit", cursor: "pointer" };
-  const guard = isPaid ? undefined : (e: React.SyntheticEvent) => { e.preventDefault(); onLocked(); };
-  return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 22 }}>
-      <select aria-label="Trier" style={{ ...selStyle, fontWeight: 600 }} value={isPaid ? sort : "value"} onMouseDown={guard} onKeyDown={guard}
-        onChange={(e) => { if (!isPaid) { e.preventDefault(); onLocked(); return; } onSort(e.target.value as "value" | "followers" | "engagement"); }}>
-        <option value="value">Tri : Rentabilité</option>
-        <option value="followers">Tri : Abonnés</option>
-        <option value="engagement">Tri : Engagement</option>
-      </select>
-      {FILTERS.map((f) => (
-        <select key={f.key} aria-label={f.label} style={selStyle} onMouseDown={guard} onKeyDown={guard}
-          value={isPaid ? (values[f.key] || f.options[0]) : f.options[0]}
-          onChange={(e) => { if (!isPaid) { e.preventDefault(); onLocked(); return; } onChange(f.key, e.target.value === f.options[0] ? "" : e.target.value); }}>
-          {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-      ))}
-    </div>
-  );
-}
-
-function UpgradeCtaButton({ onClick, fullWidth }: { onClick: () => void; fullWidth?: boolean }) {
+function UpgradeCtaButton({ lang, onClick, fullWidth }: { lang: "en" | "fr"; onClick: () => void; fullWidth?: boolean }) {
+  const t = discoveryCopy(lang);
   return (
     <button
       type="button"
@@ -156,25 +662,14 @@ function UpgradeCtaButton({ onClick, fullWidth }: { onClick: () => void; fullWid
         fontFamily: "inherit",
       }}
     >
-      <span
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          background: "rgba(255,255,255,0.18)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
+      <span style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#FFFFFF" />
         </svg>
       </span>
       <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left", flex: fullWidth ? 1 : undefined }}>
-        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Débloquer le feed complet</span>
-        <span style={{ fontSize: 11.5, fontWeight: 400, opacity: 0.88, letterSpacing: "-0.01em", marginTop: 2 }}>Filtres avancés · scroll illimité</span>
+        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1.2 }}>{t.unlockFeed}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 400, opacity: 0.88, letterSpacing: "-0.01em", marginTop: 2 }}>{t.unlockFeedSub}</span>
       </span>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0, opacity: 0.92 }}>
         <path d="M5 12h14M13 6l6 6-6 6" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -183,15 +678,16 @@ function UpgradeCtaButton({ onClick, fullWidth }: { onClick: () => void; fullWid
   );
 }
 
-function PaywallModal({ title, body, onUpgrade, onClose }: { title: string; body: string; onUpgrade: () => void; onClose: () => void }) {
+function PaywallModal({ lang, title, body, onUpgrade, onClose }: { lang: "en" | "fr"; title: string; body: string; onUpgrade: () => void; onClose: () => void }) {
+  const t = discoveryCopy(lang);
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#FFF", borderRadius: 18, padding: "30px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 24px 48px rgba(0,0,0,0.18)" }}>
         <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}><Lock size={24} /></div>
         <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 7 }}>{title}</div>
         <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.5 }}>{body}</div>
-        <UpgradeCtaButton onClick={onUpgrade} fullWidth />
-        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: "inherit" }}>Plus tard</button>
+        <UpgradeCtaButton lang={lang} onClick={onUpgrade} fullWidth />
+        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: "inherit" }}>{t.later}</button>
       </div>
     </div>
   );
@@ -200,10 +696,17 @@ function PaywallModal({ title, body, onUpgrade, onClose }: { title: string; body
 const FREE_VISIBLE = 6;
 const LIMIT = 24;
 
-export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void }) {
+export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
+  const lang = useLang();
+  const { navState, navigate, goBack } = useDashboardNavigation();
+  const t = discoveryCopy(lang);
   const isPaid = plan !== "free";
   const [creators, setCreators] = useState<FeedCreator[]>([]);
-  const [filters, setFilters] = useState<FilterState>({ niche: "", platform: "", followers: "", engagement: "", country: "", language: "" });
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
+  const [product, setProduct] = useState("");
+  const [savedUsernames, setSavedUsernames] = useState<Set<string>>(new Set());
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [folderItems, setFolderItems] = useState<FolderItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -211,12 +714,29 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
   const [error, setError] = useState<string | null>(null);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
-  const [sort, setSort] = useState<"value" | "followers" | "engagement">("value");
 
-  const params = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
+  const openCreator = (creator: FeedCreator) => {
+    setSelected(creator);
+    navigate({ view: "discovery", creator: creator.username });
+  };
+
+  useEffect(() => {
+    if (navState.view !== "discovery") return;
+    if (!navState.creator) {
+      setSelected(null);
+      return;
+    }
+    const handle = navState.creator.replace(/^@/, "").toLowerCase();
+    const found = creators.find((c) => c.username.replace(/^@/, "").toLowerCase() === handle);
+    if (found) setSelected(found);
+  }, [navState.view, navState.creator, creators]);
+  const [sort, setSort] = useState<"value" | "followers" | "engagement">("followers");
+  const mainRef = useRef<HTMLDivElement>(null);
+
+  const apiParams = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
 
   const fetchPage = useCallback(async (off: number, replace: boolean) => {
-    const qs = new URLSearchParams({ ...params, offset: String(off), limit: String(LIMIT) }).toString();
+    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(LIMIT) }).toString();
     const r = await fetch(`/api/discovery-feed?${qs}`);
     const d = await r.json();
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
@@ -224,7 +744,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
     setCreators((prev) => (replace ? list : [...prev, ...list]));
     setHasMore(!!d.hasMore);
     setOffset(off + list.length);
-  }, [params]);
+  }, [apiParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,77 +753,241 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade }: { plan: PlanTier; i
     return () => { cancelled = true; };
   }, [fetchPage]);
 
-  // Auto-load more on scroll near the bottom (paid). Re-binds on offset change
-  // so the closure always fetches the right page.
+  useEffect(() => {
+    const loadProduct = async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase) return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle();
+      if (data?.business_name) setProduct(data.business_name);
+    };
+    void loadProduct();
+  }, []);
+
+  const persistProduct = async () => {
+    const trimmed = product.trim();
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from("profiles").update({ business_name: trimmed || null }).eq("id", user.id);
+  };
+
   useEffect(() => {
     if (!isPaid || !hasMore || loading || loadingMore) return;
+    const el = mainRef.current;
+    if (!el) return;
     const onScroll = () => {
-      const el = document.scrollingElement || document.documentElement;
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 900) {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) {
         setLoadingMore(true);
         fetchPage(offset, false).finally(() => setLoadingMore(false));
       }
     };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, [isPaid, hasMore, loading, loadingMore, offset, fetchPage]);
 
-  const items = isPaid ? creators : creators.slice(0, FREE_VISIBLE + 2);
-  const hasMoreFree = !isPaid && creators.length > FREE_VISIBLE;
-  const gridCols = isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))";
+  const filtered = useMemo(() => applyClientFilters(creators, filters, savedUsernames), [creators, filters, savedUsernames]);
+  const items = isPaid ? filtered : filtered.slice(0, FREE_VISIBLE + 2);
+  const hasMoreFree = !isPaid && filtered.length > FREE_VISIBLE;
+
+  const refreshWorkspace = useCallback(async () => {
+    const [rows, f] = await Promise.all([listSaved(), listFolders()]);
+    setSavedUsernames(new Set(rows.map((r) => r.creator_username)));
+    setFolders(f.folders);
+    setFolderItems(f.items);
+  }, []);
+
+  useEffect(() => {
+    void refreshWorkspace();
+  }, [refreshWorkspace]);
+
+  const folderIdsFor = useCallback(
+    (username: string) => new Set(folderItems.filter((i) => i.creator_username === username).map((i) => i.folder_id)),
+    [folderItems]
+  );
+
+  const onSavedOptimistic = useCallback((username: string, saved: boolean) => {
+    setSavedUsernames((prev) => {
+      const next = new Set(prev);
+      if (saved) next.add(username);
+      else next.delete(username);
+      return next;
+    });
+  }, []);
+
+  const onFoldersOptimistic = useCallback((username: string, folderId: string, inFolder: boolean) => {
+    setFolderItems((items) => {
+      if (inFolder) {
+        if (items.some((i) => i.folder_id === folderId && i.creator_username === username)) return items;
+        return [...items, { folder_id: folderId, creator_username: username }];
+      }
+      return items.filter((i) => !(i.folder_id === folderId && i.creator_username === username));
+    });
+  }, []);
 
   return (
-    <div style={{ padding: isMobile ? "56px 16px 40px" : "40px", background: "#FFF", minHeight: "100vh" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0 }}>Discovery</h1>
-      <p style={{ fontSize: 14, color: "#7A7A7A", margin: "6px 0 20px" }}>Trouve les meilleurs créateurs — aperçu complet du compte, vidéos et analyse de rentabilité.</p>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        flex: 1,
+        height: isMobile ? "auto" : "100%",
+        minHeight: isMobile ? "100vh" : 0,
+        overflow: "hidden",
+        background: "#F5F5F5",
+        alignItems: isMobile ? "stretch" : "flex-start",
+      }}
+    >
+      <FilterSidebar
+        lang={lang}
+        isPaid={isPaid}
+        filters={filters}
+        product={product}
+        onProductChange={setProduct}
+        onProductBlur={() => void persistProduct()}
+        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+        onLocked={() => setFilterPaywall(true)}
+        isMobile={isMobile}
+      />
 
-      <FilterBar isPaid={isPaid} values={filters} onLocked={() => setFilterPaywall(true)}
-        onChange={(key, v) => setFilters((prev) => ({ ...prev, [key]: v }))}
-        sort={sort} onSort={setSort} />
-
-      {loading && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Chargement du feed…</div>}
-      {!loading && error && <div style={{ color: "#dc2626", fontSize: 14 }}>Erreur : {error}</div>}
-      {!loading && !error && creators.length === 0 && <div style={{ color: "#9A9A9A", fontSize: 14 }}>Aucun créateur pour ces filtres.</div>}
-
-      <div style={{ position: "relative" }}>
-        <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 16 }}>
-          {items.map((c, i) => {
-            const locked = !isPaid && i >= FREE_VISIBLE;
-            return (
-              <div key={c.username} aria-hidden={locked || undefined} style={locked ? { filter: "blur(7px)", opacity: 0.5, pointerEvents: "none" } : undefined}>
-                <FeedCard creator={c} onOpen={() => setSelected(c)} onUpgrade={onUpgrade} />
+      <div ref={mainRef} style={{ flex: 1, minWidth: 0, minHeight: 0, height: isMobile ? "auto" : "100%", overflow: isMobile ? "visible" : "auto" }}>
+        <div style={{ padding: isMobile ? "16px" : "20px 24px 40px" }}>
+          {!isMobile && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>Powered by</span>
+                <img
+                  src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+                  alt="Trackit"
+                  style={{ height: 56, width: "auto", display: "block", objectFit: "contain" }}
+                />
               </div>
-            );
-          })}
-        </div>
-
-        {hasMoreFree && (
-          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 420, background: "linear-gradient(rgba(255,255,255,0), #FFF 62%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 40, pointerEvents: "none" }}>
-            <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 28px 24px", textAlign: "center", maxWidth: 420, width: "min(100%, 420px)", boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
-              <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
-              <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6, letterSpacing: "-0.03em" }}>Des milliers de créateurs t&apos;attendent</div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.55, maxWidth: 320, marginLeft: "auto", marginRight: "auto" }}>Accède à tout le feed, aux filtres avancés et au défilement illimité.</div>
-              <UpgradeCtaButton onClick={onUpgrade} fullWidth />
             </div>
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              marginBottom: 12,
+              flexWrap: "wrap",
+            }}
+          >
+            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+              {loading ? t.loading : t.creatorCount(filtered.length)}
+            </p>
+            {!isMobile && (
+              <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                {(["followers", "engagement"] as const).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      if (!isPaid) { setFilterPaywall(true); return; }
+                      setSort(key);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      fontFamily: "inherit",
+                      cursor: "pointer",
+                      color: sort === key ? "#1A1A1A" : "#9A9A9A",
+                      fontWeight: sort === key ? 600 : 400,
+                      fontSize: 11,
+                      padding: 0,
+                    }}
+                  >
+                    {key === "followers" ? t.followers : "ER%"}
+                    {sort === key ? " ↓" : ""}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+
+          {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
+          {!loading && !error && filtered.length === 0 && (
+            <div style={{ background: "#FFF", border: "1px dashed #E5E5E5", borderRadius: 12, padding: 48, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+              {t.noCreators}
+            </div>
+          )}
+
+          <div style={{ position: "relative" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {items.map((c, i) => {
+                const locked = !isPaid && i >= FREE_VISIBLE;
+                return (
+                  <div key={c.username} aria-hidden={locked || undefined} style={locked ? { filter: "blur(6px)", opacity: 0.45, pointerEvents: "none" } : undefined}>
+                    <FeedListRow
+                      lang={lang}
+                      creator={c}
+                      saved={savedUsernames.has(c.username)}
+                      inFolders={folderIdsFor(c.username)}
+                      folders={folders}
+                      isPaid={isPaid}
+                      compact={isMobile}
+                      onOpen={() => openCreator(c)}
+                      onWorkspaceChange={() => void refreshWorkspace()}
+                      onSavedOptimistic={onSavedOptimistic}
+                      onFoldersOptimistic={onFoldersOptimistic}
+                      onUpgrade={onUpgrade}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {hasMoreFree && (
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 380, background: "linear-gradient(rgba(245,245,245,0), #F5F5F5 65%)", display: "flex", alignItems: "flex-end", justifyContent: "center", paddingBottom: 32, pointerEvents: "none" }}>
+                <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: "28px 28px 24px", textAlign: "center", maxWidth: 420, width: "min(100%, 420px)", boxShadow: "0 12px 32px rgba(0,0,0,0.12)", pointerEvents: "auto" }}>
+                  <div style={{ width: 48, height: 48, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}><Lock size={22} /></div>
+                  <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6, letterSpacing: "-0.03em" }}>{t.paywallTitle}</div>
+                  <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.55 }}>{t.paywallBody}</div>
+                  <UpgradeCtaButton lang={lang} onClick={onUpgrade} fullWidth />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {isPaid && hasMore && !loading && (
+            <div style={{ textAlign: "center", padding: "24px 0 8px" }}>
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={() => { setLoadingMore(true); fetchPage(offset, false).finally(() => setLoadingMore(false)); }}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#0047FF",
+                  background: loadingMore ? "transparent" : "#FFF",
+                  border: loadingMore ? "none" : "1px solid #D6E0FF",
+                  borderRadius: 10,
+                  padding: loadingMore ? "10px 0" : "10px 24px",
+                  cursor: loadingMore ? "default" : "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                {loadingMore ? t.loading : t.loadMore}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {isPaid && hasMore && !loading && (
-        <div style={{ textAlign: "center", padding: "28px 0 8px" }}>
-          <button type="button" disabled={loadingMore}
-            onClick={() => { setLoadingMore(true); fetchPage(offset, false).finally(() => setLoadingMore(false)); }}
-            style={{ fontSize: 14, fontWeight: 600, color: "#0047FF", background: "#FFF", border: "1px solid #D6E0FF", borderRadius: 12, padding: "12px 28px", cursor: loadingMore ? "default" : "pointer" }}>
-            {loadingMore ? "Chargement…" : "Charger plus de créateurs"}
-          </button>
-        </div>
-      )}
-
       {filterPaywall && (
-        <PaywallModal title="Le filtrage est payant" body="Filtrer par niche, abonnés, engagement, pays ou langue est réservé aux plans payants." onUpgrade={onUpgrade} onClose={() => setFilterPaywall(false)} />
+        <PaywallModal
+          lang={lang}
+          title={t.filterPaywallTitle}
+          body={t.filterPaywallBody}
+          onUpgrade={onUpgrade}
+          onClose={() => setFilterPaywall(false)}
+        />
       )}
 
-      <CreatorDetailDrawer creator={selected} plan={plan} onClose={() => setSelected(null)} onUpgrade={onUpgrade} />
+      <CreatorDetailDrawer creator={selected} plan={plan} lang={lang} onClose={goBack} onUpgrade={onUpgrade} onWorkspaceChange={() => void refreshWorkspace()} onReachOut={onReachOut} />
     </div>
   );
 }

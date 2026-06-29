@@ -15,6 +15,7 @@ import {
 } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
 import type { NormalizedFilters } from "@/lib/creator-discovery-filters";
+import { pickTikTokAvatarUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
 export interface DiscoveryCreatorResult {
   username: string;
@@ -59,26 +60,14 @@ function extractEmail(text: string): string | null {
   return m ? m[0] : null;
 }
 
-// TikTok CDN images block hotlinking -> route them through our image proxy so
-// they render in the browser. Non-CDN URLs (e.g. ui-avatars) pass through.
 function proxied(url: string | null | undefined): string | null {
   if (!url) return null;
-  if (/tiktokcdn|ttwstatic|ibyteimg/i.test(url)) {
-    return `/api/img-proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
+  const out = proxiedImageUrl(url);
+  return out || null;
 }
 
 function pickAvatar(profileRaw: any, u: SCSearchUser): string | null {
-  const user = profileRaw?.user ?? {};
-  return (
-    user.avatarMedium ||
-    user.avatarLarger ||
-    user.avatarThumb ||
-    u.avatar_medium?.url_list?.[0] ||
-    u.avatar_168x168?.url_list?.[0] ||
-    null
-  );
+  return pickTikTokAvatarUrl(profileRaw, u);
 }
 
 function pickVideoThumbs(videosRaw: any, limit = 3): DiscoveryVideoThumb[] {

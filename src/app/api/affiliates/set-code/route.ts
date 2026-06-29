@@ -1,5 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { applyDiscountCodeToCreator, ensureCreatorForHandle } from "@/lib/creator-promo-codes";
+import { normalizeCreatorHandle } from "@/lib/managed-creator-commission";
+import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
 
 export const dynamic = "force-dynamic";
 
@@ -15,35 +18,41 @@ const supabaseAdmin = createClient(
 export async function POST(request: Request) {
   const body = await request.json();
   const userId = String(body.userId || "");
-  const creatorId = String(body.creatorId || "");
+  let creatorId = String(body.creatorId || "");
+  const handle = String(body.handle || body.creator || "").trim();
   const code = String(body.code || "").trim().toUpperCase();
 
-  if (!userId || !creatorId || !code) {
-    return NextResponse.json({ ok: false, error: "Missing userId, creatorId or code" }, { status: 400 });
+  if (!userId || !code) {
+    return NextResponse.json({ ok: false, error: "Missing userId or code" }, { status: 400 });
   }
 
-  const { data: owned, error: ownErr } = await supabaseAdmin
-    .from("creators")
-    .select("id")
-    .eq("id", creatorId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  if (!creatorId && handle) {
+    const normalized = normalizeCreatorHandle(handle);
+    const { data: creators } = await supabaseAdmin
+      .from("creators")
+      .select("id, handle")
+      .eq("user_id", userId);
 
-  if (ownErr) {
-    return NextResponse.json({ ok: false, error: ownErr.message }, { status: 500 });
+    const match = (creators || []).find(
+      (c) => normalizeCreatorHandle(String(c.handle || "")) === normalized
+    );
+    if (match?.id) {
+      creatorId = String(match.id);
+    } else {
+      const ensured = await ensureCreatorForHandle(supabaseAdmin, userId, handle);
+      if (ensured?.id) creatorId = ensured.id;
+    }
   }
-  if (!owned) {
+
+  if (!creatorId) {
     return NextResponse.json({ ok: false, error: "Creator not found for this user" }, { status: 404 });
   }
 
-  const { error: updErr } = await supabaseAdmin
-    .from("creators")
-    .update({ discount_code: code })
-    .eq("id", creatorId)
-    .eq("user_id", userId);
+  const parsedRate = commissionRateFromDiscountCode(code);
 
-  if (updErr) {
-    return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+  const ok = await applyDiscountCodeToCreator(supabaseAdmin, userId, creatorId, code, parsedRate ?? null);
+  if (!ok) {
+    return NextResponse.json({ ok: false, error: "Failed to update creator" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, creatorId, code });

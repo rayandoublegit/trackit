@@ -1,6 +1,8 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { resolvePlanFromCheckout } from "@/lib/checkout";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveStripeCustomerId } from "@/lib/stripe-billing";
 
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -46,11 +48,6 @@ export async function POST(request: Request) {
 
     const base = (appUrl ?? "http://localhost:3000").replace(/\/$/, "");
 
-    const successUrl =
-      analysisId && String(analysisId).trim()
-        ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
-        : `${base}/dashboard?upgraded=true`;
-
     const sparkPriceId = process.env.STRIPE_SPARK_PRICE_ID?.trim();
     const isSpark = sparkPriceId && priceId === sparkPriceId;
     const isOneShot = priceId === "price_1TQzvsFC3qsxzaqxr3ydKYDS";
@@ -64,11 +61,38 @@ export async function POST(request: Request) {
           ? "growth"
           : resolvedPlan;
 
+    const successUrl =
+      analysisId && String(analysisId).trim()
+        ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
+        : isOneShot
+          ? oneShotSuccessUrl
+          : `${base}/dashboard?view=billing&upgraded=true`;
+
+    let stripeCustomerId: string | null = null;
+    if (userId) {
+      const admin = getSupabaseAdmin();
+      if (admin) {
+        stripeCustomerId = await resolveStripeCustomerId(
+          admin,
+          stripe,
+          String(userId),
+          email ?? null
+        );
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: isOneShot ? "payment" : "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
-      ...(email ? { customer_email: email } : {}),
+      ...(stripeCustomerId
+        ? {
+            customer: stripeCustomerId,
+            customer_update: { name: "auto", address: "auto" },
+          }
+        : email
+          ? { customer_email: email }
+          : {}),
       ...(userId
         ? {
             client_reference_id: String(userId),
@@ -85,8 +109,8 @@ export async function POST(request: Request) {
         : !isOneShot && isSpark
           ? { subscription_data: { trial_period_days: 7 } }
           : {}),
-      success_url: isOneShot ? oneShotSuccessUrl : successUrl,
-      cancel_url: cancelUrl ?? `${base}`,
+      success_url: successUrl,
+      cancel_url: cancelUrl ?? `${base}/dashboard?view=billing`,
     });
 
     console.log("Checkout: session created", session.url);

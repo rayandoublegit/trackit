@@ -3,9 +3,16 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators, saveOutreach } from "@/lib/db";
-import { dispatchOutreachHistoryUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
+import { dispatchOutreachHistoryUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
 import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
 import { avatarUrlForCreatorHandle, buildCreatorAvatarMap } from "@/lib/creator-avatar";
+import {
+  selectionCardStyle,
+  selectionTextMuted,
+  selectionTextPrimary,
+  selectionTextSubtle,
+  TRACKIT_SELECTION_BLUE,
+} from "@/lib/selection-card-styles";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
@@ -35,6 +42,7 @@ import {
   canImportTemplates,
   canUseAutoFollowUp,
   canUseAutomationWorkflows,
+  canUseBalance,
   canUseFullAutomationAgent,
   canUseShopify,
   canInviteCreators,
@@ -45,38 +53,48 @@ import {
   normalizePlan,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { LiveSalesFeed, PayoutsView } from "./PayoutsView";
+import { BalanceView, LiveSalesFeed, PayoutsView, TransactionsView } from "./PayoutsView";
+import { BillingView } from "./BillingView";
 import { FeedbackView } from "./FeedbackView";
 import { NotesView } from "./NotesView";
 import { HomeOverviewView } from "./HomeOverviewView";
 import { HelpCenterView } from "./HelpCenterView";
-import { NotificationsView, getInitialUnreadCount } from "./NotificationsView";
+import { NotificationsPanel } from "./NotificationsView";
 import {
   ensureNotificationsReset,
   getStoredUnreadCount,
   NOTIFICATIONS_UPDATED_EVENT,
   notifyShopifyConnected,
   notifyWelcomeIfNeeded,
+  playWelcomeSoundIfUnread,
+  setNotificationsUserId,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import { useLang } from "@/lib/useLang";
-import { loadAffiliates, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
+import { loadAffiliates, persistAffiliateCodesToServer, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
-  loadDashboardView,
-  readInitialDashboardView,
   readViewFromUrl,
-  saveDashboardView,
-  writeViewToUrl,
   type DashboardView,
 } from "@/lib/dashboard-view-storage";
+import {
+  DashboardNavigationProvider,
+  useDashboardNavigationController,
+} from "./DashboardNavigationProvider";
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "notes", "payouts", "settings"];
+const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "notes", "payouts", "settings", "feedback"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
+
+type SidebarNavChild = {
+  id: string;
+  label: string;
+  view: View;
+  keywords?: string[];
+};
 
 type SidebarNavEntry = {
   id: string;
@@ -86,7 +104,28 @@ type SidebarNavEntry = {
   keywords: string[];
   badge?: string;
   iconKey: string;
+  children?: SidebarNavChild[];
 };
+
+function flattenSidebarNavEntries(entries: SidebarNavEntry[]): SidebarNavEntry[] {
+  const out: SidebarNavEntry[] = [];
+  for (const item of entries) {
+    out.push({ ...item, children: undefined });
+    if (item.children) {
+      for (const child of item.children) {
+        out.push({
+          id: child.id,
+          label: child.label,
+          view: child.view,
+          section: item.section,
+          iconKey: item.iconKey,
+          keywords: [...(child.keywords ?? []), ...item.keywords],
+        });
+      }
+    }
+  }
+  return out;
+}
 
 function getSidebarSectionLabels(lang: "en" | "fr"): Record<Exclude<SidebarNavSection, "footer">, string> {
   return {
@@ -106,18 +145,29 @@ function DashboardPageContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [sidebarSearch, setSidebarSearch] = useState("");
-  const sidebarSearchRef = useRef<HTMLInputElement>(null);
-  const [view, setView] = useState<View>("dashboard");
-  const [viewReady, setViewReady] = useState(false);
+  const [sidebarGroupExpanded, setSidebarGroupExpanded] = useState<Record<string, boolean>>({
+    discovery: true,
+    campaigns: true,
+    payouts: true,
+  });
+  const navigation = useDashboardNavigationController(user?.id);
+  const view = navigation.navState.view;
+  const setView = navigation.setView;
+  const navigate = navigation.navigate;
   const [isCreator, setIsCreator] = useState(false);
+
+  useEffect(() => {
+    if (view === "notifications") {
+      navigate({ view: "discovery" }, { replace: true });
+    }
+  }, [view, navigate]);
 
   // Créateur : accueil, outils essentiels et paramètres uniquement.
   useEffect(() => {
     if (isCreator && !CREATOR_ALLOWED_VIEWS.includes(view)) {
-      setView("analytics");
+      navigate({ view: "dashboard" }, { replace: true });
     }
-  }, [isCreator, view]);
+  }, [isCreator, view, navigate]);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);
@@ -169,16 +219,36 @@ function DashboardPageContent() {
   }, []);
 
   useEffect(() => {
+    if (!user?.id) {
+      setNotificationUnread(0);
+      return;
+    }
+    setNotificationsUserId(user.id);
     ensureNotificationsReset();
-    setNotificationUnread(getInitialUnreadCount());
-    const refreshUnread = () => setNotificationUnread(getStoredUnreadCount());
+    notifyWelcomeIfNeeded(user.id, lang);
+    setNotificationUnread(getStoredUnreadCount());
+    const refreshUnread = () => {
+      setNotificationsUserId(user.id);
+      setNotificationUnread(getStoredUnreadCount());
+    };
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
     const removeSoundUnlock = installNotificationSoundUnlock();
+
+    const retryWelcome = () => {
+      primeNotificationSound();
+      const created = notifyWelcomeIfNeeded(user.id, lang);
+      if (!created) {
+        playWelcomeSoundIfUnread(user.id);
+      }
+    };
+    window.addEventListener("pointerdown", retryWelcome, { capture: true, passive: true, once: true });
+
     return () => {
       window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
+      window.removeEventListener("pointerdown", retryWelcome, { capture: true });
       removeSoundUnlock();
     };
-  }, []);
+  }, [user?.id, lang]);
 
   const loadSidebarCounts = useCallback(async (userId: string) => {
     if (!supabase) return;
@@ -203,16 +273,6 @@ function DashboardPageContent() {
     if (!user?.id) return;
     void loadSidebarCounts(user.id);
   }, [user?.id, view, loadSidebarCounts]);
-
-  // Welcome notification once per user (persisted — not on every refresh).
-  useEffect(() => {
-    if (loading || !user?.id) return;
-    const timer = window.setTimeout(() => {
-      primeNotificationSound();
-      notifyWelcomeIfNeeded(user.id, lang);
-    }, 1200);
-    return () => window.clearTimeout(timer);
-  }, [loading, user?.id, lang]);
 
   useEffect(() => {
     if (DEV_BYPASS_PLAN) {
@@ -306,30 +366,11 @@ function DashboardPageContent() {
   // status route fires (syncs stripe_connect_status) and the card updates.
   useEffect(() => {
     if (!user?.id || loading || searchParams.get("connect") !== "return") return;
-    setView("payouts");
+    navigate({ view: "payouts" }, { replace: true });
     const url = new URL(window.location.href);
     url.searchParams.delete("connect");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
-  }, [user?.id, loading, searchParams]);
-
-  useEffect(() => {
-    setView(readInitialDashboardView());
-    setViewReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!user?.id || loading || !viewReady) return;
-    if (searchParams.get("connect") === "return") return;
-    if (readViewFromUrl()) return;
-    const saved = loadDashboardView(user.id);
-    if (saved) setView(saved);
-  }, [user?.id, loading, searchParams, viewReady]);
-
-  useEffect(() => {
-    if (!viewReady) return;
-    writeViewToUrl(view);
-    saveDashboardView(view, user?.id);
-  }, [view, user?.id, viewReady]);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+  }, [user?.id, loading, searchParams, navigate]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -414,40 +455,26 @@ function DashboardPageContent() {
   }, [profile?.avatar_url]);
 
   const sidebarNavEntries = useMemo(
-    () => buildSidebarNavEntries(notificationUnread, lang, sidebarCounts),
-    [notificationUnread, lang, sidebarCounts]
+    () => (isCreator ? buildCreatorSidebarNavEntries(lang) : buildSidebarNavEntries(lang, sidebarCounts)),
+    [lang, sidebarCounts, isCreator],
   );
 
-  const sidebarSectionLabels = useMemo(() => getSidebarSectionLabels(lang), [lang]);
+  const filteredSidebarNav = sidebarNavEntries;
 
-  const filteredSidebarNav = useMemo(() => {
-    let entries = sidebarNavEntries;
-    if (isCreator) {
-      entries = entries.filter((item) => CREATOR_ALLOWED_VIEWS.includes(item.view));
+  useEffect(() => {
+    if (view === "discovery" || view === "creators") {
+      setSidebarGroupExpanded((prev) => ({ ...prev, discovery: true }));
     }
-    const q = sidebarSearch.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter((item) => {
-      const haystack = [
-        item.label,
-        item.section,
-        sidebarSectionLabels[item.section as Exclude<SidebarNavSection, "footer">] ?? "",
-        ...item.keywords,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
-  }, [sidebarSearch, sidebarNavEntries, sidebarSectionLabels, isCreator]);
-
-  const isSidebarSearching = sidebarSearch.trim().length > 0;
+    if (view === "campaigns" || view === "integrations" || view === "invitations") {
+      setSidebarGroupExpanded((prev) => ({ ...prev, campaigns: true }));
+    }
+    if (view === "payouts" || view === "balance" || view === "transactions") {
+      setSidebarGroupExpanded((prev) => ({ ...prev, payouts: true }));
+    }
+  }, [view]);
 
   const goToSidebarItem = (targetView: View) => {
-    setView(targetView);
-    writeViewToUrl(targetView);
-    if (user?.id) saveDashboardView(targetView, user.id);
-    setSidebarSearch("");
-    sidebarSearchRef.current?.blur();
+    navigate({ view: targetView });
     if (isMobile) setMobileSidebarOpen(false);
   };
 
@@ -462,29 +489,15 @@ function DashboardPageContent() {
       creatorHandle: handle || undefined,
       dmPlatform: creator ? dmPlatformFromCreatorPlatform(creator.platform) : undefined,
     });
-    setView("outreach");
-    setSidebarSearch("");
+    navigate({ view: "outreach" });
     if (isMobile) setMobileSidebarOpen(false);
   };
 
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setSidebarCollapsed(false);
-        sidebarSearchRef.current?.focus();
-        sidebarSearchRef.current?.select();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  if (loading || !viewReady) {
+  if (loading || !navigation.ready) {
     return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
   }
 
-  const sidebarWidth = sidebarCollapsed ? 72 : 264;
+  const sidebarWidth = sidebarCollapsed ? 48 : 128;
 
   const asideStyle: React.CSSProperties = isMobile
     ? {
@@ -517,56 +530,56 @@ function DashboardPageContent() {
         overflow: "hidden",
       };
 
-  const storeName = profile?.business_name?.trim() || null;
-
-  const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: 11,
-    fontWeight: 600,
-    color: "#9A9A9A",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    padding: "12px 12px 8px 12px",
-  };
-
   const renderSidebarNavItems = (items: SidebarNavEntry[], showSectionGap?: boolean) => (
     <>
       {showSectionGap && sidebarCollapsed && items.length > 0 && <div style={{ height: 16 }} />}
-      {items.map((item) => (
-        <SidebarItem
-          key={item.id}
-          collapsed={sidebarCollapsed}
-          icon={renderSidebarNavIcon(item.iconKey)}
-          label={item.label}
-          active={view === item.view}
-          badge={item.badge}
-          onClick={() => goToSidebarItem(item.view)}
-        />
-      ))}
+      {items.map((item) => {
+        if (item.children?.length) {
+          return (
+            <SidebarNavGroup
+              key={item.id}
+              collapsed={sidebarCollapsed}
+              expanded={sidebarGroupExpanded[item.id] ?? false}
+              active={view === item.view || item.children.some((c) => c.view === view)}
+              icon={renderSidebarNavIcon(item.iconKey)}
+              label={item.label}
+              badge={item.badge}
+              subItems={item.children}
+              parentView={item.view}
+              activeView={view}
+              onParentClick={() => {
+                goToSidebarItem(item.view);
+                setSidebarGroupExpanded((prev) => ({ ...prev, [item.id]: true }));
+              }}
+              onToggleExpand={() => setSidebarGroupExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+              onChildClick={(childView) => goToSidebarItem(childView)}
+            />
+          );
+        }
+        return (
+          <SidebarItem
+            key={item.id}
+            collapsed={sidebarCollapsed}
+            icon={renderSidebarNavIcon(item.iconKey)}
+            label={item.label}
+            active={view === item.view}
+            badge={item.badge}
+            onClick={() => goToSidebarItem(item.view)}
+          />
+        );
+      })}
     </>
   );
 
   const renderNavSection = (section: Exclude<SidebarNavSection, "footer">, extraTopPadding?: boolean) => {
     const items = filteredSidebarNav.filter((item) => item.section === section);
     if (items.length === 0) return null;
-    return (
-      <>
-        {!sidebarCollapsed && (
-          <div
-            style={{
-              ...sectionHeaderStyle,
-              padding: extraTopPadding ? "20px 12px 8px 12px" : sectionHeaderStyle.padding,
-            }}
-          >
-            {sidebarSectionLabels[section]}
-          </div>
-        )}
-        {renderSidebarNavItems(items, extraTopPadding)}
-      </>
-    );
+    return <>{renderSidebarNavItems(items, extraTopPadding)}</>;
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FAFAFA", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex" }}>
+    <DashboardNavigationProvider value={navigation}>
+    <div style={{ height: "100vh", minHeight: "100vh", background: "#FAFAFA", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", overflow: "hidden" }}>
       {isMobile && mobileSidebarOpen && (
         <div
           onClick={() => setMobileSidebarOpen(false)}
@@ -583,176 +596,79 @@ function DashboardPageContent() {
         </button>
       )}
       <aside style={asideStyle}>
-        <div style={{ padding: sidebarCollapsed ? "12px 8px" : "12px 16px", borderBottom: "1px solid #F5F5F5", display: "flex", justifyContent: sidebarCollapsed ? "center" : "flex-start", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            padding: sidebarCollapsed ? "8px 4px" : "8px 8px",
+            borderBottom: "1px solid #F5F5F5",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: sidebarCollapsed ? "center" : "space-between",
+            flexDirection: sidebarCollapsed ? "column" : "row",
+            gap: sidebarCollapsed ? 6 : 0,
+          }}
+        >
           <img
-            src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
+            src={TRACKIT_LOGO_URL}
             alt="Trackit"
             style={{
-              height: sidebarCollapsed ? 52 : 72,
+              height: sidebarCollapsed ? 48 : 58,
               width: "auto",
-              maxWidth: sidebarCollapsed ? 56 : undefined,
+              maxWidth: sidebarCollapsed ? 48 : 100,
               display: "block",
               objectFit: "contain",
               flexShrink: 0,
             }}
           />
-          {!sidebarCollapsed && (
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#000000", letterSpacing: "-0.02em", lineHeight: 1.35, fontFamily: "inherit" }}>
-              Find it, <span style={{ color: "#0047FF" }}>Track it</span>, Pay it
-              <span style={{ color: "#0047FF", fontSize: 28, lineHeight: 1 }}>.</span>
-            </span>
-          )}
-        </div>
-        <div style={{ padding: "16px 16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #F5F5F5" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: "#E8EEFC", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
-              {profile?.avatar_url && !avatarBroken ? (
-                <img
-                  key={profile.avatar_url}
-                  src={profile.avatar_url}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={handleSidebarAvatarError}
-                />
-              ) : (
-                <span style={{ fontSize: 16, fontWeight: 600, color: "#0047FF", letterSpacing: "-0.02em" }}>
-                  {(profile?.full_name?.[0] || profile?.username?.[0] || "?").toUpperCase()}
-                </span>
-              )}
-            </div>
-            {!sidebarCollapsed && (
-              <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {profile?.username ? `@${profile.username}` : "Account"}
-                </span>
-                <span style={{ fontSize: 12, color: isCreator ? "#0047FF" : "#9A9A9A", letterSpacing: "-0.01em" }}>
-                  {isCreator
-                    ? (lang === "fr" ? "Créateur" : "Creator")
-                    : lang === "fr"
-                    ? isScale
-                      ? "Plan Scale"
-                      : plan === "pro"
-                        ? "Plan Pro"
-                        : plan === "basic"
-                          ? "Plan Growth"
-                          : "Plan gratuit"
-                    : isScale
-                      ? "Scale Plan"
-                      : plan === "pro"
-                        ? "Pro Plan"
-                        : plan === "basic"
-                          ? "Growth Plan"
-                          : "Free Plan"}
-                </span>
-                {storeName && (
-                  <span style={{ fontSize: 12, color: "#0047FF", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {storeName}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          <button type="button" onClick={() => setSidebarCollapsed((c) => !c)} aria-label="Toggle sidebar" style={{ background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", display: "flex", padding: 4 }}>
+          <button type="button" onClick={() => setSidebarCollapsed((c) => !c)} aria-label="Toggle sidebar" style={{ background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", display: "flex", padding: 4, flexShrink: 0 }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d={sidebarCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
 
-        {!sidebarCollapsed && (
-          <div style={{ padding: "14px 12px 6px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F5F5F5", borderRadius: 10, padding: "8px 12px" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-              <input
-                ref={sidebarSearchRef}
-                type="search"
-                placeholder="Search menu..."
-                value={sidebarSearch}
-                onChange={(e) => setSidebarSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && filteredSidebarNav.length > 0) {
-                    e.preventDefault();
-                    goToSidebarItem(filteredSidebarNav[0].view);
-                  }
-                  if (e.key === "Escape") {
-                    setSidebarSearch("");
-                    sidebarSearchRef.current?.blur();
-                  }
-                }}
-                style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, color: "#1A1A1A", fontFamily: "inherit", flex: 1, minWidth: 0, letterSpacing: "-0.01em" }}
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSidebarCollapsed(false);
-                  sidebarSearchRef.current?.focus();
-                }}
-                style={{ fontSize: 11, color: "#9A9A9A", background: "#FFFFFF", padding: "2px 6px", borderRadius: 5, border: "1px solid #E5E5E5", cursor: "pointer", fontFamily: "inherit" }}
-              >
-                ⌘K
-              </button>
-            </div>
-          </div>
-        )}
-
-        <nav style={{ flex: 1, padding: "10px 12px", overflowY: "auto" }}>
-          {isSidebarSearching ? (
-            <>
-              {!sidebarCollapsed && <div style={sectionHeaderStyle}>Results</div>}
-              {filteredSidebarNav.length === 0 ? (
-                !sidebarCollapsed && (
-                  <div style={{ padding: "8px 12px", fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                    No menu items found
-                  </div>
-                )
-              ) : (
-                renderSidebarNavItems(filteredSidebarNav)
-              )}
-            </>
-          ) : (
-            <>
-              {renderNavSection("main")}
-              {renderNavSection("tools", true)}
-              {renderNavSection("workspace", true)}
-            </>
-          )}
+        <nav style={{ flex: 1, padding: "6px 6px", overflowY: "auto" }}>
+          {renderNavSection("main")}
+          {renderNavSection("tools", true)}
+          {renderNavSection("workspace", true)}
         </nav>
-
-        {!isSidebarSearching && (
-        <div style={{ padding: "10px 12px", borderTop: "1px solid #F5F5F5" }}>
-            {renderSidebarNavItems(
-              sidebarNavEntries.filter((item) =>
-                item.section === "footer" && (!isCreator || item.view === "settings")
-              )
-            )}
-        </div>
-        )}
-
-        {!isCreator && (
-        <div style={{ padding: "12px 12px 16px 12px" }}>
-          <button
-            type="button"
-            onClick={() => {
-              if (isScale) setView("settings");
-              else if (plan === "pro") void handleUpgradeScale();
-              else if (plan === "basic") void handleUpgradePro();
-              else void handleUpgradeBasic();
-            }}
-            style={{ width: "100%", background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 14, padding: sidebarCollapsed ? "12px 0" : "14px 14px", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 10, justifyContent: sidebarCollapsed ? "center" : "flex-start" }}
-          >
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(255,255,255,0.18)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2L4 14h7v8l8-12h-7V2z" fill="#FFFFFF"/></svg>
-            </div>
-            {!sidebarCollapsed && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", textAlign: "left" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.02em" }}>Upgrade & unlock</span>
-                <span style={{ fontSize: 12, fontWeight: 400, opacity: 0.85, letterSpacing: "-0.01em" }}>all features</span>
-              </div>
-            )}
-          </button>
-        </div>
-        )}
       </aside>
 
-      <main className="dashboard-main" style={{ flex: 1, overflow: "auto", background: "#FFFFFF" }}>
+      <main
+        className="dashboard-main"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          alignSelf: "stretch",
+          overflow: "hidden",
+          background: "#FFFFFF",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <DashboardTopBar
+          lang={lang}
+          profile={profile}
+          avatarBroken={avatarBroken}
+          onAvatarError={handleSidebarAvatarError}
+          shopifyConnected={Boolean(shopifyStore ?? profile?.shopify_store)}
+          isCreator={isCreator}
+          isScale={isScale}
+          isPro={isPro}
+          isBasic={isBasic}
+          userId={user?.id}
+          notificationUnread={notificationUnread}
+          onNotificationUnreadChange={setNotificationUnread}
+          onNavigate={goToSidebarItem}
+          onConnectShopify={() => goToSidebarItem("integrations")}
+        />
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: view === "discovery" ? "hidden" : "auto",
+            display: view === "discovery" ? "flex" : "block",
+            flexDirection: "column",
+          }}
+        >
         {view === "dashboard" && (
           <HomeOverviewView
             isMobile={isMobile}
@@ -775,6 +691,7 @@ function DashboardPageContent() {
               else if (plan === "basic") void handleUpgradePro();
               else void handleUpgradeScale();
             }}
+            onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
         )}
         {view === "my-creators" && (
@@ -786,12 +703,14 @@ function DashboardPageContent() {
               else if (plan === "basic") void handleUpgradePro();
               else void handleUpgradeScale();
             }}
+            onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
         )}
         {view === "creators" && (
           <CreatorsView
             isMobile={isMobile}
             plan={plan}
+            onReachOut={(creator) => navigateToOutreachSend(creator)}
             onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
@@ -806,6 +725,7 @@ function DashboardPageContent() {
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
             userId={user.id}
+            shopifyStore={shopifyStore ?? profile?.shopify_store}
           />
         )}
         {view === "affiliates" && user && (
@@ -835,6 +755,20 @@ function DashboardPageContent() {
             <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onConnectShopify={() => setView("integrations")} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
             <UpgradeGate feature="Payouts" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+          )
+        )}
+        {view === "balance" && user && (
+          canUseBalance(plan) || isCreator ? (
+            <BalanceView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
+          ) : (
+            <UpgradeGate feature={lang === "fr" ? "Solde" : "Balance"} requiredPlan="Scale" onUpgrade={handleUpgradeScale} isMobile={isMobile} />
+          )
+        )}
+        {view === "transactions" && user && (
+          (canUseBasicFeatures || isCreator) ? (
+            <TransactionsView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
+          ) : (
+            <UpgradeGate feature="Payments" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
           )
         )}
         {view === "invitations" && user && (
@@ -890,12 +824,16 @@ function DashboardPageContent() {
             <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
           )
         )}
+        {view === "billing" && user && (
+          <BillingView isMobile={isMobile} plan={plan} />
+        )}
         {view === "feedback" && <FeedbackView isMobile={isMobile} />}
         {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
-        {view === "notifications" && <NotificationsView isMobile={isMobile} onUnreadChange={setNotificationUnread} />}
+        </div>
       </main>
       {user && !isCreator && <NewCreatorModal brandId={user.id} />}
     </div>
+    </DashboardNavigationProvider>
   );
 }
 
@@ -909,7 +847,7 @@ export default function DashboardPage() {
 
 function PageHeader({ title, subtitle, right, isMobile }: { title: string; subtitle?: string; right?: React.ReactNode; isMobile?: boolean }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
@@ -1062,6 +1000,40 @@ function dmPlatformFromCreatorPlatform(platform: string): (typeof OUTREACH_DM_PL
 function creatorHandleForOutreach(username: string): string {
   const clean = username.replace(/^@/, "").trim();
   return clean ? `@${clean}` : "";
+}
+
+function defaultOutreachDraftMessage(lang: "en" | "fr"): string {
+  return lang === "fr"
+    ? "Salut {{name}} 👋\n\nJe suis tombé sur ton contenu et j'aimerais te proposer une collaboration. Tu serais partant pour en discuter ?"
+    : "Hey {{name}} 👋\n\nI came across your content and would love to explore a collaboration. Open to chatting?";
+}
+
+function outreachProfileUrl(
+  platform: (typeof OUTREACH_DM_PLATFORMS)[number],
+  handle: string,
+  options?: { subject?: string; body?: string },
+): string | null {
+  const clean = handle.replace(/^@/, "").trim();
+  if (!clean) return null;
+
+  if (platform === "Instagram") {
+    return `https://www.instagram.com/direct/new/?username=${encodeURIComponent(clean)}`;
+  }
+  if (platform === "TikTok") {
+    return `https://www.tiktok.com/@${encodeURIComponent(clean)}`;
+  }
+  if (platform === "YouTube") {
+    return `https://www.youtube.com/@${encodeURIComponent(clean)}`;
+  }
+  if (platform === "Twitter") {
+    return `https://twitter.com/${encodeURIComponent(clean)}`;
+  }
+  if (platform === "Email") {
+    const subject = options?.subject ?? "";
+    const body = options?.body ?? "";
+    return `mailto:${encodeURIComponent(clean)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  }
+  return null;
 }
 
 const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
@@ -1589,7 +1561,11 @@ function OutreachView({
           onClose={closePanel}
           onSent={() => {
             setHistoryRefreshKey((k) => k + 1);
-            showToast(lang === "fr" ? "Message copié et ajouté à l'historique ✓" : "Message copied and added to history ✓");
+            showToast(
+              lang === "fr"
+                ? "Message copié — ouvrez le DM et collez (Cmd+V) ✓"
+                : "Message copied — open their DMs and paste (Cmd+V) ✓",
+            );
             closePanel();
           }}
         />
@@ -1868,7 +1844,7 @@ function InfluencerPicker({
     onChange(selected.includes(handle) ? selected.filter((h) => h !== handle) : [...selected, handle]);
   };
 
-  if (influencers.length === 0) {
+  if (influencers.length === 0 && selected.length === 0) {
     return (
       <div style={{ padding: 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: 13, color: "#9A9A9A", textAlign: "center" }}>
         {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis Découverte ou Créateurs." : "No saved creators yet. Add creators from Discovery or Creators."}
@@ -1876,18 +1852,48 @@ function InfluencerPicker({
     );
   }
 
+  const extraSelected = selected.filter((handle) => !influencers.some((inf) => inf.handle === handle));
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Influenceurs" : "Influencers"}</span>
-        <button
-          type="button"
-          style={{ fontSize: 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-          onClick={() => onChange(selected.length === influencers.length ? [] : influencers.map((i) => i.handle))}
-        >
-          {selected.length === influencers.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
-        </button>
+        {influencers.length > 0 && (
+          <button
+            type="button"
+            style={{ fontSize: 11, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+            onClick={() => onChange(selected.length === influencers.length ? [] : influencers.map((i) => i.handle))}
+          >
+            {selected.length === influencers.length ? "Clear all" : lang === "fr" ? "Tout sélectionner" : "Select all"}
+          </button>
+        )}
       </div>
+      {extraSelected.map((handle) => (
+        <div
+          key={handle}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            ...selectionCardStyle(true),
+          }}
+        >
+          <CreatorAvatar username={handle} displayName={handle} size={32} alt={handle} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#FFFFFF" }}>{handle}</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{lang === "fr" ? "Sélectionné" : "Selected"}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(selected.filter((h) => h !== handle))}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.85)", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}
+          >
+            {lang === "fr" ? "Retirer" : "Remove"}
+          </button>
+        </div>
+      ))}
       {influencers.map((inf) => {
         const on = selected.includes(inf.handle);
         return (
@@ -1901,21 +1907,20 @@ function InfluencerPicker({
               gap: 12,
               padding: "12px 14px",
               borderRadius: 10,
-              border: `1px solid ${on ? "#0047FF" : "#E5E5E5"}`,
-              background: on ? "rgba(0,71,255,0.06)" : "#FFFFFF",
+              ...selectionCardStyle(on, { unselectedBackground: "#FFFFFF" }),
               cursor: "pointer",
               fontFamily: "inherit",
               textAlign: "left",
               width: "100%",
             }}
           >
-            <CreatorAvatar src={inf.avatarUrl} size={32} alt={inf.handle} />
+            <CreatorAvatar username={inf.handle} displayName={inf.handle} src={inf.avatarUrl} size={32} alt={inf.handle} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{inf.handle}</div>
-              <div style={{ fontSize: 11, color: "#9A9A9A" }}>{inf.platform}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: selectionTextPrimary(on) }}>{inf.handle}</div>
+              <div style={{ fontSize: 11, color: selectionTextMuted(on) }}>{inf.platform}</div>
                   </div>
-            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#0047FF" : "#D0D0D0"}`, background: on ? "#0047FF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke="#FFF" strokeWidth="2.5" strokeLinecap="round"/></svg>}
+            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#FFFFFF" : "#D0D0D0"}`, background: on ? "#FFFFFF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={TRACKIT_SELECTION_BLUE} strokeWidth="2.5" strokeLinecap="round"/></svg>}
             </div>
                   </button>
         );
@@ -1987,7 +1992,9 @@ function SendOutreachPanel({
     initialDmPlatform ?? "Instagram"
   );
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
-  const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage(""));
+  const [fields, setFields] = useState<OutreachMessageFields>(() =>
+    outreachFieldsFromMessage(initialCreatorHandle ? defaultOutreachDraftMessage(lang) : ""),
+  );
   const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -2020,9 +2027,13 @@ function SendOutreachPanel({
       setSelectedInfluencers([
         initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`,
       ]);
+      setFields((prev) => {
+        if (messageFromTemplate(prev).trim()) return prev;
+        return outreachFieldsFromMessage(defaultOutreachDraftMessage(lang));
+      });
     }
     if (initialDmPlatform) setDmPlatform(initialDmPlatform);
-  }, [initialCreatorHandle, initialDmPlatform]);
+  }, [initialCreatorHandle, initialDmPlatform, lang]);
 
   const creatorName = outreachCreatorName(selectedInfluencers[0]);
   const previewName = creatorName || "there";
@@ -2030,64 +2041,66 @@ function SendOutreachPanel({
 
   const canSend = selectedInfluencers.length > 0 && messageFromTemplate(fields).trim();
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (!canSend) return;
 
     const messageText = fullPreview;
-    const handle = selectedInfluencers[0].replace(/^@/, "");
+    const handle = selectedInfluencers[0].replace(/^@/, "").trim();
+    if (!handle) return;
 
-    let userId: string | null = null;
-    if (supabase) {
-      const { data: { user } } = await supabase.auth.getUser();
-      userId = user?.id ?? null;
+    const emailSubject =
+      personalizeOutreachText(fields.subject, previewName).trim() ||
+      personalizeOutreachText(messageFromTemplate(fields), previewName).split("\n").find((line) => line.trim())?.trim().slice(0, 80) ||
+      (lang === "fr" ? "Partenariat" : "Partnership");
+
+    const profileUrl = outreachProfileUrl(dmPlatform, handle, {
+      subject: emailSubject,
+      body: messageText,
+    });
+    if (profileUrl) {
+      window.open(profileUrl, "_blank", "noopener,noreferrer");
     }
-    if (!userId) return;
 
-    try {
-      await navigator.clipboard.writeText(messageText);
-    } catch {
-      /* clipboard may be unavailable */
-    }
-
-    const followUpDate = canUseAutoFollowUp(plan) ? followUpIn3Days() : null;
-
-    for (const influencerHandle of selectedInfluencers) {
-      const name = outreachCreatorName(influencerHandle);
-      const copiedMessage = previewFromFields(fields, name || "there");
-      const handleClean = influencerHandle.replace(/^@/, "");
-      const payload = {
-        creator_username: name || handleClean,
-        creator_display_name: influencerHandle,
-        creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
-        platform: dmPlatform,
-        message: copiedMessage,
-        status: "sent",
-        follow_up_date: followUpDate,
-      };
-      const saved = await saveOutreach(userId, payload);
-      if (!saved) {
-        appendStoredOutreachEntry(userId, payload);
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(messageText);
+      } catch {
+        /* clipboard may be unavailable */
       }
-      notifyOutreachSent(lang, influencerHandle);
-    }
-    if (dmPlatform === "Instagram") {
-      window.open(`https://www.instagram.com/direct/new/?username=${handle}`, "_blank");
-    } else if (dmPlatform === "TikTok") {
-      window.open(`https://www.tiktok.com/@${handle}`, "_blank");
-    } else if (dmPlatform === "YouTube") {
-      window.open(`https://www.youtube.com/@${handle}`, "_blank");
-    } else if (dmPlatform === "Twitter") {
-      window.open(`https://twitter.com/messages/compose?recipient_id=${handle}`, "_blank");
-    } else if (dmPlatform === "Email") {
-      const emailSubject =
-        personalizeOutreachText(fields.subject, previewName).trim() ||
-        personalizeOutreachText(messageFromTemplate(fields), previewName).split("\n").find((line) => line.trim())?.trim().slice(0, 80) ||
-        (lang === "fr" ? "Partenariat" : "Partnership");
-      window.open(`mailto:${handle}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(messageText)}`, "_blank");
-    }
 
-    dispatchOutreachHistoryUpdated();
-    onSent(selectedInfluencers.length);
+      let userId: string | null = null;
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id ?? null;
+      }
+
+      if (userId) {
+        const followUpDate = canUseAutoFollowUp(plan) ? followUpIn3Days() : null;
+
+        for (const influencerHandle of selectedInfluencers) {
+          const name = outreachCreatorName(influencerHandle);
+          const copiedMessage = previewFromFields(fields, name || "there");
+          const handleClean = influencerHandle.replace(/^@/, "");
+          const payload = {
+            creator_username: name || handleClean,
+            creator_display_name: influencerHandle,
+            creator_avatar: avatarUrlForCreatorHandle(influencerHandle, creatorAvatarMap),
+            platform: dmPlatform,
+            message: copiedMessage,
+            status: "sent",
+            follow_up_date: followUpDate,
+          };
+          const saved = await saveOutreach(userId, payload);
+          if (!saved) {
+            appendStoredOutreachEntry(userId, payload);
+          }
+          notifyOutreachSent(lang, influencerHandle, userId);
+        }
+        dispatchOutreachHistoryUpdated();
+      }
+
+      onSent(selectedInfluencers.length);
+    })();
   };
 
   const sendViaLabel =
@@ -2123,7 +2136,7 @@ function SendOutreachPanel({
               ? "En cliquant sur Envoyer, le message est copié — il ne reste plus qu’à le coller dans le DM du créateur."
               : "When you click Send, your message is copied to the clipboard — just paste it into their DMs."}
           </p>
-          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={() => void handleSend()}>{sendViaLabel}</button>
+          <button type="button" style={{ ...btnPrimary, width: "100%", opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={handleSend}>{sendViaLabel}</button>
           <button type="button" style={{ ...btnSecondary, width: "100%" }} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       }
@@ -2149,6 +2162,359 @@ function SendOutreachPanel({
         </div>
       )}
     </OutreachPanelShell>
+  );
+}
+
+
+const shopifyConnectFieldInput: React.CSSProperties = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "14px 16px",
+  borderRadius: 10,
+  border: "1px solid #D1D5DB",
+  fontSize: 15,
+  fontFamily: "inherit",
+  color: "#1A1A1A",
+  letterSpacing: "-0.02em",
+  background: "#FFF",
+  outline: "none",
+};
+
+const shopifyConnectPrimaryBtn: React.CSSProperties = {
+  background: "#0047FF",
+  color: "#FFFFFF",
+  border: "none",
+  borderRadius: 10,
+  padding: "12px 20px",
+  fontSize: 15,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+const shopifyConnectSecondaryBtn: React.CSSProperties = {
+  background: "#FFFFFF",
+  color: "#1A1A1A",
+  border: "1px solid #E5E5E5",
+  borderRadius: 10,
+  padding: "12px 20px",
+  fontSize: 15,
+  fontWeight: 500,
+  fontFamily: "inherit",
+  cursor: "pointer",
+  letterSpacing: "-0.02em",
+};
+
+function ShopifyConnectPage({
+  lang,
+  isMobile,
+  shopDomain,
+  shopToken,
+  shopError,
+  connecting,
+  changingStore,
+  onShopDomainChange,
+  onShopTokenChange,
+  onConnect,
+  onClose,
+}: {
+  lang: "en" | "fr";
+  isMobile?: boolean;
+  shopDomain: string;
+  shopToken: string;
+  shopError: string;
+  connecting: boolean;
+  changingStore?: boolean;
+  onShopDomainChange: (value: string) => void;
+  onShopTokenChange: (value: string) => void;
+  onConnect: () => void;
+  onClose: () => void;
+}) {
+  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+
+  const steps =
+    lang === "fr"
+      ? [
+          {
+            title: "Créer une app personnalisée",
+            description:
+              "Dans Shopify Admin, ouvrez Paramètres → Applications et canaux de vente → Développer des apps, puis créez une app dédiée à Trackit.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+          {
+            title: "Activer l'API Admin",
+            description:
+              "Activez l'API Admin avec la permission read_orders pour autoriser Trackit à lire vos commandes.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M7 11V7a5 5 0 0110 0v4" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+          {
+            title: "Coller vos identifiants",
+            description:
+              "Copiez le domaine .myshopify.com et le token d'accès de votre app, puis collez-les dans le formulaire à gauche.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+        ]
+      : [
+          {
+            title: "Create a custom app",
+            description:
+              "In Shopify Admin, go to Settings → Apps and sales channels → Develop apps, then create an app for Trackit.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+          {
+            title: "Enable the Admin API",
+            description:
+              "Enable the Admin API with the read_orders permission so Trackit can read your orders.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M7 11V7a5 5 0 0110 0v4" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+          {
+            title: "Paste your credentials",
+            description:
+              "Copy your .myshopify.com domain and access token, then paste them into the form on the left.",
+            icon: (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="9" y="9" width="13" height="13" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            ),
+          },
+        ];
+
+  return (
+    <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
+      <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? 48 : 64,
+            alignItems: "start",
+          }}
+        >
+          <div style={{ maxWidth: 520 }}>
+            <h1
+              style={{
+                fontSize: isMobile ? 28 : 32,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                margin: "0 0 8px",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              {changingStore
+                ? lang === "fr"
+                  ? "Changer de boutique"
+                  : "Change store"
+                : lang === "fr"
+                  ? "Connecter Shopify"
+                  : "Connect Shopify"}
+            </h1>
+            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 36px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+              {lang === "fr"
+                ? "Liez votre boutique Shopify pour synchroniser automatiquement vos ventes dans Trackit."
+                : "Link your Shopify store to automatically sync sales into Trackit."}
+            </p>
+
+            <div style={{ marginBottom: 28 }}>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+                {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
+              </label>
+              <div
+                style={{
+                  border: "1px solid #0047FF",
+                  borderRadius: 10,
+                  padding: "4px 14px",
+                  boxShadow: "0 0 0 1px rgba(0,71,255,0.08)",
+                }}
+              >
+                <input
+                  type="text"
+                  value={shopDomain}
+                  onChange={(e) => onShopDomainChange(e.target.value)}
+                  placeholder="votreboutique.myshopify.com"
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    outline: "none",
+                    fontSize: 15,
+                    fontFamily: "inherit",
+                    padding: "12px 0",
+                    background: "transparent",
+                    boxSizing: "border-box",
+                    color: "#1A1A1A",
+                  }}
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && onConnect()}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 28 }}>
+              <label style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+                {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
+              </label>
+              <input
+                type="password"
+                value={shopToken}
+                onChange={(e) => onShopTokenChange(e.target.value)}
+                placeholder={lang === "fr" ? "Token d'API Admin (shpat_...)" : "Admin API token (shpat_...)"}
+                style={shopifyConnectFieldInput}
+                onKeyDown={(e) => e.key === "Enter" && onConnect()}
+              />
+            </div>
+
+            {shopError && (
+              <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 20px", lineHeight: 1.45 }}>{shopError}</p>
+            )}
+
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="hero-cta-shopify-dark"
+                onClick={onConnect}
+                disabled={connecting}
+                style={{ ...shopifyConnectPrimaryBtn, display: "inline-flex", alignItems: "center", gap: 8, opacity: connecting ? 0.6 : 1 }}
+              >
+                <img src="/shopify-logo.svg" alt="" width={18} height={20} style={{ display: "block", flexShrink: 0 }} />
+                {connecting
+                  ? lang === "fr"
+                    ? "Vérification..."
+                    : "Verifying..."
+                  : lang === "fr"
+                    ? "Connecter Shopify"
+                    : "Connect Shopify"}
+              </button>
+              <button type="button" style={shopifyConnectSecondaryBtn} onClick={onClose} disabled={connecting}>
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              position: "relative",
+              borderRadius: 28,
+              background: "linear-gradient(145deg, #95BF47 0%, #5E8E3E 55%, #3D6B2A 100%)",
+              padding: isMobile ? "32px 20px" : "40px 32px",
+              minHeight: isMobile ? 360 : 480,
+            }}
+          >
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 24,
+                right: 32,
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.14)",
+              }}
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                bottom: 32,
+                left: 24,
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.1)",
+              }}
+            />
+
+            <div
+              style={{
+                position: "relative",
+                background: "#FFFFFF",
+                borderRadius: 20,
+                boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
+                padding: isMobile ? "24px 20px" : "32px 28px",
+                border: "1px solid rgba(255,255,255,0.8)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                <img src="/shopify-logo.svg" alt="Shopify" width={40} height={46} style={{ display: "block", flexShrink: 0 }} />
+                <div>
+                  <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                    {lang === "fr" ? "Comment connecter Shopify" : "How to connect Shopify"}
+                  </p>
+                  <p style={{ fontSize: 13, color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+                    {lang === "fr"
+                      ? "Créez une app personnalisée dans Shopify Admin (Paramètres → Applications et canaux de vente → Développer des apps), activez l'API Admin avec la permission read_orders, puis collez le domaine .myshopify.com et le token d'accès ci-dessus."
+                      : "Create a custom app in Shopify Admin (Settings → Apps and sales channels → Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                {steps.map((step, index) => (
+                  <div key={step.title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: "#F9FAFB",
+                          border: "1px solid #F0F0F0",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {step.icon}
+                      </div>
+                      {index < steps.length - 1 && (
+                        <div style={{ width: 2, flex: 1, minHeight: 16, background: "#E5E7EB", marginTop: 8, borderRadius: 999 }} />
+                      )}
+                    </div>
+                    <div style={{ paddingTop: 2 }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", margin: "0 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                        {lang === "fr" ? `Étape ${index + 1}` : `Step ${index + 1}`}
+                      </p>
+                      <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
+                        {step.title}
+                      </p>
+                      <p style={{ fontSize: 14, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+                        {step.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2182,8 +2548,7 @@ function IntegrationsView({
   const [connectedShop, setConnectedShop] = useState<string | null>(null);
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
-  const [shopifyConnectOpen, setShopifyConnectOpen] = useState(false);
-  const shopifyConnectRef = useRef<HTMLDivElement>(null);
+  const [connectPageOpen, setConnectPageOpen] = useState(false);
 
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
@@ -2223,30 +2588,47 @@ function IntegrationsView({
       setConnectedShop(shop);
       setChangingStore(false);
       window.history.replaceState({}, "", "/dashboard");
-      notifyShopifyConnected(lang, shop || (lang === "fr" ? "votre boutique" : "your store"));
+      if (user?.id) {
+        notifyShopifyConnected(lang, shop || (lang === "fr" ? "votre boutique" : "your store"), user.id);
+        void fetch("/api/shopify/sync-toggle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id, enabled: true }),
+        }).catch(() => {});
+        void runShopifyOrderSync(user.id)
+          .then(() => {
+            dispatchSalesUpdated();
+            dispatchPayoutsUpdated();
+          })
+          .catch(() => {});
+      }
     }
     if (params.get("shopify") === "error") {
       setShopError(lang === "fr" ? "La connexion a échoué. Réessayez." : "Connection failed. Please try again.");
+      setConnectPageOpen(true);
       window.history.replaceState({}, "", "/dashboard");
     }
-  }, [lang]);
+  }, [lang, user?.id]);
 
-  useEffect(() => {
-    if (!shopifyConnectOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (shopifyConnectRef.current && !shopifyConnectRef.current.contains(e.target as Node)) {
-        setShopifyConnectOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [shopifyConnectOpen]);
-
-  const handleShopifyConnect = () => {
+  const openConnectPage = (prefillDomain = "", changing = false) => {
     if (!canUseShopify(plan)) {
       void onUpgrade?.();
       return;
     }
+    setChangingStore(changing);
+    setShopDomain(prefillDomain);
+    setShopToken("");
+    setShopError("");
+    setConnectPageOpen(true);
+  };
+
+  const closeConnectPage = () => {
+    setConnectPageOpen(false);
+    setChangingStore(false);
+    setShopError("");
+  };
+
+  const handleShopifyConnect = () => {
     const storeCount = Math.max(
       connectedStores.length,
       activeShop ? 1 : 0
@@ -2294,9 +2676,9 @@ function IntegrationsView({
         setConnectedShop(payload.shop || domain);
         setChangingStore(false);
         setShopToken("");
-        setShopifyConnectOpen(false);
+        setConnectPageOpen(false);
         setConnecting(false);
-        notifyShopifyConnected(lang, payload.shopName || domain);
+        notifyShopifyConnected(lang, payload.shopName || domain, user?.id);
         // Active la sync auto par defaut des la connexion (enregistre le webhook).
         setSyncEnabled(true);
         void fetch("/api/shopify/sync-toggle", {
@@ -2304,6 +2686,12 @@ function IntegrationsView({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user?.id || "", enabled: true }),
         }).catch(() => { /* silencieux : l'utilisateur peut toggler a la main */ });
+        void runShopifyOrderSync(user?.id || "")
+          .then(() => {
+            dispatchSalesUpdated();
+            dispatchPayoutsUpdated();
+          })
+          .catch(() => { /* backfill optionnel */ });
       } catch {
         setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
         setConnecting(false);
@@ -2318,6 +2706,30 @@ function IntegrationsView({
     { name: "Make", desc: "Advanced visual automation", logo: "/make-logo.svg", logoH: 34 },
   ];
 
+  if (connectPageOpen) {
+    return (
+      <ShopifyConnectPage
+        lang={lang}
+        isMobile={isMobile}
+        shopDomain={shopDomain}
+        shopToken={shopToken}
+        shopError={shopError}
+        connecting={connecting}
+        changingStore={changingStore}
+        onShopDomainChange={(value) => {
+          setShopDomain(value);
+          setShopError("");
+        }}
+        onShopTokenChange={(value) => {
+          setShopToken(value);
+          setShopError("");
+        }}
+        onConnect={handleShopifyConnect}
+        onClose={closeConnectPage}
+      />
+    );
+  }
+
   return (
     <>
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
@@ -2326,10 +2738,10 @@ function IntegrationsView({
           ✓ {connectedShop} connected successfully
         </div>
       )}
-      <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: 16 }}>
+      <div style={{ padding: isMobile ? "12px 16px 16px" : "24px 40px 40px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
           {apps.map((app) => (
-            <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
+            <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: app.name === "Shopify" && !isShopifyConnected ? "center" : "flex-start", gap: 16, width: "100%", boxSizing: "border-box" }}>
               <div style={{ width: 52, height: 52, borderRadius: 12, background: "#FFFFFF", border: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <img src={app.logo} alt={app.name} width={34} height={app.logoH} style={{ display: "block", objectFit: "contain" }} />
               </div>
@@ -2418,17 +2830,72 @@ function IntegrationsView({
                               setSyncMsg("");
                               void (async () => {
                                 try {
-                                  const res = await fetch("/api/shopify/sync", {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ userId: user?.id || "" }),
-                                  });
-                                  const payload = (await res.json().catch(() => ({}))) as { synced?: number; created?: number; error?: string };
+                                  const res = await runShopifyOrderSync(user.id);
+                                  const payload = (await res.json().catch(() => ({}))) as {
+                                    synced?: number;
+                                    created?: number;
+                                    error?: string;
+                                    message?: string;
+                                    messageEn?: string;
+                                    ordersWithCodes?: number;
+                                    registeredCodes?: string[];
+                                    skipped?: Record<string, number>;
+                                    dbErrors?: string[];
+                                  };
                                   if (!res.ok) {
-                                    setSyncMsg(payload.error || (lang === "fr" ? "La synchronisation a echoue" : "Sync failed"));
+                                    setSyncMsg(
+                                      (lang === "fr" ? payload.message : payload.messageEn) ||
+                                        payload.error ||
+                                        (lang === "fr" ? "La synchronisation a échoué" : "Sync failed")
+                                    );
+                                  } else if (payload.error === "no_creator_codes") {
+                                    setSyncMsg(
+                                      lang === "fr"
+                                        ? payload.message || "Générez d'abord un code promo (Affiliation) pour vos créateurs."
+                                        : payload.messageEn || "Generate affiliate promo codes for your creators first."
+                                    );
                                   } else {
-                                    const n = payload.created ?? payload.synced ?? 0;
-                                    setSyncMsg(lang === "fr" ? `${n} vente(s) synchronisee(s)` : `${n} sale(s) synced`);
+                                    const n = payload.created ?? 0;
+                                    const synced = payload.synced ?? 0;
+                                    const withCodes = payload.ordersWithCodes ?? 0;
+                                    if (n > 0) {
+                                      setSyncMsg(
+                                        lang === "fr"
+                                          ? `${n} nouvelle(s) vente(s) importée(s) (${synced} attribuée(s))`
+                                          : `${n} new sale(s) imported (${synced} attributed)`
+                                      );
+                                      dispatchSalesUpdated();
+                                      dispatchPayoutsUpdated();
+                                    } else if (synced > 0) {
+                                      setSyncMsg(
+                                        lang === "fr"
+                                          ? `${synced} vente(s) déjà enregistrée(s) — rien de nouveau`
+                                          : `${synced} sale(s) already recorded — nothing new`
+                                      );
+                                    } else if (withCodes === 0) {
+                                      setSyncMsg(
+                                        lang === "fr"
+                                          ? "Aucune commande Shopify avec code promo trouvée sur les 250 dernières commandes."
+                                          : "No Shopify orders with a promo code in the last 250 orders."
+                                      );
+                                    } else {
+                                      const skip = payload.skipped || {};
+                                      setSyncMsg(
+                                        lang === "fr"
+                                          ? `${withCodes} commande(s) avec code, mais aucune ne correspond à vos créateurs. Codes enregistrés : ${(payload.registeredCodes || []).join(", ") || "—"}`
+                                          : `${withCodes} order(s) with codes but none match your creators. Registered: ${(payload.registeredCodes || []).join(", ") || "—"}`
+                                      );
+                                      if ((skip.no_commission || 0) > 0) {
+                                        setSyncMsg(
+                                          lang === "fr"
+                                            ? "Créateur trouvé mais commission manquante — définissez-la dans Gérer ou régénérez le lien d'affiliation."
+                                            : "Creator matched but commission missing — set it in Manage or regenerate the affiliate link."
+                                        );
+                                      }
+                                    }
+                                    if (payload.dbErrors?.length) {
+                                      setSyncMsg(`DB: ${payload.dbErrors[0]}`);
+                                    }
                                   }
                                 } catch {
                                   setSyncMsg(lang === "fr" ? "Erreur reseau" : "Network error");
@@ -2465,12 +2932,7 @@ function IntegrationsView({
                         ) ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              setChangingStore(true);
-                              setShopDomain("");
-                              setShopError("");
-                              setShopifyConnectOpen(true);
-                            }}
+                            onClick={() => openConnectPage("", true)}
                             style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
                           >
                             {isMultiStore
@@ -2484,12 +2946,7 @@ function IntegrationsView({
                         ) : canChangeShopifyStore(plan) ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              setChangingStore(true);
-                              setShopDomain(activeShop?.replace(/\.myshopify\.com$/, "") || "");
-                              setShopError("");
-                              setShopifyConnectOpen(true);
-                            }}
+                            onClick={() => openConnectPage(activeShop?.replace(/\.myshopify\.com$/, "") || "", true)}
                             style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
                           >
                             {lang === "fr" ? "Changer de boutique" : "Change my store"}
@@ -2511,86 +2968,24 @@ function IntegrationsView({
                         ) : null}
                       </>
                     ) : (
-                      <>
-                        <div ref={shopifyConnectRef} style={{ position: "relative", alignSelf: "flex-start" }}>
-                          <button
-                            type="button"
-                            onClick={() => setShopifyConnectOpen((open) => !open)}
-                            aria-expanded={shopifyConnectOpen}
-                            className="hero-cta-shopify hero-cta-compact-sm"
-                            style={{ flexShrink: 0, opacity: connecting ? 0.6 : 1 }}
-                          >
-                            {lang === "fr" ? "Connecter →" : "Connect →"}
-                          </button>
-                          {shopifyConnectOpen && (
-                            <div
-                              style={{
-                                position: "absolute",
-                                top: "calc(100% + 8px)",
-                                left: 0,
-                                width: 300,
-                                maxWidth: "calc(100vw - 48px)",
-                                background: "#FFFFFF",
-                                border: "1px solid #EFEFEF",
-                                borderRadius: 14,
-                                boxShadow: "0 16px 48px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 71, 255, 0.06)",
-                                padding: 16,
-                                zIndex: 30,
-                              }}
-                            >
-                              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
-                                {lang === "fr" ? "Domaine de la boutique" : "Store domain"}
-                              </label>
-                              <input
-                                value={shopDomain}
-                                onChange={(e) => { setShopDomain(e.target.value); setShopError(""); }}
-                                placeholder="votreboutique.myshopify.com"
-                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12 }}
-                                onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
-                              />
-                              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6, letterSpacing: "-0.01em" }}>
-                                {lang === "fr" ? "Token d'API Admin" : "Admin API token"}
-                              </label>
-                              <input
-                                type="password"
-                                value={shopToken}
-                                onChange={(e) => { setShopToken(e.target.value); setShopError(""); }}
-                                placeholder={lang === "fr" ? "Token d'API Admin (shpat_...)" : "Admin API token (shpat_...)"}
-                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #e0e0e0", borderRadius: 8, fontSize: 13, outline: "none", boxSizing: "border-box", marginBottom: 12 }}
-                                onKeyDown={(e) => e.key === "Enter" && handleShopifyConnect()}
-                              />
-                              <button
-                                type="button"
-                                onClick={handleShopifyConnect}
-                                disabled={connecting}
-                                className="hero-cta-shopify hero-cta-compact-sm"
-                                style={{ width: "100%", justifyContent: "center", opacity: connecting ? 0.6 : 1 }}
-                              >
-                                {connecting ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter →" : "Connect →")}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        {changingStore && (
-                          <button
-                            type="button"
-                            onClick={() => { setChangingStore(false); setShopDomain(""); setShopError(""); setShopifyConnectOpen(false); }}
-                            style={{ background: "none", border: "none", fontSize: 12, color: "#7A7A7A", cursor: "pointer", marginTop: 8, padding: 0, fontFamily: "inherit" }}
-                          >
-                            {lang === "fr" ? "Annuler" : "Cancel"}
-                          </button>
-                        )}
-                        <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 8, letterSpacing: "-0.01em", lineHeight: 1.45 }}>
-                          {lang === "fr" ? "Creez une app personnalisee dans Shopify Admin (Parametres -> Applications et canaux de vente -> Developper des apps), activez l'API Admin avec la permission read_orders, puis collez le domaine .myshopify.com et le token d'acces ci-dessus." : "Create a custom app in Shopify Admin (Settings -> Apps and sales channels -> Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
-                        </div>
-                        {shopError && <div style={{ color: "#dc2626", fontSize: 12, marginTop: 4 }}>{shopError}</div>}
-                      </>
+                      shopError ? <div style={{ color: "#dc2626", fontSize: 12, marginTop: 8 }}>{shopError}</div> : null
                     )}
                   </div>
                 )}
               </div>
-              {app.name === "Shopify" ? null : (
-                <button type="button" style={btnSecondary}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
+              {app.name === "Shopify" ? (
+                !isShopifyConnected ? (
+                  <button
+                    type="button"
+                    onClick={() => openConnectPage("")}
+                    className="hero-cta-shopify hero-cta-compact"
+                    style={{ flexShrink: 0, alignSelf: "center", opacity: connecting ? 0.6 : 1 }}
+                  >
+                    {lang === "fr" ? "Connecter →" : "Connect →"}
+                  </button>
+                ) : null
+              ) : (
+                <button type="button" style={{ ...btnSecondary, alignSelf: "center" }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
               )}
             </div>
           ))}
@@ -2772,6 +3167,19 @@ function affiliateReferralLink(ref: string) {
   return `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
 }
 
+async function runShopifyOrderSync(userId: string): Promise<Response> {
+  await persistAffiliateCodesToServer(userId);
+  const affiliates = loadAffiliates(userId);
+  return fetch("/api/shopify/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId,
+      entries: affiliates.map((a) => ({ creator: a.creator, code: a.code })),
+    }),
+  });
+}
+
 const affiliateInputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
@@ -2886,6 +3294,15 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
   useEffect(() => {
     if (!affiliatesLoaded) return;
     saveAffiliates(userId, affiliates);
+    if (affiliates.length === 0) return;
+    void fetch("/api/affiliates/sync-codes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        entries: affiliates.map((a) => ({ creator: a.creator, code: a.code })),
+      }),
+    }).catch(() => {});
   }, [affiliates, userId, affiliatesLoaded]);
 
   const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => {
@@ -2961,6 +3378,8 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <CreatorAvatar
                     src={avatarUrlForCreatorHandle(a.creator, creatorAvatarMap)}
+                    username={a.creator}
+                    displayName={a.creator}
                     size={32}
                     alt={a.creator}
                   />
@@ -3108,6 +3527,12 @@ function AddAffiliatePanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, creatorId: selected.id, code }),
       }).catch(() => { /* silencieux : l'UI continue */ });
+    } else if (userId && code && normalizedHandle) {
+      void fetch("/api/affiliates/set-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, handle: normalizedHandle, code }),
+      }).catch(() => { /* silencieux : l'UI continue */ });
     }
   };
 
@@ -3199,19 +3624,18 @@ function AddAffiliatePanel({
                         textAlign: "left",
                         padding: "10px 12px",
                         borderRadius: 12,
-                        border: isSelected ? "1px solid #0047FF" : "1px solid #EFEFEF",
-                        background: isSelected ? "rgba(0,71,255,0.06)" : "#FAFAFA",
+                        ...selectionCardStyle(isSelected),
                         cursor: "pointer",
                         fontFamily: "inherit",
                       }}
                     >
-                      <CreatorAvatar src={creator.avatar_url} size={36} alt={displayName} />
+                      <CreatorAvatar src={creator.avatar_url} username={creator.handle} displayName={displayName} size={36} alt={displayName} />
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{displayName}</div>
-                        <div style={{ fontSize: 12, color: "#7A7A7A" }}>{handleLabel}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: selectionTextPrimary(isSelected), letterSpacing: "-0.02em" }}>{displayName}</div>
+                        <div style={{ fontSize: 12, color: selectionTextSubtle(isSelected) }}>{handleLabel}</div>
                       </div>
                       {creator.platform && (
-                        <span style={{ fontSize: 11, color: "#9A9A9A", flexShrink: 0 }}>{mapAffiliatePlatform(creator.platform)}</span>
+                        <span style={{ fontSize: 11, color: selectionTextMuted(isSelected), flexShrink: 0 }}>{mapAffiliatePlatform(creator.platform)}</span>
                       )}
                     </button>
                   );
@@ -3307,6 +3731,23 @@ function AddAffiliatePanel({
             disabled={!canAdd}
             onClick={() => {
               if (!generated || !normalizedHandle) return;
+              const persistCode = () => {
+                if (!userId || !generated.code) return;
+                if (selectedCreatorId) {
+                  void fetch("/api/affiliates/set-code", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userId, creatorId: selectedCreatorId, code: generated.code }),
+                  }).catch(() => {});
+                  return;
+                }
+                void fetch("/api/affiliates/set-code", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ userId, handle: normalizedHandle, code: generated.code }),
+                }).catch(() => {});
+              };
+              persistCode();
               onAdd({ creator: normalizedHandle, platform, ref: generated.ref, code: generated.code });
             }}
             style={{ ...btnPrimary, width: "100%", opacity: canAdd ? 1 : 0.45 }}
@@ -3353,51 +3794,119 @@ const btnPrimary: React.CSSProperties = { background: "#0047FF", color: "#FFFFFF
 const btnSecondary: React.CSSProperties = { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" };
 const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
+function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
+  return [
+    {
+      id: "home",
+      label: lang === "fr" ? "Accueil" : "Home",
+      view: "dashboard",
+      section: "main",
+      iconKey: "home",
+      keywords: ["home", "accueil", "overview", "dashboard"],
+    },
+    {
+      id: "analytics",
+      label: lang === "fr" ? "Analytiques" : "Analytics",
+      view: "analytics",
+      section: "main",
+      iconKey: "analytics",
+      keywords: ["analytics", "sales", "ventes", "commissions", "performance", "stats"],
+    },
+    {
+      id: "scripts",
+      label: "Scripts",
+      view: "scripts",
+      section: "main",
+      iconKey: "scripts",
+      keywords: ["scripts", "brief", "briefs", "content", "video"],
+    },
+    {
+      id: "payouts",
+      label: "Pay it",
+      view: "payouts",
+      section: "main",
+      iconKey: "payouts",
+      keywords: ["payments", "pay", "payouts", "commissions", "iban", "paiements"],
+    },
+    {
+      id: "notes",
+      label: lang === "fr" ? "Notes" : "Notes",
+      view: "notes",
+      section: "main",
+      iconKey: "notes",
+      keywords: ["notes", "notepad", "memo"],
+    },
+    {
+      id: "settings",
+      label: lang === "fr" ? "Paramètres" : "Settings",
+      view: "settings",
+      section: "footer",
+      iconKey: "settings",
+      keywords: ["account", "profile", "settings", "paramètres"],
+    },
+  ];
+}
+
 function buildSidebarNavEntries(
-  notificationUnread: number,
   lang: "en" | "fr",
   counts: { activeCampaigns: number; savedCreators: number }
 ): SidebarNavEntry[] {
   return [
-    { id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", section: "main", iconKey: "home", keywords: ["home", "overview", "accueil", "dashboard"] },
-    { id: "discovery", label: lang === "fr" ? "Recherche" : "Discovery", view: "discovery", section: "main", iconKey: "search", keywords: ["find", "creators", "search", "tiktok", "instagram"] },
-    { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators", view: "creators", section: "main", iconKey: "creators", keywords: ["influencers", "profiles", "saved"] },
-    { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", section: "main", iconKey: "campaigns", keywords: ["campaign", "collaborations"] },
-    { id: "affiliates", label: lang === "fr" ? "Affiliés" : "Affiliates", view: "affiliates", section: "main", iconKey: "affiliates", keywords: ["partners", "referrals", "commission"] },
-    { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
-    { id: "payouts", label: lang === "fr" ? "Paiements" : "Payouts", view: "payouts", section: "main", iconKey: "payouts", keywords: ["payments", "pay", "commissions", "sales"] },
-    { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", section: "main", iconKey: "invite", keywords: ["invite", "creator", "inviter", "lien", "link"] },
-    { id: "scripts", label: "Scripts", view: "scripts", section: "tools", iconKey: "scripts", keywords: ["scripts", "briefs", "brief", "marque", "brand", "upload"] },
-    { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", section: "tools", iconKey: "analytics", keywords: ["reports", "data", "metrics", "roi"] },
-    { id: "integrations", label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", section: "tools", iconKey: "integrations", keywords: ["shopify", "zapier", "notion", "connect"] },
-    { id: "notes", label: lang === "fr" ? "Notes" : "Notes", view: "notes", section: "tools", iconKey: "notes", keywords: ["goals", "objectives", "aspirations", "journal", "workspace"] },
-    { id: "automation", label: lang === "fr" ? "Automatisation" : "Automation", view: "automation", section: "tools", iconKey: "automation", keywords: ["agents", "workflows", "auto"] },
     {
-      id: "notifications",
-      label: lang === "fr" ? "Notifications" : "Notifications",
-      view: "notifications",
-      section: "workspace",
-      iconKey: "notifications",
-      keywords: ["alerts", "bell", "updates"],
-      badge: notificationUnread > 0 ? String(notificationUnread) : undefined,
-    },
-    {
-      id: "active-campaigns",
-      label: lang === "fr" ? "Campagnes actives" : "Active Campaigns",
-      view: "campaigns",
-      section: "workspace",
-      iconKey: "dot-blue",
-      keywords: ["campaigns", "active", "running"],
-      badge: counts.activeCampaigns > 0 ? String(counts.activeCampaigns) : undefined,
-    },
-    {
-      id: "creator-lists",
-      label: lang === "fr" ? "Listes de créateurs" : "Creator Lists",
+      id: "discovery",
+      label: "Find it",
       view: "discovery",
-      section: "workspace",
-      iconKey: "dot-pink",
-      keywords: ["lists", "saved creators", "bookmarks"],
-      badge: counts.savedCreators > 0 ? String(counts.savedCreators) : undefined,
+      section: "main",
+      iconKey: "search",
+      keywords: ["find", "find it", "creators", "search", "tiktok", "instagram", "recherche", "discovery"],
+      children: [
+        {
+          id: "creators",
+          label: lang === "fr" ? "Gérer" : "Manage",
+          view: "creators",
+          keywords: ["influencers", "profiles", "saved", "manage", "gérer"],
+        },
+      ],
+    },
+    {
+      id: "campaigns",
+      label: "Track it",
+      view: "campaigns",
+      section: "main",
+      iconKey: "campaigns",
+      keywords: ["campaign", "collaborations", "track it", "trackit"],
+      children: [
+        {
+          id: "invitations",
+          label: lang === "fr" ? "Invitations" : "Invitations",
+          view: "invitations",
+          keywords: ["invite", "creator", "inviter", "lien", "link", "invitation"],
+        },
+      ],
+    },
+    // Outreach ("Messages") — hidden from sidebar for now; view + OutreachView kept in codebase
+    // { id: "outreach", label: lang === "fr" ? "Messages" : "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["messages", "dm", "email", "follow up"] },
+    {
+      id: "payouts",
+      label: "Pay it",
+      view: "payouts",
+      section: "main",
+      iconKey: "payouts",
+      keywords: ["payments", "pay", "commissions", "sales", "paiements", "payouts", "balance", "wallet", "solde", "transactions"],
+      children: [
+        {
+          id: "balance",
+          label: lang === "fr" ? "Solde" : "Balance",
+          view: "balance",
+          keywords: ["balance", "wallet", "funds", "solde", "fonds"],
+        },
+        {
+          id: "transactions",
+          label: lang === "fr" ? "Paiements" : "Payments",
+          view: "transactions",
+          keywords: ["payments", "transactions", "history", "ledger", "paiements", "commissions", "historique"],
+        },
+      ],
     },
     { id: "help", label: lang === "fr" ? "Centre d'aide" : "Help Center", view: "help", section: "footer", iconKey: "help", keywords: ["support", "guides", "docs", "faq"] },
     { id: "feedback", label: lang === "fr" ? "Avis" : "Feedback", view: "feedback", section: "footer", iconKey: "feedback", keywords: ["suggest", "bug", "feature request"] },
@@ -3450,16 +3959,456 @@ function renderSidebarNavIcon(iconKey: string) {
   }
 }
 
+const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+
+function TrackitTagline() {
+  return (
+    <span
+      style={{
+        fontSize: 14,
+        fontWeight: 600,
+        color: "#000000",
+        letterSpacing: "-0.02em",
+        lineHeight: 1.35,
+        fontFamily: "inherit",
+        whiteSpace: "nowrap",
+      }}
+    >
+      Find it, <span style={{ color: "#0047FF" }}>Track it</span>, Pay it
+      <span style={{ color: "#0047FF", fontSize: 28, lineHeight: 1 }}>.</span>
+    </span>
+  );
+}
+
+function planLabel(lang: "en" | "fr", isCreator: boolean, isScale: boolean, isPro: boolean, isBasic: boolean): string {
+  if (isCreator) return lang === "fr" ? "Créateur" : "Creator";
+  if (lang === "fr") {
+    if (isScale) return "Plan Scale";
+    if (isPro) return "Plan Pro";
+    if (isBasic) return "Plan Growth";
+    return "Plan gratuit";
+  }
+  if (isScale) return "Scale Plan";
+  if (isPro) return "Pro Plan";
+  if (isBasic) return "Growth Plan";
+  return "Free Plan";
+}
+
+function DashboardTopBar({
+  lang,
+  profile,
+  avatarBroken,
+  onAvatarError,
+  shopifyConnected,
+  isCreator,
+  isScale,
+  isPro,
+  isBasic,
+  userId,
+  notificationUnread,
+  onNotificationUnreadChange,
+  onNavigate,
+  onConnectShopify,
+}: {
+  lang: "en" | "fr";
+  profile: { full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null;
+  avatarBroken: boolean;
+  onAvatarError: () => void;
+  shopifyConnected: boolean;
+  isCreator: boolean;
+  isScale: boolean;
+  isPro: boolean;
+  isBasic: boolean;
+  userId?: string;
+  notificationUnread: number;
+  onNotificationUnreadChange: (count: number) => void;
+  onNavigate: (view: View) => void;
+  onConnectShopify: () => void;
+}) {
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountOpen && !notificationsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (accountRef.current?.contains(target) || notificationsRef.current?.contains(target)) return;
+      setAccountOpen(false);
+      setNotificationsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [accountOpen, notificationsOpen]);
+
+  const initials = (profile?.full_name?.[0] || profile?.username?.[0] || "?").toUpperCase();
+  const username = profile?.username ? `@${profile.username}` : initials;
+  const storeName = profile?.business_name?.trim() || profile?.shopify_store?.trim() || null;
+  const plan = planLabel(lang, isCreator, isScale, isPro, isBasic);
+
+  const menuItemStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+    padding: "10px 12px",
+    border: "none",
+    borderRadius: 8,
+    background: "transparent",
+    cursor: "pointer",
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#1A1A1A",
+    fontFamily: "inherit",
+    textAlign: "left",
+    letterSpacing: "-0.02em",
+  };
+
+  const dropdownStyle: React.CSSProperties = {
+    position: "absolute",
+    top: "calc(100% + 8px)",
+    right: 0,
+    minWidth: 240,
+    background: "#FFFFFF",
+    border: "1px solid #EFEFEF",
+    borderRadius: 12,
+    boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
+    padding: 6,
+    zIndex: 1000,
+  };
+
+  const navAndClose = (view: View) => {
+    onNavigate(view);
+    setAccountOpen(false);
+  };
+
+  return (
+    <header
+      style={{
+        height: 56,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 16,
+        padding: "0 24px",
+        borderBottom: "1px solid #EFEFEF",
+        background: "#FFFFFF",
+        position: "relative",
+        zIndex: 40,
+      }}
+    >
+      <TrackitTagline />
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div ref={notificationsRef} style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => {
+              primeNotificationSound();
+              setAccountOpen(false);
+              setNotificationsOpen((v) => !v);
+            }}
+            aria-expanded={notificationsOpen}
+            aria-label={lang === "fr" ? "Notifications" : "Notifications"}
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 40,
+              height: 40,
+              border: "1px solid #EFEFEF",
+              borderRadius: 10,
+              background: notificationsOpen ? "#F5F5F5" : "#FFFFFF",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              color: "#5A5A5A",
+            }}
+          >
+            <NotificationIcon />
+            {notificationUnread > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -4,
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 5px",
+                  borderRadius: 999,
+                  background: "#0047FF",
+                  color: "#FFFFFF",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  letterSpacing: "-0.02em",
+                  lineHeight: 1,
+                  boxShadow: "0 0 0 2px #FFFFFF",
+                }}
+              >
+                {notificationUnread > 9 ? "9+" : notificationUnread}
+              </span>
+            )}
+          </button>
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 8px)",
+              right: 0,
+              width: 380,
+              background: "#FFFFFF",
+              border: "1px solid #EFEFEF",
+              borderRadius: 12,
+              boxShadow: notificationsOpen ? "0 12px 32px rgba(0,0,0,0.1)" : "none",
+              overflow: "hidden",
+              zIndex: 1000,
+              visibility: notificationsOpen ? "visible" : "hidden",
+              opacity: notificationsOpen ? 1 : 0,
+              pointerEvents: notificationsOpen ? "auto" : "none",
+            }}
+          >
+            <NotificationsPanel userId={userId} onUnreadChange={onNotificationUnreadChange} />
+          </div>
+        </div>
+
+      <div ref={accountRef} style={{ position: "relative" }}>
+        <button
+          type="button"
+          onClick={() => {
+            setNotificationsOpen(false);
+            setAccountOpen((v) => !v);
+          }}
+          aria-expanded={accountOpen}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "4px 10px 4px 4px",
+            border: "1px solid #EFEFEF",
+            borderRadius: 999,
+            background: accountOpen ? "#F5F5F5" : "#FFFFFF",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            maxWidth: 220,
+          }}
+        >
+          <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#E8EEFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
+            {profile?.avatar_url && !avatarBroken ? (
+              <img key={profile.avatar_url} src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={onAvatarError} />
+            ) : (
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#0047FF" }}>{initials}</span>
+            )}
+          </div>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {username}
+          </span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#9A9A9A", flexShrink: 0, transform: accountOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        {accountOpen && (
+          <div style={dropdownStyle}>
+            <div style={{ padding: "10px 12px 8px" }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 2px", letterSpacing: "-0.02em" }}>{username}</p>
+              <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0, letterSpacing: "-0.01em" }}>{plan}</p>
+              {storeName && !isCreator && (
+                <p style={{ fontSize: 12, color: "#0047FF", margin: "4px 0 0", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {storeName}
+                </p>
+              )}
+            </div>
+            <div style={{ height: 1, background: "#F0F0F0", margin: "0 4px 4px" }} />
+            <button type="button" style={menuItemStyle} onClick={() => navAndClose("settings")}>
+              <SettingsIcon />
+              {lang === "fr" ? "Paramètres" : "Settings"}
+            </button>
+            {!isCreator && (
+              <button type="button" style={menuItemStyle} onClick={() => navAndClose("billing")}>
+                <BillingIcon />
+                {lang === "fr" ? "Facturation" : "Billing"}
+              </button>
+            )}
+            <button type="button" style={menuItemStyle} onClick={() => navAndClose("feedback")}>
+              <FeedbackIcon />
+              {lang === "fr" ? "Avis" : "Feedback"}
+            </button>
+            {!isCreator && (
+              <button type="button" style={menuItemStyle} onClick={() => navAndClose("help")}>
+                <HelpIcon />
+                {lang === "fr" ? "Centre d'aide" : "Help Center"}
+              </button>
+            )}
+            {!isCreator && (
+              <>
+                <div style={{ height: 1, background: "#F0F0F0", margin: "6px 4px" }} />
+                <div style={{ padding: "4px" }}>
+                  <button
+                    type="button"
+                    className="hero-cta-shopify"
+                    onClick={() => {
+                      onConnectShopify();
+                      setAccountOpen(false);
+                    }}
+                    style={{ width: "100%", justifyContent: "center", gap: 8, padding: "11px 16px", fontSize: 15 }}
+                  >
+                    <img src="/shopify-logo.svg" alt="" width={20} height={20} style={{ display: "block" }} />
+                    {shopifyConnected
+                      ? lang === "fr"
+                        ? "Gérer Shopify"
+                        : "Manage Shopify"
+                      : lang === "fr"
+                        ? "Connecter Shopify"
+                        : "Connect Shopify"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+      </div>
+    </header>
+  );
+}
+
+function SidebarNavGroup({
+  collapsed,
+  expanded,
+  active,
+  icon,
+  label,
+  badge,
+  subItems,
+  parentView,
+  activeView,
+  onParentClick,
+  onToggleExpand,
+  onChildClick,
+}: {
+  collapsed: boolean;
+  expanded: boolean;
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  badge?: string;
+  subItems: SidebarNavChild[];
+  parentView: View;
+  activeView: View;
+  onParentClick: () => void;
+  onToggleExpand: () => void;
+  onChildClick: (view: View) => void;
+}) {
+  if (collapsed) {
+    return (
+      <SidebarItem collapsed icon={icon} label={label} active={active} badge={badge} onClick={onParentClick} />
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 2 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, position: "relative" }}>
+        {active && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "#0047FF" }} />}
+        <button
+          type="button"
+          onClick={onParentClick}
+          style={{
+            display: "flex",
+            flex: 1,
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 8px",
+            borderRadius: 9,
+            border: "none",
+            background: activeView === parentView ? "#F5F5F5" : "transparent",
+            color: active ? "#1A1A1A" : "#5A5A5A",
+            fontSize: 13,
+            fontWeight: active ? 500 : 400,
+            letterSpacing: "-0.02em",
+            fontFamily: "inherit",
+            cursor: "pointer",
+            textAlign: "left",
+            minWidth: 0,
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "#0047FF" : "#9A9A9A", flexShrink: 0 }}>{icon}</span>
+          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+          {badge && <span style={{ fontSize: 11, color: "#9A9A9A", background: "#F5F5F5", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
+        </button>
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse" : "Expand"}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 28,
+            height: 34,
+            border: "none",
+            background: "transparent",
+            color: "#9A9A9A",
+            cursor: "pointer",
+            borderRadius: 8,
+            flexShrink: 0,
+            fontFamily: "inherit",
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: expanded ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
+      {expanded && (
+        <div style={{ paddingLeft: 20, marginTop: 2 }}>
+          {subItems.map((child) => (
+            <button
+              key={child.id}
+              type="button"
+              onClick={() => onChildClick(child.view)}
+              style={{
+                display: "flex",
+                width: "100%",
+                alignItems: "center",
+                gap: 10,
+                padding: "7px 8px 7px 12px",
+                borderRadius: 8,
+                border: "none",
+                background: activeView === child.view ? "#F5F5F5" : "transparent",
+                color: activeView === child.view ? "#1A1A1A" : "#5A5A5A",
+                fontSize: 13,
+                fontWeight: activeView === child.view ? 500 : 400,
+                letterSpacing: "-0.02em",
+                fontFamily: "inherit",
+                cursor: "pointer",
+                textAlign: "left",
+                marginBottom: 2,
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: activeView === child.view ? "#0047FF" : "#D0D0D0", flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SidebarItem({ collapsed, icon, label, active, badge, onClick }: { collapsed: boolean; icon: React.ReactNode; label: string; active?: boolean; badge?: string; onClick?: () => void }) {
   return (
-    <button type="button" onClick={onClick} style={{ display: "flex", width: "100%", alignItems: "center", gap: 12, padding: collapsed ? "10px 0" : "10px 12px", justifyContent: collapsed ? "center" : "flex-start", borderRadius: 10, border: "none", background: active ? "#F5F5F5" : "transparent", color: active ? "#1A1A1A" : "#5A5A5A", fontSize: 14, fontWeight: active ? 500 : 400, letterSpacing: "-0.02em", marginBottom: 2, position: "relative", fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}>
-      {active && !collapsed && <span style={{ position: "absolute", left: -12, top: 8, bottom: 8, width: 3, borderRadius: 2, background: "#0047FF" }} />}
+    <button type="button" onClick={onClick} style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, padding: collapsed ? "8px 0" : "8px 8px", justifyContent: collapsed ? "center" : "flex-start", borderRadius: 9, border: "none", background: active ? "#F5F5F5" : "transparent", color: active ? "#1A1A1A" : "#5A5A5A", fontSize: 13, fontWeight: active ? 500 : 400, letterSpacing: "-0.02em", marginBottom: 2, position: "relative", fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}>
+      {active && !collapsed && <span style={{ position: "absolute", left: -8, top: 7, bottom: 7, width: 3, borderRadius: 2, background: "#0047FF" }} />}
       <span style={{ display: "flex", alignItems: "center", justifyContent: "center", color: active ? "#0047FF" : "#9A9A9A", flexShrink: 0 }}>{icon}</span>
-      {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+      {!collapsed && <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>}
       {!collapsed && badge && <span style={{ fontSize: 11, color: "#9A9A9A", background: "#F5F5F5", padding: "2px 8px", borderRadius: 6 }}>{badge}</span>}
     </button>
   );
 }
+
 
 function HomeIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l9-8 9 8v10a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1V11z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function SearchIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
@@ -3477,5 +4426,6 @@ function AutomationIcon() { return <svg width="18" height="18" viewBox="0 0 24 2
 function NotificationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function HelpIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M9.5 9a2.5 2.5 0 015 0c0 1.5-2.5 2-2.5 3.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>; }
 function FeedbackIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
+function BillingIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 10h20" stroke="currentColor" strokeWidth="1.7"/><path d="M6 15h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function SettingsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>; }
 function DotIcon({ color }: { color: string }) { return <span style={{ width: 8, height: 8, borderRadius: 2, background: color, display: "inline-block" }} />; }

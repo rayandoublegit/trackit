@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
+import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 
 const BLUE = "#0047FF";
 
@@ -202,21 +203,22 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>{lang === "fr" ? "Préférences" : "Preferences"}</div>
           <label style={labelStyle}>{lang === "fr" ? "Langue" : "Language"}</label>
           <div style={{ display: "flex", gap: 8 }}>
-            {([["fr", "Français"], ["en", "English"]] as const).map(([code, label]) => (
+            {([["fr", "Français"], ["en", "English"]] as const).map(([code, label]) => {
+              const active = lang === code;
+              return (
               <button
                 key={code}
                 type="button"
                 onClick={() => { if (code !== lang) { applyAppLocale(code); window.location.reload(); } }}
                 style={{
                   flex: 1, padding: "11px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em",
-                  border: lang === code ? `1.5px solid ${BLUE}` : "1px solid rgba(0,0,0,0.12)",
-                  background: lang === code ? "rgba(0,71,255,0.06)" : "#FFFFFF",
-                  color: lang === code ? BLUE : "#1A1A1A",
+                  ...selectionCardStyle(active, { unselectedBackground: "#FFFFFF", unselectedBorder: "1px solid rgba(0,0,0,0.12)" }),
+                  color: selectionTextPrimary(active),
                 }}
               >
                 {label}
               </button>
-            ))}
+            );})}
           </div>
         </div>
 

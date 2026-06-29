@@ -5,6 +5,7 @@ import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { selectionPillColors, TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
 import {
   setDiscoveryPrefs,
   type DiscoveryLanguage,
@@ -29,6 +30,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import {
   DISCOVERY_RESULTS_CACHE_KEY,
   SAVED_CREATOR_SNAPSHOTS_KEY,
@@ -297,8 +299,8 @@ function DiscoveryTabs({
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
-                  color: active ? "#0047FF" : "#7A7A7A",
-                  background: active ? "rgba(0,71,255,0.1)" : "#F0F0F0",
+                  color: active ? "#FFFFFF" : "#7A7A7A",
+                  background: active ? TRACKIT_SELECTION_BLUE : "#F0F0F0",
                   padding: "2px 8px",
                   borderRadius: 999,
                 }}
@@ -1018,7 +1020,10 @@ function OutreachModal({
             </div>
             <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>Platform</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-              {platforms.map((p) => (
+              {platforms.map((p) => {
+                const isActive = platform === p;
+                const pill = selectionPillColors(isActive);
+                return (
                 <button
                   key={p}
                   type="button"
@@ -1027,14 +1032,14 @@ function OutreachModal({
                     ...btnSecondary,
                     padding: "8px 14px",
                     fontSize: 12,
-                    background: platform === p ? "rgba(0,71,255,0.08)" : "#FFFFFF",
-                    color: platform === p ? "#0047FF" : "#1A1A1A",
-                    borderColor: platform === p ? "#0047FF" : "#E5E5E5",
+                    background: pill.background,
+                    color: pill.color,
+                    borderColor: pill.borderColor,
                   }}
                 >
                   {p}
                 </button>
-              ))}
+              );})}
             </div>
             <button type="button" onClick={handleGenerate} disabled={generating} style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating ? 0.7 : 1 }}>
               Generate outreach →
@@ -1962,6 +1967,7 @@ export function DiscoveryView({
   onNavigateToOutreachSend?: (creator: Creator) => void;
 }) {
   const lang = useLang();
+  const { navState, navigate, goBack } = useDashboardNavigation();
   const [activeTab, setActiveTab] = useState<DiscoveryTab>("discover");
   const [productName, setProductName] = useState("");
   const [niche, setNiche] = useState("fitness");
@@ -2002,6 +2008,23 @@ export function DiscoveryView({
   } | null>(null);
   const [savedCreators, setSavedCreators] = useState<Creator[]>(() => readSavedCreatorsFromStorage());
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
+  const openCreatorProfile = (creator: Creator) => {
+    setSelectedCreator(creator);
+    navigate({ view: "discovery", creator: creator.username ?? "" });
+  };
+
+  useEffect(() => {
+    if (navState.view !== "discovery") return;
+    if (!navState.creator) {
+      setSelectedCreator(null);
+      return;
+    }
+    const handle = navState.creator.replace(/^@/, "").toLowerCase();
+    const found = [...creators, ...savedCreators].find(
+      (c) => (c.username ?? "").replace(/^@/, "").toLowerCase() === handle,
+    );
+    if (found) setSelectedCreator(found);
+  }, [navState.view, navState.creator, creators, savedCreators]);
   const [outreachCreator, setOutreachCreator] = useState<Creator | null>(null);
   const [outreachTemplates, setOutreachTemplates] = useState<OutreachTemplate[]>(INITIAL_OUTREACH_TEMPLATES);
   const [outreachContacted, setOutreachContacted] = useState<OutreachContact[]>([]);
@@ -2324,7 +2347,7 @@ export function DiscoveryView({
     writeSavedCreatorSnapshot(creator);
     setSavedCreators(prev => [...prev.filter(c => (c.username  ?? "") !== (creator.username ?? "")), creator]);
     setToast("Creator saved ✓");
-    notifyCreatorSaved(lang, creator.displayName || `@${creator.username ?? "creator"}`);
+    notifyCreatorSaved(lang, creator.displayName || `@${creator.username ?? "creator"}`, user.id);
   };
 
   const handleRemoveCreator = async (username: string) => {
@@ -2844,7 +2867,7 @@ export function DiscoveryView({
                     creator={c}
                     isSaved={isCreatorSaved(c.username  ?? "")}
                     onToggleSave={() => toggleSaveCreator(c)}
-                    onViewProfile={() => setSelectedCreator(c)}
+                    onViewProfile={() => openCreatorProfile(c)}
                   />
                 ))}
               </div>
@@ -2902,7 +2925,7 @@ export function DiscoveryView({
                     key={c.username ?? Math.random().toString()}
                     variant="saved"
                     creator={c}
-                    onViewProfile={() => setSelectedCreator(c)}
+                    onViewProfile={() => openCreatorProfile(c)}
                     onGenerateOutreach={() => openOutreach(c)}
                     onRemove={() => void handleRemoveCreator(c.username  ?? "")}
                   />
@@ -2917,7 +2940,7 @@ export function DiscoveryView({
         <CreatorProfileModal
           lang={lang}
           creator={selectedCreator}
-          onClose={() => setSelectedCreator(null)}
+          onClose={goBack}
           onGenerateOutreach={() => openOutreach(selectedCreator)}
         />
       )}

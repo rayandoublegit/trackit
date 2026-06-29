@@ -43,6 +43,52 @@ const SCALE_PRICE_IDS = () =>
     process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID
   );
 
+const ANNUAL_PRICE_IDS = () =>
+  priceIds(
+    process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID,
+    process.env.STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
+    process.env.STRIPE_PRO2_ANNUAL_PRICE_ID,
+    process.env.STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
+    process.env.STRIPE_SCALE_ANNUAL_PRICE_ID,
+    process.env.STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID
+  );
+
+const MONTHLY_PRICE_IDS = () =>
+  priceIds(
+    process.env.STRIPE_GROWTH_PRICE_ID,
+    process.env.STRIPE_GROWTH_EUR_PRICE_ID,
+    process.env.STRIPE_PRO2_PRICE_ID,
+    process.env.STRIPE_PRO2_EUR_PRICE_ID,
+    process.env.STRIPE_SCALE_PRICE_ID,
+    process.env.STRIPE_SCALE_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
+    process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID
+  );
+
+export function isAnnualPriceId(priceId: string | null | undefined): boolean {
+  if (!priceId) return false;
+  return ANNUAL_PRICE_IDS().includes(priceId);
+}
+
+export function priceBillingInterval(
+  priceId: string | null | undefined
+): "month" | "year" | null {
+  if (!priceId) return null;
+  if (ANNUAL_PRICE_IDS().includes(priceId)) return "year";
+  if (MONTHLY_PRICE_IDS().includes(priceId)) return "month";
+  return null;
+}
+
 /** Resolve Stripe price / checkout metadata to a profiles.plan value. */
 export function resolvePlanFromCheckout(
   priceId: string | null | undefined,
@@ -98,13 +144,25 @@ export function getPriceIdForUpgrade(
   return undefined;
 }
 
-export async function handleUpgrade(priceId: string): Promise<void> {
+export async function handleUpgrade(
+  priceId: string,
+  options?: { cancelUrl?: string }
+): Promise<void> {
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data: { user } } = await supabase.auth.getUser();
+  const base =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/dashboard?view=billing`
+      : undefined;
   const res = await fetch("/api/create-checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ priceId, userId: user?.id, email: user?.email }),
+    body: JSON.stringify({
+      priceId,
+      userId: user?.id,
+      email: user?.email,
+      cancelUrl: options?.cancelUrl ?? base,
+    }),
   });
   const payload = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
   if (!res.ok) throw new Error(payload.error ?? "Could not start checkout.");

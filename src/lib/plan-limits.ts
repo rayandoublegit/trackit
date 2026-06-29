@@ -153,6 +153,11 @@ export function canUseStripeConnectPayouts(plan: PlanTier): boolean {
   return plan === "scale";
 }
 
+/** Scale only: brand wallet balance (fund account & pay creators). */
+export function canUseBalance(plan: PlanTier): boolean {
+  return plan === "scale";
+}
+
 export function canUseFullAnalytics(plan: PlanTier): boolean {
   return isGrowthOrAbove(plan);
 }

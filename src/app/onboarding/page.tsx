@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  selectionCardStyle,
+  selectionTextMuted,
+  selectionTextPrimary,
+} from "@/lib/selection-card-styles";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -226,12 +232,14 @@ export default function OnboardingPage() {
                     { key: "infopreneur" as const, label: "Infopreneur", labelFr: "Infopreneur", desc: "Courses, coaching", descFr: "Formations, coaching" },
                     { key: "agency" as const, label: "Agency", labelFr: "Agence", desc: "Client services", descFr: "Services clients" },
                     { key: "other" as const, label: "Other", labelFr: "Autre", desc: "Something else", descFr: "Autre chose" },
-                  ].map((opt) => (
-                    <button key={opt.key} type="button" onClick={() => setBusinessType(opt.key)} style={cardStyle(businessType === opt.key)}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
-                      <div style={{ fontSize: 12, color: "rgba(0,0,0,0.5)", marginTop: 4 }}>{lang === "fr" ? opt.descFr : opt.desc}</div>
+                  ].map((opt) => {
+                    const active = businessType === opt.key;
+                    return (
+                    <button key={opt.key} type="button" onClick={() => setBusinessType(opt.key)} style={cardStyle(active)}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
+                      <div style={{ fontSize: 12, color: selectionTextMuted(active), marginTop: 4 }}>{lang === "fr" ? opt.descFr : opt.desc}</div>
                     </button>
-                  ))}
+                  );})}
                 </div>
               </div>
               <Input label="Your niche" labelFr="Votre niche" value={niche} onChange={setNiche} placeholder="Fashion, fitness, beauty, tech..." placeholderFr="Mode, fitness, beauté, tech..." />
@@ -243,11 +251,13 @@ export default function OnboardingPage() {
                     { key: "1k-10k" as const, label: "$1K – $10K", labelFr: "1K€ – 10K€" },
                     { key: "10k-50k" as const, label: "$10K – $50K", labelFr: "10K€ – 50K€" },
                     { key: "50k+" as const, label: "$50K+", labelFr: "50K€+" },
-                  ].map((opt) => (
-                    <button key={opt.key} type="button" onClick={() => setRevenue(opt.key)} style={cardStyle(revenue === opt.key)}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
+                  ].map((opt) => {
+                    const active = revenue === opt.key;
+                    return (
+                    <button key={opt.key} type="button" onClick={() => setRevenue(opt.key)} style={cardStyle(active)}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
                     </button>
-                  ))}
+                  );})}
                 </div>
               </div>
             </>
@@ -264,11 +274,13 @@ export default function OnboardingPage() {
                   { key: "friend" as const, label: "A friend", labelFr: "Un ami" },
                   { key: "google" as const, label: "Google", labelFr: "Google" },
                   { key: "other" as const, label: "Other", labelFr: "Autre" },
-                ].map((opt) => (
-                  <button key={opt.key} type="button" onClick={() => setSource(opt.key)} style={cardStyle(source === opt.key)}>
-                    <div style={{ fontSize: 14, fontWeight: 500, color: "#0A0A0A", letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
+                ].map((opt) => {
+                  const active = source === opt.key;
+                  return (
+                  <button key={opt.key} type="button" onClick={() => setSource(opt.key)} style={cardStyle(active)}>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.02em" }}>{lang === "fr" ? opt.labelFr : opt.label}</div>
                   </button>
-                ))}
+                );})}
               </div>
             </>
           )}
@@ -669,8 +681,7 @@ const primaryBtn: React.CSSProperties = {
 
 function cardStyle(active: boolean): React.CSSProperties {
   return {
-    background: active ? "rgba(0,71,255,0.08)" : "#FFFFFF",
-    border: active ? "1px solid #0047FF" : "1px solid rgba(0,0,0,0.1)",
+    ...selectionCardStyle(active, { unselectedBackground: "#FFFFFF", unselectedBorder: "1px solid rgba(0,0,0,0.1)" }),
     borderRadius: 12, padding: "14px 16px", cursor: "pointer", textAlign: "left",
     fontFamily: "inherit", transition: "all 0.15s ease",
   };

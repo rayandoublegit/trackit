@@ -47,6 +47,12 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
   useEffect(() => { void loadScripts(); }, [brandId]);
 
   useEffect(() => {
+    const onUpdated = () => { void loadScripts(); };
+    window.addEventListener("trackit:scripts-updated", onUpdated);
+    return () => window.removeEventListener("trackit:scripts-updated", onUpdated);
+  }, [brandId]);
+
+  useEffect(() => {
     const loadCreators = async () => {
       if (!supabase || !brandId) return;
       const { data } = await supabase.from("creators").select("id, handle, full_name").eq("user_id", brandId);
@@ -79,6 +85,7 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok) { setError(data?.error || (lang === "fr" ? "Échec." : "Failed.")); return; }
       resetForm(); setFormOpen(false);
+      window.dispatchEvent(new CustomEvent("trackit:scripts-updated"));
       await loadScripts();
     } finally {
       setSaving(false);

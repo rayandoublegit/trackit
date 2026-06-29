@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
@@ -10,11 +10,7 @@ import { useLang, type Lang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
-import { formatLastActiveFromDate } from "@/lib/format-last-active";
-import { recordLoginIp } from "@/lib/record-login";
-import { getOrCreateSessionKey } from "@/lib/session-key";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import type { UserSessionRow } from "@/app/api/auth/sessions/route";
 
 const GROWTH_MONTHLY = 19;
 const PRO_MONTHLY = 39;
@@ -38,7 +34,7 @@ function planMonthlyPrice(plan: PlanTier): number {
   return 0;
 }
 
-type SettingsTab = "general" | "profile" | "team" | "billing" | "notifications" | "security" | "api";
+type SettingsTab = "general" | "profile" | "team" | "billing" | "notifications" | "security";
 
 type TeamRole = "owner" | "admin" | "editor" | "viewer" | "billing";
 
@@ -198,10 +194,8 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
     { id: "profile", label: lang === "fr" ? "Profil" : "Profile" },
     { id: "notifications", label: lang === "fr" ? "Notifications" : "Notifications" },
     { id: "security", label: lang === "fr" ? "Sécurité" : "Security" },
-    { id: "api", label: lang === "fr" ? "API" : "API" },
   ];
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [twoFa, setTwoFa] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
@@ -305,8 +299,7 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
             )}
             {tab === "billing" && <BillingSettings isMobile={isMobile} />}
             {tab === "notifications" && <NotificationsSettings />}
-            {tab === "security" && <SecuritySettings twoFa={twoFa} setTwoFa={setTwoFa} onDeleteAccount={() => setDeleteModalOpen(true)} />}
-            {tab === "api" && <ApiSettings />}
+            {tab === "security" && <SecuritySettings onDeleteAccount={() => setDeleteModalOpen(true)} />}
           </>
         )}
       </div>
@@ -1373,94 +1366,8 @@ function RoleBadge({ lang, role }: { lang: Lang; role: TeamRole }) {
   );
 }
 
-function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean; setTwoFa: (v: boolean) => void; onDeleteAccount: () => void }) {
+function SecuritySettings({ onDeleteAccount }: { onDeleteAccount: () => void }) {
   const lang = useLang();
-  const [sessions, setSessions] = useState<UserSessionRow[]>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(true);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
-  const [revokingKey, setRevokingKey] = useState<string | null>(null);
-
-  const loadSessions = useCallback(async () => {
-    const sessionKey = getOrCreateSessionKey();
-    setSessionsLoading(true);
-    setSessionsError(null);
-    try {
-      await recordLoginIp();
-      const res = await fetch("/api/auth/sessions", {
-        credentials: "include",
-        headers: sessionKey ? { "X-Trackit-Session-Key": sessionKey } : {},
-      });
-      const data = (await res.json()) as {
-        sessions?: UserSessionRow[];
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? "Failed to load sessions");
-      setSessions(data.sessions ?? []);
-    } catch (err) {
-      setSessionsError(
-        err instanceof Error ? err.message : "Failed to load sessions"
-      );
-      setSessions([]);
-    } finally {
-      setSessionsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
-
-  const revokeSession = async (sessionKey: string, isCurrent: boolean) => {
-    setRevokingKey(sessionKey);
-    try {
-      const res = await fetch("/api/auth/sessions", {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Trackit-Session-Key": getOrCreateSessionKey(),
-        },
-        body: JSON.stringify({ sessionKey }),
-      });
-      const data = (await res.json()) as { signOut?: boolean; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Could not revoke session");
-      if (data.signOut || isCurrent) {
-        if (supabase) await supabase.auth.signOut();
-        clearUserSessionStorage();
-        window.location.href = "/auth";
-        return;
-      }
-      await loadSessions();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not revoke session");
-    } finally {
-      setRevokingKey(null);
-    }
-  };
-
-  const revokeAllOthers = async () => {
-    setRevokingKey("__all__");
-    try {
-      const res = await fetch("/api/auth/sessions", {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Trackit-Session-Key": getOrCreateSessionKey(),
-        },
-        body: JSON.stringify({ revokeOthers: true }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Could not revoke sessions");
-      await loadSessions();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not revoke sessions");
-    } finally {
-      setRevokingKey(null);
-    }
-  };
-
-  const otherSessionsCount = sessions.filter((s) => !s.isCurrent).length;
 
   return (
     <>
@@ -1471,174 +1378,9 @@ function SecuritySettings({ twoFa, setTwoFa, onDeleteAccount }: { twoFa: boolean
         <button type="button" style={btnPrimary}>{lang === "fr" ? "Sauvegarder" : "Save"}</button>
       </Card>
 
-      <Card title={lang === "fr" ? "Authentification à deux facteurs" : "Two factor authentication"}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: twoFa ? 20 : 0 }}>
-          <div>
-            <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{lang === "fr" ? "Activer 2FA" : "Enable 2FA"}</div>
-            <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Ajoutez une couche de sécurité supplémentaire à votre compte" : "Add an extra layer of security to your account"}</div>
-          </div>
-          <SettingsToggle on={twoFa} onToggle={() => setTwoFa(!twoFa)} />
-        </div>
-        {twoFa && (
-          <div style={{ display: "flex", gap: 24, alignItems: "flex-start", padding: 20, background: "#FAFAFA", borderRadius: 12, border: "1px solid #EFEFEF" }}>
-            <div style={{ width: 120, height: 120, background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <svg width="80" height="80" viewBox="0 0 100 100"><rect fill="#1A1A1A" width="20" height="20" x="10" y="10"/><rect fill="#1A1A1A" width="20" height="20" x="40" y="10"/><rect fill="#1A1A1A" width="20" height="20" x="70" y="10"/><rect fill="#1A1A1A" width="20" height="20" x="10" y="40"/><rect fill="#FFFFFF" width="20" height="20" x="40" y="40"/><rect fill="#1A1A1A" width="20" height="20" x="70" y="40"/><rect fill="#1A1A1A" width="20" height="20" x="10" y="70"/><rect fill="#1A1A1A" width="20" height="20" x="40" y="70"/><rect fill="#1A1A1A" width="20" height="20" x="70" y="70"/></svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 8 }}>Scan with your authenticator app</div>
-              <input type="text" placeholder="Enter 6-digit code" style={{ ...inputStyle, maxWidth: 200 }} />
-            </div>
-          </div>
-        )}
-      </Card>
-
-      <Card title={lang === "fr" ? "Sessions actives" : "Active sessions"}>
-        {sessionsLoading ? (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>
-            {lang === "fr" ? "Chargement des sessions..." : "Loading sessions..."}
-          </p>
-        ) : sessionsError ? (
-          <p style={{ fontSize: 13, color: "#C62828", margin: 0 }}>{sessionsError}</p>
-        ) : sessions.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>
-            {lang === "fr"
-              ? "Aucune session enregistrée. Reconnectez-vous pour voir cet appareil ici."
-              : "No sessions recorded yet. Sign in again to see this device here."}
-          </p>
-        ) : (
-          sessions.map((s) => (
-            <div
-              key={s.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "14px 0",
-                borderBottom: "1px solid #F5F5F5",
-                gap: 12,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-                  {s.device}
-                  {s.isCurrent && (
-                    <span style={{ marginLeft: 8, fontSize: 11, color: "#0047FF", fontWeight: 600 }}>
-                      {lang === "fr" ? "Cet appareil" : "This device"}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                  {s.location} · {formatLastActiveFromDate(s.lastActiveAt, lang)}
-                </div>
-              </div>
-              <button
-                type="button"
-                disabled={revokingKey === s.sessionKey}
-                onClick={() => void revokeSession(s.sessionKey, s.isCurrent)}
-                style={{
-                  ...btnSecondary,
-                  padding: "6px 12px",
-                  fontSize: 12,
-                  opacity: revokingKey === s.sessionKey ? 0.6 : 1,
-                }}
-              >
-                {revokingKey === s.sessionKey
-                  ? lang === "fr"
-                    ? "..."
-                    : "..."
-                  : lang === "fr"
-                    ? "Révoquer"
-                    : "Revoke"}
-              </button>
-            </div>
-          ))
-        )}
-        {otherSessionsCount > 0 && (
-          <button
-            type="button"
-            disabled={revokingKey === "__all__"}
-            onClick={() => void revokeAllOthers()}
-            style={{
-              ...btnSecondary,
-              marginTop: 16,
-              width: "100%",
-              opacity: revokingKey === "__all__" ? 0.6 : 1,
-            }}
-          >
-            {revokingKey === "__all__"
-              ? lang === "fr"
-                ? "Révocation..."
-                : "Revoking..."
-              : lang === "fr"
-                ? "Révoquer toutes les autres sessions"
-                : "Revoke all other sessions"}
-          </button>
-        )}
-      </Card>
-
       <Card title={lang === "fr" ? "Zone dangereuse" : "Danger zone"}>
         <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>{lang === "fr" ? "Supprimez définitivement votre compte et toutes les données associées. Cette action est irréversible." : "Permanently delete your account and all associated data. This cannot be undone."}</p>
         <button type="button" onClick={onDeleteAccount} style={{ background: "#FFFFFF", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Supprimer le compte" : "Delete account"}</button>
-      </Card>
-    </>
-  );
-}
-
-function ApiSettings() {
-  const lang = useLang();
-  const [webhooks, setWebhooks] = useState(["https://api.mystore.com/webhooks/trackit"]);
-  const [webhookInput, setWebhookInput] = useState("");
-  const apiCalls = 2847;
-  const apiLimit = 10000;
-
-  return (
-    <>
-      <Card>
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 18px 0", display: "flex", alignItems: "center" }}>
-          {lang === "fr" ? "Votre clé API" : "Your API key"}
-          <span style={{ fontSize: 11, fontWeight: 600, background: "#F0F4FF", color: "#0047FF", padding: "2px 8px", borderRadius: 20, marginLeft: 8, letterSpacing: "0.02em" }}>
-            {lang === "fr" ? "Bientôt disponible" : "Coming soon"}
-          </span>
-        </h3>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-          <code style={{ flex: 1, minWidth: 200, padding: "12px 14px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, fontSize: 13, color: "#1A1A1A", letterSpacing: "0.02em" }}>tr_live_••••••••••••••••4f2a</code>
-          <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Copier la clé" : "Copy key"}</button>
-          <button type="button" style={btnSecondary} onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Régénérer la clé" : "Regenerate key"}</button>
-        </div>
-        <p style={{ fontSize: 12, color: "#C45C00", margin: 0, letterSpacing: "-0.01em" }}>{lang === "fr" ? "La régénération cassera les intégrations existantes" : "Regenerating will break existing integrations"}</p>
-      </Card>
-
-      <Card>
-        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 14, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Voir la doc API →" : "View API docs →"}</a>
-      </Card>
-
-      <Card title={lang === "fr" ? "URL Webhook" : "Webhook URL"}>
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          <input type="url" value={webhookInput} onChange={(e) => setWebhookInput(e.target.value)} placeholder="https://your-app.com/webhook" style={{ ...inputStyle, flex: 1 }} />
-          <button
-            type="button"
-            style={btnPrimary}
-            onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}
-          >
-            {lang === "fr" ? "Ajouter un endpoint webhook" : "Add webhook endpoint"}
-          </button>
-        </div>
-        {webhooks.map((url) => (
-          <div key={url} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F5F5", gap: 12 }}>
-            <span style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis" }}>{url}</span>
-            <button type="button" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")} style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12, color: "#DC2626", borderColor: "#FECACA" }}>Delete</button>
-          </div>
-        ))}
-      </Card>
-
-      <Card title={lang === "fr" ? "Utilisation ce mois" : "Usage this month"}>
-        <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 10 }}>
-          API calls made: <strong>{apiCalls.toLocaleString()}</strong> / {apiLimit.toLocaleString()}
-        </div>
-        <div style={{ height: 8, background: "#EFEFEF", borderRadius: 999, overflow: "hidden", marginBottom: 14 }}>
-          <div style={{ width: `${(apiCalls / apiLimit) * 100}%`, height: "100%", background: "#0047FF", borderRadius: 999 }} />
-        </div>
-        <a href="#" onClick={(e) => { e.preventDefault(); alert(lang === "fr" ? "Bientôt disponible" : "Coming soon"); }} style={{ fontSize: 13, fontWeight: 500, color: "#0047FF", textDecoration: "none", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Passer à Pro pour plus de fonctionnalités →" : "Upgrade for more features →"}</a>
       </Card>
     </>
   );

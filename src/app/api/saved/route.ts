@@ -3,6 +3,9 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthedUserId } from "@/lib/api-auth";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
 import { getMaxManagedCreators, normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
+import { commissionRateFromDiscoverySnapshot } from "@/lib/managed-creator-commission";
+import { applyDiscountCodeToCreator, ensureCreatorForHandle } from "@/lib/creator-promo-codes";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +77,7 @@ export async function PATCH(request: NextRequest) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
-  let body: { username?: string; status?: string; notes?: string };
+  let body: { username?: string; status?: string; notes?: string; crm?: Record<string, unknown> };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   const username = String(body.username ?? "").trim().replace(/^@/, "");
   if (!username) return NextResponse.json({ error: "Missing username" }, { status: 400 });
@@ -82,6 +85,66 @@ export async function PATCH(request: NextRequest) {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.status !== undefined) patch.pipeline_status = body.status;
   if (body.notes !== undefined) patch.notes = body.notes;
+
+  if (body.crm !== undefined) {
+    const { data: existing } = await admin
+      .from("discovery_saved")
+      .select("snapshot")
+      .eq("user_id", userId)
+      .eq("creator_username", username)
+      .maybeSingle();
+    const snapshot =
+      existing?.snapshot && typeof existing.snapshot === "object"
+        ? (existing.snapshot as Record<string, unknown>)
+        : {};
+    const prevCrm =
+      snapshot.crm && typeof snapshot.crm === "object"
+        ? (snapshot.crm as Record<string, unknown>)
+        : {};
+    patch.snapshot = {
+      ...snapshot,
+      ...(body.crm.commissionRate !== undefined ? { commissionRate: body.crm.commissionRate } : {}),
+      crm: { ...prevCrm, ...body.crm },
+    };
+
+    if (body.crm.commissionRate !== undefined) {
+      const rate = body.crm.commissionRate;
+      const creatorPatch =
+        typeof rate === "number" && Number.isFinite(rate)
+          ? { commission_rate: rate }
+          : rate === null
+            ? { commission_rate: null }
+            : null;
+      if (creatorPatch) {
+        await admin
+          .from("creators")
+          .update(creatorPatch)
+          .eq("user_id", userId)
+          .ilike("handle", username);
+      }
+    }
+
+    if (body.crm.promoCode !== undefined) {
+      const promoRaw = String(body.crm.promoCode || "").trim();
+      if (promoRaw) {
+        const creatorRow =
+          (await admin
+            .from("creators")
+            .select("id")
+            .eq("user_id", userId)
+            .ilike("handle", username)
+            .maybeSingle()).data ??
+          (await ensureCreatorForHandle(admin, userId, username));
+        if (creatorRow?.id) {
+          const rate =
+            commissionRateFromDiscoverySnapshot(patch.snapshot) ??
+            commissionRateFromDiscountCode(promoRaw) ??
+            null;
+          await applyDiscountCodeToCreator(admin, userId, String(creatorRow.id), promoRaw, rate);
+        }
+      }
+    }
+  }
 
   const { data, error } = await admin
     .from("discovery_saved")

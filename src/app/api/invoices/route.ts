@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import { getActiveSubscriptionInfo, resolveStripeCustomerId } from "@/lib/stripe-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -35,30 +35,15 @@ function invoicePdfUrl(invoice: Stripe.Invoice): string | null {
   return invoice.invoice_pdf ?? invoice.hosted_invoice_url ?? null;
 }
 
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>([
-  "active",
-  "trialing",
-  "past_due",
-]);
-
-/** Next charge date: subscription period end, open invoice due date, or projected from last paid invoice. */
+/** Next charge date from active subscription or invoice fallbacks. */
 async function resolveNextBillingDate(
   stripe: Stripe,
   customerId: string,
   invoices: Stripe.Invoice[]
 ): Promise<number | null> {
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: "all",
-    limit: 20,
-  });
-
-  const activeSub = subscriptions.data.find((sub) =>
-    ACTIVE_SUBSCRIPTION_STATUSES.has(sub.status)
-  );
-  const subPeriodEnd = activeSub?.items?.data?.[0]?.current_period_end;
-  if (subPeriodEnd) {
-    return subPeriodEnd;
+  const subscriptionInfo = await getActiveSubscriptionInfo(stripe, customerId);
+  if (subscriptionInfo?.nextBillingDate) {
+    return subscriptionInfo.nextBillingDate;
   }
 
   const openInvoice = invoices.find((inv) => inv.status === "open");

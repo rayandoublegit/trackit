@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (ids.length) {
     const { data: itemRows } = await admin
       .from("discovery_folder_items")
-      .select("folder_id, creator_username")
+      .select("folder_id, creator_username, added_at")
       .in("folder_id", ids);
     items = itemRows ?? [];
   }

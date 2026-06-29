@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import {
+  COMMISSION_NOT_CONFIGURED_CODE,
+  commissionNotConfiguredMessage,
+  getManagedCommissionRateForCreator,
+} from "@/lib/managed-creator-commission";
 
 export const dynamic = "force-dynamic";
 
@@ -26,30 +31,41 @@ export async function POST(request: Request) {
   // Creator must belong to this user (same ownership rule as the sync).
   const { data: creator } = await supabaseAdmin
     .from("creators")
-    .select("id, user_id, balance, total_earned, total_sales, commission_rate, discount_code")
+    .select("id, user_id, handle, balance, total_earned, total_sales, commission_rate, discount_code")
     .eq("id", creatorId)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (!creator) return NextResponse.json({ ok: false, error: "Creator not found" }, { status: 404 });
 
+  const managedCommission = await getManagedCommissionRateForCreator(supabaseAdmin, userId, creator);
+  if ("error" in managedCommission) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: COMMISSION_NOT_CONFIGURED_CODE,
+        error: commissionNotConfiguredMessage("en"),
+        errorFr: commissionNotConfiguredMessage("fr"),
+      },
+      { status: 400 }
+    );
+  }
+
   // Resolve which campaign this sale belongs to.
   // Manual pick (campaignId) wins; otherwise auto-attach to the creator's campaign:
   // a single campaign -> that one; multiple -> active first, then most recent.
   let linkedCampaignId: string | null = null;
   let campaignDiscountCode: string | null = null;
-  let campaignRate: number | null = null;
 
   const { data: ccLinks } = await supabaseAdmin
     .from("campaign_creators")
-    .select("campaign_id, discount_code, commission_rate, campaigns(status, created_at)")
+    .select("campaign_id, discount_code, campaigns(status, created_at)")
     .eq("creator_id", creator.id)
     .eq("user_id", userId);
 
   const links = (ccLinks || []) as Array<{
     campaign_id: string;
     discount_code: string | null;
-    commission_rate: number | null;
     campaigns: { status?: string | null; created_at?: string | null } | null;
   }>;
 
@@ -71,11 +87,22 @@ export async function POST(request: Request) {
   if (chosen) {
     linkedCampaignId = String(chosen.campaign_id);
     campaignDiscountCode = chosen.discount_code ? String(chosen.discount_code) : null;
-    campaignRate = chosen.commission_rate != null ? Number(chosen.commission_rate) : null;
+  } else if (campaignId) {
+    const { data: campaign } = await supabaseAdmin
+      .from("campaigns")
+      .select("id")
+      .eq("id", campaignId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (!campaign) {
+      return NextResponse.json({ ok: false, error: "Campaign not found" }, { status: 404 });
+    }
+
+    linkedCampaignId = String(campaign.id);
   }
 
-  // Rate priority: campaign override (if set) -> creator's own rate -> 10.
-  const commissionRate = campaignRate ?? creator.commission_rate ?? 10;
+  const commissionRate = managedCommission.rate;
   const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
 
   const { error } = await supabaseAdmin.from("sales").insert({

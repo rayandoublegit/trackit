@@ -4,8 +4,9 @@ import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
-import { TaglineIcon } from "@/components/TaglineIcon";
+import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 
@@ -62,6 +63,98 @@ function HeroTrustedTicker({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
+function highlightFeatureTerm(text: string, term: string) {
+  const parts = text.split(term);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) => (
+    <span key={i}>
+      {part}
+      {i < parts.length - 1 && <span className="feature-desc-accent">{term}</span>}
+    </span>
+  ));
+}
+
+type CommissionPayout = {
+  dayLabel: string;
+  dateLabel: string;
+  creator: string;
+  amount: number;
+  badge: string;
+  theme: "coral" | "pink" | "blue" | "green";
+  tilt?: boolean;
+};
+
+function ProcessCommissionStack({ lang }: { lang: "en" | "fr" }) {
+  const paidToCreator =
+    lang === "fr" ? "Vous avez payé" : "You paid";
+  const toThisCreator =
+    lang === "fr" ? "à ce créateur" : "to this creator";
+
+  const payouts: CommissionPayout[] =
+    lang === "fr"
+      ? [
+          { dayLabel: "PAYÉ, LUN", dateLabel: "18 OCT", creator: "@emma_style", amount: 248, badge: "Payé", theme: "coral" },
+          { dayLabel: "PAYÉ, MAR", dateLabel: "15 OCT", creator: "@marc.fit", amount: 124, badge: "Payé", theme: "pink", tilt: true },
+          { dayLabel: "PAYÉ, MER", dateLabel: "12 OCT", creator: "@lea.beauty", amount: 318, badge: "Payé", theme: "blue" },
+        ]
+      : [
+          { dayLabel: "PAID, MON", dateLabel: "18 OCT", creator: "@emma_style", amount: 248, badge: "Paid", theme: "coral" },
+          { dayLabel: "PAID, TUE", dateLabel: "15 OCT", creator: "@marc.fit", amount: 124, badge: "Paid", theme: "pink", tilt: true },
+          { dayLabel: "PAID, WED", dateLabel: "12 OCT", creator: "@lea.beauty", amount: 318, badge: "Paid", theme: "blue" },
+        ];
+
+  return (
+    <div className="commission-stack" aria-hidden>
+      {payouts.map((payout, index) => (
+        <article
+          key={payout.creator}
+          className={`commission-sheet commission-sheet--${payout.theme}${payout.tilt ? " commission-sheet--tilt" : ""}`}
+          style={{ zIndex: index + 1 }}
+        >
+          <div className="commission-sheet__header">
+            <span className="commission-sheet__day">{payout.dayLabel}</span>
+            <span className="commission-sheet__date">{payout.dateLabel}</span>
+          </div>
+          <div className="commission-sheet__divider" aria-hidden />
+          <div className="commission-sheet__event">
+            <span className="commission-sheet__accent" aria-hidden />
+            <div className="commission-sheet__copy">
+              <p className="commission-sheet__creator">{payout.creator}</p>
+              <p className="commission-sheet__payment">
+                {paidToCreator}{" "}
+                <strong>{formatCurrency(payout.amount, lang)}</strong>{" "}
+                {toThisCreator}
+              </p>
+            </div>
+            <span className="commission-sheet__badge">{payout.badge}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
+  const prefix = lang === "fr" ? "Des tarifs simples. Sans" : "Simple pricing. No";
+
+  return (
+    <>
+      {prefix}{" "}
+      <span className="pricing-title-end">
+        {lang === "fr" ? "surprises." : "surprises"}
+        <span className="pricing-title-sparkle" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </span>
+      </span>
+      {lang === "en" ? "." : null}
+    </>
+  );
+}
+
 export default function TrackitLanding() {
   const heroDoodleRef = useRef<HTMLImageElement>(null);
   const heroCursorRef = useRef<HTMLImageElement>(null);
@@ -69,7 +162,6 @@ export default function TrackitLanding() {
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [trackitAnnual, setTrackitAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
-  const [featuresOpen, setFeaturesOpen] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const lang = useLang();
@@ -79,7 +171,6 @@ export default function TrackitLanding() {
   }, [lang]);
 
   const t = {
-  nav_features: lang === "fr" ? "Fonctionnalités" : "Features",
   nav_affiliation: lang === "fr" ? "Affiliation" : "Affiliation",
   nav_pricing: lang === "fr" ? "Tarifs" : "Pricing",
   nav_process: lang === "fr" ? "Processus" : "Process",
@@ -99,7 +190,6 @@ export default function TrackitLanding() {
   hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatCurrency(0, lang)} Manual Bank`,
   hero_bank_line2: lang === "fr" ? "Bancaires Manuels" : "Transfers",
   section_does_everything: lang === "fr" ? "Trackit fait tout" : "Trackit does everything",
-  section_in_one_place: lang === "fr" ? "Au même endroit" : "In one place",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
   feat_1_title: lang === "fr" ? "Recherche Intelligente de Créateurs" : "Smart Creator Discovery",
   feat_1_desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs sur TikTok, Instagram et YouTube. Filtrez par niche, taux d'engagement, abonnés et localisation." : "Search 250M+ creators across TikTok, Instagram, and YouTube. Filter by niche, engagement rate, follower count, and location. Find creators whose audience is exactly your customer.",
@@ -109,18 +199,10 @@ export default function TrackitLanding() {
   feat_3_desc: lang === "fr" ? "Chaque créateur reçoit un lien ou un code promo unique. Chaque vente lui est attribuée automatiquement, en temps réel. Plus de tableurs. Plus d'approximations." : "Every creator gets a unique tracking link or discount code. Every sale they drive is attributed automatically in real time. No spreadsheets. No guesswork.",
   feat_4_title: lang === "fr" ? "Paiement des Commissions en Un Clic" : "One Click Commission Payouts",
   feat_4_desc: lang === "fr" ? "Voyez exactement ce que chaque créateur a gagné. Cliquez. L'argent va directement sur leur compte." : "See exactly what every creator earned. Hit send. Money goes directly to their account. No bank transfers. No PayPal drama. No spreadsheet math.",
-  pain_title: lang === "fr" ? "Vous faites ça" : "You've been doing",
-  pain_title_2: lang === "fr" ? "à la dure." : "this the hard way.",
-  pain_1_title: lang === "fr" ? "Scroll TikTok pendant des heures." : "TikTok scrolling",
-  pain_1_desc: lang === "fr" ? "Vous faites défiler TikTok et Instagram pendant des heures pour trouver des créateurs. La plupart des outils vous donnent une base de données inutile." : "You scroll TikTok and Instagram for hours trying to find creators who actually fit your brand. Most tools give you a giant useless database.",
-  pain_2_title: lang === "fr" ? "Commissions suivies dans des tableurs." : "Commissions tracked in spreadsheets.",
-  pain_2_desc: lang === "fr" ? "Chaque mois vous calculez manuellement qui a gagné quoi et envoyez des virements PayPal individuels. Ça prend une journée entière." : "Every month you manually calculate who earned what and send individual PayPal transfers. It takes a full day and you still make mistakes.",
-  pain_3_title: lang === "fr" ? "Outils enterprise inabordables." : "Enterprise tools you can't afford.",
-  pain_3_desc: lang === "fr" ? "Modash est à 299€/mois. Aspire à 500€/mois. Vous avez juste besoin de quelque chose qui fonctionne sans ruiner votre budget." : `Modash is ${formatCurrency(299, lang)}/month. Aspire is ${formatCurrency(500, lang)}/month. You're a lean brand. You just need something that works without breaking the bank.`,
   process_title: lang === "fr" ? "Processus" : "Process",
   process_sub_line1: lang === "fr" ? "De zéro à votre première" : "From zero to first creator",
-  process_sub_line2: lang === "fr" ? "Campagne créateur" : "campaign in 10 minutes",
-  process_sub_line3: lang === "fr" ? "en 10 minutes" : "",
+  process_sub_line2: lang === "fr" ? "Campagne créateur" : "campaign in",
+  process_sub_line3: lang === "fr" ? "en" : "",
   process_sub2: lang === "fr" ? "Quatre étapes simples. Pas d'agence. Pas de contrat enterprise." : "Four simple steps. No agency. No enterprise contract. No complexity.",
   process_1: lang === "fr" ? "Connectez votre boutique Shopify." : "Connect your Shopify store.",
   process_1_sub: lang === "fr" ? "60 secondes. Un clic. C'est fait." : "60 seconds. One click. Done.",
@@ -130,13 +212,20 @@ export default function TrackitLanding() {
   process_3_sub: lang === "fr" ? "Un clic. Message généré. Prêt à envoyer." : "One click. Message generated. Ready to send.",
   process_4: lang === "fr" ? "Suivez les ventes et payez les commissions." : "Track sales and pay commissions.",
   process_4_sub: lang === "fr" ? "Chaque vente suivie. Chaque commission payée automatiquement." : "Every sale tracked. Every commission paid automatically.",
+  process_mock_shopify_line1: lang === "fr" ? "Lancez une boutique" : "Start an online",
+  process_mock_shopify_line2: lang === "fr" ? "en ligne gratuitement" : "store for free",
+  process_mock_inf_title: lang === "fr" ? "Créateurs trouvés :" : "Influencers found :",
+  process_mock_reach_out: lang === "fr" ? "Contacter →" : "Reach out →",
+  process_mock_see_profiles: lang === "fr" ? "Voir les profils →" : "See Profiles →",
+  process_mock_outreach_1: lang === "fr" ? "« Salut, j'ai vu tes posts... »" : "\"Hey seen your posts...\"",
+  process_mock_outreach_2: lang === "fr" ? "« Je vous contacte car... »" : "\"I reach to you because...\"",
+  process_mock_outreach_3: lang === "fr" ? "« Seriez-vous intéressé par... »" : "\"Are you interested in a...\"",
   why_title: lang === "fr" ? "Pourquoi Trackit ?" : "Why Trackit?",
   why_sub: lang === "fr" ? "Conçu pour les marques comme la vôtre" : "Built for brands like yours",
   why_sub_line1: lang === "fr" ? "Conçu pour les marques" : "",
   why_sub_line2: lang === "fr" ? "comme la vôtre" : "",
-  why_sub2: lang === "fr" ? "Pas pour les entreprises" : "Not for enterprise",
+  why_sub2: lang === "fr" ? "Pas pour les entreprises." : "Not for enterprise",
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : `Every other tool was built for agencies with 10 people and ${formatCurrency(500, lang)}/month budgets. Trackit was built for lean Shopify brands who need results not complexity.`,
-  pricing_title: lang === "fr" ? "Des tarifs simples. Sans surprises" : "Simple pricing. No surprises",
   pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
   pricing_save: lang === "fr" ? "−20% annuel" : "Save 20% annual",
   pricing_basic_desc: lang === "fr" ? "L'entrée idéale pour lancer votre programme créateurs." : "Your entry point — start fast without overcommitting.",
@@ -198,6 +287,8 @@ export default function TrackitLanding() {
   feat_early_access: lang === "fr" ? "Accès anticipé aux nouveaux créateurs (7 jours)" : "Early access to new creators (7 days)",
   footer_tagline: lang === "fr" ? "Une plateforme créée par des fondateurs e-com pour des fondateurs e-com" : "A Platform made by e-com founders to e-com founders",
   footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
+  footer_terms: lang === "fr" ? "Conditions générales" : "Terms & Conditions",
+  footer_privacy: lang === "fr" ? "Politique de confidentialité" : "Privacy Policy",
   traditional_title: lang === "fr" ? "Plateformes Traditionnelles" : "Traditional Platforms",
   trad_1: lang === "fr" ? "Découverte de créateurs" : "Creator discovery",
   trad_2: lang === "fr" ? "Génération de messages IA" : "AI outreach generation",
@@ -354,7 +445,6 @@ export default function TrackitLanding() {
     );
 
     document.querySelectorAll(".fade-up").forEach((el) => {
-      if (el.closest("#painContainer")) return;
       observer.observe(el);
     });
     return () => observer.disconnect();
@@ -397,9 +487,6 @@ export default function TrackitLanding() {
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('.features-dropdown-container')) {
-        setFeaturesOpen(false);
-      }
       if (!target.closest('.lang-dropdown-container')) {
         setLangOpen(false);
       }
@@ -454,203 +541,25 @@ export default function TrackitLanding() {
           </svg>
         </button>
         <div className="nav-links">
-          <div className="features-dropdown-container" style={{ position: "relative" }}>
-            <button
-              type="button"
-              className="features-nav-btn"
-              onClick={() => setFeaturesOpen(v => !v)}
-            >
-              {t.nav_features}
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-
-            {featuresOpen && (
-              <div
-                className="features-dropdown-panel"
-                style={{
-                position: "fixed",
-                top: 72,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: "min(720px, 97vw)",
-                background: "#fff",
-                borderRadius: 20,
-                boxShadow: "0 8px 40px rgba(0,0,0,0.12)",
-                border: "1px solid #EFEFEF",
-                padding: 24,
-                zIndex: 1000,
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: 14,
-                maxHeight: "min(70vh, 520px)",
-                overflowX: "hidden",
-                overflowY: "auto"
-              }}
-              >
-                {[
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.7"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
-                    title: lang === "fr" ? "Recherche de Créateurs" : "Creator Discovery",
-                    desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs par niche, engagement et localisation." : "Search 250M+ creators by niche, engagement, and location.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {["@fashionwithemma · 245K", "@fitnessbysarah · 89K", "@travelwithleo · 312K"].map((c, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#555" }}>
-                              <div style={{ width: 24, height: 24, borderRadius: "50%", background: ["#FFD6E7","#D6F5E7","#D6E7FF"][i] }} />
-                              {c}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: lang === "fr" ? "Messages IA" : "AI Outreach",
-                    desc: lang === "fr" ? "Messages personnalisés rédigés par IA pour chaque créateur." : "Personalized messages written by AI for every creator.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ fontSize: 11, color: "#555", lineHeight: 1.5, fontStyle: "italic" }}>
-                          &quot;Hey Emma, your sustainable fashion content is exactly what our brand stands for...&quot;
-                        </div>
-                        <div style={{ marginTop: 8, display: "flex", gap: 6 }}>
-                          <div style={{ background: "#0047FF", color: "#fff", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 600 }}>Copy</div>
-                          <div style={{ background: "#F0F6FF", color: "#0047FF", borderRadius: 6, padding: "4px 8px", fontSize: 10, fontWeight: 600 }}>Regenerate</div>
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 11l16-6v14L3 13v-2z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M7 13v5l4 1v-5" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: lang === "fr" ? "Suivi des Campagnes" : "Campaign Tracking",
-                    desc: lang === "fr" ? "Chaque vente attribuée automatiquement via Shopify." : "Every sale attributed automatically via Shopify.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                          <span style={{ fontSize: 10, color: "#9A9A9A" }}>This month</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1A1A" }}>{formatCurrency(4820, lang)}</span>
-                        </div>
-                        <div style={{ height: 4, background: "#E5E5E5", borderRadius: 4, overflow: "hidden" }}>
-                          <div style={{ height: "100%", width: "68%", background: "#0047FF", borderRadius: 4 }} />
-                        </div>
-                        <div style={{ fontSize: 10, color: "#0047FF", marginTop: 6 }}>↑ 18% vs last month</div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>,
-                    title: lang === "fr" ? "Paiements Automatiques" : "Auto Payouts",
-                    desc: lang === "fr" ? "Payez les commissions en un clic via Stripe." : "Pay creator commissions in one click via Stripe.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[["@emma", 482, "green"], ["@sarah", 124, "green"], ["@leo", 318, "orange"]].map(([name, amount, color], i) => (
-                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11 }}>
-                              <span style={{ color: "#555" }}>{name}</span>
-                              <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{formatCurrency(amount as number, lang)}</span>
-                              <div style={{ background: color === "green" ? "#D1FAE5" : "#FEF3C7", color: color === "green" ? "#065F46" : "#92400E", borderRadius: 4, padding: "2px 6px", fontSize: 10, fontWeight: 600 }}>
-                                {color === "green" ? (lang === "fr" ? "Payé" : "Paid") : (lang === "fr" ? "En attente" : "Pending")}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 17l6-10M7 8a2 2 0 100-4 2 2 0 000 4zM17 20a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>,
-                    title: lang === "fr" ? "Liens d'Affiliation" : "Affiliate Links",
-                    desc: lang === "fr" ? "Générez des liens de suivi uniques pour chaque créateur." : "Auto-generate unique tracking links for every creator.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ fontSize: 10, color: "#9A9A9A", marginBottom: 4 }}>Referral link</div>
-                        <div style={{ fontSize: 10, color: "#0047FF", fontFamily: "monospace", wordBreak: "break-all" }}>trackit.app/r/emma_a3f9</div>
-                        <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 6 }}>Discount code: <strong style={{ color: "#1A1A1A" }}>EMMA15</strong></div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>,
-                    title: lang === "fr" ? "Analytiques" : "Analytics",
-                    desc: lang === "fr" ? "Voyez quels créateurs génèrent le plus de revenus et pourquoi." : "See which creators drive the most revenue and why.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ display: "flex", gap: 4, alignItems: "flex-end", height: 40 }}>
-                          {[30, 50, 35, 70, 45, 80, 60].map((h, i) => (
-                            <div key={i} style={{ flex: 1, height: `${h}%`, background: i === 5 ? "#0047FF" : "#D6E7FF", borderRadius: "3px 3px 0 0" }} />
-                          ))}
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                          {["M","T","W","T","F","S","S"].map((d, i) => (
-                            <span key={i} style={{ fontSize: 9, color: "#9A9A9A", flex: 1, textAlign: "center" }}>{d}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.7"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-                    title: lang === "fr" ? "CRM" : "CRM",
-                    desc: lang === "fr" ? "Gérez toutes vos relations créateurs en un seul endroit." : "Manage all your creator relationships in one place.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10 }}>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {[["Emma Laurent", lang === "fr" ? "Partenaire" : "Partnered", "#D1FAE5", "#065F46"], ["Marc Dubois", lang === "fr" ? "Contacté" : "Contacted", "#DBEAFE", "#1E40AF"], ["Julie Chen", lang === "fr" ? "En attente" : "Pending", "#FEF3C7", "#92400E"]].map(([name, status, bg, color], i) => (
-                            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <span style={{ fontSize: 11, color: "#1A1A1A" }}>{name}</span>
-                              <div style={{ background: bg, color, borderRadius: 4, padding: "2px 6px", fontSize: 9, fontWeight: 600 }}>{status}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>,
-                    title: lang === "fr" ? "Intégration Shopify" : "Shopify Integration",
-                    desc: lang === "fr" ? "Connectez votre boutique. Chaque vente suivie automatiquement." : "Connect your store. Every sale tracked automatically.",
-                    visual: (
-                      <div style={{ marginTop: 10, background: "#F8FAFF", borderRadius: 10, padding: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                        <img src="/shopify-logo.svg" alt="Shopify" style={{ width: 28, height: 28 }} />
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A" }}>Store connected</div>
-                          <div style={{ fontSize: 10, color: "#0047FF" }}>● Live tracking active</div>
-                        </div>
-                      </div>
-                    )
-                  }
-                ].map((feature, i) => (
-                  <div key={i} style={{ background: "#FAFAFA", border: "1px solid #F0F0F0", borderRadius: 14, padding: 12, cursor: "default" }}>
-                    <span style={{ display: "flex", alignItems: "center", marginBottom: 8, color: "#9A9A9A", flexShrink: 0 }}>
-                      {feature.icon}
-                    </span>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{feature.title}</div>
-                    <div style={{ fontSize: 11, color: "#7A7A7A", lineHeight: 1.5, letterSpacing: "-0.01em", fontWeight: 400 }}>{feature.desc}</div>
-                    {feature.visual}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
           <a href="/affiliation">{t.nav_affiliation}</a>
           <a href="#pricing">{t.nav_pricing}</a>
           <a href="#process">{t.nav_process}</a>
-          <a href="#features">Trackit</a>
+          <a href="#features-trackit">Trackit</a>
         </div>
         <div className="nav-actions">
           <div className="lang-dropdown-container">
             <button
               type="button"
               onClick={() => setLangOpen(v => !v)}
-              style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'InstrumentSans', sans-serif", color: "#1A1A1A" }}
+              className="nav-lang-btn"
+              aria-label={lang === "fr" ? "Changer la langue" : "Change language"}
+              aria-expanded={langOpen}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/>
                 <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
               </svg>
-              {lang === "fr" ? "FR" : "EN"}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
             </button>
 
             {langOpen && (
@@ -658,20 +567,20 @@ export default function TrackitLanding() {
                 <button
                   type="button"
                   onClick={() => switchLandingLang("en")}
-                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "en" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "en" ? 600 : 400, color: lang === "en" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
+                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, ...selectionCardStyle(lang === "en", { unselectedBackground: "transparent", unselectedBorder: "none" }), border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "en" ? 600 : 400, color: selectionTextPrimary(lang === "en"), fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20M8 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
                   English
-                  {lang === "en" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0047FF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+                  {lang === "en" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
                 </button>
                 <button
                   type="button"
                   onClick={() => switchLandingLang("fr")}
-                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, background: lang === "fr" ? "#F0F6FF" : "none", border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "fr" ? 600 : 400, color: lang === "fr" ? "#0047FF" : "#1A1A1A", fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
+                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, ...selectionCardStyle(lang === "fr", { unselectedBackground: "transparent", unselectedBorder: "none" }), border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "fr" ? 600 : 400, color: selectionTextPrimary(lang === "fr"), fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 4v16M14 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
                   Français
-                  {lang === "fr" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0047FF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
+                  {lang === "fr" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
                 </button>
               </div>
             )}
@@ -701,8 +610,8 @@ export default function TrackitLanding() {
             gap: 4,
           }}
         >
-          <a href="#features" onClick={() => setMobileMenuOpen(false)}>
-            {t.nav_features}
+          <a href="#features-trackit" onClick={() => setMobileMenuOpen(false)}>
+            Trackit
           </a>
           <a href="/affiliation" onClick={() => setMobileMenuOpen(false)}>
             {t.nav_affiliation}
@@ -712,9 +621,6 @@ export default function TrackitLanding() {
           </a>
           <a href="#process" onClick={() => setMobileMenuOpen(false)}>
             {t.nav_process}
-          </a>
-          <a href="#features" onClick={() => setMobileMenuOpen(false)}>
-            Trackit
           </a>
           <div className="mobile-nav-lang-row">
             <button
@@ -805,14 +711,32 @@ export default function TrackitLanding() {
 
       {/* TRACKIT SECTION */}
       <section className="section" id="features">
-        <div className="tagline fade-up">
-          <TaglineIcon variant="features" />
+        <ChaoticWorkSection lang={lang} />
+
+        <div className="tagline fade-up" id="features-trackit">
           Trackit
         </div>
         <h2 className="section-title fade-up fade-up-delay-1">
           <span className="section-title-line">{t.section_does_everything}</span>
           <span className="section-title-line section-title-line--tight">
-            {t.section_in_one_place}
+            {lang === "fr" ? (
+              <>
+                Au même{" "}
+                <span className="section-title-word-tag">
+                  endroit
+                  <span className="section-title-popover">vraiment!!</span>
+                </span>
+                .
+              </>
+            ) : (
+              <>
+                In one{" "}
+                <span className="section-title-word-tag">
+                  place
+                  <span className="section-title-popover">really!!</span>
+                </span>
+              </>
+            )}
           </span>
         </h2>
         <p className="section-sub fade-up fade-up-delay-2">
@@ -842,15 +766,15 @@ export default function TrackitLanding() {
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <circle cx="12" cy="12" r="9" stroke="black" strokeWidth="1.6" />
-                  <ellipse cx="12" cy="12" rx="4" ry="9" stroke="black" strokeWidth="1.6" />
-                  <line x1="3" y1="12" x2="21" y2="12" stroke="black" strokeWidth="1.6" />
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+                  <ellipse cx="12" cy="12" rx="4" ry="9" stroke="currentColor" strokeWidth="1.6" />
+                  <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1.6" />
                 </svg>
               </span>
               {t.feat_1_title}
             </div>
             <div className="feature-desc">
-              {t.feat_1_desc}
+              {highlightFeatureTerm(t.feat_1_desc, "250M+")}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-1">
@@ -866,7 +790,7 @@ export default function TrackitLanding() {
                 >
                   <path
                     d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.6"
                     strokeLinejoin="round"
                     strokeLinecap="round"
@@ -877,7 +801,7 @@ export default function TrackitLanding() {
               {t.feat_2_title}
             </div>
             <div className="feature-desc">
-              {t.feat_2_desc}
+              {highlightFeatureTerm(t.feat_2_desc, "Trackit")}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-2">
@@ -891,17 +815,17 @@ export default function TrackitLanding() {
                   fill="none"
                   xmlns="http://www.w3.org/2000/svg"
                 >
-                  <line x1="12" y1="3" x2="12" y2="6" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
-                  <line x1="12" y1="18" x2="12" y2="21" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
-                  <line x1="3" y1="12" x2="6" y2="12" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
-                  <line x1="18" y1="12" x2="21" y2="12" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
-                  <line x1="5.6" y1="5.6" x2="7.7" y2="7.7" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="12" y1="3" x2="12" y2="6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="12" y1="18" x2="12" y2="21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="3" y1="12" x2="6" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="18" y1="12" x2="21" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                  <line x1="5.6" y1="5.6" x2="7.7" y2="7.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   <line
                     x1="16.3"
                     y1="16.3"
                     x2="18.4"
                     y2="18.4"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
@@ -910,7 +834,7 @@ export default function TrackitLanding() {
                     y1="18.4"
                     x2="7.7"
                     y2="16.3"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
@@ -919,7 +843,7 @@ export default function TrackitLanding() {
                     y1="7.7"
                     x2="18.4"
                     y2="5.6"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.8"
                     strokeLinecap="round"
                   />
@@ -928,7 +852,7 @@ export default function TrackitLanding() {
               {t.feat_3_title}
             </div>
             <div className="feature-desc">
-              {t.feat_3_desc}
+              {highlightFeatureTerm(t.feat_3_desc, lang === "fr" ? "automatiquement" : "automatically")}
             </div>
           </div>
           <div className="feature fade-up fade-up-delay-3">
@@ -944,14 +868,14 @@ export default function TrackitLanding() {
                 >
                   <path
                     d="M8 4v16M8 20l-3-3M8 20l3-3"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <path
                     d="M16 20V4M16 4l-3 3M16 4l3 3"
-                    stroke="black"
+                    stroke="currentColor"
                     strokeWidth="1.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -961,139 +885,7 @@ export default function TrackitLanding() {
               {t.feat_4_title}
             </div>
             <div className="feature-desc">
-              {t.feat_4_desc}
-            </div>
-          </div>
-        </div>
-      </section>
-      {/* PAIN POINTS */}
-      <section className="pain-points-stack" id="painContainer">
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                {t.pain_title}
-                <br />
-                {t.pain_title_2}
-              </h2>
-              <p className="pain-sub">
-                {t.pain_1_desc}
-              </p>
-            </div>
-            <div className="pain-image">
-              <img src="https://i.ibb.co/Xf5f2ZMk/painimage2.jpg" alt="TikTok scrolling" />
-            </div>
-          </div>
-        </div>
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                {t.pain_2_title}
-              </h2>
-              <p className="pain-sub">
-                {t.pain_2_desc}
-              </p>
-            </div>
-            <div className="pain-image">
-              <img src="/images/spreadsheets.png" alt="Spreadsheets" />
-            </div>
-          </div>
-        </div>
-        <div className="pain-point-card" style={{ top: "0px" }}>
-          <div className="pain-row">
-            <div className="pain-text">
-              <h2 className="pain-title">
-                {t.pain_3_title}
-              </h2>
-              <p className="pain-sub">
-                {t.pain_3_desc}
-              </p>
-            </div>
-            <div className="pain-image" style={{ overflow: "visible", borderRadius: "16px" }}>
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  borderRadius: "9px",
-                  overflow: "hidden",
-                  background: "#fafafa",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "flex-start",
-                  padding: "20px 0 20px 20px",
-                  gap: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    borderRadius: "10px",
-                    padding: "18px",
-                    width: "60%",
-                    fontFamily: "InterDisplay, sans-serif",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Essentials</div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#666",
-                      lineHeight: 1.4,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    Pour les campagnes avec jusqu&apos;à 100 créateurs.
-                    <br />
-                    Validez le marketing d&apos;influence avant de passer à l&apos;échelle.
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 700, marginBottom: "12px" }}>
-                    {formatCurrency(199, lang)} <span style={{ fontSize: "10px", fontWeight: 400, color: "#888" }}>Mensuel</span>
-                  </div>
-                  <button
-                    type="button"
-                    style={{
-                      background: "#000",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      padding: "8px 12px",
-                      fontSize: "10px",
-                      width: "100%",
-                      fontFamily: "InterDisplay, sans-serif",
-                    }}
-                  >
-                    Essayez gratuitement
-                  </button>
-                </div>
-                <div
-                  style={{
-                    background: "#f0f0f0",
-                    borderRadius: "10px",
-                    padding: "18px",
-                    width: "50%",
-                    fontFamily: "InterDisplay, sans-serif",
-                    transform: "translateX(-10%)",
-                  }}
-                >
-                  <div style={{ fontSize: "10px", color: "#999", marginBottom: "4px" }}>Recommended</div>
-                  <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "8px" }}>Performance</div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#666",
-                      lineHeight: 1.4,
-                      marginBottom: "16px",
-                    }}
-                  >
-                    For campaigns.
-                    <br />
-                    Scale your performance.
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 700 }}>{formatCurrency(499, lang)}</div>
-                </div>
-              </div>
+              {highlightFeatureTerm(t.feat_4_desc, lang === "fr" ? "compte" : "account")}
             </div>
           </div>
         </div>
@@ -1102,7 +894,6 @@ export default function TrackitLanding() {
       {/* PROCESS */}
       <section className="section" id="process">
         <div className="tagline fade-up">
-          <TaglineIcon variant="process" />
           {t.process_title}
         </div>
         <h2 className={`section-title fade-up fade-up-delay-1${lang === "en" ? " process-title--en" : " process-title--fr"}`}>
@@ -1110,13 +901,17 @@ export default function TrackitLanding() {
             <>
               <span className="process-title-line">{t.process_sub_line1}</span>
               <span className="process-title-line process-title-line--second">{t.process_sub_line2}</span>
-              <span className="process-title-line process-title-line--third">{t.process_sub_line3}</span>
+              <span className="process-title-line process-title-line--third">
+                {t.process_sub_line3}{" "}
+                <span className="process-title-pill">10 minutes.</span>
+              </span>
             </>
           ) : (
             <>
               <span className="process-title-line">{t.process_sub_line1}</span>
               <span className="process-title-line process-title-line--tight">
-                {t.process_sub_line2}
+                {t.process_sub_line2}{" "}
+                <span className="process-title-pill">10 minutes</span>
               </span>
             </>
           )}
@@ -1253,7 +1048,7 @@ export default function TrackitLanding() {
                         fontFamily: "'InterDisplay', sans-serif",
                         marginBottom: '14px'
                       }}>
-                        Start an online<br />store for free
+                        {t.process_mock_shopify_line1}<br />{t.process_mock_shopify_line2}
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                         <div style={{ width: '180px', height: '8px', background: '#EEE', borderRadius: '4px' }} />
@@ -1282,7 +1077,7 @@ export default function TrackitLanding() {
             <div className="process-mockup">
               <div className="inf-card">
                 <div className="inf-header">
-                  <div className="inf-title">Influencers found :</div>
+                  <div className="inf-title">{t.process_mock_inf_title}</div>
                   <div className="inf-filters">
                     <div className="f">1d</div>
                     <div className="f">7d</div>
@@ -1300,9 +1095,9 @@ export default function TrackitLanding() {
                     alt="Trackit"
                   />
                 </div>
-                <div className="inf-btn">Reach out →</div>
+                <div className="inf-btn">{t.process_mock_reach_out}</div>
                 <br />
-                <div className="inf-btn">See Profiles →</div>
+                <div className="inf-btn">{t.process_mock_see_profiles}</div>
               </div>
             </div>
             <div className="process-card-footer">
@@ -1319,19 +1114,19 @@ export default function TrackitLanding() {
                     <div className="outreach-logo">
                       <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
                     </div>
-                    <div className="outreach-text">&quot;Are you interested in a...&quot;</div>
+                    <div className="outreach-text">{t.process_mock_outreach_3}</div>
                   </div>
                   <div className="outreach-msg outreach-msg-2">
                     <div className="outreach-logo">
                       <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
                     </div>
-                    <div className="outreach-text">&quot;I reach to you because...&quot;</div>
+                    <div className="outreach-text">{t.process_mock_outreach_2}</div>
                   </div>
                   <div className="outreach-msg outreach-msg-1">
                     <div className="outreach-logo">
                       <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
                     </div>
-                    <div className="outreach-text">&quot;Hey seen your posts...&quot;</div>
+                    <div className="outreach-text">{t.process_mock_outreach_1}</div>
                   </div>
                 </div>
               </div>
@@ -1372,59 +1167,7 @@ export default function TrackitLanding() {
 
           <div className="process-card fade-up fade-up-delay-3">
             <div className="process-mockup">
-              <div className="pay-panel">
-                <div className="pay-panel-header">
-                  <img
-                    className="pay-panel-brand"
-                    src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-                    alt="Trackit"
-                  />
-                  <div className="pay-panel-header-row">
-                    <span className="pay-panel-badge">
-                      <span className="pay-panel-dot" aria-hidden="true" />
-                      Commission paid
-                    </span>
-                    <span className="pay-panel-amount">€248.00</span>
-                  </div>
-                </div>
-                <div className="pay-grid">
-                  <div className="pay-cell">
-                    <img
-                      className="pay-logo"
-                      src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg"
-                      alt="PayPal"
-                    />
-                  </div>
-                  <div className="pay-cell">
-                    <img
-                      className="pay-logo"
-                      src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg"
-                      alt="Mastercard"
-                    />
-                  </div>
-                  <div className="pay-cell">
-                    <img
-                      className="pay-logo"
-                      src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg"
-                      alt="Google Pay"
-                    />
-                  </div>
-                  <div className="pay-cell">
-                    <img
-                      className="pay-logo pay-logo-stripe"
-                      src="https://upload.wikimedia.org/wikipedia/commons/b/ba/Stripe_Logo%2C_revised_2016.svg"
-                      alt="Stripe"
-                    />
-                  </div>
-                  <div className="pay-cell">
-                    <img
-                      className="pay-logo pay-logo-apple"
-                      src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Apple_Pay_logo.svg"
-                      alt="Apple Pay"
-                    />
-                  </div>
-                </div>
-              </div>
+              <ProcessCommissionStack lang={lang} />
             </div>
             <div className="process-card-footer">
               <div className="process-card-title">
@@ -1464,7 +1207,6 @@ export default function TrackitLanding() {
       <section className="section" id="why">
         <div className="why-intro">
           <div className="tagline fade-up">
-            <TaglineIcon variant="why" />
             {t.why_title}
           </div>
           <h2 className={`section-title fade-up fade-up-delay-1${lang === "fr" ? " why-section-title--fr" : " why-section-title--en"}`}>
@@ -1555,10 +1297,11 @@ export default function TrackitLanding() {
       {/* PRICING */}
       <section className="section" id="pricing">
         <div className="tagline fade-up">
-          <TaglineIcon variant="pricing" />
           {t.nav_pricing}
         </div>
-        <h2 className="section-title fade-up fade-up-delay-1">{t.pricing_title}.</h2>
+        <h2 className="section-title fade-up fade-up-delay-1">
+          <PricingTitleSparkle lang={lang} />
+        </h2>
         <p className="section-sub fade-up fade-up-delay-2">
           {t.pricing_sub}
         </p>
@@ -1747,8 +1490,8 @@ export default function TrackitLanding() {
         <div className="footer-bottom">
           <div>Copyright © Trackit.Inc {t.footer_rights}</div>
           <div className="footer-links">
-            <a href="#">Terms &amp; Conditions</a>
-            <a href="#">Privacy Policy</a>
+            <Link href="/terms">{t.footer_terms}</Link>
+            <Link href="/privacy">{t.footer_privacy}</Link>
           </div>
         </div>
       </footer>

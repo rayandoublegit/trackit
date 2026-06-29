@@ -60,6 +60,60 @@ export function planFromPriceId(priceId: string | null | undefined): PlanTier {
   return resolvePlanFromCheckout(priceId, null);
 }
 
+export type BillingInterval = "month" | "year";
+
+export type ActiveSubscriptionInfo = {
+  subscriptionId: string;
+  plan: PlanTier;
+  priceId: string | null;
+  billingInterval: BillingInterval | null;
+  nextBillingDate: number | null;
+  currency: string | null;
+  status: Stripe.Subscription.Status;
+};
+
+function subscriptionPrice(subscription: Stripe.Subscription): Stripe.Price | null {
+  const raw = subscription.items.data[0]?.price;
+  if (!raw) return null;
+  return typeof raw === "string" ? null : raw;
+}
+
+export async function getActiveSubscriptionInfo(
+  stripe: Stripe,
+  customerId: string
+): Promise<ActiveSubscriptionInfo | null> {
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+    expand: ["data.items.data.price"],
+  });
+
+  const activeSub = subscriptions.data.find((sub) =>
+    subscriptionGrantsPaidAccess(sub.status)
+  );
+  if (!activeSub) return null;
+
+  const price = subscriptionPrice(activeSub);
+  const priceId = price?.id ?? null;
+  const recurring = price?.recurring?.interval;
+  const billingInterval: BillingInterval | null =
+    recurring === "year" ? "year" : recurring === "month" ? "month" : null;
+
+  const nextBillingDate =
+    activeSub.items.data[0]?.current_period_end ?? null;
+
+  return {
+    subscriptionId: activeSub.id,
+    plan: planFromSubscription(activeSub),
+    priceId,
+    billingInterval,
+    nextBillingDate,
+    currency: activeSub.currency ?? price?.currency ?? null,
+    status: activeSub.status,
+  };
+}
+
 /** Stripe Invoice subscription id (supports legacy and newer API shapes). */
 export function getSubscriptionIdFromInvoice(
   invoice: Stripe.Invoice

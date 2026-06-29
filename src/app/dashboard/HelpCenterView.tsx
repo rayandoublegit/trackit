@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { canUseDedicatedSupport, canUsePrioritySupport, type PlanTier } from "@/lib/plan-limits";
+import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 const SUPPORT_EMAIL = "support@trackit.app";
 
@@ -920,11 +921,17 @@ function GuideModal({ lang, guideId, onClose }: { lang: "en" | "fr"; guideId: st
 
 export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean; plan?: PlanTier }) {
   const lang = useLang();
+  const { navState, navigate, goBack } = useDashboardNavigation();
   const isDedicated = canUseDedicatedSupport(plan);
   const isPriority = canUsePrioritySupport(plan);
   const [search, setSearch] = useState("");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [openGuideId, setOpenGuideId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (navState.view !== "help") return;
+    setOpenGuideId(navState.helpGuide ?? null);
+  }, [navState.view, navState.helpGuide]);
 
   const supportCards = useMemo(
     () => [
@@ -1213,7 +1220,7 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.02em" }}>{guide.title}</h3>
                 <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 14px", lineHeight: 1.5, flex: 1 }}>{guide.text}</p>
                 <span style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 14 }}>{guide.tag}</span>
-                <button type="button" onClick={() => setOpenGuideId(guide.id)} style={{ ...btnSecondary, alignSelf: "flex-start" }}>
+                <button type="button" onClick={() => navigate({ view: "help", helpGuide: guide.id })} style={{ ...btnSecondary, alignSelf: "flex-start" }}>
                   {lang === "fr" ? "Lire le guide →" : "Read guide →"}
                 </button>
               </div>
@@ -1417,7 +1424,7 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
         </div>
       </div>
 
-      {openGuideId && <GuideModal lang={lang} guideId={openGuideId} onClose={() => setOpenGuideId(null)} />}
+      {openGuideId && <GuideModal lang={lang} guideId={openGuideId} onClose={goBack} />}
     </div>
   );
 }

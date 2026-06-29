@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { findCreatorRowsForProfile } from "@/lib/creator-account";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +9,10 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Trouve la/les ligne(s) creators de ce créateur (par linked_user_id), retourne {brandIds, creatorRowIds}
 async function findCreatorContext(userId: string) {
-  const { data: rows } = await supabaseAdmin
-    .from("creators")
-    .select("id, user_id")
-    .eq("linked_user_id", userId);
-  const brandIds = Array.from(new Set((rows || []).map((r) => r.user_id)));
-  const creatorRowIds = (rows || []).map((r) => r.id);
+  const { rows } = await findCreatorRowsForProfile(supabaseAdmin, userId);
+  const brandIds = Array.from(new Set(rows.map((r) => r.user_id)));
+  const creatorRowIds = rows.map((r) => r.id);
   return { brandIds, creatorRowIds };
 }
 
@@ -28,7 +25,6 @@ export async function GET(request: Request) {
   const { brandIds, creatorRowIds } = await findCreatorContext(userId);
   if (brandIds.length === 0) return NextResponse.json({ ok: true, scripts: [] });
 
-  // Scripts des marques liées : soit pour tous (target null), soit ciblant une de ses lignes creators
   const { data: scripts, error } = await supabaseAdmin
     .from("scripts")
     .select("id, brand_id, title, content, file_url, target_creator_id, created_at")
@@ -40,7 +36,6 @@ export async function GET(request: Request) {
     (s) => !s.target_creator_id || creatorRowIds.includes(s.target_creator_id)
   );
 
-  // Statuts de lecture déjà posés par ce créateur
   const { data: reads } = await supabaseAdmin
     .from("script_reads")
     .select("script_id, status")
@@ -48,7 +43,6 @@ export async function GET(request: Request) {
   const statusBy = new Map((reads || []).map((r) => [r.script_id, r.status]));
   const dismissed = new Set((reads || []).filter((r) => r.status === "dismissed").map((r) => r.script_id));
 
-  // Noms des marques
   const { data: brands } = await supabaseAdmin
     .from("profiles")
     .select("id, business_name, full_name, username")

@@ -12,10 +12,31 @@ export type NotificationItem = {
   read: boolean;
 };
 
-const STORAGE_KEY = "trackit_notifications";
+const LEGACY_STORAGE_KEY = "trackit_notifications";
 const RESET_VERSION_KEY = "trackit_notifications_reset_v2";
 const WELCOME_MIGRATION_KEY = "trackit_notifications_welcome_migrated_v3";
 const WELCOME_SENT_PREFIX = "trackit_welcome_sent_";
+const USER_SCOPED_MIGRATION_KEY = "trackit_notifications_user_scoped_v1";
+
+let activeUserId: string | null = null;
+
+function storageKeyForUser(userId: string) {
+  return `trackit_notifications_${userId}`;
+}
+
+export function setNotificationsUserId(userId: string | null) {
+  activeUserId = userId;
+  if (typeof window === "undefined" || !userId) return;
+
+  if (!localStorage.getItem(USER_SCOPED_MIGRATION_KEY)) {
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    localStorage.setItem(USER_SCOPED_MIGRATION_KEY, "1");
+  }
+}
+
+export function getNotificationsUserId() {
+  return activeUserId;
+}
 
 function welcomeNotificationBody(lang: "en" | "fr") {
   return lang === "fr"
@@ -86,10 +107,16 @@ function dispatchNotificationsUpdated() {
   );
 }
 
-/** Updates legacy welcome notification copy for existing users (localStorage). */
+function resolveStorageKey(): string | null {
+  if (!activeUserId) return null;
+  return storageKeyForUser(activeUserId);
+}
+
+/** Updates legacy welcome notification copy for the active user. */
 export function migrateWelcomeNotifications() {
-  if (typeof window === "undefined") return;
-  if (localStorage.getItem(WELCOME_MIGRATION_KEY)) return;
+  if (typeof window === "undefined" || !activeUserId) return;
+  const migrationKey = `${WELCOME_MIGRATION_KEY}_${activeUserId}`;
+  if (localStorage.getItem(migrationKey)) return;
 
   const items = loadNotifications();
   let changed = false;
@@ -102,7 +129,7 @@ export function migrateWelcomeNotifications() {
   });
 
   if (changed) saveNotifications(next);
-  localStorage.setItem(WELCOME_MIGRATION_KEY, "1");
+  localStorage.setItem(migrationKey, "1");
   if (changed) dispatchNotificationsUpdated();
 }
 
@@ -113,15 +140,20 @@ export function ensureNotificationsReset() {
     migrateWelcomeNotifications();
     return;
   }
-  localStorage.removeItem(STORAGE_KEY);
+  if (activeUserId) {
+    localStorage.removeItem(storageKeyForUser(activeUserId));
+  }
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
   localStorage.setItem(RESET_VERSION_KEY, "1");
   migrateWelcomeNotifications();
 }
 
 export function loadNotifications(): NotificationItem[] {
   if (typeof window === "undefined") return [];
+  const key = resolveStorageKey();
+  if (!key) return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -140,12 +172,15 @@ export function loadNotifications(): NotificationItem[] {
 
 export function saveNotifications(items: NotificationItem[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupeNotifications(items)));
+  const key = resolveStorageKey();
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(dedupeNotifications(items)));
 }
 
 export function resetNotifications(): NotificationItem[] {
   if (typeof window !== "undefined") {
-    localStorage.removeItem(STORAGE_KEY);
+    const key = resolveStorageKey();
+    if (key) localStorage.removeItem(key);
   }
   dispatchNotificationsUpdated();
   return [];
@@ -155,9 +190,17 @@ export function getStoredUnreadCount(): number {
   return loadNotifications().filter((n) => !n.read).length;
 }
 
+function resolveActiveUserId(userId?: string | null): string | null {
+  if (userId) setNotificationsUserId(userId);
+  return activeUserId;
+}
+
 export function pushNotification(
-  input: Omit<NotificationItem, "id" | "read" | "time"> & { time?: string }
-): NotificationItem {
+  input: Omit<NotificationItem, "id" | "read" | "time"> & { time?: string },
+  userId?: string | null
+): NotificationItem | null {
+  if (!resolveActiveUserId(userId)) return null;
+
   const fp = notificationFingerprint(input);
   const existing = loadNotifications();
   const duplicate = existing.find((n) => notificationFingerprint(n) === fp);
@@ -182,24 +225,26 @@ export function pushNotification(
 export function notifyCreatorPaid(
   lang: "en" | "fr",
   creatorName: string,
-  amount: number
+  amount: number,
+  userId?: string | null
 ) {
   const formatted = formatCurrency(amount, lang);
+  const name = creatorName.trim() || (lang === "fr" ? "ce créateur" : "this creator");
   pushNotification({
     kind: "payout",
     title:
       lang === "fr"
-        ? `Paiement envoyé à ${creatorName}`
-        : `You just paid ${creatorName}`,
+        ? `Paiement envoyé à ${name}`
+        : `You paid ${name}`,
     body:
       lang === "fr"
-        ? `Vous venez de payer ${formatted} de commission.`
-        : `You just paid ${formatted} in commission.`,
+        ? `Un payout de ${formatted} vient d'être envoyé à ${name}.`
+        : `A ${formatted} payout was just sent to ${name}.`,
     time: formatNotificationTime(lang),
-  });
+  }, userId);
 }
 
-export function notifyCampaignCreated(lang: "en" | "fr", campaignName: string) {
+export function notifyCampaignCreated(lang: "en" | "fr", campaignName: string, userId?: string | null) {
   pushNotification({
     kind: "campaign",
     title:
@@ -211,10 +256,10 @@ export function notifyCampaignCreated(lang: "en" | "fr", campaignName: string) {
         ? "Votre campagne est active. Ajoutez des créateurs et suivez les ventes."
         : "Your campaign is live. Add creators and track sales.",
     time: formatNotificationTime(lang),
-  });
+  }, userId);
 }
 
-export function notifyCreatorSaved(lang: "en" | "fr", creatorName: string) {
+export function notifyCreatorSaved(lang: "en" | "fr", creatorName: string, userId?: string | null) {
   pushNotification({
     kind: "outreach",
     title:
@@ -226,10 +271,10 @@ export function notifyCreatorSaved(lang: "en" | "fr", creatorName: string) {
         ? "Vous pouvez maintenant lancer une campagne ou envoyer un message."
         : "You can now run a campaign or send outreach.",
     time: formatNotificationTime(lang),
-  });
+  }, userId);
 }
 
-export function notifyOutreachSent(lang: "en" | "fr", creatorName: string) {
+export function notifyOutreachSent(lang: "en" | "fr", creatorName: string, userId?: string | null) {
   pushNotification({
     kind: "outreach",
     title:
@@ -241,10 +286,10 @@ export function notifyOutreachSent(lang: "en" | "fr", creatorName: string) {
         ? "Votre message a été enregistré dans l'historique."
         : "Your message was saved to outreach history.",
     time: formatNotificationTime(lang),
-  });
+  }, userId);
 }
 
-export function notifyShopifyConnected(lang: "en" | "fr", storeName: string) {
+export function notifyShopifyConnected(lang: "en" | "fr", storeName: string, userId?: string | null) {
   pushNotification({
     kind: "system",
     title: lang === "fr" ? "Shopify connecté" : "Shopify connected",
@@ -253,10 +298,10 @@ export function notifyShopifyConnected(lang: "en" | "fr", storeName: string) {
         ? `Trackit reçoit maintenant les commandes de ${storeName}.`
         : `Trackit is now receiving orders from ${storeName}.`,
     time: formatNotificationTime(lang),
-  });
+  }, userId);
 }
 
-export function notifyFundsAdded(lang: "en" | "fr", amount: number) {
+export function notifyFundsAdded(lang: "en" | "fr", amount: number, userId?: string | null) {
   pushNotification({
     kind: "payout",
     title: lang === "fr" ? "Fonds ajoutés au solde" : "Funds added to balance",
@@ -265,20 +310,71 @@ export function notifyFundsAdded(lang: "en" | "fr", amount: number) {
         ? `${formatCurrency(amount, lang)} ont été ajoutés à votre solde de paiement.`
         : `${formatCurrency(amount, lang)} was added to your payout balance.`,
     time: formatNotificationTime(lang),
-  });
+  }, userId);
+}
+
+export function notifySaleRecorded(
+  lang: "en" | "fr",
+  creatorName: string,
+  orderAmount: number,
+  commissionAmount: number,
+  userId?: string | null
+) {
+  const name = creatorName.trim() || (lang === "fr" ? "un créateur" : "a creator");
+  pushNotification({
+    kind: "campaign",
+    title:
+      lang === "fr"
+        ? `Vente enregistrée — ${name}`
+        : `Sale recorded — ${name}`,
+    body:
+      lang === "fr"
+        ? `Commande de ${formatCurrency(orderAmount, lang)} · commission ${formatCurrency(commissionAmount, lang)}.`
+        : `${formatCurrency(orderAmount, lang)} order · ${formatCurrency(commissionAmount, lang)} commission.`,
+    time: formatNotificationTime(lang),
+  }, userId);
 }
 
 /** Welcome notification — once per user, ever (persisted in localStorage). */
 export function notifyWelcomeIfNeeded(userId: string, lang: "en" | "fr"): boolean {
-  if (hasWelcomeNotificationBeenSent(userId)) return false;
-  markWelcomeNotificationSent(userId);
-  pushNotification({
-    kind: "system",
-    title: lang === "fr" ? "Bienvenue sur Trackit" : "Welcome to Trackit",
-    body: welcomeNotificationBody(lang),
-    time: formatNotificationTime(lang),
-  });
-  return true;
+  setNotificationsUserId(userId);
+
+  const items = loadNotifications();
+  if (items.some(isWelcomeNotification)) {
+    if (!hasWelcomeNotificationBeenSent(userId)) {
+      markWelcomeNotificationSent(userId);
+    }
+    return false;
+  }
+
+  if (hasWelcomeNotificationBeenSent(userId)) {
+    return false;
+  }
+
+  const item = pushNotification(
+    {
+      kind: "system",
+      title: lang === "fr" ? "Bienvenue sur Trackit" : "Welcome to Trackit",
+      body: welcomeNotificationBody(lang),
+      time: formatNotificationTime(lang),
+    },
+    userId
+  );
+
+  if (item) {
+    markWelcomeNotificationSent(userId);
+    return true;
+  }
+  return false;
+}
+
+/** Replays welcome chime after a user gesture if welcome is still unread. */
+export function playWelcomeSoundIfUnread(userId: string) {
+  setNotificationsUserId(userId);
+  const welcome = loadNotifications().find(isWelcomeNotification);
+  if (welcome && !welcome.read) {
+    playNotificationSound();
+  }
 }
 
 /** Dev helper — fires a sample notification of the given type. */

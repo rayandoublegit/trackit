@@ -9,6 +9,7 @@ import {
   NOTIFICATIONS_UPDATED_EVENT,
   resetNotifications,
   saveNotifications,
+  setNotificationsUserId,
   type NotificationItem,
   type NotificationKind,
 } from "@/lib/notifications-storage";
@@ -19,34 +20,37 @@ export function getInitialUnreadCount() {
   return getStoredUnreadCount();
 }
 
-const KIND_COLORS: Record<NotificationKind, string> = {
-  payout: "#0047FF",
-  campaign: "#7C3AED",
-  outreach: "#FF3D8B",
-  team: "#2E7D32",
-  system: "#7A7A7A",
-};
+const ICON_COLOR_READ = "#1A1A1A";
+const ICON_COLOR_UNREAD = "#FFFFFF";
+const UNREAD_BG = "#0047FF";
 
 function NotificationKindIcon({
   kind,
   useTrackitLogo,
+  unread,
 }: {
   kind: NotificationKind;
   useTrackitLogo?: boolean;
+  unread?: boolean;
 }) {
+  const stroke = unread ? ICON_COLOR_UNREAD : ICON_COLOR_READ;
+
   if (useTrackitLogo) {
     return (
       <img
-        src="/favicon.png"
+        src="/images/trackit-mark.svg"
         alt=""
         width={20}
-        height={20}
-        style={{ display: "block", objectFit: "contain" }}
+        height={19}
+        style={{
+          display: "block",
+          objectFit: "contain",
+          filter: unread ? "brightness(0) invert(1)" : "none",
+        }}
       />
     );
   }
 
-  const stroke = KIND_COLORS[kind];
   const common = {
     width: 20,
     height: 20,
@@ -140,30 +144,38 @@ function NotificationKindIcon({
 
 type FilterTab = "all" | "unread";
 
-export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange?: (count: number) => void; isMobile?: boolean }) {
-  const lang = useLang();
+function useNotifications(userId: string | undefined, onUnreadChange?: (count: number) => void) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<FilterTab>("all");
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    if (!userId) {
+      setNotifications([]);
+      setHydrated(true);
+      onUnreadChange?.(0);
+      return;
+    }
+    setNotificationsUserId(userId);
     ensureNotificationsReset();
     const loaded = loadNotifications();
     saveNotifications(loaded);
     setNotifications(loaded);
     onUnreadChange?.(loaded.filter((n) => !n.read).length);
     setHydrated(true);
-  }, [onUnreadChange]);
+  }, [userId, onUnreadChange]);
 
   useEffect(() => {
+    if (!userId) return;
     const refresh = () => {
+      setNotificationsUserId(userId);
       const loaded = loadNotifications();
       setNotifications(loaded);
       onUnreadChange?.(loaded.filter((n) => !n.read).length);
     };
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refresh);
-  }, [onUnreadChange]);
+  }, [userId, onUnreadChange]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -205,13 +217,182 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
   const visible =
     filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
 
+  return {
+    notifications,
+    filter,
+    setFilter,
+    hydrated,
+    unreadCount,
+    markRead,
+    markAllRead,
+    dismiss,
+    resetAll,
+    visible,
+  };
+}
+
+function NotificationList({
+  visible,
+  hydrated,
+  filter,
+  lang,
+  onMarkRead,
+  onDismiss,
+}: {
+  visible: NotificationItem[];
+  hydrated: boolean;
+  filter: FilterTab;
+  lang: "en" | "fr";
+  onMarkRead: (id: string) => void;
+  onDismiss: (id: string) => void;
+}) {
+  if (!hydrated) {
+    return (
+      <div style={{ padding: 32, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+        {lang === "fr" ? "Chargement…" : "Loading…"}
+      </div>
+    );
+  }
+
+  if (visible.length === 0) {
+    return (
+      <div style={{ padding: "40px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: 32, marginBottom: 10 }}>🔔</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+          {lang === "fr" ? "Aucune notification" : "No notifications"}
+        </div>
+        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, lineHeight: 1.45 }}>
+          {filter === "unread"
+            ? lang === "fr"
+              ? "Vous avez tout lu."
+              : "You've read everything."
+            : lang === "fr"
+              ? "Les mises à jour apparaîtront ici."
+              : "Updates will show up here."}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
-      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24, flexWrap: "wrap" }}>
+      {visible.map((n, i) => {
+        const useTrackitLogo = n.kind === "system" && n.title.toLowerCase().includes("trackit");
+        const unread = !n.read;
+        return (
+          <div
+            key={n.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => onMarkRead(n.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onMarkRead(n.id);
+              }
+            }}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 12,
+              width: "100%",
+              padding: "14px 16px",
+              border: "none",
+              borderBottom: i < visible.length - 1 ? `1px solid ${unread ? "rgba(255,255,255,0.15)" : "#F5F5F5"}` : "none",
+              background: unread ? UNREAD_BG : "#FFFFFF",
+              cursor: "pointer",
+              textAlign: "left",
+              fontFamily: "inherit",
+            }}
+          >
+            <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+              <NotificationKindIcon kind={n.kind} useTrackitLogo={useTrackitLogo} unread={unread} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: unread ? 600 : 500,
+                    color: unread ? "#FFFFFF" : "#1A1A1A",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {n.title}
+                </span>
+              </div>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: unread ? "rgba(255,255,255,0.9)" : "#7A7A7A",
+                  letterSpacing: "-0.01em",
+                  margin: "0 0 4px 0",
+                  lineHeight: 1.45,
+                }}
+              >
+                {n.body}
+              </p>
+              <span style={{ fontSize: 11, color: unread ? "rgba(255,255,255,0.75)" : "#9A9A9A", letterSpacing: "-0.01em" }}>
+                {n.time}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDismiss(n.id);
+              }}
+              aria-label="Dismiss"
+              style={{
+                background: "none",
+                border: "none",
+                color: unread ? "rgba(255,255,255,0.85)" : "#9A9A9A",
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: "pointer",
+                padding: 4,
+                flexShrink: 0,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+export function NotificationsPanel({
+  userId,
+  onUnreadChange,
+}: {
+  userId?: string;
+  onUnreadChange?: (count: number) => void;
+}) {
+  const lang = useLang();
+  const {
+    notifications,
+    filter,
+    setFilter,
+    hydrated,
+    unreadCount,
+    markRead,
+    markAllRead,
+    dismiss,
+    resetAll,
+    visible,
+  } = useNotifications(userId, onUnreadChange);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", maxHeight: 480 }}>
+      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid #F0F0F0", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Notifications" : "Notifications"}</h1>
-            <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+              {lang === "fr" ? "Notifications" : "Notifications"}
+            </h2>
+            <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "2px 0 0" }}>
               {unreadCount > 0
                 ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
                 : lang === "fr"
@@ -219,35 +400,60 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
                   : "You're all caught up"}
             </p>
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {unreadCount > 0 && (
-              <button type="button" onClick={markAllRead} className="hero-cta-shopify-light hero-cta-compact">
-                {lang === "fr" ? "Tout marquer comme lu" : "Mark all as read"}
+              <button
+                type="button"
+                onClick={markAllRead}
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 7,
+                  border: "1px solid #E5E5E5",
+                  background: "#FFFFFF",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  color: "#1A1A1A",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {lang === "fr" ? "Tout lire" : "Mark all read"}
               </button>
             )}
             {notifications.length > 0 && (
               <button
                 type="button"
                 onClick={resetAll}
-                className="hero-cta-shopify-light hero-cta-compact"
-                style={{ color: "#DC2626", borderColor: "#FECACA", background: "#FEF2F2" }}
+                style={{
+                  padding: "5px 10px",
+                  borderRadius: 7,
+                  border: "1px solid #FECACA",
+                  background: "#FEF2F2",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  color: "#DC2626",
+                  letterSpacing: "-0.01em",
+                }}
               >
-                {lang === "fr" ? "Tout réinitialiser" : "Reset all"}
+                {lang === "fr" ? "Réinitialiser" : "Reset"}
               </button>
             )}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+        <div style={{ display: "flex", gap: 6 }}>
           {(["all", "unread"] as FilterTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setFilter(tab)}
               style={{
-                padding: "8px 14px",
-                borderRadius: 8,
+                padding: "6px 12px",
+                borderRadius: 7,
                 border: "none",
-                fontSize: 13,
+                fontSize: 12,
                 fontFamily: "inherit",
                 fontWeight: filter === tab ? 500 : 400,
                 cursor: "pointer",
@@ -261,108 +467,16 @@ export function NotificationsView({ onUnreadChange, isMobile }: { onUnreadChange
           ))}
         </div>
       </div>
-
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
-        {!hydrated ? (
-          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 40, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
-            {lang === "fr" ? "Chargement…" : "Loading…"}
-          </div>
-        ) : visible.length === 0 ? (
-          <div
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
-              borderRadius: 16,
-              padding: 60,
-              textAlign: "center",
-            }}
-          >
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🔔</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
-              {lang === "fr" ? "Aucune notification" : "No notifications"}
-            </div>
-            <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-              {filter === "unread"
-                ? lang === "fr"
-                  ? "Vous avez tout lu."
-                  : "You've read everything."
-                : lang === "fr"
-                  ? "Les mises à jour sur les paiements, campagnes et votre équipe apparaîtront ici."
-                  : "Updates about payouts, campaigns, and your team will show up here."}
-            </p>
-          </div>
-        ) : (
-          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
-            {visible.map((n, i) => {
-              const useTrackitLogo = n.kind === "system" && n.title.toLowerCase().includes("trackit");
-              return (
-                <div
-                  key={n.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => markRead(n.id)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); markRead(n.id); } }}
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: 14,
-                    width: "100%",
-                    padding: "18px 20px",
-                    border: "none",
-                    borderBottom: i < visible.length - 1 ? "1px solid #F5F5F5" : "none",
-                    background: n.read ? "#FFFFFF" : "#FAFCFF",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  <div
-                    style={{
-                      flexShrink: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginTop: 1,
-                    }}
-                  >
-                    <NotificationKindIcon kind={n.kind} useTrackitLogo={useTrackitLogo} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: 14, fontWeight: n.read ? 500 : 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{n.title}</span>
-                      {!n.read && (
-                        <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#0047FF", flexShrink: 0 }} />
-                      )}
-                    </div>
-                    <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 6px 0", lineHeight: 1.45 }}>{n.body}</p>
-                    <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{n.time}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismiss(n.id);
-                    }}
-                    aria-label="Dismiss"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "#9A9A9A",
-                      fontSize: 18,
-                      lineHeight: 1,
-                      cursor: "pointer",
-                      padding: 4,
-                      flexShrink: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <NotificationList
+          visible={visible}
+          hydrated={hydrated}
+          filter={filter}
+          lang={lang}
+          onMarkRead={markRead}
+          onDismiss={dismiss}
+        />
       </div>
-    </>
+    </div>
   );
 }

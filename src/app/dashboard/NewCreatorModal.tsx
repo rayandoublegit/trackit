@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { listFolders, type FolderRow } from "@/lib/workspace-client";
 
 const BLUE = "#0047FF";
 
@@ -26,6 +27,9 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const [followers, setFollowers] = useState("");
   const [engagement, setEngagement] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [folders, setFolders] = useState<FolderRow[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
@@ -47,6 +51,14 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     const onFocus = () => { void load(); };
     window.addEventListener("focus", onFocus);
     return () => { clearInterval(interval); window.removeEventListener("focus", onFocus); };
+  }, [brandId]);
+
+  useEffect(() => {
+    if (!brandId) return;
+    void (async () => {
+      const { folders: f } = await listFolders();
+      setFolders(f);
+    })();
   }, [brandId]);
 
   // Pré-remplit les champs quand un nouveau créateur arrive en tête de file
@@ -82,7 +94,12 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
 
   const handleSave = async () => {
     if (!brandId || !current) return;
+    if (folders.length > 0 && !selectedFolderId) {
+      setSaveError(lang === "fr" ? "Choisissez une liste pour ce créateur." : "Choose a list for this creator.");
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
     try {
       let avatarUrl: string | undefined;
       if (avatarFile && supabase) {
@@ -94,11 +111,28 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
           avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
         }
       }
-      await fetch("/api/creators/pending-review", {
+      const res = await fetch("/api/creators/pending-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brandId, creatorId: current.id, commissionRate: commission, discountCode: discount, platform, avatarUrl, niche, followers, engagement }),
+        body: JSON.stringify({
+          brandId,
+          creatorId: current.id,
+          commissionRate: commission,
+          discountCode: discount,
+          platform,
+          avatarUrl,
+          niche,
+          followers,
+          engagement,
+          folderId: selectedFolderId || undefined,
+        }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(typeof data?.error === "string" ? data.error : (lang === "fr" ? "Échec de l'enregistrement" : "Save failed"));
+        return;
+      }
+      window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
       next();
     } finally {
       setSaving(false);
@@ -318,7 +352,41 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
               <label style={labelStyle}>{lang === "fr" ? "Taux d'engagement (%)" : "Engagement rate (%)"}</label>
               <input type="number" value={engagement} onChange={(e) => setEngagement(e.target.value)} placeholder="3.5" className="ncm-field" style={inputStyle} />
             </div>
+
+            <div>
+              <label style={labelStyle}>{lang === "fr" ? "Liste" : "List"}</label>
+              {folders.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0, lineHeight: 1.45 }}>
+                  {lang === "fr"
+                    ? "Aucune liste pour le moment — le créateur sera ajouté à « Tous les créateurs »."
+                    : "No lists yet — the creator will be added to “All creators”."}
+                </p>
+              ) : (
+                <select
+                  value={selectedFolderId}
+                  onChange={(e) => setSelectedFolderId(e.target.value)}
+                  disabled={saving}
+                  className="ncm-field"
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {lang === "fr" ? "— Choisir une liste —" : "— Choose a list —"}
+                  </option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
           </div>
+
+          {saveError && (
+            <div style={{ marginBottom: 10, fontSize: 13, color: "#A32D2D", letterSpacing: "-0.01em" }}>
+              {saveError}
+            </div>
+          )}
 
           <button
             type="button"

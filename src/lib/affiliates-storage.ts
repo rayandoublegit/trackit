@@ -57,3 +57,22 @@ export function removeAffiliate(userId: string, ref: string): StoredAffiliate[] 
   saveAffiliates(userId, next);
   return next;
 }
+
+/** Pushes local affiliate codes to Supabase before Shopify sync. */
+export async function persistAffiliateCodesToServer(userId: string): Promise<void> {
+  if (typeof window === "undefined") return;
+  const affiliates = loadAffiliates(userId);
+  if (affiliates.length === 0) return;
+  try {
+    await fetch("/api/affiliates/sync-codes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId,
+        entries: affiliates.map((a) => ({ creator: a.creator, code: a.code })),
+      }),
+    });
+  } catch {
+    /* network unavailable */
+  }
+}

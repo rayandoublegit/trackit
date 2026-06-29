@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { syncScriptRefToDiscoverySaved } from "@/lib/script-creator-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -12,13 +13,34 @@ const supabaseAdmin = createClient(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const brandId = searchParams.get("brandId");
+  const targetHandle = searchParams.get("targetHandle")?.trim().replace(/^@/, "") || null;
   if (!brandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
 
-  const { data, error } = await supabaseAdmin
+  let targetCreatorId: string | null = null;
+  if (targetHandle) {
+    const { data: creatorRow } = await supabaseAdmin
+      .from("creators")
+      .select("id")
+      .eq("user_id", brandId)
+      .ilike("handle", targetHandle)
+      .maybeSingle();
+    targetCreatorId = creatorRow?.id ?? null;
+    if (!targetCreatorId) {
+      return NextResponse.json({ ok: true, scripts: [] });
+    }
+  }
+
+  let query = supabaseAdmin
     .from("scripts")
     .select("id, title, content, file_url, target_creator_id, created_at")
     .eq("brand_id", brandId)
     .order("created_at", { ascending: false });
+
+  if (targetCreatorId) {
+    query = query.eq("target_creator_id", targetCreatorId);
+  }
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Récupère les noms des créateurs ciblés pour affichage
@@ -53,6 +75,14 @@ export async function POST(request: Request) {
     .select("id")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (targetCreatorId) {
+    const syncErr = await syncScriptRefToDiscoverySaved(supabaseAdmin, brandId, targetCreatorId, {
+      id: data.id,
+      title,
+    });
+    if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, id: data.id });
 }

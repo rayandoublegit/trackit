@@ -4,12 +4,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { videoEmbedUrl } from "@/lib/creator-video";
-import { PIPELINE_STAGES } from "@/lib/pipeline";
+import { pipelineStages } from "@/lib/pipeline";
 import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
   listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
 } from "@/lib/workspace-client";
 import type { ContentAnalysis } from "@/lib/creator-content-analysis";
+import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
+import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
+import { proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { discoveryCopy, daysAgoCopy, engagementInsightCopy } from "@/lib/discovery-copy";
+import type { Lang } from "@/lib/useLang";
 
 export type CreatorDetail = FeedCreator & {
   avgLikes?: number; avgComments?: number; avgShares?: number;
@@ -23,32 +28,146 @@ function fmt(n: number): string {
   return String(Math.round(n));
 }
 
-function daysAgoLabel(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (d <= 0) return "actif aujourd'hui";
-  if (d === 1) return "actif hier";
-  if (d < 30) return `actif il y a ${d} j`;
-  return `actif il y a ${Math.floor(d / 30)} mois`;
+function daysAgoLabel(iso: string | null, lang: Lang): string | null {
+  return daysAgoCopy(lang, iso);
 }
 
-const proxied = (u?: string) =>
-  !u ? "" : u.includes("/api/img-proxy") ? u : `/api/img-proxy?url=${encodeURIComponent(u)}`;
+const proxied = proxiedImageUrl;
 
-function authNote(d: CreatorDetail): string {
-  const vpf = Math.round((d.viewsPerFollower ?? 0) * 100);
-  const reach = vpf > 0 ? `~${vpf}% de reach sur ses abonnés` : "reach modéré";
-  if (d.authenticityScore >= 80) return `Audience saine — engagement régulier, ${reach}, pas de pics suspects.`;
-  if (d.authenticityScore >= 50) return `Audience correcte — ${reach}, engagement un peu variable.`;
-  return `Signaux à surveiller — ${reach}, ratio vues/engagement faible (possibles faux abonnés).`;
+const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
+
+const drawerActionBase: React.CSSProperties = {
+  fontFamily: drawerFont,
+  letterSpacing: "-0.02em",
+  fontSize: 13,
+  borderRadius: 8,
+};
+
+const drawerBtnSecondary: React.CSSProperties = {
+  ...drawerActionBase,
+  fontWeight: 500,
+  color: "#1A1A1A",
+  background: "#FFF",
+  border: "1px solid #E5E5E5",
+  padding: "8px 12px",
+  cursor: "pointer",
+};
+
+const drawerSelect: React.CSSProperties = {
+  ...drawerActionBase,
+  fontWeight: 500,
+  padding: "8px 10px",
+  border: "1px solid #E5E5E5",
+  background: "#FFF",
+  color: "#1A1A1A",
+  cursor: "pointer",
+};
+
+const drawerTagStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: "#1A1A1A",
+  background: "#F5F5F5",
+  padding: "2px 8px",
+  borderRadius: 20,
+  letterSpacing: "-0.01em",
+};
+
+function platformLabel(platform: string) {
+  const p = platform.toLowerCase();
+  if (p === "instagram") return "Instagram";
+  if (p === "youtube") return "YouTube";
+  return "TikTok";
+}
+
+function profileUrl(platform: string, username: string) {
+  const p = platform.toLowerCase();
+  if (p === "instagram") return `https://instagram.com/${username}`;
+  if (p === "youtube") return `https://youtube.com/@${username}`;
+  return `https://tiktok.com/@${username}`;
+}
+
+function engagementInsight(rate: number, lang: Lang): string {
+  return engagementInsightCopy(lang, rate);
+}
+
+function VerifiedBadge({ label }: { label: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-label={label} style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10" fill="#0047FF" />
+      <path d="M8 12.5l2.5 2.5L16 9" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function platformLogoSrc(platform: string): string | null {
+  const p = platform.toLowerCase();
+  if (p.includes("instagram")) return "/instagram-logo.svg";
+  if (p.includes("youtube")) return null;
+  return "/tiktok-logo.svg";
+}
+
+function PlatformPill({ platform }: { platform: string }) {
+  const label = platformLabel(platform);
+  const logoSrc = platformLogoSrc(platform);
+  const outer = 20;
+  const inner = 16;
+
+  if (logoSrc) {
+    return (
+      <span
+        style={{
+          width: outer,
+          height: outer,
+          borderRadius: "50%",
+          overflow: "hidden",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+        title={label}
+      >
+        <img
+          src={logoSrc}
+          alt={label}
+          width={inner}
+          height={inner}
+          style={{ display: "block", objectFit: "contain" }}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }} title={label}>
+      <PlatformBrandIcon platform={platform} size={inner} />
+    </span>
+  );
 }
 
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div style={{ background: "#F7F7F8", borderRadius: 10, padding: "9px 11px" }}>
-      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 2 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: accent ? "#0047FF" : "#1A1A1A" }}>{value}</div>
+    <div style={{ background: "#F7F7F8", borderRadius: 10, padding: "10px 12px" }}>
+      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: accent ? "#0047FF" : "#1A1A1A", letterSpacing: "-0.02em" }}>{value}</div>
     </div>
+  );
+}
+
+function DrawerSection({ title, children, first }: { title?: string; children: ReactNode; first?: boolean }) {
+  return (
+    <section
+      style={{
+        marginTop: first ? 0 : 32,
+        paddingTop: first ? 0 : 28,
+        borderTop: first ? "none" : "1px solid #EFEFEF",
+      }}
+    >
+      {title ? (
+        <h2 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.02em" }}>{title}</h2>
+      ) : null}
+      {children}
+    </section>
   );
 }
 
@@ -65,31 +184,78 @@ function Locked({ children, onUpgrade, label }: { children: ReactNode; onUpgrade
   );
 }
 
-function Bars({ videos }: { videos: { views: number }[] }) {
-  const vals = videos.slice(0, 8).map((v) => v.views);
-  const max = Math.max(1, ...vals);
+function TrendUpIcon() {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 5, height: 54 }}>
-      {vals.map((v, i) => (
-        <div key={i} title={`${fmt(v)} vues`} style={{ flex: 1, height: `${Math.max(8, (v / max) * 100)}%`, background: i === vals.indexOf(max) ? "#0F6E56" : "#5DCAA5", borderRadius: "3px 3px 0 0" }} />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M7 17L17 7M17 7H10M17 7v7" stroke="#15803D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MetricBarRow({ label, value, pct, trend }: { label: string; value: string; pct: number; trend?: boolean }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "118px 1fr auto", alignItems: "center", gap: 12, padding: "11px 0", borderBottom: "1px solid #F0F0F0" }}>
+      <span style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{label}</span>
+      <div style={{ height: 8, background: "#EEF4FF", borderRadius: 999, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.max(6, Math.min(100, pct))}%`, background: "#90C2FF", borderRadius: 999, transition: "width 0.2s ease" }} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 64, justifyContent: "flex-end" }}>
+        {trend && <TrendUpIcon />}
+        <span style={{ fontSize: 14, fontWeight: 600, color: trend ? "#15803D" : "#1A1A1A", letterSpacing: "-0.02em" }}>{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function ContentAnalyticsPanel({ d, lang }: { d: CreatorDetail; lang: Lang }) {
+  const t = discoveryCopy(lang);
+  const avgViews = d.avgViews || 0;
+  const avgLikes = d.avgLikes ?? 0;
+  const avgComments = d.avgComments ?? 0;
+  const avgShares = d.avgShares ?? 0;
+  const reachRatio = d.viewsPerFollower ?? 0;
+
+  const metrics = [
+    { label: t.avgViewsLong, value: fmt(avgViews), raw: avgViews, trend: avgViews > 0 && reachRatio >= 0.05 },
+    { label: t.avgLikes, value: fmt(avgLikes), raw: avgLikes, trend: avgLikes > 0 && d.engagementRate >= 3 },
+    { label: t.avgComments, value: fmt(avgComments), raw: avgComments, trend: avgComments > 0 && d.engagementRate >= 2 },
+    { label: t.avgShares, value: fmt(avgShares), raw: avgShares, trend: avgShares > 0 },
+  ];
+  const max = Math.max(1, ...metrics.map((m) => m.raw));
+
+  return (
+    <div style={{ marginBottom: 0 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "118px 1fr", gap: 12, alignItems: "start", marginBottom: 6, paddingBottom: 14, borderBottom: "1px solid #EFEFEF" }}>
+        <span style={{ fontSize: 13, color: "#9A9A9A", paddingTop: 6 }}>{t.engagementRate}</span>
+        <div>
+          <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.1 }}>{d.engagementRate}%</div>
+          <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 6, lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+            {engagementInsight(d.engagementRate, lang)}
+          </div>
+        </div>
+      </div>
+
+      {metrics.map((m) => (
+        <MetricBarRow key={m.label} label={m.label} value={m.value} pct={(m.raw / max) * 100} trend={m.trend} />
       ))}
     </div>
   );
 }
 
-function VideoTile({ v, playing, onPlay, isPaid, onUpgrade }: {
+function VideoTile({ v, playing, onPlay, isPaid, onUpgrade, lang }: {
   v: { key: string; cover: string; views: number; embed: string | null };
-  playing: boolean; onPlay: () => void; isPaid: boolean; onUpgrade: () => void;
+  playing: boolean; onPlay: () => void; isPaid: boolean; onUpgrade: () => void; lang: Lang;
 }) {
+  const t = discoveryCopy(lang);
   if (playing && v.embed) {
     return (
-      <iframe src={v.embed} title="Vidéo TikTok"
+      <iframe src={v.embed} title={t.playVideo}
         style={{ width: "100%", aspectRatio: "9 / 16", border: "none", borderRadius: 10, background: "#000" }}
         allow="autoplay; encrypted-media; fullscreen" referrerPolicy="strict-origin" />
     );
   }
   return (
-    <button type="button" aria-label="Lire la vidéo"
+    <button type="button" aria-label={t.playVideo}
       onClick={() => (isPaid ? onPlay() : onUpgrade())}
       style={{ position: "relative", aspectRatio: "9 / 16", borderRadius: 10, border: "none", cursor: "pointer", padding: 0,
         background: v.cover ? `#000 url("${v.cover}") center / cover no-repeat` : "#EDEDED", display: "block", width: "100%" }}>
@@ -97,19 +263,23 @@ function VideoTile({ v, playing, onPlay, isPaid, onUpgrade }: {
         {v.embed ? (isPaid ? "▶" : "🔒") : ""}
       </span>
       {v.views > 0 && (
-        <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 10, fontWeight: 600, color: "#FFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{fmt(v.views)} vues</span>
+        <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 10, fontWeight: 600, color: "#FFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{fmt(v.views)} {t.views}</span>
       )}
     </button>
   );
 }
 
-export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorkspaceChange }: {
+export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, onWorkspaceChange, onReachOut }: {
   creator: FeedCreator | null;
   plan: PlanTier;
+  lang: Lang;
   onClose: () => void;
   onUpgrade: () => void;
   onWorkspaceChange?: () => void;
+  onReachOut?: (creator: FeedCreator) => void;
 }) {
+  const t = discoveryCopy(lang);
+  const stages = pipelineStages(lang);
   const isPaid = plan !== "free";
   const [detail, setDetail] = useState<CreatorDetail | null>(creator);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -123,6 +293,7 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
   const [inFolders, setInFolders] = useState<Set<string>>(new Set());
   const [folderOpen, setFolderOpen] = useState(false);
   const [newFolder, setNewFolder] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
     if (!creator) return;
@@ -150,10 +321,28 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
     return true;
   };
   const onSaveToggle = async () => {
-    if (!creator) return;
-    if (saved) { await unsave(creator.username); setSaved(false); setInFolders(new Set()); }
-    else { await ensureSaved(); }
-    onWorkspaceChange?.();
+    if (!creator || saveBusy) return;
+    setSaveBusy(true);
+    try {
+      if (saved) {
+        const res = await unsave(creator.username);
+        if (res.error) return;
+        setSaved(false);
+        setInFolders(new Set());
+        setStageState("saved");
+        setNotesVal("");
+      } else {
+        const res = await saveCreator(creator);
+        if (res.error) {
+          if (res.status === 402) onUpgrade();
+          return;
+        }
+        setSaved(true);
+      }
+      onWorkspaceChange?.();
+    } finally {
+      setSaveBusy(false);
+    }
   };
   const onStageChange = async (v: string) => {
     if (!creator) return;
@@ -247,9 +436,9 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
   if (!creator || !detail) return null;
 
   const d = detail;
-  const active = daysAgoLabel(d.lastPostAt);
-  const rentaColor = d.valueScore >= 70 ? "#15803D" : d.valueScore >= 40 ? "#B45309" : "#9A1F1F";
-  const rentaBg = d.valueScore >= 70 ? "#F0FDF4" : d.valueScore >= 40 ? "#FFFBEB" : "#FEF2F2";
+  const active = daysAgoLabel(d.lastPostAt, lang);
+  const isVerified = d.authenticityScore >= 60;
+  const reachPct = Math.round((d.viewsPerFollower ?? 0) * 100);
 
   return (
     <div onClick={onClose}
@@ -257,156 +446,173 @@ export function CreatorDetailDrawer({ creator, plan, onClose, onUpgrade, onWorks
       <div onClick={(e) => e.stopPropagation()}
         style={{ width: "min(560px, 100%)", height: "100%", background: "#FFF", overflowY: "auto",
           transform: shown ? "translateX(0)" : "translateX(40px)", opacity: shown ? 1 : 0, transition: "transform .18s ease, opacity .18s ease",
-          padding: "20px 22px 40px", boxSizing: "border-box" }}>
+          padding: "24px 26px 48px", boxSizing: "border-box", fontFamily: drawerFont }}>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 14, cursor: "pointer", padding: 0 }}>← Retour</button>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+          <button type="button" onClick={onClose} style={{ ...drawerActionBase, background: "none", border: "none", color: "#9A9A9A", fontWeight: 500, cursor: "pointer", padding: 0 }}>{t.back}</button>
           <a href={d.email ? `mailto:${d.email}` : undefined} aria-disabled={!d.email}
-            style={{ fontSize: 12, fontWeight: 600, color: d.email ? "#FFF" : "#9A9A9A", background: d.email ? "#0047FF" : "#F0F0F0",
-              borderRadius: 8, padding: "7px 13px", textDecoration: "none", cursor: d.email ? "pointer" : "default" }}>
-            {d.email ? "✉ Contacter" : "Pas d'email"}
+            style={{ ...drawerActionBase, fontWeight: 600, color: d.email ? "#FFF" : "#9A9A9A", background: d.email ? "#0047FF" : "transparent",
+              padding: d.email ? "7px 13px" : 0, textDecoration: "none", cursor: d.email ? "pointer" : "default", border: "none" }}>
+            {d.email ? t.contact : t.noEmail}
           </a>
         </div>
 
-        <div style={{ display: "flex", gap: 13, alignItems: "flex-start", marginBottom: 16 }}>
-          <img src={d.avatarUrl ? proxied(d.avatarUrl) : `https://ui-avatars.com/api/?name=${encodeURIComponent(d.displayName || d.username)}&background=eef1f8&color=4a6cf7&size=200&bold=true&rounded=true`} alt="" width={62} height={62} style={{ borderRadius: "50%", background: "#F0F0F0", objectFit: "cover", flexShrink: 0 }}
-            onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(d.displayName || d.username)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
+        <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 24 }}>
+          <CreatorAvatar username={d.username} src={d.avatarUrl} displayName={d.displayName} size={62} alt={d.displayName} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A" }}>{d.displayName}</div>
-            <div style={{ fontSize: 13, color: "#9A9A9A" }}>@{d.username}{d.countryCode ? ` · ${d.countryCode}` : ""}{d.language && d.language !== "unknown" ? ` · ${d.language}` : ""}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.displayName}</div>
+              {isVerified && <VerifiedBadge label={t.verifiedAccount} />}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: "#9A9A9A" }}>@{d.username}</span>
+              <PlatformPill platform={d.platform} />
+              <div style={{ position: "relative" }}>
+                <button type="button" onClick={() => (isPaid ? setFolderOpen((o) => !o) : onUpgrade())}
+                  style={drawerBtnSecondary}>
+                  {t.folders}{inFolders.size ? ` (${inFolders.size})` : ""} ▾
+                </button>
+                {folderOpen && isPaid && (
+                  <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 10, background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 10, padding: 10, width: 230, boxShadow: "0 8px 24px rgba(0,0,0,0.14)" }}>
+                    {folders.length === 0 && <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>{t.noFoldersYet}</div>}
+                    {folders.map((f) => (
+                      <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13, cursor: "pointer" }}>
+                        <input type="checkbox" checked={inFolders.has(f.id)} onChange={() => toggleFolder(f)} />
+                        {f.name}
+                      </label>
+                    ))}
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      <input value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCreateFolder(); }}
+                        placeholder={t.newFolder} style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #E5E5E5", borderRadius: 8, fontFamily: "inherit", boxSizing: "border-box" }} />
+                      <button type="button" onClick={onCreateFolder} style={{ fontSize: 14, cursor: "pointer", border: "1px solid #E5E5E5", borderRadius: 8, background: "#FFF", padding: "0 10px" }}>+</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {isPaid ? (
+                <select value={stage} onChange={(e) => onStageChange(e.target.value)} aria-label={t.pipelineStageAria}
+                  style={drawerSelect}>
+                  {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              ) : (
+                <button type="button" onClick={onUpgrade} style={drawerBtnSecondary}>{t.pipelineStage} ▾</button>
+              )}
+            </div>
+            {(d.countryCode || (d.language && d.language !== "unknown")) && (
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                {[d.countryCode, d.language && d.language !== "unknown" ? d.language : null].filter(Boolean).join(" · ")}
+              </div>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
               {(d.niches && d.niches.length ? d.niches : [d.primaryNiche || d.niche]).filter(Boolean).slice(0, 4).map((n) => (
-                <span key={n} style={{ fontSize: 11, color: "#0F6E56", background: "#E1F5EE", padding: "2px 8px", borderRadius: 20, textTransform: "capitalize" }}>{n}</span>
+                <span key={n} style={{ ...drawerTagStyle, textTransform: "capitalize" }}>{n}</span>
               ))}
-              {active && <span style={{ fontSize: 11, color: "#15803D", background: "#F0FDF4", padding: "2px 8px", borderRadius: 20 }}>{active}</span>}
+              {active && <span style={drawerTagStyle}>{active}</span>}
             </div>
-          </div>
-          <div style={{ textAlign: "center", background: rentaBg, borderRadius: 10, padding: "6px 11px" }}>
-            <div style={{ fontSize: 11, color: rentaColor }}>Renta</div>
-            <div style={{ fontSize: 22, fontWeight: 600, color: rentaColor, lineHeight: 1.1 }}>{d.valueScore}</div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-          <button type="button" onClick={onSaveToggle}
-            style={{ fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: 8, padding: "8px 14px",
-              border: saved ? "1px solid #15803D" : "1px solid #0047FF", color: saved ? "#15803D" : "#FFF", background: saved ? "#F0FDF4" : "#0047FF" }}>
-            {saved ? "✓ Sauvegardé" : "+ Sauver"}
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={() => void onSaveToggle()} disabled={saveBusy}
+            style={{
+              ...drawerActionBase,
+              fontWeight: 600,
+              cursor: saveBusy ? "wait" : "pointer",
+              padding: "8px 14px",
+              border: "1px solid #0047FF",
+              color: saved ? "#FFFFFF" : "#0047FF",
+              background: saved ? "#0047FF" : "#FFFFFF",
+              opacity: saveBusy ? 0.7 : 1,
+            }}>
+            {saveBusy ? "…" : saved ? t.saved : t.save}
           </button>
-          <div style={{ position: "relative" }}>
-            <button type="button" onClick={() => (isPaid ? setFolderOpen((o) => !o) : onUpgrade())}
-              style={{ fontSize: 13, cursor: "pointer", borderRadius: 8, padding: "8px 12px", border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A" }}>
-              📁 Dossiers{inFolders.size ? ` (${inFolders.size})` : ""} ▾
+          {onReachOut && (
+            <button
+              type="button"
+              onClick={() => onReachOut(d)}
+              style={drawerBtnSecondary}
+            >
+              {t.reachOut}
             </button>
-            {folderOpen && isPaid && (
-              <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 10, background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 10, padding: 10, width: 230, boxShadow: "0 8px 24px rgba(0,0,0,0.14)" }}>
-                {folders.length === 0 && <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>Aucun dossier encore.</div>}
-                {folders.map((f) => (
-                  <label key={f.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 13, cursor: "pointer" }}>
-                    <input type="checkbox" checked={inFolders.has(f.id)} onChange={() => toggleFolder(f)} />
-                    {f.name}
-                  </label>
-                ))}
-                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                  <input value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") onCreateFolder(); }}
-                    placeholder="Nouveau dossier" style={{ flex: 1, fontSize: 12, padding: "6px 8px", border: "1px solid #E5E5E5", borderRadius: 8, fontFamily: "inherit", boxSizing: "border-box" }} />
-                  <button type="button" onClick={onCreateFolder} style={{ fontSize: 14, cursor: "pointer", border: "1px solid #E5E5E5", borderRadius: 8, background: "#FFF", padding: "0 10px" }}>+</button>
-                </div>
-              </div>
-            )}
-          </div>
-          {isPaid ? (
-            <select value={stage} onChange={(e) => onStageChange(e.target.value)} aria-label="Étape pipeline"
-              style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A", cursor: "pointer", fontFamily: "inherit" }}>
-              {PIPELINE_STAGES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-            </select>
-          ) : (
-            <button type="button" onClick={onUpgrade} style={{ fontSize: 13, cursor: "pointer", borderRadius: 8, padding: "8px 12px", border: "1px solid #E5E5E5", background: "#FFF", color: "#1A1A1A" }}>Étape ▾</button>
           )}
+          <a href={profileUrl(d.platform, d.username)} target="_blank" rel="noopener noreferrer"
+            style={{ ...drawerBtnSecondary, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+            {t.viewOn(platformLabel(d.platform))}
+          </a>
         </div>
 
-        {d.bio && <p style={{ fontSize: 13, color: "#5A5A5A", lineHeight: 1.5, margin: "0 0 16px" }}>{d.bio}</p>}
+        {d.bio && <p style={{ fontSize: 13, color: "#5A5A5A", lineHeight: 1.55, margin: "0 0 8px" }}>{d.bio}</p>}
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 20 }}>
-          <Stat label="Abonnés" value={fmt(d.followersCount)} />
-          <Stat label="Engagement" value={`${d.engagementRate}%`} />
-          <Stat label="Vues moy." value={fmt(d.avgViews)} />
-          <Stat label="CPM est." value={`$${d.estCpm}`} accent />
-          <Stat label="Coût/post" value={`$${fmt(d.estCostPerPost)}`} />
-          <Stat label="Posts/sem." value={d.postFrequency ? String(d.postFrequency) : "—"} />
-        </div>
+        <DrawerSection title={t.overview} first>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            <Stat label={t.followers} value={fmt(d.followersCount)} />
+            <Stat label={t.engagement} value={`${d.engagementRate}%`} />
+            <Stat label={t.avgViews} value={fmt(d.avgViews)} />
+          </div>
+        </DrawerSection>
 
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>Analyse approfondie</div>
         {isPaid ? (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 12 }}>
-              <Stat label="Authenticité" value={`${d.authenticityScore}/100`} />
-              <Stat label="Vues / abonné" value={`${Math.round((d.viewsPerFollower ?? 0) * 100)}%`} />
-              <Stat label="Posts analysés" value={String(d.postsAnalyzed ?? 0)} />
-              <Stat label="Likes moy." value={fmt(d.avgLikes ?? 0)} />
-              <Stat label="Comm. moy." value={fmt(d.avgComments ?? 0)} />
-              <Stat label="Partages moy." value={fmt(d.avgShares ?? 0)} />
+          <DrawerSection title={t.performanceSection}>
+            <ContentAnalyticsPanel d={d} lang={lang} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 20 }}>
+              <Stat label={t.authenticity} value={`${d.authenticityScore}/100`} />
+              <Stat label={t.reachPerFollower} value={`${reachPct > 0 ? reachPct : Math.round((d.viewsPerFollower ?? 0) * 100)}%`} />
+              <Stat label={t.postsAnalyzed} value={String(d.postsAnalyzed ?? 0)} />
             </div>
-            {videos.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Vues des dernières vidéos</div>
-                <Bars videos={videos} />
-              </div>
-            )}
-            <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.6, background: "#F7F7F8", borderRadius: 10, padding: "10px 12px" }}>
-              {authNote(d)}
-            </div>
-          </div>
+          </DrawerSection>
         ) : (
-          <Locked onUpgrade={onUpgrade} label="Analyse réservée aux plans payants">
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-              <Stat label="Authenticité" value="92/100" /><Stat label="Vues / abonné" value="48%" /><Stat label="Posts analysés" value="12" />
-            </div>
-          </Locked>
+          <DrawerSection title={t.performanceSection}>
+            <Locked onUpgrade={onUpgrade} label={t.lockedAnalysis}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                <Stat label={t.authenticity} value="92/100" />
+                <Stat label={t.reachPerFollower} value="48%" />
+                <Stat label={t.postsAnalyzed} value="12" />
+              </div>
+            </Locked>
+          </DrawerSection>
         )}
 
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "4px 0 10px" }}>Vidéos — lecture intégrée</div>
-        {videos.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#9A9A9A" }}>Pas encore de vidéos pour ce créateur.</div>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-            {videos.map((v) => (
-              <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} />
-            ))}
-          </div>
-        )}
+        <DrawerSection title={t.popularPosts}>
+          {videos.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#9A9A9A" }}>{t.noVideos}</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+              {videos.map((v) => (
+                <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} lang={lang} />
+              ))}
+            </div>
+          )}
+        </DrawerSection>
 
         {isPaid && (
-          <div style={{ marginTop: 18 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Analyse du contenu (IA)</div>
+          <DrawerSection title={t.aiAnalysis}>
             {analysisLoading && !analysis ? (
-              <div style={{ fontSize: 13, color: "#9A9A9A", background: "#F7F7F8", borderRadius: 10, padding: 12 }}>Analyse des vidéos en cours…</div>
+              <div style={{ fontSize: 13, color: "#9A9A9A", background: "#F7F7F8", borderRadius: 10, padding: 14 }}>{t.analyzingVideos}</div>
             ) : analysis ? (
-              <div style={{ background: "#F7F7F8", borderRadius: 10, padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ background: "#F7F7F8", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
                 <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55 }}>{analysis.summary}</div>
                 {analysis.themes.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {analysis.themes.map((t) => <span key={t} style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", padding: "2px 9px", borderRadius: 20 }}>{t}</span>)}
+                    {analysis.themes.map((th) => <span key={th} style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", padding: "2px 9px", borderRadius: 20 }}>{th}</span>)}
                   </div>
                 )}
-                {analysis.style && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>Style :</span> {analysis.style}</div>}
-                {analysis.production && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>Production :</span> {analysis.production}</div>}
-                {analysis.brandFit && <div style={{ fontSize: 12.5, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>🎯 <span style={{ fontWeight: 600 }}>Fit marque :</span> {analysis.brandFit}</div>}
-                {!analysis.brandSafe && <div style={{ fontSize: 12, color: "#9A1F1F", background: "#FEF2F2", borderRadius: 8, padding: "6px 10px" }}>⚠ Contenu potentiellement sensible pour une marque.</div>}
+                {analysis.style && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.style}:</span> {analysis.style}</div>}
+                {analysis.production && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.production}:</span> {analysis.production}</div>}
+                {analysis.brandFit && <div style={{ fontSize: 12.5, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>🎯 <span style={{ fontWeight: 600 }}>{t.brandFit}:</span> {analysis.brandFit}</div>}
+                {!analysis.brandSafe && <div style={{ fontSize: 12, color: "#9A1F1F", background: "#FEF2F2", borderRadius: 8, padding: "6px 10px" }}>⚠ {t.brandSensitive}</div>}
               </div>
             ) : (
-              <div style={{ fontSize: 13, color: "#9A9A9A" }}>Analyse indisponible pour ce créateur.</div>
+              <div style={{ fontSize: 13, color: "#9A9A9A" }}>{t.analysisUnavailable}</div>
             )}
-          </div>
+          </DrawerSection>
         )}
 
         {isPaid && (
-          <div style={{ marginTop: 18 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>Note privée</div>
+          <DrawerSection title={t.privateNote}>
             <textarea value={notesVal} onChange={(e) => setNotesVal(e.target.value)} onBlur={onNotesBlur}
-              placeholder={saved ? "Tes notes sur ce créateur…" : "Sauvegarde le créateur pour ajouter une note."}
-              style={{ width: "100%", minHeight: 70, fontSize: 13, padding: 10, border: "1px solid #E5E5E5", borderRadius: 10, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
-          </div>
+              placeholder={saved ? t.notePlaceholder : t.noteSaveFirst}
+              style={{ width: "100%", minHeight: 80, fontSize: 13, padding: 12, border: "1px solid #E5E5E5", borderRadius: 10, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }} />
+          </DrawerSection>
         )}
       </div>
     </div>

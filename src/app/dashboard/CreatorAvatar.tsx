@@ -1,4 +1,8 @@
-import { resolveCreatorAvatarUrl } from "@/lib/creator-avatar";
+"use client";
+
+import { useEffect, useState } from "react";
+import { normalizeCreatorHandle, resolveCreatorAvatarUrl } from "@/lib/creator-avatar";
+import { isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
 function ProfileIcon({ size }: { size: number }) {
   const iconSize = Math.round(size * 0.52);
@@ -10,17 +14,59 @@ function ProfileIcon({ size }: { size: number }) {
   );
 }
 
+type AvatarSource = "api" | "src" | "none";
+
+function cleanAvatarSrc(src?: string | null): string {
+  const url = resolveCreatorAvatarUrl(src);
+  if (!url || isUiAvatarsUrl(url)) return "";
+  return url;
+}
+
 export function CreatorAvatar({
   src,
+  username,
+  handle,
+  displayName,
   size = 32,
   alt = "",
 }: {
   src?: string | null;
+  username?: string;
+  handle?: string;
+  displayName?: string;
   size?: number;
   alt?: string;
 }) {
-  const url = resolveCreatorAvatarUrl(src);
-  if (!url) {
+  const resolvedUsername = normalizeCreatorHandle(username ?? handle);
+  const cleanSrc = cleanAvatarSrc(src);
+
+  const initialSource: AvatarSource = cleanSrc ? "src" : resolvedUsername ? "api" : "none";
+  const [source, setSource] = useState<AvatarSource>(initialSource);
+
+  useEffect(() => {
+    setSource(cleanSrc ? "src" : resolvedUsername ? "api" : "none");
+  }, [resolvedUsername, cleanSrc]);
+
+  const imgSrc =
+    source === "api" && resolvedUsername
+      ? `/api/creator-avatar?username=${encodeURIComponent(resolvedUsername)}`
+      : source === "src" && cleanSrc
+        ? proxiedImageUrl(cleanSrc)
+        : "";
+
+  const onError = () => {
+    if (source === "src" && resolvedUsername) {
+      setSource("api");
+      return;
+    }
+    if (source === "api" && cleanSrc) {
+      setSource("src");
+      return;
+    }
+    setSource("none");
+  };
+
+  if (!imgSrc || source === "none") {
     return (
       <div
         style={{
@@ -34,16 +80,18 @@ export function CreatorAvatar({
           justifyContent: "center",
         }}
         aria-hidden={!alt}
-        title={alt || undefined}
+        title={alt || displayName || undefined}
       >
         <ProfileIcon size={size} />
       </div>
     );
   }
+
   return (
     <img
-      src={url}
-      alt={alt}
+      key={`${source}:${imgSrc}`}
+      src={imgSrc}
+      alt={alt || displayName || resolvedUsername || ""}
       width={size}
       height={size}
       style={{
@@ -54,6 +102,7 @@ export function CreatorAvatar({
         flexShrink: 0,
         background: "#F0F0F0",
       }}
+      onError={onError}
     />
   );
 }

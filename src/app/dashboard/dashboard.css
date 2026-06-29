@@ -88,30 +88,32 @@ body.dashboard-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: #0047ff;
+  gap: 8px;
+  background: #2563eb;
   color: #fff;
-  padding: 13px 20px;
+  padding: 10px 16px;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   font-family: "InstrumentSans", sans-serif;
-  font-weight: 500;
-  font-size: 16px;
-  letter-spacing: -0.04em;
-  line-height: 1.1em;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
   margin-top: 0;
-  box-shadow: 0 8px 24px rgba(0, 71, 255, 0.35), inset 0 -3px 0 rgba(0, 0, 0, 0.15);
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, opacity 0.15s ease;
   transform-origin: center;
   cursor: pointer;
 }
 
 .hero-cta-shopify:hover {
+  background: #1d4ed8;
   transform: scale(1.08);
 }
 
 .hero-cta-shopify:disabled {
   cursor: not-allowed;
+  opacity: 0.55;
   transform: none;
 }
 
@@ -120,6 +122,76 @@ body.dashboard-page {
 }
 
 .hero-cta-shopify-dark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 0;
+  box-shadow: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, opacity 0.15s ease;
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-shopify-dark:hover {
+  background: #333;
+  transform: scale(1.08);
+}
+
+.hero-cta-shopify-dark:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.hero-cta-shopify-dark img {
+  flex-shrink: 0;
+}
+
+.hero-cta-shopify-light {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  font-family: "InstrumentSans", sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 0;
+  box-shadow: none;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.15s ease, opacity 0.15s ease;
+  transform-origin: center;
+  cursor: pointer;
+}
+
+.hero-cta-shopify-light:hover {
+  background: #f5f5f5;
+  transform: scale(1.08);
+}
+
+.hero-cta-shopify-light:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.hero-cta-raised-dark {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -141,20 +213,20 @@ body.dashboard-page {
   cursor: pointer;
 }
 
-.hero-cta-shopify-dark:hover {
+.hero-cta-raised-dark:hover {
   transform: scale(1.08);
 }
 
-.hero-cta-shopify-dark:disabled {
+.hero-cta-raised-dark:disabled {
   cursor: not-allowed;
   transform: none;
 }
 
-.hero-cta-shopify-dark img {
+.hero-cta-raised-dark img {
   flex-shrink: 0;
 }
 
-.hero-cta-shopify-light {
+.hero-cta-raised-light {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -176,11 +248,11 @@ body.dashboard-page {
   cursor: pointer;
 }
 
-.hero-cta-shopify-light:hover {
+.hero-cta-raised-light:hover {
   transform: scale(1.08);
 }
 
-.hero-cta-shopify-light:disabled {
+.hero-cta-raised-light:disabled {
   cursor: not-allowed;
   transform: none;
 }
@@ -287,8 +359,9 @@ body.dashboard-page {
 }
 
 .hero-cta-compact {
-  padding: 10px 16px;
+  padding: 9px 14px;
   font-size: 13px;
+  font-weight: 600;
 }
 
 .hero-cta-compact-sm {

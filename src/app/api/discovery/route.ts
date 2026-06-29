@@ -77,6 +77,11 @@ export async function POST(request: Request) {
       .gte("followers", f.followers.gte)
       .lte("followers", f.followers.lte);
     if (f.language) cq = cq.eq("language", f.language);
+    // Filter curated by the requested niche too, so a curated creator only
+    // appears in its actual niche(s) instead of polluting every niche.
+    if (f.nicheTokens.length) {
+      cq = cq.or(f.nicheTokens.map((w) => `niches.cs.{${w}}`).join(","));
+    }
     const { data: curatedData } = await cq
       .order("followers", { ascending: false })
       .limit(100);

@@ -8,28 +8,56 @@ export interface StageDef {
   bg: string; // light background for badges/columns
 }
 
-export const PIPELINE_STAGES: StageDef[] = [
-  { key: "saved", label: "Sauvegardé", color: "#5F5E5A", bg: "#F1EFE8" },
-  { key: "contacted", label: "Contacté", color: "#185FA5", bg: "#E6F1FB" },
-  { key: "in_progress", label: "En cours", color: "#854F0B", bg: "#FAEEDA" },
-  { key: "nurturing", label: "En éducation", color: "#534AB7", bg: "#EEEDFE" },
-  { key: "signed", label: "Signé", color: "#3B6D11", bg: "#EAF3DE" },
-  { key: "lost", label: "Perdu", color: "#A32D2D", bg: "#FCEBEB" },
+const STAGE_META: Omit<StageDef, "label">[] = [
+  { key: "saved", color: "#5F5E5A", bg: "#F1EFE8" },
+  { key: "contacted", color: "#185FA5", bg: "#E6F1FB" },
+  { key: "in_progress", color: "#854F0B", bg: "#FAEEDA" },
+  { key: "nurturing", color: "#534AB7", bg: "#EEEDFE" },
+  { key: "signed", color: "#3B6D11", bg: "#EAF3DE" },
+  { key: "lost", color: "#A32D2D", bg: "#FCEBEB" },
 ];
 
-export const STAGE_KEYS: PipelineStage[] = PIPELINE_STAGES.map((s) => s.key);
+const STAGE_LABELS: Record<"en" | "fr", Record<PipelineStage, string>> = {
+  fr: {
+    saved: "Sauvegardé",
+    contacted: "Contacté",
+    in_progress: "En cours",
+    nurturing: "En éducation",
+    signed: "Signé",
+    lost: "Perdu",
+  },
+  en: {
+    saved: "Saved",
+    contacted: "Contacted",
+    in_progress: "In progress",
+    nurturing: "Nurturing",
+    signed: "Signed",
+    lost: "Lost",
+  },
+};
 
-const MAP = new Map<string, StageDef>(PIPELINE_STAGES.map((s) => [s.key, s]));
-
-export function stageLabel(key: string): string {
-  return MAP.get(key)?.label ?? key;
+export function pipelineStages(lang: "en" | "fr" = "fr"): StageDef[] {
+  return STAGE_META.map((s) => ({ ...s, label: STAGE_LABELS[lang][s.key] }));
 }
 
+/** @deprecated Prefer pipelineStages(lang) in UI code. */
+export const PIPELINE_STAGES: StageDef[] = pipelineStages("fr");
+
+export const STAGE_KEYS: PipelineStage[] = STAGE_META.map((s) => s.key);
+
+const MAP_FR = new Map<string, StageDef>(pipelineStages("fr").map((s) => [s.key, s]));
+
+export function stageLabel(key: string, lang: "en" | "fr" = "fr"): string {
+  return STAGE_LABELS[lang][key as PipelineStage] ?? MAP_FR.get(key)?.label ?? key;
+}
+
+const META_MAP = new Map<string, Omit<StageDef, "label">>(STAGE_META.map((s) => [s.key, s]));
+
 export function stageColor(key: string): { color: string; bg: string } {
-  const s = MAP.get(key);
+  const s = META_MAP.get(key);
   return s ? { color: s.color, bg: s.bg } : { color: "#5F5E5A", bg: "#F1EFE8" };
 }
 
 export function isValidStage(key: string): key is PipelineStage {
-  return MAP.has(key);
+  return META_MAP.has(key);
 }

@@ -4,7 +4,11 @@ import Stripe from "stripe";
 import { resolvePlanFromCheckout } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import {
+  getActiveSubscriptionInfo,
+  resolveStripeCustomerId,
+  type BillingInterval,
+} from "@/lib/stripe-billing";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +56,11 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   let plan: PlanTier = normalizePlan(profile?.plan);
+  let billingInterval: BillingInterval | null = null;
+  let nextBillingDate: number | null = null;
+  let priceId: string | null = null;
+  let currency: string | null = null;
+  let hasActiveSubscription = false;
 
   try {
     const stripe = new Stripe(stripeKey);
@@ -63,31 +72,51 @@ export async function GET(request: NextRequest) {
     );
 
     if (customerId) {
-      const subscriptions = await stripe.subscriptions.list({
-        customer: customerId,
-        status: "all",
-        limit: 20,
-      });
+      const subscriptionInfo = await getActiveSubscriptionInfo(stripe, customerId);
 
-      const activeSub = subscriptions.data.find((sub) =>
-        ACTIVE_STATUSES.has(sub.status)
-      );
-
-      if (activeSub) {
-        const rawPrice = activeSub.items.data[0]?.price;
-        const priceId =
-          typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? null;
-        plan = resolvePlanFromCheckout(
-          priceId,
-          activeSub.metadata?.plan
-        );
+      if (subscriptionInfo) {
+        plan = subscriptionInfo.plan;
+        billingInterval = subscriptionInfo.billingInterval;
+        nextBillingDate = subscriptionInfo.nextBillingDate;
+        priceId = subscriptionInfo.priceId;
+        currency = subscriptionInfo.currency;
+        hasActiveSubscription = ACTIVE_STATUSES.has(subscriptionInfo.status);
       } else {
-        plan = "free";
+        const subscriptions = await stripe.subscriptions.list({
+          customer: customerId,
+          status: "all",
+          limit: 20,
+          expand: ["data.items.data.price"],
+        });
+
+        const activeSub = subscriptions.data.find((sub) =>
+          ACTIVE_STATUSES.has(sub.status)
+        );
+
+        if (activeSub) {
+          const rawPrice = activeSub.items.data[0]?.price;
+          const resolvedPriceId =
+            typeof rawPrice === "string" ? rawPrice : rawPrice?.id ?? null;
+          plan = resolvePlanFromCheckout(
+            resolvedPriceId,
+            activeSub.metadata?.plan
+          );
+          hasActiveSubscription = true;
+        } else {
+          plan = "free";
+        }
       }
     }
   } catch (err) {
     console.error("billing/plan:", err);
   }
 
-  return NextResponse.json({ plan });
+  return NextResponse.json({
+    plan,
+    billingInterval,
+    nextBillingDate,
+    priceId,
+    currency,
+    hasActiveSubscription,
+  });
 }

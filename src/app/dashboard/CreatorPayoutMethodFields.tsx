@@ -2,6 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 
 export type PayoutMethodType = "paypal" | "revolut" | "iban";
 
@@ -128,8 +129,24 @@ export const CreatorPayoutMethodFields = forwardRef<
     lang: "en" | "fr";
     onUpdate: (next: CreatorPayoutFields) => void;
     onDraftChange?: (next: CreatorPayoutFields) => void;
+    size?: "default" | "large";
   }
->(function CreatorPayoutMethodFields({ creator, lang, onUpdate, onDraftChange }, ref) {
+>(function CreatorPayoutMethodFields({ creator, lang, onUpdate, onDraftChange, size = "default" }, ref) {
+  const large = size === "large";
+  const inputStyle: React.CSSProperties = {
+    ...payoutPanelInputStyle,
+    padding: large ? "16px 18px" : payoutPanelInputStyle.padding,
+    fontSize: large ? 17 : payoutPanelInputStyle.fontSize,
+    borderRadius: large ? 12 : payoutPanelInputStyle.borderRadius,
+  };
+  const labelStyle: React.CSSProperties = {
+    ...payoutPanelFieldLabelStyle,
+    fontSize: large ? 14 : payoutPanelFieldLabelStyle.fontSize,
+    marginBottom: large ? 8 : payoutPanelFieldLabelStyle.marginBottom,
+  };
+  const controlPad = large ? "16px 18px" : "12px 14px";
+  const controlFont = large ? 17 : 14;
+  const controlRadius = large ? 12 : 10;
   const [method, setMethod] = useState<PayoutMethodType>(() => defaultPayoutMethodType(creator));
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -190,8 +207,8 @@ export const CreatorPayoutMethodFields = forwardRef<
 
   return (
     <div ref={rootRef}>
-      <span style={payoutPanelFieldLabelStyle}>{lang === "fr" ? "Moyen de paiement" : "Payment method"}</span>
-      <div style={{ position: "relative", marginBottom: 12 }}>
+      <span style={labelStyle}>{lang === "fr" ? "Moyen de paiement" : "Payment method"}</span>
+      <div style={{ position: "relative", marginBottom: large ? 16 : 12 }}>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -200,8 +217,8 @@ export const CreatorPayoutMethodFields = forwardRef<
             display: "flex",
             alignItems: "center",
             gap: 12,
-            padding: "12px 14px",
-            borderRadius: 10,
+            padding: controlPad,
+            borderRadius: controlRadius,
             border: "1px solid #EFEFEF",
             background: "#FFFFFF",
             cursor: "pointer",
@@ -210,8 +227,8 @@ export const CreatorPayoutMethodFields = forwardRef<
           }}
         >
           <PaymentMethodLogo method={current.id} />
-          <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{current.label}</span>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
+          <span style={{ flex: 1, fontSize: controlFont, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{current.label}</span>
+          <svg width={large ? 16 : 14} height={large ? 16 : 14} viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
             <path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
@@ -245,20 +262,20 @@ export const CreatorPayoutMethodFields = forwardRef<
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
-                    padding: "12px 14px",
+                    padding: controlPad,
                     border: "none",
                     borderBottom: i < PAYOUT_METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none",
-                    background: selected ? "#FAFAFA" : "#FFFFFF",
+                    ...selectionCardStyle(selected, { unselectedBackground: "#FFFFFF", unselectedBorder: "none" }),
                     cursor: "pointer",
                     fontFamily: "inherit",
                     textAlign: "left",
                   }}
                 >
                   <PaymentMethodLogo method={option.id} />
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: selected ? 600 : 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{option.label}</span>
+                  <span style={{ flex: 1, fontSize: controlFont, fontWeight: selected ? 600 : 500, color: selectionTextPrimary(selected), letterSpacing: "-0.02em" }}>{option.label}</span>
                   {selected && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path d="M5 13l4 4L19 7" stroke="#0047FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M5 13l4 4L19 7" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
                 </button>
@@ -268,14 +285,14 @@ export const CreatorPayoutMethodFields = forwardRef<
         )}
       </div>
       <label>
-        <span style={{ ...payoutPanelFieldLabelStyle, marginBottom: 6 }}>{active.label}</span>
+        <span style={{ ...labelStyle, marginBottom: large ? 8 : 6 }}>{active.label}</span>
         {prefix ? (
           <div
             style={{
               display: "flex",
               alignItems: "stretch",
               border: "1px solid #EFEFEF",
-              borderRadius: 10,
+              borderRadius: controlRadius,
               background: "#FFFFFF",
               overflow: "hidden",
             }}
@@ -284,8 +301,8 @@ export const CreatorPayoutMethodFields = forwardRef<
               style={{
                 display: "flex",
                 alignItems: "center",
-                padding: "12px 0 12px 14px",
-                fontSize: 14,
+                padding: large ? "16px 0 16px 18px" : "12px 0 12px 14px",
+                fontSize: controlFont,
                 color: "#7A7A7A",
                 letterSpacing: "-0.02em",
                 whiteSpace: "nowrap",
@@ -302,7 +319,7 @@ export const CreatorPayoutMethodFields = forwardRef<
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={() => void flushSave()}
               style={{
-                ...payoutPanelInputStyle,
+                ...inputStyle,
                 border: "none",
                 borderRadius: 0,
                 paddingLeft: 0,
@@ -318,7 +335,7 @@ export const CreatorPayoutMethodFields = forwardRef<
             placeholder={active.placeholder}
             onChange={(e) => handleInputChange(e.target.value)}
             onBlur={() => void flushSave()}
-            style={payoutPanelInputStyle}
+            style={inputStyle}
           />
         )}
       </label>

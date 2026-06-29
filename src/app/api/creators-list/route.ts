@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { enrichCreatorsForUser } from "@/lib/enrich-creator-avatars";
 
 export const dynamic = "force-dynamic";
 
@@ -15,9 +16,12 @@ export async function GET(request: Request) {
 
   const { data } = await supabaseAdmin
     .from("creators")
-    .select("id, handle, full_name, avatar_url, platform, balance, total_earned, total_sales, discount_code, paypal_link, revolut_link, iban")
+    .select(
+      "id, handle, full_name, avatar_url, platform, followers, engagement_rate, balance, total_earned, total_sales, discount_code, paypal_link, revolut_link, iban, stripe_account_id, email"
+    )
     .eq("user_id", userId)
     .order("balance", { ascending: false });
 
-  return NextResponse.json(data || []);
+  const enriched = await enrichCreatorsForUser(supabaseAdmin, userId, data ?? []);
+  return NextResponse.json(enriched);
 }

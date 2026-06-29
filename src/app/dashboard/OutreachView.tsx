@@ -22,6 +22,7 @@ import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { selectionPillColors } from "@/lib/selection-card-styles";
 import {
   canPersistTemplates,
   canUseAutoFollowUp,
@@ -315,7 +316,7 @@ function FollowUpPanel({
             </svg>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 36 }}>
-            <CreatorAvatar src={entry.avatar} size={40} alt={entry.creator} />
+            <CreatorAvatar src={entry.avatar} username={entry.handle} displayName={entry.creator} size={40} alt={entry.creator} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{entry.creator}</div>
               <div style={{ fontSize: 12, color: "#0047FF" }}>@{entry.handle}</div>
@@ -890,7 +891,7 @@ function OutreachAIGeneratePanel({
                               textAlign: "left",
                             }}
                           >
-                            <CreatorAvatar src={c.avatar} size={32} alt={c.displayName} />
+                            <CreatorAvatar src={c.avatar} username={c.username} displayName={c.displayName} size={32} alt={c.displayName} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 500 }}>{c.displayName}</div>
                               <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
@@ -906,7 +907,7 @@ function OutreachAIGeneratePanel({
                 </div>
                 {selectedCreator && (
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, padding: 12, background: "#FAFAFA", borderRadius: 10, border: "1px solid #EFEFEF" }}>
-                    <CreatorAvatar src={selectedCreator.avatar} size={40} alt={selectedCreator.displayName} />
+                    <CreatorAvatar src={selectedCreator.avatar} username={selectedCreator.username} displayName={selectedCreator.displayName} size={40} alt={selectedCreator.displayName} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedCreator.displayName}</div>
                       <div style={{ fontSize: 12, color: "#0047FF" }}>@{selectedCreator.username}</div>
@@ -962,7 +963,10 @@ function OutreachAIGeneratePanel({
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Plateforme" : "Platform"}</div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {platforms.map((p) => (
+                      {platforms.map((p) => {
+                        const isActive = platform === p;
+                        const pill = selectionPillColors(isActive);
+                        return (
                         <button
                           key={p}
                           type="button"
@@ -971,14 +975,14 @@ function OutreachAIGeneratePanel({
                             ...btnSecondary,
                             padding: "6px 12px",
                             fontSize: 12,
-                            background: platform === p ? "rgba(0,71,255,0.08)" : "#FFFFFF",
-                            color: platform === p ? "#0047FF" : "#1A1A1A",
-                            borderColor: platform === p ? "#0047FF" : "#E5E5E5",
+                            background: pill.background,
+                            color: pill.color,
+                            borderColor: pill.borderColor,
                           }}
                         >
                           {p}
                         </button>
-                      ))}
+                      );})}
                     </div>
                   </div>
                 </div>
@@ -1331,7 +1335,8 @@ export function OutreachHistorySection({
     }
     notifyOutreachSent(
       lang,
-      creator.displayName || creator.creator || handle || "creator"
+      creator.displayName || creator.creator || handle || "creator",
+      user.id
     );
     await loadHistory();
     dispatchOutreachHistoryUpdated();
@@ -1594,7 +1599,7 @@ export function OutreachHistorySection({
                         textAlign: "left",
                       }}
                     >
-                      <CreatorAvatar src={c.avatar} size={28} alt={c.displayName} />
+                      <CreatorAvatar src={c.avatar} username={c.username} displayName={c.displayName} size={28} alt={c.displayName} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{c.displayName}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{c.username}</div>
@@ -1666,7 +1671,7 @@ export function OutreachHistorySection({
                 return (
                   <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                      <CreatorAvatar src={item.avatar} size={40} alt={item.creator} />
+                      <CreatorAvatar src={item.avatar} username={item.handle} displayName={item.creator} size={40} alt={item.creator} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
@@ -1741,7 +1746,7 @@ export function OutreachHistorySection({
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                      <CreatorAvatar src={row.avatar} size={32} alt={row.creator} />
+                      <CreatorAvatar src={row.avatar} username={row.handle} displayName={row.creator} size={32} alt={row.creator} />
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{row.handle}</div>

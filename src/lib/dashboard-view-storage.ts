@@ -7,6 +7,8 @@ export const DASHBOARD_VIEWS = [
   "affiliates",
   "outreach",
   "payouts",
+  "balance",
+  "transactions",
   "invitations",
   "scripts",
   "analytics",
@@ -14,6 +16,7 @@ export const DASHBOARD_VIEWS = [
   "notes",
   "automation",
   "settings",
+  "billing",
   "feedback",
   "notifications",
   "help",
@@ -77,10 +80,12 @@ export function writeViewToUrl(view: DashboardView) {
 }
 
 export function readInitialDashboardView(userId?: string | null): DashboardView {
-  if (typeof window === "undefined") return "dashboard";
+  if (typeof window === "undefined") return "discovery";
   const params = new URLSearchParams(window.location.search);
   if (params.get("connect") === "return") return "payouts";
   const fromUrl = readViewFromUrl(window.location.search);
-  if (fromUrl) return fromUrl;
-  return loadDashboardView(userId) ?? loadDashboardView() ?? "dashboard";
+  if (fromUrl && fromUrl !== "dashboard") return fromUrl;
+  const saved = loadDashboardView(userId) ?? loadDashboardView();
+  if (saved && saved !== "dashboard") return saved;
+  return "discovery";
 }

@@ -119,12 +119,17 @@ export async function getCampaigns(userId: string) {
   return data || [];
 }
 
-export async function updateCampaignStatus(campaignId: string, status: string) {
-  if (!supabase) return;
-  await supabase
+export async function updateCampaignStatus(campaignId: string, status: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase
     .from("campaigns")
     .update({ status })
     .eq("id", campaignId);
+  if (error) {
+    console.error("updateCampaignStatus error:", error);
+    return false;
+  }
+  return true;
 }
 
 export async function updateCampaign(campaignId: string, campaign: {
@@ -136,6 +141,7 @@ export async function updateCampaign(campaignId: string, campaign: {
   commission_type: string;
   commission_rate: number;
   auto_payout: boolean;
+  status?: string;
 }) {
   if (!supabase) return null;
   const { data, error } = await supabase

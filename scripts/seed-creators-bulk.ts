@@ -12,6 +12,7 @@ import {
 } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
 import { classifyCreator } from "@/lib/creator-classify";
+import { pickTikTokAvatarUrl } from "@/lib/tiktok-avatar";
 
 config({ path: ".env.local" });
 
@@ -84,6 +85,7 @@ async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<
     }
 
     const avatar =
+      pickTikTokAvatarUrl(pRaw, u) ||
       u.avatar_medium?.url_list?.[0] || u.avatar_168x168?.url_list?.[0] ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.displayName || username)}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`;
 

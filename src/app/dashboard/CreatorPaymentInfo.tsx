@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 
 const BLUE = "#0047FF";
 
@@ -165,16 +166,18 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
               </button>
               {open && (
                 <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.08)", zIndex: 20, overflow: "hidden" }}>
-                  {METHOD_OPTIONS.map((option, i) => (
+                  {METHOD_OPTIONS.map((option, i) => {
+                    const active = option.id === method;
+                    return (
                     <button
                       key={option.id}
                       type="button"
                       onClick={() => { setMethod(option.id); setValue(""); setOpen(false); setSaved(false); setError(""); }}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "none", borderBottom: i < METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none", background: option.id === method ? "rgba(0,71,255,0.04)" : "#FFFFFF", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "none", borderBottom: i < METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none", ...selectionCardStyle(active, { unselectedBackground: "#FFFFFF", unselectedBorder: "none" }), cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
                     >
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{option.label}</span>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: selectionTextPrimary(active), letterSpacing: "-0.02em" }}>{option.label}</span>
                     </button>
-                  ))}
+                  );})}
                 </div>
               )}
             </div>

@@ -14,10 +14,13 @@ export type SavedRow = {
   pipeline_status: string;
   notes: string;
   snapshot: Record<string, unknown> | null;
+  platform?: string;
+  saved_at?: string;
+  updated_at?: string;
 };
 
-export type FolderRow = { id: string; name: string; color: string; position: number };
-export type FolderItem = { folder_id: string; creator_username: string };
+export type FolderRow = { id: string; name: string; color: string; position: number; created_at?: string };
+export type FolderItem = { folder_id: string; creator_username: string; added_at?: string };
 
 const json = (body: unknown) => ({
   method: "POST",
@@ -49,8 +52,15 @@ export async function setNotes(username: string, notes: string): Promise<void> {
   await fetch("/api/saved", { ...json({ username, notes }), method: "PATCH" });
 }
 
-export async function unsave(username: string): Promise<void> {
-  await fetch(`/api/saved?username=${encodeURIComponent(username)}`, { method: "DELETE" });
+export async function setCrm(username: string, crm: Record<string, unknown>): Promise<void> {
+  await fetch("/api/saved", { ...json({ username, crm }), method: "PATCH" });
+}
+
+export async function unsave(username: string): Promise<{ ok?: boolean; error?: string; status?: number }> {
+  const r = await fetch(`/api/saved?username=${encodeURIComponent(username)}`, { method: "DELETE" });
+  if (r.ok) return { ok: true };
+  const d = await r.json().catch(() => ({}));
+  return { error: d.error || "error", status: r.status };
 }
 
 export async function listFolders(): Promise<{ folders: FolderRow[]; items: FolderItem[] }> {

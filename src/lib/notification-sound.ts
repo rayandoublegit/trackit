@@ -57,13 +57,15 @@ export function playNotificationSound() {
   };
 
   if (ctx.state === "suspended") {
-    void ctx.resume().then(run);
+    void ctx.resume().then(() => {
+      if (ctx.state === "running") run();
+    });
     return;
   }
   run();
 }
 
-/** Attach once on dashboard — unlocks audio after any user gesture. */
+/** Attach once on dashboard — keeps audio unlocked after any user gesture. */
 export function installNotificationSoundUnlock() {
   if (typeof window === "undefined") return () => {};
 
@@ -71,8 +73,8 @@ export function installNotificationSoundUnlock() {
     primeNotificationSound();
   };
 
-  window.addEventListener("pointerdown", unlock, { capture: true, once: true });
-  window.addEventListener("keydown", unlock, { capture: true, once: true });
+  window.addEventListener("pointerdown", unlock, { capture: true, passive: true });
+  window.addEventListener("keydown", unlock, { capture: true });
   primeNotificationSound();
 
   return () => {
