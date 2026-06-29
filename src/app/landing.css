@@ -3066,10 +3066,12 @@ body { padding-top: 80px; }
   background: #000000;
   color: #FFFFFF;
   border-color: #000000;
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s ease;
 }
 
 .pricing-cta-dark:hover {
   background: #1A1A1A;
+  transform: scale(1.04);
 }
 
 .pricing-cta.pricing-cta-hero {

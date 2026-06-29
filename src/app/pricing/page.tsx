@@ -153,7 +153,7 @@ function PricingCard({
           onClick={onClick}
           className={ctaClassName ?? "pricing-cta"}
           disabled={disabled}
-          style={disabled ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", boxShadow: "none", cursor: "default" } : undefined}
+          style={disabled ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", cursor: "default", transform: "none", transition: "none" } : undefined}
         >
           {ctaLabel}
         </button>
@@ -394,7 +394,7 @@ function PricingPageContent() {
                 type="button"
                 className="pricing-cta"
                 onClick={handleStayFree}
-                style={currentPlan === "free" ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid #1A1A1A", boxShadow: "none" } : undefined}
+                style={currentPlan === "free" ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", transform: "none", transition: "none", cursor: "default" } : undefined}
               >
                 {currentPlan === "free" ? (lang === "fr" ? "Plan actuel" : "Current plan") : (lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free")}
               </button>
@@ -402,25 +402,6 @@ function PricingPageContent() {
           </div>
         </div>
 
-        <div style={{ textAlign: "center", marginTop: 24 }}>
-          <button
-            type="button"
-            onClick={handleStayFree}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#0047FF",
-              fontSize: 15,
-              fontWeight: 500,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              letterSpacing: "-0.02em",
-              textDecoration: "underline",
-            }}
-          >
-            {lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free"}
-          </button>
-        </div>
       </div>
     </main>
   );
