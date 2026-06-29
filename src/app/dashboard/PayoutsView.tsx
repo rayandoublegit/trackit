@@ -2041,7 +2041,6 @@ export function PayoutsView({
   const [creators, setCreators] = useState<any[]>([]);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
-  const [payMessage, setPayMessage] = useState<string | null>(null);
   const [confirmPay, setConfirmPay] = useState<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
   const pendingConfirmRef = useRef<{ creatorId: string; name: string; amount: number; method: string } | null>(null);
   const paymentLeftTabRef = useRef(false);
@@ -2256,11 +2255,6 @@ export function PayoutsView({
       setConfirmPay(payload);
     }
 
-    setPayMessage(
-      lang === "fr"
-        ? `Paiement de ${formatCurrency(amount, lang)} initié pour ${creator.full_name || creator.handle}.`
-        : `Payment of ${formatCurrency(amount, lang)} started for ${creator.full_name || creator.handle}.`,
-    );
   };
 
   const paySelectedCreator = async () => {
@@ -2286,11 +2280,6 @@ export function PayoutsView({
     });
     const data = await res.json();
     if (data.ok) {
-      setPayMessage(
-        lang === "fr"
-          ? `${formatCurrency(amount, lang)} marqué comme payé ✓`
-          : `${formatCurrency(amount, lang)} marked as paid ✓`
-      );
       notifyCreatorPaid(lang, name, amount, userId);
       setCreators((list) =>
         list.map((c) =>
@@ -2396,11 +2385,6 @@ export function PayoutsView({
               });
               const data = await res.json();
               if (data.success) {
-                setPayMessage(
-                  lang === "fr"
-                    ? `Virement de ${formatCurrency(amount, lang)} envoyé à ${activeCreator.full_name || activeCreator.handle}.`
-                    : `Transfer of ${formatCurrency(amount, lang)} sent to ${activeCreator.full_name || activeCreator.handle}.`,
-                );
                 notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
                 const r = await fetch(`/api/creators-list?userId=${userId}`);
                 const list = await r.json();
@@ -2485,12 +2469,6 @@ export function PayoutsView({
                 {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
               </button>
             </div>
-          </div>
-        )}
-
-        {payMessage && (
-          <div style={{ marginBottom: 16, padding: "12px 14px", background: "#F0F6FF", border: "1px solid #D6E4FF", borderRadius: 10, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
-            {payMessage}
           </div>
         )}
 
@@ -3333,22 +3311,6 @@ export function BalanceView({
           minHeight: "calc(100vh - 120px)",
         }}
       >
-        {payMessage && (
-          <div
-            style={{
-              marginBottom: 24,
-              padding: "12px 16px",
-              background: "#F0FFF4",
-              border: "1px solid #C6F6D5",
-              borderRadius: 12,
-              fontSize: 14,
-              color: "#1A1A1A",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {payMessage}
-          </div>
-        )}
 
         <div
           style={{

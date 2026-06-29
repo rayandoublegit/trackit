@@ -442,7 +442,7 @@ function DashboardPageContent() {
 
   const openWebsitePricing = useCallback(() => {
     if (typeof window === "undefined") return;
-    window.open("/#pricing", "_blank", "noopener,noreferrer");
+    window.location.href = "/pricing?returnTo=%2Fdashboard";
   }, []);
 
   const handleSidebarAvatarError = () => {

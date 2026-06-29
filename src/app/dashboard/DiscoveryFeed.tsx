@@ -759,7 +759,11 @@ function PaywallModal({ lang, title, body, onUpgrade, onClose }: { lang: "en" | 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "#FFF", borderRadius: 18, padding: "30px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 24px 48px rgba(0,0,0,0.18)" }}>
-        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#E8EEFC", color: "#0047FF", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}><Lock size={24} /></div>
+        <img
+          src={TRACKIT_LOGO_URL}
+          alt="Trackit"
+          style={{ height: 64, width: "auto", display: "block", objectFit: "contain", margin: "0 auto 14px" }}
+        />
         <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 7 }}>{title}</div>
         <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.5 }}>{body}</div>
         <UpgradeCtaButton lang={lang} onClick={onUpgrade} fullWidth />
