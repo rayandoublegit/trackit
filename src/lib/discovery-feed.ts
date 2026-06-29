@@ -176,13 +176,22 @@ export function creatorMatchesNicheFilter(
   return tokens.some((t) => hay.includes(t.toLowerCase()));
 }
 
-function nicheOrClause(label: string): string | null {
-  // STRICT: on ne matche que le tag de niche exact en base (catalogue propre).
-  // Fini le matching flou par tokens (sport/style/"ia ") qui faisait remonter
-  // une niche dans une autre (ex: fashion dans fitness).
+// Tags valides pour une niche: le tag canonique + ses sous-niches (NICHE_TREE).
+// On reste sur des tags d'array (niches.cs.{...}), jamais d'ILIKE de bio, donc
+// pas de pollution cross-niche. Les sous-niches scrapees rentables remontent.
+function nicheTagsFor(label: string): string[] {
   const key = resolveNicheKey(label);
-  if (!key) return null;
-  return `niches.cs.{${key}}`;
+  if (!key) return [];
+  const subs = NICHE_TREE[key] ?? [];
+  // On ne garde que les tags "propres" (un seul mot, pas d'espace) cote SQL array.
+  return [...new Set([key, ...subs])].filter((t) => /^[a-z0-9]+$/i.test(t));
+}
+
+function nicheOrClause(label: string): string | null {
+  const tags = nicheTagsFor(label);
+  if (!tags.length) return null;
+  // OR de tous les tags: un createur compte s'il a la niche OU une sous-niche.
+  return tags.map((t) => `niches.cs.{${t}}`).join(",");
 }
 
 function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
@@ -227,7 +236,10 @@ export async function buildFeedPage(
     if (filters.minFollowers) q = q.gte("followers", filters.minFollowers);
     if (filters.maxFollowers) q = q.lte("followers", filters.maxFollowers);
     if (filters.minEngagement) q = q.gte("engagement_rate", filters.minEngagement);
-    if (filters.country) q = q.eq("country_code", filters.country);
+    // FR strict ejecte les createurs FR dont country_code est NULL (le scraper
+    // ne le remplit pas toujours). On accepte le pays demande OU null: la langue
+    // (filtree juste apres) garantit deja qu'ils sont du bon marche.
+    if (filters.country) q = q.or(`country_code.eq.${filters.country},country_code.is.null`);
     if (filters.language) q = q.eq("language", filters.language);
     if (filters.niche) {
       const or = nicheOrClause(filters.niche);
@@ -237,13 +249,43 @@ export async function buildFeedPage(
   };
 
   const sortCol = filters.sort === "engagement" ? "engagement_rate" : filters.sort === "followers" ? "followers" : "value_score";
-  let { data, error } = await build().order(sortCol, { ascending: false, nullsFirst: false }).range(offset, offset + limit - 1);
-  if (error && sortCol === "value_score") {
-    // value_score column not present yet -> fall back to followers ordering.
-    ({ data, error } = await build().order("followers", { ascending: false }).range(offset, offset + limit - 1));
+
+  // Helper: applique le tri avec fallback si value_score absent.
+  const runOrdered = async (q: ReturnType<typeof build>, from: number, to: number) => {
+    let r = await q.order(sortCol, { ascending: false, nullsFirst: false }).range(from, to);
+    if (r.error && sortCol === "value_score") {
+      r = await build().order("followers", { ascending: false }).range(from, to);
+    }
+    return r;
+  };
+
+  // 1) CURATED/SCRIPTED d'abord: les createurs ajoutes a la main (tag 'curated'
+  //    OU video_thumbnails non-vide = marqueur indestructible de curation).
+  //    Ils passent devant les scrapes, pour toutes les niches.
+  const curatedQ = build().or("niches.cs.{curated},video_thumbnails.neq.[]");
+  const { data: curatedData } = await runOrdered(curatedQ, offset, offset + limit - 1);
+  const curatedRows = (curatedData || []).map(dbRowToFeedCreator);
+
+  const seen = new Set(curatedRows.map((c) => c.username));
+  let creators = [...curatedRows];
+
+  // 2) Completer avec le reste (scrapes) si on n'a pas atteint la limite.
+  //    On ne filtre PAS sur video_thumbnails en SQL (comparaison JSONB fragile):
+  //    on prend simplement les createurs de la niche pas encore vus, et le dedup
+  //    par username via `seen` ecarte ceux deja sortis par la couche curated.
+  if (creators.length < limit) {
+    const need = limit - creators.length;
+    // On sur-echantillonne (need*3) pour absorber les doublons deja vus.
+    const { data: restData } = await runOrdered(build(), 0, Math.max(need * 3, need) - 1);
+    for (const row of (restData || []).map(dbRowToFeedCreator)) {
+      if (creators.length >= limit) break;
+      if (seen.has(row.username)) continue;
+      seen.add(row.username);
+      creators.push(row);
+    }
   }
-  if (error || !data) return { creators: [], hasMore: false };
-  // La query DB a deja filtre par tag strict: pas de re-filtre JS qui rognerait la page.
-  const creators = data.map(dbRowToFeedCreator);
-  return { creators, hasMore: data.length === limit };
+
+  // hasMore: vrai si on a rempli la page entiere (probablement plus derriere).
+  const hasMore = creators.length >= limit;
+  return { creators: creators.slice(0, limit), hasMore };
 }
