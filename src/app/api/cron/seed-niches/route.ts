@@ -93,8 +93,12 @@ async function seedTarget(query: string, tags: string[], pages: number) {
             platform: "TikTok",
             followers,
             bio: String(u.signature || ""),
-            niches: tags.map(t => t.toLowerCase()),
-            video_thumbnails: [],
+            // GARDE-FOU: le seeder ne doit JAMAIS poser le tag "curated" (reserve a l'ajout manuel).
+            // On retire "curated" defensivement au cas ou un tag de niche s'appellerait ainsi.
+            niches: tags.map(t => t.toLowerCase()).filter(t => t !== "curated"),
+            // On ne touche PAS video_thumbnails ici: c'est le marqueur indestructible de curation.
+            // Les nouvelles lignes scrapees naissent sans thumbnails; on ne les met pas a [] explicitement
+            // pour ne jamais risquer d'ecraser ceux d'un cure existant.
             last_scraped_at: new Date().toISOString(),
             enrichment_status: "pending",
           };

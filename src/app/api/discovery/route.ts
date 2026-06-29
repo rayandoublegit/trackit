@@ -64,16 +64,20 @@ export async function POST(request: Request) {
       location: c.location,
       countryCode: c.country_code || resolveCreatorCountryCode(c.location, c.language),
       videoThumbnails: c.video_thumbnails || [],
-      curated: Array.isArray(c.niches) && c.niches.includes("curated"),
+      curated: (Array.isArray(c.niches) && c.niches.includes("curated"))
+        || (Array.isArray(c.video_thumbnails) && c.video_thumbnails.length > 0),
     });
 
     // 1a) Curated picks first (hand-added). They may still be "pending" and
     // platform casing can differ ("TikTok" vs "tiktok"), so we don't apply the
     // enriched/platform/metric gates to them. Language is still respected.
+    // Detecter les cures par DEUX signatures: le tag "curated" OU des video_thumbnails
+    // stockes (marqueur indestructible: seul l'ajout manuel en pose, jamais le cron).
+    // Ainsi, meme si un jour le tag disparait, les vrais cures restent surfaces.
     let cq = supabaseAdmin
       .from("creators_index")
       .select("*")
-      .contains("niches", ["curated"])
+      .or("niches.cs.{curated},video_thumbnails.neq.[]")
       .gte("followers", f.followers.gte)
       .lte("followers", f.followers.lte);
     if (f.language) cq = cq.eq("language", f.language);
