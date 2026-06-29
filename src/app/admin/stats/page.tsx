@@ -91,15 +91,22 @@ export default function AdminStatsPage() {
     setSelectedNiche(INITIAL_STATE.selectedNiche);
   };
 
+  // Au montage: on restaure le pseudo et le secret sauvegardes (localStorage)
+  // pour qu'un refresh ne renvoie pas a l'ecran de saisie.
   useEffect(() => {
-    resetPage();
-
-    const onPageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) resetPage();
-    };
-
-    window.addEventListener("pageshow", onPageShow);
-    return () => window.removeEventListener("pageshow", onPageShow);
+    try {
+      const savedPseudo = localStorage.getItem("trackit_admin_pseudo");
+      if (savedPseudo) setPseudo(savedPseudo);
+      const savedSecret = localStorage.getItem("trackit_admin_secret");
+      if (savedSecret) {
+        setSecret(savedSecret);
+        // Auto-deverrouille avec le secret memorise.
+        void unlockWith(savedSecret);
+      }
+    } catch {
+      // localStorage indisponible (navigation privee, etc.): on ignore.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const curationRate = useMemo(() => {
@@ -124,13 +131,15 @@ export default function AdminStatsPage() {
     };
   }, [data, selectedNiche]);
 
-  const unlock = async () => {
+  const unlockWith = async (secretValue: string) => {
+    const cleanSecret = secretValue.trim();
+    if (!cleanSecret) return;
     setLoading(true);
     setError("");
     try {
       const res = await fetch("/api/admin/stats", {
         method: "GET",
-        headers: { Authorization: `Bearer ${secret.trim()}` },
+        headers: { Authorization: `Bearer ${cleanSecret}` },
         cache: "no-store",
       });
       const json = await res.json();
@@ -138,8 +147,12 @@ export default function AdminStatsPage() {
         setUnlocked(false);
         setData(null);
         setError("Accès refusé");
+        // Secret invalide: on l'oublie pour ne pas reboucler au prochain refresh.
+        try { localStorage.removeItem("trackit_admin_secret"); } catch {}
         return;
       }
+      // Secret valide: on le memorise pour survivre au refresh.
+      try { localStorage.setItem("trackit_admin_secret", cleanSecret); } catch {}
       setData({
         total: Number(json.total) || 0,
         curated: Number(json.curated) || 0,
@@ -219,7 +232,7 @@ export default function AdminStatsPage() {
             <input
               style={{ ...field, width: 140, marginBottom: 0 }}
               value={pseudo}
-              onChange={(e) => setPseudo(e.target.value)}
+              onChange={(e) => { setPseudo(e.target.value); try { localStorage.setItem("trackit_admin_pseudo", e.target.value); } catch {} }}
               placeholder="Pseudo"
               autoComplete="off"
             />
@@ -239,7 +252,7 @@ export default function AdminStatsPage() {
               autoComplete="new-password"
             />
             <button
-              onClick={unlock}
+              onClick={() => unlockWith(secret)}
               disabled={loading}
               style={{
                 width: "100%",
