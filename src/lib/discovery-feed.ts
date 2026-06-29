@@ -194,6 +194,10 @@ function nicheOrClause(label: string): string | null {
   return tags.map((t) => `niches.cs.{${t}}`).join(",");
 }
 
+export function catalogRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
+  return dbRowToFeedCreator(c);
+}
+
 function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   const base = dbRowToCreator(c);
   const estCostPerPost = estimatedCostPerPost(base.followersCount);

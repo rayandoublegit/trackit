@@ -440,6 +440,11 @@ function DashboardPageContent() {
     }
   }, [checkoutCurrency]);
 
+  const openWebsitePricing = useCallback(() => {
+    if (typeof window === "undefined") return;
+    window.open("/#pricing", "_blank", "noopener,noreferrer");
+  }, []);
+
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
       setAvatarBroken(true);
@@ -686,11 +691,7 @@ function DashboardPageContent() {
           <DiscoveryFeed
             isMobile={isMobile}
             plan={plan}
-            onUpgrade={() => {
-              if (plan === "free") void handleUpgradeBasic();
-              else if (plan === "basic") void handleUpgradePro();
-              else void handleUpgradeScale();
-            }}
+            onUpgrade={openWebsitePricing}
             onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
         )}

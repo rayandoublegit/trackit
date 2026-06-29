@@ -59,6 +59,16 @@ export function discoveryCopy(lang: Lang) {
       fr ? `${n} créateur${n !== 1 ? "s" : ""}` : `${n} creator${n !== 1 ? "s" : ""}`,
     error: fr ? "Erreur" : "Error",
     noCreators: fr ? "Aucun créateur pour ces filtres." : "No creators match these filters.",
+    creatorNotInDatabaseTitle: fr
+      ? "Nous n'avons pas encore ce créateur dans notre base de données."
+      : "We don't have this creator in our database yet.",
+    creatorNotInDatabaseBody: fr
+      ? "Nous sommes en train de l'ajouter en ce moment même."
+      : "We're adding them right now.",
+    creatorNotInDatabaseQuery: (q: string) => {
+      const handle = q.trim().replace(/^@+/, "");
+      return fr ? `Recherche : @${handle}` : `Search: @${handle}`;
+    },
     paywallTitle: fr ? "Des milliers de créateurs t'attendent" : "Thousands of creators await",
     paywallBody: fr
       ? "Accède à tout le feed, aux filtres avancés et au défilement illimité."
