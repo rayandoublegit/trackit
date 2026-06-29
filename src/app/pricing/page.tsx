@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
@@ -162,7 +162,7 @@ function PricingCard({
   );
 }
 
-export default function PricingPage() {
+function PricingPageContent() {
   const lang = useLang();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -395,5 +395,13 @@ export default function PricingPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PricingPage() {
+  return (
+    <Suspense fallback={<main style={{ minHeight: "100vh", background: "#FFFFFF" }} />}>
+      <PricingPageContent />
+    </Suspense>
   );
 }
