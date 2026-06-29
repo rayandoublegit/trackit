@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
@@ -258,7 +258,35 @@ function PricingPageContent() {
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     const priceId = priceIdForTier(tier, currency, annual);
-    await handleUpgrade(priceId, { cancelUrl: `${window.location.origin}/pricing?returnTo=${encodeURIComponent(returnTo)}` });
+    if (!priceId) {
+      alert("Pricing not configured. Please contact support.");
+      return;
+    }
+
+    let userId: string | undefined;
+    let email: string | undefined;
+    try {
+      const { supabase } = await import("@/lib/supabase");
+      if (supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        userId = user?.id;
+        email = user?.email ?? undefined;
+      }
+    } catch {}
+
+    const res = await fetch("/api/create-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        priceId,
+        userId,
+        email,
+        cancelUrl: `${window.location.origin}/pricing?returnTo=${encodeURIComponent(returnTo)}`,
+      }),
+    });
+    const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
+    if (data.url) window.location.href = data.url;
+    else alert(data.error || "Could not start checkout");
   };
 
   const handleStayFree = () => {
