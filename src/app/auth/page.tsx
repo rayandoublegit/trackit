@@ -6,6 +6,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { getAuthRedirectPath } from "@/lib/auth-destination";
 import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
 import { useLang } from "@/lib/useLang";
+import { translateAuthError } from "@/lib/auth-errors";
 
 function AuthPageContent() {
   const router = useRouter();
@@ -52,7 +53,7 @@ function AuthPageContent() {
       if (mode === "login") {
         const { error: signErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (signErr) {
-          setError(signErr.message);
+          setError(translateAuthError(signErr.message, lang));
         } else {
           await recordLoginIp();
           const redirectParam = searchParams.get("redirectTo");
@@ -68,7 +69,7 @@ function AuthPageContent() {
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
         if (signUpError) {
-          setError(signUpError.message);
+          setError(translateAuthError(signUpError.message, lang));
         } else if (data.session) {
           await recordLoginIp();
           try {
