@@ -806,7 +806,7 @@ export default function TrackitLanding() {
 
         <div className="dashboard-wrap fade-up fade-up-delay-3">
           <video
-            src="https://res.cloudinary.com/dqsk5btgz/video/upload/v1782010377/0521_2_wt1c3c.mov"
+            src="https://res.cloudinary.com/dvtvkp4hn/video/upload/v1782776651/exporthatshi_ynk4vz.mp4"
             autoPlay
             loop
             muted
