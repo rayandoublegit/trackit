@@ -30,6 +30,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
+import { proxiedImageUrl } from "@/lib/tiktok-avatar";
 import { UpgradeModal } from "./UpgradeModal";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import {
@@ -543,17 +544,19 @@ function getVideoThumbnails(creator: Creator): VideoThumbnail[] {
 function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card" | "modal"; lang: "en" | "fr" }) {
   const videoThumbnails = getVideoThumbnails(creator);
   const isModal = size === "modal";
+  const handle = creator.username || "";
 
   return (
     <div style={{ display: "flex", gap: isModal ? 10 : 6 }}>
       {videoThumbnails.map((video, i) => {
+        const cover = video.thumbnail ? proxiedImageUrl(video.thumbnail) : "";
         const Wrapper: any = video.url ? "a" : "div";
         const wrapperProps = video.url
           ? { href: video.url, target: "_blank", rel: "noopener noreferrer" }
           : {};
         return (
         <Wrapper
-          key={i}
+          key={`${handle}:${i}:${cover || video.url || "grad"}`}
           {...wrapperProps}
           style={{
             flex: isModal ? 1 : "0 0 30%",
@@ -565,11 +568,18 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
             display: "block",
             cursor: video.url ? "pointer" : "default",
             textDecoration: "none",
-            background: video.thumbnail
-              ? `url(${video.thumbnail}) center / cover no-repeat`
-              : gradientForVideo(creator.username ?? "", i),
+            background: cover ? "#000" : gradientForVideo(handle, i),
           }}
         >
+          {cover ? (
+            <img
+              key={`${handle}:${i}:${cover}`}
+              src={cover}
+              alt=""
+              draggable={false}
+              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : null}
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div
               style={{

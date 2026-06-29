@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
-import { videoEmbedUrl } from "@/lib/creator-video";
+import { buildCreatorVideoPreviews } from "@/lib/creator-video-previews";
 import { pipelineStages } from "@/lib/pipeline";
 import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
@@ -12,7 +12,6 @@ import {
 import type { ContentAnalysis } from "@/lib/creator-content-analysis";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
-import { proxiedImageUrl } from "@/lib/tiktok-avatar";
 import { discoveryCopy, daysAgoCopy, engagementInsightCopy } from "@/lib/discovery-copy";
 import type { Lang } from "@/lib/useLang";
 
@@ -31,8 +30,6 @@ function fmt(n: number): string {
 function daysAgoLabel(iso: string | null, lang: Lang): string | null {
   return daysAgoCopy(lang, iso);
 }
-
-const proxied = proxiedImageUrl;
 
 const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
 
@@ -242,6 +239,27 @@ function ContentAnalyticsPanel({ d, lang }: { d: CreatorDetail; lang: Lang }) {
   );
 }
 
+function VideoCover({ cover, previewKey }: { cover: string; previewKey: string }) {
+  const [src, setSrc] = useState(cover);
+
+  useEffect(() => {
+    setSrc(cover);
+  }, [cover, previewKey]);
+
+  if (!src) return null;
+
+  return (
+    <img
+      key={`${previewKey}:${src}`}
+      src={src}
+      alt=""
+      draggable={false}
+      onError={() => setSrc("")}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+}
+
 function VideoTile({ v, playing, onPlay, isPaid, onUpgrade, lang }: {
   v: { key: string; cover: string; views: number; embed: string | null };
   playing: boolean; onPlay: () => void; isPaid: boolean; onUpgrade: () => void; lang: Lang;
@@ -249,7 +267,7 @@ function VideoTile({ v, playing, onPlay, isPaid, onUpgrade, lang }: {
   const t = discoveryCopy(lang);
   if (playing && v.embed) {
     return (
-      <iframe src={v.embed} title={t.playVideo}
+      <iframe key={v.key} src={v.embed} title={t.playVideo}
         style={{ width: "100%", aspectRatio: "9 / 16", border: "none", borderRadius: 10, background: "#000" }}
         allow="autoplay; encrypted-media; fullscreen" referrerPolicy="strict-origin" />
     );
@@ -258,7 +276,8 @@ function VideoTile({ v, playing, onPlay, isPaid, onUpgrade, lang }: {
     <button type="button" aria-label={t.playVideo}
       onClick={() => (isPaid ? onPlay() : onUpgrade())}
       style={{ position: "relative", aspectRatio: "9 / 16", borderRadius: 10, border: "none", cursor: "pointer", padding: 0,
-        background: v.cover ? `#000 url("${v.cover}") center / cover no-repeat` : "#EDEDED", display: "block", width: "100%" }}>
+        background: "#EDEDED", display: "block", width: "100%", overflow: "hidden" }}>
+      <VideoCover cover={v.cover} previewKey={v.key} />
       <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontSize: 26 }}>
         {v.embed ? (isPaid ? "▶" : "🔒") : ""}
       </span>
@@ -383,15 +402,19 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     setShown(false);
     const t = setTimeout(() => setShown(true), 10);
     let cancelled = false;
-    fetch(`/api/creator/${encodeURIComponent(creator.username)}`)
+    const handle = creator.username;
+    fetch(`/api/creator/${encodeURIComponent(handle)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (cancelled || !d?.creator) return;
+        const remote = d.creator as CreatorDetail;
+        if (remote.username && remote.username !== handle) return;
         setDetail((prev) => {
-          const merged = { ...prev, ...d.creator } as CreatorDetail;
-          // A DB row not yet re-enriched has no videos — keep the live ones rather than clobbering with [].
-          if (!merged.topVideos?.length) merged.topVideos = prev?.topVideos ?? [];
-          if (!merged.videoThumbnails?.length) merged.videoThumbnails = prev?.videoThumbnails ?? [];
+          if (!prev || prev.username !== handle) return remote;
+          const merged = { ...prev, ...remote } as CreatorDetail;
+          // Keep feed previews only when the API row has none yet (same creator).
+          if (!remote.topVideos?.length && prev.topVideos?.length) merged.topVideos = prev.topVideos;
+          if (!remote.videoThumbnails?.length && prev.videoThumbnails?.length) merged.videoThumbnails = prev.videoThumbnails;
           return merged;
         });
       })
@@ -421,16 +444,10 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
 
   const videos = useMemo(() => {
     if (!detail) return [];
-    const tv = detail.topVideos ?? [];
-    const base = tv.length
-      ? tv.map((v) => ({ id: v.id, cover: v.cover, shareUrl: v.shareUrl, views: v.playCount }))
-      : (detail.videoThumbnails ?? []).map((t) => ({ id: "", cover: t.thumbnail ?? "", shareUrl: t.url ?? "", views: t.views }));
-    return base.map((v, i) => ({
-      key: v.id || `v${i}`,
-      cover: proxied(v.cover),
-      views: v.views,
-      embed: videoEmbedUrl({ id: v.id, shareUrl: v.shareUrl }),
-    }));
+    return buildCreatorVideoPreviews(detail.username, {
+      videoThumbnails: detail.videoThumbnails,
+      topVideos: detail.topVideos,
+    });
   }, [detail]);
 
   if (!creator || !detail) return null;
@@ -576,7 +593,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
           {videos.length === 0 ? (
             <div style={{ fontSize: 13, color: "#9A9A9A" }}>{t.noVideos}</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+            <div key={d.username} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {videos.map((v) => (
                 <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} lang={lang} />
               ))}
