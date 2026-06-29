@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
+import { creatorMatchesNicheFilter } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
@@ -87,6 +88,12 @@ const EMPTY_FILTERS: FilterState = {
   hideSaved: false,
 };
 
+function languageFromCountry(country: string): string | null {
+  if (country === "FR") return "fr";
+  if (country === "US") return "en";
+  return null;
+}
+
 const FOLLOWER_VAL: Record<string, number> = {
   "10k": 10_000,
   "50k": 50_000,
@@ -124,6 +131,35 @@ function toParams(f: FilterState): Record<string, string> {
 
 function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<string>): FeedCreator[] {
   let out = list;
+
+  if (f.niche) {
+    out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
+  }
+
+  if (f.platform) {
+    const want = f.platform.toLowerCase();
+    out = out.filter((c) => (c.platform || "tiktok").toLowerCase().includes(want));
+  }
+
+  if (f.country) {
+    out = out.filter((c) => (c.countryCode || "").toUpperCase() === f.country);
+  }
+
+  if (f.language) {
+    out = out.filter((c) => (c.language || "").toLowerCase() === f.language);
+  }
+
+  if (f.followersFrom && FOLLOWER_VAL[f.followersFrom]) {
+    out = out.filter((c) => c.followersCount >= FOLLOWER_VAL[f.followersFrom]);
+  }
+  if (f.followersTo && FOLLOWER_VAL[f.followersTo]) {
+    out = out.filter((c) => c.followersCount <= FOLLOWER_VAL[f.followersTo]);
+  }
+
+  if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
+  else if (f.engagement === "6+") out = out.filter((c) => c.engagementRate >= 6);
+  else if (f.engagement === "9+") out = out.filter((c) => c.engagementRate >= 9);
+
   const q = f.search.trim().toLowerCase().replace(/^@/, "");
   if (q) {
     out = out.filter(
@@ -261,6 +297,21 @@ function FilterSidebar({
 }) {
   const t = discoveryCopy(lang);
   const lock = !isPaid;
+  const [platformNotice, setPlatformNotice] = useState<string | null>(null);
+  const platformNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
+    };
+  }, []);
+
+  const showPlatformComingSoon = () => {
+    setPlatformNotice(t.morePlatformsComing);
+    if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
+    platformNoticeTimerRef.current = setTimeout(() => setPlatformNotice(null), 4000);
+  };
+
   const platforms = [
     { id: "instagram", label: "Instagram" },
     { id: "tiktok", label: "TikTok" },
@@ -306,12 +357,19 @@ function FilterSidebar({
       <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
         {platforms.map((p) => {
           const active = filters.platform === p.id;
+          const paidOnly = p.id === "instagram" || p.id === "youtube";
+          const gated = paidOnly && lock;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => {
-                if (lock) { onLocked(); return; }
+                if (gated) { onLocked(); return; }
+                if (paidOnly) {
+                  showPlatformComingSoon();
+                  return;
+                }
+                setPlatformNotice(null);
                 onChange({ platform: p.id });
               }}
               style={{
@@ -323,8 +381,8 @@ function FilterSidebar({
                 fontSize: 12,
                 fontWeight: 500,
                 fontFamily: "inherit",
-                cursor: lock ? "not-allowed" : "pointer",
-                opacity: lock ? 0.65 : 1,
+                cursor: gated ? "not-allowed" : "pointer",
+                opacity: gated ? 0.55 : 1,
                 letterSpacing: "-0.01em",
               }}
             >
@@ -333,6 +391,24 @@ function FilterSidebar({
           );
         })}
       </div>
+      {platformNotice && (
+        <div
+          style={{
+            marginTop: -8,
+            marginBottom: 16,
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "#F5F8FF",
+            border: "1px solid #D6E4FF",
+            fontSize: 12,
+            color: "#0047FF",
+            letterSpacing: "-0.01em",
+            lineHeight: 1.45,
+          }}
+        >
+          {platformNotice}
+        </div>
+      )}
 
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.search}</div>
@@ -399,7 +475,10 @@ function FilterSidebar({
           value={filters.country}
           disabled={lock}
           onLocked={onLocked}
-          onChange={(v) => onChange({ country: v })}
+          onChange={(v) => {
+            const language = languageFromCountry(v);
+            onChange(language != null ? { country: v, language } : { country: v });
+          }}
           options={[
             { value: "", label: t.all },
             { value: "FR", label: t.france },
@@ -718,24 +797,42 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   }, [navState.view, navState.creator, creators]);
   const [sort, setSort] = useState<"value" | "followers" | "engagement">("followers");
   const mainRef = useRef<HTMLDivElement>(null);
+  const fetchGenRef = useRef(0);
 
   const apiParams = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
 
   const fetchPage = useCallback(async (off: number, replace: boolean) => {
+    const gen = fetchGenRef.current;
     const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(LIMIT) }).toString();
     const r = await fetch(`/api/discovery-feed?${qs}`);
     const d = await r.json();
+    if (gen !== fetchGenRef.current) return;
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
     setError(d.error || null);
-    setCreators((prev) => (replace ? list : [...prev, ...list]));
+    setCreators((prev) => {
+      const merged = replace ? list : [...prev, ...list];
+      const seen = new Set<string>();
+      return merged.filter((c) => {
+        if (!c.username || seen.has(c.username)) return false;
+        seen.add(c.username);
+        return true;
+      });
+    });
     setHasMore(!!d.hasMore);
     setOffset(off + list.length);
   }, [apiParams]);
 
   useEffect(() => {
+    fetchGenRef.current += 1;
     let cancelled = false;
+    setCreators([]);
+    setOffset(0);
+    setHasMore(true);
     setLoading(true);
-    fetchPage(0, true).catch(() => { if (!cancelled) setError("network"); }).finally(() => { if (!cancelled) setLoading(false); });
+    setError(null);
+    fetchPage(0, true)
+      .catch(() => { if (!cancelled) setError("network"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [fetchPage]);
 

@@ -67,6 +67,7 @@ export function discoveryCopy(lang: Lang) {
     filterPaywallBody: fr
       ? "Filtrer par niche, plateforme, abonnés, engagement, pays, langue et plus est réservé aux plans payants."
       : "Filtering by niche, platform, followers, engagement, country, language, and more is available on paid plans.",
+    morePlatformsComing: fr ? "Plus de plateformes bientôt" : "More platforms coming soon",
     loadMore: fr ? "Charger plus" : "Load more",
     // Drawer
     back: fr ? "← Retour" : "← Back",

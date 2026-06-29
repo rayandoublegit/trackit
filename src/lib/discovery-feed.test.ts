@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rankFeed } from "@/lib/discovery-feed";
+import { rankFeed, creatorMatchesNicheFilter } from "@/lib/discovery-feed";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 
 function creator(p: Partial<DiscoveryCreatorResult> & { username: string }): DiscoveryCreatorResult {
@@ -25,5 +25,16 @@ describe("rankFeed", () => {
     expect(out[0].estCpm).toBeGreaterThan(0);
     expect(out[0].valueTier).toBe("micro");
     expect(out[0].estCostPerPost).toBe(150);
+  });
+});
+
+describe("creatorMatchesNicheFilter", () => {
+  it("matches travel but not fitness", () => {
+    const travel = { primaryNiche: "voyage pas cher", niche: "travel", niches: ["travel"] };
+    const fitness = { primaryNiche: "coach sportif", niche: "fitness", niches: ["fitness"] };
+    expect(creatorMatchesNicheFilter(travel, "travel")).toBe(true);
+    expect(creatorMatchesNicheFilter(travel, "fitness")).toBe(false);
+    expect(creatorMatchesNicheFilter(fitness, "fitness")).toBe(true);
+    expect(creatorMatchesNicheFilter(fitness, "travel")).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
+import { NICHE_TREE } from "@/lib/niche-tree";
 import { createClient } from "@supabase/supabase-js";
 import {
   estimatedCostPerPost,
@@ -79,6 +80,7 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
     primaryNiche: String(c.primary_niche ?? ""), language: String(c.language ?? "unknown"),
     location: (c.location as string) ?? null, countryCode: (c.country_code as string) ?? null,
     videoThumbnails: Array.isArray(c.video_thumbnails) ? (c.video_thumbnails as DiscoveryCreatorResult["videoThumbnails"]) : [],
+    niches: Array.isArray(c.niches) ? (c.niches as string[]) : [],
   };
 }
 
@@ -131,8 +133,11 @@ const NICHE_TOKENS: Record<string, string[]> = {
   fashion: ["fashion", "mode", "moda", "outfit", "style", "ootd", "vintage"],
   tech: ["tech", "gadget", "coding", "ai ", "ia "],
   finance: ["finance", "money", "invest", "finanz", "argent", "crypto"],
-  travel: ["travel", "voyage", "viaje", "trip", "backpack"],
+  travel: ["travel", "voyage", "viaje", "trip", "backpack", "globe", "destination"],
   gaming: ["gaming", "game", "gamer", "valorant"],
+  lifestyle: ["lifestyle", "minimalism", "productivity", "selfcare", "routine", "quotidien", "vlog"],
+  wellness: ["wellness", "mentalhealth", "meditation", "yoga", "bien", "santé", "sante", "wellbeing"],
+  business: ["business", "entrepreneur", "marketing", "ecommerce", "startup", "freelance", "founder"],
 };
 
 // Map UI labels (FR/EN) to a niche key.
@@ -140,12 +145,46 @@ const LABEL_TO_NICHE: Record<string, string> = {
   fitness: "fitness", beauté: "beauty", beaute: "beauty", beauty: "beauty",
   food: "food", mode: "fashion", fashion: "fashion", tech: "tech",
   finance: "finance", voyage: "travel", travel: "travel", gaming: "gaming", jeux: "gaming",
+  lifestyle: "lifestyle", wellness: "wellness", business: "business",
 };
 
+export function resolveNicheKey(label: string): string {
+  const norm = label.trim().toLowerCase();
+  return LABEL_TO_NICHE[norm] ?? norm;
+}
+
+function nicheTokensFor(key: string): string[] {
+  const base = NICHE_TOKENS[key] ?? [key];
+  const subs = NICHE_TREE[key] ?? [];
+  return [...new Set([key, ...base, ...subs])];
+}
+
+/** Client-side guard: creator text fields match the selected niche filter. */
+export function creatorMatchesNicheFilter(
+  creator: { primaryNiche?: string; niche?: string; niches?: string[] },
+  label: string
+): boolean {
+  if (!label.trim()) return true;
+  const tokens = nicheTokensFor(resolveNicheKey(label));
+  const hay = [
+    creator.primaryNiche || "",
+    creator.niche || "",
+    ...(creator.niches || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return tokens.some((t) => hay.includes(t.toLowerCase()));
+}
+
 function nicheOrClause(label: string): string | null {
-  const key = LABEL_TO_NICHE[label.trim().toLowerCase()] ?? label.trim().toLowerCase();
-  const tokens = NICHE_TOKENS[key] ?? [key];
-  return tokens.map((t) => `primary_niche.ilike.%${t}%`).join(",");
+  const key = resolveNicheKey(label);
+  const tokens = nicheTokensFor(key);
+  const clauses: string[] = [];
+  for (const t of tokens) {
+    clauses.push(`primary_niche.ilike.%${t}%`);
+    if (/^[a-z0-9]+$/i.test(t)) clauses.push(`niches.cs.{${t}}`);
+  }
+  return [...new Set(clauses)].join(",");
 }
 
 function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
@@ -206,5 +245,9 @@ export async function buildFeedPage(
     ({ data, error } = await build().order("followers", { ascending: false }).range(offset, offset + limit - 1));
   }
   if (error || !data) return { creators: [], hasMore: false };
-  return { creators: data.map(dbRowToFeedCreator), hasMore: data.length === limit };
+  let creators = data.map(dbRowToFeedCreator);
+  if (filters.niche) {
+    creators = creators.filter((c) => creatorMatchesNicheFilter(c, filters.niche!));
+  }
+  return { creators, hasMore: data.length === limit };
 }

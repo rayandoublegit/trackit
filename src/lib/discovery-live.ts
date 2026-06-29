@@ -34,6 +34,7 @@ export interface DiscoveryCreatorResult {
   email: string | null;
   niche: string;
   primaryNiche: string;
+  niches?: string[];
   language: string;
   location: string | null;
   countryCode: string | null;
