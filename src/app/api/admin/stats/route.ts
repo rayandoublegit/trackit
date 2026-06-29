@@ -63,5 +63,31 @@ export async function GET(request: Request) {
     return { niche, ...c, target: TARGET_PER_NICHE };
   }).sort((a, b) => a.curated - b.curated);
 
-  return NextResponse.json({ ok: true, total, curated, niches });
+  // Demandes de createurs (recherches manuelles sans resultat), groupees par
+  // handle normalise, triees par nombre de demandes. Pour la page admin.
+  const lookupRows: { normalized_query: string; query: string; created_at: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("creator_lookup_requests")
+      .select("normalized_query, query, created_at")
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) break; // table absente ou vide: on n'echoue pas les stats
+    if (!data || data.length === 0) break;
+    lookupRows.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  const reqMap: Record<string, { normalized: string; query: string; count: number; lastAt: string }> = {};
+  for (const r of lookupRows) {
+    const key = r.normalized_query;
+    if (!reqMap[key]) {
+      reqMap[key] = { normalized: key, query: r.query, count: 0, lastAt: r.created_at };
+    }
+    reqMap[key].count++;
+    if (r.created_at > reqMap[key].lastAt) reqMap[key].lastAt = r.created_at;
+  }
+  const lookupRequests = Object.values(reqMap).sort((a, b) => b.count - a.count);
+
+  return NextResponse.json({ ok: true, total, curated, niches, lookupRequests });
 }
