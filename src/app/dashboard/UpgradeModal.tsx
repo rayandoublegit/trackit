@@ -1,5 +1,14 @@
 "use client";
 
+import {
+  formatUpgradePrimaryLabel,
+  getGateModalProps,
+  getLimitUpgradeModalProps,
+  type GateFeatureKey,
+  type LimitGateKind,
+} from "@/lib/plan-marketing";
+import type { PlanTier } from "@/lib/plan-limits";
+
 type UpgradeModalProps = {
   lang: "en" | "fr";
   onClose: () => void;
@@ -11,6 +20,9 @@ type UpgradeModalProps = {
   onPrimary?: () => void;
   planBadge?: string;
   showAllPlansLink?: boolean;
+  featureKey?: GateFeatureKey;
+  limitKind?: LimitGateKind;
+  currentPlan?: PlanTier;
 };
 
 function parseUpgradeMessage(message: string, lang: "en" | "fr") {
@@ -59,13 +71,28 @@ export function UpgradeModal({
   onPrimary,
   planBadge: planBadgeProp,
   showAllPlansLink = true,
+  featureKey,
+  limitKind,
+  currentPlan,
 }: UpgradeModalProps) {
   const parsed = message ? parseUpgradeMessage(message, lang) : null;
-  const title = titleProp ?? parsed?.title ?? (lang === "fr" ? "Fonctionnalité premium" : "Premium feature");
-  const description = descriptionProp ?? parsed?.description ?? "";
-  const bullets = bulletsProp ?? parsed?.bullets ?? [];
-  const primaryLabel = primaryLabelProp ?? parsed?.primaryLabel ?? (lang === "fr" ? "Voir les plans" : "View plans");
-  const planBadge = planBadgeProp ?? parsed?.planBadge;
+  const fromLimit =
+    limitKind && currentPlan ? getLimitUpgradeModalProps(limitKind, currentPlan, lang) : null;
+  const fromGate = featureKey ? getGateModalProps(featureKey, lang) : null;
+  const resolved = fromLimit ?? fromGate;
+
+  const title =
+    titleProp ??
+    parsed?.title ??
+    resolved?.title ??
+    (lang === "fr" ? "Fonctionnalité premium" : "Premium feature");
+  const description = descriptionProp ?? parsed?.description ?? resolved?.description ?? "";
+  const bullets = bulletsProp ?? parsed?.bullets ?? resolved?.bullets ?? [];
+  const planBadge = planBadgeProp ?? parsed?.planBadge ?? resolved?.planBadge;
+  const primaryLabel =
+    primaryLabelProp ??
+    parsed?.primaryLabel ??
+    (resolved ? formatUpgradePrimaryLabel(resolved.requiredTier, lang) : lang === "fr" ? "Voir les plans" : "View plans");
 
   const handlePrimary = () => {
     if (onPrimary) {

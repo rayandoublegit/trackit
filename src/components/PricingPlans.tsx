@@ -3,18 +3,19 @@
 import { useMemo, useState } from "react";
 import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
-const GROWTH_MONTHLY = 19;
-const PRO_MONTHLY = 39;
-const SCALE_MONTHLY = 99;
-const GROWTH_ANNUAL = 190;
-const PRO_ANNUAL = 390;
-const SCALE_ANNUAL = 990;
+const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
+const PRO_MONTHLY = PLAN_PRICES.proMonthly;
+const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
+const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
+const PRO_ANNUAL = PLAN_PRICES.proAnnual;
+const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
 
 type PaidTier = "basic" | "pro" | "scale";
 
@@ -210,65 +211,10 @@ export function PricingPlans({
   const currency = lang === "fr" ? "eur" : "usd";
   const plan = normalizePlan(currentPlan);
 
-  const growthFeatures = useMemo(() => (
-    lang === "fr"
-      ? [
-          "20 découvertes / mois",
-          "10 résultats par recherche",
-          "3 campagnes actives",
-          "15 créateurs gérés",
-          "Outreach IA illimité",
-          "Paiements manuels",
-        ]
-      : [
-          "20 discoveries / month",
-          "10 results per search",
-          "3 active campaigns",
-          "15 managed creators",
-          "Unlimited AI outreach",
-          "Manual payouts",
-        ]
-  ), [lang]);
-
-  const proFeatures = useMemo(() => (
-    lang === "fr"
-      ? [
-          "50 découvertes / mois",
-          "25 résultats par recherche",
-          "15 campagnes actives",
-          "50 créateurs gérés",
-          "Paiements auto + manuels",
-          "Automatisations",
-        ]
-      : [
-          "50 discoveries / month",
-          "25 results per search",
-          "15 active campaigns",
-          "50 managed creators",
-          "Auto + manual payouts",
-          "Automation workflows",
-        ]
-  ), [lang]);
-
-  const scaleFeatures = useMemo(() => (
-    lang === "fr"
-      ? [
-          "Découvertes illimitées",
-          "Résultats illimités",
-          "Campagnes illimitées",
-          "Créateurs illimités",
-          "Multi-boutiques Shopify",
-          "Support dédié",
-        ]
-      : [
-          "Unlimited discoveries",
-          "Unlimited results",
-          "Unlimited campaigns",
-          "Unlimited creators",
-          "Multi-store Shopify",
-          "Dedicated support",
-        ]
-  ), [lang]);
+  const growthFeatures = useMemo(() => getPlanMarketingFeatures("basic", lang, "pricing"), [lang]);
+  const proFeatures = useMemo(() => getPlanMarketingFeatures("pro", lang, "pricing"), [lang]);
+  const scaleFeatures = useMemo(() => getPlanMarketingFeatures("scale", lang, "pricing"), [lang]);
+  const freeFeatures = useMemo(() => getPlanMarketingFeatures("free", lang, "pricing"), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     if (onBeforeCheckout) {
@@ -355,8 +301,7 @@ export function PricingPlans({
         : "Current plan"
       : defaultFreeCta);
 
-  const planDisplayName =
-    plan === "basic" ? "Growth" : plan === "pro" ? "Pro" : plan === "scale" ? "Scale" : "Free";
+  const planDisplayName = marketingPlanDisplayName(plan, lang);
 
   return (
     <>
@@ -383,7 +328,7 @@ export function PricingPlans({
         <PricingCard
           lang={lang}
           name="Growth"
-          desc={lang === "fr" ? "L'entrée idéale pour lancer votre programme créateurs." : "Your entry point — start fast without overcommitting."}
+          desc={getPlanCardDescription("basic", lang)}
           price={growthAnnual ? GROWTH_ANNUAL : GROWTH_MONTHLY}
           annual={growthAnnual}
           onToggleAnnual={() => setGrowthAnnual((v) => !v)}
@@ -398,7 +343,7 @@ export function PricingPlans({
         <PricingCard
           lang={lang}
           name="Pro"
-          desc={lang === "fr" ? "Le meilleur rapport qualité-prix. Le choix de la plupart des marques." : "Best value. The plan most brands choose."}
+          desc={getPlanCardDescription("pro", lang)}
           price={proAnnual ? PRO_ANNUAL : PRO_MONTHLY}
           annual={proAnnual}
           onToggleAnnual={() => setProAnnual((v) => !v)}
@@ -414,7 +359,7 @@ export function PricingPlans({
         <PricingCard
           lang={lang}
           name="Scale"
-          desc={lang === "fr" ? "Tout Pro, plus la puissance multi-boutiques et l'automatisation." : "Everything in Pro, plus multi-store power and full automation."}
+          desc={getPlanCardDescription("scale", lang)}
           price={scaleAnnual ? SCALE_ANNUAL : SCALE_MONTHLY}
           annual={scaleAnnual}
           onToggleAnnual={() => setScaleAnnual((v) => !v)}
@@ -432,7 +377,7 @@ export function PricingPlans({
             <div className="pricing-card-top">
               <div className="pricing-logo"><img src={TRACKIT_LOGO_URL} alt="" /></div>
               <div className="pricing-name">Free</div>
-              <div className="pricing-desc">{lang === "fr" ? "Commencez sans engagement." : "Get started with no commitment."}</div>
+              <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
               <div className="pricing-price">
                 <span className="pricing-amount">{formatCurrency(0, lang)}</span>
                 <span className="pricing-period">{lang === "fr" ? "/mois" : "/month"}</span>
@@ -440,9 +385,7 @@ export function PricingPlans({
             </div>
             <div className="pricing-divider" />
             <div className="pricing-features">
-              {(lang === "fr"
-                ? ["5 découvertes au total", "5 résultats par recherche", "Sauvegarde de créateurs", "Aucun engagement"]
-                : ["5 discoveries total", "5 results per search", "Save creators", "No commitment"]).map((label) => (
+              {freeFeatures.map((label) => (
                 <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
               ))}
             </div>

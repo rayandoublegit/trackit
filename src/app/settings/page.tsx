@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import {
+  fetchProfileUsernameAvailability,
+  isValidProfileUsername,
+  normalizeProfileUsername,
+  profileUsernameSaveError,
+  profileUsernameStatusColor,
+  profileUsernameStatusMessage,
+  profileUsernameTakenMessage,
+  type ProfileUsernameStatus,
+} from "@/lib/profile-username";
 
 type SettingsLang = "en" | "fr";
 
@@ -124,6 +134,8 @@ export default function SettingsPage() {
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   const [username, setUsername] = useState("");
+  const [initialUsername, setInitialUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<ProfileUsernameStatus>("idle");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -159,6 +171,8 @@ export default function SettingsPage() {
 
       if (profile) {
         setUsername(profile.username ?? "");
+        setInitialUsername(profile.username ?? "");
+        setUsernameStatus(profile.username ? "available" : "idle");
         setAvatarUrl(profile.avatar_url ?? null);
         setPlan(profile.plan ?? "free");
       }
@@ -174,10 +188,36 @@ export default function SettingsPage() {
   const avatarFileRef = React.useRef(avatarFile);
   React.useEffect(() => { avatarFileRef.current = avatarFile; }, [avatarFile]);
 
+  React.useEffect(() => {
+    const normalized = normalizeProfileUsername(username);
+    const current = normalizeProfileUsername(initialUsername);
+    if (!normalized) { setUsernameStatus("idle"); return; }
+    if (normalized === current) { setUsernameStatus("available"); return; }
+    if (!isValidProfileUsername(normalized)) { setUsernameStatus("invalid"); return; }
+    setUsernameStatus("checking");
+    const timer = setTimeout(() => {
+      void fetchProfileUsernameAvailability(normalized).then(setUsernameStatus);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [username, initialUsername]);
+
   const saveProfile = useCallback(async () => {
     const avatarFile = avatarFileRef.current;
-    console.log("SAVE called, avatarFile:", avatarFile);
     if (!supabase || !user) return;
+
+    const trimmedUsername = normalizeProfileUsername(username);
+    if (trimmedUsername && trimmedUsername !== normalizeProfileUsername(initialUsername)) {
+      if (usernameStatus === "taken") {
+        setMessage({ text: profileUsernameTakenMessage(locale), type: "error" });
+        return;
+      }
+      if (usernameStatus !== "available") {
+        setSaving(false);
+        setMessage({ text: profileUsernameStatusMessage(usernameStatus === "checking" ? "checking" : "invalid", locale), type: "error" });
+        return;
+      }
+    }
+
     setSaving(true);
     setMessage(null);
 
@@ -203,17 +243,18 @@ export default function SettingsPage() {
 
     const { error } = await supabase
       .from("profiles")
-      .update({ username: username.trim(), avatar_url: newAvatarUrl })
+      .update({ username: trimmedUsername, avatar_url: newAvatarUrl })
       .eq("id", user.id);
 
     if (error) {
-      setMessage({ text: "Failed to save changes.", type: "error" });
+      setMessage({ text: profileUsernameSaveError(error, locale), type: "error" });
     } else {
       setMessage({ text: "Changes saved successfully.", type: "success" });
+      setInitialUsername(trimmedUsername);
       setAvatarUrl(newAvatarUrl);
     }
     setSaving(false);
-  }, [supabase, user, username, avatarFile, avatarUrl]);
+  }, [supabase, user, username, avatarFile, avatarUrl, usernameStatus, initialUsername, locale]);
 
   const changePassword = useCallback(async () => {
     if (!supabase || !user) return;
@@ -441,10 +482,15 @@ export default function SettingsPage() {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.toLowerCase())}
               placeholder="your_username"
               style={inputStyle}
             />
+            {usernameStatus !== "idle" && (
+              <div style={{ fontSize: 12, color: profileUsernameStatusColor(usernameStatus), marginTop: 8 }}>
+                {profileUsernameStatusMessage(usernameStatus, locale)}
+              </div>
+            )}
           </div>
 
           {/* Email — read only */}

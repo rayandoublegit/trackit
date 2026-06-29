@@ -32,6 +32,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
+import { runGateUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
 
 type OutreachHistoryStatus = "sent" | "opened" | "replied" | "no_response" | "converted";
 type HistoryFilter = "all" | OutreachHistoryStatus;
@@ -554,14 +555,18 @@ function incrementOutreachGenerationsToday() {
 function OutreachAIGeneratePanel({
   lang,
   plan,
-  onNavigateToBilling,
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
   onMarkSent,
   onToast,
   isMobile,
 }: {
   lang: "en" | "fr";
   plan: PlanTier;
-  onNavigateToBilling: () => void;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   onMarkSent: (entry: OutreachHistoryEntry) => void | Promise<void>;
   onToast: (msg: string) => void;
   isMobile?: boolean;
@@ -584,7 +589,7 @@ function OutreachAIGeneratePanel({
   const [sendingEmail, setSendingEmail] = useState(false);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [, setSavedTemplates] = useState<SavedOutreachTemplate[]>([]);
-  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [savedCreators, setSavedCreators] = useState<OutreachCreator[]>([]);
 
   useEffect(() => {
@@ -655,9 +660,7 @@ function OutreachAIGeneratePanel({
       const key = "trackit_outreach_gen_" + today;
       const used = parseInt(localStorage.getItem(key) || "0");
       if (used >= 1) {
-        setUpgradeMsg(lang === "fr"
-          ? "🔒 Votre génération IA gratuite est épuisée.\n\nLes marques qui utilisent Trackit AI envoient 3x plus d'outreach et closent 2x plus de créateurs.\n\nPassez à Growth → Générations illimitées, suivi des ventes, paiements automatiques."
-          : "🔒 You've used your free AI generation for today.\n\nBrands using Trackit AI send 3x more outreach and close 2x more creators.\n\nUpgrade to Growth → Unlimited AI, sale tracking, automatic payouts.");
+        setUpgradeFeature("ai-outreach");
         return;
       }
       localStorage.setItem(key, String(used + 1));
@@ -1131,9 +1134,7 @@ function OutreachAIGeneratePanel({
                       type="button"
                       onClick={() => {
                         if (!canPersistTemplates(plan)) {
-                          setUpgradeMsg(lang === "fr"
-                            ? "🔒 Sauvegarde de modèles — Plan Growth requis.\n\nSauvegardez vos outreach qui convertissent et construisez une bibliothèque de templates.\n\nPassez à Growth →"
-                            : "🔒 Save templates — Growth plan required.\n\nSave your best-converting outreach and build a template library.\n\nUpgrade to Growth →");
+                          setUpgradeFeature("templates");
                           return;
                         }
                         setSaveTemplateOpen(true);
@@ -1229,7 +1230,17 @@ function OutreachAIGeneratePanel({
           }}
         />
       )}
-      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+      {upgradeFeature && (
+        <UpgradeModal
+          lang={lang}
+          featureKey={upgradeFeature}
+          onClose={() => setUpgradeFeature(null)}
+          onPrimary={() => {
+            runGateUpgrade(upgradeFeature, lang, { onUpgrade, onUpgradePro, onUpgradeScale });
+            setUpgradeFeature(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1265,11 +1276,17 @@ function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "f
 export function OutreachHistorySection({
   plan,
   onNavigateToBilling,
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
   isMobile,
   refreshKey = 0,
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
   isMobile?: boolean;
   refreshKey?: number;
 }) {
@@ -1284,7 +1301,7 @@ export function OutreachHistorySection({
   const [followUpEntry, setFollowUpEntry] = useState<OutreachHistoryEntry | null>(null);
   const [followUpSlideIn, setFollowUpSlideIn] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
 
   useEffect(() => {
     if (followUpEntry) {
@@ -1508,9 +1525,7 @@ export function OutreachHistorySection({
 
   const sendFollowUp = async (item: OutreachHistoryEntry) => {
     if (!canUseAutoFollowUp(plan)) {
-      setUpgradeMsg(lang === "fr"
-        ? "🔒 Relances automatiques — Plan Pro requis.\n\nProgrammez des relances et convertissez plus de créateurs.\n\nPassez à Pro →"
-        : "🔒 Auto follow-ups — Pro plan required.\n\nSchedule follow-ups and convert more creators.\n\nUpgrade to Pro →");
+      setUpgradeFeature("auto-follow-up");
       return;
     }
     const res = await fetch("/api/generate-follow-up", {
@@ -1642,7 +1657,16 @@ export function OutreachHistorySection({
 
   return (
     <>
-      <OutreachAIGeneratePanel lang={lang} plan={plan} onNavigateToBilling={onNavigateToBilling} onMarkSent={handleAiMarkSent} onToast={setToast} isMobile={isMobile} />
+      <OutreachAIGeneratePanel
+        lang={lang}
+        plan={plan}
+        onUpgrade={onUpgrade}
+        onUpgradePro={onUpgradePro}
+        onUpgradeScale={onUpgradeScale}
+        onMarkSent={handleAiMarkSent}
+        onToast={setToast}
+        isMobile={isMobile}
+      />
 
       <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
@@ -1897,7 +1921,17 @@ export function OutreachHistorySection({
         </div>
       </div>
 
-      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+      {upgradeFeature && (
+        <UpgradeModal
+          lang={lang}
+          featureKey={upgradeFeature}
+          onClose={() => setUpgradeFeature(null)}
+          onPrimary={() => {
+            runGateUpgrade(upgradeFeature, lang, { onUpgrade, onUpgradePro, onUpgradeScale });
+            setUpgradeFeature(null);
+          }}
+        />
+      )}
 
       {manageEntry && (() => {
         const followUpDisabled = manageEntry.status === "replied" || manageEntry.status === "converted" || !canUseAutoFollowUp(plan);

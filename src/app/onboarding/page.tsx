@@ -19,6 +19,15 @@ import {
   requiresReferralDetails,
   type ReferralSource,
 } from "@/lib/referral-source";
+import {
+  fetchProfileUsernameAvailability,
+  isValidProfileUsername,
+  normalizeProfileUsername,
+  profileUsernameSaveError,
+  profileUsernameStatusColor,
+  profileUsernameStatusMessage,
+  type ProfileUsernameStatus,
+} from "@/lib/profile-username";
 import type { User } from "@supabase/supabase-js";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -135,15 +144,16 @@ export default function OnboardingPage() {
   }, [step]);
 
   useEffect(() => {
-    if (!username || !supabase) { setUsernameStatus("idle"); return; }
-    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) { setUsernameStatus("invalid"); return; }
+    if (!username) { setUsernameStatus("idle"); return; }
+    const normalized = normalizeProfileUsername(username);
+    if (!isValidProfileUsername(normalized)) { setUsernameStatus("invalid"); return; }
     setUsernameStatus("checking");
     const timer = setTimeout(async () => {
-      const { data } = await supabase!.from("profiles").select("id").eq("username", username).neq("id", user?.id ?? "").maybeSingle();
-      setUsernameStatus(data ? "taken" : "available");
+      const status = await fetchProfileUsernameAvailability(normalized);
+      setUsernameStatus(status);
     }, 400);
     return () => clearTimeout(timer);
-  }, [username, user?.id]);
+  }, [username]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -202,7 +212,7 @@ export default function OnboardingPage() {
         id: user.id,
         email: user.email,
         full_name: fullName.trim(),
-        username: username.trim(),
+        username: normalizeProfileUsername(username),
         avatar_url: avatarUrl,
         business_name: businessName.trim(),
         business_type: businessType,
@@ -214,7 +224,7 @@ export default function OnboardingPage() {
         updated_at: new Date().toISOString(),
       }, { onConflict: "id" });
       if (updateErr) {
-        setError(updateErr.message);
+        setError(profileUsernameSaveError(updateErr, lang));
         return false;
       }
 
@@ -562,16 +572,8 @@ function ReferralDetailsInput({
 
 function UsernameInput({ value, onChange, status }: { value: string; onChange: (v: string) => void; status: string }) {
   const lang = useLang();
-  const message =
-    status === "checking" ? (lang === "fr" ? "Vérification..." : "Checking...") :
-    status === "available" ? (lang === "fr" ? "✓ Disponible" : "✓ Available") :
-    status === "taken" ? (lang === "fr" ? "Ce nom est déjà pris" : "Username is taken") :
-    status === "invalid" ? (lang === "fr" ? "3-20 caractères, lettres/chiffres/underscores uniquement" : "3-20 characters, letters/numbers/underscores only") :
-    "";
-  const color =
-    status === "available" ? "#1FB567" :
-    status === "taken" || status === "invalid" ? "#ff6b6b" :
-    "rgba(0,0,0,0.4)";
+  const message = profileUsernameStatusMessage(status as ProfileUsernameStatus, lang);
+  const color = profileUsernameStatusColor(status as ProfileUsernameStatus);
   return (
     <div style={{ marginBottom: 8 }}>
       <FieldLabel>{lang === "fr" ? "Nom d'utilisateur" : "Username"}</FieldLabel>

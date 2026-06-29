@@ -11,10 +11,23 @@ import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preference
 import { formatCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import {
+  fetchProfileUsernameAvailability,
+  isValidProfileUsername,
+  normalizeProfileUsername,
+  profileUsernameInvalidMessage,
+  profileUsernameSaveError,
+  profileUsernameStatusColor,
+  profileUsernameStatusMessage,
+  profileUsernameTakenMessage,
+  type ProfileUsernameStatus,
+} from "@/lib/profile-username";
 
-const GROWTH_MONTHLY = 19;
-const PRO_MONTHLY = 39;
-const SCALE_MONTHLY = 99;
+import { PLAN_PRICES } from "@/lib/plan-marketing";
+
+const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
+const PRO_MONTHLY = PLAN_PRICES.proMonthly;
+const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
 
 const STRIPE_BILLING_PORTAL_LOGIN_URL =
   process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
@@ -553,6 +566,7 @@ function ProfileSettings({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<ProfileUsernameStatus>("idle");
   const avatarFileRef = useRef(avatarFile);
   useEffect(() => { avatarFileRef.current = avatarFile; }, [avatarFile]);
 
@@ -560,7 +574,32 @@ function ProfileSettings({
     setFullName(initialFullName);
     setUsername(initialUsername);
     setAvatarUrl(initialAvatarUrl);
+    setUsernameStatus(initialUsername ? "available" : "idle");
   }, [initialFullName, initialUsername, initialAvatarUrl]);
+
+  useEffect(() => {
+    const normalized = normalizeProfileUsername(username);
+    const current = normalizeProfileUsername(initialUsername);
+
+    if (!normalized) {
+      setUsernameStatus("idle");
+      return;
+    }
+    if (normalized === current) {
+      setUsernameStatus("available");
+      return;
+    }
+    if (!isValidProfileUsername(normalized)) {
+      setUsernameStatus("invalid");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    const timer = setTimeout(() => {
+      void fetchProfileUsernameAvailability(normalized).then(setUsernameStatus);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [username, initialUsername]);
 
   useEffect(() => {
     return () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); };
@@ -583,10 +622,24 @@ function ProfileSettings({
 
   const save = async () => {
     if (!supabase) return;
-    const trimmedUsername = username.trim().toLowerCase();
-    if (trimmedUsername && !/^[a-z0-9_]{3,20}$/.test(trimmedUsername)) {
-      setMessage({ text: "Username must be 3–20 characters (letters, numbers, underscores).", type: "error" });
+    const trimmedUsername = normalizeProfileUsername(username);
+    if (trimmedUsername && !isValidProfileUsername(trimmedUsername)) {
+      setMessage({ text: profileUsernameInvalidMessage(lang), type: "error" });
       return;
+    }
+    if (trimmedUsername && trimmedUsername !== normalizeProfileUsername(initialUsername)) {
+      if (usernameStatus === "checking") {
+        setMessage({ text: lang === "fr" ? "Vérification du pseudo en cours…" : "Checking username availability…", type: "error" });
+        return;
+      }
+      if (usernameStatus === "taken") {
+        setMessage({ text: profileUsernameTakenMessage(lang), type: "error" });
+        return;
+      }
+      if (usernameStatus !== "available") {
+        setMessage({ text: profileUsernameInvalidMessage(lang), type: "error" });
+        return;
+      }
     }
     setSaving(true);
     setMessage(null);
@@ -620,7 +673,7 @@ function ProfileSettings({
 
     setSaving(false);
     if (error) {
-      setMessage({ text: error.message, type: "error" });
+      setMessage({ text: profileUsernameSaveError(error, lang), type: "error" });
       return;
     }
 
@@ -674,11 +727,19 @@ function ProfileSettings({
           <input
             type="text"
             value={username}
-            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            onChange={(e) => {
+              setUsername(e.target.value.toLowerCase());
+              setMessage(null);
+            }}
             placeholder="yourname"
             style={{ ...inputStyle, paddingLeft: 28 }}
           />
         </div>
+        {usernameStatus !== "idle" && (
+          <p style={{ fontSize: 13, color: profileUsernameStatusColor(usernameStatus), margin: "8px 0 0" }}>
+            {profileUsernameStatusMessage(usernameStatus, lang)}
+          </p>
+        )}
       </Field>
       {message && (
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>

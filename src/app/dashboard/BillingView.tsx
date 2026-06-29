@@ -7,15 +7,16 @@ import { formatCurrency } from "@/lib/useCurrency";
 import { TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 
-const GROWTH_MONTHLY = 19;
-const PRO_MONTHLY = 39;
-const SCALE_MONTHLY = 99;
-const GROWTH_ANNUAL = 190;
-const PRO_ANNUAL = 390;
-const SCALE_ANNUAL = 990;
+const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
+const PRO_MONTHLY = PLAN_PRICES.proMonthly;
+const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
+const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
+const PRO_ANNUAL = PLAN_PRICES.proAnnual;
+const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
 
 const STRIPE_BILLING_PORTAL_LOGIN_URL =
   process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
@@ -29,13 +30,6 @@ const PLAN_RANK: Record<PlanTier, number> = {
   pro: 2,
   scale: 3,
 };
-
-function planDisplayName(plan: PlanTier, lang: Lang): string {
-  if (plan === "scale") return "Scale";
-  if (plan === "pro") return "Pro";
-  if (plan === "basic") return "Growth";
-  return lang === "fr" ? "Gratuit" : "Free";
-}
 
 function planAction(
   current: PlanTier,
@@ -108,61 +102,7 @@ function currentPlanPrice(
 }
 
 function planFeatures(lang: Lang, tier: PaidTier): string[] {
-  if (tier === "basic") {
-    return lang === "fr"
-      ? [
-          "20 découvertes / mois",
-          "3 campagnes actives",
-          "15 créateurs gérés",
-          "Outreach IA illimité",
-          "Paiements manuels",
-          "Intégration Shopify",
-        ]
-      : [
-          "20 discoveries / month",
-          "3 active campaigns",
-          "15 managed creators",
-          "Unlimited AI outreach",
-          "Manual payouts",
-          "Shopify integration",
-        ];
-  }
-  if (tier === "pro") {
-    return lang === "fr"
-      ? [
-          "50 découvertes / mois",
-          "15 campagnes actives",
-          "50 créateurs gérés",
-          "Paiements auto + manuels",
-          "Automatisations",
-          "Support prioritaire",
-        ]
-      : [
-          "50 discoveries / month",
-          "15 active campaigns",
-          "50 managed creators",
-          "Auto + manual payouts",
-          "Automation workflows",
-          "Priority support",
-        ];
-  }
-  return lang === "fr"
-    ? [
-        "Tout le plan Pro",
-        "Campagnes illimitées",
-        "Créateurs illimités",
-        "Solde & Stripe Connect",
-        "Multi-boutiques Shopify",
-        "Support dédié",
-      ]
-    : [
-        "Everything in Pro",
-        "Unlimited campaigns",
-        "Unlimited creators",
-        "Balance & Stripe Connect",
-        "Multi-store Shopify",
-        "Dedicated support",
-      ];
+  return getPlanMarketingFeatures(tier, lang, "pricing");
 }
 
 function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
@@ -468,14 +408,14 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
       {
         tier: "basic",
         name: "Growth",
-        description: lang === "fr" ? "Pour lancer vos premières campagnes" : "Launch your first creator campaigns",
+        description: getPlanCardDescription("basic", lang),
         monthly: GROWTH_MONTHLY,
         annualTotal: GROWTH_ANNUAL,
       },
       {
         tier: "pro",
         name: "Pro",
-        description: lang === "fr" ? "Pour scaler avec Shopify & automatisations" : "Scale with Shopify & automations",
+        description: getPlanCardDescription("pro", lang),
         monthly: PRO_MONTHLY,
         annualTotal: PRO_ANNUAL,
         popular: true,
@@ -483,7 +423,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
       {
         tier: "scale",
         name: "Scale",
-        description: lang === "fr" ? "Pour les agences et marques avancées" : "For agencies and advanced brands",
+        description: getPlanCardDescription("scale", lang),
         monthly: SCALE_MONTHLY,
         annualTotal: SCALE_ANNUAL,
       },

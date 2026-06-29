@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
-import { canUseDedicatedSupport, canUsePrioritySupport, type PlanTier } from "@/lib/plan-limits";
+import {
+  canUseDedicatedSupport,
+  canUsePrioritySupport,
+  FREE_LIFETIME_DISCOVERIES,
+  FREE_MAX_MANAGED_CREATORS,
+  FREE_RESULTS_PER_SEARCH,
+  type PlanTier,
+} from "@/lib/plan-limits";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 const SUPPORT_EMAIL = "support@trackit.app";
@@ -91,7 +98,7 @@ const GUIDE_CONTENT: Record<string, { title: string; readTime: string; blocks: G
         number: 1,
         title: "Go to Integrations",
         text: "Navigate to Integrations in the left sidebar. You'll see the Shopify card at the top of the page.",
-        tip: "💡 Tip: You can connect multiple Shopify stores on the Pro and Agency plans.",
+        tip: "💡 Tip: You can connect Shopify on Pro (1 store) or Scale (up to 3 stores).",
       },
       {
         type: "step",
@@ -322,7 +329,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for 50 discoveries/month, 25 results per search, and 50 managed creators.",
+    a: "Yes. The free plan includes 5 lifetime creator discoveries, 5 results per search, and up to 3 managed creators. Upgrade to Growth for 20 discoveries/month and manual payouts, or Pro for Shopify, unlimited AI, and 50 managed creators.",
   },
   {
     q: "How does the AI outreach work?",
@@ -452,8 +459,8 @@ function getShopifyGuideContent(lang: "en" | "fr") {
             : "Navigate to Integrations in the left sidebar. You'll see the Shopify card at the top of the page.",
         tip:
           lang === "fr"
-            ? "💡 Conseil : Vous pouvez connecter plusieurs boutiques Shopify avec les plans Pro et Agency."
-            : "💡 Tip: You can connect multiple Shopify stores on the Pro and Agency plans.",
+            ? "💡 Conseil : Shopify est disponible sur Pro (1 boutique) et Scale (jusqu'à 3 boutiques)."
+            : "💡 Tip: Shopify is available on Pro (1 store) and Scale (up to 3 stores).",
       },
       {
         type: "step" as const,
@@ -497,6 +504,74 @@ function getShopifyGuideContent(lang: "en" | "fr") {
           lang === "fr"
             ? "Boutique qui ne se connecte pas ? Assurez-vous d'utiliser le format .myshopify.com, pas votre domaine personnalisé. Toujours bloqué ? Chattez avec nous."
             : "Store not connecting? Make sure you're using the .myshopify.com format, not your custom domain. Still stuck? Chat with us.",
+      },
+    ],
+  };
+}
+
+function getFreePlanGuideContent(lang: "en" | "fr") {
+  return {
+    title: lang === "fr" ? "Guide du plan gratuit" : "Free plan guide",
+    readTime: lang === "fr" ? "2 min de lecture" : "2 min read",
+    blocks: [
+      {
+        type: "intro" as const,
+        text:
+          lang === "fr"
+            ? `Le plan gratuit vous permet de tester Trackit avec ${FREE_LIFETIME_DISCOVERIES} découvertes à vie, ${FREE_RESULTS_PER_SEARCH} résultats par recherche et jusqu'à ${FREE_MAX_MANAGED_CREATORS} créateurs gérés. Voici comment en tirer le maximum.`
+            : `The free plan lets you try Trackit with ${FREE_LIFETIME_DISCOVERIES} lifetime discoveries, ${FREE_RESULTS_PER_SEARCH} results per search, and up to ${FREE_MAX_MANAGED_CREATORS} managed creators. Here's how to get the most out of it.`,
+      },
+      {
+        type: "section" as const,
+        title: lang === "fr" ? "Vos limites" : "Your limits",
+        text:
+          lang === "fr"
+            ? `• ${FREE_LIFETIME_DISCOVERIES} découvertes au total (chaque scroll ou nouvelle recherche en consomme une)\n• ${FREE_RESULTS_PER_SEARCH} créateurs visibles par recherche\n• ${FREE_MAX_MANAGED_CREATORS} créateurs sauvegardés maximum\n• Filtres avancés réservés aux plans payants`
+            : `• ${FREE_LIFETIME_DISCOVERIES} discoveries total (each scroll or new search uses one)\n• ${FREE_RESULTS_PER_SEARCH} visible creators per search\n• ${FREE_MAX_MANAGED_CREATORS} saved creators maximum\n• Advanced filters reserved for paid plans`,
+      },
+      {
+        type: "step" as const,
+        number: 1,
+        title: lang === "fr" ? "Ouvrez Recherche" : "Open Discovery",
+        text:
+          lang === "fr"
+            ? "Cliquez sur Recherche dans la barre latérale. Le bandeau en haut affiche vos découvertes restantes et le nombre de résultats par recherche."
+            : "Click Discovery in the left sidebar. The banner at the top shows your remaining discoveries and results per search.",
+      },
+      {
+        type: "step" as const,
+        number: 2,
+        title: lang === "fr" ? "Parcourez les créateurs" : "Browse creators",
+        text:
+          lang === "fr"
+            ? `Vous verrez jusqu'à ${FREE_RESULTS_PER_SEARCH} créateurs par recherche, même en mode « Toutes niches ». Faites défiler pour lancer une nouvelle découverte et voir ${FREE_RESULTS_PER_SEARCH} créateurs supplémentaires (jusqu'à épuisement de vos ${FREE_LIFETIME_DISCOVERIES} découvertes).`
+            : `You'll see up to ${FREE_RESULTS_PER_SEARCH} creators per search, even in "All niches" mode. Scroll to run another discovery and see ${FREE_RESULTS_PER_SEARCH} more creators (until you've used all ${FREE_LIFETIME_DISCOVERIES} discoveries).`,
+      },
+      {
+        type: "step" as const,
+        number: 3,
+        title: lang === "fr" ? "Sauvegardez vos favoris" : "Save your favorites",
+        text:
+          lang === "fr"
+            ? `Cliquez sur Sauvegarder sur les cartes qui vous intéressent. Vous pouvez enregistrer jusqu'à ${FREE_MAX_MANAGED_CREATORS} créateurs — choisissez ceux avec le meilleur engagement pour votre niche.`
+            : `Click Save on the cards that interest you. You can save up to ${FREE_MAX_MANAGED_CREATORS} creators — pick those with the best engagement for your niche.`,
+      },
+      {
+        type: "step" as const,
+        number: 4,
+        title: lang === "fr" ? "Passez à Growth quand vous êtes prêt" : "Upgrade to Growth when ready",
+        text:
+          lang === "fr"
+            ? "Growth débloque 20 découvertes/mois, 10 résultats par recherche, les filtres avancés, les paiements manuels et 15 créateurs gérés."
+            : "Growth unlocks 20 discoveries/month, 10 results per search, advanced filters, manual payouts, and 15 managed creators.",
+      },
+      {
+        type: "callout" as const,
+        variant: "tip" as const,
+        text:
+          lang === "fr"
+            ? `💡 Concentrez-vous sur l'engagement (> 3 %) plutôt que le nombre d'abonnés. Avec ${FREE_LIFETIME_DISCOVERIES} découvertes, visez ${FREE_MAX_MANAGED_CREATORS} créateurs très pertinents plutôt qu'une longue liste.`
+            : `💡 Focus on engagement (> 3%) over follower count. With ${FREE_LIFETIME_DISCOVERIES} discoveries, aim for ${FREE_MAX_MANAGED_CREATORS} highly relevant creators rather than a long list.`,
       },
     ],
   };
@@ -812,7 +887,9 @@ function getAnalyticsGuideContent(lang: "en" | "fr") {
 
 function GuideModal({ lang, guideId, onClose }: { lang: "en" | "fr"; guideId: string; onClose: () => void }) {
   const content =
-    guideId === "shopify"
+    guideId === "free-plan"
+      ? getFreePlanGuideContent(lang)
+      : guideId === "shopify"
       ? getShopifyGuideContent(lang)
       : guideId === "discovery"
         ? getDiscoveryGuideContent(lang)
@@ -974,8 +1051,22 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
     [lang, isDedicated, isPriority]
   );
 
-  const guides = useMemo(
-    () => [
+  const guides = useMemo(() => {
+    const all = [
+      ...(plan === "free"
+        ? [
+            {
+              id: "free-plan",
+              icon: "🎁",
+              title: lang === "fr" ? "Guide du plan gratuit" : "Free plan guide",
+              text:
+                lang === "fr"
+                  ? `${FREE_LIFETIME_DISCOVERIES} découvertes, ${FREE_RESULTS_PER_SEARCH} résultats/recherche et ${FREE_MAX_MANAGED_CREATORS} créateurs gérés — comment en profiter.`
+                  : `${FREE_LIFETIME_DISCOVERIES} discoveries, ${FREE_RESULTS_PER_SEARCH} results/search, and ${FREE_MAX_MANAGED_CREATORS} managed creators — how to make the most of it.`,
+              tag: lang === "fr" ? "2 min de lecture" : "2 min read",
+            },
+          ]
+        : []),
       {
         id: "shopify",
         icon: "🔗",
@@ -1011,9 +1102,9 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
         text: lang === "fr" ? "Comprenez quels créateurs génèrent le plus de revenus et pourquoi." : "Understand which creators drive the most revenue and why.",
         tag: lang === "fr" ? "4 min de lecture" : "4 min read",
       },
-    ],
-    [lang]
-  );
+    ];
+    return all;
+  }, [lang, plan]);
 
   const faqItems = useMemo(
     () => [
@@ -1042,8 +1133,8 @@ export function HelpCenterView({ isMobile, plan = "free" }: { isMobile?: boolean
         q: lang === "fr" ? "Y a-t-il un plan gratuit ?" : "Is there a free plan?",
         a:
           lang === "fr"
-            ? "Oui. Le plan gratuit vous donne 5 recherches de créateurs par jour, des modèles de messages de base et 1 connexion boutique Shopify. Passez à Pro pour 50 découvertes/mois, 25 résultats par recherche et 50 créateurs gérés."
-            : "Yes. The free plan gives you 5 creator searches per day, basic outreach templates, and 1 Shopify store connection. Upgrade to Pro for 50 discoveries/month, 25 results per search, and 50 managed creators.",
+            ? "Oui. Le plan gratuit inclut 5 découvertes à vie, 5 résultats par recherche et jusqu'à 3 créateurs gérés. Passez à Growth pour 20 découvertes/mois et les paiements manuels, ou à Pro pour Shopify, l'IA illimitée et 50 créateurs gérés."
+            : "Yes. The free plan includes 5 lifetime creator discoveries, 5 results per search, and up to 3 managed creators. Upgrade to Growth for 20 discoveries/month and manual payouts, or Pro for Shopify, unlimited AI, and 50 managed creators.",
       },
       {
         q: lang === "fr" ? "Comment fonctionne le message IA ?" : "How does the AI outreach work?",

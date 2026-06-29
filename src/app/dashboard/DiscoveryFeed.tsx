@@ -333,7 +333,7 @@ function FilterSidebar({
   isMobile?: boolean;
 }) {
   const t = discoveryCopy(lang);
-  const lock = !isPaid;
+  const searchLocked = !isPaid;
   const [platformNotice, setPlatformNotice] = useState<string | null>(null);
   const platformNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -395,13 +395,11 @@ function FilterSidebar({
         {platforms.map((p) => {
           const active = filters.platform === p.id;
           const paidOnly = p.id === "instagram" || p.id === "youtube";
-          const gated = paidOnly && lock;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => {
-                if (gated) { onLocked(); return; }
                 if (paidOnly) {
                   showPlatformComingSoon();
                   return;
@@ -418,8 +416,8 @@ function FilterSidebar({
                 fontSize: 12,
                 fontWeight: 500,
                 fontFamily: "inherit",
-                cursor: gated ? "not-allowed" : "pointer",
-                opacity: gated ? 0.55 : 1,
+                cursor: "pointer",
+                opacity: 1,
                 letterSpacing: "-0.01em",
               }}
             >
@@ -454,9 +452,14 @@ function FilterSidebar({
           <input
             type="text"
             value={filters.search}
-            onChange={(e) => onChange({ search: e.target.value })}
+            readOnly={searchLocked}
+            onChange={(e) => {
+              if (searchLocked) { onLocked(); return; }
+              onChange({ search: e.target.value });
+            }}
+            onClick={() => { if (searchLocked) onLocked(); }}
             placeholder={t.searchPlaceholder}
-            style={{ ...inputStyle, paddingLeft: 34 }}
+            style={{ ...inputStyle, paddingLeft: 34, cursor: searchLocked ? "not-allowed" : "text", opacity: searchLocked ? 0.65 : 1 }}
           />
         </div>
       </div>
@@ -466,8 +469,6 @@ function FilterSidebar({
           label={t.emailAvailable}
           checked={filters.hasEmail}
           onChange={(v) => onChange({ hasEmail: v })}
-          disabled={lock}
-          onLocked={onLocked}
           onLabel={t.required}
           offLabel={t.all}
         />
@@ -475,8 +476,6 @@ function FilterSidebar({
           label={t.hideSaved}
           checked={filters.hideSaved}
           onChange={(v) => onChange({ hideSaved: v })}
-          disabled={lock}
-          onLocked={onLocked}
           onLabel={t.enabled}
           offLabel={t.disabled}
         />
@@ -487,8 +486,6 @@ function FilterSidebar({
         <FilterSelect
           label={t.niche}
           value={filters.niche}
-          disabled={lock}
-          onLocked={onLocked}
           onChange={(v) => onChange({ niche: v })}
           options={[
             { value: "", label: t.allNiches },
@@ -504,8 +501,6 @@ function FilterSidebar({
         <FilterSelect
           label={t.location}
           value={filters.country}
-          disabled={lock}
-          onLocked={onLocked}
           onChange={(v) => {
             const language = languageFromCountry(v);
             onChange(language != null ? { country: v, language } : { country: v });
@@ -519,8 +514,6 @@ function FilterSidebar({
         <FilterSelect
           label={t.language}
           value={filters.language}
-          disabled={lock}
-          onLocked={onLocked}
           onChange={(v) => onChange({ language: v })}
           options={[
             { value: "", label: t.allLanguages },
@@ -535,8 +528,6 @@ function FilterSidebar({
         <FilterSelect
           label={t.followers}
           value={filters.followersRange}
-          disabled={lock}
-          onLocked={onLocked}
           onChange={(v) => onChange({ followersRange: v })}
           options={[
             { value: "", label: t.all },
@@ -549,8 +540,6 @@ function FilterSidebar({
         <FilterSelect
           label={t.engagementRate}
           value={filters.engagement}
-          disabled={lock}
-          onLocked={onLocked}
           onChange={(v) => onChange({ engagement: v })}
           options={[
             { value: "", label: t.all },
@@ -564,8 +553,6 @@ function FilterSidebar({
           <FilterSelect
             label={t.viewsFrom}
             value={filters.viewsFrom}
-            disabled={lock}
-            onLocked={onLocked}
             onChange={(v) => onChange({ viewsFrom: v })}
             options={[
               { value: "", label: t.all },
@@ -578,8 +565,6 @@ function FilterSidebar({
           <FilterSelect
             label={t.viewsTo}
             value={filters.viewsTo}
-            disabled={lock}
-            onLocked={onLocked}
             onChange={(v) => onChange({ viewsTo: v })}
             options={[
               { value: "", label: t.all },

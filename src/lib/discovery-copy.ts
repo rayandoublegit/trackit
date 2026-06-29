@@ -73,10 +73,10 @@ export function discoveryCopy(lang: Lang) {
     paywallBody: fr
       ? "Accède à tout le feed, aux filtres avancés et au défilement illimité."
       : "Access the full feed, advanced filters, and unlimited scrolling.",
-    filterPaywallTitle: fr ? "Le filtrage est payant" : "Filtering is a paid feature",
+    filterPaywallTitle: fr ? "La recherche manuelle est payante" : "Manual search is a paid feature",
     filterPaywallBody: fr
-      ? "Filtrer par niche, plateforme, abonnés, engagement, pays, langue et plus est réservé aux plans payants."
-      : "Filtering by niche, platform, followers, engagement, country, language, and more is available on paid plans.",
+      ? "Rechercher un @créateur ou un email est réservé aux plans payants. Utilisez les filtres (niche, plateforme, engagement, pays…) pour explorer le catalogue."
+      : "Searching for a @creator or email is available on paid plans. Use filters (niche, platform, engagement, country…) to browse the catalog.",
     morePlatformsComing: fr ? "Plus de plateformes bientôt" : "More platforms coming soon",
     refreshResults: fr ? "Relancer la recherche" : "Refresh results",
     discoveriesRemaining: (used: number, limit: number) =>

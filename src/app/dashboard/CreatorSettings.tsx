@@ -6,6 +6,17 @@ import { useLang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
+import {
+  fetchProfileUsernameAvailability,
+  isValidProfileUsername,
+  normalizeProfileUsername,
+  profileUsernameInvalidMessage,
+  profileUsernameSaveError,
+  profileUsernameStatusColor,
+  profileUsernameStatusMessage,
+  profileUsernameTakenMessage,
+  type ProfileUsernameStatus,
+} from "@/lib/profile-username";
 
 const BLUE = "#0047FF";
 
@@ -23,6 +34,8 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const lang = useLang();
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
+  const [initialUsername, setInitialUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<ProfileUsernameStatus>("idle");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -52,6 +65,8 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       if (!cancelled && data) {
         setFullName(data.full_name ?? "");
         setUsername(data.username ?? "");
+        setInitialUsername(data.username ?? "");
+        setUsernameStatus(data.username ? "available" : "idle");
         const resolved = data.avatar_url && supabase ? await resolveAvatarUrl(supabase, userId, data.avatar_url) : data.avatar_url;
         if (!cancelled) setAvatarUrl(resolved ?? null);
       }
@@ -62,6 +77,30 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   }, [userId]);
 
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
+
+  useEffect(() => {
+    const normalized = normalizeProfileUsername(username);
+    const current = normalizeProfileUsername(initialUsername);
+
+    if (!normalized) {
+      setUsernameStatus("idle");
+      return;
+    }
+    if (normalized === current) {
+      setUsernameStatus("available");
+      return;
+    }
+    if (!isValidProfileUsername(normalized)) {
+      setUsernameStatus("invalid");
+      return;
+    }
+
+    setUsernameStatus("checking");
+    const timer = setTimeout(() => {
+      void fetchProfileUsernameAvailability(normalized).then(setUsernameStatus);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [username, initialUsername]);
 
   useEffect(() => {
     if (!userId) { setStripeLoading(false); return; }
@@ -123,7 +162,25 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
   const handleSave = async () => {
     if (!supabase || !userId) return;
-    const cleanUsername = username.trim().toLowerCase().replace(/^@+/, "").replace(/\s+/g, "");
+    const cleanUsername = normalizeProfileUsername(username);
+    if (cleanUsername && !isValidProfileUsername(cleanUsername)) {
+      setError(profileUsernameInvalidMessage(lang));
+      return;
+    }
+    if (cleanUsername && cleanUsername !== normalizeProfileUsername(initialUsername)) {
+      if (usernameStatus === "checking") {
+        setError(lang === "fr" ? "Vérification du pseudo en cours…" : "Checking username availability…");
+        return;
+      }
+      if (usernameStatus === "taken") {
+        setError(profileUsernameTakenMessage(lang));
+        return;
+      }
+      if (usernameStatus !== "available") {
+        setError(profileUsernameInvalidMessage(lang));
+        return;
+      }
+    }
     setSaving(true); setError(""); setSaved(false);
     try {
       let newAvatarUrl = avatarUrl;
@@ -136,8 +193,9 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
       }
       const { error: updErr } = await supabase.from("profiles").update({ full_name: fullName.trim(), username: cleanUsername || null, avatar_url: newAvatarUrl, updated_at: new Date().toISOString() }).eq("id", userId);
-      if (updErr) { setError(updErr.message); return; }
+      if (updErr) { setError(profileUsernameSaveError(updErr, lang)); return; }
       setUsername(cleanUsername);
+      setInitialUsername(cleanUsername);
       const resolved = newAvatarUrl && supabase ? await resolveAvatarUrl(supabase, userId, newAvatarUrl) : newAvatarUrl;
       setAvatarUrl(resolved ?? null);
       setAvatarFile(null);
@@ -194,8 +252,13 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           <label style={labelStyle}>{lang === "fr" ? "Pseudo (réseaux sociaux)" : "Handle (social media)"}</label>
           <div style={{ position: "relative", marginBottom: 6 }}>
             <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#9A9A9A", fontSize: 15 }}>@</span>
-            <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setSaved(false); }} placeholder="votrepseudo" style={{ ...inputStyle, paddingLeft: 30 }} />
+            <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setSaved(false); setError(""); }} placeholder="votrepseudo" style={{ ...inputStyle, paddingLeft: 30 }} />
           </div>
+          {usernameStatus !== "idle" && (
+            <div style={{ fontSize: 12, color: profileUsernameStatusColor(usernameStatus), marginBottom: 4 }}>
+              {profileUsernameStatusMessage(usernameStatus, lang)}
+            </div>
+          )}
           <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Doit correspondre au pseudo connu par la marque qui vous a invité." : "Should match the handle known by the brand that invited you."}</div>
         </div>
 

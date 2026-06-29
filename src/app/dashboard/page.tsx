@@ -44,6 +44,8 @@ import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
 import { UpgradeModal } from "./UpgradeModal";
+import { UpgradeGate } from "@/components/UpgradeGate";
+import { runGateUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import {
   canAddAnotherShopifyStore,
@@ -656,6 +658,16 @@ function DashboardPageContent() {
           {renderNavSection("tools", true)}
           {renderNavSection("workspace", true)}
         </nav>
+
+        <div
+          style={{
+            flexShrink: 0,
+            padding: sidebarCollapsed ? "8px 4px" : isMobile ? "14px 16px 18px" : "12px 8px 14px",
+            borderTop: "1px solid #F5F5F5",
+          }}
+        >
+          <TrackitTagline sidebar collapsed={sidebarCollapsed} />
+        </div>
       </aside>
 
       <main
@@ -741,27 +753,32 @@ function DashboardPageContent() {
           />
         )}
         {view === "campaigns" && user && (
-          <CampaignsView
-            isMobile={isMobile}
-            plan={plan}
-            onUpgrade={handleUpgradeBasic}
-            onUpgradePro={handleUpgradePro}
-            onUpgradeScale={handleUpgradeScale}
-            userId={user.id}
-            shopifyStore={shopifyStore ?? profile?.shopify_store}
-          />
+          plan === "free" ? (
+            <UpgradeGate featureKey="campaigns" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
+          ) : (
+            <CampaignsView
+              isMobile={isMobile}
+              plan={plan}
+              onUpgrade={handleUpgradeBasic}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+              userId={user.id}
+              shopifyStore={shopifyStore ?? profile?.shopify_store}
+            />
+          )
         )}
         {view === "affiliates" && user && (
           canUseBasicFeatures ? (
             <AffiliatesView userId={user.id} isMobile={isMobile} />
           ) : (
-            <UpgradeGate feature="Affiliates" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+            <UpgradeGate featureKey="affiliates" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "outreach" && (
           <OutreachView
             isMobile={isMobile}
             plan={plan}
+            onUpgrade={handleUpgradeBasic}
             onUpgradePro={handleUpgradePro}
             onUpgradeScale={handleUpgradeScale}
             openSendRequest={outreachSendRequest}
@@ -777,28 +794,28 @@ function DashboardPageContent() {
           (canUseBasicFeatures || isCreator) ? (
             <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onConnectShopify={() => setView("integrations")} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
           ) : (
-            <UpgradeGate feature="Payouts" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+            <UpgradeGate featureKey="payouts" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "balance" && user && (
           canUseBalance(plan) || isCreator ? (
             <BalanceView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
           ) : (
-            <UpgradeGate feature={lang === "fr" ? "Solde" : "Balance"} requiredPlan="Scale" onUpgrade={handleUpgradeScale} isMobile={isMobile} />
+            <UpgradeGate featureKey="balance" onUpgrade={handleUpgradeScale} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "transactions" && user && (
           (canUseBasicFeatures || isCreator) ? (
             <TransactionsView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
           ) : (
-            <UpgradeGate feature="Payments" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+            <UpgradeGate featureKey="transactions" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "invitations" && user && (
           canInviteCreators(plan) ? (
             <InvitationsView userId={user.id} isMobile={isMobile} />
           ) : (
-            <UpgradeGate feature="Invitations" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
+            <UpgradeGate featureKey="invitations" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "scripts" && user && (
@@ -809,26 +826,30 @@ function DashboardPageContent() {
               <ScriptsManager brandId={user.id} isMobile={isMobile} standalone />
             </div>
           ) : (
-            <UpgradeGate feature="Scripts" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
+            <UpgradeGate featureKey="scripts" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "analytics" && user && (
           (canUseBasicFeatures || isCreator) ? (
             <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
           ) : (
-            <UpgradeGate feature="Analytics" requiredPlan="Growth" onUpgrade={handleUpgradeBasic} isMobile={isMobile} />
+            <UpgradeGate featureKey="analytics" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
-        {view === "integrations" && (
-          <IntegrationsView
-            isMobile={isMobile}
-            user={user}
-            plan={plan}
-            shopifyStore={gettingStarted.shopify ? shopifyStore : null}
-            onUpgrade={handleUpgradeBasic}
-            onUpgradePro={handleUpgradePro}
-            onUpgradeScale={handleUpgradeScale}
-          />
+        {view === "integrations" && user && (
+          canUseShopify(plan) ? (
+            <IntegrationsView
+              isMobile={isMobile}
+              user={user}
+              plan={plan}
+              shopifyStore={gettingStarted.shopify ? shopifyStore : null}
+              onUpgrade={handleUpgradeBasic}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+            />
+          ) : (
+            <UpgradeGate featureKey="integrations" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
+          )
         )}
         {view === "notes" && user && (
           <NotesView isMobile={isMobile} userId={user.id} />
@@ -837,7 +858,7 @@ function DashboardPageContent() {
           canUseAutomationWorkflows(plan) ? (
             <AutomationView isMobile={isMobile} plan={plan} onUpgradeScale={handleUpgradeScale} />
           ) : (
-            <UpgradeGate feature="Automation" requiredPlan="Pro" onUpgrade={handleUpgradePro} isMobile={isMobile} />
+            <UpgradeGate featureKey="automation" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
           )
         )}
         {view === "settings" && user && (
@@ -1536,6 +1557,7 @@ function OutreachHeaderActions({
 function OutreachView({
   plan,
   onNavigateToBilling,
+  onUpgrade,
   onUpgradePro,
   onUpgradeScale,
   isMobile,
@@ -1544,6 +1566,7 @@ function OutreachView({
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
+  onUpgrade?: () => void;
   onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
   isMobile?: boolean;
@@ -1560,8 +1583,12 @@ function OutreachView({
     dmPlatform?: (typeof OUTREACH_DM_PLATFORMS)[number];
   } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [upgradeMsg, setUpgradeMsg] = useState<string | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+  const runFeatureUpgrade = (key: GateFeatureKey) => {
+    runGateUpgrade(key, lang, { onUpgrade, onUpgradePro, onUpgradeScale });
+  };
 
   const closePanel = () => {
     setPanel(null);
@@ -1611,7 +1638,17 @@ function OutreachView({
             closePanel();
           }}
         />
-        {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+        {upgradeFeature && (
+          <UpgradeModal
+            lang={lang}
+            featureKey={upgradeFeature}
+            onClose={() => setUpgradeFeature(null)}
+            onPrimary={() => {
+              runFeatureUpgrade(upgradeFeature);
+              setUpgradeFeature(null);
+            }}
+          />
+        )}
       </>
     );
   }
@@ -1624,36 +1661,28 @@ function OutreachView({
           onSend={() => { setSendTemplateId(null); setPanel("send"); }}
           onSeeTemplates={() => {
             if (!canImportTemplates(plan)) {
-              setUpgradeMsg(lang === "fr"
-                ? "🔒 Modèles — Plan Growth requis.\n\nAccédez à vos meilleurs templates et réutilisez-les sur tous vos créateurs.\n\nPassez à Growth →"
-                : "🔒 Templates — Growth plan required.\n\nAccess your best templates and reuse them across all your creators.\n\nUpgrade to Growth →");
+              setUpgradeFeature("templates");
               return;
             }
             setPanel("seeTemplates");
           }}
           onImportTemplate={() => {
             if (!canImportTemplates(plan)) {
-              setUpgradeMsg(lang === "fr"
-                ? "🔒 Import de modèles — Plan Growth requis.\n\nImportez vos meilleurs templates en un clic.\n\nPassez à Growth →"
-                : "🔒 Template import — Growth plan required.\n\nImport your best-performing templates in one click.\n\nUpgrade to Growth →");
+              setUpgradeFeature("templates");
               return;
             }
             setPanel("import");
           }}
           onImportCsv={() => {
             if (!canBulkImportTemplatesCsv(plan)) {
-              setUpgradeMsg(lang === "fr"
-                ? "🔒 Import CSV en masse — Plan Pro requis.\n\nImportez tous vos modèles d'un coup.\n\nPassez à Pro →"
-                : "🔒 Bulk CSV import — Pro plan required.\n\nImport all your templates at once.\n\nUpgrade to Pro →");
+              setUpgradeFeature("bulk-import");
               return;
             }
             setPanel("importCsv");
           }}
           onCreateTemplate={() => {
             if (!canCreateTemplates(plan)) {
-              setUpgradeMsg(lang === "fr"
-                ? "🔒 Créer un modèle — Plan Growth requis.\n\nPassez à Growth →"
-                : "🔒 Create template — Growth plan required.\n\nUpgrade to Growth →");
+              setUpgradeFeature("templates");
               return;
             }
             setPanel("create");
@@ -1667,7 +1696,15 @@ function OutreachView({
           </div>
         )}
 
-        <OutreachHistorySection isMobile={isMobile} plan={plan} onNavigateToBilling={onNavigateToBilling} refreshKey={historyRefreshKey} />
+        <OutreachHistorySection
+          isMobile={isMobile}
+          plan={plan}
+          onNavigateToBilling={onNavigateToBilling}
+          onUpgrade={onUpgrade}
+          onUpgradePro={onUpgradePro}
+          onUpgradeScale={onUpgradeScale}
+          refreshKey={historyRefreshKey}
+        />
         </div>
 
       {panel === "import" && (
@@ -1708,7 +1745,17 @@ function OutreachView({
           onCreate={() => setPanel("create")}
         />
       )}
-      {upgradeMsg && <UpgradeModal lang={lang} message={upgradeMsg} onClose={() => setUpgradeMsg(null)} />}
+      {upgradeFeature && (
+        <UpgradeModal
+          lang={lang}
+          featureKey={upgradeFeature}
+          onClose={() => setUpgradeFeature(null)}
+          onPrimary={() => {
+            runFeatureUpgrade(upgradeFeature);
+            setUpgradeFeature(null);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -3411,9 +3458,9 @@ function IntegrationsView({
                           </button>
                         ) : plan === "basic" ? (
                           <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
-                            {lang === "fr" ? "1 boutique sur Growth. " : "1 store on Growth. "}
+                            {lang === "fr" ? "Shopify nécessite le plan Pro. " : "Shopify requires the Pro plan. "}
                             <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                              {lang === "fr" ? "Multi-boutiques sur Scale →" : "Multi-store on Scale →"}
+                              {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
                             </button>
                           </p>
                         ) : plan === "pro" ? (
@@ -3558,32 +3605,6 @@ function AutomationView({
           </div>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Import</button>
           <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Test</button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function UpgradeGate({
-  feature,
-  requiredPlan,
-  onUpgrade,
-  isMobile,
-}: {
-  feature: string;
-  requiredPlan: string;
-  onUpgrade: () => void;
-  isMobile?: boolean;
-}) {
-  return (
-    <>
-      <PageHeader isMobile={isMobile} title={feature} subtitle={`${feature} is available on the ${requiredPlan} plan and above`} />
-      <div style={{ padding: isMobile ? "16px" : "40px" }}>
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 48 : 80, textAlign: "center" }}>
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: isMobile ? 56 : 72, width: "auto", margin: "0 auto 18px", display: "block" }} />
-          <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Upgrade to unlock {feature}</h3>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 400, marginLeft: "auto", marginRight: "auto" }}>This feature is part of the {requiredPlan} plan. Upgrade your account to start using {feature.toLowerCase()}.</p>
-          <button type="button" style={btnPrimary} onClick={() => void onUpgrade()}>Upgrade to {requiredPlan}</button>
         </div>
       </div>
     </>
@@ -4417,21 +4438,25 @@ function renderSidebarNavIcon(iconKey: string) {
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
-function TrackitTagline() {
+function TrackitTagline({ sidebar, collapsed }: { sidebar?: boolean; collapsed?: boolean }) {
+  if (sidebar && collapsed) return null;
+
   return (
     <span
       style={{
-        fontSize: 14,
+        fontSize: sidebar ? 11 : 14,
         fontWeight: 600,
         color: "#000000",
         letterSpacing: "-0.02em",
-        lineHeight: 1.35,
+        lineHeight: sidebar ? 1.45 : 1.35,
         fontFamily: "inherit",
-        whiteSpace: "nowrap",
+        whiteSpace: sidebar ? "normal" : "nowrap",
+        display: sidebar ? "block" : "inline",
+        textAlign: sidebar ? "center" : undefined,
       }}
     >
       Find it, <span style={{ color: "#0047FF" }}>Track it</span>, Pay it
-      <span style={{ color: "#0047FF", fontSize: 28, lineHeight: 1 }}>.</span>
+      <span style={{ color: "#0047FF", fontSize: sidebar ? 18 : 28, lineHeight: 1 }}>.</span>
     </span>
   );
 }
@@ -4546,7 +4571,7 @@ function DashboardTopBar({
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "flex-end",
         gap: 16,
         padding: "0 24px",
         borderBottom: "1px solid #EFEFEF",
@@ -4555,8 +4580,7 @@ function DashboardTopBar({
         zIndex: 40,
       }}
     >
-      <TrackitTagline />
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
         <div ref={notificationsRef} style={{ position: "relative" }}>
           <button
             type="button"

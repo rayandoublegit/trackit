@@ -2,19 +2,131 @@
 
 import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useLang } from "@/lib/useLang";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
+import { getPlanMarketingFeatures, getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
   weight: "400",
   style: "italic",
 });
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return reduced;
+}
+
+function useInViewOnce<T extends HTMLElement>(threshold = 0.35) {
+  const ref = useRef<T>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold, rootMargin: "0px 0px -20px 0px" },
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return { ref, inView };
+}
+
+function ProcessTypewriter({ text, style }: { text: string; style?: CSSProperties }) {
+  const reduced = usePrefersReducedMotion();
+  const { ref, inView } = useInViewOnce<HTMLSpanElement>();
+  const [displayed, setDisplayed] = useState(reduced ? text : "");
+  const [done, setDone] = useState(reduced);
+
+  useEffect(() => {
+    if (!inView) return;
+    if (reduced) {
+      setDisplayed(text);
+      setDone(true);
+      return;
+    }
+
+    let index = 0;
+    setDisplayed("");
+    setDone(false);
+
+    const interval = window.setInterval(() => {
+      index += 1;
+      setDisplayed(text.slice(0, index));
+      if (index >= text.length) {
+        window.clearInterval(interval);
+        setDone(true);
+      }
+    }, 58);
+
+    return () => window.clearInterval(interval);
+  }, [inView, reduced, text]);
+
+  return (
+    <span ref={ref} style={style} aria-label={text}>
+      {displayed}
+      {!done && !reduced ? <span className="process-typewriter-cursor" aria-hidden>|</span> : null}
+    </span>
+  );
+}
+
+function ProcessCountUp({ target, className }: { target: number; className?: string }) {
+  const reduced = usePrefersReducedMotion();
+  const { ref, inView } = useInViewOnce<HTMLDivElement>();
+  const [value, setValue] = useState(reduced ? target : 0);
+
+  useEffect(() => {
+    if (!inView) return;
+    if (reduced) {
+      setValue(target);
+      return;
+    }
+
+    const duration = 720;
+    const start = performance.now();
+    let raf = 0;
+
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - progress) ** 3;
+      setValue(Math.round(eased * target));
+      if (progress < 1) raf = requestAnimationFrame(tick);
+      else setValue(target);
+    };
+
+    setValue(0);
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [inView, reduced, target]);
+
+  return (
+    <div ref={ref} className={className} aria-label={String(target)}>
+      {value}
+    </div>
+  );
+}
 
 function HeroTrustedTicker({ lang }: { lang: "en" | "fr" }) {
   const [lineIndex, setLineIndex] = useState(0);
@@ -228,63 +340,15 @@ export default function TrackitLanding() {
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : `Every other tool was built for agencies with 10 people and ${formatCurrency(500, lang)}/month budgets. Trackit was built for lean Shopify brands who need results not complexity.`,
   pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
   pricing_save: lang === "fr" ? "−20% annuel" : "Save 20% annual",
-  pricing_basic_desc: lang === "fr" ? "L'entrée idéale pour lancer votre programme créateurs." : "Your entry point — start fast without overcommitting.",
   pricing_pro_desc: lang === "fr" ? "Pour les agences et les équipes qui passent à l'échelle." : "Built for agencies and teams scaling creator programs.",
-  pricing_scale_desc: lang === "fr" ? "Tout Pro, plus la puissance multi-boutiques et l'automatisation." : "Everything in Pro, plus multi-store power and full automation.",
-  pricing_trackit_desc: lang === "fr" ? "Le meilleur rapport qualité-prix. Le choix de la plupart des marques." : "Best value. The plan most brands choose.",
   pricing_scale_pill: lang === "fr" ? "Pour les agences" : "For agencies",
   pricing_most_popular: lang === "fr" ? "Le plus populaire" : "Most Popular",
-  pricing_free_desc: lang === "fr" ? "Commencez sans engagement." : "Get started with no commitment.",
   pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
   pricing_free_cta: lang === "fr" ? "Démarrer gratuitement →" : "Start free →",
   pricing_month: lang === "fr" ? "/mois" : "/month",
   pricing_year: lang === "fr" ? "par an" : "/year",
   pricing_annually: lang === "fr" ? "Annuel" : "Annually",
   pricing_everything_in_pro: lang === "fr" ? "Tout le plan Pro" : "Everything in Pro",
-  // Free
-  feat_5_discoveries_day: lang === "fr" ? "5 découvertes de créateurs (à vie)" : "5 creator discoveries (lifetime)",
-  feat_10_results_per_search: lang === "fr" ? "5 résultats par recherche" : "5 results per search",
-  feat_1_active_campaign: lang === "fr" ? "1 campagne active" : "1 active campaign",
-  feat_5_managed_creators: lang === "fr" ? "3 créateurs gérés" : "3 managed creators",
-  feat_1_ai_outreach_day: lang === "fr" ? "1 message IA/jour" : "1 AI outreach/day",
-  feat_manual_payouts_only: lang === "fr" ? "Paiements manuels uniquement" : "Manual payouts only",
-  feat_basic_analytics: lang === "fr" ? "Analytiques de base" : "Basic analytics",
-  // Growth
-  feat_30_discoveries_day: lang === "fr" ? "20 découvertes/mois" : "20 discoveries/month",
-  feat_50_results_per_search: lang === "fr" ? "10 résultats par recherche" : "10 results per search",
-  feat_3_active_campaigns: lang === "fr" ? "1 campagne active" : "1 active campaign",
-  feat_25_managed_creators: lang === "fr" ? "15 créateurs gérés" : "15 managed creators",
-  feat_50_ai_month: lang === "fr" ? "100 messages IA/mois" : "100 AI messages/month",
-  feat_unlimited_ai_outreach: lang === "fr" ? "Messages IA illimités" : "Unlimited AI outreach",
-  feat_templates_save_import: lang === "fr" ? "Modèles d'outreach (sauvegarde & import)" : "Outreach templates (save & import)",
-  feat_manual_payouts_methods: lang === "fr" ? "Paiements manuels (PayPal, Revolut, IBAN)" : "Manual payouts (PayPal, Revolut, IBAN)",
-  feat_full_analytics: lang === "fr" ? "Tableau de bord analytique complet" : "Full analytics dashboard",
-  feat_shopify_integration: lang === "fr" ? "Intégration Shopify + suivi des ventes par créateur" : "Shopify integration + per-creator sales tracking",
-  feat_creator_portal: lang === "fr" ? "Portail créateur dédié (gains & paiements en temps réel)" : "Dedicated creator portal (real-time earnings & payouts)",
-  feat_invite_creators: lang === "fr" ? "Liens d'invitation créateurs" : "Creator invite links",
-  feat_creator_scripts: lang === "fr" ? "Scripts & briefs pour vos créateurs" : "Scripts & briefs for your creators",
-  feat_affiliate_links: lang === "fr" ? "Liens d'affiliation & suivi" : "Affiliate links & tracking",
-  // Pro
-  feat_unlimited_discoveries: lang === "fr" ? "50 découvertes/mois" : "50 discoveries/month",
-  feat_unlimited_results: lang === "fr" ? "25 résultats/recherche" : "25 results/search",
-  feat_10_active_campaigns: lang === "fr" ? "15 campagnes actives" : "15 active campaigns",
-  feat_100_managed_creators: lang === "fr" ? "50 créateurs gérés" : "50 managed creators",
-  feat_all_templates_csv: lang === "fr" ? "Tous les modèles + import CSV en masse" : "All templates + bulk import via CSV",
-  feat_manual_auto_payouts: lang === "fr" ? "Paiements manuels + automatiques" : "Manual + auto payouts",
-  feat_advanced_analytics_roi: lang === "fr" ? "Analytiques avancées + suivi ROI" : "Advanced analytics + ROI tracking",
-  feat_automation_workflows: lang === "fr" ? "Workflows d'automatisation" : "Automation workflows",
-  feat_priority_support: lang === "fr" ? "Support prioritaire" : "Priority support",
-  // Scale
-  feat_unlimited_campaigns: lang === "fr" ? "Campagnes illimitées" : "Unlimited campaigns",
-  feat_unlimited_managed_creators: lang === "fr" ? "Créateurs gérés illimités" : "Unlimited managed creators",
-  feat_bulk_csv_unlimited: lang === "fr" ? "Import CSV en masse (illimité)" : "Bulk CSV import (unlimited)",
-  feat_auto_payouts_stripe: lang === "fr" ? "Paiements auto (Stripe Connect)" : "Auto payouts (Stripe Connect)",
-  feat_full_automation_agent: lang === "fr" ? "Agent d'automatisation complet" : "Full automation agent",
-  feat_white_label_outreach: lang === "fr" ? "Outreach en marque blanche" : "White-label outreach",
-  feat_multi_store_shopify_3: lang === "fr" ? "Shopify multi-boutiques (3 boutiques)" : "Multi-store Shopify (3 stores)",
-  feat_dedicated_support: lang === "fr" ? "Onboarding dédié + ligne directe fondateur" : "Dedicated onboarding + direct founder line",
-  feat_curation_on_demand: lang === "fr" ? "Curation à la demande (créateurs sourcés pour votre niche)" : "Curation on demand (creators sourced for your niche)",
-  feat_early_access: lang === "fr" ? "Accès anticipé aux nouveaux créateurs (7 jours)" : "Early access to new creators (7 days)",
   footer_tagline: lang === "fr" ? "Une plateforme créée par des fondateurs e-com pour des fondateurs e-com" : "A Platform made by e-com founders to e-com founders",
   footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
   footer_terms: lang === "fr" ? "Conditions générales" : "Terms & Conditions",
@@ -318,56 +382,10 @@ export default function TrackitLanding() {
     </svg>
   );
 
-  const freePricingFeatures = [
-    t.feat_5_discoveries_day,
-    t.feat_10_results_per_search,
-    t.feat_manual_payouts_only,
-    t.feat_basic_analytics,
-  ];
-
-  const growthPricingFeatures = [
-    t.feat_30_discoveries_day,
-    t.feat_50_results_per_search,
-    t.feat_3_active_campaigns,
-    t.feat_25_managed_creators,
-    t.feat_50_ai_month,
-    t.feat_templates_save_import,
-    t.feat_manual_payouts_methods,
-    t.feat_full_analytics,
-    t.feat_affiliate_links,
-  ];
-
-  const proPricingFeatures = [
-    t.feat_unlimited_discoveries,
-    t.feat_unlimited_results,
-    t.feat_10_active_campaigns,
-    t.feat_100_managed_creators,
-    t.feat_unlimited_ai_outreach,
-    t.feat_all_templates_csv,
-    t.feat_manual_auto_payouts,
-    t.feat_advanced_analytics_roi,
-    t.feat_shopify_integration,
-    t.feat_creator_portal,
-    t.feat_invite_creators,
-    t.feat_creator_scripts,
-    t.feat_affiliate_links,
-    t.feat_automation_workflows,
-    t.feat_priority_support,
-  ];
-
-  const scalePricingFeatures = [
-    t.pricing_everything_in_pro,
-    t.feat_unlimited_campaigns,
-    t.feat_unlimited_managed_creators,
-    t.feat_bulk_csv_unlimited,
-    t.feat_auto_payouts_stripe,
-    t.feat_full_automation_agent,
-    t.feat_white_label_outreach,
-    t.feat_multi_store_shopify_3,
-    t.feat_curation_on_demand,
-    t.feat_early_access,
-    t.feat_dedicated_support,
-  ];
+  const freePricingFeatures = getPlanMarketingFeatures("free", lang, "pricing");
+  const growthPricingFeatures = getPlanMarketingFeatures("basic", lang, "full");
+  const proPricingFeatures = getPlanMarketingFeatures("pro", lang, "full");
+  const scalePricingFeatures = getPlanMarketingFeatures("scale", lang, "pricing");
 
   const handleCheckout = async (plan: "growth" | "pro" | "scale", annual?: boolean) => {
     const isEur = (typeof window !== "undefined" && (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en")) === "fr";
@@ -482,6 +500,49 @@ export default function TrackitLanding() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const icons = Array.from(
+      document.querySelectorAll<HTMLElement>("#features .feature-icon-wrapper"),
+    );
+    if (icons.length === 0) return;
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      icons.forEach((icon) => {
+        icon.style.transform = "";
+      });
+      return;
+    }
+
+    const updateFeatureIconParallax = () => {
+      const viewportHeight = window.innerHeight;
+
+      icons.forEach((icon, index) => {
+        const rect = icon.getBoundingClientRect();
+        const enterStart = viewportHeight * 0.94;
+        const enterEnd = viewportHeight * 0.5 - index * 12;
+        const range = enterStart - enterEnd;
+        const rawProgress = range <= 0 ? 1 : (enterStart - rect.top) / range;
+        const progress = Math.min(1, Math.max(0, rawProgress));
+        const eased = 1 - (1 - progress) ** 2.4;
+        const offset = (1 - eased) * 36;
+
+        icon.style.transform = `translateY(${offset}px)`;
+      });
+    };
+
+    updateFeatureIconParallax();
+    window.addEventListener("scroll", updateFeatureIconParallax, { passive: true });
+    window.addEventListener("resize", updateFeatureIconParallax, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", updateFeatureIconParallax);
+      window.removeEventListener("resize", updateFeatureIconParallax);
+      icons.forEach((icon) => {
+        icon.style.transform = "";
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -1003,14 +1064,17 @@ export default function TrackitLanding() {
                           <path d="M35.1 10.7c-0.7 0-1.5 0.2-1.5 0.2s-0.8-2.5-2.3-3.5c-0.7-0.5-1.5-0.6-2.3-0.4l6.1 44.8l7.3-1.8c0 0-5.9-37.4-6-38.2C36.3 11.1 35.8 10.7 35.1 10.7z" fill="#5E8E3E"/>
                           <path d="M25.2 19.6l-1.5 5.7c0 0-1.7-0.8-3.7-0.7c-3 0.2-3 2.1-3 2.5c0.2 2.8 7.5 3.4 7.9 10c0.3 5.2-2.7 8.7-7.1 9c-5.3 0.3-7.9-2.8-7.9-2.8l1.1-4.6c0 0 2.7 2 4.8 1.9c1.4-0.1 1.9-1.2 1.9-2c-0.2-3.7-6.2-3.4-6.5-9.5C10.8 23.6 14.7 18 22 17.5C24.9 17.3 25.2 19.6 25.2 19.6z" fill="white"/>
                         </svg>
-                        <span style={{
-                          color: '#888',
-                          fontWeight: 400,
-                          fontSize: '11px',
-                          lineHeight: '11px',
-                          letterSpacing: '-0.4px',
-                          fontFamily: "'InterDisplay', sans-serif"
-                        }}>Shopify.com</span>
+                        <ProcessTypewriter
+                          text="Shopify.com"
+                          style={{
+                            color: "#888",
+                            fontWeight: 400,
+                            fontSize: "11px",
+                            lineHeight: "11px",
+                            letterSpacing: "-0.4px",
+                            fontFamily: "'InterDisplay', sans-serif",
+                          }}
+                        />
                       </div>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                         <circle cx="12" cy="12" r="9" stroke="#BBB" strokeWidth="1.6"/>
@@ -1088,7 +1152,7 @@ export default function TrackitLanding() {
                   </div>
                 </div>
                 <div className="inf-count">
-                  <div className="inf-num">24</div>
+                  <ProcessCountUp target={24} className="inf-num" />
                   <img
                     className="inf-brand"
                     src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
@@ -1327,9 +1391,9 @@ export default function TrackitLanding() {
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Growth</div>
-                <div className="pricing-desc">{t.pricing_basic_desc}</div>
+                <div className="pricing-desc">{getPlanCardDescription("basic", lang)}</div>
                 <div className="pricing-price">
-                  <span className="pricing-amount">{basicAnnual ? formatCurrency(190, lang) : formatCurrency(19, lang)}</span>
+                  <span className="pricing-amount">{basicAnnual ? formatCurrency(PLAN_PRICES.growthAnnual, lang) : formatCurrency(PLAN_PRICES.growthMonthly, lang)}</span>
                   <span className="pricing-period">{basicAnnual ? t.pricing_year : t.pricing_month}</span>
                 </div>
               </div>
@@ -1363,9 +1427,9 @@ export default function TrackitLanding() {
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Pro</div>
-                <div className="pricing-desc">{t.pricing_trackit_desc}</div>
+                <div className="pricing-desc">{getPlanCardDescription("pro", lang)}</div>
                 <div className="pricing-price">
-                  <span className="pricing-amount">{trackitAnnual ? formatCurrency(390, lang) : formatCurrency(39, lang)}</span>
+                  <span className="pricing-amount">{trackitAnnual ? formatCurrency(PLAN_PRICES.proAnnual, lang) : formatCurrency(PLAN_PRICES.proMonthly, lang)}</span>
                   <span className="pricing-period">{trackitAnnual ? t.pricing_year : t.pricing_month}</span>
                 </div>
               </div>
@@ -1399,9 +1463,9 @@ export default function TrackitLanding() {
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Scale</div>
-                <div className="pricing-desc">{t.pricing_scale_desc}</div>
+                <div className="pricing-desc">{getPlanCardDescription("scale", lang)}</div>
                 <div className="pricing-price">
-                  <span className="pricing-amount">{proAnnual ? formatCurrency(990, lang) : formatCurrency(99, lang)}</span>
+                  <span className="pricing-amount">{proAnnual ? formatCurrency(PLAN_PRICES.scaleAnnual, lang) : formatCurrency(PLAN_PRICES.scaleMonthly, lang)}</span>
                   <span className="pricing-period">{proAnnual ? t.pricing_year : t.pricing_month}</span>
                 </div>
               </div>
@@ -1420,7 +1484,7 @@ export default function TrackitLanding() {
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
                 <div className="pricing-name">Free</div>
-                <div className="pricing-desc">{t.pricing_free_desc}</div>
+                <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
                 <div className="pricing-price">
                   <span className="pricing-amount">{formatCurrency(0, lang)}</span>
                   <span className="pricing-period">{t.pricing_month}</span>

@@ -28,6 +28,7 @@ import {
   parseCompactNumber,
 } from "@/lib/compact-number";
 import { UpgradeModal } from "./UpgradeModal";
+import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { isDetailTab } from "@/lib/dashboard-navigation";
@@ -1628,54 +1629,22 @@ function CampaignUpgradeModal({
   onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
 }) {
-  const max = getMaxActiveCampaigns(plan);
-  const isGrowth = plan === "basic";
-  const isPro = plan === "pro";
+  const modal = getLimitUpgradeModalProps("campaigns", plan, lang);
+  if (!modal) return null;
 
-  const title =
-    isGrowth || isPro
-      ? lang === "fr"
-        ? "Limite de campagnes atteinte"
-        : "Campaign limit reached"
-      : lang === "fr"
-        ? "Créer plus de campagnes"
-        : "Upgrade to create more campaigns";
-
-  const description = isPro
-    ? lang === "fr"
-      ? `Le plan Pro inclut ${max} campagnes actives. Passez à Scale pour des campagnes illimitées.`
-      : `Pro includes ${max} active campaigns. Upgrade to Scale for unlimited campaigns.`
-    : isGrowth
-      ? lang === "fr"
-        ? `Le plan Growth inclut ${max} campagnes actives. Passez à Pro pour jusqu'à 15 campagnes.`
-        : `Growth includes ${max} active campaigns. Upgrade to Pro for up to 10 campaigns.`
-      : lang === "fr"
-        ? `Le plan gratuit inclut ${max} campagne. Passez à Growth pour jusqu'à 3 campagnes.`
-        : `Free includes ${max} campaign. Upgrade to Growth for up to 3 campaigns.`;
-
-  const planBadge = isPro ? "Scale" : isGrowth ? "Pro" : "Growth";
-
-  const primaryLabel = isPro
-    ? lang === "fr"
-      ? `Passer à Scale ${formatCurrency(99, lang)}/mois`
-      : `Upgrade to Scale ${formatCurrency(99, lang)}/mo`
-    : isGrowth
-      ? lang === "fr"
-        ? `Passer à Pro ${formatCurrency(39, lang)}/mois`
-        : `Upgrade to Pro ${formatCurrency(39, lang)}/mo`
-      : lang === "fr"
-        ? `Passer à Growth ${formatCurrency(19, lang)}/mois`
-        : `Upgrade to Growth ${formatCurrency(19, lang)}/mo`;
+  const handlePrimary = () => {
+    if (modal.requiredTier === "scale") void onUpgradeScale?.();
+    else if (modal.requiredTier === "pro") void onUpgradePro?.();
+    else void onUpgrade();
+  };
 
   return (
     <UpgradeModal
       lang={lang}
       onClose={onClose}
-      title={title}
-      description={description}
-      planBadge={planBadge}
-      primaryLabel={primaryLabel}
-      onPrimary={() => void (isPro && onUpgradeScale ? onUpgradeScale() : isGrowth && onUpgradePro ? onUpgradePro() : onUpgrade())}
+      limitKind="campaigns"
+      currentPlan={plan}
+      onPrimary={handlePrimary}
       showAllPlansLink={false}
     />
   );

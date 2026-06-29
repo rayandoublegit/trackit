@@ -106,7 +106,7 @@ export function hasReachedManagedCreatorLimit(plan: PlanTier, creatorCount: numb
 
 export const BASIC_MONTHLY_AI_MESSAGES = 100;
 
-/** Pro + Scale: unlimited AI outreach. Basic: 50/month. */
+/** Pro + Scale: unlimited AI outreach. Basic: 100/month. */
 export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }

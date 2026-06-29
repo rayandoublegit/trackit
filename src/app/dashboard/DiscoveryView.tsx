@@ -29,6 +29,7 @@ import {
   hasReachedManagedCreatorLimit,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
 import { UpgradeModal } from "./UpgradeModal";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import {
@@ -2038,81 +2039,22 @@ export function DiscoveryView({
 
   const dailyDiscoveryLimit = getDailyDiscoveryLimit(plan);
   const handleDiscoveryUpgrade = () => {
-    if (plan === "basic" && onUpgradePro) onUpgradePro();
-    else onUpgrade();
+    if (!discoveryLimitModal) return;
+    if (discoveryLimitModal.requiredTier === "scale") void onUpgradeScale?.();
+    else if (discoveryLimitModal.requiredTier === "pro") void onUpgradePro?.();
+    else void onUpgrade();
   };
 
   const handleCreatorLimitUpgrade = () => {
-    if (plan === "pro" && onUpgradeScale) onUpgradeScale();
-    else if (plan === "basic" && onUpgradePro) onUpgradePro();
-    else onUpgrade();
+    const modal = getLimitUpgradeModalProps("creators", plan, lang);
+    if (!modal) return;
+    if (modal.requiredTier === "scale") void onUpgradeScale?.();
+    else if (modal.requiredTier === "pro") void onUpgradePro?.();
+    else void onUpgrade();
   };
 
-  const creatorLimitTitle =
-    plan === "pro"
-      ? lang === "fr"
-        ? `Limite de ${PRO_MAX_MANAGED_CREATORS} créateurs atteinte`
-        : `${PRO_MAX_MANAGED_CREATORS} creator limit reached`
-      : plan === "basic"
-        ? lang === "fr"
-          ? `Limite de ${BASIC_MAX_MANAGED_CREATORS} créateurs atteinte`
-          : `${BASIC_MAX_MANAGED_CREATORS} creator limit reached`
-        : lang === "fr"
-          ? "Limite de créateurs atteinte"
-          : "Creator limit reached";
-
-  const creatorLimitDescription =
-    plan === "pro"
-      ? lang === "fr"
-        ? "Passez à Scale pour gérer un nombre illimité de créateurs."
-        : "Upgrade to Scale to manage unlimited creators."
-      : plan === "basic"
-        ? lang === "fr"
-          ? "Passez à Pro pour gérer jusqu'à 50 créateurs."
-          : "Upgrade to Pro to manage up to 50 creators."
-        : lang === "fr"
-          ? "Passez à Growth pour gérer jusqu'à 25 créateurs."
-          : "Upgrade to Growth to manage up to 25 creators.";
-
-  const creatorLimitPlanBadge = plan === "pro" ? "Scale" : plan === "basic" ? "Pro" : "Growth";
-
-  const creatorLimitPrimaryLabel =
-    plan === "pro"
-      ? lang === "fr"
-        ? `Passer à Scale ${formatCurrency(99, lang)}/mois`
-        : `Upgrade to Scale ${formatCurrency(99, lang)}/mo`
-      : plan === "basic"
-        ? lang === "fr"
-          ? `Passer à Pro ${formatCurrency(39, lang)}/mois`
-          : `Upgrade to Pro ${formatCurrency(39, lang)}/mo`
-        : lang === "fr"
-          ? `Passer à Growth ${formatCurrency(19, lang)}/mois`
-          : `Upgrade to Growth ${formatCurrency(19, lang)}/mo`;
-
-  const discoveryLimitTitle =
-    dailyDiscoveryLimit != null
-      ? lang === "fr"
-        ? `Vous avez utilisé vos ${dailyDiscoveryLimit} découvertes gratuites`
-        : `You've used your ${dailyDiscoveryLimit} free discoveries`
-      : "";
-
-  const discoveryLimitSubtitle =
-    plan === "basic"
-      ? lang === "fr"
-        ? "Passez à Pro pour 50 découvertes/mois et 25 résultats par recherche."
-        : "Upgrade to Pro for 50 discoveries/month and 25 results per search."
-      : lang === "fr"
-        ? "Les marques qui passent à Growth trouvent 3x plus de créateurs rentables. 20 découvertes par mois, 10 résultats par recherche."
-        : "Brands on Growth find 3x more profitable creators. 20 monthly discoveries, 10 results per search.";
-
-  const discoveryLimitCta =
-    plan === "basic"
-      ? lang === "fr"
-        ? "Passer à Pro →"
-        : "Upgrade to Pro →"
-      : lang === "fr"
-        ? "Passer à Growth →"
-        : "Upgrade to Growth →";
+  const creatorLimitModal = getLimitUpgradeModalProps("creators", plan, lang);
+  const discoveryLimitModal = getLimitUpgradeModalProps("discoveries", plan, lang);
 
   const syncDiscoveryGateState = async (): Promise<number | null> => {
     if (!hasDiscoveryDailyCap(plan) || dailyDiscoveryLimit == null) return null;
@@ -2775,10 +2717,10 @@ export function DiscoveryView({
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   </div>
                   <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
-                    {discoveryLimitTitle}
+                    {discoveryLimitModal?.title}
                   </h3>
                   <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
-                    {discoveryLimitSubtitle}
+                    {discoveryLimitModal?.description}
                   </p>
                   {resetCountdown && (
                     <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
@@ -2791,7 +2733,7 @@ export function DiscoveryView({
                     onClick={handleDiscoveryUpgrade}
                     style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
                   >
-                    {discoveryLimitCta}
+                    {discoveryLimitModal ? `${discoveryLimitModal.primaryLabel} →` : ""}
                   </button>
                 </div>
               </div>
@@ -2878,10 +2820,10 @@ export function DiscoveryView({
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round"/></svg>
                     </div>
                     <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 8 }}>
-                      {discoveryLimitTitle}
+                      {discoveryLimitModal?.title}
                     </h3>
                     <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, marginBottom: 6 }}>
-                      {discoveryLimitSubtitle}
+                      {discoveryLimitModal?.description}
                     </p>
                     {resetCountdown && (
                       <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 18px" }}>
@@ -2894,7 +2836,7 @@ export function DiscoveryView({
                       onClick={handleDiscoveryUpgrade}
                       style={{ background: "#0047FF", color: "#FFFFFF", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em", width: "100%" }}
                     >
-                      {discoveryLimitCta}
+                      {discoveryLimitModal ? `${discoveryLimitModal.primaryLabel} →` : ""}
                     </button>
                   </div>
                 </div>
@@ -2965,14 +2907,12 @@ export function DiscoveryView({
           userName="You"
         />
       )}
-      {upgradeModalOpen && (
+      {upgradeModalOpen && creatorLimitModal && (
         <UpgradeModal
           lang={lang}
           onClose={() => setUpgradeModalOpen(false)}
-          title={creatorLimitTitle}
-          description={creatorLimitDescription}
-          planBadge={creatorLimitPlanBadge}
-          primaryLabel={creatorLimitPrimaryLabel}
+          limitKind="creators"
+          currentPlan={plan}
           onPrimary={handleCreatorLimitUpgrade}
           showAllPlansLink={false}
         />
