@@ -9,6 +9,7 @@ import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from 
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
+import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
@@ -17,10 +18,6 @@ const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
 const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
 const PRO_ANNUAL = PLAN_PRICES.proAnnual;
 const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
-
-const STRIPE_BILLING_PORTAL_LOGIN_URL =
-  process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
-  "https://billing.stripe.com/p/login/7sY28r4L0bXp8x67ck0RG00";
 
 type PaidTier = "basic" | "pro" | "scale";
 

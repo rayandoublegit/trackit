@@ -24,14 +24,11 @@ import {
 } from "@/lib/profile-username";
 
 import { PLAN_PRICES } from "@/lib/plan-marketing";
+import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
 const PRO_MONTHLY = PLAN_PRICES.proMonthly;
 const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
-
-const STRIPE_BILLING_PORTAL_LOGIN_URL =
-  process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
-  "https://billing.stripe.com/p/login/7sY28r4L0bXp8x67ck0RG00";
 
 function planDisplayName(plan: PlanTier, lang: Lang): string {
   if (plan === "scale") return "Scale";

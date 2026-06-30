@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase";
 
-const STRIPE_BILLING_PORTAL_LOGIN_URL = "https://billing.stripe.com/p/login";
+export const STRIPE_BILLING_PORTAL_LOGIN_URL =
+  process.env.NEXT_PUBLIC_STRIPE_BILLING_PORTAL_LOGIN_URL ??
+  "https://billing.stripe.com/p/login/7sY28r4L0bXp8x67ck0RG00";
 
 export async function openStripeBillingPortal(): Promise<void> {
   if (!supabase) {
