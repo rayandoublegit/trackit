@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+const BLUE = "#0047FF";
+
 type Metrics = {
   mrr: number;
   arr: number;
@@ -53,37 +55,48 @@ function money(n: number, currency: string): string {
 function dateShort(iso: string | null): string {
   if (!iso) return "-";
   try {
-    return new Date(iso).toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
   } catch {
     return "-";
   }
 }
 
-const card: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 16,
-  padding: "18px 20px",
-  boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-  border: "1px solid rgba(0,0,0,0.04)",
-};
+function MetricCard({ label, value, hint, accent, danger }: { label: string; value: string | number; hint?: string; accent?: boolean; danger?: boolean }) {
+  return (
+    <div
+      style={{
+        background: accent ? BLUE : "#FFFFFF",
+        border: accent ? "none" : "1px solid #EFEFEF",
+        borderRadius: 16,
+        padding: "22px 24px",
+        boxShadow: accent ? "0 8px 24px rgba(0,71,255,0.15)" : "0 1px 2px rgba(0,0,0,0.03)",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "#9A9A9A", marginBottom: 10, letterSpacing: "-0.01em" }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : danger ? "#D93838" : "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
+        {value}
+      </div>
+      {hint && (
+        <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "#B0B0B0", marginTop: 8, letterSpacing: "-0.01em" }}>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
 
-const roleBadge = (role: string | null): React.CSSProperties => {
-  const r = (role ?? "user").toLowerCase();
-  if (r === "admin") return { background: "#0047FF", color: "#fff" };
-  if (r === "staff") return { background: "#e8f0ff", color: "#0047FF" };
-  return { background: "#f0f0f0", color: "#666" };
-};
-
-const planColor = (plan: string | null): string => {
+const planLabel = (plan: string | null): string => {
   const p = (plan ?? "free").toLowerCase();
-  if (p === "scale") return "#7c3aed";
-  if (p === "pro") return "#0047FF";
-  if (p === "growth" || p === "basic") return "#0891b2";
-  return "#999";
+  return p.charAt(0).toUpperCase() + p.slice(1);
+};
+
+const roleStyle = (role: string | null): React.CSSProperties => {
+  const r = (role ?? "user").toLowerCase();
+  if (r === "admin") return { background: BLUE, color: "#fff" };
+  if (r === "staff") return { background: "#EAF0FF", color: BLUE };
+  return { background: "#F5F5F5", color: "#7A7A7A" };
 };
 
 export default function AdminConsolePage() {
@@ -100,7 +113,7 @@ export default function AdminConsolePage() {
     try {
       const res = await fetch("/api/admin/console", { cache: "no-store" });
       if (res.status === 403) {
-        setError("Acces refuse. Tu dois etre connecte avec un compte admin.");
+        setError("Acces refuse. Connecte-toi avec un compte admin pour voir cette page.");
         setData(null);
         return;
       }
@@ -141,7 +154,7 @@ export default function AdminConsolePage() {
         if (!res.ok || json.error) {
           flash(`Echec: ${json.error || res.status}`);
         } else {
-          flash("Action effectuee");
+          flash("Fait");
           await load();
         }
       } catch (e) {
@@ -158,47 +171,34 @@ export default function AdminConsolePage() {
     const q = query.trim().toLowerCase();
     if (!q) return data.users;
     return data.users.filter((u) =>
-      [u.email, u.full_name, u.username, u.plan, u.role]
-        .filter(Boolean)
-        .some((f) => (f as string).toLowerCase().includes(q))
+      [u.email, u.full_name, u.username, u.plan, u.role].filter(Boolean).some((f) => (f as string).toLowerCase().includes(q))
     );
   }, [data, query]);
 
   const m = data?.metrics;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#fafafa",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        letterSpacing: "-0.01em",
-        color: "#111",
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 20px 64px" }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 40 }} />
-            <div>
-              <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Console staff</h1>
-              <div style={{ fontSize: 12, color: "#888" }}>
-                {data ? `${data.me.email} (${data.me.role})` : "..."}
-              </div>
-            </div>
+    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "InterDisplay, system-ui, -apple-system, sans-serif", color: "#1A1A1A" }}>
+      {/* Header */}
+      <div style={{ borderBottom: "1px solid #EFEFEF", background: "#FFFFFF", padding: "28px 40px 20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <h1 style={{ fontSize: 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0 }}>Console staff</h1>
+            <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: "6px 0 0" }}>
+              {data ? `${data.me.email} · ${data.me.role}` : "Vue d'ensemble du SaaS"}
+            </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             {data && (
               <span
                 style={{
                   fontSize: 11,
-                  fontWeight: 700,
-                  padding: "5px 10px",
+                  fontWeight: 600,
+                  padding: "6px 12px",
                   borderRadius: 999,
-                  background: data.stripeMode === "live" ? "#e8f5e9" : "#fff3e0",
-                  color: data.stripeMode === "live" ? "#2e7d32" : "#e65100",
-                  textTransform: "uppercase",
+                  letterSpacing: "-0.01em",
+                  background: data.stripeMode === "live" ? "#EAF7EE" : "#FFF4E5",
+                  color: data.stripeMode === "live" ? "#1B873F" : "#B25E09",
                 }}
               >
                 Stripe {data.stripeMode}
@@ -206,75 +206,45 @@ export default function AdminConsolePage() {
             )}
             <button
               onClick={() => load()}
-              style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #e5e5e5", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+              style={{ padding: "9px 16px", borderRadius: 10, border: "1px solid #EFEFEF", background: "#FFFFFF", cursor: "pointer", fontSize: 13, fontWeight: 500, fontFamily: "inherit", letterSpacing: "-0.01em" }}
             >
               Rafraichir
             </button>
           </div>
         </div>
+      </div>
 
+      <div style={{ padding: "28px 40px 64px", maxWidth: 1200, margin: "0 auto" }}>
         {error && (
-          <div style={{ ...card, color: "#c62828", marginBottom: 20 }}>{error}</div>
+          <div style={{ border: "1px solid #FFD9D9", background: "#FFF5F5", color: "#D93838", borderRadius: 14, padding: "16px 18px", fontSize: 14, letterSpacing: "-0.01em" }}>
+            {error}
+          </div>
         )}
 
         {loading && !data && (
-          <div style={{ ...card, textAlign: "center", color: "#999", padding: 48 }}>Chargement...</div>
+          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: 48, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>Chargement...</div>
         )}
 
         {m && (
           <>
             {/* Metriques principales */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <div style={card}>
-                <div style={{ fontSize: 13, color: "#888" }}>MRR</div>
-                <div style={{ fontSize: 30, fontWeight: 700, color: "#0047FF" }}>{money(m.mrr, m.currency)}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 13, color: "#888" }}>ARR</div>
-                <div style={{ fontSize: 30, fontWeight: 700 }}>{money(m.arr, m.currency)}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 13, color: "#888" }}>Abonnes actifs</div>
-                <div style={{ fontSize: 30, fontWeight: 700 }}>{m.activeSubscribers}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 13, color: "#888" }}>Churn (mois)</div>
-                <div style={{ fontSize: 30, fontWeight: 700, color: m.churnRatePct > 5 ? "#c62828" : "#2e7d32" }}>
-                  {m.churnRatePct}%
-                </div>
-              </div>
-            </div>
-
-            {/* Metriques secondaires */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12, marginBottom: 14 }}>
-              <div style={card}>
-                <div style={{ fontSize: 12, color: "#888" }}>Nouveaux (mois)</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#2e7d32" }}>+{m.newThisMonth}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 12, color: "#888" }}>Annules (mois)</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: "#c62828" }}>-{m.canceledThisMonth}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 12, color: "#888" }}>En essai</div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>{m.trialing}</div>
-              </div>
-              <div style={card}>
-                <div style={{ fontSize: 12, color: "#888" }}>Impayes</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: m.pastDue > 0 ? "#e65100" : "#111" }}>{m.pastDue}</div>
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 14 }}>
+              <MetricCard label="MRR" value={money(m.mrr, m.currency)} hint={`${money(m.arr, m.currency)} ARR`} accent />
+              <MetricCard label="Abonnes actifs" value={m.activeSubscribers} hint={`+${m.newThisMonth} ce mois`} />
+              <MetricCard label="Churn (mois)" value={`${m.churnRatePct}%`} hint={`${m.canceledThisMonth} annulations`} danger={m.churnRatePct > 5} />
+              <MetricCard label="En essai" value={m.trialing} hint={m.pastDue > 0 ? `${m.pastDue} impayes` : "aucun impaye"} />
             </div>
 
             {/* MRR par plan */}
             {Object.keys(m.mrrByPlan).length > 0 && (
-              <div style={{ ...card, marginBottom: 22 }}>
-                <div style={{ fontSize: 13, color: "#888", marginBottom: 12 }}>MRR par plan</div>
-                <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+              <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 24px", marginBottom: 28, background: "#FFFFFF" }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 16, letterSpacing: "-0.01em" }}>MRR PAR PLAN</div>
+                <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
                   {Object.entries(m.mrrByPlan).sort((a, b) => b[1] - a[1]).map(([plan, val]) => (
                     <div key={plan}>
-                      <div style={{ fontSize: 12, color: planColor(plan), fontWeight: 700, textTransform: "capitalize" }}>{plan}</div>
-                      <div style={{ fontSize: 18, fontWeight: 700 }}>{money(val, m.currency)}</div>
-                      <div style={{ fontSize: 11, color: "#999" }}>{m.countByPlan[plan] ?? 0} abonnes</div>
+                      <div style={{ fontSize: 13, color: "#7A7A7A", fontWeight: 500, letterSpacing: "-0.01em", marginBottom: 4 }}>{planLabel(plan)}</div>
+                      <div style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{money(val, m.currency)}</div>
+                      <div style={{ fontSize: 12, color: "#B0B0B0", marginTop: 2 }}>{m.countByPlan[plan] ?? 0} abonnes</div>
                     </div>
                   ))}
                 </div>
@@ -282,80 +252,78 @@ export default function AdminConsolePage() {
             )}
 
             {/* Recherche */}
-            <div style={{ marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>Utilisateurs</h2>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Rechercher par email, nom, plan, role..."
-                style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1px solid #e5e5e5", fontSize: 14, fontFamily: "inherit" }}
+                placeholder="Rechercher..."
+                style={{ width: 280, padding: "9px 14px", borderRadius: 10, border: "1px solid #EFEFEF", fontSize: 14, fontFamily: "inherit", letterSpacing: "-0.01em", outline: "none" }}
               />
-              <span style={{ fontSize: 13, color: "#888", whiteSpace: "nowrap" }}>{filtered.length} / {data?.users.length}</span>
             </div>
 
             {/* Table users */}
-            <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+            <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", background: "#FFFFFF" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: "#f7f7f8", textAlign: "left", color: "#666" }}>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>User</th>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>Plan</th>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>Abo</th>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>Role</th>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>Inscrit</th>
-                      <th style={{ padding: "12px 14px", fontWeight: 600 }}>Actions</th>
+                    <tr style={{ background: "#FAFAFA", textAlign: "left", color: "#9A9A9A" }}>
+                      <th style={{ padding: "12px 16px", fontWeight: 500, letterSpacing: "-0.01em" }}>Utilisateur</th>
+                      <th style={{ padding: "12px 16px", fontWeight: 500 }}>Plan</th>
+                      <th style={{ padding: "12px 16px", fontWeight: 500 }}>Abonnement</th>
+                      <th style={{ padding: "12px 16px", fontWeight: 500 }}>Role</th>
+                      <th style={{ padding: "12px 16px", fontWeight: 500 }}>Inscrit</th>
+                      <th style={{ padding: "12px 16px", fontWeight: 500 }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((u) => (
-                      <tr key={u.id} style={{ borderTop: "1px solid #f0f0f0" }}>
-                        <td style={{ padding: "12px 14px" }}>
-                          <div style={{ fontWeight: 600 }}>{u.email ?? "(sans email)"}</div>
-                          <div style={{ fontSize: 11, color: "#999" }}>{u.full_name || u.username || u.id.slice(0, 8)}</div>
+                      <tr key={u.id} style={{ borderTop: "1px solid #F2F2F2" }}>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.01em" }}>{u.email ?? "(sans email)"}</div>
+                          <div style={{ fontSize: 11, color: "#B0B0B0", marginTop: 2 }}>{u.full_name || u.username || u.id.slice(0, 8)}</div>
                         </td>
-                        <td style={{ padding: "12px 14px" }}>
-                          <span style={{ color: planColor(u.plan), fontWeight: 700, textTransform: "capitalize" }}>{u.plan ?? "free"}</span>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{planLabel(u.plan)}</span>
                         </td>
-                        <td style={{ padding: "12px 14px" }}>
-                          <span style={{ fontSize: 11, color: u.subscription_active ? "#2e7d32" : "#999" }}>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{ fontSize: 12, color: u.subscription_active ? "#1B873F" : "#B0B0B0" }}>
                             {u.subscription_status ?? (u.subscription_active ? "active" : "-")}
                           </span>
                         </td>
-                        <td style={{ padding: "12px 14px" }}>
+                        <td style={{ padding: "12px 16px" }}>
                           <select
                             value={(u.role ?? "user").toLowerCase()}
                             disabled={busyId === u.id}
-                            onChange={(e) =>
-                              act(u.id, "role", e.target.value, `Changer le role de ${u.email} en "${e.target.value}" ?`)
-                            }
-                            style={{ ...roleBadge(u.role), border: "none", borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", appearance: "none" }}
+                            onChange={(e) => act(u.id, "role", e.target.value, `Passer ${u.email} en "${e.target.value}" ?`)}
+                            style={{ ...roleStyle(u.role), border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 11, fontWeight: 600, cursor: "pointer", appearance: "none", fontFamily: "inherit", letterSpacing: "-0.01em" }}
                           >
                             <option value="user">user</option>
                             <option value="staff">staff</option>
                             <option value="admin">admin</option>
                           </select>
                         </td>
-                        <td style={{ padding: "12px 14px", color: "#888" }}>{dateShort(u.created_at)}</td>
-                        <td style={{ padding: "12px 14px" }}>
+                        <td style={{ padding: "12px 16px", color: "#9A9A9A" }}>{dateShort(u.created_at)}</td>
+                        <td style={{ padding: "12px 16px" }}>
                           {u.stripe_subscription_id ? (
                             <div style={{ display: "flex", gap: 6 }}>
                               <button
                                 disabled={busyId === u.id}
-                                onClick={() => act(u.id, "cancel", undefined, `Programmer l'annulation de l'abonnement de ${u.email} a la fin de la periode ?`)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #e5e5e5", background: "#fff", cursor: "pointer", fontSize: 11 }}
+                                onClick={() => act(u.id, "cancel", undefined, `Programmer l'annulation de ${u.email} a la fin de la periode payee ?`)}
+                                style={{ padding: "6px 11px", borderRadius: 8, border: "1px solid #EFEFEF", background: "#FFFFFF", cursor: "pointer", fontSize: 11, fontFamily: "inherit", color: "#5A5A5A", letterSpacing: "-0.01em" }}
                               >
                                 Annuler (fin periode)
                               </button>
                               <button
                                 disabled={busyId === u.id}
-                                onClick={() => act(u.id, "cancelNow", undefined, `ANNULER IMMEDIATEMENT l'abonnement de ${u.email} ? Le client perd l'acces tout de suite.`)}
-                                style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #fdd", background: "#fff5f5", color: "#c62828", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                                onClick={() => act(u.id, "cancelNow", undefined, `ANNULER MAINTENANT l'abonnement de ${u.email} ? Acces coupe immediatement.`)}
+                                style={{ padding: "6px 11px", borderRadius: 8, border: "1px solid #FFD9D9", background: "#FFF5F5", color: "#D93838", cursor: "pointer", fontSize: 11, fontWeight: 500, fontFamily: "inherit", letterSpacing: "-0.01em" }}
                               >
                                 Annuler now
                               </button>
                             </div>
                           ) : (
-                            <span style={{ fontSize: 11, color: "#bbb" }}>pas d&apos;abo</span>
+                            <span style={{ fontSize: 11, color: "#C8C8C8" }}>pas d&apos;abonnement</span>
                           )}
                         </td>
                       </tr>
@@ -364,13 +332,16 @@ export default function AdminConsolePage() {
                 </table>
               </div>
             </div>
+            <div style={{ fontSize: 12, color: "#B0B0B0", marginTop: 10, letterSpacing: "-0.01em" }}>
+              {filtered.length} / {data?.users.length} utilisateurs
+            </div>
           </>
         )}
       </div>
 
       {/* Toast */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#111", color: "#fff", padding: "10px 18px", borderRadius: 10, fontSize: 13, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+        <div style={{ position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1A1A1A", color: "#fff", padding: "11px 20px", borderRadius: 12, fontSize: 13, fontWeight: 500, letterSpacing: "-0.01em", boxShadow: "0 8px 24px rgba(0,0,0,0.18)" }}>
           {toast}
         </div>
       )}
