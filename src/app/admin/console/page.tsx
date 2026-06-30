@@ -33,8 +33,13 @@ type AdminUser = {
   created_at: string | null;
 };
 
+type GrowthPoint = { month: string; newSubs: number; canceledSubs: number; netMrrAdded: number };
+type Funnel = { signups: number; onboarded: number; paying: number; onboardRatePct: number; payRatePct: number };
+type Growth = { monthly: GrowthPoint[]; arpu: number; ltv: number; funnel: Funnel; currency: string };
+
 type ConsoleData = {
   metrics: Metrics;
+  growth: Growth;
   users: AdminUser[];
   stripeMode: string;
   me: { email: string; role: string };
@@ -98,6 +103,60 @@ const roleStyle = (role: string | null): React.CSSProperties => {
   if (r === "staff") return { background: "#EAF0FF", color: BLUE };
   return { background: "#F5F5F5", color: "#7A7A7A" };
 };
+
+function shortMonth(m: string): string {
+  const [, mm] = m.split("-");
+  const names = ["", "jan", "fev", "mar", "avr", "mai", "juin", "juil", "aou", "sep", "oct", "nov", "dec"];
+  return names[parseInt(mm, 10)] ?? m;
+}
+
+function MrrChart({ points, currency }: { points: GrowthPoint[]; currency: string }) {
+  const W = 720, H = 200, padL = 8, padR = 8, padT = 16, padB = 28;
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const max = Math.max(1, ...points.map((p) => p.netMrrAdded));
+  const n = points.length;
+  const barGap = 14;
+  const barW = n > 0 ? (innerW - barGap * (n - 1)) / n : 0;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      {points.map((p, i) => {
+        const h = (p.netMrrAdded / max) * innerH;
+        const x = padL + i * (barW + barGap);
+        const y = padT + innerH - h;
+        return (
+          <g key={p.month}>
+            <rect x={x} y={y} width={barW} height={Math.max(h, 2)} rx={6} fill="#0047FF" opacity={0.9} />
+            <text x={x + barW / 2} y={H - 10} textAnchor="middle" fontSize={11} fill="#9A9A9A" fontFamily="InterDisplay, sans-serif">
+              {shortMonth(p.month)}
+            </text>
+            {p.netMrrAdded > 0 && (
+              <text x={x + barW / 2} y={y - 6} textAnchor="middle" fontSize={10} fill="#1A1A1A" fontFamily="InterDisplay, sans-serif" fontWeight={600}>
+                {Math.round(p.netMrrAdded)}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function FunnelBar({ label, count, total, pct, color }: { label: string; count: number; total: number; pct: number; color: string }) {
+  const width = total > 0 ? Math.max(2, (count / total) * 100) : 0;
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+        <span style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, letterSpacing: "-0.01em" }}>{label}</span>
+        <span style={{ fontSize: 13, color: "#7A7A7A" }}>{count} · {pct}%</span>
+      </div>
+      <div style={{ height: 10, borderRadius: 999, background: "#F2F2F2", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${width}%`, borderRadius: 999, background: color, transition: "width 0.4s ease" }} />
+      </div>
+    </div>
+  );
+}
 
 export default function AdminConsolePage() {
   const [data, setData] = useState<ConsoleData | null>(null);
@@ -249,6 +308,33 @@ export default function AdminConsolePage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Croissance: ARPU / LTV + graphe MRR + funnel */}
+            {data?.growth && (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 14 }}>
+                  <MetricCard label="ARPU (par abonne)" value={money(data.growth.arpu, data.growth.currency)} hint="revenu moyen mensuel" />
+                  <MetricCard label="LTV estimee" value={money(data.growth.ltv, data.growth.currency)} hint="ARPU / churn" />
+                  <MetricCard label="Taux de conversion" value={`${data.growth.funnel.payRatePct}%`} hint={`${data.growth.funnel.paying} payants / ${data.growth.funnel.signups} inscrits`} />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 14, marginBottom: 28 }}>
+                  {/* Graphe MRR ajoute par mois */}
+                  <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 24px", background: "#FFFFFF" }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 16, letterSpacing: "-0.01em" }}>MRR AJOUTE PAR MOIS (6 MOIS)</div>
+                    <MrrChart points={data.growth.monthly} currency={data.growth.currency} />
+                  </div>
+
+                  {/* Funnel */}
+                  <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 24px", background: "#FFFFFF" }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 16, letterSpacing: "-0.01em" }}>FUNNEL DE CONVERSION</div>
+                    <FunnelBar label="Inscrits" count={data.growth.funnel.signups} total={data.growth.funnel.signups} pct={100} color="#1A1A1A" />
+                    <FunnelBar label="Onboarding fini" count={data.growth.funnel.onboarded} total={data.growth.funnel.signups} pct={data.growth.funnel.onboardRatePct} color="#6E9BFF" />
+                    <FunnelBar label="Payants" count={data.growth.funnel.paying} total={data.growth.funnel.signups} pct={data.growth.funnel.payRatePct} color="#0047FF" />
+                  </div>
+                </div>
+              </>
             )}
 
             {/* Recherche */}

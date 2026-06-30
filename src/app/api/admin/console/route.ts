@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/admin-auth";
 import { computeMetrics } from "@/lib/admin-metrics";
+import { computeGrowth } from "@/lib/admin-growth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,15 @@ export async function GET(req: NextRequest) {
     // Metriques business (Stripe = source de verite argent)
     const metrics = await computeMetrics(stripe);
 
+    // Donnees de croissance: serie mensuelle, ARPU, LTV, funnel
+    const growth = await computeGrowth(
+      stripe,
+      db,
+      metrics.churnRatePct,
+      metrics.mrr,
+      metrics.activeSubscribers
+    );
+
     // Liste des users depuis profiles (etat applicatif)
     const { data: users, error } = await db
       .from("profiles")
@@ -44,6 +54,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       me: admin,
       metrics,
+      growth,
       users: users ?? [],
       stripeMode: stripeKey.startsWith("sk_live") ? "live" : "test",
     });
