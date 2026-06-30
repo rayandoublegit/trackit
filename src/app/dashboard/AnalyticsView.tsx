@@ -63,6 +63,17 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const [sortKey, setSortKey] = useState<SortKey>("sales");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const refreshAnalytics = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`/api/analytics?userId=${userId}&range=${range}`);
+      const data = await res.json();
+      setAnalyticsData(data);
+    } catch {
+      /* keep current data */
+    }
+  }, [userId, range]);
+
   useEffect(() => {
     if (!userId) {
       setLoadingData(false);
@@ -113,16 +124,6 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   useEffect(() => {
     if (!userId) return;
 
-    const refreshAnalytics = async () => {
-      try {
-        const res = await fetch(`/api/analytics?userId=${userId}&range=${range}`);
-        const data = await res.json();
-        setAnalyticsData(data);
-      } catch {
-        /* keep current data */
-      }
-    };
-
     window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
     window.addEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
     window.addEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
@@ -133,7 +134,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
       window.removeEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
       window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, refreshAnalytics);
     };
-  }, [userId, range]);
+  }, [userId, refreshAnalytics]);
 
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
@@ -296,12 +297,14 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
         if (userId) {
           notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, userId);
         }
-        setSaleMsg(lang === "fr" ? `Vente ajoutée — ${data.commissionAmount}€ de commission créditée` : `Sale added — ${data.commissionAmount}€ commission credited`);
         dispatchSalesUpdated();
-        setTimeout(() => {
-          setShowSaleModal(false);
-          setSaleBusy(false);
-        }, 1200);
+        setShowSaleModal(false);
+        setSaleBusy(false);
+        setSaleAmount("");
+        setSaleDate("");
+        setSaleCampaignId("");
+        setSaleMsg("");
+        void refreshAnalytics();
       } else {
         setSaleMsg(
           data.code === COMMISSION_NOT_CONFIGURED_CODE
@@ -374,7 +377,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             </select>
           </>
         )}
-        {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") || saleMsg.includes("commission credited") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
+        {saleMsg ? <div style={{ fontSize: 13, color: "#C0392B", marginBottom: 12 }}>{saleMsg}</div> : null}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button type="button" disabled={saleBusy} onClick={closeSaleModal} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
           <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>

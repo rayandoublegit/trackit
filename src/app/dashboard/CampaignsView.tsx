@@ -4798,14 +4798,9 @@ function AddSaleOnboarding({
           (lang === "fr" ? "un créateur" : "a creator");
         const orderTotal = Number.parseFloat(amount) || 0;
         notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, resolvedUserId);
-        setMessageTone("success");
-        setMessage(
-          lang === "fr"
-            ? `Vente ajoutée — ${formatCurrencyWithCode(data.commissionAmount ?? 0, amountCurrency)} de commission créditée`
-            : `Sale added — ${formatCurrencyWithCode(data.commissionAmount ?? 0, amountCurrency)} commission credited`,
-        );
+        setSubmitting(false);
         await onSuccess?.(saleDate || undefined);
-        setTimeout(() => onClose(), 900);
+        onClose();
         return;
       }
 
