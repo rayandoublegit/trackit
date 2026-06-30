@@ -2925,10 +2925,11 @@ function ShopifyConnectPage({
 
             <div
               style={{
-                marginTop: 24,
-                width: isMobile ? 160 : 200,
-                aspectRatio: "1 / 1",
-                borderRadius: 10,
+                marginTop: 28,
+                width: "100%",
+                maxWidth: isMobile ? 280 : 380,
+                aspectRatio: "16 / 9",
+                borderRadius: 12,
                 overflow: "hidden",
               }}
             >
@@ -2941,7 +2942,8 @@ function ShopifyConnectPage({
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover",
+                  objectFit: "contain",
+                  background: "#F7F8FA",
                   display: "block",
                 }}
                 aria-label={lang === "fr" ? "Tutoriel connexion Shopify" : "Shopify connect tutorial"}
