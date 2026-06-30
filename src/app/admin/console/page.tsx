@@ -37,6 +37,9 @@ type GrowthPoint = { month: string; newSubs: number; canceledSubs: number; netMr
 type Funnel = { signups: number; onboarded: number; paying: number; onboardRatePct: number; payRatePct: number };
 type Growth = { monthly: GrowthPoint[]; arpu: number; ltv: number; funnel: Funnel; currency: string };
 
+type SubDetail = { status: string; currentPeriodEnd: number | null; cancelAtPeriodEnd: boolean; amount: number; currency: string; interval: string | null; priceId: string | null };
+type Invoice = { id: string; amountPaid: number; currency: string; status: string | null; created: number; pdf: string | null };
+
 type ConsoleData = {
   metrics: Metrics;
   growth: Growth;
@@ -165,6 +168,9 @@ export default function AdminConsolePage() {
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
+  const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
+  const [detail, setDetail] = useState<{ profile: Record<string, unknown>; subscription: SubDetail | null; invoices: Invoice[] } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -224,6 +230,21 @@ export default function AdminConsolePage() {
     },
     [load]
   );
+
+  const openDetail = useCallback(async (u: AdminUser) => {
+    setDetailUser(u);
+    setDetail(null);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/admin/console/user/detail?userId=${u.id}`, { cache: "no-store" });
+      const json = await res.json();
+      if (json.ok) setDetail({ profile: json.profile, subscription: json.subscription, invoices: json.invoices });
+    } catch {
+      /* ignore */
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -365,8 +386,8 @@ export default function AdminConsolePage() {
                   <tbody>
                     {filtered.map((u) => (
                       <tr key={u.id} style={{ borderTop: "1px solid #F2F2F2" }}>
-                        <td style={{ padding: "12px 16px" }}>
-                          <div style={{ fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.01em" }}>{u.email ?? "(sans email)"}</div>
+                        <td style={{ padding: "12px 16px", cursor: "pointer" }} onClick={() => openDetail(u)}>
+                          <div style={{ fontWeight: 500, color: "#0047FF", letterSpacing: "-0.01em" }}>{u.email ?? "(sans email)"}</div>
                           <div style={{ fontSize: 11, color: "#B0B0B0", marginTop: 2 }}>{u.full_name || u.username || u.id.slice(0, 8)}</div>
                         </td>
                         <td style={{ padding: "12px 16px" }}>
@@ -424,6 +445,89 @@ export default function AdminConsolePage() {
           </>
         )}
       </div>
+
+      {/* Drawer detail user */}
+      {detailUser && (
+        <div
+          onClick={() => { setDetailUser(null); setDetail(null); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.25)", zIndex: 50, display: "flex", justifyContent: "flex-end" }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(480px, 100%)", height: "100%", background: "#FFFFFF", boxShadow: "-8px 0 32px rgba(0,0,0,0.12)", overflowY: "auto", padding: "28px 28px 48px" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{detailUser.email}</div>
+                <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 2 }}>{detailUser.full_name || detailUser.username || detailUser.id}</div>
+              </div>
+              <button onClick={() => { setDetailUser(null); setDetail(null); }} style={{ border: "none", background: "transparent", fontSize: 22, color: "#9A9A9A", cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+
+            {detailLoading && <div style={{ color: "#9A9A9A", fontSize: 14, padding: "20px 0" }}>Chargement...</div>}
+
+            {detail && (
+              <>
+                {/* Abonnement Stripe */}
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>ABONNEMENT STRIPE</div>
+                  {detail.subscription ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Statut</div><div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{detail.subscription.status}</div></div>
+                      <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Montant</div><div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{money(detail.subscription.amount, detail.subscription.currency)}/{detail.subscription.interval ?? "?"}</div></div>
+                      <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Prochaine facture</div><div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{detail.subscription.currentPeriodEnd ? dateShort(new Date(detail.subscription.currentPeriodEnd * 1000).toISOString()) : "-"}</div></div>
+                      <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Annulation prevue</div><div style={{ fontSize: 14, fontWeight: 500, color: detail.subscription.cancelAtPeriodEnd ? "#D93838" : "#1A1A1A" }}>{detail.subscription.cancelAtPeriodEnd ? "Oui" : "Non"}</div></div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#B0B0B0" }}>Aucun abonnement Stripe</div>
+                  )}
+                </div>
+
+                {/* Shopify */}
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>SHOPIFY</div>
+                  {detail.profile.shopify_store || detail.profile.shopify_store_url ? (
+                    <div style={{ fontSize: 14, color: "#1A1A1A" }}>{String(detail.profile.shopify_store_url || detail.profile.shopify_store)}</div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#B0B0B0" }}>Pas de store connecte</div>
+                  )}
+                </div>
+
+                {/* Usage + infos */}
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px", marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>USAGE & INFOS</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Recherches (jour)</div><div style={{ fontSize: 14, fontWeight: 500 }}>{String(detail.profile.searches_used_today ?? 0)}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Decouvertes</div><div style={{ fontSize: 14, fontWeight: 500 }}>{String(detail.profile.discoveries_used ?? 0)}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Niche</div><div style={{ fontSize: 14, fontWeight: 500 }}>{String(detail.profile.niche ?? "-")}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Source</div><div style={{ fontSize: 14, fontWeight: 500 }}>{String(detail.profile.referral_source ?? "-")}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Onboarding</div><div style={{ fontSize: 14, fontWeight: 500 }}>{detail.profile.onboarding_completed ? "Fini" : "En cours"}</div></div>
+                    <div><div style={{ fontSize: 11, color: "#B0B0B0" }}>Entreprise</div><div style={{ fontSize: 14, fontWeight: 500 }}>{String(detail.profile.business_name ?? "-")}</div></div>
+                  </div>
+                </div>
+
+                {/* Factures */}
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>DERNIERES FACTURES</div>
+                  {detail.invoices.length > 0 ? (
+                    detail.invoices.map((inv) => (
+                      <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #F5F5F5" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{money(inv.amountPaid, inv.currency)}</div>
+                          <div style={{ fontSize: 11, color: "#B0B0B0" }}>{dateShort(new Date(inv.created * 1000).toISOString())} · {inv.status ?? "?"}</div>
+                        </div>
+                        {inv.pdf && <a href={inv.pdf} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0047FF", textDecoration: "none" }}>PDF</a>}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#B0B0B0" }}>Aucune facture</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
