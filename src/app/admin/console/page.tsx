@@ -542,6 +542,41 @@ export default function AdminConsolePage() {
                   )}
                 </div>
 
+                {/* Changement de plan (upgrade/downgrade avec proration immediate) */}
+                {detail.subscription && (
+                  <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px", marginBottom: 14 }}>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>CHANGER DE PLAN</div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {(["growth", "pro", "scale"] as const).map((plan) => {
+                        const planLabel = { growth: "Growth (19$)", pro: "Pro (39$)", scale: "Scale (99$)" }[plan];
+                        const isCurrent = String(detailUser.plan ?? "").toLowerCase() === plan;
+                        return (
+                          <button
+                            key={plan}
+                            disabled={isCurrent}
+                            onClick={() => act(detailUser.id, "changePlan", plan, `Passer ${detailUser.email} au plan ${plan.toUpperCase()} ? La difference sera facturee/creditee au prorata immediatement.`)}
+                            style={{
+                              flex: 1,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              color: isCurrent ? "#B0B0B0" : "#0047FF",
+                              background: isCurrent ? "#F5F5F5" : "#F0F5FF",
+                              border: isCurrent ? "1px solid #EFEFEF" : "1px solid #D6E4FF",
+                              borderRadius: 8,
+                              padding: "8px 10px",
+                              cursor: isCurrent ? "default" : "pointer",
+                              letterSpacing: "-0.01em",
+                            }}
+                          >
+                            {isCurrent ? `${planLabel} (actuel)` : planLabel}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#B0B0B0", marginTop: 8, letterSpacing: "-0.01em" }}>Proration immediate. Mensuel uniquement.</div>
+                  </div>
+                )}
+
                 {/* Shopify */}
                 <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px", marginBottom: 14 }}>
                   <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>SHOPIFY</div>
