@@ -1465,6 +1465,14 @@ export function CampaignsView({
   }
 
   if (addSaleId) {
+    if (loading) {
+      return (
+        <>
+          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
+          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
+        </>
+      );
+    }
     const addSaleCampaign = campaigns.find((c) => c.id === addSaleId) ?? null;
     if (!addSaleCampaign) {
       navigate({ view: "campaigns" }, { replace: true });
@@ -1565,7 +1573,7 @@ export function CampaignsView({
             navigate({ view: "campaigns", campaign: { type: "addCreators", id: selected.id } })
           }
           onAddSale={() =>
-            navigate({ view: "campaigns", campaign: { type: "addSale", id: selected.id } })
+            navigate({ view: "campaigns", campaign: { type: "addSale", id: selected.id } }, { replace: true })
           }
         />
       </>

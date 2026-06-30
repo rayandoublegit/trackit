@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
@@ -42,16 +43,19 @@ function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify, isCreator }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
+export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
+  if (props.isCreator) {
+    return <CreatorAnalytics userId={props.userId} isMobile={props.isMobile} />;
+  }
+  return <BrandAnalyticsView {...props} />;
+}
+
+function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
   const isFree = plan === "free";
   const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const { navigate } = useDashboardNavigation();
-
-  if (isCreator) {
-    return <CreatorAnalytics userId={userId} isMobile={isMobile} />;
-  }
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [range, setRange] = useState<DateRange>("30d");
@@ -218,8 +222,26 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const [saleCampaignId, setSaleCampaignId] = useState("");
   const [saleBusy, setSaleBusy] = useState(false);
   const [saleMsg, setSaleMsg] = useState("");
+  const saleModalBackdropReadyRef = useRef(false);
 
-  const openSaleModal = async () => {
+  useEffect(() => {
+    if (!showSaleModal) {
+      saleModalBackdropReadyRef.current = false;
+      return;
+    }
+    saleModalBackdropReadyRef.current = false;
+    const timer = window.setTimeout(() => {
+      saleModalBackdropReadyRef.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [showSaleModal]);
+
+  const closeSaleModal = useCallback(() => {
+    if (saleBusy) return;
+    setShowSaleModal(false);
+  }, [saleBusy]);
+
+  const openSaleModal = useCallback(async () => {
     setShowSaleModal(true);
     setSaleMsg("");
     try {
@@ -253,7 +275,7 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
     } catch {
       setSaleMsg(lang === "fr" ? "Impossible de charger vos créateurs" : "Could not load your creators");
     }
-  };
+  }, [lang, userId]);
 
   const submitManualSale = async () => {
     if (!saleCreatorId || !saleAmount) return;
@@ -297,9 +319,17 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
   const selectedSaleCreator = saleCreators.find((c) => c.id === saleCreatorId);
   const hasSaleCommission = selectedSaleCreator?.commission != null;
 
-  const saleModal = showSaleModal ? (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }} onClick={() => !saleBusy && setShowSaleModal(false)}>
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }} onClick={(e) => e.stopPropagation()}>
+  const saleModal =
+    showSaleModal && typeof document !== "undefined"
+      ? createPortal(
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200 }}
+      onMouseDown={(e) => {
+        if (e.target !== e.currentTarget || !saleModalBackdropReadyRef.current) return;
+        closeSaleModal();
+      }}
+    >
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }} onMouseDown={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1A1A1A" }}>{lang === "fr" ? "Ajouter une vente" : "Add a sale"}</h3>
         <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>{lang === "fr" ? "Enregistrez une vente générée par un créateur. La commission est calculée automatiquement." : "Record a sale driven by a creator. Commission is calculated automatically."}</p>
         <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Créateur" : "Creator"}</label>
@@ -346,12 +376,14 @@ export function AnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyS
         )}
         {saleMsg && <div style={{ fontSize: 13, color: saleMsg.includes("€") || saleMsg.includes("commission credited") ? "#0A7A3D" : "#C0392B", marginBottom: 12 }}>{saleMsg}</div>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" disabled={saleBusy} onClick={() => setShowSaleModal(false)} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
+          <button type="button" disabled={saleBusy} onClick={closeSaleModal} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
           <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>
         </div>
       </div>
-    </div>
-  ) : null;
+    </div>,
+    document.body,
+  )
+      : null;
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));

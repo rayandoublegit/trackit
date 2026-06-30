@@ -67,7 +67,10 @@ export function SplitHeaderActions({
       <button
         type="button"
         className={`${btnClass} ${sizeClass}`.trim()}
-        onClick={onPrimaryClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPrimaryClick();
+        }}
         style={{
           ...primaryPadding,
           letterSpacing: "-0.03em",
@@ -83,7 +86,10 @@ export function SplitHeaderActions({
       <button
         type="button"
         className={`${btnClass} ${sizeClass}`.trim()}
-        onClick={onPrimaryClick}
+        onClick={(e) => {
+          e.stopPropagation();
+          onPrimaryClick();
+        }}
         style={{
           borderTopRightRadius: 0,
           borderBottomRightRadius: 0,

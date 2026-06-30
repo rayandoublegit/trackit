@@ -44,7 +44,10 @@ export function useDashboardNavigationController(userId?: string | null): Dashbo
   const navigate = useCallback(
     (next: DashboardNavState, options?: { replace?: boolean }) => {
       const normalized = normalizeNavState(next);
-      if (!options?.replace && navStatesEqual(navStateRef.current, normalized)) return;
+      const campaignsScreenChanged =
+        normalized.view === "campaigns" &&
+        JSON.stringify(navStateRef.current.campaign ?? null) !== JSON.stringify(normalized.campaign ?? null);
+      if (!options?.replace && !campaignsScreenChanged && navStatesEqual(navStateRef.current, normalized)) return;
       navStateRef.current = normalized;
       setNavState(normalized);
       saveDashboardView(normalized.view, userId ?? undefined);
