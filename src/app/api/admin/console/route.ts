@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { requireAdmin } from "@/lib/admin-auth";
 import { computeMetrics } from "@/lib/admin-metrics";
 import { computeGrowth } from "@/lib/admin-growth";
+import { computeOps } from "@/lib/admin-ops";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ export async function GET(req: NextRequest) {
       metrics.activeSubscribers
     );
 
+    // Operations: impayes a relancer + sources d'acquisition
+    const ops = await computeOps(stripe, db);
+
     // Liste des users depuis profiles (etat applicatif)
     const { data: users, error } = await db
       .from("profiles")
@@ -55,6 +59,7 @@ export async function GET(req: NextRequest) {
       me: admin,
       metrics,
       growth,
+      ops,
       users: users ?? [],
       stripeMode: stripeKey.startsWith("sk_live") ? "live" : "test",
     });

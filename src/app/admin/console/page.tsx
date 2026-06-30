@@ -37,12 +37,17 @@ type GrowthPoint = { month: string; newSubs: number; canceledSubs: number; netMr
 type Funnel = { signups: number; onboarded: number; paying: number; onboardRatePct: number; payRatePct: number };
 type Growth = { monthly: GrowthPoint[]; arpu: number; ltv: number; funnel: Funnel; currency: string };
 
+type FailedPayment = { customerId: string; email: string | null; amountDue: number; currency: string; status: string | null; created: number; hostedUrl: string | null };
+type AcquisitionSource = { source: string; count: number };
+type Ops = { failedPayments: FailedPayment[]; acquisition: AcquisitionSource[] };
+
 type SubDetail = { status: string; currentPeriodEnd: number | null; cancelAtPeriodEnd: boolean; amount: number; currency: string; interval: string | null; priceId: string | null };
 type Invoice = { id: string; amountPaid: number; currency: string; status: string | null; created: number; pdf: string | null };
 
 type ConsoleData = {
   metrics: Metrics;
   growth: Growth;
+  ops: Ops;
   users: AdminUser[];
   stripeMode: string;
   me: { email: string; role: string };
@@ -231,6 +236,25 @@ export default function AdminConsolePage() {
     [load]
   );
 
+  const exportCsv = useCallback(() => {
+    if (!data) return;
+    const cols = ["email", "full_name", "plan", "subscription_status", "referral_source", "niche", "onboarding_completed", "created_at"];
+    const header = cols.join(",");
+    const escape = (v: unknown) => {
+      const str = v === null || v === undefined ? "" : String(v);
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const lines = data.users.map((u) => cols.map((c) => escape((u as unknown as Record<string, unknown>)[c])).join(","));
+    const csv = [header, ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trackit-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [data]);
+
   const openDetail = useCallback(async (u: AdminUser) => {
     setDetailUser(u);
     setDetail(null);
@@ -358,9 +382,44 @@ export default function AdminConsolePage() {
               </>
             )}
 
+            {/* Impayes a relancer + sources d'acquisition */}
+            {data?.ops && (
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: 14, marginBottom: 28 }}>
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 24px", background: "#FFFFFF" }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 16, letterSpacing: "-0.01em" }}>IMPAYES A RELANCER ({data.ops.failedPayments.length})</div>
+                  {data.ops.failedPayments.length > 0 ? (
+                    data.ops.failedPayments.map((fp, i) => (
+                      <div key={fp.customerId + i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderTop: i === 0 ? "none" : "1px solid #F5F5F5" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A" }}>{fp.email ?? fp.customerId}</div>
+                          <div style={{ fontSize: 11, color: "#B0B0B0" }}>{money(fp.amountDue, fp.currency)} du · {fp.status ?? "?"} · {dateShort(new Date(fp.created * 1000).toISOString())}</div>
+                        </div>
+                        {fp.hostedUrl && <a href={fp.hostedUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0047FF", textDecoration: "none", fontWeight: 500 }}>Relancer</a>}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#B0B0B0" }}>Aucun impaye, tout est a jour</div>
+                  )}
+                </div>
+
+                <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 24px", background: "#FFFFFF" }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 16, letterSpacing: "-0.01em" }}>SOURCES D&apos;ACQUISITION</div>
+                  {data.ops.acquisition.map((a) => (
+                    <div key={a.source} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderTop: "1px solid #F5F5F5" }}>
+                      <span style={{ fontSize: 13, color: "#1A1A1A" }}>{a.source}</span>
+                      <span style={{ fontSize: 13, fontWeight: 500, color: "#7A7A7A" }}>{a.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Recherche */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>Utilisateurs</h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>Utilisateurs</h2>
+                <button onClick={exportCsv} style={{ fontSize: 12, fontWeight: 500, color: "#0047FF", background: "#F0F5FF", border: "1px solid #D6E4FF", borderRadius: 8, padding: "6px 12px", cursor: "pointer", letterSpacing: "-0.01em" }}>Exporter CSV</button>
+              </div>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
