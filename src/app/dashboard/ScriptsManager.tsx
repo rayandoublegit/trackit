@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { canUseScripts, type PlanTier } from "@/lib/plan-limits";
+import { UpgradeModal } from "./UpgradeModal";
 
 const BLUE = "#0047FF";
 
@@ -18,12 +20,25 @@ type Script = {
 
 type CreatorOpt = { id: string; label: string };
 
-export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: string; isMobile?: boolean; standalone?: boolean }) {
+export function ScriptsManager({
+  brandId,
+  isMobile,
+  standalone,
+  plan = "free",
+  onUpgrade,
+}: {
+  brandId?: string;
+  isMobile?: boolean;
+  standalone?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+}) {
   const lang = useLang();
   const [scripts, setScripts] = useState<Script[]>([]);
   const [creators, setCreators] = useState<CreatorOpt[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -110,6 +125,14 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
   const inputStyle: React.CSSProperties = { width: "100%", padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)", fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 14 };
   const labelStyle: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 500, color: "rgba(0,0,0,0.55)", marginBottom: 6, letterSpacing: "-0.01em" };
 
+  const openNewScript = () => {
+    if (!canUseScripts(plan)) {
+      setUpgradeModalOpen(true);
+      return;
+    }
+    setFormOpen(true);
+  };
+
   const subtitle =
     loading
       ? (lang === "fr" ? "Chargement..." : "Loading...")
@@ -120,6 +143,18 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
           : `${scripts.length} script${scripts.length > 1 ? "s" : ""} shared`;
 
   return (
+    <>
+      {upgradeModalOpen && (
+        <UpgradeModal
+          lang={lang}
+          featureKey="scripts"
+          onClose={() => setUpgradeModalOpen(false)}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            void onUpgrade?.();
+          }}
+        />
+      )}
     <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: standalone ? 0 : 32 }}>
       <div style={{ padding: "18px 20px", borderBottom: "1px solid #EFEFEF" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -135,7 +170,7 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
             <button
               type="button"
               className="hero-cta-shopify"
-              onClick={() => setFormOpen(true)}
+              onClick={openNewScript}
               style={{ padding: "10px 22px", fontSize: 13, flexShrink: 0 }}
             >
               {lang === "fr" ? "+ Nouveau script" : "+ New script"}
@@ -290,5 +325,6 @@ export function ScriptsManager({ brandId, isMobile, standalone }: { brandId?: st
         )}
       </div>
     </div>
+    </>
   );
 }

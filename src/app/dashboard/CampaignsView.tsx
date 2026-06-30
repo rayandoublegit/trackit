@@ -1019,16 +1019,14 @@ export function CampaignsView({
     campaignNav?.type === "detail" && isDetailTab(campaignNav.tab) ? campaignNav.tab : "analytics";
 
   const tryOpenNewCampaign = () => {
-    if (plan === "free") {
-      alert(lang === "fr" ? "Les campagnes sont disponibles à partir du plan Growth." : "Campaigns are available on the Growth plan and above.");
-      return;
-    }
     if (hasReachedCampaignLimit(plan, campaigns.length)) {
       setUpgradeModalOpen(true);
       return;
     }
     navigate({ view: "campaigns", campaign: { type: "new" } });
   };
+
+  const canOpenNewCampaign = !hasReachedCampaignLimit(plan, campaigns.length);
 
   const refreshCampaignBoard = useCallback(async () => {
     if (!supabase) return;
@@ -1445,7 +1443,13 @@ export function CampaignsView({
     }
   }, [loading, detailId, selected, navigate]);
 
-  if (modalOpen) {
+  useEffect(() => {
+    if (!modalOpen || canOpenNewCampaign) return;
+    navigate({ view: "campaigns" }, { replace: true });
+    setUpgradeModalOpen(true);
+  }, [modalOpen, canOpenNewCampaign, navigate]);
+
+  if (modalOpen && canOpenNewCampaign) {
     return (
       <NewCampaignOnboarding
         lang={lang}

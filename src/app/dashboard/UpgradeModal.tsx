@@ -9,6 +9,8 @@ import {
 } from "@/lib/plan-marketing";
 import type { PlanTier } from "@/lib/plan-limits";
 
+const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+
 type UpgradeModalProps = {
   lang: "en" | "fr";
   onClose: () => void;
@@ -41,15 +43,6 @@ function parseUpgradeMessage(message: string, lang: "en" | "fr") {
   const planBadge = planMatch?.[1];
 
   return { title, description, bullets, primaryLabel, planBadge };
-}
-
-function LockIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="5" y="11" width="14" height="10" rx="2" stroke="#0047FF" strokeWidth="1.8" />
-      <path d="M8 11V8a4 4 0 118 0v3" stroke="#0047FF" strokeWidth="1.8" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 function CheckIcon() {
@@ -167,54 +160,43 @@ export function UpgradeModal({
             </svg>
           </button>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 14, paddingRight: 36 }}>
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 14,
-                background: "rgba(0,71,255,0.1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <LockIcon />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              {planBadge && (
-                <span
-                  style={{
-                    display: "inline-block",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "#0047FF",
-                    background: "#FFFFFF",
-                    border: "1px solid #D4E2FF",
-                    borderRadius: 999,
-                    padding: "3px 8px",
-                    marginBottom: 8,
-                  }}
-                >
-                  {planBadge}
-                </span>
-              )}
-              <h3
+          <div style={{ paddingRight: 36, marginBottom: 4 }}>
+            <img
+              src={TRACKIT_LOGO_URL}
+              alt="Trackit"
+              style={{ height: 56, width: "auto", display: "block", marginBottom: 14 }}
+            />
+            {planBadge && (
+              <span
                 style={{
-                  fontSize: 20,
-                  fontWeight: 600,
-                  color: "#1A1A1A",
-                  margin: 0,
-                  letterSpacing: "-0.03em",
-                  lineHeight: 1.25,
+                  display: "inline-block",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                  color: "#0047FF",
+                  background: "#FFFFFF",
+                  border: "1px solid #D4E2FF",
+                  borderRadius: 999,
+                  padding: "3px 8px",
+                  marginBottom: 8,
                 }}
               >
-                {title}
-              </h3>
-            </div>
+                {planBadge}
+              </span>
+            )}
+            <h3
+              style={{
+                fontSize: 20,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                margin: 0,
+                letterSpacing: "-0.03em",
+                lineHeight: 1.25,
+              }}
+            >
+              {title}
+            </h3>
           </div>
         </div>
 

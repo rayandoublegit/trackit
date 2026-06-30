@@ -44,7 +44,6 @@ import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
 import { UpgradeModal } from "./UpgradeModal";
-import { UpgradeGate } from "@/components/UpgradeGate";
 import { runGateUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import {
@@ -54,11 +53,11 @@ import {
   canCreateTemplates,
   canImportTemplates,
   canUseAutoFollowUp,
+  canUseAffiliates,
   canUseAutomationWorkflows,
   canUseBalance,
   canUseFullAutomationAgent,
   canUseShopify,
-  canInviteCreators,
   canUseScripts,
   isGrowthOrAbove,
   isScalePlan,
@@ -753,9 +752,6 @@ function DashboardPageContent() {
           />
         )}
         {view === "campaigns" && user && (
-          plan === "free" ? (
-            <UpgradeGate featureKey="campaigns" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          ) : (
             <CampaignsView
               isMobile={isMobile}
               plan={plan}
@@ -765,14 +761,14 @@ function DashboardPageContent() {
               userId={user.id}
               shopifyStore={shopifyStore ?? profile?.shopify_store}
             />
-          )
         )}
         {view === "affiliates" && user && (
-          canUseBasicFeatures ? (
-            <AffiliatesView userId={user.id} isMobile={isMobile} />
-          ) : (
-            <UpgradeGate featureKey="affiliates" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <AffiliatesView
+              userId={user.id}
+              isMobile={isMobile}
+              plan={plan}
+              onUpgrade={handleUpgradeBasic}
+            />
         )}
         {view === "outreach" && (
           <OutreachView
@@ -791,53 +787,75 @@ function DashboardPageContent() {
           />
         )}
         {view === "payouts" && user && (
-          (canUseBasicFeatures || isCreator) ? (
-            <PayoutsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onConnectShopify={() => setView("integrations")} onUpgrade={handleUpgradeBasic} onUpgradePro={handleUpgradePro} onUpgradeScale={handleUpgradeScale} />
-          ) : (
-            <UpgradeGate featureKey="payouts" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <PayoutsView
+              userId={user.id}
+              isMobile={isMobile}
+              plan={plan}
+              isCreator={isCreator}
+              shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined}
+              onConnectShopify={() => setView("integrations")}
+              onUpgrade={handleUpgradeBasic}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+            />
         )}
         {view === "balance" && user && (
-          canUseBalance(plan) || isCreator ? (
-            <BalanceView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
-          ) : (
-            <UpgradeGate featureKey="balance" onUpgrade={handleUpgradeScale} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <BalanceView
+              userId={user.id}
+              isMobile={isMobile}
+              isCreator={isCreator}
+              plan={plan}
+              onUpgrade={handleUpgradeScale}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+            />
         )}
         {view === "transactions" && user && (
-          (canUseBasicFeatures || isCreator) ? (
-            <TransactionsView userId={user.id} isMobile={isMobile} isCreator={isCreator} />
-          ) : (
-            <UpgradeGate featureKey="transactions" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <TransactionsView
+              userId={user.id}
+              isMobile={isMobile}
+              isCreator={isCreator}
+              plan={plan}
+              onUpgrade={handleUpgradeBasic}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+            />
         )}
         {view === "invitations" && user && (
-          canInviteCreators(plan) ? (
-            <InvitationsView userId={user.id} isMobile={isMobile} />
-          ) : (
-            <UpgradeGate featureKey="invitations" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <InvitationsView
+              userId={user.id}
+              isMobile={isMobile}
+              plan={plan}
+              onUpgrade={handleUpgradePro}
+            />
         )}
         {view === "scripts" && user && (
           isCreator ? (
             <CreatorScripts userId={user.id} isMobile={isMobile} />
-          ) : canUseScripts(plan) ? (
-            <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
-              <ScriptsManager brandId={user.id} isMobile={isMobile} standalone />
-            </div>
           ) : (
-            <UpgradeGate featureKey="scripts" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
+            <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
+              <ScriptsManager
+                brandId={user.id}
+                isMobile={isMobile}
+                standalone
+                plan={plan}
+                onUpgrade={handleUpgradePro}
+              />
+            </div>
           )
         )}
         {view === "analytics" && user && (
-          (canUseBasicFeatures || isCreator) ? (
-            <AnalyticsView userId={user.id} isMobile={isMobile} plan={plan} isCreator={isCreator} shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined} onUpgradePro={handleUpgradePro} onConnectShopify={() => setView("integrations")} />
-          ) : (
-            <UpgradeGate featureKey="analytics" onUpgrade={handleUpgradeBasic} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <AnalyticsView
+              userId={user.id}
+              isMobile={isMobile}
+              plan={plan}
+              isCreator={isCreator}
+              shopifyStore={shopifyStore ?? profile?.shopify_store ?? undefined}
+              onUpgradePro={handleUpgradePro}
+              onConnectShopify={() => setView("integrations")}
+            />
         )}
         {view === "integrations" && user && (
-          canUseShopify(plan) ? (
             <IntegrationsView
               isMobile={isMobile}
               user={user}
@@ -847,19 +865,18 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
-          ) : (
-            <UpgradeGate featureKey="integrations" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
         )}
         {view === "notes" && user && (
           <NotesView isMobile={isMobile} userId={user.id} />
         )}
         {view === "automation" && (
-          canUseAutomationWorkflows(plan) ? (
-            <AutomationView isMobile={isMobile} plan={plan} onUpgradeScale={handleUpgradeScale} />
-          ) : (
-            <UpgradeGate featureKey="automation" onUpgrade={handleUpgradePro} isMobile={isMobile} lang={lang} onViewPricing={openWebsitePricing} />
-          )
+            <AutomationView
+              isMobile={isMobile}
+              plan={plan}
+              onUpgrade={handleUpgradeBasic}
+              onUpgradePro={handleUpgradePro}
+              onUpgradeScale={handleUpgradeScale}
+            />
         )}
         {view === "settings" && user && (
           isCreator ? (
@@ -3084,6 +3101,7 @@ function IntegrationsView({
   const [changingStore, setChangingStore] = useState(false);
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
   const [connectPageOpen, setConnectPageOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
@@ -3147,7 +3165,7 @@ function IntegrationsView({
 
   const openConnectPage = (prefillDomain = "", changing = false) => {
     if (!canUseShopify(plan)) {
-      void onUpgrade?.();
+      setUpgradeModalOpen(true);
       return;
     }
     setChangingStore(changing);
@@ -3267,6 +3285,17 @@ function IntegrationsView({
 
   return (
     <>
+      {upgradeModalOpen && (
+        <UpgradeModal
+          lang={lang}
+          featureKey="integrations"
+          onClose={() => setUpgradeModalOpen(false)}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            void onUpgradePro?.();
+          }}
+        />
+      )}
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
       {connectedShop && (
         <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, color: "#15803d", fontSize: 14, fontWeight: 500 }}>
@@ -3533,19 +3562,35 @@ function IntegrationsView({
 function AutomationView({
   isMobile,
   plan = "free",
+  onUpgrade,
+  onUpgradePro,
   onUpgradeScale,
 }: {
   isMobile?: boolean;
   plan?: PlanTier;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
   onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
   const fullAgent = canUseFullAutomationAgent(plan);
   const workflows = canUseAutomationWorkflows(plan);
   const showComingSoon = !workflows;
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
 
   return (
     <>
+      {upgradeModalOpen && (
+        <UpgradeModal
+          lang={lang}
+          featureKey="automation"
+          onClose={() => setUpgradeModalOpen(false)}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            void onUpgradePro?.();
+          }}
+        />
+      )}
       <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
@@ -3573,15 +3618,15 @@ function AutomationView({
               type="button"
               className="hero-cta-inverse hero-cta-compact"
               onClick={() => {
+                if (!canUseAutomationWorkflows(plan)) {
+                  setUpgradeModalOpen(true);
+                  return;
+                }
                 if (fullAgent) {
                   alert(lang === "fr" ? "Agent d'automatisation — configuration bientôt disponible." : "Automation agent — setup coming soon.");
                   return;
                 }
-                if (workflows) {
-                  void onUpgradeScale?.();
-                  return;
-                }
-                alert(lang === "fr" ? "Bientôt disponible" : "Coming soon");
+                void onUpgradeScale?.();
               }}
             >
               {fullAgent
@@ -3774,11 +3819,22 @@ function AffiliateRowActions({
   );
 }
 
-function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boolean }) {
+function AffiliatesView({
+  userId,
+  isMobile,
+  plan = "free",
+  onUpgrade,
+}: {
+  userId: string;
+  isMobile?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+}) {
   const lang = useLang();
   const [affiliates, setAffiliates] = useState<AffiliateRow[]>([]);
   const [affiliatesLoaded, setAffiliatesLoaded] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [copiedRow, setCopiedRow] = useState<{ ref: string; kind: "link" | "code" } | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
@@ -3852,8 +3908,31 @@ function AffiliatesView({ userId, isMobile }: { userId: string; isMobile?: boole
 
   return (
     <>
+      {upgradeModalOpen && (
+        <UpgradeModal
+          lang={lang}
+          featureKey="affiliates"
+          onClose={() => setUpgradeModalOpen(false)}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            void onUpgrade?.();
+          }}
+        />
+      )}
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={
-        <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => setPanelOpen(true)}>{lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}</button>
+        <button
+          type="button"
+          className="hero-cta-shopify-light hero-cta-compact"
+          onClick={() => {
+            if (!canUseAffiliates(plan)) {
+              setUpgradeModalOpen(true);
+              return;
+            }
+            setPanelOpen(true);
+          }}
+        >
+          {lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}
+        </button>
       } />
         <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
         {actionMessage && (

@@ -6,6 +6,7 @@ import { useLang } from "@/lib/useLang";
 import { CreatorPaymentInfo } from "./CreatorPaymentInfo";
 import {
   canUseAutoPayouts,
+  canUseBalance,
   canUseManualPayouts,
   canUseStripeConnectPayouts,
   type PlanTier,
@@ -29,6 +30,39 @@ import { CreatorPayoutMethodFields, creatorHasPayoutDetails, type CreatorPayoutM
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { PayItWelcomeLoading, PayItWelcomeView, usePayItActivity } from "./PayItWelcomeView";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
+import { UpgradeModal } from "./UpgradeModal";
+import { getGateModalProps, type GateFeatureKey } from "@/lib/plan-marketing";
+
+function PaywallModal({
+  featureKey,
+  lang,
+  onClose,
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
+}: {
+  featureKey: GateFeatureKey;
+  lang: "en" | "fr";
+  onClose: () => void;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
+}) {
+  const gate = getGateModalProps(featureKey, lang);
+  return (
+    <UpgradeModal
+      lang={lang}
+      featureKey={featureKey}
+      onClose={onClose}
+      onPrimary={() => {
+        onClose();
+        if (gate.requiredTier === "scale") void onUpgradeScale?.();
+        else if (gate.requiredTier === "pro") void onUpgradePro?.();
+        else void onUpgrade?.();
+      }}
+    />
+  );
+}
 
 type SalePlatform = "tiktok" | "instagram" | "youtube";
 
@@ -2036,6 +2070,7 @@ export function PayoutsView({
   const { navState, navigate } = useDashboardNavigation();
   const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
   const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const payoutCreatorId =
     navState.view === "payouts" && navState.payout?.type === "creator" ? navState.payout.id : null;
   const [creators, setCreators] = useState<any[]>([]);
@@ -2342,11 +2377,29 @@ export function PayoutsView({
 
   if (showPayItWelcome && !payoutCreatorId && !payItWelcomeBypass) {
     return (
-      <PayItWelcomeView
-        isMobile={isMobile}
-        variant="overview"
-        onPrimary={() => setPayItWelcomeBypass(true)}
-      />
+      <>
+        {upgradeFeature && (
+          <PaywallModal
+            featureKey={upgradeFeature}
+            lang={lang}
+            onClose={() => setUpgradeFeature(null)}
+            onUpgrade={onUpgrade}
+            onUpgradePro={onUpgradePro}
+            onUpgradeScale={onUpgradeScale}
+          />
+        )}
+        <PayItWelcomeView
+          isMobile={isMobile}
+          variant="overview"
+          onPrimary={() => {
+            if (!canUseManualPayouts(plan)) {
+              setUpgradeFeature("payouts");
+              return;
+            }
+            setPayItWelcomeBypass(true);
+          }}
+        />
+      </>
     );
   }
 
@@ -2426,52 +2479,18 @@ export function PayoutsView({
 
   return (
     <>
+      {upgradeFeature && (
+        <PaywallModal
+          featureKey={upgradeFeature}
+          lang={lang}
+          onClose={() => setUpgradeFeature(null)}
+          onUpgrade={onUpgrade}
+          onUpgradePro={onUpgradePro}
+          onUpgradeScale={onUpgradeScale}
+        />
+      )}
       <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Aperçu" : "Overview"} />
       <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 40px 40px", position: "relative" }}>
-        {!canUseManualPayouts(plan as PlanTier) && (
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 20,
-              background: "rgba(255,255,255,0.92)",
-              backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "flex-start",
-              justifyContent: "center",
-              paddingTop: isMobile ? 32 : 48,
-              borderRadius: 16,
-            }}
-          >
-            <div
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid #EFEFEF",
-                borderRadius: 16,
-                padding: 40,
-                maxWidth: 420,
-                textAlign: "center",
-                boxShadow: "0 12px 40px rgba(0,0,0,0.08)",
-              }}
-            >
-              <div style={{ fontSize: 32, marginBottom: 16 }}>🔒</div>
-              <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 10px", letterSpacing: "-0.03em" }}>
-                {lang === "fr" ? "Paiements disponibles sur Growth et Pro" : "Payouts available on Growth and Pro"}
-              </h3>
-              <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Passez à l'offre supérieure pour payer les commissions automatiquement" : "Upgrade to pay creator commissions automatically"}
-              </p>
-              <button
-                type="button"
-                onClick={() => void onUpgrade()}
-                style={{ ...payoutsBtnPrimary, width: "100%" }}
-              >
-                {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
-              </button>
-            </div>
-          </div>
-        )}
-
         <PayoutsOverviewPanel
           stats={payoutOverviewStats}
           sales={trackedSales}
@@ -2716,15 +2735,24 @@ export function TransactionsView({
   userId,
   isMobile,
   isCreator,
+  plan = "free",
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
 }: {
   userId?: string;
   isMobile?: boolean;
   isCreator?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
   const { navigate } = useDashboardNavigation();
   const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
   const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [payouts, setPayouts] = useState<CompletedPayout[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2856,11 +2884,29 @@ export function TransactionsView({
 
   if (showPayItWelcome && !payItWelcomeBypass) {
     return (
-      <PayItWelcomeView
-        isMobile={isMobile}
-        variant="transactions"
-        onPrimary={() => setPayItWelcomeBypass(true)}
-      />
+      <>
+        {upgradeFeature && (
+          <PaywallModal
+            featureKey={upgradeFeature}
+            lang={lang}
+            onClose={() => setUpgradeFeature(null)}
+            onUpgrade={onUpgrade}
+            onUpgradePro={onUpgradePro}
+            onUpgradeScale={onUpgradeScale}
+          />
+        )}
+        <PayItWelcomeView
+          isMobile={isMobile}
+          variant="transactions"
+          onPrimary={() => {
+            if (!canUseManualPayouts(plan)) {
+              setUpgradeFeature("transactions");
+              return;
+            }
+            setPayItWelcomeBypass(true);
+          }}
+        />
+      </>
     );
   }
 
@@ -3171,15 +3217,24 @@ export function BalanceView({
   userId,
   isMobile,
   isCreator,
+  plan = "free",
+  onUpgrade,
+  onUpgradePro,
+  onUpgradeScale,
 }: {
   userId?: string;
   isMobile?: boolean;
   isCreator?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+  onUpgradePro?: () => void;
+  onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
   const { navigate } = useDashboardNavigation();
   const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome, refresh: refreshPayItActivity } = usePayItActivity(userId);
   const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [creators, setCreators] = useState<PayoutTableCreator[]>([]);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
@@ -3237,6 +3292,10 @@ export function BalanceView({
   };
 
   const openAddFunds = (presetAmount?: number) => {
+    if (!canUseBalance(plan)) {
+      setUpgradeFeature("balance");
+      return;
+    }
     if (presetAmount != null) setFundAmount(String(presetAmount));
     setAddFundsOpen(true);
   };
@@ -3282,19 +3341,45 @@ export function BalanceView({
 
   if (showPayItWelcome && !payItWelcomeBypass) {
     return (
-      <PayItWelcomeView
-        isMobile={isMobile}
-        variant="balance"
-        onPrimary={() => {
-          setPayItWelcomeBypass(true);
-          openAddFunds();
-        }}
-      />
+      <>
+        {upgradeFeature && (
+          <PaywallModal
+            featureKey={upgradeFeature}
+            lang={lang}
+            onClose={() => setUpgradeFeature(null)}
+            onUpgrade={onUpgrade}
+            onUpgradePro={onUpgradePro}
+            onUpgradeScale={onUpgradeScale}
+          />
+        )}
+        <PayItWelcomeView
+          isMobile={isMobile}
+          variant="balance"
+          onPrimary={() => {
+            if (!canUseBalance(plan)) {
+              setUpgradeFeature("balance");
+              return;
+            }
+            setPayItWelcomeBypass(true);
+            openAddFunds();
+          }}
+        />
+      </>
     );
   }
 
   return (
     <>
+      {upgradeFeature && (
+        <PaywallModal
+          featureKey={upgradeFeature}
+          lang={lang}
+          onClose={() => setUpgradeFeature(null)}
+          onUpgrade={onUpgrade}
+          onUpgradePro={onUpgradePro}
+          onUpgradeScale={onUpgradeScale}
+        />
+      )}
       <PayoutsPageHeader
         isMobile={isMobile}
         title={lang === "fr" ? "Solde" : "Balance"}

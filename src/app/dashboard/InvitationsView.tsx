@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
+import { canInviteCreators, type PlanTier } from "@/lib/plan-limits";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
+import { UpgradeModal } from "./UpgradeModal";
 
 const BLUE = "#0047FF";
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -52,16 +54,30 @@ const inviteSecondaryBtn: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
-export function InvitationsView({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
+export function InvitationsView({
+  userId,
+  isMobile,
+  plan = "free",
+  onUpgrade,
+  onViewPricing,
+}: {
+  userId?: string;
+  isMobile?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
+  onViewPricing?: () => void;
+}) {
   const lang = useLang();
   const [link, setLink] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [dashboardCreators, setDashboardCreators] = useState<DashboardCreator[]>([]);
   const [creatorsLoading, setCreatorsLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const canInvite = canInviteCreators(plan);
 
   const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
 
@@ -126,6 +142,10 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
   }, [dropdownOpen]);
 
   const generate = async () => {
+    if (!canInvite) {
+      setUpgradeModalOpen(true);
+      return;
+    }
     if (!userId) return;
     setLoading(true);
     setError("");
@@ -253,6 +273,18 @@ export function InvitationsView({ userId, isMobile }: { userId?: string; isMobil
 
   return (
     <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
+      {upgradeModalOpen && (
+        <UpgradeModal
+          lang={lang}
+          featureKey="invitations"
+          onClose={() => setUpgradeModalOpen(false)}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            void onUpgrade?.();
+          }}
+          showAllPlansLink={Boolean(onViewPricing)}
+        />
+      )}
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
         <div
           style={{
