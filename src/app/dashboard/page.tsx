@@ -2711,6 +2711,9 @@ const shopifyConnectSecondaryBtn: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
+const SHOPIFY_CONNECT_DEMO_VIDEO =
+  "https://res.cloudinary.com/dqsk5btgz/video/upload/v1782785668/shopify_ydkzyy.mp4";
+
 function ShopifyConnectPage({
   lang,
   isMobile,
@@ -2918,6 +2921,31 @@ function ShopifyConnectPage({
               <button type="button" style={shopifyConnectSecondaryBtn} onClick={onClose} disabled={connecting}>
                 {lang === "fr" ? "Annuler" : "Cancel"}
               </button>
+            </div>
+
+            <div
+              style={{
+                marginTop: 24,
+                width: isMobile ? 160 : 200,
+                aspectRatio: "1 / 1",
+                borderRadius: 10,
+                overflow: "hidden",
+              }}
+            >
+              <video
+                src={SHOPIFY_CONNECT_DEMO_VIDEO}
+                autoPlay
+                loop
+                muted
+                playsInline
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                }}
+                aria-label={lang === "fr" ? "Tutoriel connexion Shopify" : "Shopify connect tutorial"}
+              />
             </div>
           </div>
 
