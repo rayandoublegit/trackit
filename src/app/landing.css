@@ -1312,6 +1312,24 @@ body { padding-top: 80px; }
 
 #why .why-section-title--en .why-title-line--second {
   margin-top: -0.1em;
+  position: relative;
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
+}
+
+#why .why-section-title--en .why-title-line--second::after {
+  content: "";
+  position: absolute;
+  left: -1%;
+  right: -1%;
+  top: 55%;
+  height: 2px;
+  background: #0047ff;
+  border-radius: 999px;
+  transform: translateY(-50%) rotate(-0.4deg);
+  pointer-events: none;
+  box-shadow: 0 0 0 0.5px rgba(0, 71, 255, 0.08);
 }
 
 #why .why-section-title--fr {
