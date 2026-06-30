@@ -59,16 +59,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No Stripe customer found" }, { status: 404 });
     }
 
-    const configuration =
-      process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID ??
-      "bpc_1T5pKiFC3qsxzaqx37tUdyDM";
+    // Pas d'ID de config hardcode: un ID inexistant dans le mode courant
+    // (test/live) faisait echouer le portail avec une erreur /p/login.
+    // Si une env est fournie on l'utilise, sinon Stripe prend la config
+    // par defaut active du portail (a activer dans le dashboard Stripe).
+    const configuration = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID;
 
-    const base = (process.env.NEXT_PUBLIC_APP_URL ?? "https://trackit.app").replace(/\/$/, "");
+    const base = (process.env.NEXT_PUBLIC_APP_URL ?? "https://thentrack.it").replace(/\/$/, "");
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${base}/dashboard?view=billing`,
-      configuration,
+      ...(configuration ? { configuration } : {}),
     });
 
     return NextResponse.json({ url: session.url });
