@@ -14,6 +14,22 @@ const VALID_ROLES = new Set(["user", "staff", "admin"]);
  *  - action "cancel": annule l'abonnement Stripe (a la fin de periode)
  *  - action "cancelNow": annule immediatement l'abonnement Stripe
  */
+function priceIdForPlan(plan: string): string | null {
+  // Mappe un plan Trackit vers son price_id mensuel, via les memes env vars que le checkout.
+  // On prend la 1ere valeur definie (priorite au server-side, fallback NEXT_PUBLIC).
+  const pick = (...vals: (string | undefined)[]) => vals.find((v) => v && v.trim()) ?? null;
+  switch (plan) {
+    case "growth":
+      return pick(process.env.STRIPE_GROWTH_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID);
+    case "pro":
+      return pick(process.env.STRIPE_PRO2_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID);
+    case "scale":
+      return pick(process.env.STRIPE_SCALE_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID);
+    default:
+      return null;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin(req);
   if (!admin) {
@@ -107,6 +123,50 @@ export async function POST(req: NextRequest) {
           .eq("id", userId);
       }
       return NextResponse.json({ ok: true, userId, action });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Stripe error";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
+  // --- Action Stripe: changer le plan (upgrade/downgrade avec proration) ---
+  if (action === "changePlan") {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeKey) {
+      return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
+    }
+    if (!target.stripe_subscription_id) {
+      return NextResponse.json(
+        { error: "Cet utilisateur n'a pas d'abonnement Stripe actif." },
+        { status: 400 }
+      );
+    }
+    const newPlan = (value ?? "").toLowerCase();
+    const newPriceId = priceIdForPlan(newPlan);
+    if (!newPriceId) {
+      return NextResponse.json({ error: "Plan inconnu ou price_id manquant: " + newPlan }, { status: 400 });
+    }
+    try {
+      const stripe = new Stripe(stripeKey);
+      // On recupere l'item d'abonnement courant pour le remplacer (pas en ajouter un second).
+      const sub = await stripe.subscriptions.retrieve(target.stripe_subscription_id);
+      const currentItem = sub.items.data[0];
+      if (!currentItem) {
+        return NextResponse.json({ error: "Abonnement sans item, impossible de changer le plan." }, { status: 400 });
+      }
+      if (currentItem.price.id === newPriceId) {
+        return NextResponse.json({ error: "L'utilisateur est deja sur ce plan." }, { status: 400 });
+      }
+      await stripe.subscriptions.update(target.stripe_subscription_id, {
+        items: [{ id: currentItem.id, price: newPriceId }],
+        proration_behavior: "create_prorations",
+      });
+      // Reflet immediat en base
+      await db
+        .from("profiles")
+        .update({ plan: newPlan, subscription_active: true, subscription_status: "active" })
+        .eq("id", userId);
+      return NextResponse.json({ ok: true, userId, action, plan: newPlan });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Stripe error";
       return NextResponse.json({ error: message }, { status: 500 });
