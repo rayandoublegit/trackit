@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
   commissionNotConfiguredMessage,
@@ -15,9 +16,18 @@ const supabaseAdmin = createClient(
 
 // Manual sale entry — for brands without Shopify (SaaS, Starter plan, etc).
 // Mirrors /api/shopify/sync: inserts into `sales` and credits the creator.
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authedUserId = await getAuthedUserId(request);
+  if (!authedUserId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
-  const userId = String(body.userId || "");
+  const bodyUserId = String(body.userId || "");
+  if (bodyUserId && bodyUserId !== authedUserId) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+  const userId = authedUserId;
   const creatorId = String(body.creatorId || "");
   const campaignId = String(body.campaignId || "");
   const orderAmount = parseFloat(String(body.amount || "0"));

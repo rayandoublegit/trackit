@@ -1436,12 +1436,33 @@ export function CampaignsView({
   };
 
   const selected = campaigns.find((c) => c.id === detailId) ?? null;
+  const addSaleCampaign = addSaleId ? campaigns.find((c) => c.id === addSaleId) ?? null : null;
+  const addCreatorsCampaign = addCreatorsId ? campaigns.find((c) => c.id === addCreatorsId) ?? null : null;
+  const editCampaign = editId ? campaigns.find((c) => c.id === editId) ?? null : null;
 
   useEffect(() => {
     if (!loading && detailId && !selected) {
       navigate({ view: "campaigns" }, { replace: true });
     }
   }, [loading, detailId, selected, navigate]);
+
+  useEffect(() => {
+    if (!loading && addSaleId && !addSaleCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+    }
+  }, [loading, addSaleId, addSaleCampaign, navigate]);
+
+  useEffect(() => {
+    if (!loading && addCreatorsId && !addCreatorsCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+    }
+  }, [loading, addCreatorsId, addCreatorsCampaign, navigate]);
+
+  useEffect(() => {
+    if (!loading && editId && !editCampaign) {
+      navigate({ view: "campaigns" }, { replace: true });
+    }
+  }, [loading, editId, editCampaign, navigate]);
 
   useEffect(() => {
     if (!modalOpen || canOpenNewCampaign) return;
@@ -1473,16 +1494,20 @@ export function CampaignsView({
         </>
       );
     }
-    const addSaleCampaign = campaigns.find((c) => c.id === addSaleId) ?? null;
-    if (!addSaleCampaign) {
-      navigate({ view: "campaigns" }, { replace: true });
-      return null;
+    const addSaleCampaignResolved = campaigns.find((c) => c.id === addSaleId) ?? null;
+    if (!addSaleCampaignResolved) {
+      return (
+        <>
+          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
+          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
+        </>
+      );
     }
     return (
       <AddSaleOnboarding
         lang={lang}
         userId={userId}
-        campaign={addSaleCampaign}
+        campaign={addSaleCampaignResolved}
         isMobile={isMobile}
         onClose={() =>
           navigate({ view: "campaigns", campaign: { type: "detail", id: addSaleId, tab: "analytics" } }, { replace: true })
@@ -1493,15 +1518,19 @@ export function CampaignsView({
   }
 
   if (addCreatorsId) {
-    const addCreatorsCampaign = campaigns.find((c) => c.id === addCreatorsId) ?? null;
-    if (!addCreatorsCampaign) {
-      navigate({ view: "campaigns" }, { replace: true });
-      return null;
+    const addCreatorsCampaignResolved = campaigns.find((c) => c.id === addCreatorsId) ?? null;
+    if (!addCreatorsCampaignResolved) {
+      return (
+        <>
+          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
+          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
+        </>
+      );
     }
     return (
       <NewCampaignOnboarding
         mode="addCreators"
-        existingCampaign={addCreatorsCampaign}
+        existingCampaign={addCreatorsCampaignResolved}
         lang={lang}
         userId={userId}
         plan={plan}
@@ -1524,22 +1553,26 @@ export function CampaignsView({
         </>
       );
     }
-    const editCampaign = campaigns.find((c) => c.id === editId) ?? null;
-    if (!editCampaign) {
-      navigate({ view: "campaigns" }, { replace: true });
-      return null;
+    const editCampaignResolved = campaigns.find((c) => c.id === editId) ?? null;
+    if (!editCampaignResolved) {
+      return (
+        <>
+          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
+          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
+        </>
+      );
     }
     return (
       <NewCampaignOnboarding
         mode="edit"
-        existingCampaign={editCampaign}
+        existingCampaign={editCampaignResolved}
         lang={lang}
         userId={userId}
         plan={plan}
         isMobile={isMobile}
         onClose={() =>
           navigate(
-            { view: "campaigns", ...(editCampaign.status === "Draft" ? {} : { campaign: { type: "detail", id: editId } }) },
+            { view: "campaigns", ...(editCampaignResolved.status === "Draft" ? {} : { campaign: { type: "detail", id: editId } }) },
             { replace: true },
           )
         }
@@ -2663,10 +2696,6 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #EFEFEF", fontSize: 13, color: "#7A7A7A" }}>
           <span>{lang === "fr" ? "Affichage" : "Showing"} {filtered.length} {lang === "fr" ? "sur" : "of"} {campaigns.length} {lang === "fr" ? "campagnes" : "campaigns"}</span>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }} disabled>{lang === "fr" ? "Précédent" : "Previous"}</button>
-            <button type="button" style={{ ...btnSecondary, padding: "6px 12px", fontSize: 12 }}>{lang === "fr" ? "Suivant" : "Next"}</button>
-          </div>
         </div>
       </div>
     </div>

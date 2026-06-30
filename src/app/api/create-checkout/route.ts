@@ -19,6 +19,9 @@ export async function POST(request: Request) {
     }
 
     if (!appUrl) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json({ error: "App URL not configured" }, { status: 500 });
+      }
       console.error("Checkout: NEXT_PUBLIC_APP_URL is missing — success/cancel URLs will be invalid");
     }
 

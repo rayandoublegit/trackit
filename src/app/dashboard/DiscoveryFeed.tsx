@@ -369,7 +369,7 @@ function FilterSidebar({
         minHeight: isMobile ? undefined : 0,
         overflowY: isMobile ? "visible" : "auto",
         overflowX: "hidden",
-        padding: isMobile ? "56px 16px 20px" : "24px 20px 48px",
+        padding: isMobile ? "12px 16px 20px 52px" : "24px 20px 48px",
         boxSizing: "border-box",
         WebkitOverflowScrolling: "touch",
       }}
@@ -862,6 +862,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     if (found) setSelected(found);
   }, [navState.view, navState.creator, creators]);
   const [sort, setSort] = useState<"value" | "followers" | "engagement">("followers");
+  const scrollRootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const fetchGenRef = useRef(0);
   const batchIndexRef = useRef(0);
@@ -1055,7 +1056,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
 
   useEffect(() => {
     if (loading || loadingMore) return;
-    const el = mainRef.current;
+    const el = isMobile ? scrollRootRef.current : mainRef.current;
     if (!el) return;
     const onScroll = () => {
       if (el.scrollTop > 80) scrolledRef.current = true;
@@ -1066,7 +1067,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [loading, loadingMore, loadNextBatch]);
+  }, [loading, loadingMore, loadNextBatch, isMobile]);
 
   const filtered = useMemo(() => applyClientFilters(creators, filters, savedUsernames), [creators, filters, savedUsernames]);
   const visibleCreators = filtered;
@@ -1125,13 +1126,15 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
 
   return (
     <div
+      ref={scrollRootRef}
       style={{
         display: "flex",
         flexDirection: isMobile ? "column" : "row",
         flex: 1,
-        height: isMobile ? "auto" : "100%",
-        minHeight: isMobile ? "100vh" : 0,
-        overflow: "hidden",
+        height: "100%",
+        minHeight: 0,
+        overflow: isMobile ? "auto" : "hidden",
+        WebkitOverflowScrolling: "touch",
         background: "#F5F5F5",
         alignItems: "stretch",
       }}
@@ -1148,8 +1151,18 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         isMobile={isMobile}
       />
 
-      <div ref={mainRef} style={{ flex: 1, minWidth: 0, minHeight: 0, height: isMobile ? "auto" : "100%", overflow: isMobile ? "visible" : "auto" }}>
-        <div style={{ padding: isMobile ? "16px" : "20px 24px 40px" }}>
+      <div
+        ref={mainRef}
+        style={{
+          flex: isMobile ? "0 0 auto" : 1,
+          minWidth: 0,
+          minHeight: isMobile ? undefined : 0,
+          height: isMobile ? "auto" : "100%",
+          width: isMobile ? "100%" : undefined,
+          overflow: isMobile ? "visible" : "auto",
+        }}
+      >
+        <div style={{ padding: isMobile ? "8px 16px 32px 52px" : "20px 24px 40px" }}>
           {!isMobile && (
             <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 4 }}>

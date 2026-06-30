@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,9 +11,17 @@ const supabaseAdmin = createClient(
 
 // Records a MANUAL payout (PayPal / Revolut / IBAN done outside Trackit):
 // inserts a payout row and deducts the amount from the creator's balance.
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authedUserId = await getAuthedUserId(request);
+  if (!authedUserId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   const { userId, creatorId, amount, method } = await request.json();
-  if (!userId || !creatorId || !amount || Number(amount) <= 0) {
+  if (userId && userId !== authedUserId) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (!creatorId || !amount || Number(amount) <= 0) {
     return NextResponse.json({ ok: false, error: "Missing or invalid fields" }, { status: 400 });
   }
 
@@ -20,7 +29,7 @@ export async function POST(request: Request) {
     .from("creators")
     .select("id, user_id, balance")
     .eq("id", creatorId)
-    .eq("user_id", userId)
+    .eq("user_id", authedUserId)
     .single();
 
   if (!creator) {
@@ -28,7 +37,7 @@ export async function POST(request: Request) {
   }
 
   const { error } = await supabaseAdmin.from("payouts").insert({
-    user_id: userId,
+    user_id: authedUserId,
     creator_id: creatorId,
     amount: Number(amount),
     status: "paid",

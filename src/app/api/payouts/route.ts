@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const authedUserId = await getAuthedUserId(request);
+  if (!authedUserId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
@@ -17,15 +23,19 @@ export async function POST(request: Request) {
   const stripe = new Stripe(stripeKey);
 
   const { userId, creatorId, amount } = await request.json();
-  if (!userId || !creatorId || !amount || amount <= 0) {
+  if (userId && userId !== authedUserId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (!creatorId || !amount || amount <= 0) {
     return NextResponse.json({ error: "Missing or invalid fields" }, { status: 400 });
   }
 
-  // Creator must have a connected, onboarded Stripe account
+  // Creator must belong to this brand and have a connected Stripe account
   const { data: creator } = await supabaseAdmin
     .from("creators")
-    .select("id, stripe_account_id, stripe_onboarded, total_earned, balance")
+    .select("id, user_id, stripe_account_id, stripe_onboarded, total_earned, balance")
     .eq("id", creatorId)
+    .eq("user_id", authedUserId)
     .single();
 
   if (!creator?.stripe_account_id) {
@@ -54,7 +64,7 @@ export async function POST(request: Request) {
       amount: amountCents,
       currency: "eur",
       destination: creator.stripe_account_id,
-      metadata: { userId, creatorId },
+      metadata: { userId: authedUserId, creatorId },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Transfer failed";
@@ -63,7 +73,7 @@ export async function POST(request: Request) {
 
   // Record the payout
   await supabaseAdmin.from("payouts").insert({
-    user_id: userId,
+    user_id: authedUserId,
     creator_id: creatorId,
     amount: Number(amount),
     status: "paid",

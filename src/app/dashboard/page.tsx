@@ -36,7 +36,6 @@ import { AnalyticsView } from "./AnalyticsView";
 import { CreatorScripts } from "./CreatorScripts";
 import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
-import { DiscoveryView } from "./DiscoveryView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
 import { MyCreatorsView } from "./MyCreatorsView";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
@@ -3934,7 +3933,7 @@ function AffiliatesView({
           {lang === "fr" ? "+ Ajouter un affilié" : "+ Add affiliate"}
         </button>
       } />
-        <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 56 : undefined }}>
+        <div style={{ padding: isMobile ? 16 : 40 }}>
         {actionMessage && (
           <div style={{ marginBottom: 16, padding: "12px 16px", background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
             {actionMessage}

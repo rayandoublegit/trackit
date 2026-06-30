@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,9 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: Request) {
-  const userId = new URL(request.url).searchParams.get("userId");
-  if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
+export async function GET(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabaseAdmin
     .from("outreach_history")
@@ -26,10 +27,14 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, rows: data ?? [] });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
   const body = await request.json();
-  const userId = String(body.userId || "");
-  if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
+  if (body.userId && String(body.userId) !== userId) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
 
   const row = {
     user_id: userId,
@@ -52,12 +57,17 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, row: data });
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
   const body = await request.json();
-  const userId = String(body.userId || "");
   const outreachId = String(body.outreachId || "");
-  if (!userId || !outreachId) {
-    return NextResponse.json({ ok: false, error: "Missing userId or outreachId" }, { status: 400 });
+  if (body.userId && String(body.userId) !== userId) {
+    return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+  }
+  if (!outreachId) {
+    return NextResponse.json({ ok: false, error: "Missing outreachId" }, { status: 400 });
   }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -82,9 +92,9 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ ok: true, row: data });
 }
 
-export async function DELETE(request: Request) {
-  const userId = new URL(request.url).searchParams.get("userId");
-  if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
+export async function DELETE(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   const { error } = await supabaseAdmin.from("outreach_history").delete().eq("user_id", userId);
   if (error) {

@@ -3596,7 +3596,7 @@ export function BalanceView({
             ) : (
               <>
                 <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>
-                  {lang === "fr" ? "Débit sur" : "Charging"} {chargingLabel}
+                  {lang === "fr" ? "Carte enregistrée" : "Saved card"}: {chargingLabel}
                 </p>
                 <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>
                   {lang === "fr" ? "Montant à ajouter" : "Amount to add"}

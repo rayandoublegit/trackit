@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { enrichCreatorsForUser } from "@/lib/enrich-creator-avatars";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -9,10 +10,9 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-  if (!userId) return NextResponse.json([]);
+export async function GET(request: NextRequest) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data } = await supabaseAdmin
     .from("creators")
