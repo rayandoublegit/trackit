@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
+import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
@@ -17,66 +18,11 @@ const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
 const PRO_ANNUAL = PLAN_PRICES.proAnnual;
 const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
 
-type PaidTier = "basic" | "pro" | "scale";
-
-const PLAN_RANK: Record<PlanTier, number> = {
-  free: 0,
-  basic: 1,
-  pro: 2,
-  scale: 3,
-};
-
 const pricingCheckIcon = (
   <svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
     <path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-
-function planAction(
-  current: PlanTier,
-  target: PaidTier,
-  subscriptionInterval: BillingInterval | null,
-  viewAnnual: boolean,
-): "current" | "upgrade" | "downgrade" {
-  const viewInterval: BillingInterval = viewAnnual ? "year" : "month";
-  const sameTier = PLAN_RANK[current] === PLAN_RANK[target];
-  const tierDiff = PLAN_RANK[target] - PLAN_RANK[current];
-
-  if (sameTier) {
-    if (!subscriptionInterval || subscriptionInterval === viewInterval) return "current";
-    if (viewAnnual && subscriptionInterval === "month") return "upgrade";
-    if (!viewAnnual && subscriptionInterval === "year") return "downgrade";
-    return "current";
-  }
-
-  if (viewAnnual) return "upgrade";
-  if (tierDiff > 0) return "upgrade";
-  return "downgrade";
-}
-
-function planButtonLabel(
-  lang: "fr" | "en",
-  action: "current" | "upgrade" | "downgrade",
-  cardName: string,
-  currentPlan: PlanTier,
-  target: PaidTier,
-  subscriptionInterval: BillingInterval | null,
-  viewAnnual: boolean,
-): string {
-  if (action === "current") return lang === "fr" ? "Plan actuel" : "Current plan";
-
-  const sameTier = PLAN_RANK[currentPlan] === PLAN_RANK[target];
-  if (action === "upgrade" && sameTier && viewAnnual && subscriptionInterval === "month") {
-    return lang === "fr" ? "Passer à l'annuel" : "Switch to annual";
-  }
-  if (action === "upgrade") {
-    return lang === "fr" ? `Passer à ${cardName}` : `Upgrade to ${cardName}`;
-  }
-  if (!viewAnnual && sameTier && subscriptionInterval === "year") {
-    return lang === "fr" ? "Passer au mensuel" : "Switch to monthly";
-  }
-  return lang === "fr" ? "Rétrograder" : "Downgrade";
-}
 
 function priceIdForTier(tier: PaidTier, currency: "usd" | "eur", annual: boolean): string {
   if (tier === "basic") return getGrowthPriceId(currency, annual);
@@ -264,9 +210,9 @@ export function PricingPlans({
     }
   };
 
-  const growthAction = planAction(plan, "basic", subscriptionInterval, growthAnnual);
-  const proAction = planAction(plan, "pro", subscriptionInterval, proAnnual);
-  const scaleAction = planAction(plan, "scale", subscriptionInterval, scaleAnnual);
+  const growthAction = planCtaAction(plan, "basic", subscriptionInterval, growthAnnual);
+  const proAction = planCtaAction(plan, "pro", subscriptionInterval, proAnnual);
+  const scaleAction = planCtaAction(plan, "scale", subscriptionInterval, scaleAnnual);
 
   const defaultTitle = lang === "fr" ? "Choisis le plan qui te convient" : "Choose the plan that fits";
   const defaultSubtitle =
@@ -285,13 +231,13 @@ export function PricingPlans({
 
   const growthCta =
     paidCtaLabel ??
-    planButtonLabel(lang, growthAction, "Growth", plan, "basic", subscriptionInterval, growthAnnual);
+    planCtaLabel(lang, growthAction, "Growth", plan, "basic", subscriptionInterval, growthAnnual);
   const proCta =
     paidCtaLabel ??
-    planButtonLabel(lang, proAction, "Pro", plan, "pro", subscriptionInterval, proAnnual);
+    planCtaLabel(lang, proAction, "Pro", plan, "pro", subscriptionInterval, proAnnual);
   const scaleCta =
     paidCtaLabel ??
-    planButtonLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, scaleAnnual);
+    planCtaLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, scaleAnnual);
 
   const freeLabel =
     freeCtaLabel ??

@@ -9,7 +9,12 @@ import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanMarketingFeatures, getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
+import { openStripeBillingPortal } from "@/lib/open-billing-portal";
+import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import type { BillingInterval } from "@/lib/stripe-billing";
 
 const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
@@ -246,6 +251,24 @@ function ProcessCommissionStack({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
+type LandingPaidTier = "growth" | "pro" | "scale";
+
+const LANDING_TO_PAID: Record<LandingPaidTier, PaidTier> = {
+  growth: "basic",
+  pro: "pro",
+  scale: "scale",
+};
+
+const disabledPricingCtaStyle: CSSProperties = {
+  background: "#FFFFFF",
+  color: "#1A1A1A",
+  border: "1px solid transparent",
+  boxShadow: "none",
+  cursor: "default",
+  transform: "none",
+  transition: "none",
+};
+
 function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
   const prefix = lang === "fr" ? "Des tarifs simples. Sans" : "Simple pricing. No";
 
@@ -255,6 +278,9 @@ function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
       <span className="pricing-title-end">
         {lang === "fr" ? "surprises." : "surprises"}
         <span className="pricing-title-sparkle" aria-hidden="true">
+          <span />
+          <span />
+          <span />
           <span />
           <span />
           <span />
@@ -274,6 +300,12 @@ export default function TrackitLanding() {
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [trackitAnnual, setTrackitAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
+  const [subscriptionInterval, setSubscriptionInterval] = useState<BillingInterval | null>(null);
+  const [planLoading, setPlanLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [payingTier, setPayingTier] = useState<LandingPaidTier | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const lang = useLang();
@@ -386,59 +418,136 @@ export default function TrackitLanding() {
   const growthPricingFeatures = getPlanMarketingFeatures("basic", lang, "full");
   const proPricingFeatures = getPlanMarketingFeatures("pro", lang, "full");
   const scalePricingFeatures = getPlanMarketingFeatures("scale", lang, "pricing");
+  const plan = normalizePlan(currentPlan);
+  const currency = lang === "fr" ? "eur" : "usd";
 
-  const handleCheckout = async (plan: "growth" | "pro" | "scale", annual?: boolean) => {
-    const isEur = (typeof window !== "undefined" && (localStorage.getItem("trackit_lang") || navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en")) === "fr";
-    const monthlyIds: Record<string, string | undefined> = isEur ? {
-      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
-      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID,
-    } : {
-      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
-      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
-    };
-    const annualIds: Record<string, string | undefined> = isEur ? {
-      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
-      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
-    } : {
-      growth: process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
-      pro: process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
-      scale: process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
-    };
-    const priceId = (annual ? annualIds[plan] : monthlyIds[plan]) ?? monthlyIds[plan];
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/billing/plan", { credentials: "include" });
+        if (res.status === 401) {
+          if (!cancelled) {
+            setIsLoggedIn(false);
+            setCurrentPlan("free");
+            setSubscriptionInterval(null);
+          }
+          return;
+        }
+        const payload = await res.json().catch(() => ({})) as {
+          plan?: string;
+          billingInterval?: BillingInterval | null;
+        };
+        if (cancelled) return;
+        setIsLoggedIn(true);
+        setCurrentPlan(normalizePlan(payload.plan));
+        setSubscriptionInterval(payload.billingInterval ?? null);
+      } catch {
+        if (!cancelled) {
+          setIsLoggedIn(false);
+          setCurrentPlan("free");
+          setSubscriptionInterval(null);
+        }
+      } finally {
+        if (!cancelled) setPlanLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
-    if (!priceId) {
-      alert("Pricing not configured. Please contact support.");
+  const growthAction = planCtaAction(plan, "basic", subscriptionInterval, basicAnnual);
+  const proAction = planCtaAction(plan, "pro", subscriptionInterval, trackitAnnual);
+  const scaleAction = planCtaAction(plan, "scale", subscriptionInterval, proAnnual);
+
+  const growthCtaLabel = planCtaLabel(lang, growthAction, "Growth", plan, "basic", subscriptionInterval, basicAnnual);
+  const proCtaLabel = planCtaLabel(lang, proAction, "Pro", plan, "pro", subscriptionInterval, trackitAnnual);
+  const scaleCtaLabel = planCtaLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, proAnnual);
+
+  const payingLabel = lang === "fr" ? "Paiement…" : "Paying…";
+  const portalLabel = lang === "fr" ? "Chargement…" : "Loading…";
+
+  const startCheckout = async (tier: LandingPaidTier, annual: boolean) => {
+    setPayingTier(tier);
+    try {
+      const paid = LANDING_TO_PAID[tier];
+      const priceId =
+        paid === "basic"
+          ? getGrowthPriceId(currency, annual)
+          : paid === "pro"
+            ? getProPriceId(currency, annual)
+            : getScalePriceId(currency, annual);
+      if (!priceId?.trim()) {
+        alert("Pricing not configured. Please contact support.");
+        return;
+      }
+      await handleUpgrade(priceId, { cancelUrl: window.location.href });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Could not start checkout");
+    } finally {
+      setPayingTier(null);
+    }
+  };
+
+  const onPaidPlanClick = async (tier: LandingPaidTier, annual: boolean) => {
+    const action = planCtaAction(plan, LANDING_TO_PAID[tier], subscriptionInterval, annual);
+    if (action === "current") return;
+    if (action === "downgrade") {
+      setPortalLoading(true);
+      try {
+        await openStripeBillingPortal();
+      } finally {
+        setPortalLoading(false);
+      }
       return;
     }
+    await startCheckout(tier, annual);
+  };
 
-    // Get current user so Stripe session is linked to their account
-    let userId: string | undefined;
-    let email: string | undefined;
-    try {
-      const { supabase } = await import("@/lib/supabase");
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        userId = user?.id;
-        email = user?.email ?? undefined;
-      }
-    } catch {}
+  const freeCtaLabel =
+    isLoggedIn && plan === "free"
+      ? lang === "fr"
+        ? "Plan actuel"
+        : "Current plan"
+      : isLoggedIn && plan !== "free"
+        ? lang === "fr"
+          ? "Je préfère rester en free"
+          : "I'd rather stay free"
+        : t.pricing_free_cta;
 
-    const res = await fetch("/api/create-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        priceId,
-        userId,
-        email,
-        cancelUrl: window.location.href,
-      })
-    });
-    const data = await res.json();
-    if (data.url) window.location.href = data.url;
-    else alert(data.error || "Could not start checkout");
+  const handleCheckout = async (planKey: LandingPaidTier, annual?: boolean) => {
+    await onPaidPlanClick(planKey, Boolean(annual));
+  };
+
+  const renderPaidCta = (
+    tier: LandingPaidTier,
+    annual: boolean,
+    action: ReturnType<typeof planCtaAction>,
+    label: string,
+    className: string,
+  ) => {
+    const isCurrent = action === "current";
+    const isLoading = payingTier === tier || (portalLoading && action === "downgrade");
+    const text = planLoading
+      ? lang === "fr"
+        ? "Chargement…"
+        : "Loading…"
+      : isLoading
+        ? payingTier === tier
+          ? payingLabel
+          : portalLabel
+        : label;
+
+    return (
+      <button
+        type="button"
+        onClick={() => void handleCheckout(tier, annual)}
+        className={className}
+        disabled={isCurrent || isLoading || planLoading}
+        style={isCurrent ? disabledPricingCtaStyle : undefined}
+      >
+        {text}
+      </button>
+    );
   };
 
   const switchLandingLang = (next: "en" | "fr") => {
@@ -1403,7 +1512,7 @@ export default function TrackitLanding() {
                   <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
                 ))}
               </div>
-              <button type="button" onClick={() => handleCheckout("growth", basicAnnual)} className="pricing-cta">{t.pricing_cta}</button>
+              {renderPaidCta("growth", basicAnnual, growthAction, growthCtaLabel, "pricing-cta")}
             </div>
           </div>
 
@@ -1439,7 +1548,7 @@ export default function TrackitLanding() {
                   <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
                 ))}
               </div>
-              <button type="button" onClick={() => handleCheckout("pro", trackitAnnual)} className="pricing-cta pricing-cta-hero">{t.pricing_cta}</button>
+              {renderPaidCta("pro", trackitAnnual, proAction, proCtaLabel, "pricing-cta pricing-cta-hero")}
             </div>
           </div>
 
@@ -1475,7 +1584,7 @@ export default function TrackitLanding() {
                   <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
                 ))}
               </div>
-              <button type="button" onClick={() => handleCheckout("scale", proAnnual)} className="pricing-cta pricing-cta-dark">{t.pricing_cta}</button>
+              {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pricing-cta pricing-cta-dark")}
             </div>
           </div>
 
@@ -1496,7 +1605,27 @@ export default function TrackitLanding() {
                   <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
                 ))}
               </div>
-              <a href="/auth" className="pricing-cta">{t.pricing_free_cta}</a>
+              {isLoggedIn ? (
+                <button
+                  type="button"
+                  className="pricing-cta"
+                  disabled={plan === "free" || planLoading || portalLoading}
+                  onClick={() => {
+                    if (plan !== "free") void openStripeBillingPortal();
+                  }}
+                  style={
+                    plan === "free"
+                      ? { ...disabledPricingCtaStyle, opacity: planLoading ? 0.6 : 1 }
+                      : undefined
+                  }
+                >
+                  {planLoading || portalLoading
+                    ? portalLabel
+                    : freeCtaLabel}
+                </button>
+              ) : (
+                <a href="/auth" className="pricing-cta">{t.pricing_free_cta}</a>
+              )}
             </div>
           </div>
         </div>
