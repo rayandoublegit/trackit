@@ -110,41 +110,38 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       return;
     }
 
-    let brandList = brands;
-    if (!brandList.length) {
-      brandList = await load();
-    }
-    const brand = brandList.find((b) => b.id === brandId) ?? brandList[0] ?? null;
-    if (!brand?.id || !brand.creatorRowId) {
-      const refreshed = await load();
-      const resolved = refreshed.find((b) => b.id === (brandId || refreshed[0]?.id)) ?? refreshed[0];
-      if (!resolved?.creatorRowId) {
-        setError(
-          lang === "fr"
-            ? "Impossible de lier votre compte à la marque. Réessayez dans quelques secondes."
-            : "Could not link your account to the brand. Try again in a few seconds.",
-        );
-        return;
-      }
-      if (!brandId && resolved.id) setBrandId(resolved.id);
-      await uploadWithBrand(resolved);
-      return;
-    }
-    await uploadWithBrand(brand);
-  };
-
-  const uploadWithBrand = async (brand: BrandOption) => {
-    if (!userId || !brand.creatorRowId || !supabase) return;
-    const creatorRowId = brand.creatorRowId;
-
     setUploading(true);
     setError(null);
     setSuccess(null);
 
     try {
+      const prepRes = await fetch(`/api/creator/content?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+      const prep = (await prepRes.json()) as {
+        ok?: boolean;
+        brands?: BrandOption[];
+        linkError?: string;
+        error?: string;
+      };
+      if (!prepRes.ok) {
+        throw new Error(prep.error ?? (lang === "fr" ? "Impossible de charger vos marques." : "Could not load your brands."));
+      }
+      const brandList = prep.brands?.length ? prep.brands : brands;
+      const uploadBrand = brandList.find((b) => b.id === brandId) ?? brandList[0] ?? null;
+      if (!uploadBrand?.id) {
+        throw new Error(
+          prep.linkError ??
+            (lang === "fr"
+              ? "Aucune marque liée. Acceptez d'abord l'invitation de la marque."
+              : "No linked brand. Accept the brand invite first."),
+        );
+      }
+      if (!brandId) setBrandId(uploadBrand.id);
+
       let uploaded = 0;
+      let lastCreatorRowId = uploadBrand.creatorRowId;
+
       for (const file of pendingFiles) {
-        const path = `${userId}/${brand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
+        const path = `${userId}/${uploadBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
           .upload(path, file, { upsert: false, contentType: file.type || undefined });
@@ -158,8 +155,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId,
-            brandId: brand.id,
-            creatorRowId,
+            brandId: uploadBrand.id,
+            creatorRowId: lastCreatorRowId || undefined,
             title: itemTitle,
             notes: notes.trim() || null,
             fileUrl: pub.publicUrl,
@@ -168,8 +165,22 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
             fileSize: file.size,
           }),
         });
-        const data = (await res.json()) as { ok?: boolean; error?: string };
-        if (!res.ok || !data?.ok) throw new Error(data.error ?? "Upload failed");
+        const data = (await res.json()) as {
+          ok?: boolean;
+          error?: string;
+          brandId?: string;
+          creatorRowId?: string;
+        };
+        if (!res.ok || !data?.ok) {
+          throw new Error(
+            data.error ??
+              (lang === "fr"
+                ? "Impossible de lier votre compte à la marque."
+                : "Could not link your account to the brand."),
+          );
+        }
+        if (data.brandId) setBrandId(data.brandId);
+        if (data.creatorRowId) lastCreatorRowId = data.creatorRowId;
         uploaded += 1;
       }
 

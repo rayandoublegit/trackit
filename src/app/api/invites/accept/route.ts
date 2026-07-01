@@ -79,12 +79,12 @@ export async function POST(req: Request) {
   let creatorRowId: string | null = null;
 
   if (handle) {
-    const { data: existing } = await supabase
+    const { data: existingRows } = await supabase
       .from("creators")
-      .select("id")
-      .eq("user_id", invite.brand_id)
-      .eq("handle", handle)
-      .maybeSingle();
+      .select("id, handle")
+      .eq("user_id", invite.brand_id);
+    const existing =
+      (existingRows ?? []).find((row) => normalizeCreatorHandle(row.handle) === handle) ?? null;
 
     if (existing) {
       await supabase

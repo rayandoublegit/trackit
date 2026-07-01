@@ -1,28 +1,34 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { findCreatorRowsForProfile } from "@/lib/creator-account";
+import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
-
-// GET — list content uploaded by this creator
+// GET — list content uploaded by this creator + brands they can upload to
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
-  const { rows } = await findCreatorRowsForProfile(supabaseAdmin, userId);
-  if (rows.length === 0) return NextResponse.json({ ok: true, items: [], brands: [] });
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+
+  const linkCheck = await resolveCreatorUploadTarget(admin, userId);
+  const { rows } = await findCreatorRowsForProfile(admin, userId);
+  if (rows.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      items: [],
+      brands: [],
+      linkError: "error" in linkCheck ? linkCheck.error : "No brand linked",
+    });
+  }
 
   const creatorRowIds = rows.map((r) => r.id);
   const brandIds = [...new Set(rows.map((r) => r.user_id))];
 
-  const { data: items, error } = await supabaseAdmin
+  const { data: items, error } = await admin
     .from("creator_content")
     .select("id, brand_id, creator_row_id, title, notes, file_url, file_name, file_type, file_size, created_at")
     .eq("creator_user_id", userId)
@@ -30,7 +36,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const { data: brands } = await supabaseAdmin
+  const { data: brands } = await admin
     .from("profiles")
     .select("id, business_name, full_name, username")
     .in("id", brandIds);
@@ -54,10 +60,13 @@ export async function GET(request: Request) {
 
 // POST — register uploaded content (files uploaded client-side to storage first)
 export async function POST(request: Request) {
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+
   const body = await request.json().catch(() => null);
   const userId = (body?.userId as string | undefined)?.trim();
-  const brandId = (body?.brandId as string | undefined)?.trim();
-  const creatorRowId = (body?.creatorRowId as string | undefined)?.trim();
+  const brandId = (body?.brandId as string | undefined)?.trim() || null;
+  const creatorRowId = (body?.creatorRowId as string | undefined)?.trim() || null;
   const title = (body?.title as string | undefined)?.trim();
   const notes = (body?.notes as string | undefined)?.trim() || null;
   const fileUrl = (body?.fileUrl as string | undefined)?.trim();
@@ -65,19 +74,29 @@ export async function POST(request: Request) {
   const fileType = (body?.fileType as string | undefined)?.trim() || null;
   const fileSize = typeof body?.fileSize === "number" ? body.fileSize : null;
 
-  if (!userId || !brandId || !creatorRowId || !title || !fileUrl || !fileName) {
+  if (!userId || !title || !fileUrl || !fileName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const { rows } = await findCreatorRowsForProfile(supabaseAdmin, userId);
-  const match = rows.find((r) => r.id === creatorRowId && r.user_id === brandId);
-  if (!match) return NextResponse.json({ error: "Creator not linked to brand" }, { status: 403 });
+  const resolved = await resolveCreatorUploadTarget(admin, userId, brandId);
+  if ("error" in resolved) {
+    return NextResponse.json({ error: resolved.error }, { status: 403 });
+  }
 
-  const { data, error } = await supabaseAdmin
+  const targetBrandId = brandId || resolved.target.brandId;
+  const targetCreatorRowId = creatorRowId || resolved.target.creatorRowId;
+
+  const { rows } = await findCreatorRowsForProfile(admin, userId);
+  const match = rows.find((r) => r.id === targetCreatorRowId && r.user_id === targetBrandId);
+  if (!match) {
+    return NextResponse.json({ error: "Creator not linked to brand" }, { status: 403 });
+  }
+
+  const { data, error } = await admin
     .from("creator_content")
     .insert({
-      brand_id: brandId,
-      creator_row_id: creatorRowId,
+      brand_id: targetBrandId,
+      creator_row_id: targetCreatorRowId,
       creator_user_id: userId,
       title,
       notes,
@@ -90,23 +109,31 @@ export async function POST(request: Request) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const syncErr = await syncContentRefToDiscoverySaved(supabaseAdmin, brandId, creatorRowId, {
+  const syncErr = await syncContentRefToDiscoverySaved(admin, targetBrandId, targetCreatorRowId, {
     id: data.id,
     title,
   });
   if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({
+    ok: true,
+    id: data.id,
+    brandId: targetBrandId,
+    creatorRowId: targetCreatorRowId,
+  });
 }
 
 // DELETE — creator removes own content
 export async function DELETE(request: Request) {
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const userId = searchParams.get("userId");
   if (!id || !userId) return NextResponse.json({ error: "Missing id or userId" }, { status: 400 });
 
-  const { error } = await supabaseAdmin
+  const { error } = await admin
     .from("creator_content")
     .delete()
     .eq("id", id)
