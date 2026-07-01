@@ -27,9 +27,10 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
+type CreatorsIndexQuery = ReturnType<ReturnType<SupabaseClient["from"]>["select"]>;
+
 async function fetchAllRows(
-  admin: SupabaseClient,
-  build: () => ReturnType<SupabaseClient["from"]>,
+  build: () => CreatorsIndexQuery,
 ): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
   for (let page = 0; page < MAX_PAGES; page += 1) {
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
       return q;
     };
 
-    const data = await fetchAllRows(admin, build);
+    const data = await fetchAllRows(build);
 
     const pageSeed = (Math.floor(offset / limit) + 1) * 7919;
     const shuffled = seededShuffle(data, pageSeed);
