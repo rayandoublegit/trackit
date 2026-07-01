@@ -1,6 +1,8 @@
+import { createServerClient } from "@supabase/ssr";
 import Stripe from "stripe";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { checkoutPlanMetadata, resolvePlanFromCheckout } from "@/lib/checkout";
+import { saveOnboardingProfileAdmin, type OnboardingSavePayload } from "@/lib/onboarding-save";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
 
@@ -9,7 +11,7 @@ function errMessage(e: unknown): string {
   return String(e);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const stripeKey = process.env.STRIPE_SECRET_KEY;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
@@ -28,13 +30,14 @@ export async function POST(request: Request) {
     const stripe = new Stripe(stripeKey);
     const body = await request.json();
 
-    const { priceId, userId, email, analysisId, cancelUrl } = body as {
+    const { priceId, userId, email, analysisId, cancelUrl, onboarding } = body as {
       priceId?: string;
       userId?: string;
       email?: string;
       analysisId?: string;
       currency?: string;
       cancelUrl?: string;
+      onboarding?: OnboardingSavePayload;
     };
 
     if (!priceId) {
@@ -44,6 +47,50 @@ export async function POST(request: Request) {
     const resolvedPlan = resolvePlanFromCheckout(priceId);
     if (resolvedPlan === "free") {
       return NextResponse.json({ error: "Unknown or invalid price" }, { status: 400 });
+    }
+
+    const admin = getSupabaseAdmin();
+    let resolvedUserId = userId ? String(userId) : null;
+    let resolvedEmail = email ?? null;
+
+    if (onboarding) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!supabaseUrl || !supabaseAnonKey || !admin) {
+        return NextResponse.json({ error: "Not configured" }, { status: 500 });
+      }
+
+      const response = NextResponse.json({ ok: true });
+      const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          },
+        },
+      });
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (resolvedUserId && resolvedUserId !== user.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      resolvedUserId = user.id;
+      resolvedEmail = user.email ?? resolvedEmail;
+
+      const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, onboarding);
+      if (!saved.ok) {
+        return NextResponse.json({ error: saved.error }, { status: 400 });
+      }
     }
 
     const base = (appUrl ?? "http://localhost:3000").replace(/\/$/, "");
@@ -67,16 +114,13 @@ export async function POST(request: Request) {
       : `${checkoutSuccessBase}?session_id={CHECKOUT_SESSION_ID}`;
 
     let stripeCustomerId: string | null = null;
-    if (userId) {
-      const admin = getSupabaseAdmin();
-      if (admin) {
-        stripeCustomerId = await resolveStripeCustomerId(
-          admin,
-          stripe,
-          String(userId),
-          email ?? null
-        );
-      }
+    if (resolvedUserId && admin) {
+      stripeCustomerId = await resolveStripeCustomerId(
+        admin,
+        stripe,
+        resolvedUserId,
+        resolvedEmail
+      );
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -88,19 +132,19 @@ export async function POST(request: Request) {
             customer: stripeCustomerId,
             customer_update: { name: "auto", address: "auto" },
           }
-        : email
-          ? { customer_email: email }
+        : resolvedEmail
+          ? { customer_email: resolvedEmail }
           : {}),
-      ...(userId
+      ...(resolvedUserId
         ? {
-            client_reference_id: String(userId),
-            metadata: { userId: String(userId), plan: planMeta },
+            client_reference_id: resolvedUserId,
+            metadata: { userId: resolvedUserId, plan: planMeta },
           }
         : {}),
-      ...(!isOneShot && userId
+      ...(!isOneShot && resolvedUserId
         ? {
             subscription_data: {
-              metadata: { userId: String(userId), plan: planMeta },
+              metadata: { userId: resolvedUserId, plan: planMeta },
               ...(isSpark ? { trial_period_days: 7 } : {}),
             },
           }

@@ -27,7 +27,7 @@ Les préfixes `NEXT_PUBLIC_STRIPE_*` sont **optionnels** : `next.config.ts` les 
 
 ## Onboarding
 
-L’étape 4 utilise `PricingPlans` avec `onBeforeCheckout={saveOnboardingProfile}` et `cancelUrl` → `/onboarding`.
+L’étape 4 utilise `PricingPlans` avec `getOnboardingPayload` (checkout identique à `/pricing`, profil sauvé côté serveur dans `create-checkout`) et `cancelUrl` → `/onboarding`.
 
 ## Garde CI
 

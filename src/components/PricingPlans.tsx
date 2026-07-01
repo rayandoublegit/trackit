@@ -6,6 +6,7 @@ import type { StripePriceMatrix } from "@/lib/stripe-config";
 import { useStripePrices } from "@/lib/use-stripe-prices";
 import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
@@ -133,6 +134,9 @@ export type PricingPlansProps = {
   userId?: string;
   userEmail?: string;
   onStayFree: () => void;
+  /** Same checkout as /pricing; onboarding data is saved server-side in create-checkout. */
+  getOnboardingPayload?: () => Promise<OnboardingSavePayload | null> | OnboardingSavePayload | null;
+  /** @deprecated Prefer getOnboardingPayload — kept for legacy callers. */
   onBeforeCheckout?: () => Promise<boolean>;
 };
 
@@ -151,10 +155,11 @@ export function PricingPlans({
   userId,
   userEmail,
   onStayFree,
+  getOnboardingPayload,
   onBeforeCheckout,
 }: PricingPlansProps) {
   const lang = useLang();
-  const { prices, loading: loadingPrices, configured: stripeConfigured } = useStripePrices();
+  const { prices, loading: loadingPrices } = useStripePrices();
   const [growthAnnual, setGrowthAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
   const [scaleAnnual, setScaleAnnual] = useState(false);
@@ -169,7 +174,7 @@ export function PricingPlans({
   const freeFeatures = useMemo(() => getPlanMarketingFeatures("free", lang, "pricing"), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
-    if (onBeforeCheckout) {
+    if (onBeforeCheckout && !getOnboardingPayload) {
       const ok = await onBeforeCheckout();
       if (!ok) return;
     }
@@ -201,15 +206,20 @@ export function PricingPlans({
       }
     }
 
+    const onboarding = getOnboardingPayload ? await getOnboardingPayload() : undefined;
+    if (getOnboardingPayload && !onboarding) return;
+
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const res = await fetch("/api/create-checkout", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         priceId,
         userId: resolvedUserId,
         email: resolvedEmail,
         cancelUrl: cancelUrl ?? `${origin}/pricing`,
+        ...(onboarding ? { onboarding } : {}),
       }),
     });
     const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
@@ -272,7 +282,7 @@ export function PricingPlans({
         <p className="section-sub" style={{ maxWidth: 680, margin: "0 auto" }}>
           {subtitle ?? defaultSubtitle}
         </p>
-        {!loadingPrices && !stripeConfigured && (
+        {!loadingPrices && !prices.growth.usd.month && (
           <p style={{ marginTop: 12, fontSize: 14, color: "#B45309", letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? "Les checkouts payants sont temporairement indisponibles. Vous pouvez continuer en free."
@@ -298,8 +308,8 @@ export function PricingPlans({
           features={growthFeatures}
           ctaLabel={growthCta}
           onClick={() => void startCheckout("basic", growthAnnual)}
-          disabled={(!paidCtaLabel && growthAction === "current") || !stripeConfigured || loadingPrices}
-          ctaLoading={payingTier === "basic"}
+          disabled={!paidCtaLabel && growthAction === "current"}
+          ctaLoading={payingTier === "basic" || loadingPrices}
           annualPill={lang === "fr" ? "−20% annuel" : "Save 20% annual"}
         />
 
@@ -315,8 +325,8 @@ export function PricingPlans({
           onClick={() => void startCheckout("pro", proAnnual)}
           ctaClassName="pricing-cta pricing-cta-hero"
           highlight
-          disabled={(!paidCtaLabel && proAction === "current") || !stripeConfigured || loadingPrices}
-          ctaLoading={payingTier === "pro"}
+          disabled={!paidCtaLabel && proAction === "current"}
+          ctaLoading={payingTier === "pro" || loadingPrices}
         />
 
         <PricingCard
@@ -331,8 +341,8 @@ export function PricingPlans({
           onClick={() => void startCheckout("scale", scaleAnnual)}
           ctaClassName="pricing-cta pricing-cta-dark"
           pill={lang === "fr" ? "Pour les agences" : "For agencies"}
-          disabled={(!paidCtaLabel && scaleAction === "current") || !stripeConfigured || loadingPrices}
-          ctaLoading={payingTier === "scale"}
+          disabled={!paidCtaLabel && scaleAction === "current"}
+          ctaLoading={payingTier === "scale" || loadingPrices}
         />
 
         <div className="pricing-wrap pricing-wrap-full">

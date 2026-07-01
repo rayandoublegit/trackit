@@ -23,11 +23,11 @@ import {
   fetchProfileUsernameAvailability,
   isValidProfileUsername,
   normalizeProfileUsername,
-  profileUsernameSaveError,
   profileUsernameStatusColor,
   profileUsernameStatusMessage,
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
+import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { User } from "@supabase/supabase-js";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -200,48 +200,51 @@ export default function OnboardingPage() {
     setStep((s) => (s + 1) as Step);
   };
 
+  const buildOnboardingPayload = async (): Promise<OnboardingSavePayload | null> => {
+    if (!user) return null;
+    setError(null);
+    let avatarUrl: string | null = null;
+    if (avatarFile) {
+      avatarUrl = await uploadAvatar();
+      if (!avatarUrl) return null;
+    }
+    if (!businessType || !revenue || !source) {
+      setError(lang === "fr" ? "Profil incomplet" : "Incomplete profile");
+      return null;
+    }
+    return {
+      fullName: fullName.trim(),
+      username: normalizeProfileUsername(username),
+      avatarUrl,
+      businessName: businessName.trim(),
+      businessType,
+      niche: niche.trim(),
+      revenueRange: revenue,
+      referralSource: source,
+      referralSocialHandle: isSocialReferralSource(source) ? normalizeSocialHandle(sourceHandle) : null,
+      referralDetails: !isSocialReferralSource(source) ? sourceDetails.trim() || null : null,
+      shopifyStoreUrl: shopifyUrl.trim() || null,
+    };
+  };
+
   const saveOnboardingProfile = async (): Promise<boolean> => {
-    if (!user || !supabase) return false;
+    if (!user) return false;
     setLoading(true);
     setError(null);
     try {
-      let avatarUrl: string | null = null;
-      if (avatarFile) avatarUrl = await uploadAvatar();
-      if (avatarFile && !avatarUrl) return false;
-      const { error: updateErr } = await supabase.from("profiles").upsert({
-        id: user.id,
-        email: user.email,
-        full_name: fullName.trim(),
-        username: normalizeProfileUsername(username),
-        avatar_url: avatarUrl,
-        business_name: businessName.trim(),
-        business_type: businessType,
-        niche: niche.trim(),
-        revenue_range: revenue,
-        referral_source: source,
-        shopify_store_url: shopifyUrl.trim() || null,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "id" });
-      if (updateErr) {
-        setError(profileUsernameSaveError(updateErr, lang));
+      const payload = await buildOnboardingPayload();
+      if (!payload) return false;
+      const res = await fetch("/api/onboarding/complete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
         return false;
       }
-
-      if (source) {
-        const { error: referralErr } = await supabase.from("user_referral_attributions").upsert({
-          user_id: user.id,
-          source,
-          social_handle: isSocialReferralSource(source) ? normalizeSocialHandle(sourceHandle) : null,
-          details: !isSocialReferralSource(source) ? sourceDetails.trim() || null : null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" });
-        if (referralErr) {
-          setError(referralErr.message);
-          return false;
-        }
-      }
-
       return true;
     } finally {
       setLoading(false);
@@ -294,7 +297,7 @@ export default function OnboardingPage() {
               userEmail={user.email ?? undefined}
               cancelUrl={typeof window !== "undefined" ? `${window.location.origin}/onboarding` : undefined}
               onStayFree={() => void handleCompleteFree()}
-              onBeforeCheckout={saveOnboardingProfile}
+              getOnboardingPayload={buildOnboardingPayload}
             />
             {error && <OnboardingError message={error} />}
             {loading && (

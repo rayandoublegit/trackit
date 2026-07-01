@@ -27,7 +27,7 @@ describe("stripe config guard", () => {
   it("onboarding step 4 uses PricingPlans with stripe cancel URL", () => {
     const onboarding = readRepoFile("src/app/onboarding/page.tsx");
     expect(onboarding).toContain("PricingPlans");
-    expect(onboarding).toContain("onBeforeCheckout={saveOnboardingProfile}");
+    expect(onboarding).toContain("getOnboardingPayload={buildOnboardingPayload}");
     expect(onboarding).toContain("/onboarding");
   });
 
