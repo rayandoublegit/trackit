@@ -292,7 +292,7 @@ export default function OnboardingPage() {
               paidCtaLabel={lang === "fr" ? "Commencer" : "Get Started"}
               userId={user.id}
               userEmail={user.email ?? undefined}
-              cancelUrl={typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined}
+              cancelUrl={typeof window !== "undefined" ? `${window.location.origin}/onboarding` : undefined}
               onStayFree={() => void handleCompleteFree()}
               onBeforeCheckout={saveOnboardingProfile}
             />

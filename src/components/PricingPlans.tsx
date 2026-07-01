@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import type { StripePriceMatrix } from "@/lib/stripe-config";
+import { useStripePrices } from "@/lib/use-stripe-prices";
 import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
@@ -24,10 +25,14 @@ const pricingCheckIcon = (
   </svg>
 );
 
-function priceIdForTier(tier: PaidTier, currency: "usd" | "eur", annual: boolean): string {
-  if (tier === "basic") return getGrowthPriceId(currency, annual);
-  if (tier === "pro") return getProPriceId(currency, annual);
-  return getScalePriceId(currency, annual);
+function priceIdForTier(
+  prices: StripePriceMatrix,
+  tier: PaidTier,
+  currency: "usd" | "eur",
+  annual: boolean
+): string {
+  const bucket = tier === "basic" ? prices.growth : tier === "pro" ? prices.pro : prices.scale;
+  return annual ? bucket[currency].year : bucket[currency].month;
 }
 
 function PricingCard({
@@ -149,6 +154,7 @@ export function PricingPlans({
   onBeforeCheckout,
 }: PricingPlansProps) {
   const lang = useLang();
+  const { prices, loading: loadingPrices, configured: stripeConfigured } = useStripePrices();
   const [growthAnnual, setGrowthAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
   const [scaleAnnual, setScaleAnnual] = useState(false);
@@ -168,9 +174,13 @@ export function PricingPlans({
       if (!ok) return;
     }
 
-    const priceId = priceIdForTier(tier, currency, annual);
+    const priceId = priceIdForTier(prices, tier, currency, annual);
     if (!priceId?.trim()) {
-      alert("Pricing not configured. Please contact support.");
+      alert(
+        lang === "fr"
+          ? "Paiement indisponible : les prix Stripe ne sont pas configurés."
+          : "Checkout unavailable: Stripe prices are not configured."
+      );
       return;
     }
 
@@ -262,6 +272,13 @@ export function PricingPlans({
         <p className="section-sub" style={{ maxWidth: 680, margin: "0 auto" }}>
           {subtitle ?? defaultSubtitle}
         </p>
+        {!loadingPrices && !stripeConfigured && (
+          <p style={{ marginTop: 12, fontSize: 14, color: "#B45309", letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Les checkouts payants sont temporairement indisponibles. Vous pouvez continuer en free."
+              : "Paid checkout is temporarily unavailable. You can continue on the free plan."}
+          </p>
+        )}
         {showCurrentPlanBadge && !loadingPlan && (
           <div style={{ marginTop: 14, fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
             {lang === "fr" ? "Plan actuel :" : "Current plan:"}{" "}
@@ -281,7 +298,7 @@ export function PricingPlans({
           features={growthFeatures}
           ctaLabel={growthCta}
           onClick={() => void startCheckout("basic", growthAnnual)}
-          disabled={!paidCtaLabel && growthAction === "current"}
+          disabled={(!paidCtaLabel && growthAction === "current") || !stripeConfigured || loadingPrices}
           ctaLoading={payingTier === "basic"}
           annualPill={lang === "fr" ? "−20% annuel" : "Save 20% annual"}
         />
@@ -298,7 +315,7 @@ export function PricingPlans({
           onClick={() => void startCheckout("pro", proAnnual)}
           ctaClassName="pricing-cta pricing-cta-hero"
           highlight
-          disabled={!paidCtaLabel && proAction === "current"}
+          disabled={(!paidCtaLabel && proAction === "current") || !stripeConfigured || loadingPrices}
           ctaLoading={payingTier === "pro"}
         />
 
@@ -314,7 +331,7 @@ export function PricingPlans({
           onClick={() => void startCheckout("scale", scaleAnnual)}
           ctaClassName="pricing-cta pricing-cta-dark"
           pill={lang === "fr" ? "Pour les agences" : "For agencies"}
-          disabled={!paidCtaLabel && scaleAction === "current"}
+          disabled={(!paidCtaLabel && scaleAction === "current") || !stripeConfigured || loadingPrices}
           ctaLoading={payingTier === "scale"}
         />
 

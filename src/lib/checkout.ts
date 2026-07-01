@@ -1,91 +1,33 @@
 import { supabase } from "@/lib/supabase";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import {
+  annualPriceIds,
+  getGrowthPriceId,
+  getProPriceId,
+  getScalePriceId,
+  growthPriceIds,
+  monthlyPriceIds,
+  proPriceIds,
+  scalePriceIds,
+} from "@/lib/stripe-config";
 
-function priceIds(...keys: (string | undefined)[]): string[] {
-  return keys.filter((id): id is string => !!id && id.trim().length > 0);
-}
-
-const GROWTH_PRICE_IDS = () =>
-  priceIds(
-    process.env.STRIPE_GROWTH_PRICE_ID,
-    process.env.STRIPE_GROWTH_EUR_PRICE_ID,
-    process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID,
-    process.env.STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
-    process.env.STRIPE_BASIC_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID
-  );
-
-const PRO_PRICE_IDS = () =>
-  priceIds(
-    process.env.STRIPE_PRO2_PRICE_ID,
-    process.env.STRIPE_PRO2_EUR_PRICE_ID,
-    process.env.STRIPE_PRO2_ANNUAL_PRICE_ID,
-    process.env.STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
-    process.env.STRIPE_PRO_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID
-  );
-
-const SCALE_PRICE_IDS = () =>
-  priceIds(
-    process.env.STRIPE_SCALE_PRICE_ID,
-    process.env.STRIPE_SCALE_EUR_PRICE_ID,
-    process.env.STRIPE_SCALE_ANNUAL_PRICE_ID,
-    process.env.STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID
-  );
-
-const ANNUAL_PRICE_IDS = () =>
-  priceIds(
-    process.env.STRIPE_GROWTH_ANNUAL_PRICE_ID,
-    process.env.STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
-    process.env.STRIPE_PRO2_ANNUAL_PRICE_ID,
-    process.env.STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
-    process.env.STRIPE_SCALE_ANNUAL_PRICE_ID,
-    process.env.STRIPE_SCALE_ANNUAL_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID
-  );
-
-const MONTHLY_PRICE_IDS = () =>
-  priceIds(
-    process.env.STRIPE_GROWTH_PRICE_ID,
-    process.env.STRIPE_GROWTH_EUR_PRICE_ID,
-    process.env.STRIPE_PRO2_PRICE_ID,
-    process.env.STRIPE_PRO2_EUR_PRICE_ID,
-    process.env.STRIPE_SCALE_PRICE_ID,
-    process.env.STRIPE_SCALE_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID,
-    process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID
-  );
+export {
+  getGrowthPriceId,
+  getProPriceId,
+  getScalePriceId,
+} from "@/lib/stripe-config";
 
 export function isAnnualPriceId(priceId: string | null | undefined): boolean {
   if (!priceId) return false;
-  return ANNUAL_PRICE_IDS().includes(priceId);
+  return annualPriceIds().includes(priceId);
 }
 
 export function priceBillingInterval(
   priceId: string | null | undefined
 ): "month" | "year" | null {
   if (!priceId) return null;
-  if (ANNUAL_PRICE_IDS().includes(priceId)) return "year";
-  if (MONTHLY_PRICE_IDS().includes(priceId)) return "month";
+  if (annualPriceIds().includes(priceId)) return "year";
+  if (monthlyPriceIds().includes(priceId)) return "month";
   return null;
 }
 
@@ -97,9 +39,9 @@ export function resolvePlanFromCheckout(
   const meta = normalizePlan(metadataPlan);
   if (!priceId) return meta;
 
-  if (SCALE_PRICE_IDS().includes(priceId)) return "scale";
-  if (PRO_PRICE_IDS().includes(priceId)) return "pro";
-  if (GROWTH_PRICE_IDS().includes(priceId)) return "basic";
+  if (scalePriceIds().includes(priceId)) return "scale";
+  if (proPriceIds().includes(priceId)) return "pro";
+  if (growthPriceIds().includes(priceId)) return "basic";
 
   return meta;
 }
@@ -107,42 +49,6 @@ export function resolvePlanFromCheckout(
 export function checkoutPlanMetadata(plan: PlanTier): string {
   if (plan === "basic") return "growth";
   return plan;
-}
-
-// Growth ($19/mo)
-export function getGrowthPriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) {
-    return currency === "eur"
-      ? process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID!
-      : process.env.NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID!;
-  }
-  return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID!;
-}
-
-// Pro ($39/mo)
-export function getProPriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) {
-    return currency === "eur"
-      ? process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID!
-      : process.env.NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID!;
-  }
-  return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID!;
-}
-
-// Scale ($99/mo)
-export function getScalePriceId(currency: "usd" | "eur" = "usd", annual = false): string {
-  if (annual) {
-    return currency === "eur"
-      ? process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID!
-      : process.env.NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID!;
-  }
-  return currency === "eur"
-    ? process.env.NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID!
-    : process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID!;
 }
 
 export function getPriceIdForUpgrade(

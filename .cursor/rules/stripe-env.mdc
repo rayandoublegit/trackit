@@ -1,0 +1,34 @@
+# Stripe — clés et checkout
+
+## Règle
+
+Tout checkout (onboarding étape 4, `/pricing`, dashboard, landing) doit passer par **`src/lib/stripe-config.ts`** — jamais de `process.env.NEXT_PUBLIC_STRIPE_*` en dur ailleurs.
+
+## Variables Vercel / `.env`
+
+Configurer au minimum :
+
+- `STRIPE_SECRET_KEY` — clé secrète serveur
+- `STRIPE_GROWTH_PRICE_ID`, `STRIPE_PRO2_PRICE_ID`, `STRIPE_SCALE_PRICE_ID` — prix mensuels USD
+
+Optionnel : variantes EUR et annuelles (`STRIPE_*_EUR_*`, `STRIPE_*_ANNUAL_*`).
+
+Les préfixes `NEXT_PUBLIC_STRIPE_*` sont **optionnels** : `next.config.ts` les injecte depuis `STRIPE_*` via `buildClientStripeEnv()`.
+
+## Fichiers à ne pas casser
+
+| Fichier | Rôle |
+|---------|------|
+| `src/lib/stripe-config.ts` | Source unique des price IDs |
+| `next.config.ts` | `env: buildClientStripeEnv()` |
+| `src/app/api/stripe/prices/route.ts` | Prix côté serveur pour le client |
+| `src/lib/use-stripe-prices.ts` | Hook utilisé par `PricingPlans` |
+| `src/components/PricingPlans.tsx` | Checkout onboarding + pricing |
+
+## Onboarding
+
+L’étape 4 utilise `PricingPlans` avec `onBeforeCheckout={saveOnboardingProfile}` et `cancelUrl` → `/onboarding`.
+
+## Garde CI
+
+`src/lib/stripe-config.guard.test.ts` — ne pas supprimer.
