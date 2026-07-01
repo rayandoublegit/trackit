@@ -48,14 +48,13 @@ function asCreatorManagedRow(row: Record<string, unknown>): CreatorManagedRow {
 }
 
 async function selectCreatorRows(
-  supabase: SupabaseClient,
-  build: (select: string) => ReturnType<SupabaseClient["from"]>,
+  run: (select: string) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>,
 ): Promise<CreatorManagedRow[]> {
-  const full = await build(CREATOR_ROW_SELECT);
+  const full = await run(CREATOR_ROW_SELECT);
   if (!full.error && full.data?.length) {
     return (full.data as Record<string, unknown>[]).map(asCreatorManagedRow);
   }
-  const minimal = await build(CREATOR_ROW_MIN_SELECT);
+  const minimal = await run(CREATOR_ROW_MIN_SELECT);
   if (minimal.error || !minimal.data?.length) return [];
   return (minimal.data as Record<string, unknown>[]).map(asCreatorManagedRow);
 }
@@ -69,7 +68,7 @@ export async function ensureCreatorRowForBrandLink(
   userId: string,
   profile: { username: string | null; full_name: string | null },
 ): Promise<CreatorManagedRow | null> {
-  const linkedList = await selectCreatorRows(supabase, (select) =>
+  const linkedList = await selectCreatorRows((select) =>
     supabase.from("creators").select(select).eq("user_id", brandId).eq("linked_user_id", userId).limit(1),
   );
   if (linkedList[0]) return linkedList[0];
@@ -94,7 +93,7 @@ export async function ensureCreatorRowForBrandLink(
 
   if (!error && inserted) return asCreatorManagedRow(inserted as Record<string, unknown>);
 
-  const retryList = await selectCreatorRows(supabase, (select) =>
+  const retryList = await selectCreatorRows((select) =>
     supabase.from("creators").select(select).eq("user_id", brandId).eq("linked_user_id", userId).limit(1),
   );
   return retryList[0] ?? null;
@@ -163,7 +162,7 @@ export async function findCreatorRowsForProfile(
 
   const found: CreatorManagedRow[] = [];
 
-  const linkedRows = await selectCreatorRows(supabase, (cols) =>
+  const linkedRows = await selectCreatorRows((cols) =>
     supabase.from("creators").select(cols).eq("linked_user_id", userId),
   );
   if (linkedRows.length) found.push(...linkedRows);
@@ -193,7 +192,7 @@ export async function findCreatorRowsForProfile(
   const handle = normalizeCreatorHandle(profile.username);
 
   if (brandIds.length > 0) {
-    const brandRows = await selectCreatorRows(supabase, (cols) =>
+    const brandRows = await selectCreatorRows((cols) =>
       supabase.from("creators").select(cols).in("user_id", brandIds),
     );
     const rowsByBrand = new Map<string, CreatorManagedRow[]>();
@@ -237,7 +236,7 @@ export async function findCreatorRowsForProfile(
   }
 
   if (found.length === 0 && handle) {
-    const handleRows = await selectCreatorRows(supabase, (cols) =>
+    const handleRows = await selectCreatorRows((cols) =>
       supabase.from("creators").select(cols).ilike("handle", handle),
     );
     const exact = handleRows.filter((row) => normalizeCreatorHandle(row.handle) === handle);
