@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
+import { activateCreatorDashboard } from "@/lib/active-dashboard-creators";
 import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
 
 export const dynamic = "force-dynamic";
@@ -71,12 +72,25 @@ export async function POST(request: Request) {
   if (followers !== undefined && followers !== null && followers !== "") update.followers = Number(followers);
   if (engagement !== undefined && engagement !== null && engagement !== "") update.engagement_rate = Number(engagement);
 
+  const { data: beforeRow } = await admin
+    .from("creators")
+    .select("linked_user_id")
+    .eq("id", creatorId)
+    .eq("user_id", brandId)
+    .maybeSingle();
+
   const { error } = await admin
     .from("creators")
     .update(update)
     .eq("id", creatorId)
     .eq("user_id", brandId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  try {
+    await activateCreatorDashboard(admin, brandId, creatorId);
+  } catch {
+    /* colonne dashboard_active absente : needs_review=false suffit en legacy */
+  }
 
   const { data: creator, error: fetchErr } = await admin
     .from("creators")
@@ -86,15 +100,21 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   if (creator) {
-    if (creator.linked_user_id) {
-      await admin.from("creator_links").upsert(
+    const linkedUserId = creator.linked_user_id || beforeRow?.linked_user_id;
+    if (linkedUserId && !creator.linked_user_id) {
+      await admin.from("creators").update({ linked_user_id: linkedUserId }).eq("id", creatorId);
+      creator.linked_user_id = linkedUserId;
+    }
+    if (linkedUserId) {
+      const { error: linkErr } = await admin.from("creator_links").upsert(
         {
-          creator_id: creator.linked_user_id,
+          creator_id: linkedUserId,
           brand_id: brandId,
           status: CREATOR_LINK_STATUS.active,
         },
         { onConflict: "creator_id,brand_id" },
       );
+      if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
     }
     const syncErr = await syncCreatorToDiscoverySaved(admin, brandId, creator as BrandCreatorSyncRow);
     if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
@@ -126,7 +146,7 @@ export async function DELETE(request: Request) {
 
   const { error } = await admin
     .from("creators")
-    .update({ needs_review: false, linked_user_id: null })
+    .update({ needs_review: false, linked_user_id: null, dashboard_active: false })
     .eq("id", creatorId)
     .eq("user_id", brandId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

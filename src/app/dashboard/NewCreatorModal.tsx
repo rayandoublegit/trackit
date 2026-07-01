@@ -58,6 +58,9 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     void (async () => {
       const { folders: f } = await listFolders();
       setFolders(f);
+      if (f.length > 0) {
+        setSelectedFolderId((current) => current || f[0].id);
+      }
     })();
   }, [brandId]);
 
@@ -94,10 +97,6 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
 
   const handleSave = async () => {
     if (!brandId || !current) return;
-    if (folders.length > 0 && !selectedFolderId) {
-      setSaveError(lang === "fr" ? "Choisissez une liste pour ce créateur." : "Choose a list for this creator.");
-      return;
-    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -133,7 +132,11 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
         return;
       }
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
-      next();
+      if (queue.length <= 1) {
+        window.location.assign("/dashboard?view=invitations");
+      } else {
+        next();
+      }
     } finally {
       setSaving(false);
     }

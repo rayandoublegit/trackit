@@ -22,6 +22,11 @@ create policy "Creators can read own brand links"
   on public.creator_links for select
   using (auth.uid() = creator_id);
 
+drop policy if exists "Brands can read own creator links" on public.creator_links;
+create policy "Brands can read own creator links"
+  on public.creator_links for select
+  using (auth.uid() = brand_id);
+
 -- Backfill depuis les fiches creators déjà liées.
 insert into public.creator_links (creator_id, brand_id, status)
 select

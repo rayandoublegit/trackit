@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthedUserId } from "@/lib/api-auth";
 import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
+import { deactivateCreatorDashboard } from "@/lib/active-dashboard-creators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,14 @@ export async function POST(request: NextRequest) {
 
   const linkedUserId = creator.linked_user_id;
 
-  const { error: rowErr } = await admin
-    .from("creators")
-    .update({ linked_user_id: null })
-    .eq("id", creatorRowId)
-    .eq("user_id", brandId);
-  if (rowErr) return NextResponse.json({ error: rowErr.message }, { status: 500 });
+  try {
+    await deactivateCreatorDashboard(admin, brandId, creatorRowId);
+  } catch (rowErr) {
+    return NextResponse.json(
+      { error: rowErr instanceof Error ? rowErr.message : "Update failed" },
+      { status: 500 },
+    );
+  }
 
   if (linkedUserId) {
     await admin
