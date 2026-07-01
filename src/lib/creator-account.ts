@@ -29,7 +29,10 @@ function dedupeCreatorRows(rows: CreatorManagedRow[]): CreatorManagedRow[] {
 const CREATOR_ROW_SELECT =
   "id, user_id, balance, total_earned, total_sales, commission_rate, discount_code, handle, full_name, linked_user_id";
 
-async function ensureCreatorRowForBrandLink(
+export const CREATOR_ROW_SYNC_SELECT =
+  "id, handle, full_name, avatar_url, platform, commission_rate, discount_code, niche, followers, engagement_rate, linked_user_id";
+
+export async function ensureCreatorRowForBrandLink(
   supabase: SupabaseClient,
   brandId: string,
   userId: string,
@@ -76,18 +79,15 @@ export async function findCreatorRowsForProfile(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<{ profile: { username: string | null; full_name: string | null; account_type: string | null } | null; rows: CreatorManagedRow[] }> {
-  const { data: profile } = await supabase
+  const { data: profileRow } = await supabase
     .from("profiles")
     .select("username, full_name, account_type")
     .eq("id", userId)
     .maybeSingle();
 
-  if (!profile || profile.account_type !== "creator") {
-    return { profile, rows: [] };
-  }
+  let profile = profileRow;
 
   const select = CREATOR_ROW_SELECT;
-
   const found: CreatorManagedRow[] = [];
 
   const { data: linkedRows } = await supabase.from("creators").select(select).eq("linked_user_id", userId);
@@ -100,6 +100,21 @@ export async function findCreatorRowsForProfile(
     .eq("status", "active");
 
   const brandIds = [...new Set((brandLinks || []).map((l) => String(l.brand_id)).filter(Boolean))];
+  const hasActiveBrandLinks = brandIds.length > 0;
+
+  if (!profile) {
+    return { profile: null, rows: dedupeCreatorRows(found) };
+  }
+
+  if (profile.account_type !== "creator" && (hasActiveBrandLinks || found.length > 0)) {
+    await supabase.from("profiles").update({ account_type: "creator" }).eq("id", userId);
+    profile = { ...profile, account_type: "creator" };
+  }
+
+  if (profile.account_type !== "creator") {
+    return { profile, rows: [] };
+  }
+
   const handle = normalizeCreatorHandle(profile.username);
 
   if (brandIds.length > 0) {

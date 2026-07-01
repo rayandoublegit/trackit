@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import {
+  CREATOR_ROW_SYNC_SELECT,
+  ensureCreatorRowForBrandLink,
+  normalizeCreatorHandle,
+} from "@/lib/creator-account";
+import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +27,6 @@ export async function GET(req: Request) {
   if (!invite) return NextResponse.json({ ok: false, error: "Invalid invite" }, { status: 404 });
   if (invite.status === "revoked") return NextResponse.json({ ok: false, error: "Invite revoked" }, { status: 410 });
 
-  // Récupère le nom de la marque pour l'afficher au créateur.
   const { data: brand } = await supabase
     .from("profiles")
     .select("business_name, full_name, username")
@@ -45,7 +50,6 @@ export async function POST(req: Request) {
   const socialHandle = (body.socialHandle || "").trim().replace(/^@+/, "");
   if (!token || !creatorId) return NextResponse.json({ ok: false, error: "Missing token or creatorId" }, { status: 400 });
 
-  // Vérifie l'invitation.
   const { data: invite } = await supabase
     .from("creator_invites")
     .select("id, brand_id, status")
@@ -54,7 +58,6 @@ export async function POST(req: Request) {
   if (!invite) return NextResponse.json({ ok: false, error: "Invalid invite" }, { status: 404 });
   if (invite.status === "revoked") return NextResponse.json({ ok: false, error: "Invite revoked" }, { status: 410 });
 
-  // Marque le compte comme "creator".
   const profileUpdate: Record<string, unknown> = { account_type: "creator" };
   if (fullName) profileUpdate.full_name = fullName;
   if (socialHandle) profileUpdate.username = socialHandle;
@@ -64,7 +67,6 @@ export async function POST(req: Request) {
     .eq("id", creatorId);
   if (profErr) return NextResponse.json({ ok: false, error: profErr.message }, { status: 500 });
 
-  // Crée le lien créateur <-> marque (upsert pour éviter les doublons).
   const { error: linkErr } = await supabase
     .from("creator_links")
     .upsert(
@@ -73,9 +75,9 @@ export async function POST(req: Request) {
     );
   if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });
 
-  // Crée (ou relie) la ligne du créateur dans le carnet de la marque,
-  // pour qu'il apparaisse direct dans les Payouts et reçoive son IBAN.
-  const handle = socialHandle.toLowerCase().replace(/\s+/g, "");
+  const handle = normalizeCreatorHandle(socialHandle);
+  let creatorRowId: string | null = null;
+
   if (handle) {
     const { data: existing } = await supabase
       .from("creators")
@@ -85,14 +87,13 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existing) {
-      // La marque l'avait déjà ajouté : on pose juste le lien + le nom.
       await supabase
         .from("creators")
         .update({ linked_user_id: creatorId, full_name: fullName || undefined, needs_review: true })
         .eq("id", existing.id);
+      creatorRowId = existing.id;
     } else {
-      // Sinon on crée la ligne d'accueil.
-      await supabase
+      const { data: inserted, error: insertErr } = await supabase
         .from("creators")
         .insert({
           user_id: invite.brand_id,
@@ -102,11 +103,40 @@ export async function POST(req: Request) {
           platform: "tiktok",
           commission_rate: 10,
           needs_review: true,
-        });
+        })
+        .select("id")
+        .single();
+      if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
+      creatorRowId = inserted?.id ?? null;
     }
   }
 
-  // Marque l'invitation comme utilisée.
+  if (!creatorRowId) {
+    const ensured = await ensureCreatorRowForBrandLink(supabase, invite.brand_id, creatorId, {
+      username: socialHandle || null,
+      full_name: fullName || null,
+    });
+    creatorRowId = ensured?.id ?? null;
+  }
+
+  if (creatorRowId) {
+    const { data: creatorForSync } = await supabase
+      .from("creators")
+      .select(CREATOR_ROW_SYNC_SELECT)
+      .eq("id", creatorRowId)
+      .eq("user_id", invite.brand_id)
+      .maybeSingle();
+    if (creatorForSync) {
+      const syncErr = await syncCreatorToDiscoverySaved(
+        supabase,
+        invite.brand_id,
+        creatorForSync as BrandCreatorSyncRow,
+        { pipelineStatus: "signed" },
+      );
+      if (syncErr) return NextResponse.json({ ok: false, error: syncErr.message }, { status: 500 });
+    }
+  }
+
   await supabase
     .from("creator_invites")
     .update({ status: "used", used_at: new Date().toISOString(), used_by: creatorId })

@@ -10,6 +10,8 @@ import {
   enrichSavedRowsWithAccountEmails,
   fetchLinkedCreatorEmailsByHandle,
 } from "@/lib/linked-creator-emails";
+import { CREATOR_ROW_SYNC_SELECT } from "@/lib/creator-account";
+import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +30,32 @@ export async function GET(request: NextRequest) {
   const status = new URL(request.url).searchParams.get("status");
   let q = admin.from("discovery_saved").select("*").eq("user_id", userId).order("saved_at", { ascending: false });
   if (status) q = q.eq("pipeline_status", status);
-  const { data, error } = await q;
+  let { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const { data: linkedCreators } = await admin
+    .from("creators")
+    .select(CREATOR_ROW_SYNC_SELECT)
+    .eq("user_id", userId)
+    .not("linked_user_id", "is", null);
+
+  const savedHandles = new Set((data ?? []).map((row) => String(row.creator_username || "").toLowerCase()));
+  let syncedLinked = false;
+  for (const creator of linkedCreators ?? []) {
+    const username = String(creator.handle || "").trim().replace(/^@+/, "").toLowerCase();
+    if (!username || savedHandles.has(username)) continue;
+    const syncErr = await syncCreatorToDiscoverySaved(admin, userId, creator as BrandCreatorSyncRow, {
+      pipelineStatus: "signed",
+    });
+    if (!syncErr) syncedLinked = true;
+  }
+
+  if (syncedLinked) {
+    const refreshed = await q;
+    if (refreshed.error) return NextResponse.json({ error: refreshed.error.message }, { status: 500 });
+    data = refreshed.data;
+  }
+
   const rows = data ?? [];
   const emailByHandle = await fetchLinkedCreatorEmailsByHandle(admin, userId);
   return NextResponse.json({ rows: enrichSavedRowsWithAccountEmails(rows, emailByHandle) });

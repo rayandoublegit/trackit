@@ -68,13 +68,29 @@ async function mergeContentIntoRows(rows: SavedRow[], brandId: string): Promise<
     const brandContent = Array.isArray(contentData?.items) ? contentData.items : [];
     if (!brandContent.length) return rows;
 
+    type CreatorMeta = {
+      id: string;
+      handle: string;
+      full_name: string | null;
+      avatar_url: string | null;
+      platform: string | null;
+      followers: number | null;
+      engagement_rate: number | null;
+      niche: string | null;
+    };
+
+    const creatorById = new Map<string, CreatorMeta>();
     const handleById = new Map<string, string>();
     if (supabase) {
-      const { data: creatorRows } = await supabase.from("creators").select("id, handle").eq("user_id", brandId);
+      const { data: creatorRows } = await supabase
+        .from("creators")
+        .select("id, handle, full_name, avatar_url, platform, followers, engagement_rate, niche")
+        .eq("user_id", brandId);
       for (const c of creatorRows ?? []) {
-        if (c?.id && c?.handle) {
-          handleById.set(c.id, String(c.handle).replace(/^@+/, "").toLowerCase());
-        }
+        if (!c?.id || !c?.handle) continue;
+        const username = String(c.handle).replace(/^@+/, "").toLowerCase();
+        handleById.set(c.id, username);
+        creatorById.set(c.id, c as CreatorMeta);
       }
     }
 
@@ -93,7 +109,7 @@ async function mergeContentIntoRows(rows: SavedRow[], brandId: string): Promise<
 
     if (contentByUsername.size === 0) return rows;
 
-    return rows.map((row) => {
+    const merged = rows.map((row) => {
       const dbContent = contentByUsername.get(row.creator_username);
       if (!dbContent?.length) return row;
       const snap =
@@ -101,12 +117,42 @@ async function mergeContentIntoRows(rows: SavedRow[], brandId: string): Promise<
           ? (row.snapshot as Record<string, unknown>)
           : {};
       const crm = crmFromSnapshot(snap);
-      const merged = [...(crm.content ?? [])];
+      const mergedContent = [...(crm.content ?? [])];
       for (const entry of dbContent) {
-        if (!merged.some((item) => item.id === entry.id)) merged.push(entry);
+        if (!mergedContent.some((item) => item.id === entry.id)) mergedContent.push(entry);
       }
-      return { ...row, snapshot: { ...snap, crm: { ...crm, content: merged } } };
+      return { ...row, snapshot: { ...snap, crm: { ...crm, content: mergedContent } } };
     });
+
+    const known = new Set(merged.map((row) => row.creator_username));
+    const extra: SavedRow[] = [];
+    for (const [username, dbContent] of contentByUsername) {
+      if (known.has(username)) continue;
+      const creatorId = [...handleById.entries()].find(([, handle]) => handle === username)?.[0];
+      const meta = creatorId ? creatorById.get(creatorId) : null;
+      if (!meta) continue;
+      extra.push({
+        creator_username: username,
+        display_name: meta.full_name?.trim() || username,
+        avatar_url: meta.avatar_url ?? "",
+        followers: Number(meta.followers ?? 0) || 0,
+        engagement_rate: Number(meta.engagement_rate ?? 0) || 0,
+        primary_niche: meta.niche ?? "",
+        country_code: null,
+        value_score: 0,
+        pipeline_status: "signed",
+        notes: "",
+        platform: meta.platform ?? "tiktok",
+        snapshot: {
+          username,
+          displayName: meta.full_name?.trim() || username,
+          trackitCreatorId: meta.id,
+          crm: { content: dbContent },
+        },
+      });
+    }
+
+    return extra.length ? [...merged, ...extra] : merged;
   } catch {
     return rows;
   }
