@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { fetchTikTokProfileRaw, fetchTikTokVideosRaw, parseProfile, parseVideos, parseVideosRich, extractCaptions } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
 import { classifyCreator } from "@/lib/creator-classify";
+import { pickBestCreatorAvatar } from "@/lib/creator-avatar";
+import { pickTikTokAvatarUrl, storeTikTokAvatar } from "@/lib/tiktok-avatar";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -50,6 +52,14 @@ export async function GET(request: Request) {
       const rich = parseVideosRich(videosRaw);
       const row = buildEnrichmentRow(username, profile, videos, Date.now(), rich);
 
+      let avatarMerge: Record<string, unknown> = {};
+      const remoteAvatar = pickTikTokAvatarUrl(profileRaw);
+      if (remoteAvatar) {
+        const stored = await storeTikTokAvatar(supabaseAdmin, remoteAvatar, username);
+        const avatarUrl = pickBestCreatorAvatar(stored, remoteAvatar);
+        if (avatarUrl) avatarMerge = { avatar_url: avatarUrl };
+      }
+
       let classMerge: Record<string, unknown> = {};
       let classified = false;
       try {
@@ -73,7 +83,7 @@ export async function GET(request: Request) {
 
       if (classified) {
         // Full success: metrics + classification, mark enriched.
-        await supabaseAdmin.from("creators_index").upsert({ ...row, ...classMerge }, { onConflict: "username" });
+        await supabaseAdmin.from("creators_index").upsert({ ...row, ...classMerge, ...avatarMerge }, { onConflict: "username" });
         return "enriched";
       }
 
@@ -82,7 +92,7 @@ export async function GET(request: Request) {
       // enriched_at so the next run re-picks this creator and retries the model.
       await supabaseAdmin
         .from("creators_index")
-        .upsert({ ...row, enrichment_status: "pending", enriched_at: null }, { onConflict: "username" });
+        .upsert({ ...row, ...avatarMerge, enrichment_status: "pending", enriched_at: null }, { onConflict: "username" });
       return "failed";
     } catch {
       await supabaseAdmin

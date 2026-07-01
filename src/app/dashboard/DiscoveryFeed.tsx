@@ -1190,7 +1190,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   useEffect(() => {
     if (items.length === 0) return;
     prefetchCreatorAvatars(
-      items.slice(0, 32).map((c) => ({ username: c.username, avatarUrl: c.avatarUrl })),
+      items.slice(0, 48).map((c) => ({ username: c.username, avatarUrl: c.avatarUrl })),
     );
   }, [items]);
 

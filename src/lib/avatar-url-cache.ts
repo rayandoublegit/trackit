@@ -1,6 +1,6 @@
 /** In-memory + sessionStorage cache so avatars reappear instantly across views. */
 
-import { proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { creatorAvatarApiUrl } from "@/lib/feed-avatar-url";
 
 const STORAGE_KEY = "trackit_avatar_cache_v1";
 const MAX_ENTRIES = 600;
@@ -9,10 +9,11 @@ type Entry = { url: string; at: number };
 
 const memory = new Map<string, Entry>();
 
-/** Only persist URLs that stay valid (proxy or Supabase), not expiring TikTok CDN links or API routes. */
+/** URLs safe to cache for instant reuse (proxy, Supabase, or warmed creator-avatar API). */
 export function isPersistableAvatarUrl(url: string): boolean {
   const trimmed = url.trim();
-  if (!trimmed || trimmed.includes("/api/creator-avatar")) return false;
+  if (!trimmed) return false;
+  if (trimmed.includes("/api/creator-avatar")) return true;
   if (trimmed.includes("/api/img-proxy")) return true;
   try {
     const host = new URL(trimmed).hostname.toLowerCase();
@@ -116,17 +117,16 @@ export function prefetchAvatarUrls(
 
 export function prefetchCreatorAvatars(
   items: Array<{ username?: string | null; avatarUrl?: string | null }>,
-  limit = 32,
+  limit = 48,
 ): void {
   if (typeof window === "undefined") return;
   const seen = new Set<string>();
   for (const item of items.slice(0, limit)) {
+    const handle = normalizeHandle(item.username);
     const raw = item.avatarUrl?.trim() || "";
-    if (!raw) continue;
-    const url = proxiedImageUrl(raw);
+    const url = raw || (handle ? creatorAvatarApiUrl(handle) : "");
     if (!url || seen.has(url)) continue;
     seen.add(url);
-    const handle = normalizeHandle(item.username);
     const img = new window.Image();
     img.decoding = "async";
     img.onload = () => {

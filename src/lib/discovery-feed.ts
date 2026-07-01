@@ -1,4 +1,5 @@
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
+import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
 import { NICHE_TREE } from "@/lib/niche-tree";
@@ -71,8 +72,10 @@ const TTL_MS = 30 * 60 * 1000;
 function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
   return {
     username: String(c.username), displayName: String(c.display_name ?? c.username),
-    avatarUrl: String(c.avatar_url ?? ""), followersCount: Number(c.followers ?? 0),
-    engagementRate: Number(c.engagement_rate ?? 0), engagementByFollower: Number(c.engagement_by_follower ?? 0),
+    avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
+    followersCount: Number(c.followers ?? 0),
+    engagementRate: Number(c.engagement_rate ?? 0),
+    engagementByFollower: Number(c.engagement_by_follower ?? 0),
     avgViews: Number(c.avg_views ?? 0), postFrequency: Number(c.post_frequency ?? 0),
     lastPostAt: (c.last_post_at as string) ?? null, authenticityScore: Number(c.authenticity_score ?? 0),
     qualityStatus: String(c.quality_status ?? "ok"), platform: String(c.platform ?? "TikTok"),

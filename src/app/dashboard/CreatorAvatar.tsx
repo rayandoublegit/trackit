@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCachedAvatarUrl, isPersistableAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
-import { normalizeCreatorHandle, resolveCreatorAvatarUrl } from "@/lib/creator-avatar";
-import { isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { normalizeCreatorHandle } from "@/lib/creator-avatar";
+import {
+  creatorAvatarApiUrl,
+  feedAvatarUrlForCreator,
+  isStableAvatarStorageUrl,
+} from "@/lib/feed-avatar-url";
 
 function ProfileIcon({ size }: { size: number }) {
   const iconSize = Math.round(size * 0.52);
@@ -15,36 +19,20 @@ function ProfileIcon({ size }: { size: number }) {
   );
 }
 
-function cleanAvatarSrc(src?: string | null): string {
-  const url = resolveCreatorAvatarUrl(src);
-  if (!url || isUiAvatarsUrl(url)) return "";
-  return url;
-}
-
 export function isStableAvatarUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host.includes("supabase.co") || url.includes("/storage/v1/object/public/");
-  } catch {
-    return false;
-  }
+  return isStableAvatarStorageUrl(url);
 }
 
-function directAvatarSrc(cleanSrc: string): string {
-  if (!cleanSrc) return "";
-  return proxiedImageUrl(cleanSrc);
+function resolveDisplaySrc(username: string, src?: string | null): string {
+  return feedAvatarUrlForCreator(username, src);
 }
 
-function apiAvatarSrc(username: string): string {
-  return `/api/creator-avatar?username=${encodeURIComponent(username)}`;
-}
-
-function resolveInitialSrc(cleanSrc: string, username: string): string {
-  const direct = cleanSrc ? directAvatarSrc(cleanSrc) : "";
-  if (direct) return direct;
+function resolveInitialSrc(displaySrc: string, username: string): string {
   const cached = username ? getCachedAvatarUrl(username) : null;
+  if (cached && isStableAvatarStorageUrl(cached)) return cached;
+  if (displaySrc) return displaySrc;
   if (cached) return cached;
-  if (username) return apiAvatarSrc(username);
+  if (username) return creatorAvatarApiUrl(username);
   return "";
 }
 
@@ -66,11 +54,15 @@ export function CreatorAvatar({
   priority?: boolean;
 }) {
   const resolvedUsername = normalizeCreatorHandle(username ?? handle);
-  const cleanSrc = cleanAvatarSrc(src);
+
+  const displaySrc = useMemo(
+    () => resolveDisplaySrc(resolvedUsername, src),
+    [src, resolvedUsername],
+  );
 
   const targetSrc = useMemo(
-    () => resolveInitialSrc(cleanSrc, resolvedUsername),
-    [cleanSrc, resolvedUsername],
+    () => resolveInitialSrc(displaySrc, resolvedUsername),
+    [displaySrc, resolvedUsername],
   );
 
   const [imgSrc, setImgSrc] = useState(targetSrc);
@@ -81,24 +73,27 @@ export function CreatorAvatar({
     failStepRef.current = 0;
     setImgSrc(targetSrc);
     setShowFallback(!targetSrc);
-  }, [targetSrc]);
+  }, [targetSrc, resolvedUsername]);
 
   const onError = useCallback(() => {
     const step = failStepRef.current;
     failStepRef.current += 1;
 
-    if (step === 0 && cleanSrc && resolvedUsername) {
-      setImgSrc(apiAvatarSrc(resolvedUsername));
-      setShowFallback(false);
-      return;
+    if (step === 0 && resolvedUsername) {
+      const api = creatorAvatarApiUrl(resolvedUsername);
+      if (api && imgSrc !== api) {
+        setImgSrc(api);
+        setShowFallback(false);
+        return;
+      }
     }
-    if (step === 1 && cleanSrc && isStableAvatarUrl(cleanSrc)) {
-      setImgSrc(directAvatarSrc(cleanSrc));
+    if (step === 1 && displaySrc && displaySrc !== imgSrc) {
+      setImgSrc(displaySrc);
       setShowFallback(false);
       return;
     }
     setShowFallback(true);
-  }, [cleanSrc, resolvedUsername]);
+  }, [displaySrc, imgSrc, resolvedUsername]);
 
   const onLoad = useCallback(() => {
     if (resolvedUsername && imgSrc && isPersistableAvatarUrl(imgSrc)) {
@@ -130,6 +125,7 @@ export function CreatorAvatar({
 
   return (
     <img
+      key={resolvedUsername}
       src={imgSrc}
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
