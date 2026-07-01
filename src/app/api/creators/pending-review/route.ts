@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
+import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,13 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   if (creator) {
+    if (creator.linked_user_id) {
+      await admin
+        .from("creator_links")
+        .update({ status: CREATOR_LINK_STATUS.active })
+        .eq("brand_id", brandId)
+        .eq("creator_id", creator.linked_user_id);
+    }
     const syncErr = await syncCreatorToDiscoverySaved(admin, brandId, creator as BrandCreatorSyncRow);
     if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
     if (folderId) {
@@ -97,7 +105,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-// DELETE : la marque ignore le pop-up sans rien changer (juste needs_review = false)
+// DELETE : ignorer le pop-up — pas de dashboard actif pour ce créateur
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const creatorId = searchParams.get("creatorId");
@@ -106,12 +114,27 @@ export async function DELETE(request: Request) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
 
+  const { data: creator } = await admin
+    .from("creators")
+    .select("linked_user_id, handle")
+    .eq("id", creatorId)
+    .eq("user_id", brandId)
+    .maybeSingle();
+
   const { error } = await admin
     .from("creators")
-    .update({ needs_review: false })
+    .update({ needs_review: false, linked_user_id: null })
     .eq("id", creatorId)
     .eq("user_id", brandId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (creator?.linked_user_id) {
+    await admin
+      .from("creator_links")
+      .update({ status: CREATOR_LINK_STATUS.ignored })
+      .eq("brand_id", brandId)
+      .eq("creator_id", creator.linked_user_id);
+  }
 
   return NextResponse.json({ ok: true });
 }

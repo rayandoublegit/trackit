@@ -90,6 +90,7 @@ import {
   writeDashboardBootstrap,
 } from "@/lib/dashboard-bootstrap-cache";
 import { useLang } from "@/lib/useLang";
+import { useCreatorStats } from "@/lib/useCreatorStats";
 import { loadAffiliates, persistAffiliateCodesToServer, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
   readViewFromUrl,
@@ -172,6 +173,9 @@ function DashboardPageContent() {
   const setView = navigation.setView;
   const navigate = navigation.navigate;
   const [isCreator, setIsCreator] = useState(false);
+  const { stats: creatorStats, loading: creatorStatsLoading } = useCreatorStats(isCreator ? user?.id : undefined);
+  const creatorAccessRevoked =
+    isCreator && !creatorStatsLoading && creatorStats?.accessRevoked === true;
 
   useEffect(() => {
     if (view === "notifications") {
@@ -755,6 +759,38 @@ function DashboardPageContent() {
             flexDirection: "column",
           }}
         >
+        {creatorAccessRevoked ? (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: isMobile ? "56px 24px 40px" : "48px 40px",
+              background: "#FFFFFF",
+            }}
+          >
+            <div style={{ maxWidth: 440, textAlign: "center" }}>
+              <h1
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: isMobile ? 22 : 26,
+                  fontWeight: 600,
+                  color: "#1A1A1A",
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                {lang === "fr" ? "Accès désactivé" : "Access deactivated"}
+              </h1>
+              <p style={{ margin: 0, fontSize: 15, color: "#6B7280", lineHeight: 1.6 }}>
+                {lang === "fr"
+                  ? "La marque a désactivé votre espace créateur. Vous ne pouvez plus accéder à votre dashboard."
+                  : "The brand has deactivated your creator workspace. You can no longer access your dashboard."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
         {view === "dashboard" && (
           <HomeOverviewView
             isMobile={isMobile}
@@ -941,6 +977,8 @@ function DashboardPageContent() {
         )}
         {view === "feedback" && <FeedbackView isMobile={isMobile} />}
         {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
+          </>
+        )}
         </div>
       </main>
       {user && !isCreator && <NewCreatorModal brandId={user.id} />}

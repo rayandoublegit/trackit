@@ -5,6 +5,7 @@ import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT } from "@/lib/outreach-histo
 
 export type CreatorStatsData = {
   linked: boolean;
+  accessRevoked?: boolean;
   creatorName?: string | null;
   brandName?: string | null;
   discountCode?: string | null;

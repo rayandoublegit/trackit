@@ -76,6 +76,8 @@ export function InvitationsView({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [dashboardCreators, setDashboardCreators] = useState<DashboardCreator[]>([]);
   const [creatorsLoading, setCreatorsLoading] = useState(true);
+  const [deactivateTarget, setDeactivateTarget] = useState<DashboardCreator | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const canInvite = canInviteCreators(plan);
 
@@ -109,11 +111,14 @@ export function InvitationsView({
             .in("creator_id", linkedIds)
         : { data: [] as { creator_id: string; created_at: string }[] };
       const joinedMap = new Map((links ?? []).map((l) => [l.creator_id, l.created_at]));
+      const activeLinkedIds = new Set((links ?? []).map((l) => l.creator_id));
       setDashboardCreators(
-        rows.map((r) => ({
-          ...r,
-          joined_at: (r.linked_user_id && joinedMap.get(r.linked_user_id)) || r.created_at,
-        })) as DashboardCreator[]
+        rows
+          .filter((r) => r.linked_user_id && activeLinkedIds.has(r.linked_user_id))
+          .map((r) => ({
+            ...r,
+            joined_at: (r.linked_user_id && joinedMap.get(r.linked_user_id)) || r.created_at,
+          })) as DashboardCreator[]
       );
     } finally {
       setCreatorsLoading(false);
@@ -123,6 +128,28 @@ export function InvitationsView({
   useEffect(() => {
     void loadDashboardCreators();
   }, [loadDashboardCreators]);
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    try {
+      const res = await fetch("/api/creators/deactivate-dashboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorId: deactivateTarget.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error || (lang === "fr" ? "Échec de la désactivation." : "Deactivation failed."));
+        return;
+      }
+      setDeactivateTarget(null);
+      void loadDashboardCreators();
+      window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
+    } finally {
+      setDeactivating(false);
+    }
+  };
 
   useEffect(() => {
     const onSaved = () => { void loadDashboardCreators(); };
@@ -589,8 +616,8 @@ export function InvitationsView({
                   <thead>
                     <tr>
                       {(lang === "fr"
-                        ? ["Créateur", "Plateforme", "Commission", "Code promo", "Rejoint le"]
-                        : ["Creator", "Platform", "Commission", "Promo code", "Joined"]
+                        ? ["Créateur", "Plateforme", "Commission", "Code promo", "Rejoint le", "Action"]
+                        : ["Creator", "Platform", "Commission", "Promo code", "Joined", "Action"]
                       ).map((label) => (
                         <th
                           key={label}
@@ -704,6 +731,34 @@ export function InvitationsView({
                           >
                             {formatJoinedDate(creator.joined_at, lang)}
                           </td>
+                          <td
+                            style={{
+                              padding: "14px 20px",
+                              fontSize: 14,
+                              borderBottom: "1px solid #F5F5F5",
+                              verticalAlign: "middle",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setDeactivateTarget(creator)}
+                              style={{
+                                background: "#FFFFFF",
+                                color: "#1A1A1A",
+                                border: "1px solid #1A1A1A",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                fontSize: 13,
+                                fontWeight: 500,
+                                fontFamily: "inherit",
+                                cursor: "pointer",
+                                letterSpacing: "-0.01em",
+                              }}
+                            >
+                              {lang === "fr" ? "Désactiver" : "Deactivate"}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -714,6 +769,110 @@ export function InvitationsView({
           </div>
         </section>
       </div>
+
+      {deactivateTarget && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: 20,
+          }}
+          onClick={() => !deactivating && setDeactivateTarget(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#FFFFFF",
+              borderRadius: 16,
+              border: "1px solid #EFEFEF",
+              padding: "28px 28px 24px",
+              maxWidth: 420,
+              width: "100%",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.1)",
+            }}
+          >
+            <h3
+              style={{
+                margin: "0 0 10px",
+                fontSize: 18,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              {lang === "fr" ? "Désactiver le dashboard ?" : "Deactivate dashboard?"}
+            </h3>
+            <p style={{ margin: "0 0 24px", fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
+              {lang === "fr" ? (
+                <>
+                  <strong style={{ color: "#1A1A1A" }}>
+                    {deactivateTarget.full_name?.trim() || `@${deactivateTarget.handle}`}
+                  </strong>{" "}
+                  n&apos;aura plus accès à son espace créateur et sera retiré de cette liste.
+                </>
+              ) : (
+                <>
+                  <strong style={{ color: "#1A1A1A" }}>
+                    {deactivateTarget.full_name?.trim() || `@${deactivateTarget.handle}`}
+                  </strong>{" "}
+                  will lose access to their creator workspace and be removed from this list.
+                </>
+              )}
+            </p>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                disabled={deactivating}
+                onClick={() => setDeactivateTarget(null)}
+                style={{
+                  background: "#FFFFFF",
+                  color: "#1A1A1A",
+                  border: "1px solid #E5E5E5",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  fontFamily: "inherit",
+                  cursor: deactivating ? "default" : "pointer",
+                }}
+              >
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                disabled={deactivating}
+                onClick={() => void confirmDeactivate()}
+                style={{
+                  background: "#FFFFFF",
+                  color: "#1A1A1A",
+                  border: "1px solid #1A1A1A",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: deactivating ? "wait" : "pointer",
+                }}
+              >
+                {deactivating
+                  ? lang === "fr"
+                    ? "Désactivation…"
+                    : "Deactivating…"
+                  : lang === "fr"
+                    ? "Désactiver"
+                    : "Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

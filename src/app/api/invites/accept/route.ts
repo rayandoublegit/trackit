@@ -6,6 +6,7 @@ import {
   normalizeCreatorHandle,
 } from "@/lib/creator-account";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
+import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,12 @@ export async function POST(req: Request) {
   const { error: linkErr } = await supabase
     .from("creator_links")
     .upsert(
-      { creator_id: creatorId, brand_id: invite.brand_id, invite_id: invite.id, status: "active" },
+      {
+        creator_id: creatorId,
+        brand_id: invite.brand_id,
+        invite_id: invite.id,
+        status: CREATOR_LINK_STATUS.pendingReview,
+      },
       { onConflict: "creator_id,brand_id" }
     );
   if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });

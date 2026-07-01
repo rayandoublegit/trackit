@@ -144,6 +144,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     setSaving(true);
     try {
       await fetch(`/api/creators/pending-review?creatorId=${current.id}&brandId=${brandId}`, { method: "DELETE" });
+      window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
       next();
     } finally {
       setSaving(false);
