@@ -87,11 +87,14 @@ export async function POST(request: Request) {
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   if (creator) {
     if (creator.linked_user_id) {
-      await admin
-        .from("creator_links")
-        .update({ status: CREATOR_LINK_STATUS.active })
-        .eq("brand_id", brandId)
-        .eq("creator_id", creator.linked_user_id);
+      await admin.from("creator_links").upsert(
+        {
+          creator_id: creator.linked_user_id,
+          brand_id: brandId,
+          status: CREATOR_LINK_STATUS.active,
+        },
+        { onConflict: "creator_id,brand_id" },
+      );
     }
     const syncErr = await syncCreatorToDiscoverySaved(admin, brandId, creator as BrandCreatorSyncRow);
     if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });

@@ -409,7 +409,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
               marginBottom: 8,
             }}
           >
-            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer le créateur !" : "Save creator!")}
+            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Ajouter le créateur" : "Add creator")}
           </button>
           <button
             type="button"

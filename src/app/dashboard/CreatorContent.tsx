@@ -267,24 +267,13 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 960 }}>
         {!loading && brands.length > 0 && (
-          <div
-            style={{
-              marginBottom: 20,
-              padding: "12px 16px",
-              borderRadius: 12,
-              background: "rgba(26,127,55,0.06)",
-              border: "1px solid rgba(26,127,55,0.15)",
-              fontSize: 13,
-              color: "#1A1A1A",
-              lineHeight: 1.5,
-            }}
-          >
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#1A1A1A", lineHeight: 1.5 }}>
             <span style={{ fontWeight: 600, color: "#1A7F37" }}>
               {lang === "fr" ? "A rejoint · " : "Joined · "}
             </span>
             {lang === "fr" ? "Vos fichiers sont envoyés à " : "Your files are sent to "}
             <strong>{brands.find((b) => b.id === brandId)?.name || brands[0]?.name}</strong>
-          </div>
+          </p>
         )}
         {!loading && brands.length === 0 && linkError && (
           <div
@@ -472,7 +461,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               />
 
               {error && <p style={{ fontSize: 13, color: "#C62828", margin: "0 0 12px" }}>{error}</p>}
-              {success && <p style={{ fontSize: 13, color: "#1A7F37", margin: "0 0 12px" }}>{success}</p>}
+              {success && <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 12px" }}>{success}</p>}
 
               <button
                 type="button"
