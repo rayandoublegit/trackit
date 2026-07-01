@@ -28,7 +28,7 @@ describe("stripe config guard", () => {
     const onboarding = readRepoFile("src/app/onboarding/page.tsx");
     expect(onboarding).toContain("PricingPlans");
     expect(onboarding).toContain("getOnboardingPayload={buildOnboardingPayload}");
-    expect(onboarding).toContain("/onboarding");
+    expect(onboarding).toContain("/onboarding?step=4");
   });
 
   it("PricingPlans loads prices via useStripePrices", () => {

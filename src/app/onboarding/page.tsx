@@ -6,7 +6,7 @@ import {
   selectionTextPrimary,
 } from "@/lib/selection-card-styles";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
@@ -28,6 +28,14 @@ import {
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
+import {
+  clearOnboardingDraft,
+  onboardingStepFromUrl,
+  readOnboardingDraft,
+  writeOnboardingDraft,
+  type OnboardingDraft,
+  type OnboardingDraftStep,
+} from "@/lib/onboarding-draft";
 import type { User } from "@supabase/supabase-js";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -68,6 +76,7 @@ export default function OnboardingPage() {
   const lang = useLang();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,6 +103,56 @@ export default function OnboardingPage() {
     setSourceDetails("");
   }, [source]);
 
+  const applyOnboardingDraft = useCallback((draft: OnboardingDraft) => {
+    setFullName(draft.fullName);
+    setUsername(draft.username);
+    if (draft.avatarPreviewUrl) setAvatarPreview(draft.avatarPreviewUrl);
+    setBusinessName(draft.businessName);
+    setBusinessType(draft.businessType);
+    setNiche(draft.niche);
+    setRevenue(draft.revenue);
+    setSource(draft.source);
+    setSourceHandle(draft.sourceHandle);
+    setSourceDetails(draft.sourceDetails);
+    setShopifyUrl(draft.shopifyUrl);
+  }, []);
+
+  const persistOnboardingDraft = useCallback(
+    (nextStep: OnboardingDraftStep = step) => {
+      if (!user) return;
+      writeOnboardingDraft({
+        userId: user.id,
+        step: nextStep,
+        fullName,
+        username,
+        avatarPreviewUrl: avatarPreview,
+        businessName,
+        businessType,
+        niche,
+        revenue,
+        source,
+        sourceHandle,
+        sourceDetails,
+        shopifyUrl,
+      });
+    },
+    [
+      user,
+      step,
+      fullName,
+      username,
+      avatarPreview,
+      businessName,
+      businessType,
+      niche,
+      revenue,
+      source,
+      sourceHandle,
+      sourceDetails,
+      shopifyUrl,
+    ]
+  );
+
   useEffect(() => {
     const s = supabase;
     if (!s) return;
@@ -113,13 +172,25 @@ export default function OnboardingPage() {
         }
 
         if (profile?.onboarding_completed) {
+          clearOnboardingDraft();
           router.replace("/dashboard");
           return;
         }
 
-        if (user.user_metadata?.full_name) {
+        const draft = readOnboardingDraft(user.id);
+        if (draft) applyOnboardingDraft(draft);
+
+        const urlStep = onboardingStepFromUrl();
+        const resumeStep = (urlStep ?? draft?.step ?? 1) as Step;
+        setStep(resumeStep);
+
+        if (urlStep && typeof window !== "undefined") {
+          window.history.replaceState({}, "", "/onboarding");
+        }
+
+        if (user.user_metadata?.full_name && !draft?.fullName) {
           setFullName(user.user_metadata.full_name);
-        } else if (user.user_metadata?.name) {
+        } else if (user.user_metadata?.name && !draft?.fullName) {
           setFullName(user.user_metadata.name);
         }
       } catch {
@@ -127,21 +198,19 @@ export default function OnboardingPage() {
       }
 
       setUser(user);
+      setHydrated(true);
       try {
         await fetch("/api/auth/record-login", { method: "POST", credentials: "include" });
       } catch {
         /* non-blocking */
       }
     });
-  }, [router]);
+  }, [router, applyOnboardingDraft]);
 
   useEffect(() => {
-    return () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); };
-  }, [avatarPreview]);
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  }, [step]);
+    if (!user || !hydrated) return;
+    persistOnboardingDraft();
+  }, [user, hydrated, persistOnboardingDraft]);
 
   useEffect(() => {
     if (!username) { setUsernameStatus("idle"); return; }
@@ -154,6 +223,14 @@ export default function OnboardingPage() {
     }, 400);
     return () => clearTimeout(timer);
   }, [username]);
+
+  useEffect(() => {
+    return () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); };
+  }, [avatarPreview]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [step]);
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -195,14 +272,18 @@ export default function OnboardingPage() {
         return;
       }
       setStep(4);
+      persistOnboardingDraft(4);
       return;
     }
-    setStep((s) => (s + 1) as Step);
+    const nextStep = (step + 1) as Step;
+    setStep(nextStep);
+    persistOnboardingDraft(nextStep);
   };
 
   const buildOnboardingPayload = async (): Promise<OnboardingSavePayload | null> => {
     if (!user) return null;
     setError(null);
+    persistOnboardingDraft(4);
     let avatarUrl: string | null = null;
     if (avatarFile) {
       avatarUrl = await uploadAvatar();
@@ -254,10 +335,11 @@ export default function OnboardingPage() {
   const handleCompleteFree = async () => {
     const saved = await saveOnboardingProfile();
     if (!saved) return;
+    clearOnboardingDraft();
     router.replace("/dashboard");
   };
 
-  if (!user) return <div style={{ minHeight: "100vh", background: "#FFFFFF" }} />;
+  if (!user || !hydrated) return <div style={{ minHeight: "100vh", background: "#FFFFFF" }} />;
 
   const stepCopy = STEP_COPY[step as 1 | 2 | 3];
   const containerMaxWidth = step === 4 ? 1180 : 720;
@@ -295,7 +377,11 @@ export default function OnboardingPage() {
               paidCtaLabel={lang === "fr" ? "Commencer" : "Get Started"}
               userId={user.id}
               userEmail={user.email ?? undefined}
-              cancelUrl={typeof window !== "undefined" ? `${window.location.origin}/onboarding` : undefined}
+              cancelUrl={
+                typeof window !== "undefined"
+                  ? `${window.location.origin}/onboarding?step=4`
+                  : undefined
+              }
               onStayFree={() => void handleCompleteFree()}
               getOnboardingPayload={buildOnboardingPayload}
             />

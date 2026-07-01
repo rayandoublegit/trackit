@@ -223,8 +223,11 @@ export function PricingPlans({
       }),
     });
     const data = await res.json().catch(() => ({})) as { url?: string; error?: string };
-    if (data.url) window.location.href = data.url;
-    else alert(data.error || "Could not start checkout");
+    if (!res.ok || !data.url) {
+      alert(data.error || (lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout"));
+      return;
+    }
+    window.location.href = data.url;
     } finally {
       setPayingTier(null);
     }

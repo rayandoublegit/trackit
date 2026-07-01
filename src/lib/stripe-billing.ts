@@ -256,6 +256,9 @@ export async function syncProfileSubscription(
     subscription_status: subscriptionStatus,
     subscription_active: subscriptionActive,
   };
+  if (subscriptionActive) {
+    payload.onboarding_completed = true;
+  }
   if (stripeCustomerId) payload.stripe_customer_id = stripeCustomerId;
   if (stripeSubscriptionId !== undefined) {
     payload.stripe_subscription_id = stripeSubscriptionId;

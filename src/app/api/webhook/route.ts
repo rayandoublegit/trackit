@@ -112,6 +112,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       subscription_active: plan !== "free",
       stripe_customer_id: customerId,
       stripe_subscription_id: subscriptionId,
+      onboarding_completed: plan !== "free",
     });
     return;
   }

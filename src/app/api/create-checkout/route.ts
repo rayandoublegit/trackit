@@ -87,7 +87,9 @@ export async function POST(request: NextRequest) {
       resolvedUserId = user.id;
       resolvedEmail = user.email ?? resolvedEmail;
 
-      const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, onboarding);
+      const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, onboarding, {
+        markComplete: false,
+      });
       if (!saved.ok) {
         return NextResponse.json({ error: saved.error }, { status: 400 });
       }

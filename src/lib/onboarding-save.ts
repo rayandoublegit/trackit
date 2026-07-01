@@ -27,8 +27,10 @@ export async function saveOnboardingProfileAdmin(
   admin: SupabaseClient,
   userId: string,
   email: string | null | undefined,
-  payload: OnboardingSavePayload
+  payload: OnboardingSavePayload,
+  options?: { markComplete?: boolean }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const markComplete = options?.markComplete !== false;
   const username = normalizeProfileUsername(payload.username);
   if (!isValidProfileUsername(username)) {
     return { ok: false, error: "Invalid username" };
@@ -47,7 +49,7 @@ export async function saveOnboardingProfileAdmin(
       revenue_range: payload.revenueRange,
       referral_source: payload.referralSource ?? null,
       shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
-      onboarding_completed: true,
+      onboarding_completed: markComplete,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "id" }
