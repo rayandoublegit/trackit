@@ -83,6 +83,11 @@ import {
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
+import {
+  buildBootstrapFromProfile,
+  readDashboardBootstrap,
+  writeDashboardBootstrap,
+} from "@/lib/dashboard-bootstrap-cache";
 import { useLang } from "@/lib/useLang";
 import { loadAffiliates, persistAffiliateCodesToServer, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
@@ -206,20 +211,26 @@ function DashboardPageContent() {
     if (!supabase) return;
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("full_name, username, avatar_url, business_name, plan")
+      .select("full_name, username, avatar_url, business_name, plan, shopify_store, account_type, onboarding_completed")
       .eq("id", userId)
       .maybeSingle();
     if (!profileData) return;
-    const avatar_url = await resolveAvatarUrl(supabase, userId, profileData.avatar_url);
     setAvatarBroken(false);
     setProfile((prev) => ({
       full_name: profileData.full_name,
       username: profileData.username,
-      avatar_url,
+      avatar_url: profileData.avatar_url,
       business_name: profileData.business_name,
-      shopify_store: prev?.shopify_store ?? null,
+      shopify_store: profileData.shopify_store ?? prev?.shopify_store ?? null,
       plan: normalizePlan(profileData.plan),
     }));
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (authUser) {
+      writeDashboardBootstrap(buildBootstrapFromProfile(authUser, profileData));
+    }
+    void resolveAvatarUrl(supabase, userId, profileData.avatar_url).then((avatar_url) => {
+      setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
+    });
   }, []);
 
   useEffect(() => {
@@ -293,51 +304,88 @@ function DashboardPageContent() {
       return;
     }
     if (!supabase) { setLoading(false); router.replace("/auth"); return; }
-    void supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+
+    let cancelled = false;
+
+    void (async () => {
       try {
-        if (!authUser) { router.replace("/auth"); setLoading(false); return; }
-
-        const loadProfile = async () => {
-          const { data } = await supabase!
-            .from("profiles")
-            .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
-            .eq("id", authUser.id)
-            .maybeSingle();
-          return data;
-        };
-
-        const profileData = await loadProfile();
-        if (!profileData) {
+        const { data: { session } } = await supabase.auth.getSession();
+        const authUser = session?.user;
+        if (!authUser) {
           router.replace("/auth");
+          setLoading(false);
           return;
         }
-        // If onboarding was never finished, resume it instead of showing an empty dashboard.
+
+        const cached = readDashboardBootstrap(authUser.id);
+        if (cached?.onboarding_completed) {
+          if (cached.isCreator) setIsCreator(true);
+          setShopifyStore(cached.shopify_store);
+          setUser(authUser);
+          avatarRetryRef.current = false;
+          setAvatarBroken(false);
+          setProfile({
+            full_name: cached.full_name,
+            username: cached.username,
+            avatar_url: cached.avatar_url,
+            business_name: cached.business_name,
+            shopify_store: cached.shopify_store,
+            plan: normalizePlan(cached.plan),
+          });
+          setLoading(false);
+        }
+
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
+          .eq("id", authUser.id)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        if (!profileData) {
+          if (!cached) router.replace("/auth");
+          setLoading(false);
+          return;
+        }
+
         if (profileData.account_type === "creator") {
           setIsCreator(true);
         } else if (profileData.onboarding_completed === false) {
           router.replace("/onboarding");
+          setLoading(false);
           return;
         }
+
         setShopifyStore(profileData.shopify_store || null);
         setUser(authUser);
-        const avatar_url = await resolveAvatarUrl(supabase!, authUser.id, profileData.avatar_url);
         avatarRetryRef.current = false;
         setAvatarBroken(false);
         setProfile({
           full_name: profileData.full_name,
           username: profileData.username,
-          avatar_url,
+          avatar_url: profileData.avatar_url,
           business_name: profileData.business_name,
           shopify_store: profileData.shopify_store ?? null,
           plan: normalizePlan(profileData.plan),
         });
+        writeDashboardBootstrap(buildBootstrapFromProfile(authUser, profileData));
+        setLoading(false);
+
+        void resolveAvatarUrl(supabase, authUser.id, profileData.avatar_url).then((avatar_url) => {
+          if (cancelled) return;
+          setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
+        });
         void recordLoginIp();
       } catch (e) {
         console.error("Dashboard load error:", e);
-      } finally {
         setLoading(false);
       }
-    });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -520,7 +568,7 @@ function DashboardPageContent() {
     if (isMobile) setMobileSidebarOpen(false);
   };
 
-  if (loading || !navigation.ready) {
+  if (loading) {
     return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
   }
 

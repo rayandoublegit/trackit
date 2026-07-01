@@ -21,3 +21,22 @@ export function videoEmbedUrl(ref?: string | VideoRef | null): string | null {
       : extractVideoId(ref.id) ?? extractVideoId(ref.shareUrl);
   return id ? `https://www.tiktok.com/embed/v2/${id}` : null;
 }
+
+/** Embed URL with autoplay for inline playback after user click. */
+export function videoEmbedPlayUrl(ref?: string | VideoRef | null): string | null {
+  if (!ref) return null;
+  if (typeof ref === "string" && ref.includes("/embed/v2/")) {
+    try {
+      const url = new URL(ref);
+      url.searchParams.set("autoplay", "1");
+      return url.toString();
+    } catch {
+      return ref;
+    }
+  }
+  const embed = videoEmbedUrl(ref);
+  if (!embed) return null;
+  const url = new URL(embed);
+  url.searchParams.set("autoplay", "1");
+  return url.toString();
+}

@@ -29,6 +29,10 @@ import {
 } from "@/lib/profile-username";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import {
+  buildBootstrapFromOnboarding,
+  writeDashboardBootstrap,
+} from "@/lib/dashboard-bootstrap-cache";
+import {
   clearOnboardingDraft,
   onboardingStepFromUrl,
   readOnboardingDraft,
@@ -308,13 +312,13 @@ export default function OnboardingPage() {
     };
   };
 
-  const saveOnboardingProfile = async (): Promise<boolean> => {
-    if (!user) return false;
+  const saveOnboardingProfile = async (): Promise<OnboardingSavePayload | null> => {
+    if (!user) return null;
     setLoading(true);
     setError(null);
     try {
       const payload = await buildOnboardingPayload();
-      if (!payload) return false;
+      if (!payload) return null;
       const res = await fetch("/api/onboarding/complete", {
         method: "POST",
         credentials: "include",
@@ -324,17 +328,18 @@ export default function OnboardingPage() {
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(data.error ?? (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
-        return false;
+        return null;
       }
-      return true;
+      return payload;
     } finally {
       setLoading(false);
     }
   };
 
   const handleCompleteFree = async () => {
-    const saved = await saveOnboardingProfile();
-    if (!saved) return;
+    const payload = await saveOnboardingProfile();
+    if (!payload) return;
+    writeDashboardBootstrap(buildBootstrapFromOnboarding(user, payload));
     clearOnboardingDraft();
     router.replace("/dashboard");
   };

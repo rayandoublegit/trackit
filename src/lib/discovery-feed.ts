@@ -17,6 +17,7 @@ export interface FeedVideo {
   id: string;
   cover: string;
   shareUrl: string;
+  playUrl?: string;
   playCount: number;
 }
 
@@ -234,6 +235,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
     id: String(v.id ?? ""),
     cover: clientImageUrl(String(v.cover ?? "")),
     shareUrl: String(v.shareUrl ?? ""),
+    playUrl: String(v.playUrl ?? ""),
     playCount: Number(v.playCount ?? 0),
   }));
   return {

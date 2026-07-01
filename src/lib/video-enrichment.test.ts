@@ -11,7 +11,10 @@ const SAMPLE = {
       is_ad: false,
       share_url: "https://www.tiktok.com/@x/video/111",
       statistics: { play_count: 50000, digg_count: 4000, comment_count: 200, share_count: 100 },
-      video: { dynamic_cover: { url_list: ["https://cdn.tiktok.com/dyn111.webp"] } },
+      video: {
+        dynamic_cover: { url_list: ["https://cdn.tiktok.com/dyn111.webp"] },
+        play_addr: { url_list: ["https://v16-webapp.tiktok.com/video/111.mp4"] },
+      },
     },
     {
       aweme_id: "222",
@@ -41,6 +44,7 @@ describe("parseVideosRich", () => {
       id: "111",
       cover: "https://cdn.tiktok.com/dyn111.webp",
       shareUrl: "https://www.tiktok.com/@x/video/111",
+      playUrl: "https://v16-webapp.tiktok.com/video/111.mp4",
       playCount: 50000,
       likeCount: 4000,
       isAd: false,

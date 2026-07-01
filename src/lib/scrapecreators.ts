@@ -51,10 +51,13 @@ export function parseVideos(raw: any): VideoStat[] {
   });
 }
 
+import { extractTikTokPlayUrl } from "@/lib/tiktok-play-url";
+
 export interface RichVideo {
   id: string;
   cover: string; // animated WebP (dynamic_cover) preferred, renderable
   shareUrl: string;
+  playUrl: string;
   playCount: number;
   likeCount: number;
   commentCount: number;
@@ -81,6 +84,7 @@ export function parseVideosRich(raw: any): RichVideo[] {
       id: String(a?.aweme_id ?? ""),
       cover: String(cover),
       shareUrl: String(shareUrl),
+      playUrl: extractTikTokPlayUrl(v),
       playCount: Number(st.play_count ?? 0),
       likeCount: Number(st.digg_count ?? 0),
       commentCount: Number(st.comment_count ?? 0),

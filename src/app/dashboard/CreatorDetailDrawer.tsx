@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { buildCreatorVideoPreviews } from "@/lib/creator-video-previews";
+import {
+  cacheCreatorVideoStreams,
+  getCachedCreatorVideoStream,
+  prefetchCreatorVideoStreams,
+  resolveCreatorVideoStream,
+  warmCreatorVideoStream,
+} from "@/lib/creator-video-stream-cache";
 import { pipelineStages } from "@/lib/pipeline";
 import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
@@ -174,9 +181,10 @@ function Locked({ children, onUpgrade, label }: { children: ReactNode; onUpgrade
     <div style={{ position: "relative" }}>
       <div style={{ filter: "blur(6px)", opacity: 0.5, pointerEvents: "none", userSelect: "none" }}>{children}</div>
       <button type="button" onClick={onUpgrade}
-        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-          background: "rgba(255,255,255,0.35)", border: "none", borderRadius: 10, cursor: "pointer", color: "#0047FF", fontSize: 13, fontWeight: 600 }}>
-        🔒 {label}
+        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(255,255,255,0.35)", border: "none", borderRadius: 10, cursor: "pointer",
+          color: "#0047FF", fontSize: 13, fontWeight: 600, fontFamily: drawerFont, letterSpacing: "-0.025em" }}>
+        {label}
       </button>
     </div>
   );
@@ -251,27 +259,162 @@ function VideoCover({ cover, previewKey }: { cover: string; previewKey: string }
   );
 }
 
-function VideoTile({ v, playing, onPlay, isPaid, onUpgrade, lang }: {
-  v: { key: string; cover: string; views: number; embed: string | null };
-  playing: boolean; onPlay: () => void; isPaid: boolean; onUpgrade: () => void; lang: Lang;
+function VideoTile({ v, playing, onPlay, username, lang }: {
+  v: { key: string; cover: string; views: number; videoId: string | null; streamUrl: string | null };
+  playing: boolean;
+  onPlay: () => void;
+  username: string;
+  lang: Lang;
 }) {
   const t = discoveryCopy(lang);
-  if (playing && v.embed) {
+  const [resolvedStream, setResolvedStream] = useState<string | null>(() => {
+    if (v.streamUrl) return v.streamUrl;
+    if (v.videoId) return getCachedCreatorVideoStream(username, v.videoId);
+    return null;
+  });
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (v.streamUrl && v.videoId) {
+      cacheCreatorVideoStreams(username, { [v.videoId]: v.streamUrl });
+    }
+  }, [username, v.streamUrl, v.videoId]);
+
+  useEffect(() => {
+    if (!v.videoId || v.streamUrl || getCachedCreatorVideoStream(username, v.videoId)) return;
+    let cancelled = false;
+    void resolveCreatorVideoStream(username, v.videoId).then((url) => {
+      if (!cancelled && url) setResolvedStream((prev) => prev ?? url);
+    });
+    return () => { cancelled = true; };
+  }, [username, v.videoId, v.streamUrl]);
+
+  const warmStream = () => {
+    const url =
+      v.streamUrl ||
+      (v.videoId ? getCachedCreatorVideoStream(username, v.videoId) : null) ||
+      resolvedStream;
+    if (url) warmCreatorVideoStream(url);
+    else if (v.videoId) {
+      void resolveCreatorVideoStream(username, v.videoId).then((next) => {
+        if (next) warmCreatorVideoStream(next);
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!playing) return;
+
+    const cached =
+      v.streamUrl ||
+      (v.videoId ? getCachedCreatorVideoStream(username, v.videoId) : null);
+    if (cached) {
+      setResolvedStream(cached);
+      setLoadError(false);
+      warmCreatorVideoStream(cached);
+      return;
+    }
+
+    if (!v.videoId) {
+      setLoadError(true);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadError(false);
+    void resolveCreatorVideoStream(username, v.videoId).then((url) => {
+      if (cancelled) return;
+      if (url) {
+        setResolvedStream(url);
+        warmCreatorVideoStream(url);
+      } else {
+        setLoadError(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [playing, v.streamUrl, v.videoId, username]);
+
+  if (playing && resolvedStream) {
     return (
-      <iframe key={v.key} src={v.embed} title={t.playVideo}
-        style={{ width: "100%", aspectRatio: "9 / 16", border: "none", borderRadius: 10, background: "#000" }}
-        allow="autoplay; encrypted-media; fullscreen" referrerPolicy="strict-origin" />
+      <video
+        key={v.key}
+        src={resolvedStream}
+        controls
+        autoPlay
+        playsInline
+        preload="auto"
+        poster={v.cover || undefined}
+        style={{ width: "100%", aspectRatio: "9 / 16", borderRadius: 10, background: "#000", objectFit: "cover" }}
+      />
     );
   }
+
+  if (playing && loadError) {
+    return (
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "9 / 16",
+          borderRadius: 10,
+          background: "#111",
+          color: "#FFF",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          padding: 12,
+          textAlign: "center",
+          fontFamily: drawerFont,
+          letterSpacing: "-0.025em",
+        }}
+      >
+        {lang === "fr" ? "Vidéo indisponible" : "Video unavailable"}
+      </div>
+    );
+  }
+
+  const canPlay = Boolean(v.streamUrl || v.videoId);
   return (
-    <button type="button" aria-label={t.playVideo}
-      onClick={() => (isPaid ? onPlay() : onUpgrade())}
-      style={{ position: "relative", aspectRatio: "9 / 16", borderRadius: 10, border: "none", cursor: "pointer", padding: 0,
-        background: "#EDEDED", display: "block", width: "100%", overflow: "hidden" }}>
+    <button
+      type="button"
+      aria-label={t.playVideo}
+      onPointerEnter={warmStream}
+      onFocus={warmStream}
+      onClick={() => { if (canPlay) onPlay(); }}
+      disabled={!canPlay}
+      style={{
+        position: "relative",
+        aspectRatio: "9 / 16",
+        borderRadius: 10,
+        border: "none",
+        cursor: canPlay ? "pointer" : "default",
+        padding: 0,
+        background: "#EDEDED",
+        display: "block",
+        width: "100%",
+        overflow: "hidden",
+      }}
+    >
       <VideoCover cover={v.cover} previewKey={v.key} />
-      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFF", fontSize: 26 }}>
-        {v.embed ? (isPaid ? "▶" : "🔒") : ""}
-      </span>
+      {canPlay && (
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#FFF",
+            fontSize: 26,
+            pointerEvents: "none",
+          }}
+        >
+          {playing ? "…" : "▶"}
+        </span>
+      )}
       {v.views > 0 && (
         <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 10, fontWeight: 600, color: "#FFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{fmt(v.views)} {t.views}</span>
       )}
@@ -442,6 +585,21 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     });
   }, [detail]);
 
+  useEffect(() => {
+    if (!detail?.username || videos.length === 0) return;
+    const streams: Record<string, string> = {};
+    const ids: string[] = [];
+    for (const v of videos) {
+      if (v.videoId && v.streamUrl) streams[v.videoId] = v.streamUrl;
+      if (v.videoId) ids.push(v.videoId);
+    }
+    if (Object.keys(streams).length) cacheCreatorVideoStreams(detail.username, streams);
+    void prefetchCreatorVideoStreams(detail.username, ids);
+    const first = videos.find((v) => v.streamUrl || (v.videoId && getCachedCreatorVideoStream(detail.username, v.videoId)));
+    const warmUrl = first?.streamUrl || (first?.videoId ? getCachedCreatorVideoStream(detail.username, first.videoId) : null);
+    if (warmUrl) warmCreatorVideoStream(warmUrl);
+  }, [detail?.username, videos]);
+
   if (!creator || !detail) return null;
 
   const d = detail;
@@ -587,7 +745,14 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
           ) : (
             <div key={d.username} style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {videos.map((v) => (
-                <VideoTile key={v.key} v={v} playing={playing === v.key} onPlay={() => setPlaying(v.key)} isPaid={isPaid} onUpgrade={onUpgrade} lang={lang} />
+                <VideoTile
+                  key={v.key}
+                  v={v}
+                  playing={playing === v.key}
+                  onPlay={() => setPlaying(v.key)}
+                  username={d.username}
+                  lang={lang}
+                />
               ))}
             </div>
           )}

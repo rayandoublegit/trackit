@@ -35,9 +35,20 @@ export type DashboardNavigationContextValue = {
 
 const DashboardNavigationContext = createContext<DashboardNavigationContextValue | null>(null);
 
+function getInitialNavState(userId?: string | null): DashboardNavState {
+  if (typeof window === "undefined") return { view: "discovery" };
+  return normalizeNavState(
+    parseDashboardNavState(
+      window.location.search,
+      window.history.state,
+      readInitialDashboardView(userId ?? undefined),
+    ),
+  );
+}
+
 export function useDashboardNavigationController(userId?: string | null): DashboardNavigationContextValue {
-  const [navState, setNavState] = useState<DashboardNavState>({ view: "discovery" });
-  const [ready, setReady] = useState(false);
+  const [navState, setNavState] = useState<DashboardNavState>(() => getInitialNavState(userId));
+  const [ready, setReady] = useState(() => typeof window !== "undefined");
   const navStateRef = useRef(navState);
   navStateRef.current = navState;
 
@@ -68,9 +79,7 @@ export function useDashboardNavigationController(userId?: string | null): Dashbo
   );
 
   useEffect(() => {
-    const initial = normalizeNavState(
-      parseDashboardNavState(window.location.search, window.history.state, readInitialDashboardView(userId ?? undefined)),
-    );
+    const initial = getInitialNavState(userId ?? undefined);
     navStateRef.current = initial;
     setNavState(initial);
     navigateDashboardHistory(initial, { replace: true });

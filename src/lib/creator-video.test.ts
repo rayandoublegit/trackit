@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractVideoId, videoEmbedUrl } from "@/lib/creator-video";
+import { extractVideoId, videoEmbedUrl, videoEmbedPlayUrl } from "@/lib/creator-video";
 
 describe("extractVideoId", () => {
   it("pulls the id from a standard share url", () => {
@@ -43,5 +43,13 @@ describe("videoEmbedUrl", () => {
   it("returns null when no id can be derived", () => {
     expect(videoEmbedUrl(null)).toBeNull();
     expect(videoEmbedUrl({ id: "", shareUrl: "nope" })).toBeNull();
+  });
+});
+
+describe("videoEmbedPlayUrl", () => {
+  it("adds autoplay to an existing embed url", () => {
+    expect(videoEmbedPlayUrl("https://www.tiktok.com/embed/v2/123456")).toBe(
+      "https://www.tiktok.com/embed/v2/123456?autoplay=1"
+    );
   });
 });

@@ -7,6 +7,7 @@ export interface TopVideo {
   id: string;
   cover: string;
   shareUrl: string;
+  playUrl: string;
   playCount: number;
   likeCount: number;
   commentCount: number;
@@ -31,6 +32,7 @@ export function topVideos(rich: RichVideo[], max: number = MAX_TOP_VIDEOS): TopV
       id: v.id,
       cover: v.cover,
       shareUrl: v.shareUrl,
+      playUrl: v.playUrl,
       playCount: v.playCount,
       likeCount: v.likeCount,
       commentCount: v.commentCount,

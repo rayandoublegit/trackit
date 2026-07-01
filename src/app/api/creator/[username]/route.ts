@@ -9,11 +9,12 @@ export const dynamic = "force-dynamic";
 function mapTopVideos(raw: unknown) {
   if (!Array.isArray(raw)) return [];
   return raw.map((row) => {
-    const v = row as { id?: string; cover?: string; shareUrl?: string; playCount?: number };
+    const v = row as { id?: string; cover?: string; shareUrl?: string; playUrl?: string; playCount?: number };
     return {
       id: v.id ?? "",
       cover: clientImageUrl(v.cover ?? ""),
       shareUrl: v.shareUrl ?? "",
+      playUrl: v.playUrl ?? "",
       playCount: Number(v.playCount ?? 0),
     };
   });
