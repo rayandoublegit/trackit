@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Lang } from "@/lib/useLang";
 
-/** Part IDs for precise edits — cite these in requests, e.g. "move chaotic-icon-figma" or "curve chaotic-line-meet-miro". */
+/** Styles: src/app/chaotic-work.css (guarded by landing-css.guard.test.ts). */
 export const CHAOTIC_PART_IDS = {
   lines: {
     figmaCalendar: "chaotic-line-figma-calendar",

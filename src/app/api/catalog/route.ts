@@ -1,22 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { NICHE_TREE } from "@/lib/niche-tree";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   catalogRowToFeedCreator,
-  resolveNicheKey,
+  nicheCatalogOrClause,
   type FeedCreator,
 } from "@/lib/discovery-feed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// Tags valides pour une niche: tag canonique + sous-niches (array-only, propre).
-function nicheTags(label: string): string[] {
-  const key = resolveNicheKey(label);
-  if (!key) return [];
-  const subs = NICHE_TREE[key] ?? [];
-  return [...new Set([key, ...subs])].filter((t) => /^[a-z0-9]+$/i.test(t));
-}
+const PAGE_SIZE = 1000;
+const MAX_PAGES = 50;
 
 // Shuffle deterministe par seed (meme page = meme ordre; page suivante = autre ordre).
 function seededShuffle<T>(arr: T[], seed: number): T[] {
@@ -33,16 +27,33 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
+async function fetchAllRows(
+  admin: SupabaseClient,
+  build: () => ReturnType<SupabaseClient["from"]>,
+): Promise<Record<string, unknown>[]> {
+  const all: Record<string, unknown>[] = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await build().range(from, to);
+    if (error) break;
+    const batch = (data || []) as Record<string, unknown>[];
+    all.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+  return all;
+}
+
 /**
- * /api/catalog -- LA route catalogue, source de verite unique.
- * Filtres: niche (+ sous-niches) ET langue. RIEN d'autre.
- * Pas de country, pas de score, pas de quality_status. Tout sort.
- * Cures et scrapes melanges (shuffle). Pagination offset/limit.
+ * /api/catalog -- source de verite unique pour Find It.
+ * Filtres: niche (+ sous-niches + primary_niche), langue et/ou pays.
+ * Aucun filtre qualite/enrichment: tous les createurs indexes sortent.
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
   const niche = p.get("niche") || undefined;
   const language = p.get("language") || undefined;
+  const country = (p.get("country") || "").trim().toUpperCase() || undefined;
   const offset = Math.max(0, Number(p.get("offset")) || 0);
   const maxLimit = niche ? 50 : 1000;
   const defaultLimit = niche ? 25 : 1000;
@@ -56,19 +67,24 @@ export async function GET(req: NextRequest) {
   const admin = createClient(url, key);
 
   try {
-    let q = admin.from("creators_index").select("*");
-    if (language) q = q.eq("language", language);
-    if (niche) {
-      const tags = nicheTags(niche);
-      if (tags.length) q = q.or(tags.map((t) => `niches.cs.{${t}}`).join(","));
-    }
-    // Catalogue par niche+langue tient largement sous 1000.
-    const { data, error } = await q.limit(1000);
-    if (error || !data) {
-      return NextResponse.json({ creators: [], hasMore: false, count: 0, error: error?.message || "query failed" });
-    }
+    const build = () => {
+      let q = admin.from("creators_index").select("*");
+      if (language && country) {
+        q = q.or(`language.eq.${language},country_code.eq.${country}`);
+      } else if (language) {
+        q = q.eq("language", language);
+      } else if (country) {
+        q = q.eq("country_code", country);
+      }
+      if (niche) {
+        const or = nicheCatalogOrClause(niche);
+        if (or) q = q.or(or);
+      }
+      return q;
+    };
 
-    // Shuffle stable par page: meme page -> meme ordre; Relancer (page+1) -> autre.
+    const data = await fetchAllRows(admin, build);
+
     const pageSeed = (Math.floor(offset / limit) + 1) * 7919;
     const shuffled = seededShuffle(data, pageSeed);
 
@@ -76,8 +92,18 @@ export async function GET(req: NextRequest) {
     const creators: FeedCreator[] = slice.map(catalogRowToFeedCreator);
     const hasMore = offset + limit < shuffled.length;
 
-    return NextResponse.json({ creators, hasMore, count: creators.length, total: shuffled.length });
+    return NextResponse.json({
+      creators,
+      hasMore,
+      count: creators.length,
+      total: shuffled.length,
+    });
   } catch (e) {
-    return NextResponse.json({ creators: [], hasMore: false, count: 0, error: e instanceof Error ? e.message : "catalog failed" });
+    return NextResponse.json({
+      creators: [],
+      hasMore: false,
+      count: 0,
+      error: e instanceof Error ? e.message : "catalog failed",
+    });
   }
 }

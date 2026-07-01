@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
 import "./fonts.module.css";
 import "./landing.css";
+import "./chaotic-work.css";
 import "./hero-doodles.css";
 
 export const metadata: Metadata = {

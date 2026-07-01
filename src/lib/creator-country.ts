@@ -35,8 +35,16 @@ const LANGUAGE_TO_CODE: Record<string, string> = {
   fr: "FR",
   french: "FR",
   francais: "FR",
+  en: "GB",
+  english: "GB",
+  es: "ES",
+  spanish: "ES",
+  it: "IT",
+  italian: "IT",
   de: "DE",
   german: "DE",
+  pt: "PT",
+  portuguese: "PT",
 };
 
 const COUNTRY_LABELS: Record<string, { en: string; fr: string }> = {

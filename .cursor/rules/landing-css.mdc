@@ -1,0 +1,31 @@
+---
+description: Protect landing page CSS from accidental deletion or breakage
+globs: src/app/landing.css,src/app/chaotic-work.css,src/app/hero-doodles.css,src/components/TrackitLanding.tsx,src/components/ChaoticWorkSection.tsx
+alwaysApply: false
+---
+
+# Landing page CSS — do not break
+
+## File layout
+
+| File | Role |
+|------|------|
+| `src/app/landing.css` | Main LP styles (hero, sections, pricing, footer) |
+| `src/app/chaotic-work.css` | **Isolated** styles for `ChaoticWorkSection` (#features intro) |
+| `src/app/hero-doodles.css` | Frozen hero doodle positions — do not edit casually |
+
+All three are imported from `src/app/layout.tsx`. **Never remove an import.**
+
+## Rules
+
+1. **Do not delete section banners** (`/* ===== HERO ===== */`, etc.) — they are checked by `landing-css.guard.test.ts`.
+2. **Do not move chaotic-work styles back into `landing.css`** — they were split out so bulk LP edits cannot wipe them again.
+3. **Do not delete `.chaotic-work*` rules** without updating `ChaoticWorkSection.tsx` and `landing-css-contract.ts`.
+4. After any landing CSS change, run `npm test` — the guard suite must pass.
+5. If adding a new LP stylesheet: import it in `layout.tsx` and register it in `src/lib/landing-css-contract.ts`.
+
+## If the user reports broken LP design
+
+1. Run `npm test src/lib/landing-css.guard.test.ts`
+2. If tests fail, restore missing sections from git history
+3. Check `chaotic-work.css` is still imported in `layout.tsx`

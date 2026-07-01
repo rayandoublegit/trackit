@@ -2557,6 +2557,8 @@ export function DiscoveryView({
                 { value: "GB", label: lang === "fr" ? "Royaume-Uni" : "United Kingdom" },
                 { value: "DE", label: lang === "fr" ? "Allemagne" : "Germany" },
                 { value: "ES", label: lang === "fr" ? "Espagne" : "Spain" },
+                { value: "IT", label: lang === "fr" ? "Italie" : "Italy" },
+                { value: "PT", label: lang === "fr" ? "Portugal" : "Portugal" },
                 { value: "BR", label: lang === "fr" ? "Brésil" : "Brazil" },
                 { value: "CA", label: "Canada" },
               ]}
@@ -2570,6 +2572,7 @@ export function DiscoveryView({
                 { value: "french", label: lang === "fr" ? "Français" : "French" },
                 { value: "english", label: lang === "fr" ? "Anglais" : "English" },
                 { value: "spanish", label: lang === "fr" ? "Espagnol" : "Spanish" },
+                { value: "italian", label: lang === "fr" ? "Italien" : "Italian" },
                 { value: "german", label: lang === "fr" ? "Allemand" : "German" },
                 { value: "portuguese", label: lang === "fr" ? "Portugais" : "Portuguese" },
               ]}

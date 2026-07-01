@@ -1,6 +1,6 @@
 export type AppLang = "en" | "fr";
-export type DiscoveryLocation = "" | "FR" | "US" | "GB" | "DE" | "ES" | "BR" | "CA";
-export type DiscoveryLanguage = "" | "french" | "english" | "spanish" | "german" | "portuguese";
+export type DiscoveryLocation = "" | "FR" | "US" | "GB" | "DE" | "ES" | "IT" | "PT" | "BR" | "CA";
+export type DiscoveryLanguage = "" | "french" | "english" | "spanish" | "italian" | "german" | "portuguese";
 
 export const TRACKIT_LANG_KEY = "trackit_lang";
 export const TRACKIT_DISCOVERY_LOCATION_KEY = "trackit_discovery_location";
@@ -36,7 +36,7 @@ export function setAppLang(lang: AppLang): void {
 export function getDiscoveryLocation(): DiscoveryLocation {
   if (typeof window === "undefined") return "";
   const stored = localStorage.getItem(TRACKIT_DISCOVERY_LOCATION_KEY);
-  const valid: DiscoveryLocation[] = ["", "FR", "US", "GB", "DE", "ES", "BR", "CA"];
+  const valid: DiscoveryLocation[] = ["", "FR", "US", "GB", "DE", "ES", "IT", "PT", "BR", "CA"];
   if (stored !== null && valid.includes(stored as DiscoveryLocation)) return stored as DiscoveryLocation;
   return "";
 }
@@ -44,7 +44,7 @@ export function getDiscoveryLocation(): DiscoveryLocation {
 export function getDiscoveryLanguage(): DiscoveryLanguage {
   if (typeof window === "undefined") return "";
   const stored = localStorage.getItem(TRACKIT_DISCOVERY_LANGUAGE_KEY);
-  const valid: DiscoveryLanguage[] = ["", "french", "english", "spanish", "german", "portuguese"];
+  const valid: DiscoveryLanguage[] = ["", "french", "english", "spanish", "italian", "german", "portuguese"];
   if (stored !== null && valid.includes(stored as DiscoveryLanguage)) return stored as DiscoveryLanguage;
   return "";
 }

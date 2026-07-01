@@ -4,7 +4,7 @@
  * ============================================================================
  * Single source of truth for Trackit / cursor / money hero doodle placement.
  * Do NOT change this file unless the user explicitly asks to reposition doodles.
- * Landing layout work belongs in landing.css only — never duplicate doodle rules there.
+ * Landing layout work belongs in landing.css / chaotic-work.css — never duplicate doodle rules there.
  * Locked: 2026-05-27 (desktop + mobile aligned with hero headline)
  * ============================================================================
  */

@@ -1,0 +1,445 @@
+/*
+ * ============================================================================
+ * CHAOTIC WORK — features intro (DO NOT DELETE)
+ * ============================================================================
+ * Styles for ChaoticWorkSection.tsx (#features). Imported from layout.tsx.
+ * Do NOT move these rules back into landing.css — they live here on purpose so
+ * bulk edits to landing.css cannot wipe this block again.
+ * Guarded by src/lib/landing-css.guard.test.ts (npm test fails if removed).
+ * ============================================================================
+ */
+
+/* ===== CHAOTIC WORK (features intro) ===== */
+.chaotic-work {
+  position: relative;
+  width: 100%;
+  max-width: 1024px;
+  margin: 0 auto 72px;
+  aspect-ratio: 1024 / 713;
+  background: transparent;
+  overflow: visible;
+  isolation: isolate;
+  --chaotic-float-y: 72px;
+  --chaotic-float-scale: 1.15;
+  --chaotic-app-size: 60px;
+  --chaotic-logo-max: 34px;
+}
+
+.chaotic-work::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  top: -72px;
+  bottom: -72px;
+  width: 100vw;
+  transform: translateX(-50%);
+  background-color: #fff;
+  background-image: url("/chaotic-work-dots.svg");
+  background-repeat: repeat;
+  background-size: 22px 22px;
+  background-position: center top;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.35) 8%,
+    rgba(0, 0, 0, 0.85) 16%,
+    #000 24%,
+    #000 76%,
+    rgba(0, 0, 0, 0.85) 84%,
+    rgba(0, 0, 0, 0.35) 92%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 0, 0, 0.35) 8%,
+    rgba(0, 0, 0, 0.85) 16%,
+    #000 24%,
+    #000 76%,
+    rgba(0, 0, 0, 0.85) 84%,
+    rgba(0, 0, 0, 0.35) 92%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.chaotic-work__lines-layer,
+.chaotic-work__icons-layer {
+  position: absolute;
+  inset: 0;
+  transform: translateY(var(--chaotic-float-y)) scale(var(--chaotic-float-scale));
+  transform-origin: 50% 22%;
+}
+
+.chaotic-work__icons-layer {
+  z-index: 3;
+  pointer-events: none;
+}
+
+.chaotic-work__lines-layer {
+  z-index: 1;
+  pointer-events: none;
+}
+
+.chaotic-work__lines-layer .chaotic-work__lines {
+  pointer-events: auto;
+}
+
+.chaotic-work__lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Hover outlines — pick lines vs icons in the browser / Cursor */
+.chaotic-work [data-chaotic-type="line"] path {
+  pointer-events: stroke;
+  stroke-width: 1.45;
+}
+
+.chaotic-work [data-chaotic-type="icon"] {
+  pointer-events: auto;
+  cursor: default;
+}
+
+.chaotic-work [data-chaotic-type="line"]:hover path {
+  stroke: #0047ff;
+  stroke-width: 2;
+}
+
+.chaotic-work [data-chaotic-type="icon"]:hover {
+  outline: 2px dashed rgba(255, 61, 139, 0.65);
+  outline-offset: 4px;
+}
+
+.chaotic-work__content {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0 24px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.chaotic-work__title {
+  margin: 0 auto 32px;
+  align-self: center;
+  width: min(100%, 820px);
+  max-width: 820px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  font-family: var(--font-extern);
+  font-size: clamp(32px, 5vw, 58px);
+  font-weight: var(--font-extern-weight);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  color: #000;
+  text-align: center;
+}
+
+.chaotic-work__title-line {
+  display: block;
+  width: 100%;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.chaotic-work__title-emphasis {
+  color: var(--red);
+}
+
+.chaotic-work__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px 28px;
+  width: 100%;
+  max-width: 820px;
+}
+
+.chaotic-work__stats p {
+  margin: 0;
+  font-family: 'InterDisplay', sans-serif;
+  font-size: clamp(12px, 1.5vw, 16px);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 1.5;
+  color: var(--subtext);
+  text-align: center;
+}
+
+.chaotic-work__icon {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chaotic-work__app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: var(--chaotic-app-size);
+  height: var(--chaotic-app-size);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.chaotic-work__app:not(.chaotic-work__app--calendar) {
+  padding: 13px;
+}
+
+.chaotic-work__app-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.chaotic-work__icon--figma {
+  left: 2.5%;
+  top: 20%;
+  transform: rotate(8deg);
+  transform-origin: center center;
+}
+
+.chaotic-work__icon--calendar {
+  left: 25.5%;
+  top: 1.5%;
+  transform: rotate(17deg);
+  transform-origin: center center;
+}
+.chaotic-work__icon--slack {
+  left: 51.5%;
+  top: 3.8%;
+  transform: rotate(-12deg);
+  transform-origin: center center;
+}
+.chaotic-work__icon--meet {
+  left: 76%;
+  top: 2.5%;
+  transform: rotate(-16deg);
+  transform-origin: center center;
+}
+.chaotic-work__icon--miro { left: 91%; top: 33.5%; }
+.chaotic-work__icon--drive { left: 19%; top: 58%; }
+.chaotic-work__icon--messages { left: 49.5%; top: 56%; }
+.chaotic-work__icon--notion { left: 74.5%; top: 59.5%; }
+
+.chaotic-work__app--calendar {
+  flex-direction: column;
+  padding-top: 0;
+  overflow: hidden;
+}
+
+.chaotic-work__calendar-day {
+  display: block;
+  width: 100%;
+  padding: 8px 0 2px;
+  background: transparent;
+  color: #ff3b30;
+  font-family: 'InterDisplay', 'Inter', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1;
+}
+
+.chaotic-work__calendar-num {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'InterDisplay', 'Inter', sans-serif;
+  font-size: 24px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  color: #000;
+  line-height: 1;
+}
+
+.chaotic-work__app--tiktok,
+.chaotic-work__app--messages {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  width: 66px;
+  height: 66px;
+}
+
+.chaotic-work__app--messages {
+  transform: perspective(500px) rotateX(12deg) rotateY(-8deg) rotateZ(-14deg);
+  transform-origin: center center;
+}
+
+.chaotic-work__icon--messages .chaotic-work__badge--420 {
+  transform: perspective(500px) rotateX(12deg) rotateY(-8deg) rotateZ(-14deg);
+  transform-origin: center center;
+}
+
+.chaotic-work__app--notion {
+  transform: rotate(-15deg);
+  transform-origin: center center;
+}
+
+.chaotic-work__app--drive {
+  transform: rotate(-17deg);
+  transform-origin: center center;
+}
+
+.chaotic-work__dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.chaotic-work__icon--figma .chaotic-work__dot,
+.chaotic-work__dot--miro {
+  top: -2px;
+  right: -2px;
+}
+
+.chaotic-work__badge {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #ff3b30;
+  color: #fff;
+  font-family: 'InterDisplay', 'Inter', sans-serif;
+  font-weight: 600;
+  line-height: 1;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.chaotic-work__badge--99 {
+  top: -8px;
+  left: -10px;
+  min-width: 30px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.chaotic-work__badge--1m {
+  top: -8px;
+  right: -14px;
+  min-width: 38px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.chaotic-work__badge--420 {
+  top: -8px;
+  right: -10px;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
+.chaotic-work__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  font-family: 'InterDisplay', 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  color: #444;
+  white-space: nowrap;
+}
+
+.chaotic-work__pill--join {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.chaotic-work__pill--count {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+}
+
+.chaotic-work__pill--notion {
+  margin-top: 0;
+  padding: 5px 10px;
+  background: #111;
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  gap: 3px;
+}
+
+@media (max-width: 768px) {
+  .chaotic-work {
+    margin-bottom: 48px;
+    aspect-ratio: auto;
+    min-height: 520px;
+    --chaotic-float-y: 48px;
+    --chaotic-float-scale: 1.05;
+  }
+
+  .chaotic-work__stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    max-width: 280px;
+  }
+
+  .chaotic-work__title {
+    width: min(100%, 340px);
+    max-width: 340px;
+    font-size: clamp(24px, 6vw, 32px);
+  }
+
+  .chaotic-work__title--fr .chaotic-work__title-line {
+    white-space: normal;
+  }
+
+  .chaotic-work__icon--figma { left: 2%; top: 4%; transform: scale(0.82) rotate(8deg); transform-origin: top left; }
+  .chaotic-work__icon--calendar { left: 22%; top: 0%; transform: scale(0.82) rotate(17deg); transform-origin: top left; }
+  .chaotic-work__icon--slack { left: 60%; top: 1%; transform: scale(0.82) rotate(-12deg); transform-origin: top left; }
+  .chaotic-work__icon--meet { left: auto; right: 2%; top: 3%; transform: scale(0.82) rotate(-16deg); transform-origin: top right; }
+  .chaotic-work__icon--miro { left: auto; right: 2%; top: 28%; transform: scale(0.82); transform-origin: top right; }
+  .chaotic-work__icon--drive { left: 2%; top: 54%; bottom: auto; transform: scale(0.82); transform-origin: center center; }
+  .chaotic-work__icon--messages { left: 38%; top: 52%; bottom: auto; transform: scale(0.82); transform-origin: center center; }
+  .chaotic-work__icon--notion { left: auto; right: 2%; top: 55%; bottom: auto; transform: scale(0.82); transform-origin: center center; }
+
+  .chaotic-work__content {
+    position: relative;
+    padding: 120px 16px 100px;
+  }
+
+  .chaotic-work__lines {
+    display: none;
+  }
+}

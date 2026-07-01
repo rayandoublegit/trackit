@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rankFeed, creatorMatchesNicheFilter } from "@/lib/discovery-feed";
+import { rankFeed, creatorMatchesNicheFilter, nicheCatalogOrClause } from "@/lib/discovery-feed";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 
 function creator(p: Partial<DiscoveryCreatorResult> & { username: string }): DiscoveryCreatorResult {
@@ -25,6 +25,14 @@ describe("rankFeed", () => {
     expect(out[0].estCpm).toBeGreaterThan(0);
     expect(out[0].valueTier).toBe("micro");
     expect(out[0].estCostPerPost).toBe(150);
+  });
+});
+
+describe("nicheCatalogOrClause", () => {
+  it("matches array tags and primary_niche", () => {
+    const or = nicheCatalogOrClause("fitness");
+    expect(or).toContain("niches.cs.{fitness}");
+    expect(or).toContain("primary_niche.ilike.%fitness%");
   });
 });
 

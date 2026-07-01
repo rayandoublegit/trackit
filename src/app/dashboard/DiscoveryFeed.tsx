@@ -113,9 +113,18 @@ function hasActiveSearchFilters(f: FilterState): boolean {
 }
 
 function languageFromCountry(country: string): string | null {
-  if (country === "FR") return "fr";
-  if (country === "US") return "en";
-  return null;
+  const map: Record<string, string> = {
+    FR: "fr",
+    US: "en",
+    GB: "en",
+    ES: "es",
+    IT: "it",
+    DE: "de",
+    PT: "pt",
+    BR: "pt",
+    CA: "en",
+  };
+  return map[country] ?? null;
 }
 
 const FOLLOWER_RANGES: Record<string, { min: number; max?: number }> = {
@@ -150,9 +159,11 @@ function toParams(f: FilterState): Record<string, string> {
   else if (f.engagement === "12+") p.minEngagement = "12";
   else if (f.engagement === "6+") p.minEngagement = "6";
   else if (f.engagement === "9+") p.minEngagement = "9";
-  const C: Record<string, string> = { FR: "FR", US: "US", GB: "GB", DE: "DE", BR: "BR", ES: "ES", CA: "CA" };
+  const C: Record<string, string> = {
+    FR: "FR", US: "US", GB: "GB", DE: "DE", BR: "BR", ES: "ES", IT: "IT", PT: "PT", CA: "CA",
+  };
   if (C[f.country]) p.country = C[f.country];
-  const L: Record<string, string> = { fr: "fr", en: "en", es: "es", de: "de", pt: "pt" };
+  const L: Record<string, string> = { fr: "fr", en: "en", es: "es", de: "de", pt: "pt", it: "it" };
   if (L[f.language]) p.language = L[f.language];
   return p;
 }
@@ -175,7 +186,12 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
   }
 
   if (f.language) {
-    out = out.filter((c) => (c.language || "").toLowerCase() === f.language);
+    out = out.filter((c) => {
+      const lang = (c.language || "").toLowerCase();
+      if (lang === f.language) return true;
+      if (f.country && (c.countryCode || "").toUpperCase() === f.country) return true;
+      return false;
+    });
   }
 
   const followers = followerRangeBounds(f.followersRange);
@@ -582,6 +598,10 @@ function FilterSidebar({
             { value: "", label: t.all },
             { value: "FR", label: t.france },
             { value: "US", label: t.unitedStates },
+            { value: "ES", label: t.spain },
+            { value: "IT", label: t.italy },
+            { value: "DE", label: t.germany },
+            { value: "PT", label: t.portugal },
           ]}
         />
         <FilterSelect
@@ -592,6 +612,10 @@ function FilterSidebar({
             { value: "", label: t.allLanguages },
             { value: "fr", label: t.french },
             { value: "en", label: t.english },
+            { value: "es", label: t.spanish },
+            { value: "it", label: t.italian },
+            { value: "de", label: t.german },
+            { value: "pt", label: t.portuguese },
           ]}
         />
       </div>

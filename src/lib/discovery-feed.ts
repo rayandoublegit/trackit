@@ -194,6 +194,18 @@ function nicheOrClause(label: string): string | null {
   return tags.map((t) => `niches.cs.{${t}}`).join(",");
 }
 
+/** Catalogue: tags array + primary_niche pour ne rater aucun createur indexe. */
+export function nicheCatalogOrClause(label: string): string | null {
+  const tags = nicheTagsFor(label);
+  if (!tags.length) return null;
+  const clauses = new Set<string>();
+  for (const t of tags) {
+    clauses.add(`niches.cs.{${t}}`);
+    clauses.add(`primary_niche.ilike.%${t}%`);
+  }
+  return [...clauses].join(",");
+}
+
 export function catalogRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   return dbRowToFeedCreator(c);
 }
