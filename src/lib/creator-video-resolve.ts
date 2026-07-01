@@ -10,13 +10,14 @@ function playUrlFromRow(row: { id?: string; playUrl?: string }): string | null {
 
 function collectTopVideoRows(raw: unknown): { id: string; playUrl?: string }[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .map((row) => {
-      const v = row as { id?: string; playUrl?: string };
-      const id = String(v.id ?? "").trim();
-      return id ? { id, playUrl: v.playUrl } : null;
-    })
-    .filter((v): v is { id: string; playUrl?: string } => Boolean(v));
+  const out: { id: string; playUrl?: string }[] = [];
+  for (const row of raw) {
+    const v = row as { id?: string; playUrl?: string };
+    const id = String(v.id ?? "").trim();
+    if (!id) continue;
+    out.push(v.playUrl ? { id, playUrl: v.playUrl } : { id });
+  }
+  return out;
 }
 
 function collectThumbnailVideoIds(raw: unknown): string[] {

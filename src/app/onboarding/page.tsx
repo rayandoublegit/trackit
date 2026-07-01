@@ -337,6 +337,7 @@ export default function OnboardingPage() {
   };
 
   const handleCompleteFree = async () => {
+    if (!user) return;
     const payload = await saveOnboardingProfile();
     if (!payload) return;
     writeDashboardBootstrap(buildBootstrapFromOnboarding(user, payload));
