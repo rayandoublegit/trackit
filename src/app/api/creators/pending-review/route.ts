@@ -63,7 +63,20 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
 
-  const update: Record<string, unknown> = { needs_review: false };
+  const { data: beforeRow } = await admin
+    .from("creators")
+    .select("linked_user_id")
+    .eq("id", creatorId)
+    .eq("user_id", brandId)
+    .maybeSingle();
+
+  const linkedUserId = beforeRow?.linked_user_id ?? null;
+
+  const update: Record<string, unknown> = {
+    needs_review: false,
+    dashboard_active: true,
+  };
+  if (linkedUserId) update.linked_user_id = linkedUserId;
   if (commissionRate !== undefined && commissionRate !== null && commissionRate !== "") update.commission_rate = Number(commissionRate);
   if (discountCode) update.discount_code = discountCode;
   if (platform) update.platform = platform;
@@ -72,24 +85,27 @@ export async function POST(request: Request) {
   if (followers !== undefined && followers !== null && followers !== "") update.followers = Number(followers);
   if (engagement !== undefined && engagement !== null && engagement !== "") update.engagement_rate = Number(engagement);
 
-  const { data: beforeRow } = await admin
-    .from("creators")
-    .select("linked_user_id")
-    .eq("id", creatorId)
-    .eq("user_id", brandId)
-    .maybeSingle();
-
-  const { error } = await admin
+  let { error } = await admin
     .from("creators")
     .update(update)
     .eq("id", creatorId)
     .eq("user_id", brandId);
+
+  if (error?.message?.includes("dashboard_active")) {
+    const legacyUpdate = { ...update };
+    delete legacyUpdate.dashboard_active;
+    ({ error } = await admin
+      .from("creators")
+      .update(legacyUpdate)
+      .eq("id", creatorId)
+      .eq("user_id", brandId));
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   try {
-    await activateCreatorDashboard(admin, brandId, creatorId);
+    await activateCreatorDashboard(admin, brandId, creatorId, linkedUserId);
   } catch {
-    /* colonne dashboard_active absente : needs_review=false suffit en legacy */
+    /* garde-fou si la colonne dashboard_active est absente */
   }
 
   const { data: creator, error: fetchErr } = await admin
@@ -100,15 +116,15 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
   if (creator) {
-    const linkedUserId = creator.linked_user_id || beforeRow?.linked_user_id;
-    if (linkedUserId && !creator.linked_user_id) {
-      await admin.from("creators").update({ linked_user_id: linkedUserId }).eq("id", creatorId);
-      creator.linked_user_id = linkedUserId;
+    const resolvedLinkedUserId = creator.linked_user_id || linkedUserId;
+    if (resolvedLinkedUserId && !creator.linked_user_id) {
+      await admin.from("creators").update({ linked_user_id: resolvedLinkedUserId }).eq("id", creatorId);
+      creator.linked_user_id = resolvedLinkedUserId;
     }
-    if (linkedUserId) {
+    if (resolvedLinkedUserId) {
       const { error: linkErr } = await admin.from("creator_links").upsert(
         {
-          creator_id: linkedUserId,
+          creator_id: resolvedLinkedUserId,
           brand_id: brandId,
           status: CREATOR_LINK_STATUS.active,
         },
@@ -149,7 +165,16 @@ export async function DELETE(request: Request) {
     .update({ needs_review: false, linked_user_id: null, dashboard_active: false })
     .eq("id", creatorId)
     .eq("user_id", brandId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error?.message?.includes("dashboard_active")) {
+    const { error: legacyErr } = await admin
+      .from("creators")
+      .update({ needs_review: false, linked_user_id: null })
+      .eq("id", creatorId)
+      .eq("user_id", brandId);
+    if (legacyErr) return NextResponse.json({ error: legacyErr.message }, { status: 500 });
+  } else if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   if (creator?.linked_user_id) {
     await admin

@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useLang } from "@/lib/useLang";
-import type { ActiveDashboardCreator } from "@/lib/active-dashboard-creators";
+import {
+  listActiveDashboardCreatorsClient,
+  type ActiveDashboardCreator,
+} from "@/lib/active-dashboard-creators";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 
@@ -44,12 +47,8 @@ export function ActiveDashboardCreatorsPanel({
     }
     setLoading(true);
     try {
-      const res = await fetch(
-        `/api/creators/active-dashboards?brandId=${encodeURIComponent(brandId)}&_=${Date.now()}`,
-        { cache: "no-store" },
-      );
-      const data = (await res.json()) as { ok?: boolean; creators?: ActiveDashboardCreator[] };
-      setCreators(res.ok && data?.ok ? (data.creators ?? []) : []);
+      const rows = await listActiveDashboardCreatorsClient(brandId);
+      setCreators(rows);
     } finally {
       setLoading(false);
     }

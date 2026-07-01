@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { listFolders, type FolderRow } from "@/lib/workspace-client";
@@ -19,6 +20,7 @@ type PendingCreator = {
 
 export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const lang = useLang();
+  const router = useRouter();
   const [queue, setQueue] = useState<PendingCreator[]>([]);
   const [commission, setCommission] = useState("10");
   const [discount, setDiscount] = useState("");
@@ -133,7 +135,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
       }
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
       if (queue.length <= 1) {
-        window.location.assign("/dashboard?view=invitations");
+        router.push("/dashboard?view=invitations");
       } else {
         next();
       }
