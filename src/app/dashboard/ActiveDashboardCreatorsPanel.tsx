@@ -249,22 +249,23 @@ export function ActiveDashboardCreatorsPanel({
             }}
           >
             <h3 style={{ margin: "0 0 10px", fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
-              {lang === "fr" ? "Désactiver le dashboard ?" : "Deactivate dashboard?"}
+              {lang === "fr" ? "Supprimer le compte créateur ?" : "Delete creator account?"}
             </h3>
             <p style={{ margin: "0 0 24px", fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
               {lang === "fr" ? (
                 <>
+                  Le compte de{" "}
                   <strong style={{ color: "#1A1A1A" }}>
                     {deactivateTarget.full_name?.trim() || `@${deactivateTarget.handle}`}
                   </strong>{" "}
-                  n&apos;aura plus accès à son espace créateur et sera retiré de cette liste.
+                  sera définitivement supprimé. Il n&apos;aura plus accès à Trackit et sera retiré de Gérer et de cette liste.
                 </>
               ) : (
                 <>
                   <strong style={{ color: "#1A1A1A" }}>
                     {deactivateTarget.full_name?.trim() || `@${deactivateTarget.handle}`}
-                  </strong>{" "}
-                  will lose access to their creator workspace and be removed from this list.
+                  </strong>
+                  &apos;s account will be permanently deleted. They will lose access to Trackit and be removed from Manage and this list.
                 </>
               )}
             </p>
@@ -305,11 +306,11 @@ export function ActiveDashboardCreatorsPanel({
               >
                 {deactivating
                   ? lang === "fr"
-                    ? "Désactivation…"
-                    : "Deactivating…"
+                    ? "Suppression…"
+                    : "Deleting…"
                   : lang === "fr"
-                    ? "Désactiver"
-                    : "Deactivate"}
+                    ? "Supprimer"
+                    : "Delete"}
               </button>
             </div>
           </div>

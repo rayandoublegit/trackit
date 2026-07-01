@@ -7,6 +7,7 @@ import { getAuthRedirectPath } from "@/lib/auth-destination";
 import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
 import { useLang } from "@/lib/useLang";
 import { translateAuthError } from "@/lib/auth-errors";
+import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
 
 function AuthPageContent() {
   const router = useRouter();
@@ -53,6 +54,22 @@ function AuthPageContent() {
       if (mode === "login") {
         const { error: signErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (signErr) {
+          const lowered = signErr.message.trim().toLowerCase();
+          if (lowered.includes("invalid login credentials") || lowered.includes("invalid credentials")) {
+            try {
+              const check = await fetch(
+                `/api/auth/deactivated-creator?email=${encodeURIComponent(email.trim())}`,
+                { cache: "no-store" },
+              );
+              const payload = (await check.json()) as { deactivated?: boolean; brandName?: string };
+              if (payload.deactivated && payload.brandName) {
+                setError(formatCreatorDeactivatedMessage(payload.brandName, lang));
+                return;
+              }
+            } catch {
+              /* fallback to generic auth error */
+            }
+          }
           setError(translateAuthError(signErr.message, lang));
         } else {
           await recordLoginIp();

@@ -592,6 +592,7 @@ export type CreatorStatsPayload = {
   ok: true;
   linked: boolean;
   accessRevoked?: boolean;
+  revokedBrandName?: string | null;
   creatorName: string | null;
   brandName: string | null;
   discountCode: string | null;
@@ -626,16 +627,33 @@ export async function buildCreatorStatsPayload(
 
   const { data: revokedLinks } = await supabase
     .from("creator_links")
-    .select("id")
+    .select("brand_id")
     .eq("creator_id", userId)
     .eq("status", CREATOR_LINK_STATUS.revoked)
+    .order("created_at", { ascending: false })
     .limit(1);
+
+  let revokedBrandName: string | null = null;
+  if (revokedLinks?.[0]?.brand_id) {
+    const { data: revokedBrand } = await supabase
+      .from("profiles")
+      .select("business_name, full_name, username")
+      .eq("id", revokedLinks[0].brand_id)
+      .maybeSingle();
+    if (revokedBrand) {
+      revokedBrandName =
+        revokedBrand.business_name ||
+        revokedBrand.full_name ||
+        (revokedBrand.username ? `@${revokedBrand.username}` : null);
+    }
+  }
 
   if (rows.length === 0) {
     return {
       ok: true,
       linked: false,
       accessRevoked: (revokedLinks?.length ?? 0) > 0,
+      revokedBrandName,
       creatorName,
       brandName: null,
       discountCode: null,

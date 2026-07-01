@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { listFolders, type FolderRow } from "@/lib/workspace-client";
@@ -20,7 +19,6 @@ type PendingCreator = {
 
 export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const lang = useLang();
-  const router = useRouter();
   const [queue, setQueue] = useState<PendingCreator[]>([]);
   const [commission, setCommission] = useState("10");
   const [discount, setDiscount] = useState("");
@@ -84,7 +82,10 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
   }, [avatarPreview]);
 
-  const next = () => setQueue((q) => q.slice(1));
+  /** Retire le créateur validé de la file locale → ferme le pop-up immédiatement. */
+  const closeCurrent = (creatorId: string) => {
+    setQueue((q) => q.filter((c) => c.id !== creatorId));
+  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,12 +134,8 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
         setSaveError(typeof data?.error === "string" ? data.error : (lang === "fr" ? "Échec de l'enregistrement" : "Save failed"));
         return;
       }
+      closeCurrent(current.id);
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
-      if (queue.length <= 1) {
-        router.push("/dashboard?view=invitations");
-      } else {
-        next();
-      }
     } finally {
       setSaving(false);
     }
@@ -149,8 +146,8 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     setSaving(true);
     try {
       await fetch(`/api/creators/pending-review?creatorId=${current.id}&brandId=${brandId}`, { method: "DELETE" });
+      closeCurrent(current.id);
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
-      next();
     } finally {
       setSaving(false);
     }

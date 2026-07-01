@@ -91,6 +91,7 @@ import {
 } from "@/lib/dashboard-bootstrap-cache";
 import { useLang } from "@/lib/useLang";
 import { useCreatorStats } from "@/lib/useCreatorStats";
+import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
 import { loadAffiliates, persistAffiliateCodesToServer, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
   readViewFromUrl,
@@ -783,9 +784,10 @@ function DashboardPageContent() {
                 {lang === "fr" ? "Accès désactivé" : "Access deactivated"}
               </h1>
               <p style={{ margin: 0, fontSize: 15, color: "#6B7280", lineHeight: 1.6 }}>
-                {lang === "fr"
-                  ? "La marque a désactivé votre espace créateur. Vous ne pouvez plus accéder à votre dashboard."
-                  : "The brand has deactivated your creator workspace. You can no longer access your dashboard."}
+                {formatCreatorDeactivatedMessage(
+                  creatorStats?.revokedBrandName ?? creatorStats?.brandName ?? (lang === "fr" ? "La marque" : "The brand"),
+                  lang,
+                )}
               </p>
             </div>
           </div>
