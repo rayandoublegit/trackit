@@ -238,7 +238,7 @@ export function CreatorScriptPanel({
       </button>
 
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28 }}>
-        <CreatorAvatar username={creatorUsername} displayName={displayName} size={52} alt={displayName} />
+        <CreatorAvatar username={creatorUsername} src={avatarUrl} displayName={displayName} size={52} alt={displayName} priority />
         <div>
           <h1
             style={{

@@ -11,6 +11,18 @@ export function discoveryCopy(lang: Lang) {
     productPlaceholder: fr ? "Ex. Trackit, compléments fitness…" : "e.g. Trackit, fitness supplements…",
     search: fr ? "Recherche" : "Search",
     searchPlaceholder: fr ? "@créateur ou email" : "@creator or email",
+    requestSection: fr ? "Demande" : "Request",
+    requestSectionHint: fr
+      ? "Une niche manquante ? Dites-nous laquelle ajouter sur Trackit."
+      : "Missing a niche? Tell us which one to add on Trackit.",
+    requestNichePlaceholder: fr ? "Ex. SaaS, parenting, crypto…" : "e.g. SaaS, parenting, crypto…",
+    requestSubmit: fr ? "Envoyer la demande" : "Submit request",
+    requestSubmitting: fr ? "Envoi…" : "Sending…",
+    requestSuccess: fr
+      ? "Demande envoyée — nous priorisons les niches les plus demandées."
+      : "Request sent — we prioritize the most requested niches.",
+    requestError: fr ? "Impossible d'envoyer la demande." : "Could not send your request.",
+    requestSignIn: fr ? "Connectez-vous pour envoyer une demande." : "Sign in to submit a request.",
     emailAvailable: fr ? "Email disponible" : "Email available",
     hideSaved: fr ? "Masquer les profils sauvegardés" : "Hide saved profiles",
     required: fr ? "Requis" : "Required",

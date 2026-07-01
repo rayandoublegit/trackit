@@ -21,6 +21,8 @@ import { SaveCreatorDropdown } from "@/app/dashboard/SaveCreatorDropdown";
 import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
+import { submitNicheRequest } from "@/lib/niche-requests";
+import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 function fmt(n: number): string {
@@ -311,6 +313,75 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
+function NicheRequestSection({ lang, product }: { lang: "en" | "fr"; product: string }) {
+  const t = discoveryCopy(lang);
+  const [niche, setNiche] = useState("");
+  const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleSubmit = async () => {
+    const trimmed = niche.trim();
+    if (trimmed.length < 2 || status === "submitting") return;
+    setStatus("submitting");
+    setErrorMsg("");
+    const result = await submitNicheRequest(trimmed, product);
+    if (result.ok) {
+      setNiche("");
+      setStatus("success");
+      return;
+    }
+    setStatus("error");
+    if (result.error === "Not signed in") {
+      setErrorMsg(t.requestSignIn);
+    } else {
+      setErrorMsg(t.requestError);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        paddingTop: 16,
+        borderTop: "1px solid #EFEFEF",
+      }}
+    >
+      <SectionTitle>{t.requestSection}</SectionTitle>
+      <p style={{ fontSize: 12, color: "#7A7A7A", margin: "0 0 10px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+        {t.requestSectionHint}
+      </p>
+      <input
+        type="text"
+        value={niche}
+        onChange={(e) => {
+          setNiche(e.target.value);
+          if (status === "success" || status === "error") setStatus("idle");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void handleSubmit();
+        }}
+        placeholder={t.requestNichePlaceholder}
+        style={inputStyle}
+      />
+      <button
+        type="button"
+        className="hero-cta-shopify-light hero-cta-compact-sm"
+        disabled={niche.trim().length < 2 || status === "submitting"}
+        onClick={() => void handleSubmit()}
+        style={{ width: "100%", marginTop: 10 }}
+      >
+        {status === "submitting" ? t.requestSubmitting : t.requestSubmit}
+      </button>
+      {status === "success" ? (
+        <p style={{ fontSize: 12, color: "#15803D", margin: "10px 0 0", lineHeight: 1.45 }}>{t.requestSuccess}</p>
+      ) : null}
+      {status === "error" && errorMsg ? (
+        <p style={{ fontSize: 12, color: "#C0392B", margin: "10px 0 0", lineHeight: 1.45 }}>{errorMsg}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function FilterSidebar({
   lang,
   isPaid,
@@ -464,6 +535,8 @@ function FilterSidebar({
         </div>
       </div>
 
+      <NicheRequestSection lang={lang} product={product} />
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
         <FilterToggle
           label={t.emailAvailable}
@@ -593,6 +666,7 @@ function FeedListRow({
   onFoldersOptimistic,
   onUpgrade,
   compact,
+  avatarPriority,
 }: {
   lang: "en" | "fr";
   creator: FeedCreator;
@@ -606,6 +680,7 @@ function FeedListRow({
   onFoldersOptimistic: (username: string, folderId: string, inFolder: boolean) => void;
   onUpgrade?: () => void;
   compact?: boolean;
+  avatarPriority?: boolean;
 }) {
   const c = creator;
   const t = discoveryCopy(lang);
@@ -633,7 +708,14 @@ function FeedListRow({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 200px", minWidth: 0 }}>
-        <CreatorAvatar username={c.username} src={c.avatarUrl} displayName={c.displayName} size={44} alt={c.displayName} />
+        <CreatorAvatar
+          username={c.username}
+          src={c.avatarUrl}
+          displayName={c.displayName}
+          size={44}
+          alt={c.displayName}
+          priority={avatarPriority}
+        />
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -1081,6 +1163,13 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const isCreatorSearchMiss =
     !loading && !error && !discoveryGateActive && searchQuery.length > 0 && filtered.length === 0;
 
+  useEffect(() => {
+    if (items.length === 0) return;
+    prefetchCreatorAvatars(
+      items.slice(0, 32).map((c) => ({ username: c.username, avatarUrl: c.avatarUrl })),
+    );
+  }, [items]);
+
   const refreshWorkspace = useCallback(async () => {
     const [rows, f] = await Promise.all([listSaved(), listFolders()]);
     setSavedUsernames(new Set(rows.map((r) => r.creator_username)));
@@ -1300,6 +1389,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
                       folders={folders}
                       isPaid={isPaid}
                       compact={isMobile}
+                      avatarPriority={i < 10}
                       onOpen={() => openCreator(c)}
                       onWorkspaceChange={() => void refreshWorkspace()}
                       onSavedOptimistic={onSavedOptimistic}

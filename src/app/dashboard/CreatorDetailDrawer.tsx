@@ -475,7 +475,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
         </div>
 
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 24 }}>
-          <CreatorAvatar username={d.username} src={d.avatarUrl} displayName={d.displayName} size={62} alt={d.displayName} />
+          <CreatorAvatar username={d.username} src={d.avatarUrl} displayName={d.displayName} size={62} alt={d.displayName} priority />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.displayName}</div>

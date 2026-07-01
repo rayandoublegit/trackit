@@ -89,5 +89,35 @@ export async function GET(request: Request) {
   }
   const lookupRequests = Object.values(reqMap).sort((a, b) => b.count - a.count);
 
-  return NextResponse.json({ ok: true, total, curated, niches, lookupRequests });
+  const nicheReqRows: { normalized_niche: string; niche: string; product_context: string | null; created_at: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("niche_requests")
+      .select("normalized_niche, niche, product_context, created_at")
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+    if (error) break;
+    if (!data || data.length === 0) break;
+    nicheReqRows.push(...data);
+    if (data.length < PAGE) break;
+  }
+
+  const nicheReqMap: Record<string, { normalized: string; niche: string; productContext: string | null; count: number; lastAt: string }> = {};
+  for (const r of nicheReqRows) {
+    const key = r.normalized_niche;
+    if (!nicheReqMap[key]) {
+      nicheReqMap[key] = {
+        normalized: key,
+        niche: r.niche,
+        productContext: r.product_context,
+        count: 0,
+        lastAt: r.created_at,
+      };
+    }
+    nicheReqMap[key].count++;
+    if (r.created_at > nicheReqMap[key].lastAt) nicheReqMap[key].lastAt = r.created_at;
+  }
+  const nicheRequests = Object.values(nicheReqMap).sort((a, b) => b.count - a.count);
+
+  return NextResponse.json({ ok: true, total, curated, niches, lookupRequests, nicheRequests });
 }

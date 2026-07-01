@@ -19,6 +19,7 @@ import {
   resolveCreatorAvatarUrl,
 } from "@/lib/creator-avatar";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
@@ -619,6 +620,10 @@ function OutreachAIGeneratePanel({
     };
     void load();
   }, []);
+
+  useEffect(() => {
+    prefetchCreatorAvatars(savedCreators.map((c) => ({ username: c.username, avatarUrl: c.avatar })));
+  }, [savedCreators]);
 
   const filteredCreators = useMemo(() => {
     const q = creatorSearch.trim().toLowerCase().replace(/^@/, "");
@@ -1441,6 +1446,10 @@ export function OutreachHistorySection({
     window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refresh);
     return () => window.removeEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refresh);
   }, [loadHistory]);
+
+  useEffect(() => {
+    prefetchCreatorAvatars(savedCreators.map((c) => ({ username: c.username, avatarUrl: c.avatar })));
+  }, [savedCreators]);
 
   const handleMarkSent = async (
     creator: {

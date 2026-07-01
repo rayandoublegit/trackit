@@ -2020,12 +2020,14 @@ function InfluencerPicker({
   layout = "panel",
   emailMode = false,
   emailMap = {},
+  avatarMap = {},
 }: {
   selected: string[];
   onChange: (handles: string[]) => void;
   layout?: OutreachFormLayout;
   emailMode?: boolean;
   emailMap?: Record<string, string>;
+  avatarMap?: Record<string, string>;
 }) {
   const lang = useLang();
   const styles = outreachFormStyles(layout);
@@ -2107,7 +2109,13 @@ function InfluencerPicker({
             ...selectionCardStyle(true),
           }}
         >
-          <CreatorAvatar username={handle} displayName={handle} size={layout === "page" ? 40 : 32} alt={handle} />
+          <CreatorAvatar
+            username={handle}
+            displayName={handle}
+            src={avatarUrlForCreatorHandle(handle, avatarMap)}
+            size={layout === "page" ? 40 : 32}
+            alt={handle}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: layout === "page" ? 14 : 13, fontWeight: 500, color: "#FFFFFF" }}>{handle}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{lang === "fr" ? "Sélectionné" : "Selected"}</div>
@@ -2555,6 +2563,7 @@ function SendOutreachPanel({
             layout="page"
             emailMode={isEmail}
             emailMap={{ ...creatorEmailMap, ...creatorEmailOverrides }}
+            avatarMap={creatorAvatarMap}
             selected={selectedInfluencers}
             onChange={setSelectedInfluencers}
           />
@@ -2585,7 +2594,13 @@ function SendOutreachPanel({
                     background: "#FAFAFA",
                   }}
                 >
-                  <CreatorAvatar username={row.handle} displayName={row.handle} size={36} alt={row.handle} />
+                  <CreatorAvatar
+                    username={row.handle}
+                    displayName={row.handle}
+                    src={avatarUrlForCreatorHandle(row.handle, creatorAvatarMap)}
+                    size={36}
+                    alt={row.handle}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>{row.handle}</div>
                     <div style={{ fontSize: 12, color: "#6B7280" }}>

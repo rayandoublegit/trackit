@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getCachedAvatarUrl, isPersistableAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { normalizeCreatorHandle, resolveCreatorAvatarUrl } from "@/lib/creator-avatar";
-import { isTikTokCdnUrl, isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
 function ProfileIcon({ size }: { size: number }) {
   const iconSize = Math.round(size * 0.52);
@@ -14,15 +15,13 @@ function ProfileIcon({ size }: { size: number }) {
   );
 }
 
-type AvatarSource = "api" | "src" | "none";
-
 function cleanAvatarSrc(src?: string | null): string {
   const url = resolveCreatorAvatarUrl(src);
   if (!url || isUiAvatarsUrl(url)) return "";
   return url;
 }
 
-function isStableAvatarUrl(url: string): boolean {
+export function isStableAvatarUrl(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
     return host.includes("supabase.co") || url.includes("/storage/v1/object/public/");
@@ -31,14 +30,22 @@ function isStableAvatarUrl(url: string): boolean {
   }
 }
 
-/** Prefer the avatar API for expiring CDN URLs so each handle resolves to the right photo. */
-function pickAvatarSource(cleanSrc: string, resolvedUsername: string): AvatarSource {
-  if (!cleanSrc && !resolvedUsername) return "none";
-  if (!resolvedUsername) return cleanSrc ? "src" : "none";
-  if (!cleanSrc) return "api";
-  if (isStableAvatarUrl(cleanSrc)) return "src";
-  if (isTikTokCdnUrl(cleanSrc)) return "api";
-  return "src";
+function directAvatarSrc(cleanSrc: string): string {
+  if (!cleanSrc) return "";
+  return proxiedImageUrl(cleanSrc);
+}
+
+function apiAvatarSrc(username: string): string {
+  return `/api/creator-avatar?username=${encodeURIComponent(username)}`;
+}
+
+function resolveInitialSrc(cleanSrc: string, username: string): string {
+  const direct = cleanSrc ? directAvatarSrc(cleanSrc) : "";
+  if (direct) return direct;
+  const cached = username ? getCachedAvatarUrl(username) : null;
+  if (cached) return cached;
+  if (username) return apiAvatarSrc(username);
+  return "";
 }
 
 export function CreatorAvatar({
@@ -48,6 +55,7 @@ export function CreatorAvatar({
   displayName,
   size = 32,
   alt = "",
+  priority = false,
 }: {
   src?: string | null;
   username?: string;
@@ -55,36 +63,51 @@ export function CreatorAvatar({
   displayName?: string;
   size?: number;
   alt?: string;
+  priority?: boolean;
 }) {
   const resolvedUsername = normalizeCreatorHandle(username ?? handle);
   const cleanSrc = cleanAvatarSrc(src);
 
-  const [source, setSource] = useState<AvatarSource>(() => pickAvatarSource(cleanSrc, resolvedUsername));
+  const targetSrc = useMemo(
+    () => resolveInitialSrc(cleanSrc, resolvedUsername),
+    [cleanSrc, resolvedUsername],
+  );
+
+  const [imgSrc, setImgSrc] = useState(targetSrc);
+  const [showFallback, setShowFallback] = useState(!targetSrc);
+  const failStepRef = useRef(0);
 
   useEffect(() => {
-    setSource(pickAvatarSource(cleanSrc, resolvedUsername));
-  }, [resolvedUsername, cleanSrc]);
+    failStepRef.current = 0;
+    setImgSrc(targetSrc);
+    setShowFallback(!targetSrc);
+  }, [targetSrc]);
 
-  const imgSrc =
-    source === "api" && resolvedUsername
-      ? `/api/creator-avatar?username=${encodeURIComponent(resolvedUsername)}`
-      : source === "src" && cleanSrc
-        ? proxiedImageUrl(cleanSrc)
-        : "";
+  const onError = useCallback(() => {
+    const step = failStepRef.current;
+    failStepRef.current += 1;
 
-  const onError = () => {
-    if (source === "src" && resolvedUsername) {
-      setSource("api");
+    if (step === 0 && cleanSrc && resolvedUsername) {
+      setImgSrc(apiAvatarSrc(resolvedUsername));
+      setShowFallback(false);
       return;
     }
-    if (source === "api" && cleanSrc && isStableAvatarUrl(cleanSrc)) {
-      setSource("src");
+    if (step === 1 && cleanSrc && isStableAvatarUrl(cleanSrc)) {
+      setImgSrc(directAvatarSrc(cleanSrc));
+      setShowFallback(false);
       return;
     }
-    setSource("none");
-  };
+    setShowFallback(true);
+  }, [cleanSrc, resolvedUsername]);
 
-  if (!imgSrc || source === "none") {
+  const onLoad = useCallback(() => {
+    if (resolvedUsername && imgSrc && isPersistableAvatarUrl(imgSrc)) {
+      setCachedAvatarUrl(resolvedUsername, imgSrc);
+    }
+    setShowFallback(false);
+  }, [imgSrc, resolvedUsername]);
+
+  if (showFallback || !imgSrc) {
     return (
       <div
         style={{
@@ -107,11 +130,13 @@ export function CreatorAvatar({
 
   return (
     <img
-      key={`${resolvedUsername}:${source}:${imgSrc}`}
       src={imgSrc}
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
       height={size}
+      loading={priority ? "eager" : "lazy"}
+      decoding="async"
+      fetchPriority={priority ? "high" : "auto"}
       style={{
         width: size,
         height: size,
@@ -120,6 +145,7 @@ export function CreatorAvatar({
         flexShrink: 0,
         background: "#F0F0F0",
       }}
+      onLoad={onLoad}
       onError={onError}
     />
   );

@@ -30,11 +30,20 @@ type LookupRequest = {
   lastAt: string;
 };
 
+type NicheRequest = {
+  normalized: string;
+  niche: string;
+  productContext: string | null;
+  count: number;
+  lastAt: string;
+};
+
 type StatsData = {
   total: number;
   curated: number;
   niches: NicheStat[];
   lookupRequests: LookupRequest[];
+  nicheRequests: NicheRequest[];
 };
 
 function formatCompact(n: number): string {
@@ -170,6 +179,13 @@ export default function AdminStatsPage() {
         lookupRequests: (Array.isArray(json.lookupRequests) ? json.lookupRequests : []).map((r: LookupRequest) => ({
           normalized: String(r.normalized),
           query: String(r.query),
+          count: Number(r.count) || 0,
+          lastAt: String(r.lastAt),
+        })),
+        nicheRequests: (Array.isArray(json.nicheRequests) ? json.nicheRequests : []).map((r: NicheRequest) => ({
+          normalized: String(r.normalized),
+          niche: String(r.niche),
+          productContext: r.productContext != null ? String(r.productContext) : null,
           count: Number(r.count) || 0,
           lastAt: String(r.lastAt),
         })),
@@ -444,6 +460,59 @@ export default function AdminStatsPage() {
                         <div style={{ fontSize: 15, fontWeight: 600, color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           @{r.normalized}
                         </div>
+                        <div style={{ fontSize: 12, color: "#999" }}>
+                          demandé le {new Date(r.lastAt).toLocaleDateString("fr-FR")}
+                        </div>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          padding: "4px 12px",
+                          borderRadius: 999,
+                          background: r.count > 1 ? "#0047FF" : "#e8e8e8",
+                          color: r.count > 1 ? "#fff" : "#666",
+                          whiteSpace: "nowrap",
+                          marginLeft: 12,
+                        }}
+                      >
+                        {r.count} {r.count > 1 ? "demandes" : "demande"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data && data.nicheRequests.length > 0 && (
+              <div style={{ ...card, marginTop: 24 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 4px", color: "#111" }}>
+                  Niches demandées par les marques
+                </h2>
+                <p style={{ fontSize: 13, color: "#888", margin: "0 0 16px" }}>
+                  Niches soumises via Find It → Request. À implémenter en priorité (les plus demandées en haut).
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {data.nicheRequests.map((r) => (
+                    <div
+                      key={r.normalized}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "#F7F7F8",
+                        borderRadius: 12,
+                        padding: "10px 14px",
+                      }}
+                    >
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {r.niche}
+                        </div>
+                        {r.productContext ? (
+                          <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
+                            Produit : {r.productContext}
+                          </div>
+                        ) : null}
                         <div style={{ fontSize: 12, color: "#999" }}>
                           demandé le {new Date(r.lastAt).toLocaleDateString("fr-FR")}
                         </div>

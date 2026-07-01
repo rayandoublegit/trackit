@@ -41,11 +41,35 @@ export const FR_NICHE_QUERIES: Record<string, string[]> = {
   business: ["entrepreneur français", "marketing digital", "ecommerce france", "side business", "freelance", "creer entreprise", "business en ligne", "agence marketing", "dropshipping france", "startup"],
 };
 
+// English-market search queries, same canonical niches as FR. English keywords
+// surface English-speaking creators; tagged with the same niche taxonomy.
+export const EN_NICHE_QUERIES: Record<string, string[]> = {
+  fitness: ["gym workout", "fat loss", "build muscle", "home workout", "calisthenics", "personal trainer", "weight training", "fitness transformation", "powerlifting", "crossfit"],
+  food: ["easy recipes", "high protein meals", "meal prep", "healthy recipes", "baking recipes", "air fryer recipes", "vegan recipes", "quick dinner", "food recipe", "cooking tips"],
+  beauty: ["skincare routine", "makeup tutorial", "grwm makeup", "hair care tips", "beauty tips", "nail art", "acne skincare", "makeup look", "skincare tips", "hair routine"],
+  fashion: ["outfit ideas", "streetwear style", "ootd outfit", "fashion tips", "thrift haul", "mens fashion", "womens fashion", "style inspo", "outfit inspiration", "fashion haul"],
+  travel: ["budget travel", "travel tips", "solo travel", "travel destinations", "road trip usa", "van life", "city travel guide", "travel hacks", "family travel", "cheap flights"],
+  pets: ["dog training", "puppy training", "pet care tips", "cat lovers", "dog tips", "pet grooming", "dog behavior", "pet nutrition", "rescue dogs", "dog owner"],
+  lifestyle: ["productivity tips", "self improvement", "morning routine", "organization tips", "minimalism", "daily vlog", "self care routine", "that girl routine", "life hacks", "student life"],
+  finance: ["stock investing", "personal finance", "crypto investing", "budgeting tips", "save money", "money tips", "real estate investing", "financial freedom", "side hustles", "passive income"],
+  tech: ["tech review", "gadget review", "ai tools", "smartphone review", "tech tips", "useful apps", "desk setup", "tech gadgets", "iphone tips", "smart home"],
+  home: ["interior design", "diy home", "home organization", "home decor", "indoor plants", "decor inspiration", "home renovation", "home staging", "cleaning tips", "small space ideas"],
+  parenting: ["mom life", "dad life", "parenting tips", "pregnancy tips", "newborn tips", "toddler mom", "parenting hacks", "baby tips", "big family", "first time mom"],
+  wellness: ["mental health", "meditation", "yoga practice", "nutrition tips", "supplements", "wellness routine", "self love", "better sleep", "stress relief", "holistic health"],
+  business: ["entrepreneur tips", "digital marketing", "ecommerce tips", "side business", "freelancing", "start a business", "online business", "marketing agency", "dropshipping", "startup founder"],
+};
+
 export function buildSeedTargets(): { query: string; tags: string[] }[] {
   // FR-first: each French query is tagged with its canonical niche so discovery
   // (which filters language === "fr") serves these to French Shopify brands.
   const targets: { query: string; tags: string[] }[] = [];
+  // FR first (priority market), then EN.
   for (const [niche, queries] of Object.entries(FR_NICHE_QUERIES)) {
+    for (const query of queries) {
+      targets.push({ query, tags: [niche] });
+    }
+  }
+  for (const [niche, queries] of Object.entries(EN_NICHE_QUERIES)) {
     for (const query of queries) {
       targets.push({ query, tags: [niche] });
     }

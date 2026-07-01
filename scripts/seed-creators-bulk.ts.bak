@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { buildSeedTargets, FR_NICHE_QUERIES } from "@/lib/niche-tree";
+import { buildSeedTargets } from "@/lib/niche-tree";
 import {
   searchTikTokUsersRaw,
   fetchTikTokProfileRaw,
@@ -20,8 +20,6 @@ const SEED_TARGET = Number(process.env.SEED_TARGET ?? 1500);
 const PER_NICHE = Number(process.env.SEED_PER_NICHE ?? 8);
 const CONCURRENCY = Number(process.env.SEED_CONCURRENCY ?? 5);
 const MIN_FOLLOWERS = 5000;
-const SEED_PAGES = Number(process.env.SEED_PAGES ?? 1);
-const FR_ONLY = process.env.SEED_FR_ONLY === "1";
 const DRY = process.env.SEED_DRY === "1";
 const USE_CLAUDE = Boolean(process.env.ANTHROPIC_API_KEY);
 
@@ -52,23 +50,8 @@ type SCUser = {
 };
 
 async function search(query: string): Promise<SCUser[]> {
-  const out: SCUser[] = [];
-  const seenLocal = new Set<string>();
-  for (let page = 0; page < SEED_PAGES; page++) {
-    const cursor = page * 30;
-    let data: { user_list?: { user_info?: SCUser }[] };
-    try {
-      data = (await searchTikTokUsersRaw(query, cursor || undefined)) as { user_list?: { user_info?: SCUser }[] };
-    } catch { break; }
-    const batch = (data?.user_list ?? []).map((u) => u.user_info).filter((u): u is SCUser => !!u && !!u.unique_id);
-    if (batch.length === 0) break;
-    for (const u of batch) {
-      const id = String(u.unique_id);
-      if (!seenLocal.has(id)) { seenLocal.add(id); out.push(u); }
-    }
-    if (page < SEED_PAGES - 1) await new Promise((r) => setTimeout(r, 200));
-  }
-  return out;
+  const data = (await searchTikTokUsersRaw(query)) as { user_list?: { user_info?: SCUser }[] };
+  return (data?.user_list ?? []).map((u) => u.user_info).filter((u): u is SCUser => !!u && !!u.unique_id);
 }
 
 async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<"ok" | "skip" | "fail"> {
@@ -131,10 +114,7 @@ async function main() {
   let stored = seen.size;
   console.log(`Resume: ${stored} already enriched.`);
 
-  const targets: Target[] = FR_ONLY
-    ? Object.values(FR_NICHE_QUERIES).flat().map((q) => ({ q, l: "fr", c: "FR" }))
-    : [...buildSeedTargets().map((t) => ({ q: t.query })), ...LOCALIZED];
-  console.log(`Targets: ${targets.length} queries${FR_ONLY ? " (FR-only mode)" : ""} | pages/query: ${SEED_PAGES}`);
+  const targets: Target[] = [...buildSeedTargets().map((t) => ({ q: t.query })), ...LOCALIZED];
   for (const t of targets) {
     if (stored >= SEED_TARGET) break;
     let users: SCUser[] = [];
