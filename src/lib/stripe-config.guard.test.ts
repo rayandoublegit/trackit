@@ -3,10 +3,12 @@ import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   TRACKIT_STRIPE_DEFAULT_PRICE_IDS,
+  assertNonEmptyStripePriceId,
   buildClientStripeEnv,
   getGrowthPriceId,
   getProPriceId,
   getScalePriceId,
+  stripePriceEnvCandidates,
 } from "./stripe-config";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -58,5 +60,16 @@ describe("stripe config guard", () => {
     expect(env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID).toBe(
       TRACKIT_STRIPE_DEFAULT_PRICE_IDS.scaleUsdMonthly
     );
+  });
+
+  it("assertNonEmptyStripePriceId throws with env var names", () => {
+    expect(() =>
+      assertNonEmptyStripePriceId("", stripePriceEnvCandidates("growth", "eur", true))
+    ).toThrow(/STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID/);
+  });
+
+  it("check:stripe script is wired in package.json", () => {
+    const pkg = JSON.parse(readRepoFile("package.json"));
+    expect(pkg.scripts["check:stripe"]).toBe("tsx scripts/check-stripe-prices.ts");
   });
 });

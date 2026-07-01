@@ -37,6 +37,103 @@ export const STRIPE_PRICE_ENV_ALIASES: Record<string, string> = {
   STRIPE_SCALE_ANNUAL_EUR_PRICE_ID: "NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID",
 };
 
+/** Optional price env vars outside STRIPE_PRICE_ENV_ALIASES (e.g. Spark trial). */
+export const STRIPE_EXTRA_PRICE_ENV_VAR_NAMES = ["STRIPE_SPARK_PRICE_ID"] as const;
+
+/** Every env var name that may hold a Stripe price ID (server + client keys from aliases). */
+export function getStripePriceEnvVarNames(): string[] {
+  return [
+    ...new Set([
+      ...Object.keys(STRIPE_PRICE_ENV_ALIASES),
+      ...Object.values(STRIPE_PRICE_ENV_ALIASES),
+    ]),
+  ];
+}
+
+/** Env vars consulted by getGrowthPriceId / getProPriceId / getScalePriceId for a slot. */
+export function stripePriceEnvCandidates(
+  tier: "growth" | "pro" | "scale",
+  currency: "usd" | "eur" = "usd",
+  annual = false
+): string[] {
+  if (tier === "growth") {
+    if (annual) {
+      return currency === "eur"
+        ? ["STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_EUR_PRICE_ID"]
+        : ["STRIPE_GROWTH_ANNUAL_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_ANNUAL_PRICE_ID"];
+    }
+    return currency === "eur"
+      ? ["STRIPE_GROWTH_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID"]
+      : [
+          "STRIPE_GROWTH_PRICE_ID",
+          "STRIPE_BASIC_PRICE_ID",
+          "NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID",
+        ];
+  }
+  if (tier === "pro") {
+    if (annual) {
+      return currency === "eur"
+        ? ["STRIPE_PRO2_ANNUAL_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_EUR_PRICE_ID"]
+        : ["STRIPE_PRO2_ANNUAL_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_ANNUAL_PRICE_ID"];
+    }
+    return currency === "eur"
+      ? ["STRIPE_PRO2_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID"]
+      : ["STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID"];
+  }
+  if (annual) {
+    return currency === "eur"
+      ? ["STRIPE_SCALE_ANNUAL_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_EUR_PRICE_ID"]
+      : ["STRIPE_SCALE_ANNUAL_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_ANNUAL_PRICE_ID"];
+  }
+  return currency === "eur"
+    ? ["STRIPE_SCALE_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_EUR_PRICE_ID"]
+    : ["STRIPE_SCALE_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID"];
+}
+
+export type StripeResolvedPriceSlot = {
+  label: string;
+  envVarCandidates: string[];
+  resolve: () => string;
+};
+
+/** Checkout slots resolved at runtime (used by check-stripe-prices script). */
+export function getStripeResolvedPriceSlots(): StripeResolvedPriceSlot[] {
+  const tiers = ["growth", "pro", "scale"] as const;
+  const currencies = ["usd", "eur"] as const;
+  const slots: StripeResolvedPriceSlot[] = [];
+  for (const tier of tiers) {
+    for (const currency of currencies) {
+      for (const annual of [false, true]) {
+        const interval = annual ? "annual" : "monthly";
+        const envVarCandidates = stripePriceEnvCandidates(tier, currency, annual);
+        const label = `${tier} · ${currency.toUpperCase()} · ${interval}`;
+        slots.push({
+          label,
+          envVarCandidates,
+          resolve: () => {
+            if (tier === "growth") return getGrowthPriceId(currency, annual);
+            if (tier === "pro") return getProPriceId(currency, annual);
+            return getScalePriceId(currency, annual);
+          },
+        });
+      }
+    }
+  }
+  return slots;
+}
+
+/** Throw before calling Stripe when a resolved price ID is empty. */
+export function assertNonEmptyStripePriceId(
+  priceId: string | null | undefined,
+  envVarCandidates: string[]
+): asserts priceId is string {
+  if (!priceId?.trim()) {
+    throw new Error(
+      `Missing Stripe price ID. Set one of: ${envVarCandidates.join(", ")}`
+    );
+  }
+}
+
 export function buildClientStripeEnv(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [serverKey, clientKey] of Object.entries(STRIPE_PRICE_ENV_ALIASES)) {

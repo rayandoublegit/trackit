@@ -9,6 +9,8 @@ import {
   monthlyPriceIds,
   proPriceIds,
   scalePriceIds,
+  assertNonEmptyStripePriceId,
+  stripePriceEnvCandidates,
 } from "@/lib/stripe-config";
 
 export {
@@ -64,8 +66,17 @@ export function getPriceIdForUpgrade(
 
 export async function handleUpgrade(
   priceId: string,
-  options?: { cancelUrl?: string }
+  options?: { cancelUrl?: string; tier?: "growth" | "pro" | "scale"; currency?: "usd" | "eur"; annual?: boolean }
 ): Promise<void> {
+  const envVarCandidates =
+    options?.tier != null
+      ? stripePriceEnvCandidates(options.tier, options.currency ?? "usd", options.annual ?? false)
+      : [
+          ...stripePriceEnvCandidates("growth", "usd", false),
+          ...stripePriceEnvCandidates("pro", "usd", false),
+          ...stripePriceEnvCandidates("scale", "usd", false),
+        ];
+  assertNonEmptyStripePriceId(priceId, envVarCandidates);
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data: { user } } = await supabase.auth.getUser();
   const base =

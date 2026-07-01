@@ -5,6 +5,13 @@ import { checkoutPlanMetadata, resolvePlanFromCheckout } from "@/lib/checkout";
 import { saveOnboardingProfileAdmin, type OnboardingSavePayload } from "@/lib/onboarding-save";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import {
+  assertNonEmptyStripePriceId,
+  getStripePriceEnvVarNames,
+  growthPriceIds,
+  proPriceIds,
+  scalePriceIds,
+} from "@/lib/stripe-config";
 
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message;
@@ -42,6 +49,25 @@ export async function POST(request: NextRequest) {
 
     if (!priceId) {
       return NextResponse.json({ error: "Missing priceId" }, { status: 400 });
+    }
+
+    const checkoutEnvCandidates = (() => {
+      if (growthPriceIds().includes(priceId)) {
+        return ["STRIPE_GROWTH_PRICE_ID", "STRIPE_BASIC_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID"];
+      }
+      if (proPriceIds().includes(priceId)) {
+        return ["STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID"];
+      }
+      if (scalePriceIds().includes(priceId)) {
+        return ["STRIPE_SCALE_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID"];
+      }
+      return getStripePriceEnvVarNames();
+    })();
+
+    try {
+      assertNonEmptyStripePriceId(priceId, checkoutEnvCandidates);
+    } catch (e: unknown) {
+      return NextResponse.json({ error: errMessage(e) }, { status: 400 });
     }
 
     const resolvedPlan = resolvePlanFromCheckout(priceId);
