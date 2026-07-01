@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { isValidProfileUsername, normalizeProfileUsername } from "@/lib/profile-username";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
@@ -39,7 +40,12 @@ export default function InvitePage() {
     if (!supabase) { setFormError("Service indisponible"); return; }
     if (!email.trim() || !password) { setFormError("Entrez votre email et un mot de passe"); return; }
     if (!fullName.trim()) { setFormError("Entrez votre nom complet"); return; }
-    if (!socialHandle.trim()) { setFormError("Entrez votre pseudo sur les réseaux"); return; }
+    const cleanHandle = normalizeProfileUsername(socialHandle);
+    if (!cleanHandle) { setFormError("Entrez votre pseudo sur les réseaux"); return; }
+    if (!isValidProfileUsername(cleanHandle)) {
+      setFormError("Pseudo invalide : 3–20 caractères, lettres, chiffres et underscores uniquement.");
+      return;
+    }
     setSubmitting(true);
     try {
       let userId = "";
@@ -63,7 +69,7 @@ export default function InvitePage() {
       const res = await fetch("/api/invites/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, creatorId: userId, fullName: fullName.trim(), socialHandle: socialHandle.trim() }),
+        body: JSON.stringify({ token, creatorId: userId, fullName: fullName.trim(), socialHandle: cleanHandle }),
       });
       const data = await res.json();
       if (!data.ok) { setFormError(data.error || "Échec de la liaison"); setSubmitting(false); return; }
@@ -167,7 +173,10 @@ function InviteUI(props: {
                 Créez votre compte gratuit en quelques secondes.
               </p>
               <input type="text" placeholder="Votre nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} style={input} autoComplete="name" />
-              <input type="text" placeholder="Votre pseudo (ex : @moncompte)" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} style={input} autoComplete="off" />
+              <input type="text" placeholder="Votre pseudo (ex : moncompte)" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} style={input} autoComplete="off" />
+              <p style={{ fontSize: 12, color: "rgba(0,0,0,0.4)", margin: "-4px 0 12px", lineHeight: 1.45 }}>
+                Même pseudo que sur TikTok / Instagram — la marque vous retrouvera avec ce nom.
+              </p>
               <input type="email" placeholder="Votre email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" />
               <div style={{ position: "relative" }}>
                 <input type={showPassword ? "text" : "password"} placeholder="Choisissez un mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...input, paddingRight: 46 }} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />

@@ -1,11 +1,12 @@
 import type { Lang } from "@/lib/useLang";
+import { normalizeCreatorHandle } from "@/lib/creator-account";
 
 export const PROFILE_USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 export type ProfileUsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export function normalizeProfileUsername(raw: string): string {
-  return raw.trim().toLowerCase().replace(/^@+/, "").replace(/\s+/g, "");
+  return normalizeCreatorHandle(raw);
 }
 
 export function isValidProfileUsername(username: string): boolean {

@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:stripe": "tsx scripts/check-stripe-prices.ts"
+    "check:stripe": "tsx scripts/check-stripe-prices.ts",
+    "db:creator-content": "tsx scripts/apply-creator-content-migration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.99.0",

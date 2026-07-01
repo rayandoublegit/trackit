@@ -48,6 +48,28 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const [stripeOnboarded, setStripeOnboarded] = useState(false);
   const [stripeLoading, setStripeLoading] = useState(true);
   const [stripeStarting, setStripeStarting] = useState(false);
+  const [brandMemberships, setBrandMemberships] = useState<
+    { brandId: string; brandName: string; creatorHandle: string | null; linkStatus: string; handleMatched: boolean }[]
+  >([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+
+  const loadBrandMemberships = async () => {
+    if (!userId) {
+      setBrandsLoading(false);
+      return;
+    }
+    setBrandsLoading(true);
+    try {
+      const res = await fetch(`/api/creator/brands?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        brands?: typeof brandMemberships;
+      };
+      if (data?.ok) setBrandMemberships(data.brands ?? []);
+    } finally {
+      setBrandsLoading(false);
+    }
+  };
 
   const disconnectAccount = async () => {
     if (!supabase) return;
@@ -74,6 +96,20 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
     };
     void load();
     return () => { cancelled = true; };
+  }, [userId]);
+
+  useEffect(() => {
+    void loadBrandMemberships();
+  }, [userId]);
+
+  useEffect(() => {
+    const onRefresh = () => void loadBrandMemberships();
+    window.addEventListener("trackit:creators-saved", onRefresh);
+    window.addEventListener("trackit:content-updated", onRefresh);
+    return () => {
+      window.removeEventListener("trackit:creators-saved", onRefresh);
+      window.removeEventListener("trackit:content-updated", onRefresh);
+    };
   }, [userId]);
 
   useEffect(() => () => { if (avatarPreview) URL.revokeObjectURL(avatarPreview); }, [avatarPreview]);
@@ -202,6 +238,14 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
       setSaved(true);
       onSaved?.();
+      if (userId && cleanUsername) {
+        await fetch("/api/creator/sync-brand-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+      }
+      void loadBrandMemberships();
     } finally {
       setSaving(false);
     }
@@ -260,6 +304,88 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
             </div>
           )}
           <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Doit correspondre au pseudo connu par la marque qui vous a invité." : "Should match the handle known by the brand that invited you."}</div>
+        </div>
+
+        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+            {lang === "fr" ? "Marque partenaire" : "Partner brand"}
+          </div>
+          <p style={{ fontSize: 13, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: "0 0 16px", lineHeight: 1.5 }}>
+            {lang === "fr"
+              ? "Indique si votre compte est bien relié à la marque qui vous a invité. Vos uploads de contenu sont envoyés à cette marque."
+              : "Shows whether your account is linked to the brand that invited you. Your content uploads are sent to this brand."}
+          </p>
+
+          {brandsLoading ? (
+            <div style={{ fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
+          ) : brandMemberships.length === 0 ? (
+            <div
+              style={{
+                padding: "14px 16px",
+                borderRadius: 12,
+                background: "#FFF7ED",
+                border: "1px solid #FED7AA",
+                fontSize: 13,
+                color: "#9A3412",
+                lineHeight: 1.5,
+              }}
+            >
+              {lang === "fr"
+                ? "Aucune marque associée pour le moment. Acceptez l'invitation de la marque et vérifiez que votre pseudo ci-dessus correspond à celui connu par la marque."
+                : "No linked brand yet. Accept the brand invite and make sure your handle above matches the one the brand knows."}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {brandMemberships.map((brand) => {
+                const pending = brand.linkStatus === "pending_review";
+                return (
+                  <div
+                    key={brand.brandId}
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "14px 16px",
+                      borderRadius: 12,
+                      background: "rgba(26,127,55,0.06)",
+                      border: "1px solid rgba(26,127,55,0.15)",
+                    }}
+                  >
+                    <span style={{ fontSize: 16, color: "#1A7F37", fontWeight: 700, lineHeight: 1.2, marginTop: 1 }}>&#10003;</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A7F37", letterSpacing: "-0.02em" }}>
+                        {lang === "fr" ? "A rejoint" : "Joined"}
+                      </div>
+                      <div style={{ fontSize: 14, color: "#1A1A1A", marginTop: 4, letterSpacing: "-0.02em" }}>
+                        {lang === "fr" ? "Appartient à " : "Belongs to "}
+                        <strong>{brand.brandName}</strong>
+                      </div>
+                      {brand.creatorHandle && (
+                        <div style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
+                          {lang === "fr" ? "Pseudo côté marque : " : "Brand-side handle: "}
+                          @{brand.creatorHandle.replace(/^@+/, "")}
+                          {brand.handleMatched
+                            ? lang === "fr"
+                              ? " · correspond à votre compte"
+                              : " · matches your account"
+                            : lang === "fr"
+                              ? " · vérifiez votre pseudo ci-dessus"
+                              : " · check your handle above"}
+                        </div>
+                      )}
+                      {pending && (
+                        <div style={{ fontSize: 12, color: "#946000", marginTop: 6 }}>
+                          {lang === "fr"
+                            ? "En attente de validation par la marque — vous pouvez déjà envoyer du contenu."
+                            : "Pending brand validation — you can already upload content."}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>

@@ -4,6 +4,7 @@ import {
   CREATOR_ROW_SYNC_SELECT,
   ensureCreatorRowForBrandLink,
   normalizeCreatorHandle,
+  syncCreatorRowsByProfileHandle,
 } from "@/lib/creator-account";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
 import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
@@ -48,8 +49,9 @@ export async function POST(req: Request) {
   const token = (body.token || "").trim();
   const creatorId = (body.creatorId || "").trim();
   const fullName = (body.fullName || "").trim();
-  const socialHandle = (body.socialHandle || "").trim().replace(/^@+/, "");
+  const socialHandle = normalizeCreatorHandle(body.socialHandle);
   if (!token || !creatorId) return NextResponse.json({ ok: false, error: "Missing token or creatorId" }, { status: 400 });
+  if (!socialHandle) return NextResponse.json({ ok: false, error: "Missing social handle" }, { status: 400 });
 
   const { data: invite } = await supabase
     .from("creator_invites")
@@ -59,9 +61,12 @@ export async function POST(req: Request) {
   if (!invite) return NextResponse.json({ ok: false, error: "Invalid invite" }, { status: 404 });
   if (invite.status === "revoked") return NextResponse.json({ ok: false, error: "Invite revoked" }, { status: 410 });
 
-  const profileUpdate: Record<string, unknown> = { account_type: "creator" };
+  const profileUpdate: Record<string, unknown> = {
+    account_type: "creator",
+    onboarding_completed: true,
+    username: socialHandle,
+  };
   if (fullName) profileUpdate.full_name = fullName;
-  if (socialHandle) profileUpdate.username = socialHandle;
   const { error: profErr } = await supabase
     .from("profiles")
     .update(profileUpdate)
@@ -81,7 +86,7 @@ export async function POST(req: Request) {
     );
   if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });
 
-  const handle = normalizeCreatorHandle(socialHandle);
+  const handle = socialHandle;
   let creatorRowId: string | null = null;
 
   if (handle) {
@@ -148,5 +153,10 @@ export async function POST(req: Request) {
     .update({ status: "used", used_at: new Date().toISOString(), used_by: creatorId })
     .eq("id", invite.id);
 
-  return NextResponse.json({ ok: true, brandId: invite.brand_id });
+  await syncCreatorRowsByProfileHandle(supabase, creatorId, {
+    username: socialHandle,
+    full_name: fullName || null,
+  });
+
+  return NextResponse.json({ ok: true, brandId: invite.brand_id, handle: socialHandle });
 }

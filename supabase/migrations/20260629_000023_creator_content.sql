@@ -1,4 +1,6 @@
--- Creator-uploaded content visible to brands in Manage creators.
+-- Creator-uploaded content (dashboard créateur → visible dans Gérer).
+-- À lancer une fois dans Supabase : SQL Editor → New query → Run.
+
 create table if not exists public.creator_content (
   id uuid primary key default gen_random_uuid(),
   brand_id uuid not null references public.profiles(id) on delete cascade,
@@ -21,27 +23,35 @@ create index if not exists creator_content_creator_user_idx
 
 alter table public.creator_content enable row level security;
 
--- Brands read content for their workspace via service role APIs; creators read own uploads.
+-- CREATE POLICY ne supporte pas IF NOT EXISTS → drop puis create (idempotent).
+drop policy if exists "Creators can read own content rows" on public.creator_content;
 create policy "Creators can read own content rows"
   on public.creator_content for select
   using (auth.uid() = creator_user_id);
 
+drop policy if exists "Creators can insert own content rows" on public.creator_content;
 create policy "Creators can insert own content rows"
   on public.creator_content for insert
   with check (auth.uid() = creator_user_id);
 
+drop policy if exists "Creators can delete own content rows" on public.creator_content;
 create policy "Creators can delete own content rows"
   on public.creator_content for delete
   using (auth.uid() = creator_user_id);
 
+grant select, insert, delete on public.creator_content to authenticated;
+
+-- Bucket Storage pour les fichiers (images / vidéos).
 insert into storage.buckets (id, name, public)
 values ('creator-content', 'creator-content', true)
 on conflict (id) do update set public = excluded.public;
 
+drop policy if exists "Creator content files are publicly readable" on storage.objects;
 create policy "Creator content files are publicly readable"
   on storage.objects for select
   using (bucket_id = 'creator-content');
 
+drop policy if exists "Creators can upload creator content" on storage.objects;
 create policy "Creators can upload creator content"
   on storage.objects for insert
   with check (
@@ -49,6 +59,7 @@ create policy "Creators can upload creator content"
     and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
 
+drop policy if exists "Creators can update own creator content files" on storage.objects;
 create policy "Creators can update own creator content files"
   on storage.objects for update
   using (
@@ -56,6 +67,7 @@ create policy "Creators can update own creator content files"
     and (string_to_array(name, '/'))[1] = auth.uid()::text
   );
 
+drop policy if exists "Creators can delete own creator content files" on storage.objects;
 create policy "Creators can delete own creator content files"
   on storage.objects for delete
   using (

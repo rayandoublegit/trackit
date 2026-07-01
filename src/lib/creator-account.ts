@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   CREATOR_DASHBOARD_ACCESS_STATUSES,
   CREATOR_LINK_STATUS,
+  type CreatorLinkStatus,
 } from "@/lib/creator-dashboard-access";
 
 export type CreatorManagedRow = {
@@ -77,16 +78,28 @@ export async function ensureCreatorRowForBrandLink(
   );
   if (linkedList[0]) return linkedList[0];
 
-  const handle =
-    normalizeCreatorHandle(profile.username) ||
+  const handle = normalizeCreatorHandle(profile.username);
+  if (handle) {
+    const onBrand = await selectCreatorRows((select) =>
+      supabase.from("creators").select(select).eq("user_id", brandId),
+    );
+    const match = onBrand.find((row) => normalizeCreatorHandle(row.handle) === handle);
+    if (match && (!match.linked_user_id || match.linked_user_id === userId)) {
+      await supabase.from("creators").update({ linked_user_id: userId, handle }).eq("id", match.id);
+      return { ...match, linked_user_id: userId, handle };
+    }
+  }
+
+  const fallbackHandle =
+    handle ||
     `u_${userId.replace(/-/g, "").slice(0, 12)}`;
 
   const { data: inserted, error } = await supabase
     .from("creators")
     .insert({
       user_id: brandId,
-      handle,
-      full_name: profile.full_name || handle,
+      handle: fallbackHandle,
+      full_name: profile.full_name || fallbackHandle,
       linked_user_id: userId,
       platform: "tiktok",
       commission_rate: 10,
@@ -103,7 +116,231 @@ export async function ensureCreatorRowForBrandLink(
   return retryList[0] ?? null;
 }
 
+/**
+ * Relie le créateur aux fiches marque via le pseudo onboarding (profiles.username).
+ * Même pseudo normalisé côté compte et côté marque → upload & dashboard OK.
+ */
+export async function syncCreatorRowsByProfileHandle(
+  supabase: SupabaseClient,
+  userId: string,
+  profile?: { username: string | null; full_name: string | null } | null,
+): Promise<void> {
+  let profileRow = profile;
+  if (!profileRow) {
+    const { data } = await supabase
+      .from("profiles")
+      .select("username, full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    profileRow = data;
+  }
+
+  const handle = normalizeCreatorHandle(profileRow?.username);
+  if (!handle) return;
+
+  if (profileRow?.username && profileRow.username !== handle) {
+    await supabase.from("profiles").update({ username: handle }).eq("id", userId);
+  }
+
+  const links = await fetchCreatorLinksForUser(supabase, userId);
+  const brandIds = new Set<string>();
+
+  for (const link of links) {
+    if (isBrandBlocked(links, link.brand_id)) continue;
+    if ((CREATOR_DASHBOARD_ACCESS_STATUSES as readonly string[]).includes(link.status)) {
+      brandIds.add(link.brand_id);
+    }
+  }
+
+  const alreadyLinked = await selectCreatorRows((cols) =>
+    supabase.from("creators").select(cols).eq("linked_user_id", userId),
+  );
+  for (const row of alreadyLinked) {
+    if (!isBrandBlocked(links, row.user_id)) brandIds.add(row.user_id);
+  }
+
+  for (const brandId of brandIds) {
+    const brandRows = await selectCreatorRows((cols) =>
+      supabase.from("creators").select(cols).eq("user_id", brandId),
+    );
+
+    const byHandle = brandRows.filter((r) => normalizeCreatorHandle(r.handle) === handle);
+    const owned = byHandle.find((r) => !r.linked_user_id || r.linked_user_id === userId)
+      ?? brandRows.find((r) => r.linked_user_id === userId)
+      ?? null;
+
+    if (owned) {
+      const patch: Record<string, unknown> = {};
+      if (owned.linked_user_id !== userId) patch.linked_user_id = userId;
+      if (normalizeCreatorHandle(owned.handle) !== handle) patch.handle = handle;
+      if (Object.keys(patch).length) {
+        await supabase.from("creators").update(patch).eq("id", owned.id);
+      }
+      if (!links.some((l) => l.brand_id === brandId)) {
+        await ensureCreatorLinkRecord(supabase, userId, brandId, CREATOR_LINK_STATUS.pendingReview);
+      }
+      continue;
+    }
+
+    const takenByOther = byHandle.some((r) => r.linked_user_id && r.linked_user_id !== userId);
+    if (takenByOther) continue;
+
+    if (hasBrandAccessLink(links, brandId) || alreadyLinked.some((r) => r.user_id === brandId)) {
+      await supabase.from("creators").insert({
+        user_id: brandId,
+        handle,
+        full_name: profileRow?.full_name || handle,
+        linked_user_id: userId,
+        platform: "tiktok",
+        commission_rate: 10,
+        needs_review: true,
+      });
+      if (!links.some((l) => l.brand_id === brandId)) {
+        await ensureCreatorLinkRecord(supabase, userId, brandId, CREATOR_LINK_STATUS.pendingReview);
+      }
+    }
+  }
+}
+
 export type CreatorUploadTarget = { brandId: string; creatorRowId: string };
+
+export type CreatorBrandMembership = {
+  brandId: string;
+  brandName: string;
+  creatorRowId: string;
+  creatorHandle: string | null;
+  linkStatus: CreatorLinkStatus | "legacy";
+  handleMatched: boolean;
+};
+
+type CreatorLinkRow = { brand_id: string; status: string };
+
+async function fetchCreatorLinksForUser(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<CreatorLinkRow[]> {
+  const { data, error } = await supabase
+    .from("creator_links")
+    .select("brand_id, status")
+    .eq("creator_id", userId);
+  if (error) return [];
+  return (data ?? []).map((l) => ({ brand_id: String(l.brand_id), status: String(l.status) }));
+}
+
+function isBrandBlocked(links: CreatorLinkRow[], brandId: string): boolean {
+  const link = links.find((l) => l.brand_id === brandId);
+  return (
+    link?.status === CREATOR_LINK_STATUS.revoked || link?.status === CREATOR_LINK_STATUS.ignored
+  );
+}
+
+function hasBrandAccessLink(links: CreatorLinkRow[], brandId: string): boolean {
+  const link = links.find((l) => l.brand_id === brandId);
+  if (!link) return false;
+  return (CREATOR_DASHBOARD_ACCESS_STATUSES as readonly string[]).includes(link.status);
+}
+
+function filterAccessibleCreatorRows(
+  rows: CreatorManagedRow[],
+  userId: string,
+  links: CreatorLinkRow[],
+  handle: string,
+): CreatorManagedRow[] {
+  return dedupeCreatorRows(rows).filter((row) => {
+    if (isBrandBlocked(links, row.user_id)) return false;
+    if (row.linked_user_id === userId) return true;
+    if (hasBrandAccessLink(links, row.user_id)) return true;
+    if (handle && normalizeCreatorHandle(row.handle) === handle) {
+      if (row.linked_user_id && row.linked_user_id !== userId) return false;
+      if (!row.linked_user_id || row.linked_user_id === userId) return true;
+    }
+    return false;
+  });
+}
+
+async function ensureCreatorLinkRecord(
+  supabase: SupabaseClient,
+  userId: string,
+  brandId: string,
+  status: CreatorLinkStatus = CREATOR_LINK_STATUS.pendingReview,
+): Promise<void> {
+  await supabase.from("creator_links").upsert(
+    { creator_id: userId, brand_id: brandId, status },
+    { onConflict: "creator_id,brand_id", ignoreDuplicates: true },
+  );
+}
+
+async function reconcileCreatorBrandRows(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: CreatorManagedRow[],
+  links: CreatorLinkRow[],
+  handle: string,
+): Promise<CreatorManagedRow[]> {
+  const updated = [...rows];
+  for (const row of updated) {
+    if (isBrandBlocked(links, row.user_id)) continue;
+
+    const rowHandle = normalizeCreatorHandle(row.handle);
+    const handleMatch = Boolean(handle && rowHandle === handle);
+    const shouldOwn = row.linked_user_id === userId || handleMatch || hasBrandAccessLink(links, row.user_id);
+
+    if (shouldOwn && row.linked_user_id !== userId) {
+      await supabase.from("creators").update({ linked_user_id: userId }).eq("id", row.id);
+      row.linked_user_id = userId;
+    }
+
+    if (row.linked_user_id === userId && !links.some((l) => l.brand_id === row.user_id)) {
+      await ensureCreatorLinkRecord(supabase, userId, row.user_id, CREATOR_LINK_STATUS.pendingReview);
+    }
+  }
+  return updated;
+}
+
+/** Brands a creator belongs to (for settings + content upload). */
+export async function listCreatorBrandMemberships(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ profile: { username: string | null; full_name: string | null } | null; brands: CreatorBrandMembership[] }> {
+  const { profile, rows } = await findCreatorRowsForProfile(supabase, userId);
+  if (rows.length === 0) {
+    return { profile, brands: [] };
+  }
+
+  const brandIds = [...new Set(rows.map((r) => r.user_id))];
+  const { data: brandProfiles } = await supabase
+    .from("profiles")
+    .select("id, business_name, full_name, username")
+    .in("id", brandIds);
+
+  const links = await fetchCreatorLinksForUser(supabase, userId);
+  const handle = normalizeCreatorHandle(profile?.username);
+
+  const nameById = new Map(
+    (brandProfiles ?? []).map((b) => [
+      b.id,
+      b.business_name || b.full_name || (b.username ? `@${b.username}` : "Marque"),
+    ]),
+  );
+
+  const brands: CreatorBrandMembership[] = rows.map((row) => {
+    const link = links.find((l) => l.brand_id === row.user_id);
+    const linkStatus: CreatorBrandMembership["linkStatus"] =
+      link && (CREATOR_DASHBOARD_ACCESS_STATUSES as readonly string[]).includes(link.status)
+        ? (link.status as CreatorLinkStatus)
+        : "legacy";
+    return {
+      brandId: row.user_id,
+      brandName: nameById.get(row.user_id) || "Marque",
+      creatorRowId: row.id,
+      creatorHandle: row.handle,
+      linkStatus,
+      handleMatched: Boolean(handle && normalizeCreatorHandle(row.handle) === handle),
+    };
+  });
+
+  return { profile, brands };
+}
 
 /** Resolve (and if needed create) the creators row used for content upload. */
 export async function resolveCreatorUploadTarget(
@@ -164,25 +401,40 @@ export async function findCreatorRowsForProfile(
 
   let profile = profileRow;
 
+  if (profile?.username) {
+    await syncCreatorRowsByProfileHandle(supabase, userId, profile);
+    const { data: refreshed } = await supabase
+      .from("profiles")
+      .select("username, full_name, account_type")
+      .eq("id", userId)
+      .maybeSingle();
+    if (refreshed) profile = refreshed;
+  }
+
   const found: CreatorManagedRow[] = [];
+
+  const allLinks = await fetchCreatorLinksForUser(supabase, userId);
+  const accessBrandIds = [
+    ...new Set(
+      allLinks
+        .filter((l) => (CREATOR_DASHBOARD_ACCESS_STATUSES as readonly string[]).includes(l.status))
+        .map((l) => l.brand_id),
+    ),
+  ];
+  const brandIds = accessBrandIds;
+  const hasActiveBrandLinks = brandIds.length > 0;
 
   const linkedRows = await selectCreatorRows((cols) =>
     supabase.from("creators").select(cols).eq("linked_user_id", userId),
   );
   if (linkedRows.length) found.push(...linkedRows);
 
-  const { data: brandLinks } = await supabase
-    .from("creator_links")
-    .select("brand_id, status")
-    .eq("creator_id", userId)
-    .in("status", [...CREATOR_DASHBOARD_ACCESS_STATUSES]);
-
-  const brandIds = [...new Set((brandLinks || []).map((l) => String(l.brand_id)).filter(Boolean))];
-  const hasActiveBrandLinks = brandIds.length > 0;
-
   if (!profile) {
-    const allowed = new Set(brandIds);
-    return { profile: null, rows: dedupeCreatorRows(found.filter((r) => allowed.has(r.user_id))) };
+    const reconciled = await reconcileCreatorBrandRows(supabase, userId, found, allLinks, "");
+    return {
+      profile: null,
+      rows: filterAccessibleCreatorRows(reconciled, userId, allLinks, ""),
+    };
   }
 
   if (profile.account_type !== "creator" && (hasActiveBrandLinks || found.length > 0)) {
@@ -191,8 +443,22 @@ export async function findCreatorRowsForProfile(
   }
 
   if (profile.account_type !== "creator") {
-    const allowed = new Set(brandIds);
-    return { profile, rows: dedupeCreatorRows(found.filter((r) => allowed.has(r.user_id))) };
+    const handleEarly = normalizeCreatorHandle(profile.username);
+    if (handleEarly) {
+      const handleRows = await selectCreatorRows((cols) =>
+        supabase.from("creators").select(cols).ilike("handle", handleEarly),
+      );
+      for (const row of handleRows) {
+        if (normalizeCreatorHandle(row.handle) === handleEarly && !found.some((f) => f.id === row.id)) {
+          found.push(row);
+        }
+      }
+    }
+    const reconciled = await reconcileCreatorBrandRows(supabase, userId, found, allLinks, handleEarly);
+    return {
+      profile,
+      rows: filterAccessibleCreatorRows(reconciled, userId, allLinks, handleEarly),
+    };
   }
 
   const handle = normalizeCreatorHandle(profile.username);
@@ -242,32 +508,31 @@ export async function findCreatorRowsForProfile(
   }
 
   if (found.length === 0 && handle) {
-    const { data: allLinks } = await supabase
-      .from("creator_links")
-      .select("brand_id, status")
-      .eq("creator_id", userId);
-    const allowedBrands = new Set(
-      (allLinks ?? [])
-        .filter((l) => (CREATOR_DASHBOARD_ACCESS_STATUSES as readonly string[]).includes(String(l.status)))
-        .map((l) => String(l.brand_id)),
-    );
     const handleRows = await selectCreatorRows((cols) =>
       supabase.from("creators").select(cols).ilike("handle", handle),
     );
     const exact = handleRows.filter((row) => normalizeCreatorHandle(row.handle) === handle);
     for (const row of exact) {
-      if (!allowedBrands.has(row.user_id)) continue;
+      if (isBrandBlocked(allLinks, row.user_id)) continue;
+      if (row.linked_user_id && row.linked_user_id !== userId) continue;
       found.push(row);
-      if (!row.linked_user_id) {
-        await supabase.from("creators").update({ linked_user_id: userId }).eq("id", row.id);
-      }
+    }
+  } else if (handle) {
+    const handleRows = await selectCreatorRows((cols) =>
+      supabase.from("creators").select(cols).ilike("handle", handle),
+    );
+    for (const row of handleRows) {
+      if (normalizeCreatorHandle(row.handle) !== handle) continue;
+      if (isBrandBlocked(allLinks, row.user_id)) continue;
+      if (row.linked_user_id && row.linked_user_id !== userId) continue;
+      if (!found.some((f) => f.id === row.id)) found.push(row);
     }
   }
 
-  const allowedBrandIds = new Set(brandIds);
-  const filtered = found.filter((row) => allowedBrandIds.has(row.user_id));
+  const reconciled = await reconcileCreatorBrandRows(supabase, userId, found, allLinks, handle);
+  const filtered = filterAccessibleCreatorRows(reconciled, userId, allLinks, handle);
 
-  return { profile, rows: dedupeCreatorRows(filtered) };
+  return { profile, rows: filtered };
 }
 
 async function fetchSalesForCreator(
