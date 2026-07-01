@@ -113,6 +113,9 @@ export function metricsFromRow(
 }
 
 export function emailFromRow(snapshot: Record<string, unknown> | null | undefined): string {
+  if (snapshot && typeof snapshot.accountEmail === "string" && snapshot.accountEmail.trim()) {
+    return snapshot.accountEmail.trim();
+  }
   if (snapshot && typeof snapshot.email === "string" && snapshot.email.trim()) {
     return snapshot.email.trim();
   }

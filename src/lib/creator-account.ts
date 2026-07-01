@@ -26,6 +26,52 @@ function dedupeCreatorRows(rows: CreatorManagedRow[]): CreatorManagedRow[] {
   });
 }
 
+const CREATOR_ROW_SELECT =
+  "id, user_id, balance, total_earned, total_sales, commission_rate, discount_code, handle, full_name, linked_user_id";
+
+async function ensureCreatorRowForBrandLink(
+  supabase: SupabaseClient,
+  brandId: string,
+  userId: string,
+  profile: { username: string | null; full_name: string | null },
+): Promise<CreatorManagedRow | null> {
+  const { data: linked } = await supabase
+    .from("creators")
+    .select(CREATOR_ROW_SELECT)
+    .eq("user_id", brandId)
+    .eq("linked_user_id", userId)
+    .maybeSingle();
+  if (linked) return linked as CreatorManagedRow;
+
+  const handle =
+    normalizeCreatorHandle(profile.username) ||
+    `u_${userId.replace(/-/g, "").slice(0, 12)}`;
+
+  const { data: inserted, error } = await supabase
+    .from("creators")
+    .insert({
+      user_id: brandId,
+      handle,
+      full_name: profile.full_name || handle,
+      linked_user_id: userId,
+      platform: "tiktok",
+      commission_rate: 10,
+      needs_review: true,
+    })
+    .select(CREATOR_ROW_SELECT)
+    .single();
+
+  if (!error && inserted) return inserted as CreatorManagedRow;
+
+  const { data: retry } = await supabase
+    .from("creators")
+    .select(CREATOR_ROW_SELECT)
+    .eq("user_id", brandId)
+    .eq("linked_user_id", userId)
+    .maybeSingle();
+  return (retry as CreatorManagedRow) || null;
+}
+
 export async function findCreatorRowsForProfile(
   supabase: SupabaseClient,
   userId: string,
@@ -40,8 +86,7 @@ export async function findCreatorRowsForProfile(
     return { profile, rows: [] };
   }
 
-  const select =
-    "id, user_id, balance, total_earned, total_sales, commission_rate, discount_code, handle, full_name, linked_user_id";
+  const select = CREATOR_ROW_SELECT;
 
   const found: CreatorManagedRow[] = [];
 
@@ -87,6 +132,13 @@ export async function findCreatorRowsForProfile(
         if (!found.some((f) => f.id === row.id)) {
           found.push(row);
           await supabase.from("creators").update({ linked_user_id: userId }).eq("id", row.id);
+        }
+      }
+
+      if (!found.some((f) => f.user_id === brandId)) {
+        const ensured = await ensureCreatorRowForBrandLink(supabase, brandId, userId, profile);
+        if (ensured && !found.some((f) => f.id === ensured.id)) {
+          found.push(ensured);
         }
       }
     }

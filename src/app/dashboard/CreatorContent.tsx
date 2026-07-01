@@ -58,10 +58,10 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = async (): Promise<BrandOption[]> => {
     if (!userId) {
       setLoading(false);
-      return;
+      return [];
     }
     try {
       const res = await fetch(`/api/creator/content?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
@@ -74,13 +74,13 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         setItems(data.items ?? []);
         const nextBrands = data.brands ?? [];
         setBrands(nextBrands);
-        if (!brandId && nextBrands.length > 0) {
-          setBrandId(nextBrands[0].id);
-        }
+        setBrandId((current) => current || (nextBrands[0]?.id ?? ""));
+        return nextBrands;
       }
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
   useEffect(() => {
@@ -91,7 +91,6 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     return () => window.removeEventListener("trackit:content-updated", onUpdated);
   }, [userId]);
 
-  const selectedBrand = brands.find((b) => b.id === brandId) ?? null;
 
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
@@ -101,10 +100,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   };
 
   const uploadAll = async () => {
-    if (!userId || !selectedBrand?.creatorRowId) {
-      setError(lang === "fr" ? "Aucune marque liée." : "No linked brand.");
-      return;
-    }
+    if (!userId) return;
     if (!pendingFiles.length) {
       setError(lang === "fr" ? "Ajoutez au moins un fichier." : "Add at least one file.");
       return;
@@ -114,6 +110,33 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       return;
     }
 
+    let brandList = brands;
+    if (!brandList.length) {
+      brandList = await load();
+    }
+    const brand = brandList.find((b) => b.id === brandId) ?? brandList[0] ?? null;
+    if (!brand?.id || !brand.creatorRowId) {
+      const refreshed = await load();
+      const resolved = refreshed.find((b) => b.id === (brandId || refreshed[0]?.id)) ?? refreshed[0];
+      if (!resolved?.creatorRowId) {
+        setError(
+          lang === "fr"
+            ? "Impossible de lier votre compte à la marque. Réessayez dans quelques secondes."
+            : "Could not link your account to the brand. Try again in a few seconds.",
+        );
+        return;
+      }
+      if (!brandId && resolved.id) setBrandId(resolved.id);
+      await uploadWithBrand(resolved);
+      return;
+    }
+    await uploadWithBrand(brand);
+  };
+
+  const uploadWithBrand = async (brand: BrandOption) => {
+    if (!userId || !brand.creatorRowId || !supabase) return;
+    const creatorRowId = brand.creatorRowId;
+
     setUploading(true);
     setError(null);
     setSuccess(null);
@@ -121,8 +144,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     try {
       let uploaded = 0;
       for (const file of pendingFiles) {
-        const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
-        const path = `${userId}/${selectedBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
+        const path = `${userId}/${brand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
           .upload(path, file, { upsert: false, contentType: file.type || undefined });
@@ -136,8 +158,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId,
-            brandId: selectedBrand.id,
-            creatorRowId: selectedBrand.creatorRowId,
+            brandId: brand.id,
+            creatorRowId,
             title: itemTitle,
             notes: notes.trim() || null,
             fileUrl: pub.publicUrl,
@@ -225,26 +247,14 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       </div>
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 960 }}>
-        {brands.length === 0 && !loading ? (
-          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>
-              {lang === "fr" ? "Aucune marque liée" : "No linked brand"}
-            </div>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, lineHeight: 1.5 }}>
-              {lang === "fr"
-                ? "Votre compte créateur doit être relié à une marque avant d'envoyer du contenu."
-                : "Your creator account must be linked to a brand before you can upload content."}
-            </p>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-              gap: isMobile ? 28 : 40,
-              alignItems: "start",
-            }}
-          >
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? 28 : 40,
+            alignItems: "start",
+          }}
+        >
             <div
               onDragOver={(e) => {
                 e.preventDefault();
@@ -406,7 +416,6 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               </button>
             </div>
           </div>
-        )}
 
         <div style={{ marginTop: 40 }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px" }}>

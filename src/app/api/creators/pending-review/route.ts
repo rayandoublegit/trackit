@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { accountEmailForLinkedUser } from "@/lib/linked-creator-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,7 @@ async function syncCreatorToDiscoverySaved(brandId: string, creator: CreatorRow)
   const avatarUrl = creator.avatar_url ?? "";
   const commissionRate = creator.commission_rate ?? 10;
   const promoCode = creator.discount_code?.trim() ?? "";
+  const accountEmail = await accountEmailForLinkedUser(admin, creator.linked_user_id);
 
   const snapshot: Record<string, unknown> = {
     ...prevSnap,
@@ -62,6 +64,7 @@ async function syncCreatorToDiscoverySaved(brandId: string, creator: CreatorRow)
     commissionRate,
     trackitCreatorId: creator.id,
     linkedUserId: creator.linked_user_id,
+    ...(accountEmail ? { accountEmail } : {}),
     crm: {
       ...prevCrm,
       ...(promoCode ? { promoCode } : {}),

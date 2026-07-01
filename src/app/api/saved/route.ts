@@ -6,6 +6,10 @@ import { getMaxManagedCreators, normalizePlan, type PlanTier } from "@/lib/plan-
 import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
 import { commissionRateFromDiscoverySnapshot } from "@/lib/managed-creator-commission";
 import { applyDiscountCodeToCreator, ensureCreatorForHandle } from "@/lib/creator-promo-codes";
+import {
+  enrichSavedRowsWithAccountEmails,
+  fetchLinkedCreatorEmailsByHandle,
+} from "@/lib/linked-creator-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +30,9 @@ export async function GET(request: NextRequest) {
   if (status) q = q.eq("pipeline_status", status);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ rows: data ?? [] });
+  const rows = data ?? [];
+  const emailByHandle = await fetchLinkedCreatorEmailsByHandle(admin, userId);
+  return NextResponse.json({ rows: enrichSavedRowsWithAccountEmails(rows, emailByHandle) });
 }
 
 export async function POST(request: NextRequest) {
