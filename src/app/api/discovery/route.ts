@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
+import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     const mapRow = (c: any) => ({
       username: c.username,
       displayName: c.display_name,
-      avatarUrl: c.avatar_url,
+      avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
       followersCount: c.followers,
       engagementRate: Number(c.engagement_rate ?? 0),
       engagementByFollower: Number(c.engagement_by_follower ?? 0),

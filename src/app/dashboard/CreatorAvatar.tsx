@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCachedAvatarUrl, isPersistableAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
-import { normalizeCreatorHandle } from "@/lib/creator-avatar";
+import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
 import {
   creatorAvatarApiUrl,
   feedAvatarUrlForCreator,
@@ -27,7 +27,7 @@ function resolveDisplaySrc(username: string, src?: string | null): string {
   return feedAvatarUrlForCreator(username, src);
 }
 
-function resolveInitialSrc(displaySrc: string, username: string): string {
+function resolveTargetSrc(displaySrc: string, username: string): string {
   const cached = username ? getCachedAvatarUrl(username) : null;
   if (cached && isStableAvatarStorageUrl(cached)) return cached;
   if (displaySrc) return displaySrc;
@@ -61,19 +61,18 @@ export function CreatorAvatar({
   );
 
   const targetSrc = useMemo(
-    () => resolveInitialSrc(displaySrc, resolvedUsername),
+    () => resolveTargetSrc(displaySrc, resolvedUsername),
     [displaySrc, resolvedUsername],
   );
 
-  const [imgSrc, setImgSrc] = useState(targetSrc);
-  const [showFallback, setShowFallback] = useState(!targetSrc);
+  const [overrideSrc, setOverrideSrc] = useState<string | null>(null);
   const failStepRef = useRef(0);
+  const activeSrc = overrideSrc ?? targetSrc;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     failStepRef.current = 0;
-    setImgSrc(targetSrc);
-    setShowFallback(!targetSrc);
-  }, [targetSrc, resolvedUsername]);
+    setOverrideSrc(null);
+  }, [resolvedUsername, displaySrc, targetSrc]);
 
   const onError = useCallback(() => {
     const step = failStepRef.current;
@@ -81,28 +80,25 @@ export function CreatorAvatar({
 
     if (step === 0 && resolvedUsername) {
       const api = creatorAvatarApiUrl(resolvedUsername);
-      if (api && imgSrc !== api) {
-        setImgSrc(api);
-        setShowFallback(false);
+      if (api && activeSrc !== api) {
+        setOverrideSrc(api);
         return;
       }
     }
-    if (step === 1 && displaySrc && displaySrc !== imgSrc) {
-      setImgSrc(displaySrc);
-      setShowFallback(false);
+    if (step === 1 && displaySrc && displaySrc !== activeSrc) {
+      setOverrideSrc(displaySrc);
       return;
     }
-    setShowFallback(true);
-  }, [displaySrc, imgSrc, resolvedUsername]);
+    setOverrideSrc("");
+  }, [activeSrc, displaySrc, resolvedUsername]);
 
   const onLoad = useCallback(() => {
-    if (resolvedUsername && imgSrc && isPersistableAvatarUrl(imgSrc)) {
-      setCachedAvatarUrl(resolvedUsername, imgSrc);
+    if (resolvedUsername && activeSrc && isPersistableAvatarUrl(activeSrc)) {
+      setCachedAvatarUrl(resolvedUsername, activeSrc);
     }
-    setShowFallback(false);
-  }, [imgSrc, resolvedUsername]);
+  }, [activeSrc, resolvedUsername]);
 
-  if (showFallback || !imgSrc) {
+  if (!activeSrc) {
     return (
       <div
         style={{
@@ -125,8 +121,8 @@ export function CreatorAvatar({
 
   return (
     <img
-      key={resolvedUsername}
-      src={imgSrc}
+      key={`${resolvedUsername}:${activeSrc}`}
+      src={activeSrc}
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
       height={size}
@@ -145,4 +141,13 @@ export function CreatorAvatar({
       onError={onError}
     />
   );
+}
+
+/** Pick the best avatar when merging feed + API rows (drawer refresh). */
+export function mergeCreatorAvatarSrc(
+  username: string,
+  ...candidates: Array<string | null | undefined>
+): string {
+  const best = pickBestCreatorAvatar(...candidates);
+  return feedAvatarUrlForCreator(username, best);
 }

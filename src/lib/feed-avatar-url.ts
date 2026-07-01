@@ -1,14 +1,9 @@
 import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
-import { isTikTokCdnUrl, isUiAvatarsUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { clientImageUrl, isStablePublicImageUrl } from "@/lib/client-image-url";
+import { isTikTokCdnUrl, isUiAvatarsUrl } from "@/lib/tiktok-avatar";
 
 export function isStableAvatarStorageUrl(url: string): boolean {
-  if (!url || isUiAvatarsUrl(url)) return false;
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return host.includes("supabase.co") || url.includes("/storage/v1/object/public/");
-  } catch {
-    return false;
-  }
+  return isStablePublicImageUrl(url);
 }
 
 export function creatorAvatarApiUrl(username: string): string {
@@ -29,7 +24,7 @@ export function feedAvatarUrlForCreator(username: string, rawAvatar?: string | n
   if (clean) {
     if (isStableAvatarStorageUrl(clean)) return clean;
     if (isTikTokCdnUrl(clean) && api) return api;
-    const proxied = proxiedImageUrl(clean);
+    const proxied = clientImageUrl(clean);
     if (proxied && !proxied.includes("/api/creator-avatar")) return proxied;
     if (!isUiAvatarsUrl(clean) && !isTikTokCdnUrl(clean)) return clean;
   }

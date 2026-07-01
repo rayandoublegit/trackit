@@ -22,7 +22,7 @@ import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
-import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
+import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 function fmt(n: number): string {
@@ -1189,8 +1189,13 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
 
   useEffect(() => {
     if (items.length === 0) return;
-    prefetchCreatorAvatars(
-      items.slice(0, 48).map((c) => ({ username: c.username, avatarUrl: c.avatarUrl })),
+    prefetchCreatorMedia(
+      items.slice(0, 48).map((c) => ({
+        username: c.username,
+        avatarUrl: c.avatarUrl,
+        topVideos: c.topVideos,
+        videoThumbnails: c.videoThumbnails,
+      })),
     );
   }, [items]);
 

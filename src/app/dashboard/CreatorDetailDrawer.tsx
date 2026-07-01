@@ -10,7 +10,8 @@ import {
   listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
 } from "@/lib/workspace-client";
 import type { ContentAnalysis } from "@/lib/creator-content-analysis";
-import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
+import { CreatorAvatar, mergeCreatorAvatarSrc } from "@/app/dashboard/CreatorAvatar";
+import { ProxiedImage } from "@/app/dashboard/ProxiedImage";
 import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
 import { discoveryCopy, daysAgoCopy, engagementInsightCopy } from "@/lib/discovery-copy";
 import type { Lang } from "@/lib/useLang";
@@ -240,21 +241,11 @@ function ContentAnalyticsPanel({ d, lang }: { d: CreatorDetail; lang: Lang }) {
 }
 
 function VideoCover({ cover, previewKey }: { cover: string; previewKey: string }) {
-  const [src, setSrc] = useState(cover);
-
-  useEffect(() => {
-    setSrc(cover);
-  }, [cover, previewKey]);
-
-  if (!src) return null;
-
   return (
-    <img
-      key={`${previewKey}:${src}`}
-      src={src}
+    <ProxiedImage
+      identity={previewKey}
+      src={cover}
       alt=""
-      draggable={false}
-      onError={() => setSrc("")}
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
     />
   );
@@ -412,6 +403,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
         setDetail((prev) => {
           if (!prev || prev.username !== handle) return remote;
           const merged = { ...prev, ...remote } as CreatorDetail;
+          merged.avatarUrl = mergeCreatorAvatarSrc(handle, remote.avatarUrl, prev.avatarUrl);
           // Keep feed previews only when the API row has none yet (same creator).
           if (!remote.topVideos?.length && prev.topVideos?.length) merged.topVideos = prev.topVideos;
           if (!remote.videoThumbnails?.length && prev.videoThumbnails?.length) merged.videoThumbnails = prev.videoThumbnails;

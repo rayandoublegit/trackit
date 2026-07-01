@@ -1,4 +1,5 @@
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
+import { clientImageUrl } from "@/lib/client-image-url";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
@@ -69,6 +70,18 @@ export function rankFeed(creators: DiscoveryCreatorResult[]): FeedCreator[] {
 let cache: { at: number; creators: FeedCreator[] } | null = null;
 const TTL_MS = 30 * 60 * 1000;
 
+function mapVideoThumbnails(raw: unknown): DiscoveryCreatorResult["videoThumbnails"] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((row) => {
+    const t = row as { views?: number; thumbnail?: string | null; url?: string | null };
+    return {
+      views: Number(t.views ?? 0),
+      thumbnail: clientImageUrl(t.thumbnail) || null,
+      url: t.url ?? null,
+    };
+  });
+}
+
 function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
   return {
     username: String(c.username), displayName: String(c.display_name ?? c.username),
@@ -82,7 +95,7 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
     bio: String(c.bio ?? ""), email: (c.email as string) ?? null, niche: String(c.primary_niche ?? ""),
     primaryNiche: String(c.primary_niche ?? ""), language: String(c.language ?? "unknown"),
     location: (c.location as string) ?? null, countryCode: (c.country_code as string) ?? null,
-    videoThumbnails: Array.isArray(c.video_thumbnails) ? (c.video_thumbnails as DiscoveryCreatorResult["videoThumbnails"]) : [],
+    videoThumbnails: mapVideoThumbnails(c.video_thumbnails),
     niches: Array.isArray(c.niches) ? (c.niches as string[]) : [],
   };
 }
@@ -219,7 +232,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   const tv = Array.isArray(c.top_videos) ? (c.top_videos as Record<string, unknown>[]) : [];
   const topVideos: FeedVideo[] = tv.slice(0, 6).map((v) => ({
     id: String(v.id ?? ""),
-    cover: String(v.cover ?? ""),
+    cover: clientImageUrl(String(v.cover ?? "")),
     shareUrl: String(v.shareUrl ?? ""),
     playCount: Number(v.playCount ?? 0),
   }));

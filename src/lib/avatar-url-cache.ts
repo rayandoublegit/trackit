@@ -135,3 +135,31 @@ export function prefetchCreatorAvatars(
     img.src = url;
   }
 }
+
+/** Prefetch avatars + video cover thumbnails for instant drawer previews. */
+export function prefetchCreatorMedia(
+  items: Array<{
+    username?: string | null;
+    avatarUrl?: string | null;
+    topVideos?: Array<{ cover?: string | null }>;
+    videoThumbnails?: Array<{ thumbnail?: string | null }>;
+  }>,
+  limit = 48,
+): void {
+  prefetchCreatorAvatars(items, limit);
+  if (typeof window === "undefined") return;
+  const seen = new Set<string>();
+  for (const item of items.slice(0, limit)) {
+    const urls = [
+      ...(item.topVideos ?? []).map((v) => v.cover?.trim() || ""),
+      ...(item.videoThumbnails ?? []).map((t) => t.thumbnail?.trim() || ""),
+    ];
+    for (const url of urls) {
+      if (!url || seen.has(url)) continue;
+      seen.add(url);
+      const img = new window.Image();
+      img.decoding = "async";
+      img.src = url;
+    }
+  }
+}

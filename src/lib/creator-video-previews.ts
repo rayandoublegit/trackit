@@ -1,5 +1,5 @@
 import { videoEmbedUrl } from "@/lib/creator-video";
-import { proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { clientImageUrl } from "@/lib/client-image-url";
 
 export type VideoPreview = {
   key: string;
@@ -11,11 +11,6 @@ export type VideoPreview = {
 type VideoThumb = { views?: number; thumbnail?: string | null; url?: string | null };
 type TopVideo = { id?: string; cover?: string; shareUrl?: string; playCount?: number };
 
-function proxiedCover(url?: string | null): string {
-  if (!url?.trim()) return "";
-  return proxiedImageUrl(url.trim()) || "";
-}
-
 /** Build deduped, proxied video previews for a creator (curated thumbs first, then top_videos). */
 export function buildCreatorVideoPreviews(
   username: string,
@@ -26,13 +21,14 @@ export function buildCreatorVideoPreviews(
   const seen = new Set<string>();
 
   const push = (item: { id?: string; cover: string; shareUrl?: string; views: number }) => {
-    const dedupe = item.id || item.shareUrl || item.cover;
+    const cover = clientImageUrl(item.cover);
+    const dedupe = item.id || item.shareUrl || cover;
     if (!dedupe || seen.has(dedupe)) return;
-    if (!item.cover && !item.shareUrl) return;
+    if (!cover && !item.shareUrl) return;
     seen.add(dedupe);
     out.push({
       key: `${username}:${item.id || item.shareUrl || out.length}`,
-      cover: proxiedCover(item.cover),
+      cover,
       views: item.views,
       embed: videoEmbedUrl({ id: item.id, shareUrl: item.shareUrl }),
     });

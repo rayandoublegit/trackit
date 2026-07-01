@@ -14,6 +14,7 @@ import {
   parseVideos,
 } from "@/lib/scrapecreators";
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
+import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import type { NormalizedFilters } from "@/lib/creator-discovery-filters";
 import { pickTikTokAvatarUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
@@ -119,7 +120,10 @@ async function enrichOne(u: SCSearchUser, niche: string): Promise<DiscoveryCreat
     const row = buildEnrichmentRow(username, { ...profile, followers }, videos);
     const bio = profile.bio || String(u.signature || "");
     const avatar =
-      proxied(pickAvatar(pRaw, u)) ||
+      feedAvatarUrlForCreator(
+        username,
+        proxied(pickAvatar(pRaw, u)) || pickAvatar(pRaw, u) || "",
+      ) ||
       `https://ui-avatars.com/api/?name=${encodeURIComponent(row.display_name || username)}&background=E8EEFC&color=0047FF&size=200&bold=true&rounded=true`;
     return {
       username,
