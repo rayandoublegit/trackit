@@ -5,7 +5,7 @@ import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { StripePriceMatrix } from "@/lib/stripe-config";
 import { useStripePrices } from "@/lib/use-stripe-prices";
 import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
@@ -244,13 +244,7 @@ export function PricingPlans({
       : "Same pricing as the website, with the live Stripe checkouts. Stay free or upgrade anytime.";
   const defaultTagline = lang === "fr" ? "Tarifs" : "Pricing";
   const defaultFreeCta =
-    plan === "free"
-      ? lang === "fr"
-        ? "Je préfère rester en free"
-        : "I'd rather stay free"
-      : lang === "fr"
-        ? "Je préfère rester en free"
-        : "I'd rather stay free";
+    plan === "free" ? freeStayAnywayCtaLabel(lang) : preferFreeCtaLabel(lang);
 
   const growthCta =
     paidCtaLabel ??
@@ -262,13 +256,7 @@ export function PricingPlans({
     paidCtaLabel ??
     planCtaLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, scaleAnnual);
 
-  const freeLabel =
-    freeCtaLabel ??
-    (plan === "free" && showCurrentPlanBadge
-      ? lang === "fr"
-        ? "Plan actuel"
-        : "Current plan"
-      : defaultFreeCta);
+  const freeLabel = freeCtaLabel ?? defaultFreeCta;
 
   const planDisplayName = marketingPlanDisplayName(plan, lang);
 
@@ -294,8 +282,14 @@ export function PricingPlans({
         )}
         {showCurrentPlanBadge && !loadingPlan && (
           <div style={{ marginTop: 14, fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-            {lang === "fr" ? "Plan actuel :" : "Current plan:"}{" "}
-            <strong style={{ color: "#1A1A1A" }}>{planDisplayName}</strong>
+            {plan === "free" ? (
+              <strong style={{ color: "#1A1A1A" }}>{freePlanBadgeLabel(lang)}</strong>
+            ) : (
+              <>
+                {lang === "fr" ? "Plan actuel :" : "Current plan:"}{" "}
+                <strong style={{ color: "#1A1A1A" }}>{planDisplayName}</strong>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -373,9 +367,7 @@ export function PricingPlans({
               style={
                 freeCtaDisabled
                   ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", transform: "none", transition: "none", cursor: "default", opacity: 0.6 }
-                  : plan === "free" && showCurrentPlanBadge && !freeCtaLabel
-                    ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", transform: "none", transition: "none", cursor: "default" }
-                    : undefined
+                  : undefined
               }
             >
               {freeLabel}

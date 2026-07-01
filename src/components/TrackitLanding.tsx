@@ -13,7 +13,7 @@ import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from 
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanMarketingFeatures, getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
-import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import { planCtaAction, planCtaLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
 
 const instrumentSerif = Instrument_Serif({
@@ -505,13 +505,9 @@ export default function TrackitLanding() {
 
   const freeCtaLabel =
     isLoggedIn && plan === "free"
-      ? lang === "fr"
-        ? "Plan actuel"
-        : "Current plan"
+      ? freeStayAnywayCtaLabel(lang)
       : isLoggedIn && plan !== "free"
-        ? lang === "fr"
-          ? "Je préfère rester en free"
-          : "I'd rather stay free"
+        ? preferFreeCtaLabel(lang)
         : t.pricing_free_cta;
 
   const handleCheckout = async (planKey: LandingPaidTier, annual?: boolean) => {

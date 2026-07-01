@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { PricingPlans } from "@/components/PricingPlans";
+import { freeStayAnywayCtaLabel } from "@/lib/pricing-cta";
 import {
   isSocialReferralSource,
   normalizeSocialHandle,
@@ -379,7 +380,7 @@ export default function OnboardingPage() {
                   : "Pick a plan to unlock all of Trackit, or continue for free — you can upgrade anytime."
               }
               showCurrentPlanBadge={false}
-              freeCtaLabel={lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free"}
+              freeCtaLabel={freeStayAnywayCtaLabel(lang)}
               paidCtaLabel={lang === "fr" ? "Commencer" : "Get Started"}
               userId={user.id}
               userEmail={user.email ?? undefined}
