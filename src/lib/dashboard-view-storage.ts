@@ -11,6 +11,7 @@ export const DASHBOARD_VIEWS = [
   "transactions",
   "invitations",
   "scripts",
+  "content",
   "analytics",
   "integrations",
   "notes",

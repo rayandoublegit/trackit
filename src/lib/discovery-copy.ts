@@ -263,6 +263,8 @@ export function discoveryCopy(lang: Lang) {
     colLabel: fr ? "Label" : "Label",
     colDocuments: fr ? "Documents" : "Documents",
     colScripts: fr ? "Script" : "Script",
+    colContent: fr ? "Content" : "Content",
+    viewContent: fr ? "Voir" : "View",
     uploadScript: fr ? "Ajouter" : "Add",
     scriptPanelBack: fr ? "Retour à la liste" : "Back to list",
     scriptPanelTitle: fr ? "Script créateur" : "Creator script",
@@ -283,6 +285,14 @@ export function discoveryCopy(lang: Lang) {
     scriptSavedBtn: fr ? "Enregistré" : "Saved",
     scriptError: fr ? "Impossible d'enregistrer le script." : "Could not save script.",
     scriptExisting: fr ? "Scripts existants" : "Existing scripts",
+    contentPanelBack: fr ? "Retour à la liste" : "Back to list",
+    contentPanelTitle: fr ? "Content créateur" : "Creator content",
+    contentPanelSubtitle: (name: string) =>
+      fr ? `Fichiers et vidéos envoyés par ${name}` : `Files and videos uploaded by ${name}`,
+    contentEmptyTitle: fr ? "Aucun contenu pour le moment" : "No content yet",
+    contentEmptySubtitle: fr
+      ? "Le créateur peut importer des vidéos et fichiers depuis son dashboard Content."
+      : "The creator can upload videos and files from their Content dashboard.",
     colNotes: fr ? "Notes" : "Notes",
     colBirthday: fr ? "Anniversaire" : "Birthday",
     colAddress: fr ? "Adresse" : "Address",

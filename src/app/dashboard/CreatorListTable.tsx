@@ -243,6 +243,43 @@ function EditableTextCell({
   );
 }
 
+function ContentCell({
+  content,
+  viewLabel,
+  onOpen,
+}: {
+  content: { id: string; title: string }[];
+  viewLabel: string;
+  onOpen: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={onOpen}
+        style={{
+          border: "1px solid #E5E5E5",
+          background: "#FFF",
+          borderRadius: 8,
+          padding: "6px 12px",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "#1A1A1A",
+        }}
+      >
+        {viewLabel}
+      </button>
+      {content.length > 0 && (
+        <span style={{ fontSize: 13, color: "#7A7A7A" }} title={content.map((s) => s.title).join(", ")}>
+          {content.length}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ScriptCell({
   scripts,
   addLabel,
@@ -276,55 +313,6 @@ function ScriptCell({
           {scripts.length}
         </span>
       )}
-    </div>
-  );
-}
-
-function DocumentsCell({
-  documents,
-  addLabel,
-  onAdd,
-}: {
-  documents: string[];
-  addLabel: string;
-  onAdd: (names: string[]) => void;
-}) {
-  const ref = useRef<HTMLInputElement>(null);
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={() => ref.current?.click()}
-        style={{
-          border: "1px solid #E5E5E5",
-          background: "#FFF",
-          borderRadius: 8,
-          padding: "6px 12px",
-          fontSize: 13,
-          fontWeight: 500,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          color: "#1A1A1A",
-        }}
-      >
-        + {addLabel}
-      </button>
-      {documents.length > 0 && (
-        <span style={{ fontSize: 13, color: "#7A7A7A" }} title={documents.join(", ")}>
-          {documents.length}
-        </span>
-      )}
-      <input
-        ref={ref}
-        type="file"
-        multiple
-        style={{ display: "none" }}
-        onChange={(e) => {
-          const names = Array.from(e.target.files ?? []).map((f) => f.name);
-          if (names.length) onAdd(names);
-          e.target.value = "";
-        }}
-      />
     </div>
   );
 }
@@ -508,6 +496,7 @@ export function CreatorListTable({
   onNotesChange,
   onCrmChange,
   onOpenScript,
+  onOpenContent,
   onDelete,
 }: {
   rows: SavedRow[];
@@ -518,6 +507,7 @@ export function CreatorListTable({
   onNotesChange: (username: string, notes: string) => void;
   onCrmChange: (username: string, patch: Partial<CreatorCrm>) => void;
   onOpenScript: (row: SavedRow) => void;
+  onOpenContent: (row: SavedRow) => void;
   onDelete: (username: string) => void;
 }) {
   const columns: { key: string; label: string; minWidth: number }[] = [
@@ -532,8 +522,8 @@ export function CreatorListTable({
     { key: "commission", label: t.colCommission, minWidth: 120 },
     { key: "promoCode", label: t.colPromoCode, minWidth: 130 },
     { key: "label", label: t.colLabel, minWidth: 120 },
-    { key: "documents", label: t.colDocuments, minWidth: 140 },
     { key: "scripts", label: t.colScripts, minWidth: 140 },
+    { key: "content", label: t.colContent, minWidth: 130 },
     { key: "notes", label: t.colNotes, minWidth: 180 },
     { key: "birthday", label: t.colBirthday, minWidth: 120 },
     { key: "address", label: t.colAddress, minWidth: 160 },
@@ -573,8 +563,8 @@ export function CreatorListTable({
             const email = emailFromRow(snap);
             const crm = crmFromSnapshot(snap);
             const metrics = metricsFromRow(snap, r.engagement_rate);
-            const docs = crm.documents ?? [];
             const scriptRefs = crm.scripts ?? [];
+            const contentRefs = crm.content ?? [];
             const convoEmail = email || crm.lastEmail;
 
             return (
@@ -666,17 +656,17 @@ export function CreatorListTable({
                   />
                 </td>
                 <td style={tdStyle}>
-                  <DocumentsCell
-                    documents={docs}
-                    addLabel={t.uploadDoc}
-                    onAdd={(names) => onCrmChange(r.creator_username, { documents: [...docs, ...names] })}
-                  />
-                </td>
-                <td style={tdStyle}>
                   <ScriptCell
                     scripts={scriptRefs}
                     addLabel={t.uploadScript}
                     onOpen={() => onOpenScript(r)}
+                  />
+                </td>
+                <td style={tdStyle}>
+                  <ContentCell
+                    content={contentRefs}
+                    viewLabel={t.viewContent}
+                    onOpen={() => onOpenContent(r)}
                   />
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>

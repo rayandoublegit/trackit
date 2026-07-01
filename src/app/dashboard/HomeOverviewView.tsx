@@ -390,9 +390,9 @@ function CreatorHomeOverview({
               onClick={() => onNavigate("scripts")}
             />
             <QuickAction
-              label={lang === "fr" ? "Analytiques" : "Analytics"}
-              description={lang === "fr" ? "Détail de vos ventes et performances." : "Detailed sales and performance."}
-              onClick={() => onNavigate("analytics")}
+              label="Content"
+              description={lang === "fr" ? "Envoyez vos vidéos et fichiers à la marque." : "Upload your videos and files to the brand."}
+              onClick={() => onNavigate("content")}
             />
           </div>
         </div>

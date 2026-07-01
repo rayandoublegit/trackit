@@ -3,6 +3,11 @@ export type CreatorScriptRef = {
   title: string;
 };
 
+export type CreatorContentRef = {
+  id: string;
+  title: string;
+};
+
 export type CreatorCrm = {
   promoCode?: string;
   label?: string;
@@ -14,6 +19,7 @@ export type CreatorCrm = {
   commissionRate?: number | null;
   documents?: string[];
   scripts?: CreatorScriptRef[];
+  content?: CreatorContentRef[];
 };
 
 export function parseCommissionRate(value: unknown): number | undefined {
@@ -76,6 +82,18 @@ export function crmFromSnapshot(snapshot: Record<string, unknown> | null | undef
             return { id, title };
           })
           .filter((s): s is CreatorScriptRef => s !== null)
+      : undefined,
+    content: Array.isArray(c.content)
+      ? c.content
+          .map((s) => {
+            if (!s || typeof s !== "object") return null;
+            const row = s as Record<string, unknown>;
+            const id = typeof row.id === "string" ? row.id : "";
+            const title = typeof row.title === "string" ? row.title : "";
+            if (!id || !title) return null;
+            return { id, title };
+          })
+          .filter((s): s is CreatorContentRef => s !== null)
       : undefined,
   };
 }

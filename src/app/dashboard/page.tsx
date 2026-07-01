@@ -34,6 +34,7 @@ import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CreatorScripts } from "./CreatorScripts";
+import { CreatorContent } from "./CreatorContent";
 import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
@@ -101,7 +102,7 @@ import {
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "notes", "payouts", "settings", "feedback"];
+const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "content", "notes", "payouts", "settings", "feedback"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -890,6 +891,9 @@ function DashboardPageContent() {
               />
             </div>
           )
+        )}
+        {view === "content" && user && isCreator && (
+          <CreatorContent userId={user.id} isMobile={isMobile} />
         )}
         {view === "analytics" && user && (
             <AnalyticsView
@@ -4466,7 +4470,15 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
       view: "scripts",
       section: "main",
       iconKey: "scripts",
-      keywords: ["scripts", "brief", "briefs", "content", "video"],
+      keywords: ["scripts", "brief", "briefs", "video"],
+    },
+    {
+      id: "content",
+      label: "Content",
+      view: "content",
+      section: "main",
+      iconKey: "content",
+      keywords: ["content", "upload", "video", "files", "livrables", "ugc"],
     },
     {
       id: "payouts",
@@ -4582,6 +4594,8 @@ function renderSidebarNavIcon(iconKey: string) {
       return <InviteIcon />;
     case "scripts":
       return <ScriptsIcon />;
+    case "content":
+      return <ContentIcon />;
     case "analytics":
       return <AnalyticsIcon />;
     case "integrations":
@@ -5070,6 +5084,7 @@ function MessageIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" 
 function PayoutIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="13" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 11h20" stroke="currentColor" strokeWidth="1.7"/><circle cx="17" cy="15" r="1.2" fill="currentColor"/></svg>; }
 function InviteIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M2 7l10 6 10-6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
 function ScriptsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>; }
+function ContentIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M10 10l5 3-5 3V10z" fill="currentColor"/><path d="M3 9h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }
 function AnalyticsIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7"/><path d="M12 3a9 9 0 019 9h-9V3z" fill="currentColor" opacity="0.25"/></svg>; }
 function IntegrationIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 3v6H3v6h6v6h6v-6h6V9h-6V3H9z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/></svg>; }
 function NotesIcon() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/><path d="M14 2v6h6M8 13h8M8 17h5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>; }

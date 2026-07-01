@@ -21,6 +21,7 @@ import {
 import { CreatorDetailDrawer } from "./CreatorDetailDrawer";
 import { CreatorImportPanel } from "./CreatorImportPanel";
 import { CreatorScriptPanel } from "./CreatorScriptPanel";
+import { CreatorContentBrandPanel } from "./CreatorContentBrandPanel";
 import { CreatorListTable } from "./CreatorListTable";
 import { emailFromRow, type CreatorCrm, crmFromSnapshot } from "@/lib/creator-crm";
 import { useLang } from "@/lib/useLang";
@@ -58,6 +59,57 @@ function trackitCreatorIdFromRow(row: SavedRow): string | undefined {
   const snap = row.snapshot as Record<string, unknown> | null;
   const id = snap?.trackitCreatorId;
   return typeof id === "string" && id.trim() ? id.trim() : undefined;
+}
+
+async function mergeContentIntoRows(rows: SavedRow[], brandId: string): Promise<SavedRow[]> {
+  try {
+    const contentRes = await fetch(`/api/content?brandId=${encodeURIComponent(brandId)}`, { cache: "no-store" });
+    const contentData = await contentRes.json();
+    const brandContent = Array.isArray(contentData?.items) ? contentData.items : [];
+    if (!brandContent.length) return rows;
+
+    const handleById = new Map<string, string>();
+    if (supabase) {
+      const { data: creatorRows } = await supabase.from("creators").select("id, handle").eq("user_id", brandId);
+      for (const c of creatorRows ?? []) {
+        if (c?.id && c?.handle) {
+          handleById.set(c.id, String(c.handle).replace(/^@+/, "").toLowerCase());
+        }
+      }
+    }
+
+    const contentByUsername = new Map<string, { id: string; title: string }[]>();
+    for (const item of brandContent) {
+      const creatorId = item.creator_row_id as string | null;
+      if (!creatorId) continue;
+      const username = handleById.get(creatorId);
+      if (!username) continue;
+      const list = contentByUsername.get(username) ?? [];
+      if (!list.some((entry) => entry.id === item.id)) {
+        list.push({ id: item.id, title: String(item.title) });
+      }
+      contentByUsername.set(username, list);
+    }
+
+    if (contentByUsername.size === 0) return rows;
+
+    return rows.map((row) => {
+      const dbContent = contentByUsername.get(row.creator_username);
+      if (!dbContent?.length) return row;
+      const snap =
+        row.snapshot && typeof row.snapshot === "object"
+          ? (row.snapshot as Record<string, unknown>)
+          : {};
+      const crm = crmFromSnapshot(snap);
+      const merged = [...(crm.content ?? [])];
+      for (const entry of dbContent) {
+        if (!merged.some((item) => item.id === entry.id)) merged.push(entry);
+      }
+      return { ...row, snapshot: { ...snap, crm: { ...crm, content: merged } } };
+    });
+  } catch {
+    return rows;
+  }
 }
 
 async function mergeScriptsIntoRows(rows: SavedRow[], brandId: string): Promise<SavedRow[]> {
@@ -212,6 +264,7 @@ export function CreatorManageLists({
   const [importOpen, setImportOpen] = useState(false);
   const [brandId, setBrandId] = useState<string | null>(null);
   const [scriptTarget, setScriptTarget] = useState<SavedRow | null>(null);
+  const [contentTarget, setContentTarget] = useState<SavedRow | null>(null);
 
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -225,7 +278,8 @@ export function CreatorManageLists({
 
   const load = useCallback(async () => {
     const [r, f] = await Promise.all([listSaved(), listFolders()]);
-    const merged = brandId ? await mergeScriptsIntoRows(r, brandId) : r;
+    const mergedScripts = brandId ? await mergeScriptsIntoRows(r, brandId) : r;
+    const merged = brandId ? await mergeContentIntoRows(mergedScripts, brandId) : mergedScripts;
     setRows(merged);
     setFolders(f.folders);
     setItems(f.items);
@@ -240,9 +294,11 @@ export function CreatorManageLists({
     const onSaved = () => { void load(); };
     window.addEventListener("trackit:creators-saved", onSaved);
     window.addEventListener("trackit:scripts-updated", onSaved);
+    window.addEventListener("trackit:content-updated", onSaved);
     return () => {
       window.removeEventListener("trackit:creators-saved", onSaved);
       window.removeEventListener("trackit:scripts-updated", onSaved);
+      window.removeEventListener("trackit:content-updated", onSaved);
     };
   }, [load]);
 
@@ -526,6 +582,22 @@ export function CreatorManageLists({
     );
   }
 
+  if (contentTarget && brandId) {
+    return (
+      <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
+        <CreatorContentBrandPanel
+          lang={lang}
+          isMobile={isMobile}
+          brandId={brandId}
+          creatorUsername={contentTarget.creator_username}
+          displayName={contentTarget.display_name}
+          avatarUrl={contentTarget.avatar_url}
+          onClose={() => setContentTarget(null)}
+        />
+      </div>
+    );
+  }
+
   if (scriptTarget && brandId) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
@@ -688,6 +760,7 @@ export function CreatorManageLists({
               onNotesChange={(username, notes) => void onNotesChange(username, notes)}
               onCrmChange={(username, patch) => void onCrmChange(username, patch)}
               onOpenScript={(row) => setScriptTarget(row)}
+              onOpenContent={(row) => setContentTarget(row)}
               onDelete={(username) => void onDeleteCreator(username)}
             />
           )}
