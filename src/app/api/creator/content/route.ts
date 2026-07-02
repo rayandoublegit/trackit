@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
-import { syncContentToCampaigns } from "@/lib/content-campaign-sync";
+import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +116,10 @@ export async function POST(request: Request) {
   });
   if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
 
-  await syncContentToCampaigns(admin, targetBrandId, targetCreatorRowId, data.id);
+  const campaignSyncErr = await backfillCreatorContentToCampaigns(admin, targetBrandId, targetCreatorRowId);
+  if (campaignSyncErr) {
+    console.error("campaign content sync failed:", campaignSyncErr.message);
+  }
 
   return NextResponse.json({
     ok: true,

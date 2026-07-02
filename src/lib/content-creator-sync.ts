@@ -69,3 +69,56 @@ export async function syncContentRefToDiscoverySaved(
     .upsert(row, { onConflict: "user_id,creator_username" });
   return error ? new Error(error.message) : null;
 }
+
+/** Synchronise les références CRM pour tout le contenu existant d'un créateur. */
+export async function backfillDiscoveryContentRefs(
+  admin: SupabaseClient,
+  brandId: string,
+  creatorRowId: string,
+): Promise<Error | null> {
+  const { data: creator, error: creatorErr } = await admin
+    .from("creators")
+    .select("linked_user_id")
+    .eq("id", creatorRowId)
+    .eq("user_id", brandId)
+    .maybeSingle();
+
+  if (creatorErr) return new Error(creatorErr.message);
+  if (!creator) return null;
+
+  const select = "id, title";
+  const byRow = await admin
+    .from("creator_content")
+    .select(select)
+    .eq("brand_id", brandId)
+    .eq("creator_row_id", creatorRowId);
+
+  const byUser = creator.linked_user_id
+    ? await admin
+        .from("creator_content")
+        .select(select)
+        .eq("brand_id", brandId)
+        .eq("creator_user_id", creator.linked_user_id)
+    : { data: [] as { id: string; title: string | null }[], error: null };
+
+  const error = byRow.error || byUser.error;
+  if (error?.message?.includes("creator_content")) return null;
+  if (error) return new Error(error.message);
+
+  const merged = new Map<string, { id: string; title: string | null }>();
+  for (const row of [...(byRow.data || []), ...(byUser.data || [])]) {
+    merged.set(String(row.id), row);
+  }
+  const items = [...merged.values()];
+  if (items.length === 0) return null;
+
+  for (const item of items) {
+    const syncErr = await syncContentRefToDiscoverySaved(admin, brandId, creatorRowId, {
+      id: String(item.id),
+      title: String(item.title || "Content"),
+    });
+    if (syncErr) return syncErr;
+  }
+
+  return null;
+}

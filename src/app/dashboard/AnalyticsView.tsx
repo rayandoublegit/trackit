@@ -32,7 +32,7 @@ const btnSecondary: React.CSSProperties = {
   cursor: "pointer", letterSpacing: "-0.02em",
 };
 
-type DateRange = "today" | "7d" | "30d" | "90d" | "custom";
+type DateRange = "today" | "3d" | "7d" | "30d" | "90d" | "custom";
 type SortKey = "sales" | "commission" | "roi" | "creator";
 
 function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
@@ -736,6 +736,7 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
 }) {
   const ranges: { id: DateRange; label: string }[] = [
     { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
+    { id: "3d", label: lang === "fr" ? "3 jours" : "3 days" },
     { id: "7d", label: lang === "fr" ? "7 jours" : "7 days" },
     { id: "30d", label: lang === "fr" ? "30 jours" : "30 days" },
     { id: "90d", label: lang === "fr" ? "90 jours" : "90 days" },

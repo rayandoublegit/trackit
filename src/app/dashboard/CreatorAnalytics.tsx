@@ -1,10 +1,20 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
+import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
+import {
+  analyticsPeriodLabel,
+  isWithinPeriod,
+  resolveAnalyticsDateBounds,
+  type AnalyticsDateRange,
+} from "@/lib/analytics-periods";
 
 const BLUE = "#0047FF";
+
+const CREATOR_PERIOD_OPTIONS: AnalyticsDateRange[] = ["today", "3d", "7d", "30d", "90d", "all"];
 
 function MetricCard({
   label,
@@ -45,7 +55,22 @@ function MetricCard({
 export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
   const { stats, loading, error } = useCreatorStats(userId);
+  const [period, setPeriod] = useState<AnalyticsDateRange>("30d");
   const allSales = stats?.sales ?? [];
+
+  const periodBounds = useMemo(
+    () => resolveAnalyticsDateBounds(period),
+    [period],
+  );
+
+  const filteredSales = useMemo(() => {
+    if (!periodBounds) return allSales;
+    return allSales.filter((sale) => isWithinPeriod(sale.date, periodBounds.start, periodBounds.end));
+  }, [allSales, periodBounds]);
+
+  const periodSalesTotal = filteredSales.reduce((sum, sale) => sum + (Number(sale.orderAmount) || 0), 0);
+  const periodCommissionTotal = filteredSales.reduce((sum, sale) => sum + (Number(sale.commissionAmount) || 0), 0);
+  const periodLabel = analyticsPeriodLabel(period, lang);
 
   const fmtDate = (iso: string) => {
     try {
@@ -92,18 +117,23 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
           borderBottom: "1px solid #EFEFEF",
         }}
       >
-        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
-          {lang === "fr" ? "Analytiques" : "Analytics"}
-        </h1>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
-          {stats?.brandName
-            ? lang === "fr"
-              ? `Ventes et commissions générées pour ${stats.brandName}.`
-              : `Sales and commissions driven for ${stats.brandName}.`
-            : lang === "fr"
-              ? "Vue d'ensemble de vos ventes et commissions."
-              : "Overview of your sales and commissions."}
-        </p>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
+              {lang === "fr" ? "Analytiques" : "Analytics"}
+            </h1>
+            <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+              {stats?.brandName
+                ? lang === "fr"
+                  ? `Ventes et commissions générées pour ${stats.brandName}.`
+                  : `Sales and commissions driven for ${stats.brandName}.`
+                : lang === "fr"
+                  ? "Vue d'ensemble de vos ventes et commissions."
+                  : "Overview of your sales and commissions."}
+            </p>
+          </div>
+          <AnalyticsPeriodDropdown value={period} onChange={setPeriod} lang={lang} options={CREATOR_PERIOD_OPTIONS} align="right" />
+        </div>
       </div>
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 1080 }}>
@@ -141,18 +171,22 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 16, marginBottom: 28 }}>
           <MetricCard
             label={lang === "fr" ? "Ventes générées" : "Sales driven"}
-            value={formatCurrency(stats?.totalSales ?? 0, lang)}
-            hint={lang === "fr" ? `${stats?.salesCount ?? 0} commande(s) via votre code` : `${stats?.salesCount ?? 0} order(s) via your code`}
+            value={formatCurrency(periodSalesTotal, lang)}
+            hint={
+              lang === "fr"
+                ? `${filteredSales.length} commande(s) — ${periodLabel.toLowerCase()}`
+                : `${filteredSales.length} order(s) — ${periodLabel.toLowerCase()}`
+            }
           />
           <MetricCard
             label={lang === "fr" ? "Commissions gagnées" : "Commissions earned"}
-            value={formatCurrency(stats?.totalCommissions ?? 0, lang)}
-            hint={lang === "fr" ? "Total cumulé" : "All-time total"}
+            value={formatCurrency(periodCommissionTotal, lang)}
+            hint={lang === "fr" ? `Sur la période : ${periodLabel.toLowerCase()}` : `In period: ${periodLabel.toLowerCase()}`}
           />
           <MetricCard
             label={lang === "fr" ? "Solde à recevoir" : "Balance due"}
             value={formatCurrency(stats?.balance ?? 0, lang)}
-            hint={lang === "fr" ? "En attente de versement" : "Awaiting payout"}
+            hint={lang === "fr" ? "En attente de versement (total)" : "Awaiting payout (total)"}
             accent={(stats?.balance ?? 0) > 0}
           />
         </div>
@@ -170,23 +204,23 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
             }}
           >
             <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-              {lang === "fr" ? "Historique de mes ventes" : "My sales history"}
+              {lang === "fr" ? `Historique de mes ventes — ${periodLabel}` : `My sales history — ${periodLabel}`}
             </div>
-            {allSales.length > 0 && (
+            {filteredSales.length > 0 && (
               <span style={{ fontSize: 12, color: "#9A9A9A" }}>
-                {allSales.length} {lang === "fr" ? "vente(s)" : "sale(s)"}
+                {filteredSales.length} {lang === "fr" ? "vente(s)" : "sale(s)"}
               </span>
             )}
           </div>
-          {allSales.length === 0 ? (
+          {filteredSales.length === 0 ? (
             <div style={{ padding: "48px 24px", textAlign: "center" }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>
-                {lang === "fr" ? "Vos ventes apparaîtront ici" : "Your sales will appear here"}
+                {lang === "fr" ? "Aucune vente sur cette période" : "No sales in this period"}
               </div>
               <p style={{ fontSize: 14, color: "#7A7A7A", lineHeight: 1.5, margin: "0 auto", maxWidth: 400 }}>
                 {lang === "fr"
-                  ? "Dès qu'une commande passe avec votre code promo, elle s'affiche ici avec votre commission."
-                  : "Once an order comes in with your promo code, it shows here with your commission."}
+                  ? "Essayez une autre période ou attendez qu'une commande passe avec votre code promo."
+                  : "Try another period or wait for an order with your promo code."}
               </p>
             </div>
           ) : (
@@ -205,7 +239,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
                   </tr>
                 </thead>
                 <tbody>
-                  {allSales.map((sale) => {
+                  {filteredSales.map((sale) => {
                     const statusStyle = saleStatusStyle(sale.status);
                     return (
                       <tr key={sale.id} style={{ borderBottom: "1px solid #F5F5F5" }}>

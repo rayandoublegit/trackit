@@ -16,7 +16,7 @@ import { dedupeCampaignRows, normalizeCampaignStatus } from "@/lib/campaign-stat
 
 export const dynamic = "force-dynamic";
 
-const VALID_RANGES = new Set<AnalyticsDateRange>(["today", "7d", "30d", "90d", "custom"]);
+const VALID_RANGES = new Set<AnalyticsDateRange>(["today", "3d", "7d", "30d", "90d", "custom"]);
 
 function parseRange(value: string | null): AnalyticsDateRange {
   if (value && VALID_RANGES.has(value as AnalyticsDateRange)) return value as AnalyticsDateRange;
@@ -51,7 +51,8 @@ export async function GET(request: Request) {
   const range = parseRange(searchParams.get("range"));
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
-  const { start, end, prevStart, prevEnd } = getPeriodBounds(range);
+  const periodRange = range === "custom" || range === "all" ? "30d" : range;
+  const { start, end, prevStart, prevEnd } = getPeriodBounds(periodRange);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")

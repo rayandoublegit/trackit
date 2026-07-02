@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignContentTab } from "./CampaignContentTab";
+import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
@@ -19,7 +20,7 @@ import {
 } from "@/lib/plan-limits";
 import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
-import { computeTrend, formatTrendLabel, isWithinPeriod, type PeriodTrend } from "@/lib/analytics-periods";
+import { computeTrend, formatTrendLabel, isWithinPeriod, resolveAnalyticsDateBounds, analyticsPeriodLabel, ANALYTICS_PERIOD_OPTIONS, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
 import { formatCurrency, formatCurrencyWithCode, type DisplayCurrency } from "@/lib/useCurrency";
 import {
   compactNumberToInput,
@@ -615,18 +616,19 @@ async function fetchCampaignAnalyticsSnapshot(
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  const monthStats = computeCreatorStatsForCampaign(
+  const topCreatorBounds = dateBounds ?? { start: monthStart, end: monthEnd };
+  const topStats = computeCreatorStatsForCampaign(
     salesRows,
     campaign.id,
     resolvedCreatorIds,
     creatorCounts,
     campaignMeta,
-    { start: monthStart, end: monthEnd },
+    topCreatorBounds,
   );
-  const monthCreatorIds = [...new Set([...resolvedCreatorIds, ...Object.keys(monthStats)])];
-  const monthRows: CampaignCreatorRow[] = monthCreatorIds
+  const topCreatorIds = [...new Set([...resolvedCreatorIds, ...Object.keys(topStats)])];
+  const monthRows: CampaignCreatorRow[] = topCreatorIds
     .map((id) => {
-      const row = buildCreatorRow(id, monthStats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 });
+      const row = buildCreatorRow(id, topStats[id] ?? { salesCount: 0, salesAmount: 0, commission: 0 });
       return {
         ...row,
         roi: computeCreatorCampaignRoi(row.salesAmount, row.commission),
@@ -774,13 +776,13 @@ function formatCreatorsSub(campaignCount: number, lang: "en" | "fr"): string {
 
 function formatSalesTrendSub(trend: PeriodTrend, lang: "en" | "fr"): { text: string; color: string } {
   if (trend.current === 0 && trend.previous === 0) {
-    return { text: lang === "fr" ? "Aucune vente ce mois" : "No sales this month", color: "#7A7A7A" };
+    return { text: lang === "fr" ? "Aucune vente sur la période" : "No sales in period", color: "#7A7A7A" };
   }
   const label = formatTrendLabel(trend.changePct, lang);
   const arrow = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
   const color = trend.direction === "up" ? "#2E7D32" : trend.direction === "down" ? "#E53935" : "#7A7A7A";
   return {
-    text: lang === "fr" ? `vs mois dernier ${label} ${arrow}` : `vs last month ${label} ${arrow}`,
+    text: lang === "fr" ? `vs période précédente ${label} ${arrow}` : `vs previous period ${label} ${arrow}`,
     color,
   };
 }
@@ -3064,8 +3066,10 @@ function CampaignDetailToolbar({
   isMobile,
   currency,
   setCurrency,
-  dateRange,
-  setDateRange,
+  analyticsPeriod,
+  setAnalyticsPeriod,
+  customDateRange,
+  setCustomDateRange,
   onBack,
   onStatusChange,
   onEdit,
@@ -3078,8 +3082,10 @@ function CampaignDetailToolbar({
   isMobile?: boolean;
   currency: DisplayCurrency;
   setCurrency: (value: DisplayCurrency) => void;
-  dateRange: CampaignDateRange;
-  setDateRange: (value: CampaignDateRange) => void;
+  analyticsPeriod: AnalyticsDateRange;
+  setAnalyticsPeriod: (value: AnalyticsDateRange) => void;
+  customDateRange: CampaignDateRange;
+  setCustomDateRange: (value: CampaignDateRange) => void;
   onBack: () => void;
   onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
   onEdit: (id: string) => void;
@@ -3089,16 +3095,16 @@ function CampaignDetailToolbar({
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
+  const [periodOpen, setPeriodOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLDivElement>(null);
-  const dateRef = useRef<HTMLDivElement>(null);
+  const periodRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(statusRef, statusOpen, () => setStatusOpen(false));
   useClickOutside(currencyRef, currencyOpen, () => setCurrencyOpen(false));
-  useClickOutside(dateRef, dateOpen, () => setDateOpen(false));
+  useClickOutside(periodRef, periodOpen, () => setPeriodOpen(false));
   useClickOutside(moreRef, moreOpen, () => setMoreOpen(false));
 
   const isPaused = campaign.status === "Paused";
@@ -3273,47 +3279,72 @@ function CampaignDetailToolbar({
           )}
         </div>
 
-        <div ref={dateRef} style={{ position: "relative" }}>
-          <button type="button" onClick={() => setDateOpen((open) => !open)} style={toolbarControl}>
-            {formatCampaignDateRangeLabel(dateRange, lang)}
+        <div ref={periodRef} style={{ position: "relative" }}>
+          <button type="button" onClick={() => setPeriodOpen((open) => !open)} style={toolbarControl}>
+            {analyticsPeriod === "custom"
+              ? formatCampaignDateRangeLabel(customDateRange, lang)
+              : analyticsPeriodLabel(analyticsPeriod, lang)}
             <ChevronDownIcon />
           </button>
-          {dateOpen && (
+          {periodOpen && (
             <div style={{ ...dropdownPanel, minWidth: 280, padding: 14 }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
-                    {lang === "fr" ? "Début" : "Start"}
-                  </div>
-                  <input
-                    type="date"
-                    value={dateRange.start}
-                    max={dateRange.end}
-                    onChange={(e) => setDateRange(normalizeCampaignDateRange({ ...dateRange, start: e.target.value }))}
-                    style={dateInputStyle}
-                  />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
-                    {lang === "fr" ? "Fin" : "End"}
-                  </div>
-                  <input
-                    type="date"
-                    value={dateRange.end}
-                    min={dateRange.start}
-                    max={new Date().toISOString().slice(0, 10)}
-                    onChange={(e) => setDateRange(normalizeCampaignDateRange({ ...dateRange, end: e.target.value }))}
-                    style={dateInputStyle}
-                  />
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: analyticsPeriod === "custom" ? 12 : 0 }}>
+                {ANALYTICS_PERIOD_OPTIONS.map((period) => (
+                  <button
+                    key={period}
+                    type="button"
+                    style={{
+                      ...menuItemStyle,
+                      fontWeight: analyticsPeriod === period ? 600 : 400,
+                      background: analyticsPeriod === period ? "#F5F5F5" : "transparent",
+                    }}
+                    onClick={() => {
+                      setAnalyticsPeriod(period);
+                      if (period !== "custom") setPeriodOpen(false);
+                    }}
+                  >
+                    {analyticsPeriodLabel(period, lang)}
+                  </button>
+                ))}
               </div>
-              <button
-                type="button"
-                onClick={() => setDateOpen(false)}
-                style={{ ...btnSecondary, width: "100%", marginTop: 12, padding: "8px 12px", fontSize: 13 }}
-              >
-                {lang === "fr" ? "Appliquer" : "Apply"}
-              </button>
+              {analyticsPeriod === "custom" && (
+                <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
+                        {lang === "fr" ? "Début" : "Start"}
+                      </div>
+                      <input
+                        type="date"
+                        value={customDateRange.start}
+                        max={customDateRange.end}
+                        onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, start: e.target.value }))}
+                        style={dateInputStyle}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
+                        {lang === "fr" ? "Fin" : "End"}
+                      </div>
+                      <input
+                        type="date"
+                        value={customDateRange.end}
+                        min={customDateRange.start}
+                        max={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, end: e.target.value }))}
+                        style={dateInputStyle}
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPeriodOpen(false)}
+                    style={{ ...btnSecondary, width: "100%", marginTop: 12, padding: "8px 12px", fontSize: 13 }}
+                  >
+                    {lang === "fr" ? "Appliquer" : "Apply"}
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -3417,23 +3448,46 @@ function CampaignDetailToolbar({
 function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onAddSale, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onAddSale: () => void; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>(initialTab);
   const [currency, setCurrency] = useState<DisplayCurrency>(lang === "fr" ? "EUR" : "USD");
-  const [dateRange, setDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsDateRange>("30d");
+  const [customDateRange, setCustomDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
   const [analytics, setAnalytics] = useState<CampaignAnalyticsSnapshot | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
+
+  const campaignAllStart = useMemo(() => defaultCampaignDateRange(campaign).start, [campaign]);
+  const analyticsDateBounds = useMemo(
+    () =>
+      resolveAnalyticsDateBounds(analyticsPeriod, {
+        allStart: campaignAllStart,
+        customRange: customDateRange,
+      }),
+    [analyticsPeriod, campaignAllStart, customDateRange],
+  );
+  const exportDateRange = useMemo<CampaignDateRange>(() => {
+    if (analyticsPeriod === "custom") return customDateRange;
+    if (analyticsDateBounds) {
+      return {
+        start: analyticsDateBounds.start.toISOString().slice(0, 10),
+        end: analyticsDateBounds.end.toISOString().slice(0, 10),
+      };
+    }
+    return customDateRange;
+  }, [analyticsPeriod, analyticsDateBounds, customDateRange]);
 
   useEffect(() => {
     setTab(initialTab);
   }, [campaign.id, initialTab]);
 
   useEffect(() => {
-    setDateRange(defaultCampaignDateRange(campaign));
+    setCustomDateRange(defaultCampaignDateRange(campaign));
+    setAnalyticsPeriod("30d");
   }, [campaign.id, campaign.startRaw, campaign.start, campaign.createdAt]);
 
   useEffect(() => {
     const lastSaleDate = sessionStorage.getItem("trackit_last_sale_date");
     if (!lastSaleDate) return;
     sessionStorage.removeItem("trackit_last_sale_date");
-    setDateRange((prev) =>
+    setAnalyticsPeriod("custom");
+    setCustomDateRange((prev) =>
       normalizeCampaignDateRange({
         start: lastSaleDate < prev.start ? lastSaleDate : prev.start,
         end: lastSaleDate > prev.end ? lastSaleDate : prev.end,
@@ -3468,7 +3522,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       }
 
       try {
-        const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId);
+        const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, analyticsDateBounds);
         if (!cancelled) setAnalytics(snapshot);
       } catch {
         if (!cancelled) {
@@ -3501,7 +3555,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
       window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
     };
-  }, [campaign, userId]);
+  }, [campaign, userId, analyticsDateBounds]);
 
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
@@ -3549,10 +3603,10 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     }
 
     try {
-      const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, toDateBounds(dateRange));
+      const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, analyticsDateBounds);
       const data: CampaignAnalyticsExport = {
         campaignName: campaign.name,
-        dateRange,
+        dateRange: exportDateRange,
         currency,
         rows: snapshot.rows,
         totals: snapshot.totals,
@@ -3579,8 +3633,10 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         isMobile={isMobile}
         currency={currency}
         setCurrency={setCurrency}
-        dateRange={dateRange}
-        setDateRange={setDateRange}
+        analyticsPeriod={analyticsPeriod}
+        setAnalyticsPeriod={setAnalyticsPeriod}
+        customDateRange={customDateRange}
+        setCustomDateRange={setCustomDateRange}
         onBack={onBack}
         onStatusChange={onStatusChange}
         onEdit={onEdit}
@@ -3637,6 +3693,14 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       )}
       {tab === "analytics" && (
         <>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <AnalyticsPeriodDropdown
+          value={analyticsPeriod}
+          onChange={setAnalyticsPeriod}
+          lang={lang}
+          align="right"
+        />
+      </div>
       <div
         style={{
           display: "grid",
@@ -3706,6 +3770,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           rows={analytics?.rows ?? []}
           monthRows={analytics?.monthRows ?? []}
           loading={analyticsLoading}
+          periodLabel={analyticsPeriodLabel(analyticsPeriod, lang)}
         />
         </>
       )}
@@ -3804,6 +3869,7 @@ function AnalyticsTab({
   rows,
   monthRows,
   loading,
+  periodLabel,
 }: {
   lang: "en" | "fr";
   campaign: Campaign;
@@ -3812,6 +3878,7 @@ function AnalyticsTab({
   rows: CampaignCreatorRow[];
   monthRows: CampaignCreatorRow[];
   loading: boolean;
+  periodLabel: string;
 }) {
   const headers = [
     lang === "fr" ? "Créateur" : "Creator",
@@ -3842,13 +3909,16 @@ function AnalyticsTab({
 
   const monthEmptyMessage =
     lang === "fr"
-      ? "Aucune vente ce mois pour cette campagne."
-      : "No sales this month for this campaign yet.";
+      ? `Aucune vente sur la période (${periodLabel.toLowerCase()}).`
+      : `No sales in period (${periodLabel.toLowerCase()}).`;
+
+  const topCreatorsTitle =
+    lang === "fr" ? `Meilleurs créateurs — ${periodLabel}` : `Top creators — ${periodLabel}`;
 
   return (
     <>
       <div style={{ marginBottom: 20 }}>
-      <Card title={lang === "fr" ? "Meilleurs créateurs ce mois" : "Top creators this month"}>
+      <Card title={topCreatorsTitle}>
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 640 : undefined }}>
             <thead>

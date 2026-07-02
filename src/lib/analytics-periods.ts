@@ -1,4 +1,14 @@
-export type AnalyticsDateRange = "today" | "7d" | "30d" | "90d" | "custom";
+export type AnalyticsDateRange = "today" | "3d" | "7d" | "30d" | "90d" | "all" | "custom";
+
+export const ANALYTICS_PERIOD_OPTIONS: AnalyticsDateRange[] = [
+  "today",
+  "3d",
+  "7d",
+  "30d",
+  "90d",
+  "all",
+  "custom",
+];
 
 export type PeriodBounds = {
   start: Date;
@@ -26,7 +36,10 @@ function endOfDay(date: Date) {
   return d;
 }
 
-export function getPeriodBounds(range: AnalyticsDateRange, now = new Date()): PeriodBounds {
+export function getPeriodBounds(
+  range: Exclude<AnalyticsDateRange, "all" | "custom">,
+  now = new Date(),
+): PeriodBounds {
   if (range === "today") {
     const start = startOfDay(now);
     const end = endOfDay(now);
@@ -40,7 +53,8 @@ export function getPeriodBounds(range: AnalyticsDateRange, now = new Date()): Pe
     };
   }
 
-  const days = range === "7d" ? 7 : range === "90d" ? 90 : 30;
+  const days =
+    range === "3d" ? 3 : range === "7d" ? 7 : range === "90d" ? 90 : 30;
   const end = endOfDay(now);
   const start = startOfDay(new Date(now));
   start.setDate(start.getDate() - (days - 1));
@@ -75,9 +89,49 @@ export function computeTrend(current: number, previous: number): PeriodTrend {
   };
 }
 
+export function analyticsPeriodLabel(range: AnalyticsDateRange, lang: "en" | "fr"): string {
+  if (range === "today") return lang === "fr" ? "Aujourd'hui" : "Today";
+  if (range === "3d") return lang === "fr" ? "3 derniers jours" : "Last 3 days";
+  if (range === "7d") return lang === "fr" ? "7 derniers jours" : "Last 7 days";
+  if (range === "30d") return lang === "fr" ? "30 derniers jours" : "Last 30 days";
+  if (range === "90d") return lang === "fr" ? "90 derniers jours" : "Last 90 days";
+  if (range === "all") return lang === "fr" ? "Toute la période" : "All time";
+  return lang === "fr" ? "Personnalisé" : "Custom";
+}
+
 export function formatTrendLabel(changePct: number | null, lang: "en" | "fr"): string {
   if (changePct === null) return lang === "fr" ? "Nouveau" : "New";
   const abs = Math.abs(changePct);
   const formatted = abs >= 100 ? Math.round(abs).toString() : abs.toFixed(1);
   return `${formatted}%`;
+}
+
+export function resolveAnalyticsDateBounds(
+  range: AnalyticsDateRange,
+  options?: {
+    allStart?: string;
+    customRange?: { start: string; end: string };
+    now?: Date;
+  },
+): { start: Date; end: Date } | undefined {
+  const now = options?.now ?? new Date();
+
+  if (range === "all") {
+    if (!options?.allStart) return undefined;
+    return {
+      start: startOfDay(new Date(`${options.allStart}T00:00:00`)),
+      end: endOfDay(now),
+    };
+  }
+
+  if (range === "custom") {
+    if (!options?.customRange?.start || !options?.customRange?.end) return undefined;
+    const start = startOfDay(new Date(`${options.customRange.start}T00:00:00`));
+    const end = endOfDay(new Date(`${options.customRange.end}T23:59:59.999`));
+    if (start.getTime() > end.getTime()) return { start: end, end: start };
+    return { start, end };
+  }
+
+  const bounds = getPeriodBounds(range, now);
+  return { start: bounds.start, end: bounds.end };
 }

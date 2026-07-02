@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
-import { syncContentToCampaigns } from "@/lib/content-campaign-sync";
-import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
+import {
+  backfillCampaignContent,
+  backfillCreatorContentToCampaigns,
+  loadBrandContentForCreators,
+  resolveCampaignContentIds,
+  resolveCreatorRowIdsByHandle,
+} from "@/lib/content-campaign-sync";
+import { backfillDiscoveryContentRefs, syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -72,34 +78,56 @@ export async function GET(request: Request) {
   const campaignId = searchParams.get("campaignId")?.trim() || null;
   if (!brandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
 
-  let contentIds: string[] | null = null;
   if (campaignId) {
-    const { data: links, error: linkErr } = await admin
-      .from("campaign_content")
-      .select("content_id")
-      .eq("brand_id", brandId)
-      .eq("campaign_id", campaignId);
-    if (linkErr?.message?.includes("campaign_content")) {
-      return NextResponse.json({ ok: true, items: [] });
-    }
-    if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 });
-    contentIds = (links || []).map((l) => l.content_id);
+    const { ids: contentIds, error: resolveErr } = await resolveCampaignContentIds(admin, brandId, campaignId);
+    if (resolveErr) return NextResponse.json({ error: resolveErr.message }, { status: 500 });
     if (contentIds.length === 0) return NextResponse.json({ ok: true, items: [] });
+
+    const { data, error } = await admin
+      .from("creator_content")
+      .select(
+        "id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at",
+      )
+      .eq("brand_id", brandId)
+      .in("id", contentIds)
+      .order("created_at", { ascending: false });
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const items = await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]);
+    return NextResponse.json({ ok: true, items });
   }
 
-  let targetCreatorId: string | null = null;
   if (targetHandle) {
-    const { data: creatorRow } = await admin
+    const creatorRowIds = await resolveCreatorRowIdsByHandle(admin, brandId, targetHandle);
+    if (creatorRowIds.length === 0) return NextResponse.json({ ok: true, items: [] });
+
+    for (const creatorRowId of creatorRowIds) {
+      await backfillDiscoveryContentRefs(admin, brandId, creatorRowId);
+      await backfillCreatorContentToCampaigns(admin, brandId, creatorRowId);
+    }
+
+    const { data: creatorRows } = await admin
       .from("creators")
-      .select("id")
+      .select("id, linked_user_id")
       .eq("user_id", brandId)
-      .ilike("handle", targetHandle)
-      .maybeSingle();
-    targetCreatorId = creatorRow?.id ?? null;
-    if (!targetCreatorId) return NextResponse.json({ ok: true, items: [] });
+      .in("id", creatorRowIds);
+
+    const linkedUserIds = [
+      ...new Set(
+        (creatorRows || [])
+          .map((row) => (row.linked_user_id ? String(row.linked_user_id) : null))
+          .filter(Boolean),
+      ),
+    ] as string[];
+
+    const { data, error } = await loadBrandContentForCreators(admin, brandId, creatorRowIds, linkedUserIds);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const items = await enrichContentItems(admin, brandId, data);
+    return NextResponse.json({ ok: true, items });
   }
 
-  let query = admin
+  const { data, error } = await admin
     .from("creator_content")
     .select(
       "id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at",
@@ -107,10 +135,6 @@ export async function GET(request: Request) {
     .eq("brand_id", brandId)
     .order("created_at", { ascending: false });
 
-  if (targetCreatorId) query = query.eq("creator_row_id", targetCreatorId);
-  if (contentIds) query = query.in("id", contentIds);
-
-  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const items = await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]);
@@ -179,7 +203,10 @@ export async function POST(request: Request) {
   });
   if (syncErr) return NextResponse.json({ error: syncErr.message }, { status: 500 });
 
-  await syncContentToCampaigns(admin, brandId, creatorRowId, data.id);
+  const campaignSyncErr = await backfillCreatorContentToCampaigns(admin, brandId, creatorRowId);
+  if (campaignSyncErr) {
+    console.error("campaign content sync failed:", campaignSyncErr.message);
+  }
 
   return NextResponse.json({ ok: true, id: data.id, creatorRowId });
 }

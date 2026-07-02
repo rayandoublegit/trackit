@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { listCreatorBrandMemberships, syncCreatorRowsByProfileHandle } from "@/lib/creator-account";
+import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
+import { backfillDiscoveryContentRefs } from "@/lib/content-creator-sync";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,12 @@ export async function POST(request: Request) {
 
   await syncCreatorRowsByProfileHandle(admin, userId);
   const { profile, brands } = await listCreatorBrandMemberships(admin, userId);
+
+  for (const brand of brands) {
+    if (!brand.creatorRowId) continue;
+    await backfillDiscoveryContentRefs(admin, brand.brandId, brand.creatorRowId);
+    await backfillCreatorContentToCampaigns(admin, brand.brandId, brand.creatorRowId);
+  }
 
   return NextResponse.json({
     ok: true,
