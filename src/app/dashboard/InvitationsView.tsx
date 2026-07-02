@@ -7,7 +7,6 @@ import { ActiveDashboardCreatorsPanel } from "./ActiveDashboardCreatorsPanel";
 import { UpgradeModal } from "./UpgradeModal";
 
 const BLUE = "#0047FF";
-const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
 const inviteSecondaryBtn: React.CSSProperties = {
   background: "#FFFFFF",
@@ -40,23 +39,11 @@ export function InvitationsView({
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const linkCardRef = useRef<HTMLDivElement>(null);
   const canInvite = canInviteCreators(plan);
 
   const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
-
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [dropdownOpen]);
 
   const generate = async () => {
     if (!canInvite) {
@@ -79,19 +66,9 @@ export function InvitationsView({
         return;
       }
       setLink(`${window.location.origin}/invite/${data.token}`);
-      setDropdownOpen(true);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCtaClick = () => {
-    if (loading) return;
-    if (link) {
-      setDropdownOpen((open) => !open);
-      return;
-    }
-    void generate();
   };
 
   const copy = async () => {
@@ -105,88 +82,11 @@ export function InvitationsView({
     }
   };
 
-  const steps =
-    lang === "fr"
-      ? [
-          {
-            title: "Partagez le lien",
-            description: "Envoyez votre lien d'invitation au créateur par message, email ou DM.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-          },
-          {
-            title: "Le créateur s'inscrit",
-            description: "Il crée son compte Trackit en quelques clics et rejoint automatiquement votre espace marque.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle cx="12" cy="8" r="4" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            ),
-          },
-          {
-            title: "Accès au dashboard créateur",
-            description: "Il accède à son espace personnel : campagnes, ventes suivies et commissions en temps réel.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M3 9h18M9 21V9" stroke="#1A1A1A" strokeWidth="1.8" />
-              </svg>
-            ),
-          },
-          {
-            title: "Commissions automatiques",
-            description: "Chaque vente attribuée remonte dans Trackit et alimente ses paiements sans action manuelle.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-          },
-        ]
-      : [
-          {
-            title: "Share the link",
-            description: "Send your invite link to the creator via message, email, or DM.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-          },
-          {
-            title: "Creator signs up",
-            description: "They create their Trackit account in a few clicks and automatically join your brand workspace.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle cx="12" cy="8" r="4" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            ),
-          },
-          {
-            title: "Creator dashboard access",
-            description: "They get their own space: campaigns, tracked sales, and commissions in real time.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="#1A1A1A" strokeWidth="1.8" />
-                <path d="M3 9h18M9 21V9" stroke="#1A1A1A" strokeWidth="1.8" />
-              </svg>
-            ),
-          },
-          {
-            title: "Automatic commissions",
-            description: "Every attributed sale flows into Trackit and feeds their payouts with no manual work.",
-            icon: (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-          },
-        ];
+  useEffect(() => {
+    if (link && linkCardRef.current) {
+      linkCardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [link]);
 
   return (
     <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
@@ -203,38 +103,58 @@ export function InvitationsView({
         />
       )}
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-        <div
+        <header style={{ marginBottom: isMobile ? 24 : 28 }}>
+          <h1
+            style={{
+              fontSize: isMobile ? 28 : 32,
+              fontWeight: 600,
+              color: "#1A1A1A",
+              margin: "0 0 8px",
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {lang === "fr" ? "Inviter un créateur" : "Invite a creator"}
+          </h1>
+          <p style={{ fontSize: 15, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+            {lang === "fr"
+              ? "Invitez un créateur à rejoindre votre programme et générez un lien d'invitation unique."
+              : "Invite a creator to join your program and generate a unique invite link."}
+          </p>
+        </header>
+
+        <section
+          ref={linkCardRef}
           style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "minmax(260px, 360px) 1fr",
-            gap: isMobile ? 40 : 48,
-            alignItems: "start",
+            border: "1px solid #EFEFEF",
+            borderRadius: 16,
+            background: "#FAFAFA",
+            padding: isMobile ? "24px 20px" : "32px 28px",
+            marginBottom: isMobile ? 28 : 32,
           }}
         >
-          <div>
-            <h1
+          <div style={{ maxWidth: 720 }}>
+            <h2
               style={{
-                fontSize: isMobile ? 28 : 32,
+                fontSize: isMobile ? 17 : 18,
                 fontWeight: 600,
                 color: "#1A1A1A",
                 margin: "0 0 8px",
-                letterSpacing: "-0.03em",
+                letterSpacing: "-0.02em",
               }}
             >
-              {lang === "fr" ? "Inviter un créateur" : "Invite a creator"}
-            </h1>
-            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 40px", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? "Générer un lien d'invitation" : "Generate an invite link"}
+            </h2>
+            <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
               {lang === "fr"
-                ? "Générez un lien unique et onboarder vos créateurs sur Trackit en quelques minutes, sans configuration complexe."
-                : "Generate a unique link and onboard creators on Trackit in minutes, no complex setup required."}
+                ? "Partagez ce lien par message, email ou DM. Le créateur pourra créer son compte et rejoindre votre espace."
+                : "Share this link via message, email, or DM. The creator can create their account and join your workspace."}
             </p>
 
-            <div ref={dropdownRef} style={{ position: "relative", display: "inline-block" }}>
+            {!link ? (
               <button
                 type="button"
-                onClick={handleCtaClick}
+                onClick={() => void generate()}
                 disabled={loading}
-                aria-expanded={dropdownOpen}
                 style={{
                   ...inviteSecondaryBtn,
                   opacity: loading ? 0.6 : 1,
@@ -249,220 +169,89 @@ export function InvitationsView({
                     ? "Générer un lien d'invitation"
                     : "Generate an invite link"}
               </button>
-
-              {dropdownOpen && link && (
-                <div
+            ) : (
+              <div>
+                <p
                   style={{
-                    position: "absolute",
-                    top: "calc(100% + 8px)",
-                    left: 0,
-                    width: isMobile ? "calc(100vw - 40px)" : 380,
-                    maxWidth: "calc(100vw - 48px)",
-                    background: "#FFFFFF",
-                    border: "1px solid #EFEFEF",
-                    borderRadius: 14,
-                    boxShadow: "0 16px 48px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 71, 255, 0.06)",
-                    padding: 16,
-                    zIndex: 30,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#9A9A9A",
+                    margin: "0 0 10px",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
                   }}
                 >
-                  <p
+                  {lang === "fr" ? "Lien d'invitation" : "Invite link"}
+                </p>
+                <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={link}
+                    onFocus={(e) => e.target.select()}
                     style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "#9A9A9A",
-                      margin: "0 0 10px",
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
+                      flex: "1 1 220px",
+                      minWidth: 0,
+                      padding: "12px 14px",
+                      borderRadius: 10,
+                      border: "1px solid #E5E5E5",
+                      fontSize: 14,
+                      fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      color: "#1A1A1A",
+                      background: "#FFFFFF",
                     }}
-                  >
-                    {lang === "fr" ? "Lien d'invitation" : "Invite link"}
-                  </p>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={link}
-                      onFocus={(e) => e.target.select()}
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        border: "1px solid #E5E5E5",
-                        fontSize: 13,
-                        fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
-                        outline: "none",
-                        boxSizing: "border-box",
-                        color: "#1A1A1A",
-                        background: "#FAFAFA",
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void copy()}
-                      style={{
-                        flexShrink: 0,
-                        padding: "10px 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: copied ? "#1A7F37" : BLUE,
-                        color: "#FFFFFF",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                        letterSpacing: "-0.01em",
-                      }}
-                    >
-                      {copied ? (lang === "fr" ? "Copié" : "Copied") : lang === "fr" ? "Copier" : "Copy"}
-                    </button>
-                  </div>
+                  />
                   <button
                     type="button"
-                    onClick={() => void generate()}
-                    disabled={loading}
+                    onClick={() => void copy()}
                     style={{
-                      background: "none",
+                      flexShrink: 0,
+                      padding: "12px 18px",
+                      borderRadius: 10,
                       border: "none",
-                      color: BLUE,
-                      fontSize: 13,
+                      background: copied ? "#1A7F37" : BLUE,
+                      color: "#FFFFFF",
+                      fontSize: 14,
                       fontWeight: 500,
                       fontFamily: "inherit",
-                      cursor: loading ? "default" : "pointer",
-                      padding: 0,
+                      cursor: "pointer",
                       letterSpacing: "-0.01em",
-                      opacity: loading ? 0.6 : 1,
                     }}
                   >
-                    {lang === "fr" ? "Générer un nouveau lien" : "Generate a new link"}
+                    {copied ? (lang === "fr" ? "Copié" : "Copied") : lang === "fr" ? "Copier" : "Copy"}
                   </button>
                 </div>
-              )}
-            </div>
+                <button
+                  type="button"
+                  onClick={() => void generate()}
+                  disabled={loading}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: BLUE,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: "inherit",
+                    cursor: loading ? "default" : "pointer",
+                    padding: 0,
+                    letterSpacing: "-0.01em",
+                    opacity: loading ? 0.6 : 1,
+                  }}
+                >
+                  {lang === "fr" ? "Générer un nouveau lien" : "Generate a new link"}
+                </button>
+              </div>
+            )}
 
             {error && (
               <p style={{ color: "#dc2626", fontSize: 13, margin: "16px 0 0", lineHeight: 1.45 }}>{error}</p>
             )}
           </div>
+        </section>
 
-          <div
-            style={{
-              position: "relative",
-              borderRadius: 28,
-              background: "linear-gradient(145deg, #0047FF 0%, #0038CC 55%, #002D99 100%)",
-              padding: isMobile ? "28px 20px" : "32px 28px",
-              minWidth: 0,
-            }}
-          >
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: 24,
-                right: 32,
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.12)",
-              }}
-            />
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                bottom: 32,
-                left: 24,
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)",
-              }}
-            />
-
-            <div
-              style={{
-                position: "relative",
-                background: "#FFFFFF",
-                borderRadius: 20,
-                boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
-                padding: isMobile ? "22px 18px" : "28px 26px",
-                border: "1px solid rgba(255,255,255,0.8)",
-              }}
-            >
-              <div style={{ marginBottom: isMobile ? 20 : 22 }}>
-                <img
-                  src={TRACKIT_LOGO}
-                  alt="Trackit"
-                  style={{
-                    height: isMobile ? 56 : 72,
-                    width: "auto",
-                    display: "block",
-                    marginBottom: 16,
-                  }}
-                />
-                <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
-                  {lang === "fr" ? "Comment ça marche" : "How it works"}
-                </p>
-                <p style={{ fontSize: 13, color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
-                  {lang === "fr"
-                    ? "De l'invitation au dashboard créateur, tout est automatique une fois le lien partagé."
-                    : "From invite to creator dashboard, everything runs automatically once the link is shared."}
-                </p>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-                  gap: isMobile ? 18 : "20px 24px",
-                }}
-              >
-                {steps.map((step, index) => (
-                  <div key={step.title} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 10,
-                        background: "#F9FAFB",
-                        border: "1px solid #F0F0F0",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {step.icon}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <p
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: BLUE,
-                          margin: "0 0 3px",
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {lang === "fr" ? `Étape ${index + 1}` : `Step ${index + 1}`}
-                      </p>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 3px", letterSpacing: "-0.02em", lineHeight: 1.3 }}>
-                        {step.title}
-                      </p>
-                      <p style={{ fontSize: 13, color: "#6B7280", margin: 0, lineHeight: 1.45, letterSpacing: "-0.01em" }}>
-                        {step.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <ActiveDashboardCreatorsPanel brandId={userId} isMobile={isMobile} />
+        <ActiveDashboardCreatorsPanel brandId={userId} isMobile={isMobile} compactTop />
       </div>
     </div>
   );

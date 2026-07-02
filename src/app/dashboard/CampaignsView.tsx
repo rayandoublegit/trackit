@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { CampaignContentTab } from "./CampaignContentTab";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
@@ -55,7 +56,7 @@ type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
 type BoardTab = "active" | "drafts" | "finished";
 type CampaignSort = "recent" | "name";
-type DetailTab = "creators" | "analytics";
+type DetailTab = "creators" | "analytics" | "content";
 type CampaignDateRange = { start: string; end: string };
 
 type CampaignAnalyticsExport = {
@@ -3505,6 +3506,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
+    { id: "content", label: lang === "fr" ? "Contenu" : "Content" },
   ];
 
   const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
@@ -3623,6 +3625,14 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           loading={analyticsLoading}
           currency={currency}
           onAddCreator={onAddCreators}
+        />
+      )}
+      {tab === "content" && (
+        <CampaignContentTab
+          lang={lang}
+          brandId={userId}
+          campaignId={campaign.id}
+          isMobile={isMobile}
         />
       )}
       {tab === "analytics" && (
@@ -4922,7 +4932,7 @@ function AddSaleOnboarding({
                         ) : null}
                       </div>
                       {commission != null ? (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#15803D", whiteSpace: "nowrap" }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#1A1A1A", whiteSpace: "nowrap" }}>
                           {commission}%
                         </span>
                       ) : (
@@ -5000,7 +5010,7 @@ function AddSaleOnboarding({
               <p
                 style={{
                   fontSize: 14,
-                  color: messageTone === "success" ? "#15803D" : "#C0392B",
+                  color: messageTone === "success" ? "#1A1A1A" : "#C0392B",
                   margin: "0 0 20px",
                 }}
               >
@@ -5726,7 +5736,7 @@ function NewCampaignOnboarding({
                     : "Select creators"}
             </h1>
             {isAddCreatorsMode && existingCampaign ? (
-              <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 28px", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 15, color: "#1A1A1A", margin: "0 0 28px", lineHeight: 1.5 }}>
                 {(existingCampaign.creatorIds?.length ?? 0) > 0
                   ? lang === "fr"
                     ? `${existingCampaign.creatorIds?.length} créateur${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} déjà dans « ${existingCampaign.name} ». Ajoutez-en d'autres ou mettez la liste à jour.`
@@ -5736,7 +5746,7 @@ function NewCampaignOnboarding({
                     : `Add creators to "${existingCampaign.name}".`}
               </p>
             ) : (
-              <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
+              <p style={{ fontSize: 15, color: "#1A1A1A", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
             )}
 
             <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
@@ -5830,13 +5840,13 @@ function NewCampaignOnboarding({
                 style={{ ...onboardingTextarea, minHeight: 140 }}
               />
               {manualSearchNotFound && (
-                <p style={{ fontSize: 14, color: "#9CA3AF", margin: "10px 0 0" }}>
+                <p style={{ fontSize: 14, color: "#1A1A1A", margin: "10px 0 0" }}>
                   {lang === "fr"
                     ? "Nous n'avons pas trouvé de créateurs correspondant à cette recherche"
                     : "We couldn't find any creators matching this search"}
                 </p>
               )}
-              <p style={{ fontSize: 13, color: "#9CA3AF", margin: "8px 0 0" }}>
+              <p style={{ fontSize: 13, color: "#1A1A1A", margin: "8px 0 0" }}>
                 {lang === "fr"
                   ? "Seuls les créateurs sauvegardés dans Find it peuvent être ajoutés."
                   : "Only creators saved in Find it can be added."}
@@ -5845,7 +5855,7 @@ function NewCampaignOnboarding({
 
             {addedCreators.length > 0 && (
               <div style={{ marginBottom: 32 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#6B7280", marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>
                   {isAddCreatorsMode
                     ? lang === "fr"
                       ? `${addedCreators.length} créateur${addedCreators.length > 1 ? "s" : ""} dans la sélection`
@@ -5886,18 +5896,21 @@ function NewCampaignOnboarding({
                             <span
                               style={{
                                 fontSize: 11,
-                                fontWeight: 500,
-                                color: "#0369A1",
-                                background: "rgba(3, 105, 161, 0.1)",
-                                padding: "2px 8px",
+                                fontWeight: 600,
+                                color: "#FFFFFF",
+                                background: "#0047FF",
+                                padding: "4px 10px",
                                 borderRadius: 999,
+                                letterSpacing: "-0.01em",
+                                lineHeight: 1,
+                                whiteSpace: "nowrap",
                               }}
                             >
                               {lang === "fr" ? "Dans la campagne" : "In campaign"}
                             </span>
                           ) : null}
                         </div>
-                        <div style={{ fontSize: 13, color: "#6B7280" }}>@{entry.handle.replace(/^@/, "")}</div>
+                        <div style={{ fontSize: 13, color: "#1A1A1A" }}>@{entry.handle.replace(/^@/, "")}</div>
                       </div>
                       <button
                         type="button"

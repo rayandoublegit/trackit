@@ -29,9 +29,11 @@ function formatJoinedDate(iso: string, lang: "fr" | "en"): string {
 export function ActiveDashboardCreatorsPanel({
   brandId,
   isMobile,
+  compactTop,
 }: {
   brandId?: string;
   isMobile?: boolean;
+  compactTop?: boolean;
 }) {
   const lang = useLang();
   const [creators, setCreators] = useState<ActiveDashboardCreator[]>([]);
@@ -85,7 +87,7 @@ export function ActiveDashboardCreatorsPanel({
   };
 
   return (
-    <section style={{ marginTop: isMobile ? 40 : 56 }}>
+    <section style={{ marginTop: compactTop ? 0 : isMobile ? 40 : 56 }}>
       <div style={{ marginBottom: 20 }}>
         <h2
           style={{

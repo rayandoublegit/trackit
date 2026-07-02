@@ -18,18 +18,21 @@ export type PayoutsScreen =
   | { type: "list" }
   | { type: "creator"; id: string };
 
+export type ContentScreen = { type: "list" } | { type: "add" };
+
 export type DashboardNavState = {
   view: DashboardView;
   campaign?: CampaignsScreen;
   payout?: PayoutsScreen;
+  contentScreen?: ContentScreen;
   creator?: string;
   list?: string;
   helpGuide?: string;
   settingsTab?: string;
 };
 
-export function isDetailTab(value: string | undefined): value is "creators" | "analytics" {
-  return value === "creators" || value === "analytics";
+export function isDetailTab(value: string | undefined): value is "creators" | "analytics" | "content" {
+  return value === "creators" || value === "analytics" || value === "content";
 }
 
 export function normalizeNavState(state: DashboardNavState): DashboardNavState {
@@ -40,6 +43,9 @@ export function normalizeNavState(state: DashboardNavState): DashboardNavState {
   }
   if (state.view === "payouts" && state.payout) {
     next.payout = state.payout;
+  }
+  if (state.view === "content" && state.contentScreen) {
+    next.contentScreen = state.contentScreen;
   }
   if ((state.view === "discovery" || state.view === "my-creators" || state.view === "creators") && state.creator) {
     next.creator = state.creator;
@@ -119,6 +125,9 @@ export function parseDashboardNavState(
   const payoutCreator = params.get("payoutCreator");
   if (payoutCreator) state.payout = { type: "creator", id: payoutCreator };
 
+  const contentParam = params.get("content");
+  if (contentParam === "add") state.contentScreen = { type: "add" };
+
   return normalizeNavState(state);
 }
 
@@ -140,6 +149,7 @@ export function buildDashboardUrl(state: DashboardNavState): string {
   url.searchParams.delete("helpGuide");
   url.searchParams.delete("settingsTab");
   url.searchParams.delete("payoutCreator");
+  url.searchParams.delete("content");
 
   if (state.view === "campaigns" && state.campaign) {
     if (state.campaign.type === "new") {
@@ -161,6 +171,10 @@ export function buildDashboardUrl(state: DashboardNavState): string {
 
   if (state.view === "payouts" && state.payout?.type === "creator") {
     url.searchParams.set("payoutCreator", state.payout.id);
+  }
+
+  if (state.view === "content" && state.contentScreen?.type === "add") {
+    url.searchParams.set("content", "add");
   }
 
   if (state.creator) url.searchParams.set("creator", state.creator);
