@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { formatCurrency } from "@/lib/useCurrency";
+import { AffiliationHeroSection } from "@/components/AffiliationHeroSection";
+import { AffiliationStepMotion } from "@/components/AffiliationStepMotion";
+import "../affiliation-hero.css";
+import "../affiliation-steps.css";
 
 const FONT = "'InterDisplay', 'Inter Display', sans-serif";
 const BLUE = "#0047FF";
@@ -87,31 +91,28 @@ export default function AffiliationPage() {
 
   const steps = [
     {
-      step: "1",
+      step: "1" as const,
       title: lang === "fr" ? "Partagez votre lien" : "Share your link",
       desc:
         lang === "fr"
           ? "Publiez-le partout. Bio, vidéos, newsletters, posts. Votre lien unique suit chaque inscription que vous générez."
           : "Post it anywhere. Bio, videos, newsletters, posts. Your unique link tracks every signup you drive.",
-      image: "/images/link.png",
     },
     {
-      step: "2",
+      step: "2" as const,
       title: lang === "fr" ? "Ils s'inscrivent et paient" : "They sign up and pay",
       desc:
         lang === "fr"
           ? "Votre audience découvre Trackit. Quand ils passent à Basic ou Pro, la vente vous est attribuée."
           : "Your audience discovers Trackit. When they upgrade to Basic or Pro, the sale is attributed to you.",
-      image: "/images/signupandpay.png",
     },
     {
-      step: "3",
+      step: "3" as const,
       title: lang === "fr" ? "Vous êtes payé" : "You get paid",
       desc:
         lang === "fr"
           ? "Commission récurrente de 20% déposée chaque mois. Tant qu'ils restent abonnés, vous continuez à gagner."
           : "20% recurring commission deposited every month. As long as they stay subscribed, you keep earning.",
-      image: "/images/getpaid.png",
     },
   ];
 
@@ -152,53 +153,14 @@ export default function AffiliationPage() {
       </nav>
 
       {/* Hero */}
-      <section style={{ width: "100%", padding: "48px 24px 64px" }}>
-        <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "center" }}>
-        <img
-          src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-          alt="Trackit"
-          style={{
-            height: "clamp(88px, 14vw, 128px)",
-            width: "auto",
-            display: "block",
-            margin: "0 auto 6px",
-            objectFit: "contain",
-            transform: "translateX(-4px)",
-          }}
-        />
-        <div
-          style={{
-            color: BLUE,
-            fontSize: "clamp(18px, 2.8vw, 22px)",
-            fontWeight: 700,
-            letterSpacing: "-0.03em",
-            marginBottom: 24,
-            textAlign: "center",
-            transform: "translateX(-4px)",
-          }}
-        >
-          {lang === "fr" ? "Affiliation" : "Affiliate"}
-        </div>
-        <h1
-          className="hero-headline"
-          style={{ fontSize: "clamp(36px, 5vw, 52px)", marginBottom: 16 }}
-        >
-          <span className="hero-line-wrap">{lang === "fr" ? "Gagnez 20% sur chaque" : "Earn 20% on every"}</span>
-          <span className="hero-line-wrap">
-            {lang === "fr" ? "utilisateur que vous apportez" : "user you bring"}
-            <span style={{ color: BLUE, fontSize: "1.55em", fontWeight: 600 }}>.</span>
-          </span>
-        </h1>
-        <p className="hero-sub" style={{ marginBottom: 20 }}>
-          {lang === "fr"
-            ? "Partagez votre lien unique. Chaque fois que quelqu'un s'inscrit et paie, vous gagnez 20% de son abonnement. Chaque mois. Sans plafond. Sans minimum."
-            : "Share your unique link. Every time someone signs up and pays, you earn 20% of their subscription. Every month. No cap. No minimum."}
-        </p>
+      <section className="affiliation-page-hero" style={{ width: "100%", padding: "8px 24px 0" }}>
+        <AffiliationHeroSection lang={lang} />
+        <div className="affiliation-page-hero__cta" style={{ maxWidth: 560, margin: "0 auto", textAlign: "center" }}>
         <button
           type="button"
           className="hero-cta"
           onClick={() => setPanelOpen(true)}
-          style={{ marginTop: 8, marginBottom: 12, border: "none", cursor: "pointer" }}
+          style={{ marginTop: 0, marginBottom: 10, border: "none", cursor: "pointer" }}
         >
           {lang === "fr" ? "Devenir partenaire →" : "Start partnering →"}
         </button>
@@ -209,13 +171,13 @@ export default function AffiliationPage() {
       </section>
 
       {/* How it works */}
-      <section style={{ maxWidth: 960, margin: "0 auto", padding: "0 24px 72px" }}>
+      <section className="affiliation-page-steps" style={{ maxWidth: 960, margin: "0 auto", padding: "72px 24px 56px" }}>
         <h2
           style={{
             fontSize: "clamp(28px, 4vw, 36px)",
             fontWeight: 600,
             textAlign: "center",
-            marginBottom: 32,
+            marginBottom: 24,
             letterSpacing: "-0.03em",
           }}
         >
@@ -256,20 +218,14 @@ export default function AffiliationPage() {
               <p style={{ fontSize: 14, color: SUBTEXT, margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
                 {item.desc}
               </p>
-              {"image" in item && item.image && (
-                <img
-                  src={item.image}
-                  alt={item.title}
-                  className="affiliation-step-image"
-                />
-              )}
+              <AffiliationStepMotion step={item.step} />
             </div>
           ))}
         </div>
       </section>
 
       {/* Revenue simulator */}
-      <section style={{ maxWidth: 560, margin: "0 auto", padding: "0 24px 72px" }}>
+      <section style={{ maxWidth: 560, margin: "0 auto", padding: "0 24px 56px" }}>
         <div
           style={{
             background: "#fff",
@@ -362,7 +318,7 @@ export default function AffiliationPage() {
       </section>
 
       {/* FAQ */}
-      <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 24px 72px" }}>
+      <section style={{ maxWidth: 640, margin: "0 auto", padding: "0 24px 56px" }}>
         <h2
           style={{
             fontSize: 22,
