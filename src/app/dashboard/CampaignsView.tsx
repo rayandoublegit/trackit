@@ -3698,14 +3698,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       )}
       {tab === "analytics" && (
         <>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
-        <AnalyticsPeriodDropdown
-          value={analyticsPeriod}
-          onChange={setAnalyticsPeriod}
-          lang={lang}
-          align="right"
-        />
-      </div>
       <div
         style={{
           display: "grid",
