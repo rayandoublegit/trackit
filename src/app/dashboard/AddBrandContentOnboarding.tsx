@@ -50,11 +50,14 @@ type CreatorRow = {
 export function AddBrandContentOnboarding({
   brandId,
   isMobile,
+  campaignCreatorIds,
   onClose,
   onSuccess,
 }: {
   brandId?: string;
   isMobile?: boolean;
+  /** Limite la liste aux créateurs membres de la campagne (onglet Contenu campagne). */
+  campaignCreatorIds?: string[];
   onClose: () => void;
   onSuccess: () => void;
 }) {
@@ -84,12 +87,16 @@ export function AddBrandContentOnboarding({
         .eq("user_id", brandId)
         .not("linked_user_id", "is", null)
         .order("created_at", { ascending: false });
-      const rows = (data || []) as CreatorRow[];
+      let rows = (data || []) as CreatorRow[];
+      if (campaignCreatorIds?.length) {
+        const allowed = new Set(campaignCreatorIds.map(String));
+        rows = rows.filter((row) => allowed.has(row.id));
+      }
       setCreators(rows);
       if (rows[0]) setCreatorRowId(rows[0].id);
       setLoadingCreators(false);
     })();
-  }, [brandId]);
+  }, [brandId, campaignCreatorIds]);
 
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
@@ -206,9 +213,13 @@ export function AddBrandContentOnboarding({
           {lang === "fr" ? "Ajouter du contenu" : "Add content"}
         </h1>
         <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 32px", lineHeight: 1.5 }}>
-          {lang === "fr"
-            ? "Associez des fichiers et des notes à un créateur. Le contenu apparaîtra dans Gérer et dans ses campagnes."
-            : "Attach files and notes to a creator. Content will appear in Manage and in their campaigns."}
+          {campaignCreatorIds?.length
+            ? lang === "fr"
+              ? "Associez des fichiers à un créateur de cette campagne. Le contenu apparaîtra ici et dans Gérer."
+              : "Attach files to a creator in this campaign. Content will appear here and in Manage."
+            : lang === "fr"
+              ? "Associez des fichiers et des notes à un créateur. Le contenu apparaîtra dans Gérer et dans ses campagnes."
+              : "Attach files and notes to a creator. Content will appear in Manage and in their campaigns."}
         </p>
 
         {loadingCreators ? (
@@ -216,9 +227,13 @@ export function AddBrandContentOnboarding({
         ) : creators.length === 0 ? (
           <div>
             <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5 }}>
-              {lang === "fr"
-                ? "Ajoutez d'abord un créateur avec un compte actif via Invitations."
-                : "Add a creator with an active account via Invitations first."}
+              {campaignCreatorIds?.length
+                ? lang === "fr"
+                  ? "Aucun créateur de cette campagne n'a de compte actif. Ajoutez des créateurs à la campagne via Invitations."
+                  : "No creator in this campaign has an active account. Add creators to the campaign via Invitations."
+                : lang === "fr"
+                  ? "Ajoutez d'abord un créateur avec un compte actif via Invitations."
+                  : "Add a creator with an active account via Invitations first."}
             </p>
             <button type="button" style={onboardingSecondaryBtn} onClick={onClose}>
               {lang === "fr" ? "Retour" : "Back"}

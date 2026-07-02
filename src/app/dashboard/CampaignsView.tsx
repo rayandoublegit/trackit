@@ -3688,6 +3688,11 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           lang={lang}
           brandId={userId}
           campaignId={campaign.id}
+          campaignCreatorIds={
+            analytics?.rows?.map((row) => row.id) ??
+            campaign.creatorIds ??
+            []
+          }
           isMobile={isMobile}
         />
       )}
