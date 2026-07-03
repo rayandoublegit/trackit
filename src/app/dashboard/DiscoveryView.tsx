@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
@@ -31,7 +31,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
-import { proxiedImageUrl } from "@/lib/tiktok-avatar";
+import { clientImageUrl } from "@/lib/client-image-url";
 import { UpgradeModal } from "./UpgradeModal";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import {
@@ -542,15 +542,70 @@ function getVideoThumbnails(creator: Creator): VideoThumbnail[] {
   ];
 }
 
+function VideoThumbImage({
+  src,
+  username,
+  index,
+}: {
+  src: string;
+  username: string;
+  index: number;
+}) {
+  const [activeSrc, setActiveSrc] = useState(src);
+  const triedRefresh = useRef(false);
+
+  useEffect(() => {
+    setActiveSrc(src);
+    triedRefresh.current = false;
+  }, [src]);
+
+  if (!activeSrc) return null;
+
+  return (
+    <img
+      key={`${username}:${index}:${activeSrc}`}
+      src={activeSrc}
+      alt=""
+      draggable={false}
+      loading="eager"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+      onError={() => {
+        if (triedRefresh.current || !username) {
+          setActiveSrc("");
+          return;
+        }
+        triedRefresh.current = true;
+        setActiveSrc(`/api/creator-video-thumbs?username=${encodeURIComponent(username)}&i=${index}`);
+      }}
+    />
+  );
+}
+
 function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card" | "modal"; lang: "en" | "fr" }) {
   const videoThumbnails = getVideoThumbnails(creator);
   const isModal = size === "modal";
   const handle = creator.username || "";
 
+  // Always show 3 slots so missing previews can load via the refresh API.
+  const slots: VideoThumbnail[] =
+    videoThumbnails.length > 0
+      ? videoThumbnails.slice(0, 3)
+      : [
+          { views: 0, thumbnail: null },
+          { views: 0, thumbnail: null },
+          { views: 0, thumbnail: null },
+        ];
+
   return (
     <div style={{ display: "flex", gap: isModal ? 10 : 6 }}>
-      {videoThumbnails.map((video, i) => {
-        const cover = video.thumbnail ? proxiedImageUrl(video.thumbnail) : "";
+      {slots.map((video, i) => {
+        const cover = video.thumbnail
+          ? clientImageUrl(video.thumbnail)
+          : handle
+            ? `/api/creator-video-thumbs?username=${encodeURIComponent(handle)}&i=${i}`
+            : "";
         const Wrapper: any = video.url ? "a" : "div";
         const wrapperProps = video.url
           ? { href: video.url, target: "_blank", rel: "noopener noreferrer" }
@@ -572,15 +627,7 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
             background: cover ? "#000" : gradientForVideo(handle, i),
           }}
         >
-          {cover ? (
-            <img
-              key={`${handle}:${i}:${cover}`}
-              src={cover}
-              alt=""
-              draggable={false}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : null}
+          {cover ? <VideoThumbImage src={cover} username={handle} index={i} /> : null}
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div
               style={{

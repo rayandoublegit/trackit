@@ -3312,10 +3312,10 @@ function CampaignDetailToolbar({
               {analyticsPeriod === "custom" && (
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <div>
+        <div>
                       <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
                         {lang === "fr" ? "Début" : "Start"}
-                      </div>
+          </div>
                       <input
                         type="date"
                         value={customDateRange.start}
@@ -3323,11 +3323,11 @@ function CampaignDetailToolbar({
                         onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, start: e.target.value }))}
                         style={dateInputStyle}
                       />
-                    </div>
+        </div>
                     <div>
                       <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
                         {lang === "fr" ? "Fin" : "End"}
-                      </div>
+        </div>
                       <input
                         type="date"
                         value={customDateRange.end}
@@ -3336,7 +3336,7 @@ function CampaignDetailToolbar({
                         onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, end: e.target.value }))}
                         style={dateInputStyle}
                       />
-                    </div>
+      </div>
                   </div>
                   <button
                     type="button"
@@ -3947,10 +3947,10 @@ function AnalyticsTab({
                   const displayName = row.full_name || row.handle || "—";
                   const handle = row.handle ? row.handle.replace(/^@/, "") : "";
                   return (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                      <td style={{ padding: "14px" }}>
+          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+            <td style={{ padding: "14px" }}>
                         <CampaignCreatorRankBadge rank={index + 1} />
-                      </td>
+            </td>
                       <td style={{ padding: "14px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                           <CreatorAvatar
@@ -3987,7 +3987,7 @@ function AnalyticsTab({
                       <td style={{ padding: "14px" }}>
                         <CampaignCreatorStatusBadge lang={lang} active={row.salesAmount > 0} />
                       </td>
-                    </tr>
+          </tr>
                   );
                 })
               )}
@@ -4038,8 +4038,8 @@ function AnalyticsTab({
                 </tr>
             ))
           )}
-        </Table>
-      </Card>
+      </Table>
+    </Card>
     </>
   );
 }
@@ -4984,7 +4984,7 @@ function AddSaleOnboarding({
                       key={creator.id}
                       type="button"
                       onClick={() => setCreatorId(creator.id)}
-                      style={{
+                style={{
                         display: "flex",
                         alignItems: "center",
                         gap: 12,
@@ -5007,11 +5007,11 @@ function AddSaleOnboarding({
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: selectionTextPrimary(selected) }}>
                           {creator.full_name || creator.handle || "—"}
-                        </div>
+              </div>
                         {creator.handle ? (
                           <div style={{ fontSize: 13, color: selectionTextSecondary(selected) }}>@{creator.handle.replace(/^@/, "")}</div>
                         ) : null}
-                      </div>
+          </div>
                       {commission != null ? (
                         <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#1A1A1A", whiteSpace: "nowrap" }}>
                           {commission}%
@@ -5024,8 +5024,8 @@ function AddSaleOnboarding({
                     </button>
                   );
                 })}
+        </div>
               </div>
-            </div>
 
             {creatorId && !hasSelectedCommission ? (
               <div
@@ -5040,24 +5040,24 @@ function AddSaleOnboarding({
                 <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5 }}>
                   {commissionNotConfiguredMessage(lang)}
                 </p>
-                <button
-                  type="button"
+                    <button
+                      type="button"
                   onClick={() => navigate({ view: "creators" })}
-                  style={{
+                      style={{
                     border: "none",
                     background: "#0047FF",
                     color: "#FFFFFF",
                     borderRadius: 8,
                     padding: "8px 14px",
-                    fontSize: 13,
+                        fontSize: 13,
                     fontWeight: 500,
-                    cursor: "pointer",
+                        cursor: "pointer",
                     fontFamily: "inherit",
-                  }}
-                >
+                      }}
+                    >
                   {lang === "fr" ? "Ouvrir Find it → Gérer" : "Open Find it → Manage"}
-                </button>
-              </div>
+                    </button>
+                </div>
             ) : null}
 
             <div style={{ marginBottom: 24 }}>
@@ -5107,8 +5107,8 @@ function AddSaleOnboarding({
                 {lang === "fr" ? "Annuler" : "Cancel"}
               </button>
             </div>
-          </>
-        )}
+            </>
+          )}
       </div>
     </div>
   );
@@ -5678,8 +5678,8 @@ function NewCampaignOnboarding({
                   style={{ width: "100%", border: "none", outline: "none", fontSize: 15, fontFamily: "inherit", padding: "12px 0", background: "transparent", boxSizing: "border-box" }}
                   autoFocus
                 />
-              </div>
-            </div>
+                </div>
+                    </div>
 
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -5752,8 +5752,8 @@ function NewCampaignOnboarding({
                     <InfoHint title={row.hint} />
                   </span>
                 </label>
-              ))}
-            </div>
+                  ))}
+                </div>
 
             <div style={{ marginBottom: 40 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -5873,7 +5873,7 @@ function NewCampaignOnboarding({
                     ) : listOptions.length === 0 ? (
                       <div style={{ padding: 12, fontSize: 13, color: "#9A9A9A" }}>
                         {lang === "fr" ? "Aucune liste. Ajoutez des créateurs dans Gérer." : "No lists yet. Add creators in Manage."}
-                      </div>
+              </div>
                     ) : (
                       listOptions.map((list) => (
                         <label
@@ -5891,14 +5891,14 @@ function NewCampaignOnboarding({
                         </label>
                       ))
                     )}
-                  </div>
-                )}
+            </div>
+          )}
               </div>
               <button type="button" style={{ ...onboardingSecondaryBtn, flexShrink: 0 }} onClick={() => csvRef.current?.click()}>
                 {lang === "fr" ? "Importer CSV" : "Import CSV"}
               </button>
               <input ref={csvRef} type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={(e) => void onCsvSelected(e.target.files?.[0])} />
-            </div>
+        </div>
 
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
@@ -5999,7 +5999,7 @@ function NewCampaignOnboarding({
                         style={{ border: "none", background: "transparent", color: "#9CA3AF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
                       >
                         {lang === "fr" ? "Retirer" : "Remove"}
-                      </button>
+          </button>
                     </div>
                   );
                   })}
@@ -6040,7 +6040,7 @@ function NewCampaignOnboarding({
                       : lang === "fr"
                         ? "Démarrer la campagne"
                         : "Start campaign"}
-              </button>
+            </button>
               {!isAddCreatorsMode && (
                 <button type="button" style={onboardingSecondaryBtn} onClick={() => setStep(0)}>
                   {lang === "fr" ? "Retour" : "Back"}
@@ -6049,7 +6049,7 @@ function NewCampaignOnboarding({
               <button type="button" style={onboardingSecondaryBtn} onClick={() => void handleClose()} disabled={savingDraft || launching}>
                 {exitLabel}
               </button>
-            </div>
+        </div>
           </>
         )}
       </div>

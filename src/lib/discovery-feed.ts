@@ -4,6 +4,7 @@ import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { liveSearchAndEnrich } from "@/lib/discovery-live";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
 import { NICHE_TREE } from "@/lib/niche-tree";
+import { displayVideoThumbnails } from "@/lib/tiktok-video-thumbs";
 import { createClient } from "@supabase/supabase-js";
 import {
   estimatedCostPerPost,
@@ -71,16 +72,20 @@ export function rankFeed(creators: DiscoveryCreatorResult[]): FeedCreator[] {
 let cache: { at: number; creators: FeedCreator[] } | null = null;
 const TTL_MS = 30 * 60 * 1000;
 
-function mapVideoThumbnails(raw: unknown): DiscoveryCreatorResult["videoThumbnails"] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((row) => {
-    const t = row as { views?: number; thumbnail?: string | null; url?: string | null };
-    return {
-      views: Number(t.views ?? 0),
-      thumbnail: clientImageUrl(t.thumbnail) || null,
-      url: t.url ?? null,
-    };
-  });
+function mapVideoThumbnails(
+  videoThumbnails: unknown,
+  topVideos: unknown
+): DiscoveryCreatorResult["videoThumbnails"] {
+  const thumbs = displayVideoThumbnails(
+    Array.isArray(videoThumbnails) ? videoThumbnails : [],
+    Array.isArray(topVideos) ? topVideos : [],
+    3
+  );
+  return thumbs.map((t) => ({
+    views: t.views,
+    thumbnail: clientImageUrl(t.thumbnail) || null,
+    url: t.url,
+  }));
 }
 
 function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
@@ -96,7 +101,7 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
     bio: String(c.bio ?? ""), email: (c.email as string) ?? null, niche: String(c.primary_niche ?? ""),
     primaryNiche: String(c.primary_niche ?? ""), language: String(c.language ?? "unknown"),
     location: (c.location as string) ?? null, countryCode: (c.country_code as string) ?? null,
-    videoThumbnails: mapVideoThumbnails(c.video_thumbnails),
+    videoThumbnails: mapVideoThumbnails(c.video_thumbnails, c.top_videos),
     niches: Array.isArray(c.niches) ? (c.niches as string[]) : [],
   };
 }
@@ -141,48 +146,53 @@ export async function buildFeed(opts: { limitPerNiche?: number } = {}): Promise<
   return ranked;
 }
 
-// UI niche label -> DB tokens. primary_niche / niches are raw (multi-lingual)
-// search terms, so we match a small synonym set with ILIKE / array-contains.
+// Exact tags only (niches[] / primary_niche). No partials, no cross-niche terms.
 const NICHE_TOKENS: Record<string, string[]> = {
-  fitness: ["fitness", "gym", "workout", "musculation", "sport", "abnehmen", "palestra"],
-  beauty: ["beaut", "makeup", "maquill", "maquiag", "skincare", "schminken", "trucco"],
-  food: ["food", "recipe", "recett", "receta", "receita", "cook", "cuisine", "rezept", "ricett"],
-  fashion: ["fashion", "mode", "moda", "outfit", "style", "ootd", "vintage"],
-  tech: ["tech", "gadget", "coding", "ai ", "ia "],
-  finance: ["finance", "money", "invest", "finanz", "argent", "crypto"],
-  travel: ["travel", "voyage", "viaje", "trip", "backpack", "globe", "destination"],
-  gaming: ["gaming", "game", "gamer", "valorant"],
-  lifestyle: ["lifestyle", "minimalism", "productivity", "selfcare", "routine", "quotidien", "vlog"],
-  wellness: ["wellness", "mentalhealth", "meditation", "yoga", "bien", "santé", "sante", "wellbeing"],
-  business: ["business", "entrepreneur", "marketing", "ecommerce", "startup", "freelance", "founder"],
+  fitness: ["fitness", "gym", "workout", "musculation", "bodybuilding", "calisthenics", "crossfit", "powerlifting"],
+  beauty: ["beauty", "beaute", "makeup", "maquillage", "skincare", "haircare", "grwm"],
+  food: ["food", "recipe", "recipes", "recette", "recettes", "cuisine", "baking", "mealprep", "vegan"],
+  fashion: ["fashion", "mode", "moda", "outfit", "outfits", "ootd", "streetwear", "menswear", "womenswear"],
+  tech: ["tech", "gadgets", "coding", "smarthome", "techreviews", "pcbuilds"],
+  finance: ["finance", "investing", "crypto", "personalfinance", "stocks", "budgeting", "realestate"],
+  travel: ["travel", "voyage", "voyages", "viaje", "backpacking", "vanlife", "solotravel", "digitalnomad"],
+  gaming: ["gaming", "gamer", "esports", "valorant", "fortnite", "minecraft"],
+  lifestyle: ["lifestyle", "minimalism", "vlog", "thatgirl", "dayinmylife", "slowliving"],
+  wellness: ["wellness", "mentalhealth", "meditation", "yoga", "wellbeing", "biohacking", "holistic"],
+  business: ["business", "entrepreneur", "marketing", "startup", "freelance", "founder", "agency", "smallbusiness"],
+  pets: ["pets", "dogs", "cats", "petcare", "puppytraining"],
+  home: ["home", "interiordesign", "homedecor", "diyhome", "organization"],
+  parenting: ["parenting", "momlife", "dadlife", "babytips", "pregnancy"],
   "e-commerce": [
     "e-commerce",
     "ecom",
     "ecommerce",
     "dropshipping",
     "shopify",
-    "amazon",
     "amazonfba",
-    "dtc",
-    "ugc",
     "tiktokshop",
-    "moneymaker",
-    "moneymaking",
-    "sidehustle",
-    "passiveincome",
-    "onlinebusiness",
+    "dtc",
     "printondemand",
-    "productreview",
+    "shopifydropshipping",
   ],
-  saas: ["saas", "software", "b2b", "startup", "nocode", "productled", "aitools"],
+  saas: ["saas", "b2bsaas", "productled", "saastok", "microsaas"],
 };
 
 // Map UI labels (FR/EN) to a niche key.
 const LABEL_TO_NICHE: Record<string, string> = {
-  fitness: "fitness", beauté: "beauty", beaute: "beauty", beauty: "beauty",
-  food: "food", mode: "fashion", fashion: "fashion", tech: "tech",
-  finance: "finance", voyage: "travel", travel: "travel", gaming: "gaming", jeux: "gaming",
-  lifestyle: "lifestyle", wellness: "wellness", business: "business",
+  fitness: "fitness",
+  beauté: "beauty", beaute: "beauty", beauty: "beauty",
+  food: "food", cuisine: "food",
+  mode: "fashion", fashion: "fashion",
+  tech: "tech",
+  finance: "finance",
+  voyage: "travel", travel: "travel",
+  gaming: "gaming", jeux: "gaming",
+  lifestyle: "lifestyle",
+  wellness: "wellness", "bien-etre": "wellness", "bien-être": "wellness",
+  business: "business",
+  pets: "pets", animaux: "pets",
+  home: "home", maison: "home",
+  parenting: "parenting", parentalite: "parenting",
   ecom: "e-commerce", ecommerce: "e-commerce", "e-commerce": "e-commerce",
   saas: "saas",
 };
@@ -198,21 +208,22 @@ function nicheTokensFor(key: string): string[] {
   return [...new Set([key, ...base, ...subs])];
 }
 
-/** Client-side guard: creator text fields match the selected niche filter. */
+/** Client-side guard: creator must carry an exact niche tag (no substring pollution). */
 export function creatorMatchesNicheFilter(
   creator: { primaryNiche?: string; niche?: string; niches?: string[] },
   label: string
 ): boolean {
   if (!label.trim()) return true;
-  const tokens = nicheTokensFor(resolveNicheKey(label));
-  const hay = [
-    creator.primaryNiche || "",
-    creator.niche || "",
-    ...(creator.niches || []),
-  ]
-    .join(" ")
+  const tags = new Set(nicheTagsFor(label));
+  if (!tags.size) return true;
+
+  for (const n of creator.niches ?? []) {
+    if (tags.has(String(n).trim().toLowerCase())) return true;
+  }
+  const primary = String(creator.primaryNiche || creator.niche || "")
+    .trim()
     .toLowerCase();
-  return tokens.some((t) => hay.includes(t.toLowerCase()));
+  return Boolean(primary && tags.has(primary));
 }
 
 // Tags valides pour une niche: canonique + synonymes (NICHE_TOKENS) + sous-niches.
@@ -229,30 +240,25 @@ export function nicheTagsFor(label: string): string[] {
     .filter((t) => /^[a-z0-9-]+$/i.test(t));
 }
 
-/** Fast niche filter: array tags only (indexed GIN). Prefer this for search latency. */
-export function nicheOrClause(label: string): string | null {
-  const tags = nicheTagsFor(label);
-  if (!tags.length) return null;
-  // OR de tous les tags: un createur compte s'il a la niche OU une sous-niche.
-  return tags.map((t) => `niches.cs.{${t}}`).join(",");
-}
-
 /**
- * Catalogue: tags array + primary_niche.
- * Heavier than nicheOrClause — use only when recall matters more than speed.
+ * Fast niche filter: exact array tags (GIN) + exact primary_niche.
+ * No ILIKE %wildcards% — avoids fitness/etc. leaking into e-commerce / saas.
  */
-export function nicheCatalogOrClause(label: string): string | null {
+export function nicheOrClause(label: string): string | null {
   const tags = nicheTagsFor(label);
   if (!tags.length) return null;
   const clauses = new Set<string>();
   for (const t of tags) {
     clauses.add(`niches.cs.{${t}}`);
-    clauses.add(`primary_niche.ilike.%${t}%`);
+    // Exact primary_niche (case-insensitive). Quote tags with hyphens.
+    clauses.add(`primary_niche.ilike."${t}"`);
   }
-  // Always include the canonical key on primary_niche for older rows.
-  const key = resolveNicheKey(label);
-  if (key) clauses.add(`primary_niche.ilike.%${key}%`);
   return [...clauses].join(",");
+}
+
+/** Alias kept for callers that used the heavier catalogue filter. */
+export function nicheCatalogOrClause(label: string): string | null {
+  return nicheOrClause(label);
 }
 
 /** Columns needed to render a discovery/catalog card (avoid select *). */
@@ -276,6 +282,7 @@ export const CREATOR_LIST_COLUMNS = [
   "location",
   "country_code",
   "video_thumbnails",
+  "top_videos",
   "niches",
 ].join(",");
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rankFeed, creatorMatchesNicheFilter, nicheCatalogOrClause } from "@/lib/discovery-feed";
+import { rankFeed, creatorMatchesNicheFilter, nicheCatalogOrClause, nicheOrClause } from "@/lib/discovery-feed";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 
 function creator(p: Partial<DiscoveryCreatorResult> & { username: string }): DiscoveryCreatorResult {
@@ -28,39 +28,61 @@ describe("rankFeed", () => {
   });
 });
 
-describe("nicheCatalogOrClause", () => {
-  it("matches array tags and primary_niche", () => {
-    const or = nicheCatalogOrClause("fitness");
+describe("nicheOrClause", () => {
+  it("matches array tags and exact primary_niche", () => {
+    const or = nicheOrClause("fitness");
     expect(or).toContain("niches.cs.{fitness}");
-    expect(or).toContain("primary_niche.ilike.%fitness%");
+    expect(or).toContain('primary_niche.ilike."fitness"');
+    expect(or).not.toContain("%fitness%");
   });
 
-  it("expands e-commerce synonyms (dropshipping, moneymaker, …)", () => {
+  it("uses strict e-commerce tags only (no fitness pollution)", () => {
     const or = nicheCatalogOrClause("e-commerce");
     expect(or).toContain("niches.cs.{e-commerce}");
     expect(or).toContain("niches.cs.{dropshipping}");
-    expect(or).toContain("niches.cs.{moneymaker}");
     expect(or).toContain("niches.cs.{shopify}");
-    expect(or).toContain("primary_niche.ilike.%dropshipping%");
+    expect(or).not.toContain("moneymaker");
+    expect(or).not.toContain("ugc");
+    expect(or).not.toContain("sidehustle");
+    expect(or).not.toContain("fitness");
   });
-});
 
-describe("creatorMatchesNicheFilter e-commerce", () => {
-  it("matches dropshipping / moneymaker creators under e-commerce", () => {
-    expect(creatorMatchesNicheFilter({ niches: ["dropshipping"] }, "e-commerce")).toBe(true);
-    expect(creatorMatchesNicheFilter({ niches: ["moneymaker"] }, "e-commerce")).toBe(true);
-    expect(creatorMatchesNicheFilter({ primaryNiche: "shopify" }, "e-commerce")).toBe(true);
-    expect(creatorMatchesNicheFilter({ niches: ["fitness"] }, "e-commerce")).toBe(false);
+  it("uses strict saas tags only", () => {
+    const or = nicheOrClause("saas");
+    expect(or).toContain("niches.cs.{saas}");
+    expect(or).toContain('primary_niche.ilike."saas"');
+    expect(or).not.toContain("startup");
+    expect(or).not.toContain("software");
+    expect(or).not.toContain("fitness");
   });
 });
 
 describe("creatorMatchesNicheFilter", () => {
-  it("matches travel but not fitness", () => {
-    const travel = { primaryNiche: "voyage pas cher", niche: "travel", niches: ["travel"] };
-    const fitness = { primaryNiche: "coach sportif", niche: "fitness", niches: ["fitness"] };
+  it("keeps every niche isolated (no cross-niche leak)", () => {
+    const travel = { primaryNiche: "travel", niche: "travel", niches: ["travel"] };
+    const fitness = { primaryNiche: "fitness", niche: "fitness", niches: ["fitness"] };
+    const food = { primaryNiche: "food", niches: ["food", "recipes"] };
     expect(creatorMatchesNicheFilter(travel, "travel")).toBe(true);
     expect(creatorMatchesNicheFilter(travel, "fitness")).toBe(false);
     expect(creatorMatchesNicheFilter(fitness, "fitness")).toBe(true);
     expect(creatorMatchesNicheFilter(fitness, "travel")).toBe(false);
+    expect(creatorMatchesNicheFilter(fitness, "food")).toBe(false);
+    expect(creatorMatchesNicheFilter(food, "food")).toBe(true);
+    expect(creatorMatchesNicheFilter(food, "fitness")).toBe(false);
+    expect(creatorMatchesNicheFilter(food, "beauty")).toBe(false);
+  });
+
+  it("matches only exact e-commerce / saas tags", () => {
+    expect(creatorMatchesNicheFilter({ niches: ["dropshipping"] }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["e-commerce"] }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ primaryNiche: "shopify" }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["fitness"] }, "e-commerce")).toBe(false);
+    expect(creatorMatchesNicheFilter({ niches: ["ugc"] }, "e-commerce")).toBe(false);
+    expect(creatorMatchesNicheFilter({ niches: ["moneymaker"] }, "e-commerce")).toBe(false);
+
+    expect(creatorMatchesNicheFilter({ niches: ["saas"] }, "saas")).toBe(true);
+    expect(creatorMatchesNicheFilter({ primaryNiche: "saas" }, "saas")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["startup"] }, "saas")).toBe(false);
+    expect(creatorMatchesNicheFilter({ niches: ["fitness"] }, "saas")).toBe(false);
   });
 });

@@ -172,7 +172,8 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
   let out = list;
 
   if (f.niche) {
-    // Niche deja filtree server-side (tag strict). Pas de re-filtre client qui rognerait la liste.
+    // Server filters by exact tags; client re-checks so nothing leaks across niches.
+    out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
   }
 
   if (f.platform) {
@@ -1186,7 +1187,9 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const items = isPaid ? visibleCreators : visibleCreators.slice(0, FREE_VISIBLE + 2);
   const hasMoreFree = !isPaid && visibleCreators.length > FREE_VISIBLE;
   const displayCount = filtered.length;
-  const batchNote = allNichesBrowse ? "" : (planResultCap != null ? t.resultsCappedAt(planResultCap) : "");
+  // Creator count is only meaningful for a specific niche — hide on "All niches".
+  const showCreatorCount = Boolean(filters.niche.trim());
+  const batchNote = showCreatorCount && planResultCap != null ? t.resultsCappedAt(planResultCap) : "";
   const discoveryGateActive = showDiscoveryGate;
   const feedGateActive = discoveryGateActive || hasMoreFree;
   const searchQuery = filters.search.trim();
@@ -1310,16 +1313,15 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
             }}
           >
             <div style={{ minWidth: 0 }}>
-              {!allNichesBrowse && (
+              {showCreatorCount ? (
                 <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
                   {loading ? t.loading : `${t.creatorCount(displayCount)}${batchNote}`}
                 </p>
-              )}
-              {allNichesBrowse && loading && (
+              ) : loading ? (
                 <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
                   {t.loading}
                 </p>
-              )}
+              ) : null}
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               {!isMobile && (

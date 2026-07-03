@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
-import { CREATOR_LIST_COLUMNS, nicheOrClause } from "@/lib/discovery-feed";
+import { CREATOR_LIST_COLUMNS, creatorMatchesNicheFilter, nicheOrClause } from "@/lib/discovery-feed";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
+import { displayVideoThumbnails } from "@/lib/tiktok-video-thumbs";
+import { clientImageUrl } from "@/lib/client-image-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -59,15 +61,24 @@ export async function POST(request: Request) {
     platform: c.platform,
     bio: c.bio,
     email: c.email,
-    niche: body.niche,
-    primaryNiche: c.primary_niche,
+    niche: c.primary_niche ?? "",
+    primaryNiche: c.primary_niche ?? "",
+    niches: Array.isArray(c.niches) ? c.niches : [],
     language: c.language,
     location: c.location,
     countryCode: c.country_code || resolveCreatorCountryCode(
       typeof c.location === "string" ? c.location : null,
       typeof c.language === "string" ? c.language : null
     ),
-    videoThumbnails: c.video_thumbnails || [],
+    videoThumbnails: displayVideoThumbnails(
+      Array.isArray(c.video_thumbnails) ? c.video_thumbnails : [],
+      Array.isArray(c.top_videos) ? c.top_videos : [],
+      3
+    ).map((t) => ({
+      views: t.views,
+      thumbnail: clientImageUrl(t.thumbnail) || null,
+      url: t.url,
+    })),
     curated:
       (Array.isArray(c.niches) && c.niches.includes("curated")) ||
       (Array.isArray(c.video_thumbnails) && c.video_thumbnails.length > 0),
@@ -106,8 +117,13 @@ export async function POST(request: Request) {
 
   const [curatedRes, scrapedRes] = await Promise.all([curatedQ, scrapedQ]);
 
-  const curatedRows = (curatedRes.data ?? []).map(mapRow);
-  const scrapedRows = (scrapedRes.data ?? []).map(mapRow);
+  const nicheLabel = String(body.niche);
+  const curatedRows = ((curatedRes.data ?? []) as unknown as Record<string, unknown>[])
+    .map(mapRow)
+    .filter((r) => creatorMatchesNicheFilter(r, nicheLabel));
+  const scrapedRows = ((scrapedRes.data ?? []) as unknown as Record<string, unknown>[])
+    .map(mapRow)
+    .filter((r) => creatorMatchesNicheFilter(r, nicheLabel));
 
   const CAP = 30;
   const HALF = 15;

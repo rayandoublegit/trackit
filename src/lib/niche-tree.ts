@@ -14,28 +14,21 @@ export const NICHE_TREE: Record<string, string[]> = {
   home: ["interiordesign", "diyhome", "cleaning", "organization", "plants", "homedecor", "renovation", "smallspaces", "rentaldecor", "cottagecore"],
   parenting: ["momlife", "dadlife", "babytips", "toddlers", "pregnancy", "newborn", "parentinghacks", "homeschool", "bigfamily"],
   wellness: ["mentalhealth", "meditation", "yoga", "nutrition", "supplements", "sleep", "biohacking", "holistic", "selflove", "therapy"],
-  business: ["entrepreneur", "marketing", "ecommerce", "sidehustle", "smallbusiness", "saas", "dropshipping", "agency", "founder", "freelance"],
+  // No ecommerce/saas/dropshipping here — those have their own parent niches.
+  business: ["entrepreneur", "marketing", "sidehustle", "smallbusiness", "agency", "founder", "freelance"],
+  // Strict tags only — avoid broad terms (ugc, sidehustle, …) that pollute other niches.
   "e-commerce": [
     "ecommerce",
     "ecom",
     "dropshipping",
     "shopify",
     "amazonfba",
-    "productreview",
-    "ugc",
-    "dtc",
-    "onlinestore",
-    "amazon",
     "tiktokshop",
-    "moneymaker",
-    "moneymaking",
-    "sidehustle",
-    "passiveincome",
-    "onlinebusiness",
+    "dtc",
     "printondemand",
     "shopifydropshipping",
   ],
-  saas: ["saas", "b2b", "software", "startup", "productled", "nocode", "aitools", "productivitysaas", "b2bsaas"],
+  saas: ["b2bsaas", "productled", "saastok", "microsaas"],
   beautytech: ["ledmask", "microcurrent", "gua sha", "skintools", "hairtools"],
   outdoors: ["hiking", "camping", "fishing", "climbing", "surfing", "skiing", "cycling"],
   auto: ["cartok", "carmods", "supercars", "evs", "motorcycles", "detailing"],
@@ -62,6 +55,8 @@ export const FR_NICHE_QUERIES: Record<string, string[]> = {
   business: ["entrepreneur francais", "marketing digital", "ecommerce france", "side business", "freelance", "creer entreprise", "business en ligne", "agence marketing", "dropshipping france", "startup", "entrepreneuriat", "business france", "auto entrepreneur", "vendre en ligne", "marketing reseaux sociaux", "copywriting", "personal branding", "shopify france", "e-commerce", "networking business", "creer sa boite", "solopreneur", "business plan", "marketing france", "growth hacking", "vente en ligne", "micro entreprise", "lancer business"],
   ecommerce: ["dropshipping france", "e-commerce france", "ecommerce france", "boutique en ligne", "vendre sur shopify", "shopify france", "print on demand france", "amazon fba france", "vinted revente", "formation ecommerce", "lancer sa boutique", "produit gagnant", "marketing ecommerce", "tiktok ads france", "facebook ads ecommerce", "fournisseur dropshipping", "aliexpress dropshipping", "marque en ligne", "dnvb france", "site ecommerce", "conversion ecommerce", "logistique ecommerce", "seo ecommerce", "outils ecommerce", "vendre en ligne france"],
   saas: ["saas france", "startup france", "startup tech france", "logiciel entreprise", "outil no code", "no code france", "automatisation business", "indie hacker france", "creer un saas", "developpeur entrepreneur", "tech france", "application web", "lancer une startup", "growth startup", "b2b saas", "outil productivite entreprise", "ia pour entreprise", "micro saas", "bootstrapper", "levee de fonds startup", "french tech", "solopreneur tech", "outil ia business", "logiciel saas", "code et business"],
+  ecommerce: ["dropshipping france", "e-commerce france", "ecommerce france", "boutique en ligne", "vendre sur shopify", "shopify france", "print on demand france", "amazon fba france", "vinted revente", "formation ecommerce", "lancer sa boutique", "produit gagnant", "marketing ecommerce", "tiktok ads france", "facebook ads ecommerce", "fournisseur dropshipping", "aliexpress dropshipping", "marque en ligne", "dnvb france", "site ecommerce", "conversion ecommerce", "logistique ecommerce", "seo ecommerce", "outils ecommerce", "vendre en ligne france"],
+  saas: ["saas france", "startup france", "startup tech france", "logiciel entreprise", "outil no code", "no code france", "automatisation business", "indie hacker france", "creer un saas", "developpeur entrepreneur", "tech france", "application web", "lancer une startup", "growth startup", "b2b saas", "outil productivite entreprise", "ia pour entreprise", "micro saas", "bootstrapper", "levee de fonds startup", "french tech", "solopreneur tech", "outil ia business", "logiciel saas", "code et business"],
 };
 
 // English-market search queries, same canonical niches as FR. English keywords
@@ -80,6 +75,8 @@ export const EN_NICHE_QUERIES: Record<string, string[]> = {
   parenting: ["mom life", "dad life", "parenting tips", "pregnancy tips", "newborn tips", "toddler mom", "parenting hacks", "baby tips", "big family", "first time mom"],
   wellness: ["mental health", "meditation", "yoga practice", "nutrition tips", "supplements", "wellness routine", "self love", "better sleep", "stress relief", "holistic health"],
   business: ["entrepreneur tips", "digital marketing", "ecommerce tips", "side business", "freelancing", "start a business", "online business", "marketing agency", "dropshipping", "startup founder"],
+  ecommerce: ["dropshipping", "ecommerce tips", "shopify store", "print on demand", "amazon fba", "winning product", "online store", "tiktok shop seller", "product research", "aliexpress dropshipping", "shopify dropshipping", "ecommerce marketing", "facebook ads ecommerce", "tiktok ads", "one product store", "branded dropshipping", "ecommerce automation", "sell online", "dtc brand", "ecommerce business", "store owner", "ecom lifestyle", "scale ecommerce", "ecommerce tools", "q4 dropshipping"],
+  saas: ["saas founder", "build in public", "indie hacker", "micro saas", "no code tools", "saas marketing", "startup founder", "b2b saas", "saas growth", "bootstrapped founder", "ai tools business", "software founder", "mrr journey", "saas metrics", "product led growth", "solo founder", "tech startup", "launch startup", "saas sales", "founder journey", "saas tips", "arr growth", "startup tools", "software business", "vibe coding"],
   ecommerce: ["dropshipping", "ecommerce tips", "shopify store", "print on demand", "amazon fba", "winning product", "online store", "tiktok shop seller", "product research", "aliexpress dropshipping", "shopify dropshipping", "ecommerce marketing", "facebook ads ecommerce", "tiktok ads", "one product store", "branded dropshipping", "ecommerce automation", "sell online", "dtc brand", "ecommerce business", "store owner", "ecom lifestyle", "scale ecommerce", "ecommerce tools", "q4 dropshipping"],
   saas: ["saas founder", "build in public", "indie hacker", "micro saas", "no code tools", "saas marketing", "startup founder", "b2b saas", "saas growth", "bootstrapped founder", "ai tools business", "software founder", "mrr journey", "saas metrics", "product led growth", "solo founder", "tech startup", "launch startup", "saas sales", "founder journey", "saas tips", "arr growth", "startup tools", "software business", "vibe coding"],
 };

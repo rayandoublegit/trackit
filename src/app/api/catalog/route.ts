@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   catalogRowToFeedCreator,
   CREATOR_LIST_COLUMNS,
+  creatorMatchesNicheFilter,
   nicheOrClause,
   type FeedCreator,
 } from "@/lib/discovery-feed";
@@ -80,7 +81,20 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const rows = (data || []) as Record<string, unknown>[];
+    let rows = (data ?? []) as unknown as Record<string, unknown>[];
+    // Exact-tag safety net: drop any row that leaked through SQL.
+    if (niche) {
+      rows = rows.filter((row) =>
+        creatorMatchesNicheFilter(
+          {
+            primaryNiche: typeof row.primary_niche === "string" ? row.primary_niche : "",
+            niche: typeof row.primary_niche === "string" ? row.primary_niche : "",
+            niches: Array.isArray(row.niches) ? (row.niches as string[]) : [],
+          },
+          niche
+        )
+      );
+    }
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const pageSeed = (Math.floor(offset / limit) + 1) * 7919;

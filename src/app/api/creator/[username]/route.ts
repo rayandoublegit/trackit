@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { clientImageUrl } from "@/lib/client-image-url";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { estimatedCostPerPost, estimatedCpm, valueScore, valueTier } from "@/lib/creator-value";
+import { displayVideoThumbnails } from "@/lib/tiktok-video-thumbs";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +21,16 @@ function mapTopVideos(raw: unknown) {
   });
 }
 
-function mapVideoThumbnails(raw: unknown) {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((row) => {
-    const t = row as { views?: number; thumbnail?: string | null; url?: string | null };
-    return {
-      views: Number(t.views ?? 0),
-      thumbnail: clientImageUrl(t.thumbnail) || null,
-      url: t.url ?? null,
-    };
-  });
+function mapVideoThumbnails(videoThumbnails: unknown, topVideos: unknown) {
+  return displayVideoThumbnails(
+    Array.isArray(videoThumbnails) ? videoThumbnails : [],
+    Array.isArray(topVideos) ? topVideos : [],
+    6
+  ).map((t) => ({
+    views: t.views,
+    thumbnail: clientImageUrl(t.thumbnail) || null,
+    url: t.url,
+  }));
 }
 
 // Deep detail for the in-app creator drawer. Reads the shared discovery index
@@ -90,7 +91,7 @@ export async function GET(
       valueScore: valueScore(followers, er, avgViews),
       valueTier: valueTier(followers),
       topVideos: mapTopVideos(c.top_videos),
-      videoThumbnails: mapVideoThumbnails(c.video_thumbnails),
+      videoThumbnails: mapVideoThumbnails(c.video_thumbnails, c.top_videos),
     },
   });
 }
