@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
