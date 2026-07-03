@@ -1,33 +1,36 @@
 import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
 import { clientImageUrl, isStablePublicImageUrl } from "@/lib/client-image-url";
-import { isTikTokCdnUrl, isUiAvatarsUrl } from "@/lib/tiktok-avatar";
+import { isUiAvatarsUrl } from "@/lib/tiktok-avatar";
 
 export function isStableAvatarStorageUrl(url: string): boolean {
   return isStablePublicImageUrl(url);
 }
 
-export function creatorAvatarApiUrl(username: string): string {
+export function creatorAvatarApiUrl(username: string, rawSrc?: string | null): string {
   const handle = normalizeCreatorHandle(username);
   if (!handle) return "";
-  return `/api/creator-avatar?username=${encodeURIComponent(handle)}`;
+  const base = `/api/creator-avatar?username=${encodeURIComponent(handle)}`;
+  const src = pickBestCreatorAvatar(rawSrc);
+  if (src && !isUiAvatarsUrl(src) && !isStableAvatarStorageUrl(src)) {
+    return `${base}&src=${encodeURIComponent(src)}`;
+  }
+  return base;
 }
 
 /**
  * Client-ready avatar URL for feed/lists.
- * Stable Supabase first; TikTok CDN → API (persists); else proxy; else API by username.
+ * Prefer stored Supabase URLs, then proxied DB URLs, then creator-avatar API.
  */
 export function feedAvatarUrlForCreator(username: string, rawAvatar?: string | null): string {
   const handle = normalizeCreatorHandle(username);
-  const api = handle ? creatorAvatarApiUrl(handle) : "";
   const clean = pickBestCreatorAvatar(rawAvatar);
 
-  if (clean) {
-    if (isStableAvatarStorageUrl(clean)) return clean;
-    if (isTikTokCdnUrl(clean) && api) return api;
+  if (clean && isStableAvatarStorageUrl(clean)) return clean;
+
+  if (clean && !isUiAvatarsUrl(clean)) {
     const proxied = clientImageUrl(clean);
-    if (proxied && !proxied.includes("/api/creator-avatar")) return proxied;
-    if (!isUiAvatarsUrl(clean) && !isTikTokCdnUrl(clean)) return clean;
+    if (proxied) return proxied;
   }
 
-  return api;
+  return handle ? creatorAvatarApiUrl(handle, clean) : "";
 }

@@ -9,7 +9,16 @@ export const IMAGE_PROXY_ALLOWED_SUFFIXES = [
   "ttwstatic.com",
   "ui-avatars.com",
   "ibb.co",
+  "i.ibb.co",
   "supabase.co",
+  "cdninstagram.com",
+  "fbcdn.net",
+  "instagram.com",
+  "ytimg.com",
+  "googleusercontent.com",
+  "ggpht.com",
+  "pbs.twimg.com",
+  "twimg.com",
 ];
 
 export function isAllowedImageHost(url: string): boolean {

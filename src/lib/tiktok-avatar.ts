@@ -84,19 +84,18 @@ export async function fetchFreshAvatarUrl(username: string): Promise<string | nu
   }
 }
 
-/** Resolve a fetchable avatar URL for a creator (DB value → fresh TikTok profile). */
+/** Resolve a fetchable avatar URL for a creator (stored → fresh TikTok profile). */
 export async function resolveCreatorAvatarRemoteUrl(
   username: string,
   storedUrl?: string | null
 ): Promise<string | null> {
   const stored = storedUrl?.trim() || "";
-  const storedIsStable =
-    stored && !isUiAvatarsUrl(stored) && isAllowedImageHost(stored) && !isTikTokCdnUrl(stored);
-  if (storedIsStable) return stored;
+  if (stored && !isUiAvatarsUrl(stored) && isAllowedImageHost(stored)) {
+    return stored;
+  }
 
   const fresh = await fetchFreshAvatarUrl(username);
   if (fresh) return fresh;
 
-  if (stored && !isUiAvatarsUrl(stored) && isAllowedImageHost(stored)) return stored;
   return null;
 }

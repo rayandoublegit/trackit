@@ -4,7 +4,7 @@ import { getAuthedUserId } from "@/lib/api-auth";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
   commissionNotConfiguredMessage,
-  getManagedCommissionRateForCreator,
+  resolveCommissionRateForManualSale,
 } from "@/lib/managed-creator-commission";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,12 @@ export async function POST(request: NextRequest) {
 
   if (!creator) return NextResponse.json({ ok: false, error: "Creator not found" }, { status: 404 });
 
-  const managedCommission = await getManagedCommissionRateForCreator(supabaseAdmin, userId, creator);
+  const managedCommission = await resolveCommissionRateForManualSale(
+    supabaseAdmin,
+    userId,
+    creator,
+    campaignId || null
+  );
   if ("error" in managedCommission) {
     return NextResponse.json(
       {

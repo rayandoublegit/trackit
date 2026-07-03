@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
@@ -693,13 +691,13 @@ function CreatorProfileModal({
         </button>
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20, paddingRight: 32 }}>
-          <img
+          <CreatorAvatar
             src={creator.avatarUrl}
-            onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }}
+            username={creator.username}
+            displayName={creator.displayName}
+            size={80}
             alt={creator.displayName}
-            width={80}
-            height={80}
-            style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }}
+            priority
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 4px 0" }}>
@@ -814,7 +812,7 @@ function CreatorMiniCard({ creator }: { creator: Creator }) {
         marginBottom: 20,
       }}
     >
-      <img src={creator.avatarUrl} alt={creator.displayName} width={40} height={40} style={{ borderRadius: "50%", background: "#F0F0F0", flexShrink: 0 }} onError={(e) => { const img = e.currentTarget; if (!img.dataset.fb) { img.dataset.fb = "1"; img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`; } }} />
+      <CreatorAvatar src={creator.avatarUrl} username={creator.username} displayName={creator.displayName} size={40} alt={creator.displayName} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{creator.displayName}</div>
         <div style={{ fontSize: 12, color: "#0047FF" }}>@{creator.username ?? ""}</div>
@@ -1529,19 +1527,12 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
     <>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
         <div style={{ position: "relative", flexShrink: 0 }}>
-          <img
+          <CreatorAvatar
             src={creator.avatarUrl}
-            onError={(e) => {
-              const img = e.currentTarget;
-              if (!img.dataset.fb) {
-                img.dataset.fb = "1";
-                img.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(creator.displayName || creator.username || "?")}&background=eef4ff&color=0047ff&size=200&bold=true&rounded=true`;
-              }
-            }}
+            username={creator.username}
+            displayName={creator.displayName}
+            size={56}
             alt={creator.displayName}
-            width={56}
-            height={56}
-            style={{ borderRadius: "50%", background: "#EEF4FF", border: "2px solid #FFFFFF", boxShadow: "0 0 0 1px #D4E2FF" }}
           />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>

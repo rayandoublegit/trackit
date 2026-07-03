@@ -8,9 +8,11 @@ describe("feedAvatarUrlForCreator", () => {
     expect(isStableAvatarStorageUrl(url)).toBe(true);
   });
 
-  it("routes TikTok CDN through creator-avatar API", () => {
+  it("routes TikTok CDN through img-proxy", () => {
     const cdn = "https://p16-sign.tiktokcdn-us.com/obj/foo.jpg";
-    expect(feedAvatarUrlForCreator("bar", cdn)).toBe("/api/creator-avatar?username=bar");
+    expect(feedAvatarUrlForCreator("bar", cdn)).toBe(
+      `/api/img-proxy?url=${encodeURIComponent(cdn)}`,
+    );
   });
 
   it("falls back to API when avatar is missing or ui-avatars", () => {

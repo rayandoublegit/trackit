@@ -1,6 +1,6 @@
 /** In-memory + sessionStorage cache so avatars reappear instantly across views. */
 
-import { creatorAvatarApiUrl } from "@/lib/feed-avatar-url";
+import { creatorAvatarApiUrl, feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 
 const STORAGE_KEY = "trackit_avatar_cache_v1";
 const MAX_ENTRIES = 600;
@@ -123,8 +123,10 @@ export function prefetchCreatorAvatars(
   const seen = new Set<string>();
   for (const item of items.slice(0, limit)) {
     const handle = normalizeHandle(item.username);
-    const raw = item.avatarUrl?.trim() || "";
-    const url = raw || (handle ? creatorAvatarApiUrl(handle) : "");
+    const url =
+      (handle ? feedAvatarUrlForCreator(handle, item.avatarUrl) : "") ||
+      item.avatarUrl?.trim() ||
+      "";
     if (!url || seen.has(url)) continue;
     seen.add(url);
     const img = new window.Image();

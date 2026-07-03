@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { fetchRemoteImage } from "@/lib/fetch-remote-image";
-import { avatarFromDiscoverySavedRow, normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
-import { resolveCreatorAvatarRemoteUrl, storeTikTokAvatar, fetchFreshAvatarUrl, isUiAvatarsUrl } from "@/lib/tiktok-avatar";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { fetchRemoteImage, isAllowedImageHost } from "@/lib/fetch-remote-image";
+import { avatarFromDiscoverySavedRow, pickBestCreatorAvatar } from "@/lib/creator-avatar";
+import {
+  isUiAvatarsUrl,
+  resolveCreatorAvatarRemoteUrl,
+  storeTikTokAvatar,
+} from "@/lib/tiktok-avatar";
 import { getCachedImage, setCachedImage } from "@/lib/image-proxy-cache";
 
 export const dynamic = "force-dynamic";
@@ -29,8 +33,8 @@ async function lookupStoredAvatar(admin: NonNullable<ReturnType<typeof getAdmin>
   const { data: savedRows } = await admin
     .from("discovery_saved")
     .select("avatar_url, snapshot")
-    .eq("creator_username", username)
-    .limit(8);
+    .ilike("creator_username", username)
+    .limit(12);
   for (const row of savedRows ?? []) {
     const url = avatarFromDiscoverySavedRow(row);
     if (url) return url;
@@ -40,7 +44,7 @@ async function lookupStoredAvatar(admin: NonNullable<ReturnType<typeof getAdmin>
     .from("creators")
     .select("avatar_url")
     .ilike("handle", username)
-    .limit(8);
+    .limit(12);
   for (const row of creatorRows ?? []) {
     const url = pickBestCreatorAvatar(row.avatar_url);
     if (url) return url;
@@ -49,9 +53,39 @@ async function lookupStoredAvatar(admin: NonNullable<ReturnType<typeof getAdmin>
   return pickBestCreatorAvatar(indexUrl) || null;
 }
 
+function uniqueUrls(...candidates: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of candidates) {
+    const url = candidate?.trim() || "";
+    if (!url || isUiAvatarsUrl(url) || !isAllowedImageHost(url) || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out;
+}
+
+async function persistPermanentAvatar(
+  admin: SupabaseClient,
+  username: string,
+  remoteUrl: string
+): Promise<string | null> {
+  const permanent = await storeTikTokAvatar(admin, remoteUrl, username);
+  if (!permanent) return null;
+
+  await Promise.all([
+    admin.from("creators_index").update({ avatar_url: permanent }).eq("username", username),
+    admin.from("creators").update({ avatar_url: permanent }).ilike("handle", username),
+  ]);
+
+  return permanent;
+}
+
 export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get("username")?.replace(/^@/, "").trim().toLowerCase();
   if (!username) return new NextResponse("missing username", { status: 400 });
+
+  const srcParam = req.nextUrl.searchParams.get("src");
 
   let storedUrl: string | null = null;
   const admin = getAdmin();
@@ -66,7 +100,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const cacheKey = `${username}::${storedUrl || "none"}`;
+  const cacheKey = `${username}::${srcParam || storedUrl || "none"}`;
   const hit = getCachedImage(cacheKey);
   if (hit) {
     return new NextResponse(hit.body, {
@@ -78,37 +112,28 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const remoteUrl = await resolveCreatorAvatarRemoteUrl(username, storedUrl);
-  let img = remoteUrl ? await fetchRemoteImage(remoteUrl) : null;
-  let usedUrl = remoteUrl;
+  const resolved = await resolveCreatorAvatarRemoteUrl(username, storedUrl);
+  const candidates = uniqueUrls(srcParam, storedUrl, resolved);
 
-  if (!img) {
-    const fresh = await fetchFreshAvatarUrl(username);
-    if (fresh && fresh !== remoteUrl) {
-      img = await fetchRemoteImage(fresh);
-      usedUrl = fresh;
+  for (const remoteUrl of candidates) {
+    const img = await fetchRemoteImage(remoteUrl);
+    if (!img) continue;
+
+    const buf = await new Response(img.body).arrayBuffer();
+    setCachedImage(cacheKey, buf, img.contentType);
+
+    if (admin && !isStablePublicUrl(storedUrl ?? "")) {
+      void persistPermanentAvatar(admin, username, remoteUrl);
     }
-  }
 
-  if (!img || !usedUrl) return new NextResponse("no avatar", { status: 404 });
-
-  const buf = await new Response(img.body).arrayBuffer();
-  setCachedImage(cacheKey, buf, img.contentType);
-
-  // Persist a permanent copy when we had to refresh (fire-and-forget).
-  if (admin && usedUrl !== storedUrl && !isStablePublicUrl(storedUrl ?? "")) {
-    void storeTikTokAvatar(admin, usedUrl, username).then((permanent) => {
-      if (permanent) {
-        void admin.from("creators_index").update({ avatar_url: permanent }).eq("username", username);
-      }
+    return new NextResponse(buf, {
+      status: 200,
+      headers: {
+        "content-type": img.contentType,
+        "cache-control": "public, max-age=86400, immutable",
+      },
     });
   }
 
-  return new NextResponse(buf, {
-    status: 200,
-    headers: {
-      "content-type": img.contentType,
-      "cache-control": "public, max-age=86400, immutable",
-    },
-  });
+  return new NextResponse("no avatar", { status: 404 });
 }

@@ -42,6 +42,52 @@ export async function getManagedCommissionRateForCreator(
   return { rate };
 }
 
+/** Manual / campaign sale: CRM → campaign default → creator row → promo code suffix. */
+export async function resolveCommissionRateForManualSale(
+  admin: SupabaseClient,
+  userId: string,
+  creator: { id?: string; handle?: string | null; commission_rate?: number | null },
+  campaignId?: string | null
+): Promise<{ rate: number } | { error: typeof COMMISSION_NOT_CONFIGURED_CODE }> {
+  const managed = await getManagedCommissionRateForCreator(admin, userId, creator);
+  if (!("error" in managed)) return managed;
+
+  let campaignLinkRate: number | null = null;
+  let campaignDefaultRate: number | null = null;
+
+  if (campaignId) {
+    const { data: campaign } = await admin
+      .from("campaigns")
+      .select("commission_rate")
+      .eq("id", campaignId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    campaignDefaultRate = parseCommissionRate(campaign?.commission_rate) ?? null;
+
+    if (creator.id) {
+      const { data: link } = await admin
+        .from("campaign_creators")
+        .select("discount_code")
+        .eq("campaign_id", campaignId)
+        .eq("creator_id", creator.id)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      campaignLinkRate =
+        commissionRateFromDiscountCode(String(link?.discount_code || "")) ?? null;
+    }
+  }
+
+  if (campaignLinkRate != null) return { rate: campaignLinkRate };
+  if (campaignDefaultRate != null) return { rate: campaignDefaultRate };
+
+  const creatorRate = parseCommissionRate(creator.commission_rate);
+  if (creatorRate != null) return { rate: creatorRate };
+
+  return { error: COMMISSION_NOT_CONFIGURED_CODE };
+}
+
 export async function loadManagedCommissionByHandle(
   admin: SupabaseClient,
   userId: string

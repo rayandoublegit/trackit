@@ -27,12 +27,12 @@ function resolveDisplaySrc(username: string, src?: string | null): string {
   return feedAvatarUrlForCreator(username, src);
 }
 
-function resolveTargetSrc(displaySrc: string, username: string): string {
+function resolveTargetSrc(displaySrc: string, username: string, rawSrc?: string | null): string {
   const cached = username ? getCachedAvatarUrl(username) : null;
   if (cached && isStableAvatarStorageUrl(cached)) return cached;
   if (displaySrc) return displaySrc;
   if (cached) return cached;
-  if (username) return creatorAvatarApiUrl(username);
+  if (username) return creatorAvatarApiUrl(username, rawSrc);
   return "";
 }
 
@@ -61,8 +61,8 @@ export function CreatorAvatar({
   );
 
   const targetSrc = useMemo(
-    () => resolveTargetSrc(displaySrc, resolvedUsername),
-    [displaySrc, resolvedUsername],
+    () => resolveTargetSrc(displaySrc, resolvedUsername, src),
+    [displaySrc, resolvedUsername, src],
   );
 
   const [overrideSrc, setOverrideSrc] = useState<string | null>(null);
@@ -79,18 +79,18 @@ export function CreatorAvatar({
     failStepRef.current += 1;
 
     if (step === 0 && resolvedUsername) {
-      const api = creatorAvatarApiUrl(resolvedUsername);
+      const api = creatorAvatarApiUrl(resolvedUsername, src);
       if (api && activeSrc !== api) {
         setOverrideSrc(api);
         return;
       }
     }
-    if (step === 1 && displaySrc && displaySrc !== activeSrc) {
+    if (step === 1 && displaySrc && displaySrc !== activeSrc && !displaySrc.includes("/api/creator-avatar")) {
       setOverrideSrc(displaySrc);
       return;
     }
     setOverrideSrc("");
-  }, [activeSrc, displaySrc, resolvedUsername]);
+  }, [activeSrc, displaySrc, resolvedUsername, src]);
 
   const onLoad = useCallback(() => {
     if (resolvedUsername && activeSrc && isPersistableAvatarUrl(activeSrc)) {

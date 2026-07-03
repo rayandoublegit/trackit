@@ -2899,74 +2899,6 @@ body { padding-top: 80px; }
   margin-bottom: 56px;
 }
 
-.pricing-highlights {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 28px;
-}
-
-.pricing-highlight {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 10px 0;
-  border-radius: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
-
-.pricing-highlights--hero .pricing-highlight {
-  background: transparent;
-  box-shadow: none;
-}
-
-.pricing-highlight__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #0047ff;
-  box-shadow: 0 2px 8px rgba(0, 71, 255, 0.2);
-}
-
-.pricing-highlight__text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.pricing-highlight__label {
-  font-family: "InterDisplay", "Inter Display", sans-serif;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.2;
-  color: #7a7a7a;
-  letter-spacing: -0.02em;
-}
-
-.pricing-highlight__value {
-  font-family: "InterDisplay", "Inter Display", sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: #1a1a1a;
-  letter-spacing: -0.03em;
-}
-
-.pricing-wrap-full .pricing-highlights {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  max-width: 720px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .pricing-feature {
   display: flex;
   align-items: center;
@@ -3507,9 +3439,6 @@ body { padding-top: 80px; }
   .pricing-wrap-hero .pricing-toggle { justify-content: flex-start; }
   .pricing-toggle-left { font-size: 13px; }
   .pricing-toggle-pill { font-size: 10px; padding: 3px 7px; }
-  .pricing-wrap-full .pricing-highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
-  .pricing-highlight { min-height: 52px; padding: 8px 0; }
-  .pricing-highlight__value { font-size: 12px; }
 
   /* OUTREACH SECTION */
   .outreach-text { font-size: 15px; }

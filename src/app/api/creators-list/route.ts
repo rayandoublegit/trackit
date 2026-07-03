@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const { data } = await supabaseAdmin
     .from("creators")
     .select(
-      "id, handle, full_name, avatar_url, platform, followers, engagement_rate, balance, total_earned, total_sales, discount_code, paypal_link, revolut_link, iban, stripe_account_id, email"
+      "id, handle, full_name, avatar_url, platform, followers, engagement_rate, balance, total_earned, total_sales, discount_code, commission_rate, paypal_link, revolut_link, iban, stripe_account_id, email"
     )
     .eq("user_id", userId)
     .order("balance", { ascending: false });

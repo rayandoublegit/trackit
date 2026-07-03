@@ -5,8 +5,8 @@ import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { StripePriceMatrix } from "@/lib/stripe-config";
 import { useStripePrices } from "@/lib/use-stripe-prices";
 import { getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
-import { PricingFeatureTiles } from "@/components/PricingFeatureTiles";
+import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
+import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
@@ -39,7 +39,7 @@ function PricingCard({
   price,
   annual,
   onToggleAnnual,
-  highlights,
+  features,
   ctaClassName,
   onClick,
   ctaLabel,
@@ -55,7 +55,7 @@ function PricingCard({
   price: number;
   annual: boolean;
   onToggleAnnual: () => void;
-  highlights: ReturnType<typeof getPlanPricingHighlights>;
+  features: string[];
   ctaClassName?: string;
   onClick: () => void;
   ctaLabel: string;
@@ -96,7 +96,7 @@ function PricingCard({
           </div>
         </div>
         <div className="pricing-divider" />
-        <PricingFeatureTiles highlights={highlights} hero={highlight} />
+        <PricingFeatureList features={features} />
         <button
           type="button"
           onClick={onClick}
@@ -160,10 +160,10 @@ export function PricingPlans({
   const currency = lang === "fr" ? "eur" : "usd";
   const plan = normalizePlan(currentPlan);
 
-  const growthHighlights = useMemo(() => getPlanPricingHighlights("basic", lang), [lang]);
-  const proHighlights = useMemo(() => getPlanPricingHighlights("pro", lang), [lang]);
-  const scaleHighlights = useMemo(() => getPlanPricingHighlights("scale", lang), [lang]);
-  const freeHighlights = useMemo(() => getPlanPricingHighlights("free", lang), [lang]);
+  const growthFeatures = useMemo(() => getPlanPricingFeatureLines("basic", lang), [lang]);
+  const proFeatures = useMemo(() => getPlanPricingFeatureLines("pro", lang), [lang]);
+  const scaleFeatures = useMemo(() => getPlanPricingFeatureLines("scale", lang), [lang]);
+  const freeFeatures = useMemo(() => getPlanPricingFeatureLines("free", lang), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     if (onBeforeCheckout && !getOnboardingPayload) {
@@ -294,7 +294,7 @@ export function PricingPlans({
           price={growthAnnual ? GROWTH_ANNUAL : GROWTH_MONTHLY}
           annual={growthAnnual}
           onToggleAnnual={() => setGrowthAnnual((v) => !v)}
-          highlights={growthHighlights}
+          features={growthFeatures}
           ctaLabel={growthCta}
           onClick={() => void startCheckout("basic", growthAnnual)}
           disabled={!paidCtaLabel && growthAction === "current"}
@@ -309,7 +309,7 @@ export function PricingPlans({
           price={proAnnual ? PRO_ANNUAL : PRO_MONTHLY}
           annual={proAnnual}
           onToggleAnnual={() => setProAnnual((v) => !v)}
-          highlights={proHighlights}
+          features={proFeatures}
           ctaLabel={proCta}
           onClick={() => void startCheckout("pro", proAnnual)}
           ctaClassName="pricing-cta pricing-cta-hero"
@@ -325,7 +325,7 @@ export function PricingPlans({
           price={scaleAnnual ? SCALE_ANNUAL : SCALE_MONTHLY}
           annual={scaleAnnual}
           onToggleAnnual={() => setScaleAnnual((v) => !v)}
-          highlights={scaleHighlights}
+          features={scaleFeatures}
           ctaLabel={scaleCta}
           onClick={() => void startCheckout("scale", scaleAnnual)}
           ctaClassName="pricing-cta pricing-cta-dark"
@@ -346,7 +346,7 @@ export function PricingPlans({
               </div>
             </div>
             <div className="pricing-divider" />
-            <PricingFeatureTiles highlights={freeHighlights} />
+            <PricingFeatureList features={freeFeatures} />
             <button
               type="button"
               className="pricing-cta"

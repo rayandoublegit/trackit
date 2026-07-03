@@ -35,6 +35,7 @@ import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { isDetailTab } from "@/lib/dashboard-navigation";
 import { avatarFromDiscoverySavedRow, buildAvatarByHandleFromSavedRows } from "@/lib/creator-avatar";
+import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
 import {
   enrichCreatorsWithAvatars,
   enrichCreatorsWithSavedAvatarsClient,
@@ -45,6 +46,7 @@ import {
   commissionRateFromDiscoverySnapshot,
   normalizeCreatorHandle,
 } from "@/lib/managed-creator-commission";
+import { parseCommissionRate } from "@/lib/creator-crm";
 import {
   selectionAccentText,
   selectionCardStyle,
@@ -4766,7 +4768,7 @@ function AddSaleOnboarding({
   onSuccess?: (saleDate?: string) => void | Promise<void>;
 }) {
   const [creators, setCreators] = useState<
-    { id: string; handle: string; full_name?: string; avatar_url?: string }[]
+    { id: string; handle: string; full_name?: string; avatar_url?: string; commission_rate?: number | null }[]
   >([]);
   const [commissionByCreatorId, setCommissionByCreatorId] = useState<Record<string, number>>({});
   const [loadingCreators, setLoadingCreators] = useState(true);
@@ -4811,13 +4813,19 @@ function AddSaleOnboarding({
 
       const { data } = await supabase
         .from("creators")
-        .select("id, handle, full_name, avatar_url")
+        .select("id, handle, full_name, avatar_url, commission_rate")
         .eq("user_id", resolvedUserId)
         .in("id", creatorIds);
 
       if (cancelled) return;
 
-      const rows = (data || []) as { id: string; handle: string; full_name?: string; avatar_url?: string }[];
+      const rows = (data || []) as {
+        id: string;
+        handle: string;
+        full_name?: string;
+        avatar_url?: string;
+        commission_rate?: number | null;
+      }[];
 
       const { data: savedRows } = await supabase
         .from("discovery_saved")
@@ -4841,12 +4849,17 @@ function AddSaleOnboarding({
       }
 
       const commissionMap: Record<string, number> = {};
+      const campaignDefaultRate = parseCommissionRate(campaign.commissionRate) ?? 10;
       for (const creator of enrichedRows) {
-        const rate = commissionByHandle.get(normalizeCreatorHandle(creator.handle || ""));
-        if (rate != null) commissionMap[creator.id] = rate;
+        const fromCrm = commissionByHandle.get(normalizeCreatorHandle(creator.handle || ""));
+        const fromCreator = parseCommissionRate(creator.commission_rate);
+        commissionMap[creator.id] = fromCrm ?? fromCreator ?? campaignDefaultRate;
       }
 
       setCreators(enrichedRows);
+      prefetchCreatorAvatars(
+        enrichedRows.map((c) => ({ username: c.handle, avatarUrl: c.avatar_url })),
+      );
       setCommissionByCreatorId(commissionMap);
       if (rows[0]?.id) setCreatorId(enrichedRows[0]?.id ?? rows[0].id);
       setLoadingCreators(false);
@@ -4856,7 +4869,7 @@ function AddSaleOnboarding({
     return () => {
       cancelled = true;
     };
-  }, [campaign.creatorIds, campaign.id, userId]);
+  }, [campaign.commissionRate, campaign.creatorIds, campaign.id, userId]);
 
   const submit = async () => {
     if (!creatorId || !amount || submitting) return;
@@ -4879,6 +4892,7 @@ function AddSaleOnboarding({
 
       const res = await fetch("/api/sales/manual", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: resolvedUserId,

@@ -12,8 +12,8 @@ import { formatCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
-import { PricingFeatureTiles } from "@/components/PricingFeatureTiles";
+import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
+import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { planCtaAction, planCtaLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
@@ -410,10 +410,10 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
 };
 
-  const freePricingHighlights = getPlanPricingHighlights("free", lang);
-  const growthPricingHighlights = getPlanPricingHighlights("basic", lang);
-  const proPricingHighlights = getPlanPricingHighlights("pro", lang);
-  const scalePricingHighlights = getPlanPricingHighlights("scale", lang);
+  const freePricingFeatures = getPlanPricingFeatureLines("free", lang);
+  const growthPricingFeatures = getPlanPricingFeatureLines("basic", lang);
+  const proPricingFeatures = getPlanPricingFeatureLines("pro", lang);
+  const scalePricingFeatures = getPlanPricingFeatureLines("scale", lang);
   const plan = normalizePlan(currentPlan);
   const currency = lang === "fr" ? "eur" : "usd";
 
@@ -1499,7 +1499,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <PricingFeatureTiles highlights={growthPricingHighlights} />
+              <PricingFeatureList features={growthPricingFeatures} />
               {renderPaidCta("growth", basicAnnual, growthAction, growthCtaLabel, "pricing-cta")}
             </div>
           </div>
@@ -1531,7 +1531,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <PricingFeatureTiles highlights={proPricingHighlights} hero />
+              <PricingFeatureList features={proPricingFeatures} />
               {renderPaidCta("pro", trackitAnnual, proAction, proCtaLabel, "pricing-cta pricing-cta-hero")}
             </div>
           </div>
@@ -1563,7 +1563,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <PricingFeatureTiles highlights={scalePricingHighlights} />
+              <PricingFeatureList features={scalePricingFeatures} />
               {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pricing-cta pricing-cta-dark")}
             </div>
           </div>
@@ -1580,7 +1580,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <PricingFeatureTiles highlights={freePricingHighlights} />
+              <PricingFeatureList features={freePricingFeatures} />
               {isLoggedIn ? (
                 <button
                   type="button"

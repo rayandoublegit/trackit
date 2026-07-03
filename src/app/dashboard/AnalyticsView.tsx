@@ -12,6 +12,7 @@ import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EV
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import { parseCommissionRate } from "@/lib/creator-crm";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
   commissionNotConfiguredMessage,
@@ -261,9 +262,12 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
         }
       }
 
-      const list = (data.creators || data || []).map((c: { id: string; full_name?: string; handle?: string }) => {
+      const list = (data.creators || data || []).map(
+        (c: { id: string; full_name?: string; handle?: string; commission_rate?: number | null }) => {
         const handle = c.handle || "";
-        const commission = commissionByHandle.get(normalizeCreatorHandle(handle));
+        const fromCrm = commissionByHandle.get(normalizeCreatorHandle(handle));
+        const fromCreator = parseCommissionRate(c.commission_rate);
+        const commission = fromCrm ?? fromCreator ?? 10;
         return {
           id: c.id,
           label: c.full_name || handle || c.id,
@@ -286,6 +290,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     try {
       const res = await fetch("/api/sales/manual", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, creatorId: saleCreatorId, amount: saleAmount, date: saleDate || undefined, campaignId: saleCampaignId || undefined }),
       });
