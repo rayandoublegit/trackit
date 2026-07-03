@@ -61,9 +61,9 @@ export async function POST(request: Request) {
     platform: c.platform,
     bio: c.bio,
     email: c.email,
-    niche: c.primary_niche ?? "",
-    primaryNiche: c.primary_niche ?? "",
-    niches: Array.isArray(c.niches) ? c.niches : [],
+    niche: String(c.primary_niche ?? ""),
+    primaryNiche: String(c.primary_niche ?? ""),
+    niches: Array.isArray(c.niches) ? c.niches.map(String) : [],
     language: c.language,
     location: c.location,
     countryCode: c.country_code || resolveCreatorCountryCode(

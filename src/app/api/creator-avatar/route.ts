@@ -182,14 +182,19 @@ function redirectTo(url: string): NextResponse {
   });
 }
 
+function toArrayBuffer(buf: ArrayBuffer | Uint8Array): ArrayBuffer {
+  if (buf instanceof ArrayBuffer) return buf;
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+}
+
 function serveBytes(
-  buf: ArrayBuffer | Buffer,
+  buf: ArrayBuffer | Uint8Array,
   contentType: string,
   cacheKey: string,
   permanentUrl?: string | null
 ): NextResponse {
-  const body = buf instanceof Buffer ? buf : Buffer.from(buf);
-  setCachedImage(cacheKey, body, contentType);
+  const ab = toArrayBuffer(buf);
+  setCachedImage(cacheKey, ab, contentType);
   const headers: Record<string, string> = {
     "content-type": contentType,
     "cache-control": "public, max-age=86400, immutable",
@@ -197,7 +202,7 @@ function serveBytes(
   if (permanentUrl && isStablePublicUrl(permanentUrl)) {
     headers["x-permanent-avatar-url"] = permanentUrl;
   }
-  return new NextResponse(body, { status: 200, headers });
+  return new NextResponse(ab, { status: 200, headers });
 }
 
 /**
@@ -257,15 +262,15 @@ export async function GET(req: NextRequest) {
         const img = await fetchRemoteImage(remoteUrl);
         if (!img) continue;
 
-        const buf = Buffer.from(await new Response(img.body).arrayBuffer());
-        if (!buf.length) continue;
+        const bytes = new Uint8Array(await new Response(img.body).arrayBuffer());
+        if (!bytes.byteLength) continue;
 
         if (admin) {
-          const permanent = await persistBuffer(admin, username, buf, img.contentType);
+          const permanent = await persistBuffer(admin, username, Buffer.from(bytes), img.contentType);
           if (permanent) return redirectTo(permanent);
         }
 
-        return serveBytes(buf, img.contentType, cacheKey);
+        return serveBytes(bytes, img.contentType, cacheKey);
       }
     }
 
@@ -297,11 +302,12 @@ export async function GET(req: NextRequest) {
 
         if (refreshed) {
           await clearRefreshFailed(admin, username);
+          const bytes = new Uint8Array(refreshed.bytes);
           if (isStablePublicUrl(refreshed.permanentUrl)) {
-            setCachedImage(cacheKey, refreshed.bytes, refreshed.contentType);
+            setCachedImage(cacheKey, toArrayBuffer(bytes), refreshed.contentType);
             return redirectTo(refreshed.permanentUrl);
           }
-          return serveBytes(refreshed.bytes, refreshed.contentType, cacheKey, refreshed.permanentUrl);
+          return serveBytes(bytes, refreshed.contentType, cacheKey, refreshed.permanentUrl);
         }
 
         // Hard scrape failure (deleted account, empty profile, etc.).
@@ -316,8 +322,8 @@ export async function GET(req: NextRequest) {
 
       const img = await fetchRemoteImage(fresh);
       if (!img) return fallbackNoAvatar();
-      const buf = Buffer.from(await new Response(img.body).arrayBuffer());
-      return serveBytes(buf, img.contentType, cacheKey);
+      const bytes = new Uint8Array(await new Response(img.body).arrayBuffer());
+      return serveBytes(bytes, img.contentType, cacheKey);
     } finally {
       releaseAvatarScrapeSlot();
     }
