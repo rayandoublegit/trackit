@@ -2144,7 +2144,7 @@ function CampaignsBoard({
       <div style={{ padding: pad }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", margin: 0, marginBottom: 6, letterSpacing: "-0.03em", maxWidth: 520 }}>
-            Track it
+            {lang === "fr" ? "Campagnes" : "Campaigns"}
           </h1>
           <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 520, lineHeight: 1.5 }}>
             {lang === "fr"
