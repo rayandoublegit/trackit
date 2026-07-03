@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { StripePriceMatrix } from "@/lib/stripe-config";
 import { useStripePrices } from "@/lib/use-stripe-prices";
-import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
+import { getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
+import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
+import { PricingFeatureTiles } from "@/components/PricingFeatureTiles";
 import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
@@ -19,12 +21,6 @@ const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
 const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
 const PRO_ANNUAL = PLAN_PRICES.proAnnual;
 const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
-
-const pricingCheckIcon = (
-  <svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-    <path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 function priceIdForTier(
   prices: StripePriceMatrix,
@@ -43,7 +39,7 @@ function PricingCard({
   price,
   annual,
   onToggleAnnual,
-  features,
+  highlights,
   ctaClassName,
   onClick,
   ctaLabel,
@@ -59,7 +55,7 @@ function PricingCard({
   price: number;
   annual: boolean;
   onToggleAnnual: () => void;
-  features: string[];
+  highlights: ReturnType<typeof getPlanPricingHighlights>;
   ctaClassName?: string;
   onClick: () => void;
   ctaLabel: string;
@@ -100,11 +96,7 @@ function PricingCard({
           </div>
         </div>
         <div className="pricing-divider" />
-        <div className="pricing-features">
-          {features.map((label) => (
-            <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-          ))}
-        </div>
+        <PricingFeatureTiles highlights={highlights} hero={highlight} />
         <button
           type="button"
           onClick={onClick}
@@ -168,10 +160,10 @@ export function PricingPlans({
   const currency = lang === "fr" ? "eur" : "usd";
   const plan = normalizePlan(currentPlan);
 
-  const growthFeatures = useMemo(() => getPlanMarketingFeatures("basic", lang, "pricing"), [lang]);
-  const proFeatures = useMemo(() => getPlanMarketingFeatures("pro", lang, "pricing"), [lang]);
-  const scaleFeatures = useMemo(() => getPlanMarketingFeatures("scale", lang, "pricing"), [lang]);
-  const freeFeatures = useMemo(() => getPlanMarketingFeatures("free", lang, "pricing"), [lang]);
+  const growthHighlights = useMemo(() => getPlanPricingHighlights("basic", lang), [lang]);
+  const proHighlights = useMemo(() => getPlanPricingHighlights("pro", lang), [lang]);
+  const scaleHighlights = useMemo(() => getPlanPricingHighlights("scale", lang), [lang]);
+  const freeHighlights = useMemo(() => getPlanPricingHighlights("free", lang), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     if (onBeforeCheckout && !getOnboardingPayload) {
@@ -302,7 +294,7 @@ export function PricingPlans({
           price={growthAnnual ? GROWTH_ANNUAL : GROWTH_MONTHLY}
           annual={growthAnnual}
           onToggleAnnual={() => setGrowthAnnual((v) => !v)}
-          features={growthFeatures}
+          highlights={growthHighlights}
           ctaLabel={growthCta}
           onClick={() => void startCheckout("basic", growthAnnual)}
           disabled={!paidCtaLabel && growthAction === "current"}
@@ -317,7 +309,7 @@ export function PricingPlans({
           price={proAnnual ? PRO_ANNUAL : PRO_MONTHLY}
           annual={proAnnual}
           onToggleAnnual={() => setProAnnual((v) => !v)}
-          features={proFeatures}
+          highlights={proHighlights}
           ctaLabel={proCta}
           onClick={() => void startCheckout("pro", proAnnual)}
           ctaClassName="pricing-cta pricing-cta-hero"
@@ -333,7 +325,7 @@ export function PricingPlans({
           price={scaleAnnual ? SCALE_ANNUAL : SCALE_MONTHLY}
           annual={scaleAnnual}
           onToggleAnnual={() => setScaleAnnual((v) => !v)}
-          features={scaleFeatures}
+          highlights={scaleHighlights}
           ctaLabel={scaleCta}
           onClick={() => void startCheckout("scale", scaleAnnual)}
           ctaClassName="pricing-cta pricing-cta-dark"
@@ -354,11 +346,7 @@ export function PricingPlans({
               </div>
             </div>
             <div className="pricing-divider" />
-            <div className="pricing-features">
-              {freeFeatures.map((label) => (
-                <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-              ))}
-            </div>
+            <PricingFeatureTiles highlights={freeHighlights} />
             <button
               type="button"
               className="pricing-cta"

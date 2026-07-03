@@ -11,7 +11,9 @@ import { applyAppLocale } from "@/lib/locale-preferences";
 import { formatCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanMarketingFeatures, getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
+import { getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
+import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
+import { PricingFeatureTiles } from "@/components/PricingFeatureTiles";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { planCtaAction, planCtaLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
@@ -408,16 +410,10 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
 };
 
-  const pricingCheckIcon = (
-    <svg className="check-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
-      <path d="M4 12l3 3 5-6M11 15l3 3 6-9" stroke="#9A9A9A" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-
-  const freePricingFeatures = getPlanMarketingFeatures("free", lang, "pricing");
-  const growthPricingFeatures = getPlanMarketingFeatures("basic", lang, "full");
-  const proPricingFeatures = getPlanMarketingFeatures("pro", lang, "full");
-  const scalePricingFeatures = getPlanMarketingFeatures("scale", lang, "pricing");
+  const freePricingHighlights = getPlanPricingHighlights("free", lang);
+  const growthPricingHighlights = getPlanPricingHighlights("basic", lang);
+  const proPricingHighlights = getPlanPricingHighlights("pro", lang);
+  const scalePricingHighlights = getPlanPricingHighlights("scale", lang);
   const plan = normalizePlan(currentPlan);
   const currency = lang === "fr" ? "eur" : "usd";
 
@@ -1503,11 +1499,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <div className="pricing-features">
-                {growthPricingFeatures.map((label) => (
-                  <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-                ))}
-              </div>
+              <PricingFeatureTiles highlights={growthPricingHighlights} />
               {renderPaidCta("growth", basicAnnual, growthAction, growthCtaLabel, "pricing-cta")}
             </div>
           </div>
@@ -1539,11 +1531,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <div className="pricing-features">
-                {proPricingFeatures.map((label) => (
-                  <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-                ))}
-              </div>
+              <PricingFeatureTiles highlights={proPricingHighlights} hero />
               {renderPaidCta("pro", trackitAnnual, proAction, proCtaLabel, "pricing-cta pricing-cta-hero")}
             </div>
           </div>
@@ -1575,11 +1563,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <div className="pricing-features">
-                {scalePricingFeatures.map((label) => (
-                  <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-                ))}
-              </div>
+              <PricingFeatureTiles highlights={scalePricingHighlights} />
               {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pricing-cta pricing-cta-dark")}
             </div>
           </div>
@@ -1596,11 +1580,7 @@ export default function TrackitLanding() {
                 </div>
               </div>
               <div className="pricing-divider"></div>
-              <div className="pricing-features">
-                {freePricingFeatures.map((label) => (
-                  <div key={label} className="pricing-feature">{pricingCheckIcon}{label}</div>
-                ))}
-              </div>
+              <PricingFeatureTiles highlights={freePricingHighlights} />
               {isLoggedIn ? (
                 <button
                   type="button"
