@@ -155,7 +155,25 @@ const NICHE_TOKENS: Record<string, string[]> = {
   lifestyle: ["lifestyle", "minimalism", "productivity", "selfcare", "routine", "quotidien", "vlog"],
   wellness: ["wellness", "mentalhealth", "meditation", "yoga", "bien", "santé", "sante", "wellbeing"],
   business: ["business", "entrepreneur", "marketing", "ecommerce", "startup", "freelance", "founder"],
-  ecom: ["ecom", "ecommerce", "e-commerce", "dropshipping", "shopify", "amazon", "dtc", "ugc"],
+  "e-commerce": [
+    "e-commerce",
+    "ecom",
+    "ecommerce",
+    "dropshipping",
+    "shopify",
+    "amazon",
+    "amazonfba",
+    "dtc",
+    "ugc",
+    "tiktokshop",
+    "moneymaker",
+    "moneymaking",
+    "sidehustle",
+    "passiveincome",
+    "onlinebusiness",
+    "printondemand",
+    "productreview",
+  ],
   saas: ["saas", "software", "b2b", "startup", "nocode", "productled", "aitools"],
 };
 
@@ -165,7 +183,7 @@ const LABEL_TO_NICHE: Record<string, string> = {
   food: "food", mode: "fashion", fashion: "fashion", tech: "tech",
   finance: "finance", voyage: "travel", travel: "travel", gaming: "gaming", jeux: "gaming",
   lifestyle: "lifestyle", wellness: "wellness", business: "business",
-  ecom: "ecom", ecommerce: "ecom", "e-commerce": "ecom",
+  ecom: "e-commerce", ecommerce: "e-commerce", "e-commerce": "e-commerce",
   saas: "saas",
 };
 
@@ -197,25 +215,32 @@ export function creatorMatchesNicheFilter(
   return tokens.some((t) => hay.includes(t.toLowerCase()));
 }
 
-// Tags valides pour une niche: le tag canonique + ses sous-niches (NICHE_TREE).
+// Tags valides pour une niche: canonique + synonymes (NICHE_TOKENS) + sous-niches.
 // On reste sur des tags d'array (niches.cs.{...}), jamais d'ILIKE de bio, donc
 // pas de pollution cross-niche. Les sous-niches scrapees rentables remontent.
-function nicheTagsFor(label: string): string[] {
+export function nicheTagsFor(label: string): string[] {
   const key = resolveNicheKey(label);
   if (!key) return [];
+  const tokens = NICHE_TOKENS[key] ?? [];
   const subs = NICHE_TREE[key] ?? [];
-  // On ne garde que les tags "propres" (un seul mot, pas d'espace) cote SQL array.
-  return [...new Set([key, ...subs])].filter((t) => /^[a-z0-9]+$/i.test(t));
+  // Tags "propres" (lettres/chiffres/tirets) pour le filtre SQL array.
+  return [...new Set([key, ...tokens, ...subs])]
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => /^[a-z0-9-]+$/i.test(t));
 }
 
-function nicheOrClause(label: string): string | null {
+/** Fast niche filter: array tags only (indexed GIN). Prefer this for search latency. */
+export function nicheOrClause(label: string): string | null {
   const tags = nicheTagsFor(label);
   if (!tags.length) return null;
   // OR de tous les tags: un createur compte s'il a la niche OU une sous-niche.
   return tags.map((t) => `niches.cs.{${t}}`).join(",");
 }
 
-/** Catalogue: tags array + primary_niche pour ne rater aucun createur indexe. */
+/**
+ * Catalogue: tags array + primary_niche.
+ * Heavier than nicheOrClause — use only when recall matters more than speed.
+ */
 export function nicheCatalogOrClause(label: string): string | null {
   const tags = nicheTagsFor(label);
   if (!tags.length) return null;
@@ -224,8 +249,36 @@ export function nicheCatalogOrClause(label: string): string | null {
     clauses.add(`niches.cs.{${t}}`);
     clauses.add(`primary_niche.ilike.%${t}%`);
   }
+  // Always include the canonical key on primary_niche for older rows.
+  const key = resolveNicheKey(label);
+  if (key) clauses.add(`primary_niche.ilike.%${key}%`);
   return [...clauses].join(",");
 }
+
+/** Columns needed to render a discovery/catalog card (avoid select *). */
+export const CREATOR_LIST_COLUMNS = [
+  "username",
+  "display_name",
+  "avatar_url",
+  "followers",
+  "engagement_rate",
+  "engagement_by_follower",
+  "avg_views",
+  "post_frequency",
+  "last_post_at",
+  "authenticity_score",
+  "quality_status",
+  "platform",
+  "bio",
+  "email",
+  "primary_niche",
+  "language",
+  "location",
+  "country_code",
+  "video_thumbnails",
+  "niches",
+].join(",");
+
 
 export function catalogRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   return dbRowToFeedCreator(c);

@@ -1,18 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import {
   catalogRowToFeedCreator,
-  nicheCatalogOrClause,
+  CREATOR_LIST_COLUMNS,
+  nicheOrClause,
   type FeedCreator,
 } from "@/lib/discovery-feed";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 15;
 
-const PAGE_SIZE = 1000;
-const MAX_PAGES = 50;
-
-// Shuffle deterministe par seed (meme page = meme ordre; page suivante = autre ordre).
+// Light shuffle of the current page only (no full-table load).
 function seededShuffle<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
   let s = seed || 1;
@@ -27,28 +25,9 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
-type CreatorsIndexQuery = ReturnType<ReturnType<SupabaseClient["from"]>["select"]>;
-
-async function fetchAllRows(
-  build: () => CreatorsIndexQuery,
-): Promise<Record<string, unknown>[]> {
-  const all: Record<string, unknown>[] = [];
-  for (let page = 0; page < MAX_PAGES; page += 1) {
-    const from = page * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    const { data, error } = await build().range(from, to);
-    if (error) break;
-    const batch = (data || []) as Record<string, unknown>[];
-    all.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
-  }
-  return all;
-}
-
 /**
- * /api/catalog -- source de verite unique pour Find It.
- * Filtres: niche (+ sous-niches + primary_niche), langue et/ou pays.
- * Aucun filtre qualite/enrichment: tous les createurs indexes sortent.
+ * /api/catalog — Find It feed.
+ * Paginated at the DB (no full-table scan). Niche filter uses GIN array tags only.
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
@@ -56,8 +35,8 @@ export async function GET(req: NextRequest) {
   const language = p.get("language") || undefined;
   const country = (p.get("country") || "").trim().toUpperCase() || undefined;
   const offset = Math.max(0, Number(p.get("offset")) || 0);
-  const maxLimit = niche ? 50 : 1000;
-  const defaultLimit = niche ? 25 : 1000;
+  const maxLimit = niche ? 50 : 100;
+  const defaultLimit = niche ? 25 : 48;
   const limit = Math.min(maxLimit, Math.max(1, Number(p.get("limit")) || defaultLimit));
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -68,36 +47,50 @@ export async function GET(req: NextRequest) {
   const admin = createClient(url, key);
 
   try {
-    const build = () => {
-      let q = admin.from("creators_index").select("*");
-      if (language && country) {
-        q = q.or(`language.eq.${language},country_code.eq.${country}`);
-      } else if (language) {
-        q = q.eq("language", language);
-      } else if (country) {
-        q = q.eq("country_code", country);
-      }
-      if (niche) {
-        const or = nicheCatalogOrClause(niche);
-        if (or) q = q.or(or);
-      }
-      return q;
-    };
+    // Fetch limit+1 to know hasMore without counting the whole table.
+    const from = offset;
+    const to = offset + limit; // inclusive → limit+1 rows
 
-    const data = await fetchAllRows(build);
+    let q = admin
+      .from("creators_index")
+      .select(CREATOR_LIST_COLUMNS)
+      .order("followers", { ascending: false, nullsFirst: false })
+      .range(from, to);
 
+    if (language && country) {
+      q = q.or(`language.eq.${language},country_code.eq.${country}`);
+    } else if (language) {
+      q = q.eq("language", language);
+    } else if (country) {
+      q = q.eq("country_code", country);
+    }
+
+    if (niche) {
+      const or = nicheOrClause(niche);
+      if (or) q = q.or(or);
+    }
+
+    const { data, error } = await q;
+    if (error) {
+      return NextResponse.json({
+        creators: [],
+        hasMore: false,
+        count: 0,
+        error: error.message,
+      });
+    }
+
+    const rows = (data || []) as Record<string, unknown>[];
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
     const pageSeed = (Math.floor(offset / limit) + 1) * 7919;
-    const shuffled = seededShuffle(data, pageSeed);
-
-    const slice = shuffled.slice(offset, offset + limit);
-    const creators: FeedCreator[] = slice.map(catalogRowToFeedCreator);
-    const hasMore = offset + limit < shuffled.length;
+    const shuffled = seededShuffle(page, pageSeed);
+    const creators: FeedCreator[] = shuffled.map(catalogRowToFeedCreator);
 
     return NextResponse.json({
       creators,
       hasMore,
       count: creators.length,
-      total: shuffled.length,
     });
   } catch (e) {
     return NextResponse.json({

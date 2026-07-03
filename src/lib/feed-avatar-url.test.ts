@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { feedAvatarUrlForCreator, isStableAvatarStorageUrl } from "@/lib/feed-avatar-url";
+import { creatorAvatarApiUrl, feedAvatarUrlForCreator, isStableAvatarStorageUrl } from "@/lib/feed-avatar-url";
 
 describe("feedAvatarUrlForCreator", () => {
   it("uses stable Supabase URLs directly", () => {
@@ -8,10 +8,10 @@ describe("feedAvatarUrlForCreator", () => {
     expect(isStableAvatarStorageUrl(url)).toBe(true);
   });
 
-  it("routes TikTok CDN through img-proxy", () => {
+  it("routes TikTok CDN through creator-avatar (refresh + permanent store)", () => {
     const cdn = "https://p16-sign.tiktokcdn-us.com/obj/foo.jpg";
     expect(feedAvatarUrlForCreator("bar", cdn)).toBe(
-      `/api/img-proxy?url=${encodeURIComponent(cdn)}`,
+      `/api/creator-avatar?username=bar&src=${encodeURIComponent(cdn)}`,
     );
   });
 
@@ -19,6 +19,12 @@ describe("feedAvatarUrlForCreator", () => {
     expect(feedAvatarUrlForCreator("baz", "")).toBe("/api/creator-avatar?username=baz");
     expect(feedAvatarUrlForCreator("baz", "https://ui-avatars.com/api/?name=baz")).toBe(
       "/api/creator-avatar?username=baz",
+    );
+  });
+
+  it("supports force refresh", () => {
+    expect(creatorAvatarApiUrl("qux", null, { refresh: true })).toBe(
+      "/api/creator-avatar?username=qux&refresh=1",
     );
   });
 });

@@ -2,14 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
+import { CREATOR_LIST_COLUMNS, nicheOrClause } from "@/lib/discovery-feed";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
-import { liveSearchAndEnrich } from "@/lib/discovery-live";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 15;
 
-// Lazy so the route doesn't crash at import when Supabase env is absent (e.g.
-// local dev preview). Real deployments always have these set.
 function getSupabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +17,7 @@ function getSupabaseAdmin() {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  if (!body?.niche) return NextResponse.json({ creators: [] });
+  if (!body?.niche) return NextResponse.json({ creators: [], count: 0 });
 
   const f = normalizeDiscoveryFilters({
     niche: body.niche,
@@ -39,137 +37,111 @@ export async function POST(request: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL
   );
 
-  // 1) DB-first: enriched creators already in creators_index (fast + free).
-  if (hasDb) {
-    const supabaseAdmin = getSupabaseAdmin();
+  if (!hasDb) {
+    return NextResponse.json({ creators: [], count: 0, source: "db" });
+  }
 
-    // Shared mapper so curated + scraped rows render identically.
-    const mapRow = (c: any) => ({
-      username: c.username,
-      displayName: c.display_name,
-      avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
-      followersCount: c.followers,
-      engagementRate: Number(c.engagement_rate ?? 0),
-      engagementByFollower: Number(c.engagement_by_follower ?? 0),
-      avgViews: c.avg_views ?? 0,
-      postFrequency: Number(c.post_frequency ?? 0),
-      lastPostAt: c.last_post_at,
-      authenticityScore: c.authenticity_score ?? null,
-      qualityStatus: c.quality_status,
-      platform: c.platform,
-      bio: c.bio,
-      email: c.email,
-      niche: body.niche,
-      primaryNiche: c.primary_niche,
-      language: c.language,
-      location: c.location,
-      countryCode: c.country_code || resolveCreatorCountryCode(c.location, c.language),
-      videoThumbnails: c.video_thumbnails || [],
-      curated: (Array.isArray(c.niches) && c.niches.includes("curated"))
-        || (Array.isArray(c.video_thumbnails) && c.video_thumbnails.length > 0),
-    });
+  const supabaseAdmin = getSupabaseAdmin();
+  const nicheOr = body.niche ? nicheOrClause(String(body.niche)) : null;
 
-    // 1a) Curated picks first (hand-added). They may still be "pending" and
-    // platform casing can differ ("TikTok" vs "tiktok"), so we don't apply the
-    // enriched/platform/metric gates to them. Language is still respected.
-    // Detecter les cures par DEUX signatures: le tag "curated" OU des video_thumbnails
-    // stockes (marqueur indestructible: seul l'ajout manuel en pose, jamais le cron).
-    // Ainsi, meme si un jour le tag disparait, les vrais cures restent surfaces.
-    let cq = supabaseAdmin
-      .from("creators_index")
-      .select("*")
-      .or("niches.cs.{curated},video_thumbnails.neq.[]")
-      .gte("followers", f.followers.gte)
-      .lte("followers", f.followers.lte);
-    if (f.language) cq = cq.eq("language", f.language);
-    // Filter curated by the requested niche too, so a curated creator only
-    // appears in its actual niche(s) instead of polluting every niche.
-    if (f.nicheTokens.length) {
-      cq = cq.or(f.nicheTokens.map((w) => `niches.cs.{${w}}`).join(","));
-    }
-    const { data: curatedData } = await cq
-      .order("followers", { ascending: false })
-      .limit(100);
+  const mapRow = (c: Record<string, unknown>) => ({
+    username: c.username,
+    displayName: c.display_name,
+    avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
+    followersCount: c.followers,
+    engagementRate: Number(c.engagement_rate ?? 0),
+    engagementByFollower: Number(c.engagement_by_follower ?? 0),
+    avgViews: c.avg_views ?? 0,
+    postFrequency: Number(c.post_frequency ?? 0),
+    lastPostAt: c.last_post_at,
+    authenticityScore: c.authenticity_score ?? null,
+    qualityStatus: c.quality_status,
+    platform: c.platform,
+    bio: c.bio,
+    email: c.email,
+    niche: body.niche,
+    primaryNiche: c.primary_niche,
+    language: c.language,
+    location: c.location,
+    countryCode: c.country_code || resolveCreatorCountryCode(
+      typeof c.location === "string" ? c.location : null,
+      typeof c.language === "string" ? c.language : null
+    ),
+    videoThumbnails: c.video_thumbnails || [],
+    curated:
+      (Array.isArray(c.niches) && c.niches.includes("curated")) ||
+      (Array.isArray(c.video_thumbnails) && c.video_thumbnails.length > 0),
+  });
 
-    // 1b) Scraped + enriched creators (existing behavior).
-    let q = supabaseAdmin
-      .from("creators_index")
-      .select("*")
-      .eq("platform", (f.platform || "").toLowerCase())
-      .eq("enrichment_status", "enriched")
-      .gte("followers", f.followers.gte)
-      .lte("followers", f.followers.lte)
-      .gte("engagement_rate", f.minEngagement)
-      .gte("avg_views", f.minViews)
-      .gte("authenticity_score", f.minAuthenticity);
+  // Curated + enriched in parallel (DB only — no live ScrapeCreators).
+  let curatedQ = supabaseAdmin
+    .from("creators_index")
+    .select(CREATOR_LIST_COLUMNS)
+    .or("niches.cs.{curated},video_thumbnails.neq.[]")
+    .gte("followers", f.followers.gte)
+    .lte("followers", f.followers.lte)
+    .order("followers", { ascending: false })
+    .limit(40);
+  if (f.language) curatedQ = curatedQ.eq("language", f.language);
+  if (nicheOr) curatedQ = curatedQ.or(nicheOr);
 
-    if (f.nicheTokens.length) {
-      q = q.or(f.nicheTokens.map((w) => `niches.cs.{${w}}`).join(","));
-    }
-    if (f.language) q = q.eq("language", f.language);
-    if (f.countryCode) q = q.or(`country_code.eq.${f.countryCode},country_code.is.null`);
-    if (f.activeSince) q = q.gte("last_post_at", f.activeSince);
-    if (f.hasEmail) q = q.not("email", "is", null);
-    for (const s of f.excludeStatuses) q = q.neq("quality_status", s);
-    for (const s of f.sort) q = q.order(s.column, { ascending: s.ascending });
+  let scrapedQ = supabaseAdmin
+    .from("creators_index")
+    .select(CREATOR_LIST_COLUMNS)
+    .ilike("platform", f.platform || "TikTok")
+    .eq("enrichment_status", "enriched")
+    .gte("followers", f.followers.gte)
+    .lte("followers", f.followers.lte)
+    .gte("engagement_rate", f.minEngagement)
+    .gte("avg_views", f.minViews)
+    .gte("authenticity_score", f.minAuthenticity)
+    .limit(40);
+  if (nicheOr) scrapedQ = scrapedQ.or(nicheOr);
+  if (f.language) scrapedQ = scrapedQ.eq("language", f.language);
+  if (f.countryCode) scrapedQ = scrapedQ.or(`country_code.eq.${f.countryCode},country_code.is.null`);
+  if (f.activeSince) scrapedQ = scrapedQ.gte("last_post_at", f.activeSince);
+  if (f.hasEmail) scrapedQ = scrapedQ.not("email", "is", null);
+  for (const s of f.excludeStatuses) scrapedQ = scrapedQ.neq("quality_status", s);
+  for (const s of f.sort) scrapedQ = scrapedQ.order(s.column, { ascending: s.ascending });
 
-    const { data, error } = await q.limit(100);
+  const [curatedRes, scrapedRes] = await Promise.all([curatedQ, scrapedQ]);
 
-    // Merge: curated first, then scraped, dedup by username, cap at 30.
-    const curatedRows = (curatedData ?? []).map(mapRow);
-    const scrapedRows = (!error && data ? data : []).map(mapRow);
-    // 50/50 mix: aim for 15 curated + 15 scraped. If one side is short, fill
-    // the remaining slots from the other so we always return up to 30.
-    const CAP = 30, HALF = 15;
-    const seen = new Set<string>();
-    const dedup = (rows: any[]) => rows.filter((r) => {
-      const k = (r.username || "").toLowerCase();
+  const curatedRows = (curatedRes.data ?? []).map(mapRow);
+  const scrapedRows = (scrapedRes.data ?? []).map(mapRow);
+
+  const CAP = 30;
+  const HALF = 15;
+  const seen = new Set<string>();
+  const dedup = (rows: ReturnType<typeof mapRow>[]) =>
+    rows.filter((r) => {
+      const k = String(r.username || "").toLowerCase();
       if (!k || seen.has(k)) return false;
       seen.add(k);
       return true;
     });
-    // Fisher-Yates shuffle so each refresh surfaces a fresh random sample
-    // from the quality pool (good creators, different order every time).
-    const shuffle = (arr: any[]) => {
-      const a = [...arr];
-      for (let i = a.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [a[i], a[j]] = [a[j], a[i]];
-      }
-      return a;
-    };
-    const curatedU = shuffle(dedup(curatedRows));
-    const scrapedU = shuffle(dedup(scrapedRows));
-    const merged = [
-      ...curatedU.slice(0, HALF),
-      ...scrapedU.slice(0, CAP - Math.min(curatedU.length, HALF)),
-    ].slice(0, CAP);
-    // Top up if still under cap (e.g. curated had > 15 and scraped ran out).
-    if (merged.length < CAP) {
-      for (const r of [...curatedU, ...scrapedU]) {
-        if (merged.length >= CAP) break;
-        if (!merged.includes(r)) merged.push(r);
-      }
-    }
 
-    if (merged.length > 0) {
-      return NextResponse.json({ creators: merged, source: "db", count: merged.length });
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
-    // DB empty for this niche -> fall through to live on-demand (cold niche).
-  }
+    return a;
+  };
 
-  // 2) Live on-demand: real ScrapeCreators search + enrichment. Used locally
-  //    (no DB) or for cold niches. In-memory cached to limit credit spend.
-  if (process.env.SCRAPECREATORS_API_KEY) {
-    try {
-      const creators = await liveSearchAndEnrich(body.niche, f);
-      return NextResponse.json({ creators, source: "live", count: creators.length });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "live search failed";
-      return NextResponse.json({ creators: [], error: msg });
+  const curatedU = shuffle(dedup(curatedRows));
+  const scrapedU = shuffle(dedup(scrapedRows));
+  const merged = [
+    ...curatedU.slice(0, HALF),
+    ...scrapedU.slice(0, CAP - Math.min(curatedU.length, HALF)),
+  ].slice(0, CAP);
+
+  if (merged.length < CAP) {
+    for (const r of [...curatedU, ...scrapedU]) {
+      if (merged.length >= CAP) break;
+      if (!merged.includes(r)) merged.push(r);
     }
   }
 
-  // No DB match and no live source configured -> empty result.
-  return NextResponse.json({ creators: [], count: 0 });
+  return NextResponse.json({ creators: merged, source: "db", count: merged.length });
 }

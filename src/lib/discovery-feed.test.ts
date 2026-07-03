@@ -34,6 +34,24 @@ describe("nicheCatalogOrClause", () => {
     expect(or).toContain("niches.cs.{fitness}");
     expect(or).toContain("primary_niche.ilike.%fitness%");
   });
+
+  it("expands e-commerce synonyms (dropshipping, moneymaker, …)", () => {
+    const or = nicheCatalogOrClause("e-commerce");
+    expect(or).toContain("niches.cs.{e-commerce}");
+    expect(or).toContain("niches.cs.{dropshipping}");
+    expect(or).toContain("niches.cs.{moneymaker}");
+    expect(or).toContain("niches.cs.{shopify}");
+    expect(or).toContain("primary_niche.ilike.%dropshipping%");
+  });
+});
+
+describe("creatorMatchesNicheFilter e-commerce", () => {
+  it("matches dropshipping / moneymaker creators under e-commerce", () => {
+    expect(creatorMatchesNicheFilter({ niches: ["dropshipping"] }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["moneymaker"] }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ primaryNiche: "shopify" }, "e-commerce")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["fitness"] }, "e-commerce")).toBe(false);
+  });
 });
 
 describe("creatorMatchesNicheFilter", () => {

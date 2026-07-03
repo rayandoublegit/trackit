@@ -2338,7 +2338,8 @@ export function DiscoveryView({
       setShowBlur(false);
     }
 
-    await persistProductName();
+    // Don't block the search on profile writes.
+    void persistProductName();
     const nicheTerm = niche;
     setLoading(true);
     setError(null);
@@ -2507,7 +2508,7 @@ export function DiscoveryView({
                 { value: "tech", label: lang === "fr" ? "Tech" : "Tech" },
                 { value: "food", label: lang === "fr" ? "Cuisine" : "Food" },
                 { value: "travel", label: lang === "fr" ? "Voyage" : "Travel" },
-                { value: "ecom", label: "Ecom" },
+                { value: "e-commerce", label: "E-commerce" },
                 { value: "saas", label: "SaaS" },
               ]}
             />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { getCachedAvatarUrl, isPersistableAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
 import {
@@ -78,25 +78,53 @@ export function CreatorAvatar({
     const step = failStepRef.current;
     failStepRef.current += 1;
 
-    if (step === 0 && resolvedUsername) {
-      const api = creatorAvatarApiUrl(resolvedUsername, src);
+    if (!resolvedUsername) {
+      setOverrideSrc("");
+      return;
+    }
+
+    // Force a live TikTok profile scrape + permanent re-host.
+    if (step === 0) {
+      const refreshUrl = creatorAvatarApiUrl(resolvedUsername, src, { refresh: true });
+      if (refreshUrl && activeSrc !== refreshUrl) {
+        setOverrideSrc(refreshUrl);
+        return;
+      }
+    }
+
+    // One more attempt without the (possibly dead) src hint.
+    if (step === 1) {
+      const api = creatorAvatarApiUrl(resolvedUsername, null, { refresh: true });
       if (api && activeSrc !== api) {
         setOverrideSrc(api);
         return;
       }
     }
-    if (step === 1 && displaySrc && displaySrc !== activeSrc && !displaySrc.includes("/api/creator-avatar")) {
-      setOverrideSrc(displaySrc);
-      return;
-    }
-    setOverrideSrc("");
-  }, [activeSrc, displaySrc, resolvedUsername, src]);
 
-  const onLoad = useCallback(() => {
-    if (resolvedUsername && activeSrc && isPersistableAvatarUrl(activeSrc)) {
-      setCachedAvatarUrl(resolvedUsername, activeSrc);
-    }
-  }, [activeSrc, resolvedUsername]);
+    setOverrideSrc("");
+  }, [activeSrc, resolvedUsername, src]);
+
+  const onLoad = useCallback(
+    (e: SyntheticEvent<HTMLImageElement>) => {
+      if (!resolvedUsername || !activeSrc) return;
+
+      // If the browser followed a redirect to a permanent Supabase URL, cache that.
+      try {
+        const current = e.currentTarget.currentSrc || e.currentTarget.src || activeSrc;
+        if (isStableAvatarStorageUrl(current)) {
+          setCachedAvatarUrl(resolvedUsername, current);
+          return;
+        }
+      } catch {
+        /* ignore */
+      }
+
+      if (isPersistableAvatarUrl(activeSrc)) {
+        setCachedAvatarUrl(resolvedUsername, activeSrc);
+      }
+    },
+    [activeSrc, resolvedUsername],
+  );
 
   if (!activeSrc) {
     return (
@@ -126,9 +154,10 @@ export function CreatorAvatar({
       alt={alt || displayName || resolvedUsername || ""}
       width={size}
       height={size}
-      loading={priority ? "eager" : "lazy"}
+      loading="eager"
       decoding="async"
       fetchPriority={priority ? "high" : "auto"}
+      referrerPolicy="no-referrer"
       style={{
         width: size,
         height: size,

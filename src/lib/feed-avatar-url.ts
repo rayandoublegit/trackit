@@ -1,36 +1,39 @@
 import { normalizeCreatorHandle, pickBestCreatorAvatar } from "@/lib/creator-avatar";
-import { clientImageUrl, isStablePublicImageUrl } from "@/lib/client-image-url";
+import { isStablePublicImageUrl } from "@/lib/client-image-url";
 import { isUiAvatarsUrl } from "@/lib/tiktok-avatar";
 
 export function isStableAvatarStorageUrl(url: string): boolean {
   return isStablePublicImageUrl(url);
 }
 
-export function creatorAvatarApiUrl(username: string, rawSrc?: string | null): string {
+/** Always resolve via creator-avatar (refresh from TikTok + permanent store). */
+export function creatorAvatarApiUrl(
+  username: string,
+  rawSrc?: string | null,
+  opts?: { refresh?: boolean }
+): string {
   const handle = normalizeCreatorHandle(username);
   if (!handle) return "";
-  const base = `/api/creator-avatar?username=${encodeURIComponent(handle)}`;
+  const params = new URLSearchParams({ username: handle });
   const src = pickBestCreatorAvatar(rawSrc);
   if (src && !isUiAvatarsUrl(src) && !isStableAvatarStorageUrl(src)) {
-    return `${base}&src=${encodeURIComponent(src)}`;
+    params.set("src", src);
   }
-  return base;
+  if (opts?.refresh) params.set("refresh", "1");
+  return `/api/creator-avatar?${params.toString()}`;
 }
 
 /**
- * Client-ready avatar URL for feed/lists.
- * Prefer stored Supabase URLs, then proxied DB URLs, then creator-avatar API.
+ * Client-ready avatar URL.
+ * - Permanent Supabase URLs → direct (instant)
+ * - Everything else (missing, expired CDN, ui-avatars) → /api/creator-avatar
+ *   which scrapes the TikTok profile, stores the photo, updates the DB, and serves it.
  */
 export function feedAvatarUrlForCreator(username: string, rawAvatar?: string | null): string {
   const handle = normalizeCreatorHandle(username);
   const clean = pickBestCreatorAvatar(rawAvatar);
 
   if (clean && isStableAvatarStorageUrl(clean)) return clean;
-
-  if (clean && !isUiAvatarsUrl(clean)) {
-    const proxied = clientImageUrl(clean);
-    if (proxied) return proxied;
-  }
 
   return handle ? creatorAvatarApiUrl(handle, clean) : "";
 }

@@ -90,11 +90,9 @@
   justify-content: center;
   width: var(--aff-hero-app-size);
   height: var(--aff-hero-app-size);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.06),
-    0 8px 24px rgba(0, 0, 0, 0.08);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: #1a1a1a;
   transform-origin: center center;
   animation: aff-hero-icon-bubble 0.55s cubic-bezier(0.34, 1.45, 0.64, 1) 1 both;
@@ -235,10 +233,6 @@
   transform: rotate(12deg);
 }
 
-.affiliation-hero__icon--coin .affiliation-hero__app {
-  background: linear-gradient(160deg, #f4f8ff 0%, #fff 55%);
-}
-
 .affiliation-hero__icon--like {
   right: 5%;
   top: 62%;
@@ -248,23 +242,6 @@
 .affiliation-hero__icon--sm .affiliation-hero__app {
   width: 52px;
   height: 52px;
-  border-radius: 14px;
-}
-
-.affiliation-hero__icon--share .affiliation-hero__app {
-  background: linear-gradient(160deg, #f4f8ff 0%, #fff 55%);
-}
-
-.affiliation-hero__icon--users .affiliation-hero__app {
-  background: linear-gradient(160deg, #f8f5ff 0%, #fff 55%);
-}
-
-.affiliation-hero__icon--chart .affiliation-hero__app {
-  background: linear-gradient(160deg, #f0fdf8 0%, #fff 55%);
-}
-
-.affiliation-hero__icon--comment .affiliation-hero__app {
-  background: linear-gradient(160deg, #f0f9ff 0%, #fff 55%);
 }
 
 .affiliation-hero__badge {
@@ -290,48 +267,48 @@
 }
 
 .affiliation-hero__icon--views .affiliation-hero__badge {
-  top: -8px;
-  right: -12px;
+  top: 0;
+  right: 0;
 }
 
 .affiliation-hero__icon--star .affiliation-hero__badge {
-  top: -8px;
-  left: -10px;
+  top: 0;
+  left: 0;
   background: #f59e0b;
 }
 
 .affiliation-hero__icon--coin .affiliation-hero__badge {
-  top: -8px;
-  right: -14px;
+  top: 0;
+  right: 0;
   background: #0047ff;
 }
 
 .affiliation-hero__icon--like .affiliation-hero__badge {
-  top: -8px;
-  right: -10px;
+  top: 0;
+  right: 0;
 }
 
 .affiliation-hero__icon--share .affiliation-hero__badge {
-  top: -8px;
-  right: -12px;
+  top: 0;
+  right: 0;
   background: #0047ff;
 }
 
 .affiliation-hero__icon--users .affiliation-hero__badge {
-  top: -8px;
-  left: -10px;
+  top: 0;
+  left: 0;
   background: #7c3aed;
 }
 
 .affiliation-hero__icon--chart .affiliation-hero__badge {
-  top: -8px;
-  right: -12px;
+  top: 0;
+  right: 0;
   background: #10b981;
 }
 
 .affiliation-hero__icon--comment .affiliation-hero__badge {
-  top: -8px;
-  left: -8px;
+  top: 0;
+  left: 0;
   background: #0ea5e9;
 }
 

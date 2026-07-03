@@ -585,7 +585,7 @@ function FilterSidebar({
             { value: "fashion", label: t.nicheFashion },
             { value: "beauty", label: t.nicheBeauty },
             { value: "tech", label: "Tech" },
-            { value: "ecom", label: t.nicheEcom },
+            { value: "e-commerce", label: t.nicheEcom },
             { value: "saas", label: t.nicheSaas },
           ]}
         />
@@ -992,6 +992,13 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     const gen = fetchGenRef.current;
     const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse;
 
+    const off = batchIndex * batchSize;
+    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(batchSize) }).toString();
+
+    // Start catalog immediately; check quota in parallel (don't serialize).
+    const catalogPromise = fetch(`/api/catalog?${qs}`).then((r) => r.json());
+
+    let quotaUsedBefore = 0;
     if (countsTowardQuota) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: 0 };
@@ -1006,15 +1013,14 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
         return { count: 0, blocked: true };
       }
       setShowDiscoveryGate(false);
+      quotaUsedBefore = quota.used ?? 0;
     } else if (allNichesBrowse) {
       setShowDiscoveryGate(false);
     }
 
-    const off = batchIndex * batchSize;
-    const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(batchSize) }).toString();
-    const r = await fetch(`/api/catalog?${qs}`);
-    const d = await r.json();
+    const d = await catalogPromise;
     if (gen !== fetchGenRef.current) return { count: 0 };
+
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
     const rows = !isCatalogMode ? shuffleFeedCreators(list) : list;
     const apiHasMore = !!d.hasMore;
@@ -1046,9 +1052,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (!supabase) return { count: deduped.length };
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { count: deduped.length };
-      const latestQuota = await syncDiscoveryQuota(supabase, user.id, plan);
-      const usedBefore = latestQuota?.used ?? 0;
-      const next = await incrementDiscoveryQuota(supabase, user.id, plan, usedBefore);
+      const next = await incrementDiscoveryQuota(supabase, user.id, plan, quotaUsedBefore);
       if (next >= discoveryLimit!) {
         setHasMore(false);
       } else {
@@ -1066,7 +1070,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     batchIndexRef.current = 0;
     poolHasMoreRef.current = true;
     let cancelled = false;
-    setCreators([]);
+    // Keep previous results visible while the new page loads (no blank flash).
     setHasMore(true);
     setLoading(true);
     setError(null);

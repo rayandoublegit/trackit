@@ -21,7 +21,7 @@ function estimateEngagement(followers: number): number {
 }
 
 // The app's canonical niches (must match the discovery dropdown).
-const CANONICAL = ["fitness", "fashion", "beauty", "tech", "food", "travel"];
+const CANONICAL = ["fitness", "fashion", "beauty", "tech", "food", "travel", "e-commerce", "saas"];
 
 // Map messy/variant/French sub-niche terms to a canonical parent niche.
 const NICHE_MAP: Record<string, string> = {
@@ -46,11 +46,18 @@ const NICHE_MAP: Record<string, string> = {
   // travel
   travel: "travel", voyage: "travel", voyages: "travel", trip: "travel",
   vanlife: "travel", roadtrip: "travel", tourisme: "travel", aventure: "travel",
+  // e-commerce
+  ecom: "e-commerce", ecommerce: "e-commerce", "e-commerce": "e-commerce",
+  dropshipping: "e-commerce", shopify: "e-commerce", amazonfba: "e-commerce",
+  moneymaker: "e-commerce", moneymaking: "e-commerce",
+  tiktokshop: "e-commerce", ugc: "e-commerce", dtc: "e-commerce",
+  // saas
+  saas: "saas", software: "saas", b2b: "saas",
 };
 
 // Returns canonical parent niches + original sub-niches + "curated", deduped.
 function normalizeNiches(raw: string): string[] {
-  const subs = raw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const subs = raw.split(",").map((s) => s.trim().toLowerCase().replace(/\s+/g, "")).filter(Boolean);
   const out = new Set<string>(["curated"]);
   for (const s of subs) {
     out.add(s); // keep the original sub-niche so it's searchable directly
