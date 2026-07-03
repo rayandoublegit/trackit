@@ -585,6 +585,8 @@ function FilterSidebar({
             { value: "fashion", label: t.nicheFashion },
             { value: "beauty", label: t.nicheBeauty },
             { value: "tech", label: "Tech" },
+            { value: "ecom", label: t.nicheEcom },
+            { value: "saas", label: t.nicheSaas },
           ]}
         />
         <FilterSelect

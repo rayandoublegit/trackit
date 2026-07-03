@@ -155,6 +155,8 @@ const NICHE_TOKENS: Record<string, string[]> = {
   lifestyle: ["lifestyle", "minimalism", "productivity", "selfcare", "routine", "quotidien", "vlog"],
   wellness: ["wellness", "mentalhealth", "meditation", "yoga", "bien", "santé", "sante", "wellbeing"],
   business: ["business", "entrepreneur", "marketing", "ecommerce", "startup", "freelance", "founder"],
+  ecom: ["ecom", "ecommerce", "e-commerce", "dropshipping", "shopify", "amazon", "dtc", "ugc"],
+  saas: ["saas", "software", "b2b", "startup", "nocode", "productled", "aitools"],
 };
 
 // Map UI labels (FR/EN) to a niche key.
@@ -163,6 +165,8 @@ const LABEL_TO_NICHE: Record<string, string> = {
   food: "food", mode: "fashion", fashion: "fashion", tech: "tech",
   finance: "finance", voyage: "travel", travel: "travel", gaming: "gaming", jeux: "gaming",
   lifestyle: "lifestyle", wellness: "wellness", business: "business",
+  ecom: "ecom", ecommerce: "ecom", "e-commerce": "ecom",
+  saas: "saas",
 };
 
 export function resolveNicheKey(label: string): string {

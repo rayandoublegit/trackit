@@ -15,6 +15,8 @@ export const NICHE_TREE: Record<string, string[]> = {
   parenting: ["momlife", "dadlife", "babytips", "toddlers", "pregnancy", "newborn", "parentinghacks", "homeschool", "bigfamily"],
   wellness: ["mentalhealth", "meditation", "yoga", "nutrition", "supplements", "sleep", "biohacking", "holistic", "selflove", "therapy"],
   business: ["entrepreneur", "marketing", "ecommerce", "sidehustle", "smallbusiness", "saas", "dropshipping", "agency", "founder", "freelance"],
+  ecom: ["ecommerce", "dropshipping", "shopify", "amazonfba", "productreview", "ugc", "dtc", "onlinestore", "amazon", "tiktokshop"],
+  saas: ["saas", "b2b", "software", "startup", "productled", "nocode", "aitools", "productivitysaas", "b2bsaas"],
   beautytech: ["ledmask", "microcurrent", "gua sha", "skintools", "hairtools"],
   outdoors: ["hiking", "camping", "fishing", "climbing", "surfing", "skiing", "cycling"],
   auto: ["cartok", "carmods", "supercars", "evs", "motorcycles", "detailing"],
