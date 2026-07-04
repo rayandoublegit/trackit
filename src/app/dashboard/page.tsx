@@ -94,6 +94,7 @@ import {
 import { useLang } from "@/lib/useLang";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
+import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
 import { loadAffiliates, persistAffiliateCodesToServer, removeAffiliate, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
 import {
   readViewFromUrl,
@@ -3818,19 +3819,14 @@ function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: st
 
 type AffiliateRow = StoredAffiliate;
 
-function slugFromHandle(handle: string) {
-  const base = handle.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
-  return `${base}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function codeFromHandle(handle: string, discount: string) {
   const base = handle.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "CREATOR";
   const pct = discount.replace(/\D/g, "") || "15";
   return `${base}${pct}`;
 }
 
-function affiliateReferralLink(ref: string) {
-  return `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
+function affiliateReferralLink(slug: string) {
+  return buildTrackitShortLink(slug);
 }
 
 async function runShopifyOrderSync(userId: string): Promise<Response> {
@@ -4003,8 +3999,8 @@ function AffiliatesView({
   const handleRemoveAffiliate = (affiliate: AffiliateRow) => {
     const confirmed = window.confirm(
       lang === "fr"
-        ? `Supprimer ${affiliate.creator} et son lien d'affiliation (/r/${affiliate.ref}) ?\n\nCette action est définitive.`
-        : `Remove ${affiliate.creator} and their affiliate link (/r/${affiliate.ref})?\n\nThis cannot be undone.`
+        ? `Supprimer ${affiliate.creator} et son lien d'affiliation (/l/${affiliate.ref}) ?\n\nCette action est définitive.`
+        : `Remove ${affiliate.creator} and their affiliate link (/l/${affiliate.ref})?\n\nThis cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -4088,7 +4084,7 @@ function AffiliatesView({
                     <div style={{ fontSize: 11, color: "#9A9A9A" }}>{a.platform}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>/r/{a.ref}</div>
+                <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{buildTrackitShortLink(a.ref)}</div>
                 <div style={{ fontSize: 12, color: "#1A1A1A", fontFamily: "monospace", fontWeight: 600 }}>{a.code}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ marginLeft: -14 }}>
@@ -4175,6 +4171,9 @@ function AddAffiliatePanel({
   const [savedCreators, setSavedCreators] = useState<SavedCreatorPick[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+  const [destinationUrl, setDestinationUrl] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -4187,6 +4186,19 @@ function AddAffiliatePanel({
       }
     };
     void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { supabase } = await import("@/lib/supabase");
+      if (!supabase || cancelled) return;
+      const { data } = await supabase.from("profiles").select("shopify_store_url").eq("id", userId).maybeSingle();
+      if (!cancelled && data?.shopify_store_url) setDestinationUrl(String(data.shopify_store_url));
+    })();
     return () => {
       cancelled = true;
     };
@@ -4211,28 +4223,48 @@ function AddAffiliatePanel({
     }
   };
 
-  const handleGenerate = () => {
-    if (!normalizedHandle) return;
-    const ref = slugFromHandle(normalizedHandle);
-    const selected = savedCreators.find((creator) => creator.id === selectedCreatorId);
-    const code = selected?.discount_code || codeFromHandle(normalizedHandle, discount);
-    const link = affiliateReferralLink(ref);
-    setGenerated({ ref, code, link });
-    setCopied(null);
-    // Persiste le code promo sur le createur pour que l'attribution des ventes
-    // (Shopify sync + ventes manuelles) retrouve le createur via creators.discount_code.
-    if (selected?.id && userId && code) {
-      void fetch("/api/affiliates/set-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, creatorId: selected.id, code }),
-      }).catch(() => { /* silencieux : l'UI continue */ });
-    } else if (userId && code && normalizedHandle) {
-      void fetch("/api/affiliates/set-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, handle: normalizedHandle, code }),
-      }).catch(() => { /* silencieux : l'UI continue */ });
+  const handleGenerate = async () => {
+    if (!normalizedHandle || !destinationUrl.trim()) return;
+    setGenerating(true);
+    setGenError("");
+    try {
+      const selected = savedCreators.find((creator) => creator.id === selectedCreatorId);
+      const code = selected?.discount_code || codeFromHandle(normalizedHandle, discount);
+
+      const created = await createAffiliateShortLink({
+        brandId: userId,
+        creatorUsername: normalizedHandle,
+        destinationUrl: destinationUrl.trim(),
+      });
+      if (!created.ok || !created.slug) {
+        setGenError(
+          (lang === "fr" ? created.errorFr : undefined) ||
+            created.error ||
+            (lang === "fr" ? "Impossible de créer le lien." : "Could not create link."),
+        );
+        return;
+      }
+
+      const ref = created.slug;
+      const link = created.link || affiliateReferralLink(ref);
+      setGenerated({ ref, code, link });
+      setCopied(null);
+
+      if (selected?.id && userId && code) {
+        void fetch("/api/affiliates/set-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, creatorId: selected.id, code, ref }),
+        }).catch(() => {});
+      } else if (userId && code && normalizedHandle) {
+        void fetch("/api/affiliates/set-code", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, handle: normalizedHandle, code, ref }),
+        }).catch(() => {});
+      }
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -4246,7 +4278,7 @@ function AddAffiliatePanel({
     }
   };
 
-  const canGenerate = normalizedHandle.length > 1;
+  const canGenerate = normalizedHandle.length > 1 && destinationUrl.trim().length > 0;
   const canAdd = !!generated && normalizedHandle;
 
   return (
@@ -4378,13 +4410,30 @@ function AddAffiliatePanel({
             style={{ ...affiliateInputStyle, marginBottom: 20 }}
           />
 
+          <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{lang === "fr" ? "URL de destination" : "Destination URL"}</label>
+          <input
+            type="url"
+            value={destinationUrl}
+            onChange={(e) => { setDestinationUrl(e.target.value); setGenerated(null); }}
+            placeholder="https://votre-boutique.com"
+            style={{ ...affiliateInputStyle, marginBottom: 20 }}
+          />
+
+          {genError ? <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 12px" }}>{genError}</p> : null}
+
           <button
             type="button"
-            onClick={handleGenerate}
-            disabled={!canGenerate}
-            style={{ ...btnPrimary, width: "100%", opacity: canGenerate ? 1 : 0.45 }}
+            onClick={() => void handleGenerate()}
+            disabled={!canGenerate || generating}
+            style={{ ...btnPrimary, width: "100%", opacity: canGenerate && !generating ? 1 : 0.45 }}
           >
-            {lang === "fr" ? "Générer" : "Generate"}
+            {generating
+              ? lang === "fr"
+                ? "Génération…"
+                : "Generating…"
+              : lang === "fr"
+                ? "Générer"
+                : "Generate"}
           </button>
 
           {generated && (
@@ -4394,7 +4443,7 @@ function AddAffiliatePanel({
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Referral link</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{ flex: 1, fontSize: 12, color: "#0047FF", fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.link}
                   </div>
                   <button type="button" style={iconBtn} title="Copy link" onClick={() => void copyText(generated.link, "link")}>
@@ -4405,8 +4454,8 @@ function AddAffiliatePanel({
               </div>
 
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Short path</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A", fontFamily: "monospace" }}>/r/{generated.ref}</div>
+                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Chemin court" : "Short path"}</div>
+                <div style={{ fontSize: 13, color: "#1A1A1A", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em" }}>/l/{generated.ref}</div>
               </div>
 
               <div>

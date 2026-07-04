@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { applyDiscountCodeToCreator, ensureCreatorForHandle } from "@/lib/creator-promo-codes";
 import { normalizeCreatorHandle } from "@/lib/managed-creator-commission";
 import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
+import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,6 @@ export async function POST(request: Request) {
     creatorId,
     code,
     ref: affiliateRef,
-    link: affiliateRef ? `/r/${affiliateRef}` : null,
+    link: affiliateRef ? buildTrackitShortLink(affiliateRef) : null,
   });
 }

@@ -1,64 +1,35 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import {
   fillChartSeries,
+  computeTrend,
   formatTrendLabel,
   getPeriodBounds,
+  toDayKey,
   type PeriodTrend,
 } from "@/lib/analytics-periods";
 import { campaignStatusLabel } from "@/lib/campaign-status";
 import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorAvatar } from "./CreatorAvatar";
-import { useDashboardNavigation } from "./DashboardNavigationProvider";
-import { parseCommissionRate } from "@/lib/creator-crm";
-import {
-  COMMISSION_NOT_CONFIGURED_CODE,
-  commissionNotConfiguredMessage,
-  commissionRateFromDiscoverySnapshot,
-  normalizeCreatorHandle,
-} from "@/lib/managed-creator-commission";
-import { notifySaleRecorded } from "@/lib/notifications-storage";
-import { primeNotificationSound } from "@/lib/notification-sound";
+import { AddSalePanel } from "./AddSalePanel";
 import {
   AnalyticsChartCard as ChartCard,
   AnalyticsSectionHeader,
-  HeroMetricChart,
-  InteractiveLineChart,
-  MetricPanelCard,
+  HeroBarChartCard,
   ProfitabilityPill,
   SummaryMetricCard,
   trendColors,
-  trendToSeries,
 } from "./analytics-metric-cards";
-
-const btnPrimary: React.CSSProperties = {
-  background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
-  padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit",
-  cursor: "pointer", letterSpacing: "-0.02em",
-};
-const btnSecondary: React.CSSProperties = {
-  background: "#FFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10,
-  padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit",
-  cursor: "pointer", letterSpacing: "-0.02em",
-};
+import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 
 type DateRange = "today" | "3d" | "7d" | "30d" | "90d" | "custom";
 type SortKey = "sales" | "commission" | "roi" | "creator";
-
-function ChartEmpty({ lang }: { lang: "en" | "fr" }) {
-  return (
-    <div style={{ padding: "48px 24px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
-      {lang === "fr" ? "Pas assez de données pour afficher ce graphique." : "Not enough data to display this chart."}
-    </div>
-  );
-}
 
 export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
   if (props.isCreator) {
@@ -72,7 +43,6 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
-  const { navigate } = useDashboardNavigation();
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loadingData, setLoadingData] = useState(true);
   const [range, setRange] = useState<DateRange>("30d");
@@ -207,10 +177,6 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   }, [sortKey, sortDir, analyticsData]);
 
   const campaignRows = analyticsData?.campaigns || [];
-  const totalSent = analyticsData?.totalSent || 0;
-  const outreachMessagesSent = analyticsData?.outreachMessagesSent || 0;
-  const responseRate = analyticsData?.responseRate || 0;
-  const converted = analyticsData?.converted || 0;
   const totalRevenue = analyticsData?.totalRevenue || 0;
   const totalCommissions = analyticsData?.totalCommissions || 0;
   const accruedCommissions = analyticsData?.accruedCommissions || 0;
@@ -221,14 +187,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     salesCount?: number;
     net?: number;
   }>;
-  const platformBreakdown = (analyticsData?.platformBreakdown || []) as Array<{ platform: string; revenue: number; commission: number; salesCount: number }>;
-  const outreachByPlatform = (analyticsData?.outreachByPlatform || []) as Array<{ platform: string; sent: number; replied: number; converted: number; bestMessage: string }>;
-  const followUpImpact = analyticsData?.followUpImpact as
-    | { withFollowUp?: { sent: number; replied: number; replyRate: number }; withoutFollowUp?: { sent: number; replied: number; replyRate: number } }
-    | undefined;
   const netRevenue = Math.max(0, totalRevenue - accruedCommissions);
-  const conversionRate = outreachMessagesSent > 0 ? Math.round((converted / outreachMessagesSent) * 100) : 0;
-  const avgCommissionRate = totalRevenue > 0 ? Math.round((accruedCommissions / totalRevenue) * 100) : 0;
   const overallRoi = accruedCommissions > 0 ? totalRevenue / accruedCommissions : 0;
   const isProfitable = overallRoi >= 1 || (accruedCommissions === 0 && totalRevenue > 0);
   const trends = analyticsData?.trends as
@@ -249,23 +208,32 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return getPeriodBounds(periodRange);
   }, [range]);
 
-  const revenueSeries = useMemo(
+  const currentStartKey = toDayKey(periodBounds.start);
+
+  // Full span: previous period → current (for bar charts).
+  const revenueSeriesFull = useMemo(
     () =>
       fillChartSeries(
         revenueTimeline.map((p) => ({ date: p.date, value: Number(p.revenue) || 0 })),
-        periodBounds.start,
+        periodBounds.prevStart,
         periodBounds.end,
       ),
     [revenueTimeline, periodBounds],
   );
-  const commissionSeries = useMemo(
+  const salesCountSeriesFull = useMemo(
     () =>
       fillChartSeries(
-        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.commission) || 0 })),
-        periodBounds.start,
+        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.salesCount) || 0 })),
+        periodBounds.prevStart,
         periodBounds.end,
       ),
     [revenueTimeline, periodBounds],
+  );
+
+  // Current period only (hero line charts).
+  const revenueSeries = useMemo(
+    () => revenueSeriesFull.filter((p) => p.date >= currentStartKey),
+    [revenueSeriesFull, currentStartKey],
   );
   const netSeries = useMemo(
     () =>
@@ -276,195 +244,56 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
         })),
         periodBounds.start,
         periodBounds.end,
-      ),
-    [revenueTimeline, periodBounds],
+      ).filter((p) => p.date >= currentStartKey),
+    [revenueTimeline, periodBounds, currentStartKey],
   );
   const salesCountSeries = useMemo(
-    () =>
-      fillChartSeries(
-        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.salesCount) || 0 })),
-        periodBounds.start,
-        periodBounds.end,
-      ),
-    [revenueTimeline, periodBounds],
+    () => salesCountSeriesFull.filter((p) => p.date >= currentStartKey),
+    [salesCountSeriesFull, currentStartKey],
   );
 
-  const [showSaleModal, setShowSaleModal] = useState(false);
-  const [saleCreators, setSaleCreators] = useState<{ id: string; label: string; handle: string; commission?: number }[]>([]);
-  const [saleCreatorId, setSaleCreatorId] = useState("");
-  const [saleAmount, setSaleAmount] = useState("");
-  const [saleDate, setSaleDate] = useState("");
-  const [saleCampaignId, setSaleCampaignId] = useState("");
-  const [saleBusy, setSaleBusy] = useState(false);
-  const [saleMsg, setSaleMsg] = useState("");
-  const saleModalBackdropReadyRef = useRef(false);
-
-  useEffect(() => {
-    if (!showSaleModal) {
-      saleModalBackdropReadyRef.current = false;
-      return;
+  const salesVolumeTrend = useMemo(() => {
+    const prevStartKey = toDayKey(periodBounds.prevStart);
+    let current = 0;
+    let previous = 0;
+    for (const p of revenueTimeline) {
+      const count = Number(p.salesCount) || 0;
+      if (p.date >= currentStartKey) current += count;
+      else if (p.date >= prevStartKey && p.date < currentStartKey) previous += count;
     }
-    saleModalBackdropReadyRef.current = false;
-    const timer = window.setTimeout(() => {
-      saleModalBackdropReadyRef.current = true;
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [showSaleModal]);
+    return computeTrend(current, previous);
+  }, [revenueTimeline, currentStartKey, periodBounds.prevStart]);
 
-  const closeSaleModal = useCallback(() => {
-    if (saleBusy) return;
-    setShowSaleModal(false);
-  }, [saleBusy]);
+  const periodSalesCount = useMemo(
+    () => salesCountSeries.reduce((sum, p) => sum + p.value, 0),
+    [salesCountSeries],
+  );
 
-  const openSaleModal = useCallback(async () => {
-    setShowSaleModal(true);
-    setSaleMsg("");
-    try {
-      const [creatorsRes, savedRes] = await Promise.all([
-        fetch(`/api/creators-list?userId=${userId}`),
-        fetch("/api/saved", { cache: "no-store" }),
-      ]);
-      const data = await creatorsRes.json();
-      const savedData = savedRes.ok ? await savedRes.json() : { rows: [] };
+  const roiSparklineSeries = useMemo(
+    () =>
+      revenueSeries.map((p) => {
+        const day = revenueTimeline.find((t) => t.date === p.date);
+        const rev = Number(day?.revenue) || 0;
+        const comm = Number(day?.commission) || 0;
+        return { date: p.date, value: comm > 0 ? rev / comm : 0 };
+      }),
+    [revenueSeries, revenueTimeline],
+  );
 
-      const commissionByHandle = new Map<string, number>();
-      for (const row of savedData.rows || []) {
-        const rate = commissionRateFromDiscoverySnapshot(row.snapshot);
-        if (rate != null) {
-          commissionByHandle.set(normalizeCreatorHandle(String(row.creator_username || "")), rate);
-        }
-      }
+  const [showAddSalePanel, setShowAddSalePanel] = useState(false);
 
-      const list = (data.creators || data || []).map(
-        (c: { id: string; full_name?: string; handle?: string; commission_rate?: number | null }) => {
-        const handle = c.handle || "";
-        const fromCrm = commissionByHandle.get(normalizeCreatorHandle(handle));
-        const fromCreator = parseCommissionRate(c.commission_rate);
-        const commission = fromCrm ?? fromCreator ?? 10;
-        return {
-          id: c.id,
-          label: c.full_name || handle || c.id,
-          handle,
-          commission,
-        };
-      });
-      setSaleCreators(list);
-      if (list.length > 0) setSaleCreatorId(list[0].id);
-    } catch {
-      setSaleMsg(lang === "fr" ? "Impossible de charger vos créateurs" : "Could not load your creators");
-    }
-  }, [lang, userId]);
+  const saleCampaignOptions = useMemo(
+    () =>
+      (campaignRows as { id?: string; name?: string }[])
+        .filter((c) => c.id)
+        .map((c) => ({ id: String(c.id), name: String(c.name || c.id) })),
+    [campaignRows],
+  );
 
-  const submitManualSale = async () => {
-    if (!saleCreatorId || !saleAmount) return;
-    primeNotificationSound();
-    setSaleBusy(true);
-    setSaleMsg("");
-    try {
-      const res = await fetch("/api/sales/manual", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, creatorId: saleCreatorId, amount: saleAmount, date: saleDate || undefined, campaignId: saleCampaignId || undefined }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        const selectedCreator = saleCreators.find((c) => c.id === saleCreatorId);
-        const creatorName = selectedCreator?.label?.trim() || (lang === "fr" ? "un créateur" : "a creator");
-        const orderTotal = Number.parseFloat(saleAmount) || 0;
-        if (userId) {
-          notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, userId);
-        }
-        dispatchSalesUpdated();
-        setShowSaleModal(false);
-        setSaleBusy(false);
-        setSaleAmount("");
-        setSaleDate("");
-        setSaleCampaignId("");
-        setSaleMsg("");
-        void refreshAnalytics();
-      } else {
-        setSaleMsg(
-          data.code === COMMISSION_NOT_CONFIGURED_CODE
-            ? commissionNotConfiguredMessage(lang)
-            : (lang === "fr" ? data.errorFr : undefined) || data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale")
-        );
-        setSaleBusy(false);
-      }
-    } catch {
-      setSaleMsg(lang === "fr" ? "Erreur réseau" : "Network error");
-      setSaleBusy(false);
-    }
-  };
-
-  const selectedSaleCreator = saleCreators.find((c) => c.id === saleCreatorId);
-  const hasSaleCommission = selectedSaleCreator?.commission != null;
-
-  const saleModal =
-    showSaleModal && typeof document !== "undefined"
-      ? createPortal(
-    <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200 }}
-      onMouseDown={(e) => {
-        if (e.target !== e.currentTarget || !saleModalBackdropReadyRef.current) return;
-        closeSaleModal();
-      }}
-    >
-      <div style={{ background: "#fff", borderRadius: 12, padding: 24, width: 380, maxWidth: "90vw" }} onMouseDown={(e) => e.stopPropagation()}>
-        <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 4px", color: "#1A1A1A" }}>{lang === "fr" ? "Ajouter une vente" : "Add a sale"}</h3>
-        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>{lang === "fr" ? "Enregistrez une vente générée par un créateur. La commission est calculée automatiquement." : "Record a sale driven by a creator. Commission is calculated automatically."}</p>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Créateur" : "Creator"}</label>
-        <select value={saleCreatorId} onChange={(e) => setSaleCreatorId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12 }}>
-          {saleCreators.length === 0 && <option value="">{lang === "fr" ? "Aucun créateur géré" : "No managed creators"}</option>}
-          {saleCreators.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-              {c.commission != null ? ` (${c.commission}%)` : lang === "fr" ? " — commission manquante" : " — no commission"}
-            </option>
-          ))}
-        </select>
-        {saleCreatorId && !hasSaleCommission ? (
-          <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 8, border: "1px solid #EFEFEF", background: "#FFFFFF" }}>
-            <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 10px", lineHeight: 1.45 }}>
-              {commissionNotConfiguredMessage(lang)}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setShowSaleModal(false);
-                navigate({ view: "creators" });
-              }}
-              style={{ border: "none", background: "#0047FF", color: "#fff", borderRadius: 8, padding: "8px 12px", fontSize: 13, fontWeight: 500, cursor: "pointer" }}
-            >
-              {lang === "fr" ? "Ouvrir Find it → Gérer" : "Open Find it → Manage"}
-            </button>
-          </div>
-        ) : null}
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Montant de la commande (€)" : "Order amount (€)"}</label>
-        <input type="number" min="0" step="0.01" value={saleAmount} onChange={(e) => setSaleAmount(e.target.value)} placeholder="149.90" style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Date (optionnel)" : "Date (optional)"}</label>
-        <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 12, boxSizing: "border-box" }} />
-        {campaignRows.length > 0 && (
-          <>
-            <label style={{ fontSize: 12, fontWeight: 500, color: "#555", display: "block", marginBottom: 4 }}>{lang === "fr" ? "Campagne (optionnel)" : "Campaign (optional)"}</label>
-            <select value={saleCampaignId} onChange={(e) => setSaleCampaignId(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E5E5E5", fontSize: 14, marginBottom: 16 }}>
-              <option value="">{lang === "fr" ? "Aucune campagne" : "No campaign"}</option>
-              {campaignRows.map((c: { id?: string; name?: string }) => (
-                <option key={c.id} value={c.id}>{c.name || c.id}</option>
-              ))}
-            </select>
-          </>
-        )}
-        {saleMsg ? <div style={{ fontSize: 13, color: "#C0392B", marginBottom: 12 }}>{saleMsg}</div> : null}
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" disabled={saleBusy} onClick={closeSaleModal} style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E5E5", background: "#fff", fontSize: 14, cursor: "pointer" }}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
-          <button type="button" disabled={saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission} onClick={submitManualSale} style={{ padding: "10px 16px", borderRadius: 8, border: "none", background: "#0047FF", color: "#fff", fontSize: 14, fontWeight: 500, cursor: "pointer", opacity: saleBusy || !saleCreatorId || !saleAmount || !hasSaleCommission ? 0.5 : 1 }}>{saleBusy ? "…" : lang === "fr" ? "Ajouter" : "Add"}</button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  )
-      : null;
+  const handleSaleAdded = useCallback(async () => {
+    dispatchSalesUpdated();
+    await refreshAnalytics();
+  }, [refreshAnalytics]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -548,12 +377,19 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
           <button type="button" className="hero-cta-shopify" style={{ padding: "10px 22px", fontSize: 13 }} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
           <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={openSaleModal} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
+            <button type="button" onClick={() => setShowAddSalePanel(true)} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
               {lang === "fr" ? "Ou ajoutez vos ventes manuellement" : "Or add your sales manually"}
             </button>
           </div>
         </div>
-        {saleModal}
+        <AddSalePanel
+          open={showAddSalePanel}
+          onClose={() => setShowAddSalePanel(false)}
+          lang={lang}
+          userId={userId}
+          campaigns={saleCampaignOptions}
+          onSuccess={handleSaleAdded}
+        />
       </>
     );
   }
@@ -567,7 +403,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             variant="white"
             size="compact"
             primaryLabel={lang === "fr" ? "+ Ajouter une vente" : "+ Add a sale"}
-            onPrimaryClick={openSaleModal}
+            onPrimaryClick={() => setShowAddSalePanel(true)}
             menuAriaLabel={lang === "fr" ? "Plus d'actions" : "More actions"}
             menuItems={[
               {
@@ -582,23 +418,21 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             ]}
           />
         </div>
-        {saleModal}
-
-        <AnalyticsSectionHeader
-          title={lang === "fr" ? "Vue d’ensemble" : "Overview"}
-          info={
-            lang === "fr"
-              ? "Indicateurs clés de performance sur la période sélectionnée."
-              : "Key performance indicators for the selected period."
-          }
+        <AddSalePanel
+          open={showAddSalePanel}
+          onClose={() => setShowAddSalePanel(false)}
           lang={lang}
+          userId={userId}
+          campaigns={saleCampaignOptions}
+          onSuccess={handleSaleAdded}
         />
+
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
             gap: 14,
-            marginBottom: 28,
+            marginBottom: 14,
           }}
         >
           <SummaryMetricCard
@@ -610,6 +444,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={formatCurrency(totalRevenue, lang)}
             trend={compare ? trends?.revenue : undefined}
+            sparklineSeries={revenueSeries}
             lang={lang}
           />
           <SummaryMetricCard
@@ -621,6 +456,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={formatCurrency(netRevenue, lang)}
             trend={compare ? trends?.netRevenue : undefined}
+            sparklineSeries={netSeries}
             lang={lang}
             profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
           />
@@ -633,196 +469,67 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={overallRoi > 0 ? `${overallRoi.toFixed(1)}×` : "—"}
             trend={compare ? trends?.roi : undefined}
+            sparklineSeries={roiSparklineSeries}
             lang={lang}
             profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
           />
         </div>
 
-        <HeroMetricChart
-          title={lang === "fr" ? "Revenus nets" : "Net revenue"}
-          info={
-            lang === "fr"
-              ? "Revenus générés moins les commissions dues aux créateurs. Survolez la courbe pour le détail par jour."
-              : "Revenue generated minus commissions owed to creators. Hover the chart for daily detail."
-          }
-          value={formatCurrency(netRevenue, lang)}
-          trend={trends?.netRevenue}
-          series={netSeries}
-          formatPoint={(v) => formatCurrency(v, lang)}
-          lang={lang}
-          period={range === "custom" ? "30d" : range}
-          onPeriodChange={(next) => {
-            if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-              setRange(next);
-            }
-          }}
-        />
-        <HeroMetricChart
-          title={lang === "fr" ? "Revenus" : "Revenue"}
-          info={
-            lang === "fr"
-              ? "Somme des commandes générées par vos créateurs. Survolez la courbe pour le détail par jour."
-              : "Sum of orders driven by your creators. Hover the chart for daily detail."
-          }
-          value={formatCurrency(totalRevenue, lang)}
-          trend={trends?.revenue}
-          series={revenueSeries}
-          formatPoint={(v) => formatCurrency(v, lang)}
-          lang={lang}
-          period={range === "custom" ? "30d" : range}
-          onPeriodChange={(next) => {
-            if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-              setRange(next);
-            }
-          }}
-          accent="#0F766E"
-        />
-
-        <AnalyticsSectionHeader
-          title={lang === "fr" ? "Autres métriques" : "Other metrics"}
-          info={
-            lang === "fr"
-              ? "Commissions et volume de ventes sur la période."
-              : "Commissions and sales volume for the period."
-          }
-          lang={lang}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 28 }}>
-          <MetricPanelCard
-            title={lang === "fr" ? "Commissions dues" : "Commissions owed"}
-            info={
-              lang === "fr"
-                ? "Commissions calculées sur les ventes de la période, qu’elles soient payées ou non."
-                : "Commissions calculated on sales in this period, whether paid or not."
-            }
-            value={formatCurrency(accruedCommissions, lang)}
-            trend={compare ? trends?.accruedCommissions : undefined}
-            series={commissionSeries}
-            formatPoint={(v) => formatCurrency(v, lang)}
-            lang={lang}
-            chartVariant="bars"
-          />
-          <MetricPanelCard
-            title={lang === "fr" ? "Ventes" : "Sales"}
-            info={
-              lang === "fr"
-                ? "Nombre de commandes attribuées à vos créateurs sur la période."
-                : "Number of orders attributed to your creators in this period."
-            }
-            value={String(analyticsData?.salesCount || salesCountSeries.reduce((s, p) => s + p.value, 0))}
-            series={salesCountSeries}
-            formatPoint={(v) =>
-              lang === "fr"
-                ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
-                : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
-            }
-            lang={lang}
-            chartVariant="bars"
-          />
-        </div>
-
-        <AnalyticsSectionHeader
-          title={lang === "fr" ? "Outreach & activité" : "Outreach & activity"}
-          info={
-            lang === "fr"
-              ? "Performance de vos messages et conversions en partenaires."
-              : "Outreach performance and partner conversions."
-          }
-          lang={lang}
-        />
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-            gap: 14,
-            marginBottom: 14,
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: "stretch",
+            gap: isMobile ? 20 : 20,
+            marginBottom: 28,
+            minWidth: 0,
           }}
         >
-          <SummaryMetricCard
-            title={lang === "fr" ? "Créateurs contactés" : "Creators contacted"}
-            info={
-              lang === "fr"
-                ? "Nombre de créateurs uniques contactés via l’outreach sur la période."
-                : "Unique creators contacted via outreach in this period."
-            }
-            value={String(totalSent)}
-            trend={compare ? trends?.outreachSent : undefined}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <HeroBarChartCard
+              title={lang === "fr" ? "Volume de ventes" : "Sales volume"}
+              info={
+                lang === "fr"
+                  ? "Volume cumulé de ventes, de la période précédente à la période actuelle — un bâton tous les 7 jours."
+                  : "Cumulative sales volume from the previous period through the current one — one bar every 7 days."
+              }
+              value={String(periodSalesCount || analyticsData?.salesCount || 0)}
+              trend={compare ? salesVolumeTrend : undefined}
+              series={salesCountSeriesFull}
+              formatPoint={(v) =>
+                lang === "fr"
+                  ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
+                  : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
+              }
+              lang={lang}
+              period={range === "custom" ? "custom" : range}
+              onPeriodChange={(next) => {
+                if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+                  setRange(next);
+                }
+              }}
+            />
+          </div>
+
+          <AnalyticsSalesPanel
+            userId={userId}
             lang={lang}
+            isMobile={isMobile}
+            period={range === "custom" ? "custom" : range}
+            onPeriodChange={(next) => {
+              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+                setRange(next);
+              }
+            }}
           />
-          <SummaryMetricCard
-            title={lang === "fr" ? "Taux de réponse" : "Response rate"}
-            info={
-              lang === "fr"
-                ? "Part des messages d’outreach ayant reçu une réponse."
-                : "Share of outreach messages that received a reply."
-            }
-            value={`${responseRate}%`}
-            trend={compare ? trends?.responseRate : undefined}
-            lang={lang}
-          />
-          <SummaryMetricCard
-            title={lang === "fr" ? "Convertis" : "Converted"}
-            info={
-              lang === "fr"
-                ? "Créateurs passés partenaires après un message d’outreach."
-                : "Creators who became partners after outreach."
-            }
-            value={String(converted)}
-            trend={compare ? trends?.converted : undefined}
-            lang={lang}
-          />
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 28 }}>
-          <ChartCard
-            title={lang === "fr" ? "Performance des messages" : "Outreach performance"}
-            info={
-              lang === "fr"
-                ? "Entonnoir envoyé → répondu → converti pour vos messages d’outreach."
-                : "Funnel from sent → replied → converted for your outreach messages."
-            }
-            lang={lang}
-          >
-            {outreachMessagesSent > 0 ? (
-              <FunnelBarChart lang={lang} totalSent={outreachMessagesSent} responseRate={responseRate} converted={converted} />
-            ) : (
-              <ChartEmpty lang={lang} />
-            )}
-          </ChartCard>
-          <ChartCard
-            title={lang === "fr" ? "Commissions payées" : "Commissions paid"}
-            info={
-              lang === "fr"
-                ? "Montant déjà versé aux créateurs sur la période."
-                : "Amount already paid out to creators in this period."
-            }
-            lang={lang}
-          >
-            <div style={{ fontSize: 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 12 }}>
-              {formatCurrency(totalCommissions, lang)}
-            </div>
-            {trends?.commissions && compare ? (
-              <div style={{ marginBottom: 12 }}>
-                <InteractiveLineChart
-                  lang={lang}
-                  points={trendToSeries(trends.commissions)}
-                  formatValue={(v) => formatCurrency(v, lang)}
-                  height={120}
-                />
-              </div>
-            ) : (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-                {lang === "fr" ? "Activez la comparaison pour voir la tendance." : "Enable compare to see the trend."}
-              </p>
-            )}
-          </ChartCard>
         </div>
 
         <AnalyticsSectionHeader
-          title={lang === "fr" ? "Détail & classements" : "Details & rankings"}
+          title={lang === "fr" ? "Performances créateurs" : "Creator performance"}
           info={
             lang === "fr"
-              ? "Tableaux détaillés par créateur, campagne et plateforme."
-              : "Detailed tables by creator, campaign, and platform."
+              ? "Classement des créateurs par ventes générées, commissions et rentabilité."
+              : "Creators ranked by sales driven, commissions, and profitability."
           }
           lang={lang}
         />
@@ -918,48 +625,8 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           </div>
         </ChartCard>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <ChartCard
-            title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}
-            info={
-              lang === "fr"
-                ? "Part des revenus conservée après commissions créateurs."
-                : "Share of revenue kept after creator commissions."
-            }
-          >
-            {hasAdvancedAnalytics && totalRevenue > 0 ? (
-              <>
-                <DonutChart lang={lang} netPct={Math.round((netRevenue / totalRevenue) * 100)} />
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "16px 0 4px", textAlign: "center" }}>{lang === "fr" ? `Taux de commission moyen : ${avgCommissionRate}%` : `Average commission rate: ${avgCommissionRate}%`}</p>
-                <p style={{ fontSize: 13, color: "#1A1A1A", margin: 0, textAlign: "center", fontWeight: 500 }}>{lang === "fr" ? `Revenus nets après commissions : ${formatCurrency(netRevenue, lang)}` : `Net revenue after commissions: ${formatCurrency(netRevenue, lang)}`}</p>
-              </>
-            ) : !hasAdvancedAnalytics ? (
-              <div style={{ padding: 32, textAlign: "center" }}>
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>{lang === "fr" ? "Analytiques avancées + ROI — Plan Pro" : "Advanced analytics + ROI — Pro plan"}</p>
-                <button type="button" style={btnPrimary} onClick={() => void onUpgradePro?.()}>{lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}</button>
-              </div>
-            ) : (
-              <ChartEmpty lang={lang} />
-            )}
-          </ChartCard>
-          <ChartCard
-            title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}
-            info={
-              lang === "fr"
-                ? "Revenus générés par plateforme (TikTok, Instagram, YouTube…)."
-                : "Revenue driven by platform (TikTok, Instagram, YouTube…)."
-            }
-          >
-            {platformBreakdown.length > 0 ? (
-              <PlatformBreakdownChart lang={lang} rows={platformBreakdown} />
-            ) : (
-              <ChartEmpty lang={lang} />
-            )}
-          </ChartCard>
-        </div>
-
         <ChartCard
-          title={lang === "fr" ? "Performance des campagnes" : "Campaign Performance"}
+          title={lang === "fr" ? "Performance des campagnes" : "Campaign performance"}
           info={
             lang === "fr"
               ? "Ventes, commissions et ROI par campagne sur la période."
@@ -1004,66 +671,6 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             </tbody>
           </table>
           </div>
-        </ChartCard>
-
-        <ChartCard
-          title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"}
-          info={
-            lang === "fr"
-              ? "Détail des envois, réponses et conversions par plateforme."
-              : "Sent, replies, and conversions broken down by platform."
-          }
-          style={{ marginBottom: 20 }}
-        >
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-            <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value={String(outreachMessagesSent)} />
-            <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value={`${responseRate}%`} />
-            <MiniStat label={lang === "fr" ? "Convertis" : "Converted"} value={String(converted)} />
-            <MiniStat label={lang === "fr" ? "Conversion en partenaire" : "Conversion to partner"} value={`${conversionRate}%`} />
-          </div>
-          <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                <Th>{lang === "fr" ? "Plateforme" : "Platform"}</Th><Th>{lang === "fr" ? "Envoyé" : "Sent"}</Th><Th>{lang === "fr" ? "Répondu" : "Replied"}</Th><Th>{lang === "fr" ? "Converti" : "Converted"}</Th><Th>{lang === "fr" ? "Aperçu du meilleur message" : "Best performing message preview"}</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {outreachByPlatform.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
-                    {lang === "fr" ? "Aucun message envoyé sur cette période." : "No outreach sent in this period."}
-                  </td>
-                </tr>
-              ) : outreachByPlatform.map((row) => (
-                <tr key={row.platform} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                  <td style={{ padding: "12px 8px", fontWeight: 500 }}>{row.platform}</td>
-                  <td style={{ padding: "12px 8px" }}>{row.sent}</td>
-                  <td style={{ padding: "12px 8px" }}>{row.replied}</td>
-                  <td style={{ padding: "12px 8px" }}>{row.converted}</td>
-                  <td style={{ padding: "12px 8px", color: "#7A7A7A", maxWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {row.bestMessage || "—"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          </div>
-        </ChartCard>
-
-        <ChartCard
-          title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}
-          info={
-            lang === "fr"
-              ? "Compare le taux de réponse avec et sans message de relance."
-              : "Compares reply rate with and without a follow-up message."
-          }
-        >
-          {(followUpImpact?.withFollowUp?.sent || 0) + (followUpImpact?.withoutFollowUp?.sent || 0) > 0 ? (
-            <FollowUpImpactChart lang={lang} withFollowUp={followUpImpact?.withFollowUp} withoutFollowUp={followUpImpact?.withoutFollowUp} />
-          ) : (
-            <ChartEmpty lang={lang} />
-          )}
         </ChartCard>
       </div>
     </>
@@ -1211,115 +818,4 @@ function formatCampaignStartDate(value: string | null | undefined, lang: "en" | 
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return value.split("T")[0] ?? "—";
   return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { year: "numeric", month: "short", day: "numeric" });
-}
-
-function MiniStat({ label, value, large }: { label: string; value: string; large?: boolean }) {
-  return (
-    <div style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16, textAlign: "center" }}>
-      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: large ? 28 : 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{value}</div>
-    </div>
-  );
-}
-
-function FunnelBarChart({ lang, totalSent, responseRate, converted }: { lang: "en" | "fr"; totalSent: number; responseRate: number; converted: number }) {
-  const replied = Math.round((totalSent * responseRate) / 100);
-  const bars = [
-    { label: lang === "fr" ? "Envoyé" : "Sent", value: totalSent, color: "#9A9A9A", h: 100 },
-    { label: lang === "fr" ? "Répondu" : "Replied", value: replied, color: "#95BF47", h: totalSent > 0 ? Math.max(8, Math.round((replied / totalSent) * 100)) : 0 },
-    { label: lang === "fr" ? "Converti" : "Converted", value: converted, color: "#2E7D32", h: totalSent > 0 ? Math.max(8, Math.round((converted / totalSent) * 100)) : 0 },
-  ];
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 180, gap: 12, paddingTop: 8 }}>
-      {bars.map((b) => (
-        <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-          <div style={{ width: "100%", maxWidth: 56, height: `${b.h}%`, minHeight: 8, background: b.color, borderRadius: "6px 6px 0 0" }} />
-          <span style={{ fontSize: 11, color: "#7A7A7A" }}>{b.label}</span>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{b.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DonutChart({ lang, netPct }: { lang: "en" | "fr"; netPct: number }) {
-  const circumference = 377;
-  const dash = Math.round((netPct / 100) * circumference);
-  return (
-    <div style={{ display: "flex", justifyContent: "center" }}>
-      <svg width="160" height="160" viewBox="0 0 160 160">
-        <circle cx="80" cy="80" r="60" fill="none" stroke="#EFEFEF" strokeWidth="24" />
-        <circle cx="80" cy="80" r="60" fill="none" stroke="#0047FF" strokeWidth="24" strokeDasharray={`${dash} ${circumference}`} strokeDashoffset="0" transform="rotate(-90 80 80)" />
-        <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">{netPct}%</text>
-        <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">{lang === "fr" ? "Revenus nets" : "Net revenue"}</text>
-      </svg>
-    </div>
-  );
-}
-
-function PlatformBreakdownChart({
-  lang,
-  rows,
-}: {
-  lang: "en" | "fr";
-  rows: Array<{ platform: string; revenue: number; commission: number; salesCount: number }>;
-}) {
-  const max = Math.max(...rows.map((r) => r.revenue), 1);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {rows.map((row) => {
-        const pct = Math.max(4, Math.round((row.revenue / max) * 100));
-        return (
-          <div key={row.platform}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6 }}>
-              <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.platform}</span>
-              <span style={{ color: "#7A7A7A" }}>{formatCurrency(row.revenue, lang)} · {row.salesCount} {lang === "fr" ? "ventes" : "sales"}</span>
-            </div>
-            <div style={{ height: 8, background: "#F0F0F0", borderRadius: 999 }}>
-              <div style={{ width: `${pct}%`, height: 8, background: "#0047FF", borderRadius: 999 }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function FollowUpImpactChart({
-  lang,
-  withFollowUp,
-  withoutFollowUp,
-}: {
-  lang: "en" | "fr";
-  withFollowUp?: { sent: number; replied: number; replyRate: number };
-  withoutFollowUp?: { sent: number; replied: number; replyRate: number };
-}) {
-  const groups = [
-    { label: lang === "fr" ? "Avec relance" : "With follow-up", stats: withFollowUp },
-    { label: lang === "fr" ? "Sans relance" : "Without follow-up", stats: withoutFollowUp },
-  ];
-  const maxRate = Math.max(withFollowUp?.replyRate || 0, withoutFollowUp?.replyRate || 0, 1);
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-      {groups.map((g) => (
-        <div key={g.label} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>{g.label}</div>
-          <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 10 }}>
-            {g.stats?.sent ?? 0} {lang === "fr" ? "envoyés" : "sent"} · {g.stats?.replied ?? 0} {lang === "fr" ? "réponses" : "replies"}
-          </div>
-          <div style={{ height: 8, background: "#ECECEC", borderRadius: 999, marginBottom: 6 }}>
-            <div
-              style={{
-                width: `${Math.max(4, Math.round(((g.stats?.replyRate || 0) / maxRate) * 100))}%`,
-                height: 8,
-                background: "#95BF47",
-                borderRadius: 999,
-              }}
-            />
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A" }}>{g.stats?.replyRate ?? 0}%</div>
-        </div>
-      ))}
-    </div>
-  );
 }

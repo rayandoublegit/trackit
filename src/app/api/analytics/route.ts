@@ -353,8 +353,10 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => b.periodRevenue - a.periodRevenue);
 
+  // Timeline spans previous period → current period so bar charts can compare both.
+  const timelineSales = salesRows.filter((s) => isWithinPeriod(s.created_at, prevStart, end));
   const revenueDayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
-  for (const sale of periodSales) {
+  for (const sale of timelineSales) {
     const day = dayKeyFromIso(String(sale.created_at));
     if (!day) continue;
     const agg = revenueDayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
@@ -363,7 +365,7 @@ export async function GET(request: Request) {
     agg.salesCount += 1;
     revenueDayMap.set(day, agg);
   }
-  // Full period: every day, including zeros — so charts show all months in range.
+  // Every day from previous period start through current period end (zeros included).
   const revenueTimeline = fillTimelineDays(
     Array.from(revenueDayMap.entries()).map(([date, agg]) => ({
       date,
@@ -372,7 +374,7 @@ export async function GET(request: Request) {
       salesCount: agg.salesCount,
       net: Math.max(0, agg.revenue - agg.commission),
     })),
-    start,
+    prevStart,
     end,
   );
 

@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import {
-  formatContentBytes,
   isImageContentFile,
   isVideoContentFile,
   type ContentListItem,
 } from "@/lib/content-shared";
-import { CreatorAvatar } from "./CreatorAvatar";
 import { AddBrandContentOnboarding } from "./AddBrandContentOnboarding";
 
 const BLUE = "#0047FF";
@@ -160,37 +158,46 @@ export function CampaignContentTab({
   return (
     <>
       {header}
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
+          gap: 14,
+        }}
+      >
         {items.map((item) => {
           const isImage = isImageContentFile(item);
           const isVideo = isVideoContentFile(item);
+          const fileLabel = item.title?.trim() || item.file_name || "—";
+          const creatorLabel =
+            item.creatorName || (item.creatorHandle ? `@${item.creatorHandle}` : null);
+
           return (
             <article
               key={item.id}
               style={{
                 display: "flex",
-                flexDirection: isMobile ? "column" : "row",
-                gap: 16,
+                flexDirection: "column",
                 border: "1px solid #EFEFEF",
                 borderRadius: 14,
-                padding: 16,
+                overflow: "hidden",
                 background: "#FFFFFF",
+                minHeight: 0,
               }}
             >
               <div
                 style={{
-                  width: isMobile ? "100%" : 200,
-                  flexShrink: 0,
+                  width: "100%",
                   aspectRatio: "16/10",
-                  borderRadius: 10,
-                  overflow: "hidden",
                   background: "#F5F5F5",
+                  flexShrink: 0,
                 }}
               >
                 {isImage ? (
-                  <img src={item.file_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={item.file_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 ) : isVideo ? (
-                  <video src={item.file_url} controls style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <video src={item.file_url} controls style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 ) : (
                   <div
                     style={{
@@ -200,43 +207,97 @@ export function CampaignContentTab({
                       justifyContent: "center",
                       fontSize: 12,
                       color: "#6B7280",
-                      padding: 8,
+                      padding: 12,
                       textAlign: "center",
+                      wordBreak: "break-word",
                     }}
                   >
                     {item.file_name}
                   </div>
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                  <CreatorAvatar
-                    src={null}
-                    username={item.creatorHandle || ""}
-                    displayName={item.creatorName || item.creatorHandle || ""}
-                    size={32}
-                    alt={item.creatorName || ""}
-                  />
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
-                    {item.creatorName || (item.creatorHandle ? `@${item.creatorHandle}` : "—")}
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  padding: "12px 14px 14px",
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#1A1A1A",
+                        letterSpacing: "-0.02em",
+                        lineHeight: 1.3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={fileLabel}
+                    >
+                      {fileLabel}
+                    </div>
+                    {item.notes ? (
+                      <p
+                        style={{
+                          fontSize: 13,
+                          color: "#6B7280",
+                          margin: "4px 0 0",
+                          lineHeight: 1.4,
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {item.notes}
+                      </p>
+                    ) : creatorLabel ? (
+                      <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 4, letterSpacing: "-0.01em" }}>
+                        {creatorLabel}
+                      </div>
+                    ) : null}
                   </div>
+                  <time
+                    dateTime={item.created_at}
+                    style={{
+                      fontSize: 12,
+                      color: "#9A9A9A",
+                      letterSpacing: "-0.01em",
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      paddingTop: 2,
+                    }}
+                  >
+                    {formatDate(item.created_at, lang)}
+                  </time>
                 </div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>{item.title}</div>
-                <div style={{ fontSize: 13, color: "#9A9A9A", marginBottom: 8 }}>
-                  {formatDate(item.created_at, lang)}
-                  {item.file_size ? ` · ${formatContentBytes(item.file_size)}` : ""}
+
+                <div style={{ marginTop: "auto", paddingTop: 4 }}>
+                  <a
+                    href={item.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: BLUE,
+                      textDecoration: "none",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {lang === "fr" ? "Ouvrir le fichier" : "Open file"} →
+                  </a>
                 </div>
-                {item.notes ? (
-                  <p style={{ fontSize: 13, color: "#4B5563", margin: "0 0 10px", lineHeight: 1.5 }}>{item.notes}</p>
-                ) : null}
-                <a
-                  href={item.file_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 13, fontWeight: 500, color: BLUE, textDecoration: "none" }}
-                >
-                  {lang === "fr" ? "Ouvrir le fichier" : "Open file"} →
-                </a>
               </div>
             </article>
           );

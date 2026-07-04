@@ -3,24 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
+import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
 import { loadAffiliates, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
+import { supabase } from "@/lib/supabase";
 import { CreatorAvatar } from "./CreatorAvatar";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
-
-function slugFromHandle(handle: string) {
-  const base = handle.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
-  return `${base}_${Math.random().toString(36).slice(2, 8)}`;
-}
 
 function codeFromHandle(handle: string, discount: string) {
   const base = handle.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "CREATOR";
   const pct = discount.replace(/\D/g, "") || "15";
   return `${base}${pct}`;
-}
-
-function affiliateReferralLink(ref: string) {
-  return `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
 }
 
 function mapAffiliatePlatform(platform?: string) {
@@ -68,8 +61,11 @@ export function CreatorAffiliatePanel({
   const [link, setLink] = useState("");
   const [code, setCode] = useState("");
   const [ref, setRef] = useState("");
+  const [destinationUrl, setDestinationUrl] = useState("");
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [ready, setReady] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
 
   const name = displayName?.trim() || `@${handle}`;
 
@@ -81,39 +77,79 @@ export function CreatorAffiliatePanel({
       promoCode?.match(/(\d{1,2})$/)?.[1] ||
       (commissionRate != null && Number.isFinite(commissionRate) ? String(Math.round(commissionRate)) : "15");
 
-    const nextRef = existing?.ref || existingRef?.trim() || slugFromHandle(handle);
+    const nextRef = existing?.ref || existingRef?.trim() || "";
     const nextCode = existing?.code || promoCode?.trim() || codeFromHandle(handle, discount);
-    const nextLink = affiliateReferralLink(nextRef);
 
     setRef(nextRef);
     setCode(nextCode);
-    setLink(nextLink);
+    setLink(nextRef ? buildTrackitShortLink(nextRef) : "");
     setReady(true);
 
-    const row: StoredAffiliate = {
-      creator: handle.startsWith("@") ? handle : `@${handle}`,
-      platform: mapAffiliatePlatform(platform),
-      ref: nextRef,
-      code: nextCode,
-      clicks: existing?.clicks ?? 0,
-      conversions: existing?.conversions ?? 0,
-      sales: existing?.sales ?? 0,
-      commission: existing?.commission ?? 0,
-      status: existing?.status ?? "Active",
-    };
-    const list = loadAffiliates(userId);
-    saveAffiliates(userId, [row, ...list.filter((a) => !handlesMatch(a.creator, handle))]);
+    if (supabase) {
+      void supabase
+        .from("profiles")
+        .select("shopify_store_url")
+        .eq("id", userId)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.shopify_store_url) setDestinationUrl(String(data.shopify_store_url));
+        });
+    }
+  }, [userId, handle, promoCode, commissionRate, existingRef]);
 
-    void fetch("/api/affiliates/set-code", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, handle: `@${handle}`, code: nextCode, ref: nextRef }),
-    })
-      .then(() => onAssigned?.({ promoCode: nextCode, affiliateRef: nextRef }))
-      .catch(() => {
-        onAssigned?.({ promoCode: nextCode, affiliateRef: nextRef });
+  const generateLink = async () => {
+    if (!userId || !handle || !destinationUrl.trim()) return;
+    setGenerating(true);
+    setGenError("");
+    try {
+      const existing = loadAffiliates(userId).find((a) => handlesMatch(a.creator, handle));
+      const nextCode = existing?.code || code;
+
+      const created = await createAffiliateShortLink({
+        brandId: userId,
+        creatorUsername: handle,
+        destinationUrl: destinationUrl.trim(),
       });
-  }, [userId, handle, platform, promoCode, commissionRate, existingRef, onAssigned]);
+      if (!created.ok || !created.slug) {
+        setGenError(
+          (lang === "fr" ? created.errorFr : undefined) ||
+            created.error ||
+            (lang === "fr" ? "Impossible de créer le lien." : "Could not create link."),
+        );
+        return;
+      }
+
+      const nextRef = created.slug;
+      const nextLink = created.link || buildTrackitShortLink(nextRef);
+
+      const row: StoredAffiliate = {
+        creator: handle.startsWith("@") ? handle : `@${handle}`,
+        platform: mapAffiliatePlatform(platform),
+        ref: nextRef,
+        code: nextCode,
+        clicks: existing?.clicks ?? 0,
+        conversions: existing?.conversions ?? 0,
+        sales: existing?.sales ?? 0,
+        commission: existing?.commission ?? 0,
+        status: existing?.status ?? "Active",
+      };
+      const list = loadAffiliates(userId);
+      saveAffiliates(userId, [row, ...list.filter((a) => !handlesMatch(a.creator, handle))]);
+
+      await fetch("/api/affiliates/set-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, handle: `@${handle}`, code: nextCode, ref: nextRef }),
+      }).catch(() => {});
+
+      setRef(nextRef);
+      setCode(nextCode);
+      setLink(nextLink);
+      onAssigned?.({ promoCode: nextCode, affiliateRef: nextRef });
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const copyText = async (text: string, kind: "link" | "code") => {
     try {
@@ -194,6 +230,49 @@ export function CreatorAffiliatePanel({
 
       {!ready ? (
         <div style={{ color: "#9A9A9A", fontSize: 14 }}>{t.loading}</div>
+      ) : !link ? (
+        <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>
+              {lang === "fr" ? "URL de destination" : "Destination URL"}
+            </label>
+            <input
+              type="url"
+              value={destinationUrl}
+              onChange={(e) => setDestinationUrl(e.target.value)}
+              placeholder="https://votre-boutique.com"
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #E5E5E5",
+                fontSize: 14,
+                fontFamily: externFont,
+              }}
+            />
+          </div>
+          {genError ? <p style={{ color: "#dc2626", fontSize: 13, margin: 0 }}>{genError}</p> : null}
+          <button
+            type="button"
+            disabled={generating || !destinationUrl.trim()}
+            onClick={() => void generateLink()}
+            style={{
+              border: "none",
+              background: "#0047FF",
+              color: "#FFF",
+              borderRadius: 10,
+              padding: "12px 18px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: generating ? "default" : "pointer",
+              opacity: generating || !destinationUrl.trim() ? 0.5 : 1,
+              fontFamily: externFont,
+            }}
+          >
+            {generating ? (lang === "fr" ? "Génération…" : "Generating…") : t.affiliateGenerate}
+          </button>
+        </div>
       ) : (
         <div style={{ maxWidth: 560, display: "flex", flexDirection: "column", gap: 28 }}>
           <div>
@@ -245,7 +324,7 @@ export function CreatorAffiliatePanel({
               </button>
             </div>
             <p style={{ margin: "10px 0 0", fontSize: 13, color: "#9A9A9A", fontFamily: externFont }}>
-              /r/{ref}
+              /l/{ref}
             </p>
           </div>
 

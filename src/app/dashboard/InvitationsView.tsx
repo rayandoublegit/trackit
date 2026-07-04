@@ -6,10 +6,13 @@ import { canInviteCreators, type PlanTier } from "@/lib/plan-limits";
 import { ActiveDashboardCreatorsPanel } from "./ActiveDashboardCreatorsPanel";
 import { UpgradeModal } from "./UpgradeModal";
 import { getSavedCreators } from "@/lib/db";
+import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
 import { loadAffiliates, saveAffiliates, type StoredAffiliate } from "@/lib/affiliates-storage";
+import { supabase } from "@/lib/supabase";
 import { CreatorAvatar } from "./CreatorAvatar";
 
 const BLUE = "#0047FF";
+const externFont = "'InterDisplay', 'Inter Display', sans-serif";
 
 const inviteSecondaryBtn: React.CSSProperties = {
   background: "#FFFFFF",
@@ -24,19 +27,14 @@ const inviteSecondaryBtn: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
-function slugFromHandle(handle: string) {
-  const base = handle.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9]/g, "") || "creator";
-  return `${base}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 function codeFromHandle(handle: string, discount = "15") {
   const base = handle.replace(/^@/, "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "CREATOR";
   const pct = discount.replace(/\D/g, "") || "15";
   return `${base}${pct}`;
 }
 
-function affiliateReferralLink(ref: string) {
-  return `${typeof window !== "undefined" ? window.location.origin : "https://trackit.app"}/r/${ref}`;
+function affiliateReferralLink(slug: string) {
+  return buildTrackitShortLink(slug);
 }
 
 function handlesMatch(a: string, b: string) {
@@ -86,6 +84,7 @@ export function InvitationsView({
   } | null>(null);
   const [affiliateCopied, setAffiliateCopied] = useState<"link" | "code" | null>(null);
   const [affiliateLoading, setAffiliateLoading] = useState(false);
+  const [destinationUrl, setDestinationUrl] = useState("");
 
   const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
 
@@ -117,6 +116,18 @@ export function InvitationsView({
     return () => {
       cancelled = true;
     };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !supabase) return;
+    void supabase
+      .from("profiles")
+      .select("shopify_store_url")
+      .eq("id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.shopify_store_url) setDestinationUrl(String(data.shopify_store_url));
+      });
   }, [userId]);
 
   const generate = async () => {
@@ -167,15 +178,25 @@ export function InvitationsView({
   const generateAffiliate = async () => {
     if (!userId) return;
     const handle = affiliateHandle.trim().replace(/^@/, "");
-    if (!handle) return;
+    if (!handle || !destinationUrl.trim()) return;
 
     setAffiliateLoading(true);
     try {
       const existing = loadAffiliates(userId).find((a) => handlesMatch(a.creator, handle));
       const selected = savedCreators.find((c) => c.id === affiliateSelectedId);
-      const nextRef = existing?.ref || slugFromHandle(handle);
       const nextCode = existing?.code || selected?.discount_code || codeFromHandle(handle);
-      const nextLink = affiliateReferralLink(nextRef);
+
+      const created = await createAffiliateShortLink({
+        brandId: userId,
+        creatorUsername: handle,
+        destinationUrl: destinationUrl.trim(),
+      });
+      if (!created.ok || !created.slug) {
+        return;
+      }
+
+      const nextRef = created.slug;
+      const nextLink = created.link || affiliateReferralLink(nextRef);
 
       const row: StoredAffiliate = {
         creator: `@${handle}`,
@@ -231,7 +252,8 @@ export function InvitationsView({
     }
   }, [affiliateGenerated]);
 
-  const canGenerateAffiliate = affiliateHandle.trim().replace(/^@/, "").length > 0;
+  const canGenerateAffiliate =
+    affiliateHandle.trim().replace(/^@/, "").length > 0 && destinationUrl.trim().length > 0;
 
   return (
     <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
@@ -329,7 +351,8 @@ export function InvitationsView({
                       borderRadius: 10,
                       border: "1px solid #E5E5E5",
                       fontSize: 14,
-                      fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
+                      fontFamily: externFont,
+                      letterSpacing: "-0.02em",
                       outline: "none",
                       boxSizing: "border-box",
                       color: "#1A1A1A",
@@ -484,6 +507,31 @@ export function InvitationsView({
               />
             </div>
 
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>
+                {lang === "fr" ? "URL de destination" : "Destination URL"}
+              </label>
+              <input
+                type="url"
+                value={destinationUrl}
+                onChange={(e) => {
+                  setDestinationUrl(e.target.value);
+                  setAffiliateGenerated(null);
+                }}
+                placeholder="https://votre-boutique.com"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  border: "1px solid #E5E5E5",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  color: "#1A1A1A",
+                }}
+              />
+            </div>
+
             {!affiliateGenerated ? (
               <button
                 type="button"
@@ -522,7 +570,8 @@ export function InvitationsView({
                         borderRadius: 10,
                         border: "1px solid #E5E5E5",
                         fontSize: 14,
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                        fontFamily: externFont,
+                        letterSpacing: "-0.02em",
                         color: "#1A1A1A",
                         background: "#FAFAFA",
                       }}
@@ -558,7 +607,7 @@ export function InvitationsView({
                     {lang === "fr" ? "Code promo" : "Promo code"}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.04em" }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, fontFamily: externFont, letterSpacing: "-0.02em" }}>
                       {affiliateGenerated.code}
                     </span>
                     <button

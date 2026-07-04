@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { normalizeCreatorHandle } from "@/lib/managed-creator-commission";
+import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
 export const dynamic = "force-dynamic";
 
@@ -98,11 +99,6 @@ export async function GET(request: Request) {
     creatorRows = await loadCreatorsByHandle(profileHandle);
   }
 
-  const origin =
-    request.headers.get("origin") ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "https://trackit.app";
-
   for (const row of creatorRows) {
     const handle = normalizeCreatorHandle(row.handle || "");
     let affiliateRef = row.affiliate_ref?.trim() || "";
@@ -119,7 +115,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       assigned: true,
-      link: affiliateRef ? `${origin.replace(/\/$/, "")}/r/${affiliateRef}` : null,
+      link: affiliateRef ? buildTrackitShortLink(affiliateRef) : null,
       ref: affiliateRef || null,
       code: code || null,
       handle: row.handle,

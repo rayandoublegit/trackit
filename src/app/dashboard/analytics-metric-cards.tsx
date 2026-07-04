@@ -6,7 +6,53 @@ import { analyticsPeriodLabel, formatTrendLabel, type AnalyticsDateRange, type P
 import { useLang } from "@/lib/useLang";
 import { AnalyticsPeriodDropdown, HERO_PERIOD_OPTIONS } from "./AnalyticsPeriodDropdown";
 
-export type ChartPoint = { date: string; value: number };
+export type ChartPoint = { date: string; value: number; /** Inclusive end of a range label. */ endDate?: string };
+
+/** Bar sampling interval: shorter periods → denser bars (30d → every 7d, 7d → every 2d, 3d/today → daily). */
+export function barChartStepDaysForPeriod(period: AnalyticsDateRange, totalDaysInSeries?: number): number {
+  if (period === "today" || period === "3d") return 1;
+  if (period === "7d") return 2;
+  if (period === "custom" && totalDaysInSeries != null) {
+    if (totalDaysInSeries <= 6) return 1;
+    if (totalDaysInSeries <= 14) return 2;
+    return 7;
+  }
+  return 7;
+}
+
+/**
+ * Bar charts: keep previous period → current period, but only one stick every `stepDays` days.
+ * Always keeps the first day (start of previous period) and the last day (end of current).
+ * Example: 1 jan (prev) → 8 jan → 15 jan → 20 jan (current).
+ */
+export function sampleSeriesEveryNDays(points: ChartPoint[], stepDays = 7): ChartPoint[] {
+  const dated = points
+    .filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (dated.length === 0) return points;
+  if (dated.length <= 2) return dated.map((p) => ({ date: p.date, value: Number(p.value) || 0 }));
+
+  const indices = new Set<number>([0, dated.length - 1]);
+  for (let i = stepDays; i < dated.length - 1; i += stepDays) {
+    indices.add(i);
+  }
+
+  return [...indices]
+    .sort((a, b) => a - b)
+    .map((i) => ({
+      date: dated[i].date,
+      value: Number(dated[i].value) || 0,
+    }));
+}
+
+/** Running total — so bars show value progression from previous period into current. */
+export function toCumulativeSeries(points: ChartPoint[]): ChartPoint[] {
+  let sum = 0;
+  return points.map((p) => {
+    sum += Number(p.value) || 0;
+    return { date: p.date, value: sum, endDate: p.endDate };
+  });
+}
 
 export function trendColors(direction: PeriodTrend["direction"]) {
   if (direction === "up") return { fg: "#166534", bg: "#DCFCE7" };
@@ -199,12 +245,13 @@ function TrendInline({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" })
   );
 }
 
-/** Compact top-row summary card (Leadwave-style). */
+/** Compact top-row summary card with mini sparkline (dashboard KPI style). */
 export function SummaryMetricCard({
   title,
   info,
   value,
   trend,
+  sparklineSeries,
   lang,
   profitability,
 }: {
@@ -212,17 +259,24 @@ export function SummaryMetricCard({
   info: string;
   value: string;
   trend?: PeriodTrend;
+  sparklineSeries?: ChartPoint[];
   lang: "en" | "fr";
   profitability?: boolean;
 }) {
+  const sparkPoints = ensureChartSeries(sparklineSeries, trend, trend?.current ?? 0);
+  const sparkColor =
+    trend?.direction === "down" ? "#DC2626" : trend?.direction === "up" ? "#16A34A" : "#9CA3AF";
+
   return (
     <div
       style={{
         background: "#FFFFFF",
         border: "1px solid #EFEFEF",
         borderRadius: 14,
-        padding: "18px 18px 16px",
-        minHeight: 120,
+        padding: "16px 16px 14px",
+        minHeight: 118,
+        minWidth: 0,
+        overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         gap: 10,
@@ -233,14 +287,53 @@ export function SummaryMetricCard({
         <span style={{ fontSize: 13, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.01em" }}>{title}</span>
         <InfoTip text={info} lang={lang} />
       </div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
-        {value}
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ fontSize: 26, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
+          {value}
+        </div>
+        <div style={{ width: 88, flexShrink: 0, marginBottom: 2 }}>
+          <MiniSparkline points={sparkPoints} color={sparkColor} />
+        </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: "auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: "auto", minWidth: 0 }}>
         {trend ? <TrendInline trend={trend} lang={lang} /> : null}
         {profitability != null ? <ProfitabilityPill profitable={profitability} lang={lang} /> : null}
       </div>
     </div>
+  );
+}
+
+function MiniSparkline({ points, color }: { points: ChartPoint[]; color: string }) {
+  const width = 88;
+  const height = 44;
+  const padX = 2;
+  const padY = 4;
+  const chartW = width - padX * 2;
+  const chartH = height - padY * 2;
+  const values = points.map((p) => p.value);
+  const minV = Math.min(...values, 0);
+  const maxV = Math.max(...values, 1);
+  const span = Math.max(maxV - minV, 1e-9);
+
+  const coords = points.map((p, i) => {
+    const x = padX + (points.length === 1 ? chartW / 2 : (i / (points.length - 1)) * chartW);
+    const y = padY + chartH - ((p.value - minV) / span) * chartH;
+    return { x, y };
+  });
+
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
+  const areaPath =
+    coords.length > 0
+      ? `${linePath} L ${coords[coords.length - 1].x.toFixed(1)} ${(padY + chartH).toFixed(1)} L ${coords[0].x.toFixed(1)} ${(padY + chartH).toFixed(1)} Z`
+      : "";
+
+  return (
+    <svg width={width} height={height} aria-hidden style={{ display: "block" }}>
+      {areaPath ? <path d={areaPath} fill={color} fillOpacity={0.12} /> : null}
+      {linePath ? (
+        <path d={linePath} fill="none" stroke={color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
+      ) : null}
+    </svg>
   );
 }
 
@@ -679,7 +772,12 @@ export function MetricPanelCard({
   profitability?: boolean;
   chartVariant?: "line" | "bars";
 }) {
-  const points = ensureChartSeries(series, trend, trend?.current ?? 0);
+  const rawPoints = ensureChartSeries(series, trend, trend?.current ?? 0);
+  // Bars: previous period → current period, one stick every 7 days (first + last always kept).
+  const points =
+    chartVariant === "bars"
+      ? sampleSeriesEveryNDays(toCumulativeSeries(rawPoints), 7)
+      : rawPoints;
   return (
     <div
       style={{
@@ -704,7 +802,7 @@ export function MetricPanelCard({
         {value}
       </div>
       {chartVariant === "bars" ? (
-        <BarSparkline lang={lang} points={points} formatValue={formatPoint} height={140} />
+        <AnalyticsBarChart lang={lang} points={points} formatValue={formatPoint} height={140} />
       ) : (
         <InteractiveLineChart lang={lang} points={points} formatValue={formatPoint} height={140} />
       )}
@@ -881,39 +979,121 @@ export function InteractiveLineChart({
   );
 }
 
-function BarSparkline({
+function formatBarPointLabel(point: ChartPoint, lang: "en" | "fr", weekly?: boolean) {
+  if (weekly && point.endDate && point.endDate !== point.date) {
+    return `${formatChartDate(point.date, lang, true)} – ${formatChartDate(point.endDate, lang, true)}`;
+  }
+  return formatChartDate(point.date, lang, weekly ? true : false);
+}
+
+/** Large bar chart for hero analytics panels. */
+export function HeroBarChartCard({
+  title,
+  info,
+  value,
+  trend,
+  series,
+  formatPoint,
+  lang,
+  period,
+  onPeriodChange,
+  periodOptions = HERO_PERIOD_OPTIONS,
+}: {
+  title: string;
+  info: string;
+  value: string;
+  trend?: PeriodTrend;
+  series?: ChartPoint[];
+  formatPoint: (value: number) => string;
+  lang: "en" | "fr";
+  period: AnalyticsDateRange;
+  onPeriodChange: (period: AnalyticsDateRange) => void;
+  periodOptions?: AnalyticsDateRange[];
+}) {
+  const rawPoints = ensureChartSeries(series, trend, trend?.current ?? 0);
+  const stepDays = barChartStepDaysForPeriod(period, rawPoints.length);
+  const points = sampleSeriesEveryNDays(toCumulativeSeries(rawPoints), stepDays);
+  return (
+    <div
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid #EFEFEF",
+        borderRadius: 16,
+        padding: "20px 22px 18px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.02em" }}>{title}</span>
+          <InfoTip text={info} lang={lang} />
+        </div>
+        <AnalyticsPeriodDropdown
+          value={period}
+          onChange={onPeriodChange}
+          lang={lang}
+          options={periodOptions}
+          align="right"
+          variant="subtle"
+        />
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
+        <div style={{ fontSize: 36, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.045em", lineHeight: 1.05 }}>
+          {value}
+        </div>
+        {trend ? <TrendPill trend={trend} lang={lang} /> : null}
+      </div>
+      <AnalyticsBarChart lang={lang} points={points} formatValue={formatPoint} height={240} />
+    </div>
+  );
+}
+
+export function AnalyticsBarChart({
   lang,
   points,
   formatValue,
   height = 140,
+  weekly = false,
 }: {
   lang: "en" | "fr";
   points: ChartPoint[];
   formatValue: (value: number) => string;
   height?: number;
+  weekly?: boolean;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(...points.map((p) => p.value), 1);
   const active = hover != null ? points[hover] : null;
+  const barMaxWidth = points.length <= 6 ? 40 : points.length <= 10 ? 32 : 24;
+  const showAllLabels = points.length <= 8;
 
   return (
     <div style={{ position: "relative", height }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: height - 24, paddingTop: 8 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: points.length <= 6 ? 10 : 6, height: height - 28, paddingTop: 8 }}>
         {points.map((p, i) => {
           const h = Math.max(4, Math.round((p.value / max) * 100));
           const isActive = hover === i;
+          const label = formatBarPointLabel(p, lang, weekly);
           return (
             <div
-              key={`${p.date}-${i}`}
-              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}
+              key={`${p.date}-${p.endDate ?? ""}-${i}`}
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                height: "100%",
+                justifyContent: "flex-end",
+                minWidth: 0,
+              }}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
             >
               <div
-                title={`${formatChartDate(p.date, lang, false)} · ${formatValue(p.value)}`}
+                title={`${label} · ${formatValue(p.value)}`}
                 style={{
                   width: "100%",
-                  maxWidth: 28,
+                  maxWidth: barMaxWidth,
                   height: `${h}%`,
                   minHeight: 4,
                   background: isActive ? "#1A1A1A" : "#D4D4D4",
@@ -926,9 +1106,29 @@ function BarSparkline({
           );
         })}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>
-        <span>{formatChartDate(points[0]?.date, lang, true)}</span>
-        <span>{formatChartDate(points[points.length - 1]?.date, lang, true)}</span>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: showAllLabels ? "space-between" : "space-between",
+          gap: 4,
+          fontSize: 10,
+          color: "#9A9A9A",
+          marginTop: 6,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {showAllLabels
+          ? points.map((p, i) => (
+              <span key={`lbl-${i}`} style={{ flex: 1, textAlign: "center", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {formatChartDate(p.date, lang, true)}
+              </span>
+            ))
+          : (
+            <>
+              <span>{formatChartDate(points[0]?.date, lang, true)}</span>
+              <span>{formatChartDate(points[points.length - 1]?.endDate ?? points[points.length - 1]?.date, lang, true)}</span>
+            </>
+          )}
       </div>
       {active ? (
         <div
@@ -947,7 +1147,7 @@ function BarSparkline({
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{formatChartDate(active.date, lang, false)}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{formatBarPointLabel(active, lang, weekly)}</div>
           <div style={{ fontSize: 12, color: "#7A7A7A" }}>{formatValue(active.value)}</div>
         </div>
       ) : null}

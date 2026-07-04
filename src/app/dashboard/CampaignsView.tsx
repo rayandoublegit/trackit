@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignContentTab } from "./CampaignContentTab";
+import { CampaignLinksTab } from "./CampaignLinksTab";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
@@ -20,14 +21,15 @@ import {
 } from "@/lib/plan-limits";
 import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
-import { computeTrend, dayKeyFromIso, fillTimelineDays, formatTrendLabel, isWithinPeriod, resolveAnalyticsDateBounds, analyticsPeriodLabel, ANALYTICS_PERIOD_OPTIONS, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
+import { computeTrend, dayKeyFromIso, fillTimelineDays, formatTrendLabel, isWithinPeriod, resolveAnalyticsDateBounds, analyticsPeriodLabel, ANALYTICS_PERIOD_OPTIONS, toDayKey, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
 import {
   AnalyticsSectionHeader,
-  HeroMetricChart,
-  MetricPanelCard,
+  HeroBarChartCard,
   ProfitabilityPill,
   SummaryMetricCard,
 } from "./analytics-metric-cards";
+import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
+import { AddSalePanel } from "./AddSalePanel";
 import { formatCurrency, formatCurrencyWithCode, type DisplayCurrency } from "@/lib/useCurrency";
 import {
   compactNumberToInput,
@@ -66,7 +68,7 @@ type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
 type BoardTab = "active" | "drafts" | "finished";
 type CampaignSort = "recent" | "name";
-type DetailTab = "creators" | "analytics" | "content";
+type DetailTab = "creators" | "analytics" | "content" | "links";
 type CampaignDateRange = { start: string; end: string };
 
 type CampaignAnalyticsExport = {
@@ -481,6 +483,15 @@ function computeCampaignScopedSalesTrend(
   );
 }
 
+function previousBoundsFromCurrent(dateBounds: { start: Date; end: Date }): { start: Date; end: Date } {
+  const durationMs = dateBounds.end.getTime() - dateBounds.start.getTime();
+  const prevEnd = new Date(dateBounds.start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - durationMs);
+  prevStart.setHours(0, 0, 0, 0);
+  prevEnd.setHours(23, 59, 59, 999);
+  return { start: prevStart, end: prevEnd };
+}
+
 function buildCampaignTimeline(
   sales: SaleRow[],
   campaignId: string,
@@ -488,10 +499,15 @@ function buildCampaignTimeline(
   campaignMeta: Record<string, CampaignSalesMeta>,
   dateBounds?: { start: Date; end: Date },
 ): CampaignAnalyticsTimelinePoint[] {
+  // Include previous period → current so bar charts can bridge both.
+  const spanStart = dateBounds ? previousBoundsFromCurrent(dateBounds).start : undefined;
+  const spanEnd = dateBounds?.end;
+
   const dayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
   for (const sale of sales) {
     if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
-    if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
+    if (spanStart && spanEnd && !isWithinPeriod(sale.created_at, spanStart, spanEnd)) continue;
+    if (!spanStart && dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
     const day = dayKeyFromIso(String(sale.created_at));
     if (!day) continue;
     const agg = dayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
@@ -510,10 +526,9 @@ function buildCampaignTimeline(
       net: Math.max(0, agg.revenue - agg.commission),
     }));
 
-  if (!dateBounds) return sparse;
+  if (!dateBounds || !spanStart || !spanEnd) return sparse;
 
-  // Full period (every day, including zeros) so months without sales still appear.
-  return fillTimelineDays(sparse, dateBounds.start, dateBounds.end);
+  return fillTimelineDays(sparse, spanStart, spanEnd);
 }
 
 function sumCommissionByCreator(sales: SaleRow[]): Map<string, number> {
@@ -1147,7 +1162,6 @@ export function CampaignsView({
   const campaignNav = navState.view === "campaigns" ? navState.campaign : undefined;
   const modalOpen = campaignNav?.type === "new";
   const addCreatorsId = campaignNav?.type === "addCreators" ? campaignNav.id : null;
-  const addSaleId = campaignNav?.type === "addSale" ? campaignNav.id : null;
   const editId = campaignNav?.type === "edit" ? campaignNav.id : null;
   const detailId = campaignNav?.type === "detail" ? campaignNav.id : null;
   const detailInitialTab =
@@ -1571,7 +1585,6 @@ export function CampaignsView({
   };
 
   const selected = campaigns.find((c) => c.id === detailId) ?? null;
-  const addSaleCampaign = addSaleId ? campaigns.find((c) => c.id === addSaleId) ?? null : null;
   const addCreatorsCampaign = addCreatorsId ? campaigns.find((c) => c.id === addCreatorsId) ?? null : null;
   const editCampaign = editId ? campaigns.find((c) => c.id === editId) ?? null : null;
 
@@ -1580,12 +1593,6 @@ export function CampaignsView({
       navigate({ view: "campaigns" }, { replace: true });
     }
   }, [loading, detailId, selected, navigate]);
-
-  useEffect(() => {
-    if (!loading && addSaleId && !addSaleCampaign) {
-      navigate({ view: "campaigns" }, { replace: true });
-    }
-  }, [loading, addSaleId, addSaleCampaign, navigate]);
 
   useEffect(() => {
     if (!loading && addCreatorsId && !addCreatorsCampaign) {
@@ -1616,38 +1623,6 @@ export function CampaignsView({
         onCreate={handleCreateCampaign}
         onSaveDraft={handleSaveDraft}
         onLaunchDraft={handleLaunchDraft}
-      />
-    );
-  }
-
-  if (addSaleId) {
-    if (loading) {
-      return (
-        <>
-          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
-          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
-        </>
-      );
-    }
-    const addSaleCampaignResolved = campaigns.find((c) => c.id === addSaleId) ?? null;
-    if (!addSaleCampaignResolved) {
-      return (
-        <>
-          <CampaignsHeader isMobile={isMobile} lang={lang} onNew={tryOpenNewCampaign} showFilters={false} showNewButton={false} />
-          <CampaignsLoadingState isMobile={isMobile} lang={lang} />
-        </>
-      );
-    }
-    return (
-      <AddSaleOnboarding
-        lang={lang}
-        userId={userId}
-        campaign={addSaleCampaignResolved}
-        isMobile={isMobile}
-        onClose={() =>
-          navigate({ view: "campaigns", campaign: { type: "detail", id: addSaleId, tab: "analytics" } }, { replace: true })
-        }
-        onSuccess={handleManualSaleAdded}
       />
     );
   }
@@ -1740,9 +1715,7 @@ export function CampaignsView({
           onAddCreators={() =>
             navigate({ view: "campaigns", campaign: { type: "addCreators", id: selected.id } })
           }
-          onAddSale={() =>
-            navigate({ view: "campaigns", campaign: { type: "addSale", id: selected.id } }, { replace: true })
-          }
+          onManualSaleAdded={handleManualSaleAdded}
         />
       </>
     );
@@ -3198,13 +3171,8 @@ function CampaignDetailToolbar({
   isMobile,
   currency,
   setCurrency,
-  analyticsPeriod,
-  setAnalyticsPeriod,
-  customDateRange,
-  setCustomDateRange,
   onBack,
   onStatusChange,
-  onEdit,
   onAddCreators,
   onAddSale,
   onExport,
@@ -3214,29 +3182,21 @@ function CampaignDetailToolbar({
   isMobile?: boolean;
   currency: DisplayCurrency;
   setCurrency: (value: DisplayCurrency) => void;
-  analyticsPeriod: AnalyticsDateRange;
-  setAnalyticsPeriod: (value: AnalyticsDateRange) => void;
-  customDateRange: CampaignDateRange;
-  setCustomDateRange: (value: CampaignDateRange) => void;
   onBack: () => void;
   onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
-  onEdit: (id: string) => void;
   onAddCreators: () => void;
   onAddSale: () => void;
   onExport: (format: "csv" | "xlsx") => void | Promise<void>;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
   const [currencyOpen, setCurrencyOpen] = useState(false);
-  const [periodOpen, setPeriodOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
   const currencyRef = useRef<HTMLDivElement>(null);
-  const periodRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(statusRef, statusOpen, () => setStatusOpen(false));
   useClickOutside(currencyRef, currencyOpen, () => setCurrencyOpen(false));
-  useClickOutside(periodRef, periodOpen, () => setPeriodOpen(false));
   useClickOutside(moreRef, moreOpen, () => setMoreOpen(false));
 
   const isPaused = campaign.status === "Paused";
@@ -3411,81 +3371,13 @@ function CampaignDetailToolbar({
           )}
         </div>
 
-        <div ref={periodRef} style={{ position: "relative" }}>
-          <button type="button" onClick={() => setPeriodOpen((open) => !open)} style={toolbarControl}>
-            {analyticsPeriod === "custom"
-              ? formatCampaignDateRangeLabel(customDateRange, lang)
-              : analyticsPeriodLabel(analyticsPeriod, lang)}
-            <ChevronDownIcon />
-          </button>
-          {periodOpen && (
-            <div style={{ ...dropdownPanel, minWidth: 280, padding: 14 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: analyticsPeriod === "custom" ? 12 : 0 }}>
-                {ANALYTICS_PERIOD_OPTIONS.map((period) => (
-                  <button
-                    key={period}
-                    type="button"
-                    style={{
-                      ...menuItemStyle,
-                      fontWeight: analyticsPeriod === period ? 600 : 400,
-                      background: analyticsPeriod === period ? "#F5F5F5" : "transparent",
-                    }}
-                    onClick={() => {
-                      setAnalyticsPeriod(period);
-                      if (period !== "custom") setPeriodOpen(false);
-                    }}
-                  >
-                    {analyticsPeriodLabel(period, lang)}
-                  </button>
-                ))}
-              </div>
-              {analyticsPeriod === "custom" && (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div>
-                      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
-                        {lang === "fr" ? "Début" : "Start"}
-          </div>
-                      <input
-                        type="date"
-                        value={customDateRange.start}
-                        max={customDateRange.end}
-                        onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, start: e.target.value }))}
-                        style={dateInputStyle}
-                      />
-        </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>
-                        {lang === "fr" ? "Fin" : "End"}
-        </div>
-                      <input
-                        type="date"
-                        value={customDateRange.end}
-                        min={customDateRange.start}
-                        max={new Date().toISOString().slice(0, 10)}
-                        onChange={(e) => setCustomDateRange(normalizeCampaignDateRange({ ...customDateRange, end: e.target.value }))}
-                        style={dateInputStyle}
-                      />
-      </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPeriodOpen(false)}
-                    style={{ ...btnSecondary, width: "100%", marginTop: 12, padding: "8px 12px", fontSize: 13 }}
-                  >
-                    {lang === "fr" ? "Appliquer" : "Apply"}
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
         <div ref={moreRef} style={{ position: "relative" }}>
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
             aria-label={lang === "fr" ? "Plus d'actions" : "More actions"}
+            aria-expanded={moreOpen}
+            aria-haspopup="menu"
             style={{ ...toolbarControl, padding: "6px 8px" }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -3495,17 +3387,28 @@ function CampaignDetailToolbar({
             </svg>
           </button>
           {moreOpen && (
-            <div style={dropdownPanel}>
+            <div style={{ ...dropdownPanel, minWidth: 220 }}>
               <button
                 type="button"
                 style={menuItemStyle}
                 onClick={() => {
                   setMoreOpen(false);
-                  void onExport("xlsx");
+                  onAddSale();
                 }}
               >
-                {lang === "fr" ? "Exporter Excel" : "Export Excel"}
+                {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
               </button>
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setMoreOpen(false);
+                  onAddCreators();
+                }}
+              >
+                {lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
+              </button>
+              <div style={{ height: 1, background: "#EFEFEF", margin: "4px 0" }} />
               <button
                 type="button"
                 style={menuItemStyle}
@@ -3515,6 +3418,16 @@ function CampaignDetailToolbar({
                 }}
               >
                 {lang === "fr" ? "Exporter CSV" : "Export CSV"}
+              </button>
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setMoreOpen(false);
+                  void onExport("xlsx");
+                }}
+              >
+                {lang === "fr" ? "Exporter Excel" : "Export Excel"}
               </button>
               {campaign.status !== "Completed" && (
                 <>
@@ -3534,51 +3447,14 @@ function CampaignDetailToolbar({
             </div>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={() => onEdit(campaign.id)}
-          aria-label={lang === "fr" ? "Modifier la campagne" : "Edit campaign"}
-          style={{
-            border: "none",
-            background: "transparent",
-            padding: 6,
-            cursor: "pointer",
-            color: "#1A1A1A",
-            display: "inline-flex",
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
-            <path d="M13.5 6.5l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-        </button>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "stretch" }}>
-          <button
-            type="button"
-            className="hero-cta-raised-light"
-            onClick={onAddSale}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
-          </button>
-          <button
-            type="button"
-            className="hero-cta-raised-light"
-            onClick={onAddCreators}
-            style={{ whiteSpace: "nowrap" }}
-          >
-            {lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
-          </button>
-        </div>
       </div>
     </div>
   );
 }
 
-function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onAddSale, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onAddSale: () => void; isMobile?: boolean }) {
+function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onManualSaleAdded, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onManualSaleAdded?: (saleDate?: string) => void | Promise<void>; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>(initialTab);
+  const [addSaleOpen, setAddSaleOpen] = useState(false);
   const [currency, setCurrency] = useState<DisplayCurrency>(lang === "fr" ? "EUR" : "USD");
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsDateRange>("30d");
   const [customDateRange, setCustomDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
@@ -3698,6 +3574,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
     { id: "content", label: lang === "fr" ? "Contenu" : "Content" },
+    { id: "links", label: lang === "fr" ? "Liens" : "Links" },
   ];
 
   const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
@@ -3720,17 +3597,22 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const netRevenueTrend = analytics?.netRevenueTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
   const roiTrend = analytics?.roiTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
   const timeline = analytics?.timeline ?? [];
-  const revenueSeries = timeline.map((p) => ({ date: p.date, value: p.revenue }));
-  const commissionSeries = timeline.map((p) => ({ date: p.date, value: p.commission }));
-  const netSeries = timeline.map((p) => ({ date: p.date, value: p.net }));
-  const salesCountSeries = timeline.map((p) => ({ date: p.date, value: p.salesCount }));
+  const currentStartKey = analyticsDateBounds ? toDayKey(analyticsDateBounds.start) : "";
+  const revenueSeries = timeline
+    .filter((p) => !currentStartKey || p.date >= currentStartKey)
+    .map((p) => ({ date: p.date, value: p.revenue }));
+  const netSeries = timeline
+    .filter((p) => !currentStartKey || p.date >= currentStartKey)
+    .map((p) => ({ date: p.date, value: p.net }));
+  const salesCountSeriesFull = timeline.map((p) => ({ date: p.date, value: p.salesCount }));
+  const salesCountSeries = timeline
+    .filter((p) => !currentStartKey || p.date >= currentStartKey)
+    .map((p) => ({ date: p.date, value: p.salesCount }));
+  const periodSalesCount = salesCountSeries.reduce((sum, p) => sum + p.value, 0);
+  const roiSparklineSeries = timeline
+    .filter((p) => !currentStartKey || p.date >= currentStartKey)
+    .map((p) => ({ date: p.date, value: p.commission > 0 ? p.revenue / p.commission : 0 }));
   const isProfitable = (roi ?? 0) >= 1 || (totals.commission === 0 && totals.sales > 0);
-  const pendingPayoutsSub =
-    pendingPayouts > 0
-      ? lang === "fr"
-        ? `${pendingCreatorCount} créateur${pendingCreatorCount > 1 ? "s" : ""} à payer`
-        : `${pendingCreatorCount} creator${pendingCreatorCount > 1 ? "s" : ""} to pay`
-      : formatPendingPayoutsSub(0, lang);
   const money = (v: number) => formatCurrencyWithCode(v, currency);
 
   const handleExport = async (format: "csv" | "xlsx") => {
@@ -3777,15 +3659,10 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         isMobile={isMobile}
         currency={currency}
         setCurrency={setCurrency}
-        analyticsPeriod={analyticsPeriod}
-        setAnalyticsPeriod={setAnalyticsPeriod}
-        customDateRange={customDateRange}
-        setCustomDateRange={setCustomDateRange}
         onBack={onBack}
         onStatusChange={onStatusChange}
-        onEdit={onEdit}
         onAddCreators={onAddCreators}
-        onAddSale={onAddSale}
+        onAddSale={() => setAddSaleOpen(true)}
         onExport={handleExport}
       />
       <div style={{ display: "flex", gap: 28, overflowX: "auto", marginTop: 28 }}>
@@ -3840,23 +3717,23 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           isMobile={isMobile}
         />
       )}
+      {tab === "links" && (
+        <CampaignLinksTab
+          lang={lang}
+          brandId={userId}
+          campaignId={campaign.id}
+          campaignCreatorIds={campaign.creatorIds ?? []}
+          isMobile={isMobile}
+        />
+      )}
       {tab === "analytics" && (
         <>
-          <AnalyticsSectionHeader
-            title={lang === "fr" ? "Vue d’ensemble" : "Overview"}
-            info={
-              lang === "fr"
-                ? "Indicateurs clés de cette campagne sur la période sélectionnée."
-                : "Key indicators for this campaign in the selected period."
-            }
-            lang={lang}
-          />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
               gap: 14,
-              marginBottom: 28,
+              marginBottom: 14,
             }}
           >
             <SummaryMetricCard
@@ -3868,6 +3745,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               }
               value={money(totals.sales)}
               trend={salesTrend}
+              sparklineSeries={revenueSeries}
               lang={lang}
             />
             <SummaryMetricCard
@@ -3879,6 +3757,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               }
               value={money(netRevenue)}
               trend={netRevenueTrend}
+              sparklineSeries={netSeries}
               lang={lang}
               profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
             />
@@ -3891,146 +3770,64 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               }
               value={formatCampaignRoi(roi)}
               trend={roiTrend}
+              sparklineSeries={roiSparklineSeries}
               lang={lang}
               profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
             />
           </div>
 
-          <HeroMetricChart
-            title={lang === "fr" ? "Revenus nets" : "Net revenue"}
-            info={
-              lang === "fr"
-                ? "Revenus de la campagne moins les commissions dues. Survolez la courbe pour le détail par jour."
-                : "Campaign revenue minus commissions owed. Hover the chart for daily detail."
-            }
-            value={money(netRevenue)}
-            trend={netRevenueTrend}
-            series={netSeries}
-            formatPoint={money}
-            lang={lang}
-            period={analyticsPeriod === "custom" || analyticsPeriod === "all" ? "30d" : analyticsPeriod}
-            onPeriodChange={(next) => {
-              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-                setAnalyticsPeriod(next);
-              }
-            }}
-          />
-          <HeroMetricChart
-            title={lang === "fr" ? "Revenus" : "Revenue"}
-            info={
-              lang === "fr"
-                ? "Somme des commandes attribuées à cette campagne. Survolez la courbe pour le détail par jour."
-                : "Sum of orders attributed to this campaign. Hover the chart for daily detail."
-            }
-            value={money(totals.sales)}
-            trend={salesTrend}
-            series={revenueSeries}
-            formatPoint={money}
-            lang={lang}
-            period={analyticsPeriod === "custom" || analyticsPeriod === "all" ? "30d" : analyticsPeriod}
-            onPeriodChange={(next) => {
-              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-                setAnalyticsPeriod(next);
-              }
-            }}
-            accent="#0F766E"
-          />
-
-          <AnalyticsSectionHeader
-            title={lang === "fr" ? "Autres métriques" : "Other metrics"}
-            info={
-              lang === "fr"
-                ? "Commissions et volume de ventes sur la période."
-                : "Commissions and sales volume for the period."
-            }
-            lang={lang}
-          />
-          <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 28 }}>
-            <MetricPanelCard
-              title={lang === "fr" ? "Commissions" : "Commissions"}
-              info={
-                lang === "fr"
-                  ? "Commissions dues aux créateurs pour les ventes de cette campagne."
-                  : "Commissions owed to creators for sales in this campaign."
-              }
-              value={money(totals.commission)}
-              trend={commissionTrend}
-              series={commissionSeries}
-              formatPoint={money}
-              lang={lang}
-              chartVariant="bars"
-            />
-            <MetricPanelCard
-              title={lang === "fr" ? "Ventes" : "Sales"}
-              info={
-                lang === "fr"
-                  ? "Nombre de commandes attribuées à cette campagne."
-                  : "Number of orders attributed to this campaign."
-              }
-              value={String(salesCountSeries.reduce((s, p) => s + p.value, 0))}
-              series={salesCountSeries}
-              formatPoint={(v) =>
-                lang === "fr"
-                  ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
-                  : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
-              }
-              lang={lang}
-              chartVariant="bars"
-            />
-          </div>
-
-          <AnalyticsSectionHeader
-            title={lang === "fr" ? "Activité campagne" : "Campaign activity"}
-            info={
-              lang === "fr"
-                ? "Créateurs, moyenne et paiements liés à cette campagne."
-                : "Creators, averages, and payouts for this campaign."
-            }
-            lang={lang}
-          />
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-              gap: 14,
+              display: "flex",
+              flexDirection: isMobile ? "column" : "row",
+              alignItems: "stretch",
+              gap: isMobile ? 20 : 20,
               marginBottom: 28,
+              minWidth: 0,
             }}
           >
-            <SummaryMetricCard
-              title={lang === "fr" ? "Moyenne / créateur" : "Avg per creator"}
-              info={
-                lang === "fr"
-                  ? "Revenus moyens générés par créateur dans la campagne."
-                  : "Average revenue driven per creator in this campaign."
-              }
-              value={money(avgPerCreator)}
-              trend={salesTrend}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <HeroBarChartCard
+                title={lang === "fr" ? "Volume de ventes" : "Sales volume"}
+                info={
+                  lang === "fr"
+                    ? "Volume cumulé de ventes, de la période précédente à la période actuelle — un bâton tous les 7 jours."
+                    : "Cumulative sales volume from the previous period through the current one — one bar every 7 days."
+                }
+                value={String(periodSalesCount)}
+                trend={salesTrend}
+                series={salesCountSeriesFull}
+                formatPoint={(v) =>
+                  lang === "fr"
+                    ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
+                    : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
+                }
+                lang={lang}
+                period={analyticsPeriod === "all" ? "90d" : analyticsPeriod}
+                onPeriodChange={(next) => {
+                  if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+                    setAnalyticsPeriod(next);
+                  }
+                }}
+              />
+            </div>
+
+            <AnalyticsSalesPanel
+              userId={userId}
               lang={lang}
-            />
-            <SummaryMetricCard
-              title={lang === "fr" ? "Créateurs actifs" : "Active creators"}
-              info={
-                lang === "fr"
-                  ? `Créateurs ayant généré au moins une vente (${activeCreators} sur ${creatorCount} dans la campagne).`
-                  : `Creators who drove at least one sale (${activeCreators} of ${creatorCount} in campaign).`
-              }
-              value={String(activeCreators)}
-              lang={lang}
-            />
-            <SummaryMetricCard
-              title={lang === "fr" ? "Paiements en attente" : "Pending payouts"}
-              info={
-                lang === "fr"
-                  ? `Solde restant à verser aux créateurs de cette campagne. ${pendingPayoutsSub}`
-                  : `Balance still owed to creators in this campaign. ${pendingPayoutsSub}`
-              }
-              value={money(pendingPayouts)}
-              lang={lang}
+              isMobile={isMobile}
+              campaignId={campaign.id}
+              period={analyticsPeriod === "all" ? "90d" : analyticsPeriod}
+              onPeriodChange={(next) => {
+                if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+                  setAnalyticsPeriod(next);
+                }
+              }}
             />
           </div>
 
           <AnalyticsSectionHeader
-            title={lang === "fr" ? "Détail & classements" : "Details & rankings"}
+            title={lang === "fr" ? "Performances créateurs" : "Creator performance"}
             info={
               lang === "fr"
                 ? "Classement des créateurs et détail des performances."
@@ -4051,6 +3848,19 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         </>
       )}
     </div>
+    <AddSalePanel
+      open={addSaleOpen}
+      onClose={() => setAddSaleOpen(false)}
+      lang={lang}
+      userId={userId}
+      campaign={{
+        id: campaign.id,
+        name: campaign.name,
+        creatorIds: campaign.creatorIds,
+        commissionRate: campaign.commissionRate,
+      }}
+      onSuccess={onManualSaleAdded}
+    />
   </>
   );
 }
@@ -5029,367 +4839,6 @@ const onboardingSecondaryBtn: React.CSSProperties = {
   borderRadius: 10,
 };
 
-function AddSaleOnboarding({
-  lang,
-  userId,
-  campaign,
-  isMobile,
-  onClose,
-  onSuccess,
-}: {
-  lang: "en" | "fr";
-  userId?: string;
-  campaign: Campaign;
-  isMobile?: boolean;
-  onClose: () => void;
-  onSuccess?: (saleDate?: string) => void | Promise<void>;
-}) {
-  const [creators, setCreators] = useState<
-    { id: string; handle: string; full_name?: string; avatar_url?: string; commission_rate?: number | null }[]
-  >([]);
-  const [commissionByCreatorId, setCommissionByCreatorId] = useState<Record<string, number>>({});
-  const [loadingCreators, setLoadingCreators] = useState(true);
-  const [creatorId, setCreatorId] = useState("");
-  const [amount, setAmount] = useState("");
-  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [messageTone, setMessageTone] = useState<"error" | "success">("error");
-  const { navigate } = useDashboardNavigation();
-
-  const amountCurrency = lang === "fr" ? "EUR" : "USD";
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setLoadingCreators(true);
-      if (!supabase) {
-        if (!cancelled) setLoadingCreators(false);
-        return;
-      }
-
-      let resolvedUserId = userId;
-      if (!resolvedUserId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          if (!cancelled) setLoadingCreators(false);
-          return;
-        }
-        resolvedUserId = user.id;
-      }
-
-      const creatorIds = campaign.creatorIds ?? [];
-      if (creatorIds.length === 0) {
-        if (!cancelled) {
-          setCreators([]);
-          setLoadingCreators(false);
-        }
-        return;
-      }
-
-      const { data } = await supabase
-        .from("creators")
-        .select("id, handle, full_name, avatar_url, commission_rate")
-        .eq("user_id", resolvedUserId)
-        .in("id", creatorIds);
-
-      if (cancelled) return;
-
-      const rows = (data || []) as {
-        id: string;
-        handle: string;
-        full_name?: string;
-        avatar_url?: string;
-        commission_rate?: number | null;
-      }[];
-
-      const { data: savedRows } = await supabase
-        .from("discovery_saved")
-        .select("creator_username, avatar_url, snapshot")
-        .eq("user_id", resolvedUserId);
-
-      const avatarByHandle = buildAvatarByHandleFromSavedRows(savedRows ?? []);
-      const enrichedRows = enrichCreatorsWithAvatars(rows, avatarByHandle);
-
-      const commissionByHandle = new Map<string, number>();
-      for (const row of savedRows || []) {
-        const rate = commissionRateFromDiscoverySnapshot(
-          (row as { snapshot?: unknown }).snapshot
-        );
-        if (rate != null) {
-          commissionByHandle.set(
-            normalizeCreatorHandle(String((row as { creator_username?: string }).creator_username || "")),
-            rate
-          );
-        }
-      }
-
-      const commissionMap: Record<string, number> = {};
-      const campaignDefaultRate = parseCommissionRate(campaign.commissionRate) ?? 10;
-      for (const creator of enrichedRows) {
-        const fromCrm = commissionByHandle.get(normalizeCreatorHandle(creator.handle || ""));
-        const fromCreator = parseCommissionRate(creator.commission_rate);
-        commissionMap[creator.id] = fromCrm ?? fromCreator ?? campaignDefaultRate;
-      }
-
-      setCreators(enrichedRows);
-      prefetchCreatorAvatars(
-        enrichedRows.map((c) => ({ username: c.handle, avatarUrl: c.avatar_url })),
-      );
-      setCommissionByCreatorId(commissionMap);
-      if (rows[0]?.id) setCreatorId(enrichedRows[0]?.id ?? rows[0].id);
-      setLoadingCreators(false);
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [campaign.commissionRate, campaign.creatorIds, campaign.id, userId]);
-
-  const submit = async () => {
-    if (!creatorId || !amount || submitting) return;
-    primeNotificationSound();
-    setSubmitting(true);
-    setMessage("");
-
-    try {
-      let resolvedUserId = userId;
-      if (!resolvedUserId && supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        resolvedUserId = user?.id;
-      }
-      if (!resolvedUserId) {
-        setMessageTone("error");
-        setMessage(lang === "fr" ? "Session expirée." : "Session expired.");
-        setSubmitting(false);
-        return;
-      }
-
-      const res = await fetch("/api/sales/manual", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: resolvedUserId,
-          creatorId,
-          amount,
-          date: saleDate || undefined,
-          campaignId: campaign.id,
-        }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        error?: string;
-        errorFr?: string;
-        code?: string;
-        commissionAmount?: number;
-      };
-
-      if (data.ok) {
-        const selectedCreator = creators.find((c) => c.id === creatorId);
-        const creatorName =
-          selectedCreator?.full_name?.trim() ||
-          selectedCreator?.handle?.trim() ||
-          (lang === "fr" ? "un créateur" : "a creator");
-        const orderTotal = Number.parseFloat(amount) || 0;
-        notifySaleRecorded(lang, creatorName, orderTotal, data.commissionAmount ?? 0, resolvedUserId);
-        setSubmitting(false);
-        await onSuccess?.(saleDate || undefined);
-        onClose();
-        return;
-      }
-
-      setMessageTone("error");
-      setMessage(
-        data.code === COMMISSION_NOT_CONFIGURED_CODE
-          ? commissionNotConfiguredMessage(lang)
-          : (lang === "fr" ? data.errorFr : undefined) || data.error || (lang === "fr" ? "Échec de l'ajout" : "Failed to add sale")
-      );
-    } catch {
-      setMessageTone("error");
-      setMessage(lang === "fr" ? "Erreur réseau" : "Network error");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
-  const contentMax = 720;
-  const selectedCommission = creatorId ? commissionByCreatorId[creatorId] : undefined;
-  const hasSelectedCommission = selectedCommission != null;
-  const canSubmit = Boolean(creatorId && amount && !submitting && hasSelectedCommission);
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
-      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
-        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-          {lang === "fr" ? "Ajouter une vente" : "Add a sale"}
-        </h1>
-        <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 32px", lineHeight: 1.5 }}>
-          {lang === "fr"
-            ? `Enregistrez une vente pour la campagne « ${campaign.name} ». La commission est calculée automatiquement.`
-            : `Record a sale for "${campaign.name}". Commission is calculated automatically.`}
-        </p>
-
-        {loadingCreators ? (
-          <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
-        ) : creators.length === 0 ? (
-          <div style={{ marginBottom: 28 }}>
-            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5 }}>
-              {lang === "fr"
-                ? "Ajoutez d'abord des créateurs à cette campagne avant d'enregistrer une vente."
-                : "Add creators to this campaign before recording a sale."}
-            </p>
-            <button type="button" style={onboardingSecondaryBtn} onClick={onClose}>
-              {lang === "fr" ? "Retour à la campagne" : "Back to campaign"}
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
-                {lang === "fr" ? "Créateur" : "Creator"}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {creators.map((creator) => {
-                  const selected = creatorId === creator.id;
-                  const commission = commissionByCreatorId[creator.id];
-                  return (
-                    <button
-                      key={creator.id}
-                      type="button"
-                      onClick={() => setCreatorId(creator.id)}
-                style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        width: "100%",
-                        textAlign: "left",
-                        padding: "12px 14px",
-                        borderRadius: 10,
-                        ...selectionCardStyle(selected),
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      <CreatorAvatar
-                        src={creator.avatar_url}
-                        username={creator.handle}
-                        displayName={creator.full_name}
-                        size={36}
-                        alt={creator.full_name || creator.handle}
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: selectionTextPrimary(selected) }}>
-                          {creator.full_name || creator.handle || "—"}
-              </div>
-                        {creator.handle ? (
-                          <div style={{ fontSize: 13, color: selectionTextSecondary(selected) }}>@{creator.handle.replace(/^@/, "")}</div>
-                        ) : null}
-          </div>
-                      {commission != null ? (
-                        <span style={{ fontSize: 13, fontWeight: 600, color: selected ? "#FFFFFF" : "#1A1A1A", whiteSpace: "nowrap" }}>
-                          {commission}%
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 12, color: selectionAccentText(selected), whiteSpace: "nowrap" }}>
-                          {lang === "fr" ? "Commission manquante" : "No commission"}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-        </div>
-              </div>
-
-            {creatorId && !hasSelectedCommission ? (
-              <div
-                style={{
-                  marginBottom: 24,
-                  padding: "14px 16px",
-                  borderRadius: 10,
-                  border: "1px solid #EFEFEF",
-                  background: "#FFFFFF",
-                }}
-              >
-                <p style={{ fontSize: 14, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5 }}>
-                  {commissionNotConfiguredMessage(lang)}
-                </p>
-                    <button
-                      type="button"
-                  onClick={() => navigate({ view: "creators" })}
-                      style={{
-                    border: "none",
-                    background: "#0047FF",
-                    color: "#FFFFFF",
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                        fontSize: 13,
-                    fontWeight: 500,
-                        cursor: "pointer",
-                    fontFamily: "inherit",
-                      }}
-                    >
-                  {lang === "fr" ? "Ouvrir Find it → Gérer" : "Open Find it → Manage"}
-                    </button>
-                </div>
-            ) : null}
-
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
-                {lang === "fr" ? `Montant de la commande (${amountCurrency})` : `Order amount (${amountCurrency})`}
-              </div>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder={lang === "fr" ? "149,90" : "149.90"}
-                style={onboardingFieldInput}
-              />
-            </div>
-
-            <div style={{ marginBottom: 32 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
-                {lang === "fr" ? "Date de la vente" : "Sale date"}
-              </div>
-              <input
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-                style={dateInputStyle}
-              />
-            </div>
-
-            {message ? (
-              <p
-                style={{
-                  fontSize: 14,
-                  color: messageTone === "success" ? "#1A1A1A" : "#C0392B",
-                  margin: "0 0 20px",
-                }}
-              >
-                {message}
-              </p>
-            ) : null}
-
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button type="button" style={onboardingPrimaryBtn} disabled={!canSubmit} onClick={() => void submit()}>
-                {submitting ? (lang === "fr" ? "Ajout…" : "Adding…") : lang === "fr" ? "Ajouter la vente" : "Add sale"}
-              </button>
-              <button type="button" style={onboardingSecondaryBtn} onClick={onClose} disabled={submitting}>
-                {lang === "fr" ? "Annuler" : "Cancel"}
-              </button>
-            </div>
-            </>
-          )}
-      </div>
-    </div>
-  );
-}
 
 function NewCampaignOnboarding({
   lang,
