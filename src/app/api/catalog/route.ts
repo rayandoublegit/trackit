@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       let cq = admin
         .from("creators_index")
         .select(CREATOR_LIST_COLUMNS)
-        .contains("niches", ["curated"])
+        .eq("is_curated", true)
         .order("followers", { ascending: false, nullsFirst: false })
         .limit(20);
       if (language) cq = cq.eq("language", language);

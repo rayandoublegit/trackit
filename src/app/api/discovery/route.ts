@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   let curatedQ = supabaseAdmin
     .from("creators_index")
     .select(CREATOR_LIST_COLUMNS)
-    .contains("niches", ["curated"])
+    .eq("is_curated", true)
     .order("followers", { ascending: false })
     .limit(40);
   if (f.language) curatedQ = curatedQ.eq("language", f.language);

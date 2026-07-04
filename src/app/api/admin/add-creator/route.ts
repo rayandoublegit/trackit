@@ -227,6 +227,7 @@ export async function POST(request: Request) {
     bio,
     niches,
     primary_niche: niches.find((n) => n !== "curated") ?? null,
+    is_curated: true,
     enrichment_status: "enriched",
     language: language || null,
     location: location || null,
