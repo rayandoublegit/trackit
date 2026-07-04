@@ -59,7 +59,8 @@ export async function GET(req: NextRequest) {
       .range(from, to);
 
     if (language && country) {
-      q = q.or(`language.eq.${language},country_code.eq.${country}`);
+      // Language is strict (a creator has ONE content language). Country narrows within it.
+      q = q.eq("language", language);
     } else if (language) {
       q = q.eq("language", language);
     } else if (country) {
