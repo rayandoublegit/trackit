@@ -3,6 +3,7 @@ import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/cre
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
 import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
 export const dynamic = "force-dynamic";
 
@@ -50,13 +51,33 @@ export async function GET(request: Request) {
     brandName: brandName.get(item.brand_id) || "",
   }));
 
+  const contentIds = (items || []).map((item) => item.id);
+  const linkByContent = new Map<string, string>();
+  if (contentIds.length) {
+    const { data: linkRows } = await admin
+      .from("affiliate_links")
+      .select("content_id, slug")
+      .in("content_id", contentIds)
+      .eq("active", true);
+    for (const row of linkRows || []) {
+      if (row.content_id && row.slug) {
+        linkByContent.set(String(row.content_id), buildTrackitShortLink(String(row.slug)));
+      }
+    }
+  }
+
+  const withLinks = result.map((item) => ({
+    ...item,
+    linkUrl: linkByContent.get(item.id) ?? null,
+  }));
+
   const brandOptions = brandIds.map((id) => ({
     id,
     name: brandName.get(id) || id,
     creatorRowId: rows.find((r) => r.user_id === id)?.id ?? null,
   }));
 
-  return NextResponse.json({ ok: true, items: result, brands: brandOptions });
+  return NextResponse.json({ ok: true, items: withLinks, brands: brandOptions });
 }
 
 // POST — register uploaded content (files uploaded client-side to storage first)
@@ -121,11 +142,39 @@ export async function POST(request: Request) {
     console.error("campaign content sync failed:", campaignSyncErr.message);
   }
 
+  // C1: create a tracked sub-link dedicated to THIS content, so revenue can be
+  // attributed per post. Best-effort: content upload never fails because of it.
+  let linkUrl: string | null = null;
+  try {
+    const [{ data: cr }, { data: shop }, { data: cc }] = await Promise.all([
+      admin.from("creators").select("handle").eq("id", targetCreatorRowId).maybeSingle(),
+      admin.from("shopify_stores").select("shop_domain").eq("user_id", targetBrandId).limit(1).maybeSingle(),
+      admin.from("campaign_content").select("campaign_id").eq("content_id", data.id).limit(1).maybeSingle(),
+    ]);
+    if (shop?.shop_domain) {
+      const slug = "c" + Math.random().toString(36).slice(2, 9);
+      const { error: linkErr } = await admin.from("affiliate_links").insert({
+        slug,
+        brand_id: targetBrandId,
+        creator_username: cr?.handle ?? null,
+        campaign_id: cc?.campaign_id ?? null,
+        content_id: data.id,
+        destination_url: `https://${shop.shop_domain}`,
+        active: true,
+      });
+      if (!linkErr) linkUrl = `https://thentrack.it/l/${slug}`;
+      else console.error("content link creation failed:", linkErr.message);
+    }
+  } catch (e) {
+    console.error("content link creation error:", e);
+  }
+
   return NextResponse.json({
     ok: true,
     id: data.id,
     brandId: targetBrandId,
     creatorRowId: targetCreatorRowId,
+    linkUrl,
   });
 }
 

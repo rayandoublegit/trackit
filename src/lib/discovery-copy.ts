@@ -10,7 +10,7 @@ export function discoveryCopy(lang: Lang) {
     yourProduct: fr ? "Votre produit ou marque" : "Your product or brand",
     productPlaceholder: fr ? "Ex. Trackit, compléments fitness…" : "e.g. Trackit, fitness supplements…",
     search: fr ? "Recherche" : "Search",
-    searchPlaceholder: fr ? "@créateur ou email" : "@creator or email",
+    searchPlaceholder: fr ? "Rechercher un créateur (@pseudo, nom…)" : "Search any creator (@handle, name…)",
     requestSection: fr ? "Demande" : "Request",
     requestSectionHint: fr
       ? "Une niche manquante ? Dites-nous laquelle ajouter sur Trackit."

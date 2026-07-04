@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   let lq = supa
     .from("affiliate_links")
-    .select("id, slug, creator_username, campaign_id, destination_url, active, created_at")
+    .select("id, slug, creator_username, campaign_id, content_id, destination_url, active, created_at")
     .eq("brand_id", brandId);
   if (campaignId) lq = lq.eq("campaign_id", campaignId);
   const { data: links, error: lerr } = await lq;
@@ -68,15 +68,20 @@ export async function GET(req: NextRequest) {
 
   const out = links.map((l) => {
     const b = byLink.get(l.id)!;
+    const salesCount = salesByRef.get(l.slug)?.count ?? 0;
+    const revenue = Number((salesByRef.get(l.slug)?.revenue ?? 0).toFixed(2));
+    const commission = Number((salesByRef.get(l.slug)?.commission ?? 0).toFixed(2));
     return {
       ...l,
       metrics: {
         clicks: b.clicks,
         uniques: b.uniq.size,
-        sales: salesByRef.get(l.slug)?.count ?? 0,
-        revenue: Number((salesByRef.get(l.slug)?.revenue ?? 0).toFixed(2)),
-        commission: Number((salesByRef.get(l.slug)?.commission ?? 0).toFixed(2)),
-        conversionRate: b.clicks > 0 ? Number((((salesByRef.get(l.slug)?.count ?? 0) / b.clicks) * 100).toFixed(2)) : 0,
+        sales: salesCount,
+        revenue,
+        commission,
+        conversionRate: b.clicks > 0 ? Number(((salesCount / b.clicks) * 100).toFixed(2)) : 0,
+        aov: salesCount > 0 ? Number((revenue / salesCount).toFixed(2)) : 0,
+        epc: b.clicks > 0 ? Number((revenue / b.clicks).toFixed(2)) : 0,
         byDay: b.byDay,
         devices: b.devices,
         countries: b.countries,

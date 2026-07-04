@@ -11,33 +11,20 @@ import {
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-// Light shuffle of the current page only (no full-table load).
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const a = [...arr];
-  let s = seed || 1;
-  const rand = () => {
-    s = (s * 1103515245 + 12345) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
 /**
  * /api/catalog — Find It feed.
- * Paginated at the DB (no full-table scan). Niche filter uses GIN array tags only.
+ * Paginated at the DB. Optional `search` queries the full creators_index (global).
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  const niche = p.get("niche") || undefined;
-  const language = p.get("language") || undefined;
-  const country = (p.get("country") || "").trim().toUpperCase() || undefined;
+  const searchRaw = (p.get("search") || p.get("q") || "").trim().replace(/^@/, "");
+  const search = searchRaw.length >= 2 ? searchRaw.replace(/[%_,]/g, "") : "";
+  const niche = search ? undefined : p.get("niche") || undefined;
+  const language = search ? undefined : p.get("language") || undefined;
+  const country = search ? undefined : (p.get("country") || "").trim().toUpperCase() || undefined;
   const offset = Math.max(0, Number(p.get("offset")) || 0);
-  const maxLimit = niche ? 50 : 100;
-  const defaultLimit = niche ? 25 : 48;
+  const maxLimit = search ? 50 : niche ? 50 : 100;
+  const defaultLimit = search ? 30 : niche ? 25 : 48;
   const limit = Math.min(maxLimit, Math.max(1, Number(p.get("limit")) || defaultLimit));
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,9 +35,41 @@ export async function GET(req: NextRequest) {
   const admin = createClient(url, key);
 
   try {
-    // Fetch limit+1 to know hasMore without counting the whole table.
     const from = offset;
-    const to = offset + limit; // inclusive → limit+1 rows
+    const to = offset + limit;
+
+    if (search) {
+      const pattern = `%${search}%`;
+      const { data, error } = await admin
+        .from("creators_index")
+        .select(CREATOR_LIST_COLUMNS)
+        .or(`username.ilike.${pattern},display_name.ilike.${pattern},email.ilike.${pattern}`)
+        .order("followers", { ascending: false, nullsFirst: false })
+        .range(from, to);
+
+      if (error) {
+        return NextResponse.json({
+          creators: [],
+          hasMore: false,
+          count: 0,
+          error: error.message,
+        });
+      }
+
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      const hasMore = rows.length > limit;
+      const page = rows.slice(0, limit);
+      const creators: FeedCreator[] = page.map(catalogRowToFeedCreator);
+
+      return NextResponse.json({
+        creators,
+        hasMore,
+        count: creators.length,
+        search,
+      });
+    }
+
+    // Fetch limit+1 to know hasMore without counting the whole table.
 
     let q = admin
       .from("creators_index")
@@ -82,7 +101,6 @@ export async function GET(req: NextRequest) {
         .eq("is_curated", true)
         .order("followers", { ascending: false, nullsFirst: false })
         .limit(20);
-      if (language) cq = cq.eq("language", language);
       if (niche) {
         const cor = nicheOrClause(niche);
         if (cor) cq = cq.or(cor);
@@ -121,9 +139,8 @@ export async function GET(req: NextRequest) {
     }
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
-    const pageSeed = (Math.floor(offset / limit) + 1) * 7919;
-    const shuffled = seededShuffle(page, pageSeed);
-    const creators: FeedCreator[] = shuffled.map(catalogRowToFeedCreator);
+    // Stable order: curated picks first (already prepended), then followers desc from SQL.
+    const creators: FeedCreator[] = page.map(catalogRowToFeedCreator);
 
     return NextResponse.json({
       creators,

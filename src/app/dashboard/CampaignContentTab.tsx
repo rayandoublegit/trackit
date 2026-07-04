@@ -8,6 +8,7 @@ import {
   type ContentListItem,
 } from "@/lib/content-shared";
 import { AddBrandContentOnboarding } from "./AddBrandContentOnboarding";
+import { CampaignContentPerformancePanel } from "./CampaignContentPerformancePanel";
 
 const BLUE = "#0047FF";
 
@@ -128,6 +129,7 @@ export function CampaignContentTab({
       <>
         {header}
         <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+        <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
       </>
     );
   }
@@ -151,6 +153,7 @@ export function CampaignContentTab({
               : "No content for this campaign yet. Add some yourself or wait for a member creator to upload from their dashboard."}
           </p>
         </div>
+        <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
       </>
     );
   }
@@ -303,6 +306,7 @@ export function CampaignContentTab({
           );
         })}
       </div>
+      <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
     </>
   );
 }

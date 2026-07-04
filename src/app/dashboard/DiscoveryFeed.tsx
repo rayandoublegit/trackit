@@ -13,7 +13,7 @@ import {
   syncDiscoveryQuota,
 } from "@/lib/discovery-quota";
 import type { FeedCreator } from "@/lib/discovery-feed";
-import { creatorMatchesNicheFilter } from "@/lib/discovery-feed";
+import { creatorMatchesNicheFilter, isCuratedFeedCreator } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
@@ -148,7 +148,12 @@ const VIEWS_VAL: Record<string, number> = {
   "1m": 1_000_000,
 };
 
-function toParams(f: FilterState): Record<string, string> {
+function toParams(f: FilterState, debouncedSearch = ""): Record<string, string> {
+  const q = debouncedSearch.trim().replace(/^@/, "");
+  if (q.length >= 2) {
+    return { search: q };
+  }
+
   const p: Record<string, string> = {};
   if (f.niche) p.niche = f.niche;
   if (f.platform && f.platform !== "tiktok") p.platform = f.platform;
@@ -169,67 +174,80 @@ function toParams(f: FilterState): Record<string, string> {
 }
 
 function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<string>): FeedCreator[] {
-  let out = list;
+  const curated = list.filter((c) => isCuratedFeedCreator(c));
+  const regular = list.filter((c) => !isCuratedFeedCreator(c));
 
-  if (f.niche) {
-    // Server filters by exact tags; client re-checks so nothing leaks across niches.
-    out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
-  }
+  const filterRegular = (input: FeedCreator[]): FeedCreator[] => {
+    let out = input;
+    const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
 
-  if (f.platform) {
-    const want = f.platform.toLowerCase();
-    out = out.filter((c) => (c.platform || "tiktok").toLowerCase().includes(want));
-  }
+    if (!isGlobalSearch && f.niche) {
+      out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
+    }
 
-  if (f.country) {
-    // Pays gere server-side par /api/catalog (filtre niche+langue uniquement).
-    // Pas de re-filtre client: il ejectait les country_code vides.
-  }
+    if (!isGlobalSearch && f.platform) {
+      const want = f.platform.toLowerCase();
+      out = out.filter((c) => (c.platform || "tiktok").toLowerCase().includes(want));
+    }
 
-  if (f.language) {
-    out = out.filter((c) => {
-      const lang = (c.language || "").toLowerCase();
-      if (lang === f.language) return true;
-      if (f.country && (c.countryCode || "").toUpperCase() === f.country) return true;
-      return false;
-    });
-  }
+    const followers = followerRangeBounds(f.followersRange);
+    if (followers.min != null) {
+      out = out.filter((c) => c.followersCount >= followers.min!);
+    }
+    if (followers.max != null) {
+      out = out.filter((c) => c.followersCount <= followers.max!);
+    }
 
-  const followers = followerRangeBounds(f.followersRange);
-  if (followers.min != null) {
-    out = out.filter((c) => c.followersCount >= followers.min!);
-  }
-  if (followers.max != null) {
-    out = out.filter((c) => c.followersCount <= followers.max!);
-  }
+    if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
+    else if (f.engagement === "6+") out = out.filter((c) => c.engagementRate >= 6);
+    else if (f.engagement === "9+") out = out.filter((c) => c.engagementRate >= 9);
 
-  if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
-  else if (f.engagement === "6+") out = out.filter((c) => c.engagementRate >= 6);
-  else if (f.engagement === "9+") out = out.filter((c) => c.engagementRate >= 9);
+    if (!isGlobalSearch) {
+      const q = f.search.trim().toLowerCase().replace(/^@/, "");
+      if (q) {
+        out = out.filter(
+          (c) =>
+            c.username.toLowerCase().includes(q) ||
+            c.displayName.toLowerCase().includes(q) ||
+            (c.email?.toLowerCase().includes(q) ?? false),
+        );
+      }
+    }
+    if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
+    if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
+    if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => c.avgViews >= VIEWS_VAL[f.viewsFrom]);
+    if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => c.avgViews <= VIEWS_VAL[f.viewsTo]);
+    return out;
+  };
 
-  const q = f.search.trim().toLowerCase().replace(/^@/, "");
-  if (q) {
-    out = out.filter(
-      (c) =>
-        c.username.toLowerCase().includes(q) ||
-        c.displayName.toLowerCase().includes(q) ||
-        (c.email?.toLowerCase().includes(q) ?? false)
-    );
-  }
-  if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
-  if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
-  if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => c.avgViews >= VIEWS_VAL[f.viewsFrom]);
-  if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => c.avgViews <= VIEWS_VAL[f.viewsTo]);
-  return out;
-}
+  const filterCurated = (input: FeedCreator[]): FeedCreator[] => {
+    let out = input;
+    const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
+    if (!isGlobalSearch) {
+      const q = f.search.trim().toLowerCase().replace(/^@/, "");
+      if (q) {
+        out = out.filter(
+          (c) =>
+            c.username.toLowerCase().includes(q) ||
+            c.displayName.toLowerCase().includes(q) ||
+            (c.email?.toLowerCase().includes(q) ?? false),
+        );
+      }
+    }
+    if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
+    return out;
+  };
 
-function shuffleFeedCreators<T>(list: T[]): T[] {
-  const out = [...list];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
+  const curatedOut = filterCurated(curated);
+  const regularOut = filterRegular(regular);
+  const seen = new Set<string>();
+  const merged: FeedCreator[] = [];
+  for (const c of [...curatedOut, ...regularOut]) {
+    if (!c.username || seen.has(c.username)) continue;
+    seen.add(c.username);
+    merged.push(c);
   }
-  return out;
+  return merged;
 }
 
 function estimateEngagement(c: FeedCreator) {
@@ -970,6 +988,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     if (found) setSelected(found);
   }, [navState.view, navState.creator, creators]);
   const [sort, setSort] = useState<"value" | "followers" | "engagement">("followers");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const fetchGenRef = useRef(0);
@@ -978,19 +997,25 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const scrolledRef = useRef(false);
   const loadingNextRef = useRef(false);
 
-  const isCatalogMode = useMemo(() => !hasActiveSearchFilters(filters), [filters]);
   const allNichesBrowse = useMemo(() => isAllNichesBrowse(filters), [filters]);
   const planResultCap = resultsPerSearch;
   const batchSize = allNichesBrowse ? ALL_NICHES_CHUNK : (planResultCap ?? SCALE_PAGE_LIMIT);
 
-  const apiParams = useMemo(() => ({ ...toParams(filters), sort }), [filters, sort]);
+  useEffect(() => {
+    const q = filters.search.trim();
+    const timer = setTimeout(() => setDebouncedSearch(q), 350);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  const apiParams = useMemo(() => toParams(filters, debouncedSearch), [filters, debouncedSearch]);
+  const isGlobalSearch = debouncedSearch.trim().replace(/^@/, "").length >= 2;
 
   const discoverAndFetch = useCallback(async (
     batchIndex: number,
     mode: "replace" | "append" = "replace",
   ): Promise<{ count: number; blocked?: boolean }> => {
     const gen = fetchGenRef.current;
-    const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse;
+    const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse && !isGlobalSearch;
 
     const off = batchIndex * batchSize;
     const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(batchSize) }).toString();
@@ -1022,7 +1047,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     if (gen !== fetchGenRef.current) return { count: 0 };
 
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
-    const rows = !isCatalogMode ? shuffleFeedCreators(list) : list;
+    const rows = list;
     const apiHasMore = !!d.hasMore;
     poolHasMoreRef.current = apiHasMore;
     setError(d.error || null);
@@ -1063,16 +1088,14 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     }
 
     return { count: deduped.length };
-  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, isCatalogMode, batchSize, allNichesBrowse]);
+  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, batchSize, allNichesBrowse, isGlobalSearch]);
 
   useEffect(() => {
     fetchGenRef.current += 1;
     batchIndexRef.current = 0;
     poolHasMoreRef.current = true;
     let cancelled = false;
-    // Keep previous results visible while the new page loads (no blank flash).
     setHasMore(true);
-    setLoading(true);
     setError(null);
     scrolledRef.current = false;
     discoverAndFetch(0, "replace")
@@ -1150,12 +1173,11 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     setLoadingMore(true);
     try {
       let nextBatch = batchIndexRef.current + 1;
-      let result = await discoverAndFetch(nextBatch, "append");
+      const result = await discoverAndFetch(nextBatch, "append");
       if (result.blocked) return;
-      if (result.count === 0 && (allNichesBrowse || !hasDiscoveryCap)) {
-        nextBatch = 0;
-        result = await discoverAndFetch(0, "append");
-        if (result.blocked) return;
+      if (result.count === 0) {
+        setHasMore(false);
+        return;
       }
       batchIndexRef.current = nextBatch;
     } catch {
@@ -1181,19 +1203,37 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     return () => el.removeEventListener("scroll", onScroll);
   }, [loading, loadingMore, loadNextBatch, isMobile]);
 
-  const filtered = useMemo(() => applyClientFilters(creators, filters, savedUsernames), [creators, filters, savedUsernames]);
+  const filtered = useMemo(() => {
+    const base = applyClientFilters(creators, filters, savedUsernames);
+    const curated = base.filter((c) => isCuratedFeedCreator(c));
+    const regular = base.filter((c) => !isCuratedFeedCreator(c));
+    const sortedRegular =
+      sort === "engagement"
+        ? [...regular].sort((a, b) => b.engagementRate - a.engagementRate)
+        : sort === "followers"
+          ? [...regular].sort((a, b) => b.followersCount - a.followersCount)
+          : regular;
+    const seen = new Set<string>();
+    const out: FeedCreator[] = [];
+    for (const c of [...curated, ...sortedRegular]) {
+      if (!c.username || seen.has(c.username)) continue;
+      seen.add(c.username);
+      out.push(c);
+    }
+    return out;
+  }, [creators, filters, savedUsernames, sort]);
   const visibleCreators = filtered;
   const items = isPaid ? visibleCreators : visibleCreators.slice(0, FREE_VISIBLE + 2);
   const hasMoreFree = !isPaid && visibleCreators.length > FREE_VISIBLE;
   const displayCount = filtered.length;
-  // Creator count is only meaningful for a specific niche — hide on "All niches".
-  const showCreatorCount = Boolean(filters.niche.trim());
+  // Creator count hidden during global search (results are query-driven, not niche-scoped).
+  const showCreatorCount = Boolean(filters.niche.trim()) && !isGlobalSearch;
   const batchNote = showCreatorCount && planResultCap != null ? t.resultsCappedAt(planResultCap) : "";
   const discoveryGateActive = showDiscoveryGate;
   const feedGateActive = discoveryGateActive || hasMoreFree;
-  const searchQuery = filters.search.trim();
+  const searchQuery = debouncedSearch.trim();
   const isCreatorSearchMiss =
-    !loading && !error && !discoveryGateActive && searchQuery.length > 0 && filtered.length === 0;
+    !loading && !error && !discoveryGateActive && searchQuery.replace(/^@/, "").length >= 2 && filtered.length === 0;
 
   useEffect(() => {
     if (items.length === 0) return;

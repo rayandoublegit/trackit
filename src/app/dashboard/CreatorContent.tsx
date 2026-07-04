@@ -20,7 +20,78 @@ type ContentItem = {
   file_size: number | null;
   created_at: string;
   brandName: string;
+  linkUrl?: string | null;
 };
+
+const externFont = "'InterDisplay', 'Inter Display', sans-serif";
+
+function ContentTrackedLink({ lang, linkUrl }: { lang: "en" | "fr"; linkUrl: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid #E5E5E5",
+        background: "#FAFAFA",
+      }}
+    >
+      <p style={{ fontSize: 12, color: "#6B7280", margin: "0 0 8px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+        {lang === "fr"
+          ? "Ton lien pour ce contenu — mets-le en bio/description"
+          : "Your link for this content — add it to your bio or description"}
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: externFont,
+            fontSize: 13,
+            color: BLUE,
+            letterSpacing: "-0.02em",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+          title={linkUrl}
+        >
+          {linkUrl}
+        </span>
+        <button
+          type="button"
+          onClick={() => void copy()}
+          style={{
+            flexShrink: 0,
+            border: "1px solid #E5E5E5",
+            background: "#FFF",
+            borderRadius: 8,
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            color: "#1A1A1A",
+          }}
+        >
+          {copied ? (lang === "fr" ? "Copié" : "Copied") : lang === "fr" ? "Copier" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function isImageFile(item: Pick<ContentItem, "file_url" | "file_type" | "file_name">): boolean {
   if (item.file_type?.startsWith("image/")) return true;
@@ -57,6 +128,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [lastUploadedLink, setLastUploadedLink] = useState<string | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
 
   const load = async (): Promise<BrandOption[]> => {
@@ -121,6 +193,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     setUploading(true);
     setError(null);
     setSuccess(null);
+    setLastUploadedLink(null);
 
     try {
       const prepRes = await fetch(`/api/creator/content?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
@@ -147,6 +220,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
       let uploaded = 0;
       let lastCreatorRowId = uploadBrand.creatorRowId;
+      let latestLinkUrl: string | null = null;
 
       for (const file of pendingFiles) {
         const path = `${userId}/${uploadBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
@@ -178,6 +252,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           error?: string;
           brandId?: string;
           creatorRowId?: string;
+          linkUrl?: string | null;
         };
         if (!res.ok || !data?.ok) {
           throw new Error(
@@ -189,12 +264,14 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         }
         if (data.brandId) setBrandId(data.brandId);
         if (data.creatorRowId) lastCreatorRowId = data.creatorRowId;
+        if (data.linkUrl) latestLinkUrl = data.linkUrl;
         uploaded += 1;
       }
 
       setPendingFiles([]);
       setTitle("");
       setNotes("");
+      setLastUploadedLink(latestLinkUrl);
       setSuccess(
         lang === "fr"
           ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à la marque.`
@@ -462,6 +539,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
               {error && <p style={{ fontSize: 13, color: "#C62828", margin: "0 0 12px" }}>{error}</p>}
               {success && <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 12px" }}>{success}</p>}
+              {lastUploadedLink && <ContentTrackedLink lang={lang} linkUrl={lastUploadedLink} />}
 
               <button
                 type="button"
@@ -528,6 +606,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                       >
                         {item.file_name} →
                       </a>
+                      {item.linkUrl ? <ContentTrackedLink lang={lang} linkUrl={item.linkUrl} /> : null}
                     </div>
                     <button
                       type="button"

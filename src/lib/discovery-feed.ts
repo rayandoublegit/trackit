@@ -28,6 +28,13 @@ export interface FeedCreator extends DiscoveryCreatorResult {
   estCpm: number;
   valueTier: ValueTier;
   topVideos?: FeedVideo[];
+  /** Hand-picked creator — always pinned, never dropped by client filters. */
+  isCurated?: boolean;
+}
+
+export function isCuratedFeedCreator(c: Pick<FeedCreator, "isCurated" | "niches">): boolean {
+  if (c.isCurated) return true;
+  return (c.niches ?? []).some((n) => String(n).toLowerCase() === "curated");
 }
 
 export type FeedFilters = {
@@ -86,6 +93,12 @@ function mapVideoThumbnails(
     thumbnail: clientImageUrl(t.thumbnail) || null,
     url: t.url,
   }));
+}
+
+function readIsCurated(c: Record<string, unknown>): boolean {
+  if (c.is_curated === true) return true;
+  const niches = Array.isArray(c.niches) ? (c.niches as string[]) : [];
+  return niches.some((n) => String(n).toLowerCase() === "curated");
 }
 
 function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
@@ -284,6 +297,7 @@ export const CREATOR_LIST_COLUMNS = [
   "video_thumbnails",
   "top_videos",
   "niches",
+  "is_curated",
 ].join(",");
 
 
@@ -309,6 +323,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
     valueScore: valueScore(base.followersCount, base.engagementRate, base.avgViews),
     valueTier: valueTier(base.followersCount),
     topVideos,
+    isCurated: readIsCurated(c),
   };
 }
 
