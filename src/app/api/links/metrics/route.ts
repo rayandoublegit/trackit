@@ -48,6 +48,24 @@ export async function GET(req: NextRequest) {
     b.sources[src] = (b.sources[src] ?? 0) + 1;
   }
 
+  // Sales attributed to these links (Lot B)
+  const slugs = links.map((l) => l.slug);
+  const { data: sales } = await supa
+    .from("sales")
+    .select("attributed_ref, order_amount, commission_amount, created_at")
+    .in("attributed_ref", slugs)
+    .gte("created_at", since)
+    .limit(20000);
+  const salesByRef = new Map<string, { count: number; revenue: number; commission: number }>();
+  for (const sl of sales ?? []) {
+    const k = sl.attributed_ref as string;
+    const b = salesByRef.get(k) ?? { count: 0, revenue: 0, commission: 0 };
+    b.count++;
+    b.revenue += Number(sl.order_amount) || 0;
+    b.commission += Number(sl.commission_amount) || 0;
+    salesByRef.set(k, b);
+  }
+
   const out = links.map((l) => {
     const b = byLink.get(l.id)!;
     return {
@@ -55,6 +73,10 @@ export async function GET(req: NextRequest) {
       metrics: {
         clicks: b.clicks,
         uniques: b.uniq.size,
+        sales: salesByRef.get(l.slug)?.count ?? 0,
+        revenue: Number((salesByRef.get(l.slug)?.revenue ?? 0).toFixed(2)),
+        commission: Number((salesByRef.get(l.slug)?.commission ?? 0).toFixed(2)),
+        conversionRate: b.clicks > 0 ? Number((((salesByRef.get(l.slug)?.count ?? 0) / b.clicks) * 100).toFixed(2)) : 0,
         byDay: b.byDay,
         devices: b.devices,
         countries: b.countries,
@@ -65,6 +87,9 @@ export async function GET(req: NextRequest) {
   const totals = {
     clicks: out.reduce((s, l) => s + l.metrics.clicks, 0),
     uniques: out.reduce((s, l) => s + l.metrics.uniques, 0),
+    sales: out.reduce((s, l) => s + l.metrics.sales, 0),
+    revenue: Number(out.reduce((s, l) => s + l.metrics.revenue, 0).toFixed(2)),
+    commission: Number(out.reduce((s, l) => s + l.metrics.commission, 0).toFixed(2)),
   };
   return NextResponse.json({ links: out, totals, days });
 }

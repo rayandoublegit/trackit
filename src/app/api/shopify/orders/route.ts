@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import {
-  extractDiscountCodes,
   ingestShopifyOrder,
   resolveBrandUserIdFromShop,
 } from "@/lib/shopify-order-ingest";
@@ -27,11 +26,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true, matched: false, reason: "unknown_shop" });
   }
 
-  const codes = extractDiscountCodes(order);
-  if (codes.length === 0) {
-    return NextResponse.json({ received: true, matched: false });
-  }
-
+  // No early return on missing discount codes: the ingest also attributes
+  // orders coming from tracked links (?ref= in landing_site) without any code.
   const result = await ingestShopifyOrder(supabase, order, {
     userId: brandUserId,
     shopDomain,

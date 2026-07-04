@@ -77,6 +77,25 @@ async function crmAffiliateFor(
   };
 }
 
+async function latestAffiliateSlugForCreator(brandId: string, handle: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from("affiliate_links")
+    .select("slug")
+    .eq("brand_id", brandId)
+    .eq("creator_username", handle)
+    .eq("active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    if (error.message.toLowerCase().includes("affiliate_links")) return "";
+    return "";
+  }
+
+  return data?.slug?.trim() || "";
+}
+
 /**
  * Creator-facing: returns the affiliate link assigned by their brand (if any).
  */
@@ -108,6 +127,10 @@ export async function GET(request: Request) {
       const crm = await crmAffiliateFor(row.user_id, handle);
       if (!affiliateRef) affiliateRef = crm.affiliateRef;
       if (!code) code = crm.promoCode;
+    }
+
+    if (!affiliateRef && row.user_id && handle) {
+      affiliateRef = await latestAffiliateSlugForCreator(row.user_id, handle);
     }
 
     if (!affiliateRef && !code) continue;

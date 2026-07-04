@@ -330,55 +330,11 @@ export async function ingestShopifyOrder(
   }
 ): Promise<IngestShopifyOrderResult> {
   const codes = extractDiscountCodes(order);
+  if (codes.length === 0) return { matched: false, isNew: false, skipReason: "no_codes" };
 
-  // Lot B: affiliate-link attribution. Our /l/[slug] redirect appends ?ref=slug,
-  // which Shopify keeps in the order's landing_site (and sometimes note_attributes).
-  const o = order as Record<string, unknown>;
-  const refSlug = ((): string | null => {
-    const ls = String(o.landing_site || "");
-    const m = ls.match(/[?&]ref=([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    const notes = (o.note_attributes as Array<{ name?: string; value?: string }> | undefined) || [];
-    const n = notes.find((a) => (a.name || "").toLowerCase() === "ref");
-    return n?.value || null;
-  })();
-  let refInfo: { slug: string; linkId: string; creatorUsername: string | null; campaignId: string | null } | null = null;
-  if (refSlug) {
-    const { data: al } = await admin
-      .from("affiliate_links")
-      .select("id, slug, creator_username, campaign_id")
-      .eq("slug", refSlug)
-      .maybeSingle();
-    if (al) refInfo = { slug: al.slug, linkId: al.id, creatorUsername: al.creator_username, campaignId: al.campaign_id };
-  }
-
-  if (codes.length === 0 && !refInfo) return { matched: false, isNew: false, skipReason: "no_codes" };
-
-  const matchRes = codes.length
-    ? (options.maps
-        ? await matchOrderWithMaps(admin, options.userId, codes, options.maps)
-        : await matchOrderLive(admin, options.userId, codes))
-    : { match: null, reason: "no_codes" as const };
-  let match = matchRes.match;
-  const reason = matchRes.reason as "no_match" | "no_commission" | "no_codes" | "db_error" | undefined;
-
-  // Ref-only fallback: no promo code used, but the buyer came through a tracked link.
-  if (!match && refInfo?.creatorUsername) {
-    const { data: cr } = await admin
-      .from("creators")
-      .select("id, handle, commission_rate")
-      .eq("user_id", options.userId)
-      .ilike("handle", refInfo.creatorUsername)
-      .maybeSingle();
-    if (cr) {
-      match = {
-        creator: cr,
-        commissionRate: parseCommissionRate((cr as { commission_rate?: string | number | null }).commission_rate) ?? 0,
-        code: "ref:" + refInfo.slug,
-        linkedCampaignId: refInfo.campaignId,
-      } as unknown as typeof match;
-    }
-  }
+  const { match, reason } = options.maps
+    ? await matchOrderWithMaps(admin, options.userId, codes, options.maps)
+    : await matchOrderLive(admin, options.userId, codes);
 
   if (!match) {
     return { matched: false, isNew: false, skipReason: reason || "no_match" };
@@ -406,20 +362,9 @@ export async function ingestShopifyOrder(
     discount_code_used: match.code,
     campaign_id: match.linkedCampaignId,
     shop_domain: shopDomain,
-    affiliate_link_id: refInfo?.linkId ?? null,
-    attributed_ref: refInfo?.slug ?? null,
     status,
     created_at: order.created_at || new Date().toISOString(),
   };
-
-  if (refInfo) {
-    await admin
-      .from("link_clicks")
-      .update({ converted: true })
-      .eq("ref_code", refInfo.slug)
-      .eq("converted", false)
-      .gte("created_at", new Date(Date.now() - 30 * 86400000).toISOString());
-  }
 
   let dbError: string | undefined;
   if (isNew) {

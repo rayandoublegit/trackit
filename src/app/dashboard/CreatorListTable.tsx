@@ -7,11 +7,98 @@ import { stageColor } from "@/lib/pipeline";
 import type { SavedRow } from "@/lib/workspace-client";
 import { avatarFromDiscoverySavedRow } from "@/lib/creator-avatar";
 import { crmFromSnapshot, emailFromRow, metricsFromRow, type CreatorCrm } from "@/lib/creator-crm";
+import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import type { discoveryCopy } from "@/lib/discovery-copy";
 
 type Copy = ReturnType<typeof discoveryCopy>;
+
+const externFont = "'InterDisplay', 'Inter Display', sans-serif";
+
+function AffiliateLinkCell({
+  affiliateRef,
+  onGenerate,
+  t,
+}: {
+  affiliateRef?: string;
+  onGenerate: () => void;
+  t: Copy;
+}) {
+  const [copied, setCopied] = useState(false);
+  const ref = affiliateRef?.trim();
+
+  if (!ref) {
+    return (
+      <button
+        type="button"
+        onClick={onGenerate}
+        style={{
+          border: "1px solid #E5E5E5",
+          background: "#FFF",
+          borderRadius: 8,
+          padding: "6px 12px",
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "#1A1A1A",
+        }}
+      >
+        {t.affiliateGenerate}
+      </button>
+    );
+  }
+
+  const shortPath = `thentrack.it/l/${ref}`;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, maxWidth: 220 }}>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontFamily: externFont,
+          fontSize: 12,
+          color: "#0047FF",
+          letterSpacing: "-0.02em",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+        title={buildTrackitShortLink(ref)}
+      >
+        {shortPath}
+      </span>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(buildTrackitShortLink(ref)).then(
+            () => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            },
+            () => {},
+          );
+        }}
+        style={{
+          flexShrink: 0,
+          border: "1px solid #E5E5E5",
+          background: "#FFF",
+          borderRadius: 8,
+          padding: "4px 8px",
+          fontSize: 11,
+          fontWeight: 500,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          color: "#1A1A1A",
+        }}
+      >
+        {copied ? t.affiliateCopied : t.copy}
+      </button>
+    </div>
+  );
+}
 
 function fmtCount(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -521,7 +608,7 @@ export function CreatorListTable({
     { key: "email", label: t.emailCol, minWidth: 180 },
     { key: "lastEmail", label: t.colLastEmail, minWidth: 160 },
     { key: "conversation", label: t.colConversation, minWidth: 150 },
-    { key: "affiliate", label: t.colAffiliateLink, minWidth: 150 },
+    { key: "affiliate", label: t.colAffiliateLink, minWidth: 210 },
     { key: "commission", label: t.colCommission, minWidth: 120 },
     { key: "promoCode", label: t.colPromoCode, minWidth: 130 },
     { key: "label", label: t.colLabel, minWidth: 120 },
@@ -635,23 +722,11 @@ export function CreatorListTable({
                   )}
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenAffiliate(r)}
-                    style={{
-                      border: "1px solid #E5E5E5",
-                      background: "#FFF",
-                      borderRadius: 8,
-                      padding: "6px 12px",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      color: "#1A1A1A",
-                    }}
-                  >
-                    {t.affiliateGenerate}
-                  </button>
+                  <AffiliateLinkCell
+                    affiliateRef={crm.affiliateRef}
+                    onGenerate={() => onOpenAffiliate(r)}
+                    t={t}
+                  />
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                   <EditablePercentCell
