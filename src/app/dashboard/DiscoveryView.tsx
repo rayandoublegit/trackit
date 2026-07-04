@@ -2556,7 +2556,6 @@ export function DiscoveryView({
                 { value: "food", label: lang === "fr" ? "Cuisine" : "Food" },
                 { value: "travel", label: lang === "fr" ? "Voyage" : "Travel" },
                 { value: "e-commerce", label: "E-commerce" },
-                { value: "saas", label: "SaaS" },
               ]}
             />
             <FilterSelect

@@ -323,7 +323,6 @@ export function discoveryCopy(lang: Lang) {
     nicheWellness: fr ? "Bien-être" : "Wellness",
     nicheBusiness: fr ? "Business" : "Business",
     nicheEcom: "E-commerce",
-    nicheSaas: "SaaS",
   };
 }
 
