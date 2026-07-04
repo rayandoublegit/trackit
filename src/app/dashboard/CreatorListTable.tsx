@@ -497,7 +497,6 @@ export function CreatorListTable({
   onCrmChange,
   onOpenScript,
   onOpenContent,
-  onOpenAffiliate,
   onDelete,
 }: {
   rows: SavedRow[];
@@ -509,7 +508,6 @@ export function CreatorListTable({
   onCrmChange: (username: string, patch: Partial<CreatorCrm>) => void;
   onOpenScript: (row: SavedRow) => void;
   onOpenContent: (row: SavedRow) => void;
-  onOpenAffiliate: (row: SavedRow) => void;
   onDelete: (username: string) => void;
 }) {
   const columns: { key: string; label: string; minWidth: number }[] = [
@@ -521,7 +519,6 @@ export function CreatorListTable({
     { key: "email", label: t.emailCol, minWidth: 180 },
     { key: "lastEmail", label: t.colLastEmail, minWidth: 160 },
     { key: "conversation", label: t.colConversation, minWidth: 150 },
-    { key: "affiliate", label: t.colAffiliateLink, minWidth: 150 },
     { key: "commission", label: t.colCommission, minWidth: 120 },
     { key: "promoCode", label: t.colPromoCode, minWidth: 130 },
     { key: "label", label: t.colLabel, minWidth: 120 },
@@ -633,25 +630,6 @@ export function CreatorListTable({
                   ) : (
                     <span style={{ color: "#B0B0B0", fontSize: 14 }}>—</span>
                   )}
-                </td>
-                <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => onOpenAffiliate(r)}
-                    style={{
-                      border: "1px solid #E5E5E5",
-                      background: "#FFF",
-                      borderRadius: 8,
-                      padding: "6px 12px",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      color: "#1A1A1A",
-                    }}
-                  >
-                    {t.affiliateGenerate}
-                  </button>
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                   <EditablePercentCell
