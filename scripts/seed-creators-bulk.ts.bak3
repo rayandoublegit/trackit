@@ -25,12 +25,6 @@ const FR_ONLY = process.env.SEED_FR_ONLY === "1";
 const SEED_NICHES = (process.env.SEED_NICHES ?? "").split(",").map((x) => x.trim()).filter(Boolean);
 // Map query -> niche canonique, remplie uniquement en mode SEED_NICHES pour forcer le tag.
 const NICHE_OF_QUERY = new Map<string, string>();
-// Relevance keywords per targeted niche: Claude's detected niches/bio must match
-// at least one, otherwise the creator is skipped (brands/shops/off-topic are dropped).
-const NICHE_RELEVANCE: Record<string, string[]> = {
-  "e-commerce": ["ecommerce", "e-commerce", "ecom", "dropshipping", "shopify", "amazon fba", "print on demand", "online business", "business", "marketing", "entrepreneur", "vente en ligne", "boutique"],
-  saas: ["saas", "startup", "tech", "software", "no code", "nocode", "indie hacker", "founder", "build in public", "ai", "developer", "entrepreneur", "business", "b2b"],
-};
 for (const n of SEED_NICHES) {
   for (const q of (FR_NICHE_QUERIES as Record<string, string[]>)[n] ?? []) NICHE_OF_QUERY.set(q, n);
   for (const q of (EN_NICHE_QUERIES as Record<string, string[]>)[n] ?? []) NICHE_OF_QUERY.set(q, n);
@@ -102,29 +96,16 @@ async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<
       primary_niche: NICHE_OF_QUERY.get(t.q) ?? t.q, niches: [NICHE_OF_QUERY.get(t.q) ?? t.q], language: t.l ?? null, country_code: t.c ?? null,
     };
     if (USE_CLAUDE) {
-      const forced = NICHE_OF_QUERY.get(t.q);
-      let c;
       try {
-        c = await classifyCreator({ displayName: profile.displayName, bio: profile.bio, captions: extractCaptions(vRaw) });
-      } catch {
-        // In targeted-niche mode, no classification = no quality check = skip.
-        if (forced) return "skip";
-      }
-      if (c) {
-        if (forced) {
-          // Quality gate: Claude's detected niches/bio must overlap the target domain.
-          const hay = [c.primaryNiche, ...(c.niches ?? []), profile.bio ?? ""].join(" ").toLowerCase();
-          const ok = (NICHE_RELEVANCE[forced] ?? []).some((k) => hay.includes(k));
-          if (!ok) return "skip";
-        }
+        const c = await classifyCreator({ displayName: profile.displayName, bio: profile.bio, captions: extractCaptions(vRaw) });
         extra = {
-          primary_niche: forced ?? c.primaryNiche,
-          niches: Array.from(new Set([...(forced ? [forced] : []), ...c.niches, c.primaryNiche])),
+          primary_niche: NICHE_OF_QUERY.get(t.q) ?? c.primaryNiche,
+          niches: Array.from(new Set([...(NICHE_OF_QUERY.get(t.q) ? [NICHE_OF_QUERY.get(t.q) as string] : []), ...c.niches, c.primaryNiche])),
           language: c.language ?? t.l ?? null,
           country_code: c.countryCode ?? t.c ?? null,
           email: c.email,
         };
-      }
+      } catch { /* fall back to inferred values above */ }
     }
 
     const avatar =
