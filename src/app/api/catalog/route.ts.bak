@@ -71,25 +71,6 @@ export async function GET(req: NextRequest) {
       if (or) q = q.or(or);
     }
 
-    // Curated picks: hand-added creators always surface on the first page,
-    // regardless of follower count.
-    let curatedRows: Record<string, unknown>[] = [];
-    if (offset === 0) {
-      let cq = admin
-        .from("creators_index")
-        .select(CREATOR_LIST_COLUMNS)
-        .contains("niches", ["curated"])
-        .order("followers", { ascending: false, nullsFirst: false })
-        .limit(20);
-      if (language) cq = cq.eq("language", language);
-      if (niche) {
-        const cor = nicheOrClause(niche);
-        if (cor) cq = cq.or(cor);
-      }
-      const cr = await cq;
-      curatedRows = (cr.data ?? []) as unknown as Record<string, unknown>[];
-    }
-
     const { data, error } = await q;
     if (error) {
       return NextResponse.json({
@@ -101,10 +82,6 @@ export async function GET(req: NextRequest) {
     }
 
     let rows = (data ?? []) as unknown as Record<string, unknown>[];
-    if (curatedRows.length) {
-      const seenU = new Set(curatedRows.map((r) => String(r.username || "").toLowerCase()));
-      rows = [...curatedRows, ...rows.filter((r) => !seenU.has(String(r.username || "").toLowerCase()))];
-    }
     // Exact-tag safety net: drop any row that leaked through SQL.
     if (niche) {
       rows = rows.filter((row) =>
