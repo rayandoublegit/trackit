@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/useCurrency";
 import { SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import { AnalyticsPeriodDropdown, HERO_PERIOD_OPTIONS } from "./AnalyticsPeriodDropdown";
-import type { AnalyticsDateRange } from "@/lib/analytics-periods";
+import { getPeriodBounds, isWithinPeriod, type AnalyticsDateRange } from "@/lib/analytics-periods";
 
 type TrackedSale = {
   id: string;
@@ -155,8 +155,6 @@ export function AnalyticsSalesPanel({
   lang,
   isMobile,
   campaignId,
-  period,
-  onPeriodChange,
   periodOptions = HERO_PERIOD_OPTIONS,
 }: {
   userId?: string;
@@ -164,12 +162,11 @@ export function AnalyticsSalesPanel({
   isMobile?: boolean;
   /** When set, only sales linked to this campaign are shown. */
   campaignId?: string;
-  period?: AnalyticsDateRange;
-  onPeriodChange?: (period: AnalyticsDateRange) => void;
   periodOptions?: AnalyticsDateRange[];
 }) {
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [loading, setLoading] = useState(true);
+  const [listPeriod, setListPeriod] = useState<AnalyticsDateRange>("7d");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("today");
   const [search, setSearch] = useState("");
 
@@ -205,9 +202,21 @@ export function AnalyticsSalesPanel({
     return sales.filter((sale) => String(sale.campaign_id || "") === campaignId);
   }, [sales, campaignId]);
 
+  const periodBounds = useMemo(() => {
+    if (listPeriod === "all" || listPeriod === "custom") {
+      return getPeriodBounds("7d");
+    }
+    return getPeriodBounds(listPeriod);
+  }, [listPeriod]);
+
   const filteredSales = useMemo(() => {
-    return scopedSales.filter((sale) => saleInTimeFilter(sale, timeFilter) && saleMatchesSearch(sale, search));
-  }, [scopedSales, timeFilter, search]);
+    return scopedSales.filter(
+      (sale) =>
+        isWithinPeriod(sale.created_at, periodBounds.start, periodBounds.end) &&
+        saleInTimeFilter(sale, timeFilter) &&
+        saleMatchesSearch(sale, search),
+    );
+  }, [scopedSales, periodBounds, timeFilter, search]);
 
   const todayCount = useMemo(
     () => scopedSales.filter((sale) => saleInTimeFilter(sale, "today")).length,
@@ -269,16 +278,18 @@ export function AnalyticsSalesPanel({
           <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.03em" }}>
             {lang === "fr" ? "Dernières ventes" : "Latest sales"}
           </h2>
-          {period && onPeriodChange ? (
-            <AnalyticsPeriodDropdown
-              value={period}
-              onChange={onPeriodChange}
-              lang={lang}
-              options={periodOptions}
-              align="right"
-              variant="subtle"
-            />
-          ) : null}
+          <AnalyticsPeriodDropdown
+            value={listPeriod === "all" || listPeriod === "custom" ? "7d" : listPeriod}
+            onChange={(next) => {
+              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+                setListPeriod(next);
+              }
+            }}
+            lang={lang}
+            options={periodOptions}
+            align="right"
+            variant="subtle"
+          />
         </div>
 
         <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>

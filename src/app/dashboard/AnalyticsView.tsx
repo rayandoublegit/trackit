@@ -515,12 +515,6 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             userId={userId}
             lang={lang}
             isMobile={isMobile}
-            period={range === "custom" ? "custom" : range}
-            onPeriodChange={(next) => {
-              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-                setRange(next);
-              }
-            }}
           />
         </div>
 

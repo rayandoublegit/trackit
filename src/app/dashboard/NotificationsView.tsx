@@ -20,32 +20,29 @@ export function getInitialUnreadCount() {
   return getStoredUnreadCount();
 }
 
-const ICON_COLOR_READ = "#1A1A1A";
-const ICON_COLOR_UNREAD = "#FFFFFF";
-const UNREAD_BG = "#0047FF";
+const ICON_COLOR = "#1A1A1A";
+const READ_BG = "#FFFFFF";
+const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
 function NotificationKindIcon({
   kind,
   useTrackitLogo,
-  unread,
 }: {
   kind: NotificationKind;
   useTrackitLogo?: boolean;
-  unread?: boolean;
 }) {
-  const stroke = unread ? ICON_COLOR_UNREAD : ICON_COLOR_READ;
+  const stroke = ICON_COLOR;
 
   if (useTrackitLogo) {
     return (
       <img
-        src="/images/trackit-mark.svg"
+        src={TRACKIT_LOGO}
         alt=""
         width={20}
-        height={19}
+        height={20}
         style={{
           display: "block",
           objectFit: "contain",
-          filter: unread ? "brightness(0) invert(1)" : "none",
         }}
       />
     );
@@ -304,23 +301,23 @@ function NotificationList({
               width: "100%",
               padding: "14px 16px",
               border: "none",
-              borderBottom: i < visible.length - 1 ? `1px solid ${unread ? "rgba(255,255,255,0.15)" : "#F5F5F5"}` : "none",
-              background: unread ? UNREAD_BG : "#FFFFFF",
+              borderBottom: i < visible.length - 1 ? "1px solid #F0F0F0" : "none",
+              background: READ_BG,
               cursor: "pointer",
               textAlign: "left",
               fontFamily: "inherit",
             }}
           >
             <div style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
-              <NotificationKindIcon kind={n.kind} useTrackitLogo={useTrackitLogo} unread={unread} />
+              <NotificationKindIcon kind={n.kind} useTrackitLogo={useTrackitLogo} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+              <div style={{ marginBottom: 3 }}>
                 <span
                   style={{
                     fontSize: 13,
                     fontWeight: unread ? 600 : 500,
-                    color: unread ? "#FFFFFF" : "#1A1A1A",
+                    color: "#1A1A1A",
                     letterSpacing: "-0.02em",
                   }}
                 >
@@ -330,7 +327,7 @@ function NotificationList({
               <p
                 style={{
                   fontSize: 12,
-                  color: unread ? "rgba(255,255,255,0.9)" : "#7A7A7A",
+                  color: "#7A7A7A",
                   letterSpacing: "-0.01em",
                   margin: "0 0 4px 0",
                   lineHeight: 1.45,
@@ -338,7 +335,7 @@ function NotificationList({
               >
                 {n.body}
               </p>
-              <span style={{ fontSize: 11, color: unread ? "rgba(255,255,255,0.75)" : "#9A9A9A", letterSpacing: "-0.01em" }}>
+              <span style={{ fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
                 {n.time}
               </span>
             </div>
@@ -352,7 +349,7 @@ function NotificationList({
               style={{
                 background: "none",
                 border: "none",
-                color: unread ? "rgba(255,255,255,0.85)" : "#9A9A9A",
+                color: "#9A9A9A",
                 fontSize: 18,
                 lineHeight: 1,
                 cursor: "pointer",

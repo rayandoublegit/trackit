@@ -1,18 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useLang } from "@/lib/useLang";
-import { supabase } from "@/lib/supabase";
 import {
   formatContentBytes,
   isImageContentFile,
   isVideoContentFile,
-  safeContentFileName,
   type ContentListItem,
 } from "@/lib/content-shared";
-import { useDashboardNavigation } from "./DashboardNavigationProvider";
-import { CreatorAvatar } from "./CreatorAvatar";
-import { AddBrandContentOnboarding } from "./AddBrandContentOnboarding";
+import { AddBrandContentPanel } from "./AddBrandContentPanel";
 
 const BLUE = "#0047FF";
 
@@ -124,9 +120,9 @@ function ContentCard({ item, lang }: { item: ContentListItem; lang: "fr" | "en" 
 
 export function BrandContentView({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
-  const { navState, navigate } = useDashboardNavigation();
   const [items, setItems] = useState<ContentListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addContentOpen, setAddContentOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -153,20 +149,6 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
     window.addEventListener("trackit:content-updated", onUpdated);
     return () => window.removeEventListener("trackit:content-updated", onUpdated);
   }, [load]);
-
-  if (navState.contentScreen?.type === "add") {
-    return (
-      <AddBrandContentOnboarding
-        brandId={userId}
-        isMobile={isMobile}
-        onClose={() => navigate({ view: "content" }, { replace: true })}
-        onSuccess={() => {
-          window.dispatchEvent(new CustomEvent("trackit:content-updated"));
-          navigate({ view: "content" }, { replace: true });
-        }}
-      />
-    );
-  }
 
   const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
 
@@ -204,7 +186,7 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
           <button
             type="button"
             style={{ ...primaryBtn, alignSelf: isMobile ? "stretch" : "flex-start", whiteSpace: "nowrap" }}
-            onClick={() => navigate({ view: "content", contentScreen: { type: "add" } })}
+            onClick={() => setAddContentOpen(true)}
           >
             {lang === "fr" ? "+ Ajouter du contenu" : "+ Add content"}
           </button>
@@ -226,11 +208,7 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
                 ? "Aucun contenu pour le moment. Vos créateurs peuvent en envoyer depuis leur dashboard, ou ajoutez-en vous-même."
                 : "No content yet. Creators can upload from their dashboard, or add some yourself."}
             </p>
-            <button
-              type="button"
-              style={primaryBtn}
-              onClick={() => navigate({ view: "content", contentScreen: { type: "add" } })}
-            >
+            <button type="button" style={primaryBtn} onClick={() => setAddContentOpen(true)}>
               {lang === "fr" ? "Ajouter du contenu" : "Add content"}
             </button>
           </div>
@@ -248,6 +226,13 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
           </div>
         )}
       </div>
+
+      <AddBrandContentPanel
+        open={addContentOpen}
+        onClose={() => setAddContentOpen(false)}
+        brandId={userId}
+        onSuccess={() => setAddContentOpen(false)}
+      />
     </div>
   );
 }

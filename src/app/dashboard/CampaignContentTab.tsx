@@ -7,8 +7,9 @@ import {
   isVideoContentFile,
   type ContentListItem,
 } from "@/lib/content-shared";
-import { AddBrandContentOnboarding } from "./AddBrandContentOnboarding";
+import { AddBrandContentPanel } from "./AddBrandContentPanel";
 import { CampaignContentPerformancePanel } from "./CampaignContentPerformancePanel";
+import { ContentPostStatsDisplay } from "./ContentPostStats";
 
 const BLUE = "#0047FF";
 
@@ -89,21 +90,6 @@ export function CampaignContentTab({
     };
   }, [brandId, campaignId, loadItems]);
 
-  if (showAddContent) {
-    return (
-      <AddBrandContentOnboarding
-        brandId={brandId}
-        isMobile={isMobile}
-        campaignCreatorIds={campaignCreatorIds}
-        onClose={() => setShowAddContent(false)}
-        onSuccess={() => {
-          window.dispatchEvent(new CustomEvent("trackit:content-updated"));
-          setShowAddContent(false);
-        }}
-      />
-    );
-  }
-
   const header = (
     <div
       style={{
@@ -130,6 +116,13 @@ export function CampaignContentTab({
         {header}
         <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
         <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
+        <AddBrandContentPanel
+          open={showAddContent}
+          onClose={() => setShowAddContent(false)}
+          brandId={brandId}
+          campaignCreatorIds={campaignCreatorIds}
+          onSuccess={() => setShowAddContent(false)}
+        />
       </>
     );
   }
@@ -154,6 +147,13 @@ export function CampaignContentTab({
           </p>
         </div>
         <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
+        <AddBrandContentPanel
+          open={showAddContent}
+          onClose={() => setShowAddContent(false)}
+          brandId={brandId}
+          campaignCreatorIds={campaignCreatorIds}
+          onSuccess={() => setShowAddContent(false)}
+        />
       </>
     );
   }
@@ -267,6 +267,7 @@ export function CampaignContentTab({
                         {creatorLabel}
                       </div>
                     ) : null}
+                    <ContentPostStatsDisplay item={item} lang={lang} />
                   </div>
                   <time
                     dateTime={item.created_at}
@@ -307,6 +308,13 @@ export function CampaignContentTab({
         })}
       </div>
       <CampaignContentPerformancePanel lang={lang} brandId={brandId} campaignId={campaignId} isMobile={isMobile} />
+      <AddBrandContentPanel
+        open={showAddContent}
+        onClose={() => setShowAddContent(false)}
+        brandId={brandId}
+        campaignCreatorIds={campaignCreatorIds}
+        onSuccess={() => setShowAddContent(false)}
+      />
     </>
   );
 }

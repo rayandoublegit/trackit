@@ -7,6 +7,7 @@ import {
   resolveCreatorRowIdsByHandle,
 } from "@/lib/content-campaign-sync";
 import { backfillDiscoveryContentRefs, syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
+import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,7 @@ export async function GET(request: Request) {
     const { data, error } = await admin
       .from("creator_content")
       .select(
-        "id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at",
+        `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
       )
       .eq("brand_id", brandId)
       .in("id", contentIds)
@@ -130,7 +131,7 @@ export async function GET(request: Request) {
   const { data, error } = await admin
     .from("creator_content")
     .select(
-      "id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at",
+      `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
     )
     .eq("brand_id", brandId)
     .order("created_at", { ascending: false });

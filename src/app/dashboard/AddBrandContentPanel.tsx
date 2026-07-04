@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
 import { safeContentFileName } from "@/lib/content-shared";
@@ -12,31 +13,19 @@ import {
 import { CreatorAvatar } from "./CreatorAvatar";
 
 const BLUE = "#0047FF";
+const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
 
-const onboardingPrimaryBtn: React.CSSProperties = {
-  background: BLUE,
-  color: "#FFFFFF",
-  border: "none",
-  borderRadius: 10,
-  padding: "13px 22px",
-  fontSize: 15,
+const drawerBtnPrimary: React.CSSProperties = {
+  fontFamily: drawerFont,
+  letterSpacing: "-0.02em",
+  fontSize: 14,
+  borderRadius: 8,
   fontWeight: 600,
-  fontFamily: "inherit",
+  color: "#FFF",
+  background: "#1A1A1A",
+  border: "none",
+  padding: "11px 16px",
   cursor: "pointer",
-  letterSpacing: "-0.02em",
-};
-
-const onboardingSecondaryBtn: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
-  borderRadius: 10,
-  padding: "12px 20px",
-  fontSize: 15,
-  fontWeight: 500,
-  fontFamily: "inherit",
-  cursor: "pointer",
-  letterSpacing: "-0.02em",
 };
 
 type CreatorRow = {
@@ -47,24 +36,25 @@ type CreatorRow = {
   linked_user_id: string | null;
 };
 
-export function AddBrandContentOnboarding({
-  brandId,
-  isMobile,
-  campaignCreatorIds,
+export function AddBrandContentPanel({
+  open,
   onClose,
+  brandId,
+  campaignCreatorIds,
   onSuccess,
 }: {
+  open: boolean;
+  onClose: () => void;
   brandId?: string;
-  isMobile?: boolean;
   /** Limite la liste aux créateurs membres de la campagne (onglet Contenu campagne). */
   campaignCreatorIds?: string[];
-  onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }) {
   const lang = useLang();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [shown, setShown] = useState(false);
   const [creators, setCreators] = useState<CreatorRow[]>([]);
-  const [loadingCreators, setLoadingCreators] = useState(true);
+  const [loadingCreators, setLoadingCreators] = useState(false);
   const [creatorRowId, setCreatorRowId] = useState("");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
@@ -75,10 +65,30 @@ export function AddBrandContentOnboarding({
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
 
   useEffect(() => {
-    if (!brandId || !supabase) {
-      setLoadingCreators(false);
+    if (!open) {
+      setShown(false);
       return;
     }
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTitle("");
+    setNotes("");
+    setPendingFiles([]);
+    setDragOver(false);
+    setMessage("");
+    setMessageTone("error");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !brandId || !supabase) {
+      if (!open) setLoadingCreators(false);
+      return;
+    }
+    let cancelled = false;
     void (async () => {
       setLoadingCreators(true);
       const { data } = await supabase
@@ -87,16 +97,20 @@ export function AddBrandContentOnboarding({
         .eq("user_id", brandId)
         .not("linked_user_id", "is", null)
         .order("created_at", { ascending: false });
+      if (cancelled) return;
       let rows = (data || []) as CreatorRow[];
       if (campaignCreatorIds?.length) {
         const allowed = new Set(campaignCreatorIds.map(String));
         rows = rows.filter((row) => allowed.has(row.id));
       }
       setCreators(rows);
-      if (rows[0]) setCreatorRowId(rows[0].id);
+      setCreatorRowId(rows[0]?.id ?? "");
       setLoadingCreators(false);
     })();
-  }, [brandId, campaignCreatorIds]);
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId, campaignCreatorIds, open]);
 
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
@@ -163,7 +177,8 @@ export function AddBrandContentOnboarding({
           : `${uploaded} file${uploaded > 1 ? "s" : ""} added.`,
       );
       window.dispatchEvent(new CustomEvent("trackit:content-updated"));
-      setTimeout(() => onSuccess(), 600);
+      onSuccess?.();
+      setTimeout(() => onClose(), 400);
     } catch (err) {
       setMessageTone("error");
       setMessage(err instanceof Error ? err.message : lang === "fr" ? "Échec de l'envoi." : "Upload failed.");
@@ -172,8 +187,8 @@ export function AddBrandContentOnboarding({
     }
   };
 
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
-  const contentMax = 720;
+  const canSubmit = Boolean(creatorRowId && pendingFiles.length > 0 && !submitting);
+
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "12px 14px",
@@ -187,58 +202,103 @@ export function AddBrandContentOnboarding({
     letterSpacing: "-0.01em",
   };
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
-      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={submitting}
-          style={{
-            background: "none",
-            border: "none",
-            padding: 0,
-            marginBottom: 24,
-            fontSize: 14,
-            fontWeight: 500,
-            color: "#6B7280",
-            cursor: submitting ? "default" : "pointer",
-            fontFamily: "inherit",
-          }}
-        >
-          ← {lang === "fr" ? "Retour au contenu" : "Back to content"}
-        </button>
+  if (!open || typeof document === "undefined") return null;
 
-        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+  const subtitle = campaignCreatorIds?.length
+    ? lang === "fr"
+      ? "Associez des fichiers à un créateur de cette campagne. Le contenu apparaîtra ici et dans Gérer."
+      : "Attach files to a creator in this campaign. Content will appear here and in Manage."
+    : lang === "fr"
+      ? "Associez des fichiers et des notes à un créateur. Le contenu apparaîtra dans Gérer et dans leurs campagnes."
+      : "Attach files and notes to a creator. Content will appear in Manage and in their campaigns.";
+
+  return createPortal(
+    <div
+      onClick={() => {
+        if (!submitting) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        zIndex: 1200,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(560px, 100%)",
+          height: "100%",
+          background: "#FFF",
+          overflowY: "auto",
+          transform: shown ? "translateX(0)" : "translateX(40px)",
+          opacity: shown ? 1 : 0,
+          transition: "transform .18s ease, opacity .18s ease",
+          padding: "28px 28px 56px",
+          boxSizing: "border-box",
+          fontFamily: drawerFont,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 12 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#9A9A9A",
+              fontWeight: 500,
+              fontSize: 14,
+              cursor: submitting ? "default" : "pointer",
+              padding: 0,
+              fontFamily: "inherit",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {lang === "fr" ? "Retour" : "Back"}
+          </button>
+          <button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => void submit()}
+            style={{
+              ...drawerBtnPrimary,
+              opacity: canSubmit ? 1 : 0.45,
+              cursor: canSubmit ? "pointer" : "default",
+            }}
+          >
+            {submitting
+              ? lang === "fr"
+                ? "Envoi…"
+                : "Uploading…"
+              : lang === "fr"
+                ? "Ajouter le contenu"
+                : "Add content"}
+          </button>
+        </div>
+
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Ajouter du contenu" : "Add content"}
-        </h1>
-        <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 32px", lineHeight: 1.5 }}>
-          {campaignCreatorIds?.length
-            ? lang === "fr"
-              ? "Associez des fichiers à un créateur de cette campagne. Le contenu apparaîtra ici et dans Gérer."
-              : "Attach files to a creator in this campaign. Content will appear here and in Manage."
-            : lang === "fr"
-              ? "Associez des fichiers et des notes à un créateur. Le contenu apparaîtra dans Gérer et dans ses campagnes."
-              : "Attach files and notes to a creator. Content will appear in Manage and in their campaigns."}
+        </h2>
+        <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 28px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
+          {subtitle}
         </p>
 
         {loadingCreators ? (
           <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement des créateurs…" : "Loading creators…"}</p>
         ) : creators.length === 0 ? (
-          <div>
-            <p style={{ fontSize: 15, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5 }}>
-              {campaignCreatorIds?.length
-                ? lang === "fr"
-                  ? "Aucun créateur de cette campagne n'a de compte actif. Ajoutez des créateurs à la campagne via Invitations."
-                  : "No creator in this campaign has an active account. Add creators to the campaign via Invitations."
-                : lang === "fr"
-                  ? "Ajoutez d'abord un créateur avec un compte actif via Invitations."
-                  : "Add a creator with an active account via Invitations first."}
-            </p>
-            <button type="button" style={onboardingSecondaryBtn} onClick={onClose}>
-              {lang === "fr" ? "Retour" : "Back"}
-            </button>
-          </div>
+          <p style={{ fontSize: 15, color: "#6B7280", margin: 0, lineHeight: 1.5 }}>
+            {campaignCreatorIds?.length
+              ? lang === "fr"
+                ? "Aucun créateur de cette campagne n'a de compte actif. Ajoutez des créateurs à la campagne via Invitations."
+                : "No creator in this campaign has an active account. Add creators to the campaign via Invitations."
+              : lang === "fr"
+                ? "Ajoutez d'abord un créateur avec un compte actif via Invitations."
+                : "Add a creator with an active account via Invitations first."}
+          </p>
         ) : (
           <>
             <div style={{ marginBottom: 24 }}>
@@ -304,7 +364,7 @@ export function AddBrandContentOnboarding({
 
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
-                {lang === "fr" ? "Notes (optionnel)" : "Notes (optional)"}
+                {lang === "fr" ? "Notes" : "Notes"}
               </label>
               <textarea
                 value={notes}
@@ -315,7 +375,7 @@ export function AddBrandContentOnboarding({
               />
             </div>
 
-            <div style={{ marginBottom: 24 }}>
+            <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
                 {lang === "fr" ? "Fichiers" : "Files"}
               </label>
@@ -394,36 +454,17 @@ export function AddBrandContentOnboarding({
               <p
                 style={{
                   fontSize: 14,
-                  margin: "0 0 16px",
+                  margin: 0,
                   color: messageTone === "success" ? "#1A1A1A" : "#A32D2D",
                 }}
               >
                 {message}
               </p>
             ) : null}
-
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                style={onboardingPrimaryBtn}
-                disabled={submitting || !creatorRowId || pendingFiles.length === 0}
-                onClick={() => void submit()}
-              >
-                {submitting
-                  ? lang === "fr"
-                    ? "Envoi…"
-                    : "Uploading…"
-                  : lang === "fr"
-                    ? "Ajouter le contenu"
-                    : "Add content"}
-              </button>
-              <button type="button" style={onboardingSecondaryBtn} disabled={submitting} onClick={onClose}>
-                {lang === "fr" ? "Annuler" : "Cancel"}
-              </button>
-            </div>
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

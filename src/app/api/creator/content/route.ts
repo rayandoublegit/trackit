@@ -33,7 +33,9 @@ export async function GET(request: Request) {
 
   const { data: items, error } = await admin
     .from("creator_content")
-    .select("id, brand_id, creator_row_id, title, notes, file_url, file_name, file_type, file_size, created_at")
+    .select(
+      "id, brand_id, creator_row_id, title, notes, file_url, file_name, file_type, file_size, created_at, post_url, views, likes, comments, shares, posted_at, stats_updated_at",
+    )
     .eq("creator_user_id", userId)
     .in("creator_row_id", creatorRowIds)
     .order("created_at", { ascending: false });

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators, saveOutreach } from "@/lib/db";
 import { dispatchOutreachHistoryUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
@@ -1139,7 +1140,7 @@ type OutreachTemplate = {
   imported?: boolean;
 };
 
-const OUTREACH_DM_PLATFORMS = ["Instagram", "TikTok", "YouTube", "Twitter", "Email"] as const;
+const OUTREACH_DM_PLATFORMS = ["Instagram", "TikTok", "Twitter", "Email"] as const;
 
 type OutreachSendRequest = {
   key: number;
@@ -1151,7 +1152,6 @@ type OutreachSendRequest = {
 function dmPlatformFromCreatorPlatform(platform: string): (typeof OUTREACH_DM_PLATFORMS)[number] {
   const p = platform.toLowerCase();
   if (p.includes("tiktok")) return "TikTok";
-  if (p.includes("youtube")) return "YouTube";
   if (p.includes("twitter") || p === "x") return "Twitter";
   if (p.includes("email")) return "Email";
   return "Instagram";
@@ -1198,9 +1198,6 @@ function outreachProfileUrl(
   }
   if (platform === "TikTok") {
     return `https://www.tiktok.com/@${encodeURIComponent(clean)}`;
-  }
-  if (platform === "YouTube") {
-    return `https://www.youtube.com/@${encodeURIComponent(clean)}`;
   }
   if (platform === "Twitter") {
     return `https://twitter.com/${encodeURIComponent(clean)}`;
@@ -1712,11 +1709,16 @@ function OutreachView({
 
   useEffect(() => {
     if (!openSendRequest) return;
+    const platformRaw = openSendRequest.dmPlatform as string | undefined;
+    const platform =
+      platformRaw === "YouTube"
+        ? "TikTok"
+        : (openSendRequest.dmPlatform as (typeof OUTREACH_DM_PLATFORMS)[number] | undefined);
     setSendTemplateId(null);
     setSendPrefill({
       creatorHandle: openSendRequest.creatorHandle,
       creatorEmail: openSendRequest.creatorEmail,
-      dmPlatform: openSendRequest.dmPlatform,
+      dmPlatform: platform,
     });
     setPanel("send");
     onOpenSendHandled?.();
@@ -1735,38 +1737,6 @@ function OutreachView({
     setSendTemplateId(templateId);
     setPanel("send");
   };
-
-  if (panel === "send") {
-    return (
-      <>
-        <SendOutreachPanel
-          templates={templates}
-          plan={plan}
-          isMobile={isMobile}
-          initialTemplateId={sendTemplateId}
-          initialCreatorHandle={sendPrefill?.creatorHandle}
-          initialCreatorEmail={sendPrefill?.creatorEmail}
-          initialDmPlatform={sendPrefill?.dmPlatform}
-          onClose={closePanel}
-          onSent={() => {
-            setHistoryRefreshKey((k) => k + 1);
-            closePanel();
-          }}
-        />
-        {upgradeFeature && (
-          <UpgradeModal
-            lang={lang}
-            featureKey={upgradeFeature}
-            onClose={() => setUpgradeFeature(null)}
-            onPrimary={() => {
-              runFeatureUpgrade(upgradeFeature);
-              setUpgradeFeature(null);
-            }}
-          />
-        )}
-      </>
-    );
-  }
 
   return (
     <>
@@ -1860,6 +1830,24 @@ function OutreachView({
           onCreate={() => setPanel("create")}
         />
       )}
+      <SendOutreachPanel
+        open={panel === "send"}
+        templates={templates}
+        plan={plan}
+        isMobile={isMobile}
+        initialTemplateId={sendTemplateId}
+        initialCreatorHandle={sendPrefill?.creatorHandle}
+        initialCreatorEmail={sendPrefill?.creatorEmail}
+        initialDmPlatform={sendPrefill?.dmPlatform}
+        onClose={closePanel}
+        onSent={() => {
+          setHistoryRefreshKey((k) => k + 1);
+          closePanel();
+          showToast(
+            lang === "fr" ? "Outreach enregistré dans l'historique" : "Outreach saved to history",
+          );
+        }}
+      />
       {upgradeFeature && (
         <UpgradeModal
           lang={lang}
@@ -2315,6 +2303,7 @@ function TemplateSelect({
 }
 
 function SendOutreachPanel({
+  open,
   templates,
   plan,
   initialTemplateId,
@@ -2325,6 +2314,7 @@ function SendOutreachPanel({
   onClose,
   onSent,
 }: {
+  open: boolean;
   templates: OutreachTemplate[];
   plan: PlanTier;
   initialTemplateId: string | null;
@@ -2337,11 +2327,14 @@ function SendOutreachPanel({
 }) {
   const lang = useLang();
   const pageStyles = outreachFormStyles("page");
+  const [shown, setShown] = useState(false);
   const [selectedInfluencers, setSelectedInfluencers] = useState<string[]>(() =>
     initialCreatorHandle ? [initialCreatorHandle.startsWith("@") ? initialCreatorHandle : `@${initialCreatorHandle}`] : []
   );
+  const initialPlatform =
+    (initialDmPlatform as string | undefined) === "YouTube" ? "TikTok" : initialDmPlatform;
   const [dmPlatform, setDmPlatform] = useState<(typeof OUTREACH_DM_PLATFORMS)[number]>(
-    initialDmPlatform ?? "Instagram"
+    initialPlatform ?? "Instagram",
   );
   const isEmail = dmPlatform === "Email";
   const [templateId, setTemplateId] = useState(initialTemplateId ?? "");
@@ -2355,6 +2348,15 @@ function SendOutreachPanel({
   const [creatorEmailMap, setCreatorEmailMap] = useState<Record<string, string>>({});
   const [sendingEmail, setSendingEmail] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setShown(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, [open]);
 
   useEffect(() => {
     const loadCreators = async () => {
@@ -2401,7 +2403,7 @@ function SendOutreachPanel({
           : outreachFieldsFromMessage(defaultOutreachDraftMessage(lang));
       });
     }
-    if (initialDmPlatform) setDmPlatform(initialDmPlatform);
+    if (initialPlatform) setDmPlatform(initialPlatform);
     if (initialCreatorEmail?.trim() && initialCreatorHandle) {
       const key = normalizeCreatorHandle(initialCreatorHandle);
       if (key) {
@@ -2565,38 +2567,79 @@ function SendOutreachPanel({
         ? lang === "fr"
           ? "Envoyer via TikTok"
           : "Send via TikTok"
-        : dmPlatform === "YouTube"
+        : dmPlatform === "Twitter"
           ? lang === "fr"
-            ? "Envoyer via YouTube"
-            : "Send via YouTube"
-          : dmPlatform === "Twitter"
-            ? lang === "fr"
-              ? "Envoyer via Twitter"
-              : "Send via Twitter"
-            : dmPlatform === "Email"
-              ? sendingEmail
+            ? "Envoyer via Twitter"
+            : "Send via Twitter"
+          : dmPlatform === "Email"
+            ? sendingEmail
+              ? lang === "fr"
+                ? "Envoi en cours…"
+                : "Sending…"
+              : isBatchEmail
                 ? lang === "fr"
-                  ? "Envoi en cours…"
-                  : "Sending…"
-                : isBatchEmail
-                  ? lang === "fr"
-                    ? `Envoyer à ${resolvedRecipients.length} créateurs`
-                    : `Send to ${resolvedRecipients.length} creators`
-                  : lang === "fr"
-                    ? "Envoyer par email"
-                    : "Send via Email"
-              : lang === "fr"
-                ? `Envoyer via ${dmPlatform}`
-                : `Send via ${dmPlatform}`;
+                  ? `Envoyer à ${resolvedRecipients.length} créateurs`
+                  : `Send to ${resolvedRecipients.length} creators`
+                : lang === "fr"
+                  ? "Envoyer par email"
+                  : "Send via Email"
+            : lang === "fr"
+              ? `Envoyer via ${dmPlatform}`
+              : `Send via ${dmPlatform}`;
 
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
-  const contentMax = 720;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
-      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
-        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-          {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : (lang === "fr" ? "Envoyer un outreach" : "Send outreach")}
+  return createPortal(
+    <div
+      onClick={() => {
+        if (!sendingEmail) onClose();
+      }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        zIndex: 1200,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(560px, 100%)",
+          height: "100%",
+          background: "#FFF",
+          overflowY: "auto",
+          transform: shown ? "translateX(0)" : "translateX(40px)",
+          opacity: shown ? 1 : 0,
+          transition: "transform .18s ease, opacity .18s ease",
+          padding: isMobile ? "24px 20px 48px" : "28px 28px 56px",
+          boxSizing: "border-box",
+          fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={sendingEmail}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            marginBottom: 20,
+            fontSize: 14,
+            fontWeight: 500,
+            color: "#6B7280",
+            cursor: sendingEmail ? "default" : "pointer",
+            fontFamily: "inherit",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          ← {lang === "fr" ? "Retourner sur outreach" : "Back to outreach"}
+        </button>
+
+        <h1 style={{ fontSize: isMobile ? 24 : 26, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
+          {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : lang === "fr" ? "Envoyer un outreach" : "Send outreach"}
         </h1>
         <p style={{ ...pageStyles.sectionHint, marginBottom: 36 }}>
           {isEmail
@@ -2793,10 +2836,10 @@ function SendOutreachPanel({
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button type="button" style={{ ...outreachPagePrimaryBtn, opacity: canSend ? 1 : 0.45 }} disabled={!canSend} onClick={handleSend}>{sendViaLabel}</button>
-          <button type="button" style={outreachPageSecondaryBtn} onClick={onClose}>{lang === "fr" ? "Annuler" : "Cancel"}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

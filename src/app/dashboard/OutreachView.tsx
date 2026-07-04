@@ -103,7 +103,6 @@ type FollowUpTone = "Casual" | "Professional" | "Friendly";
 const PLATFORM_DM_OPTIONS = [
   { value: "tiktok", label: "TikTok DM" },
   { value: "instagram", label: "Instagram DM" },
-  { value: "youtube", label: "YouTube" },
   { value: "email", label: "Email" },
 ] as const;
 
@@ -111,7 +110,6 @@ function platformLabel(platform: string) {
   const p = platform.toLowerCase();
   if (p === "tiktok") return "TikTok DM";
   if (p === "instagram") return "Instagram DM";
-  if (p === "youtube") return "YouTube";
   if (p === "email") return "Email";
   return platform;
 }

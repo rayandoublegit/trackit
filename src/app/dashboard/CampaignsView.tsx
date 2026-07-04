@@ -3818,12 +3818,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               lang={lang}
               isMobile={isMobile}
               campaignId={campaign.id}
-              period={analyticsPeriod === "all" ? "90d" : analyticsPeriod}
-              onPeriodChange={(next) => {
-                if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-                  setAnalyticsPeriod(next);
-                }
-              }}
             />
           </div>
 

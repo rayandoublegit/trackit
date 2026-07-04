@@ -2,47 +2,106 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
+import {
+  calcEngagementRate,
+  formatCompactStat,
+  isImageContentFile,
+  isVideoContentFile,
+  type ContentListItem,
+} from "@/lib/content-shared";
 import { AnalyticsSectionHeader } from "./analytics-metric-cards";
 
-type LinkMetrics = {
-  clicks: number;
-  uniques: number;
-  sales: number;
-  revenue: number;
-  commission: number;
-  conversionRate: number;
-  aov: number;
-  epc: number;
-};
+type PerfRow = ContentListItem;
 
-type ContentLinkRow = {
-  id: string;
-  slug: string;
-  content_id: string | null;
-  creator_username: string;
-  metrics: LinkMetrics;
-};
+function sortPerfRows(items: PerfRow[]): PerfRow[] {
+  const withStats = items
+    .filter((item) => item.post_url && item.stats_updated_at)
+    .sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+  const pending = items.filter((item) => item.post_url && !item.stats_updated_at);
+  return [...withStats, ...pending];
+}
 
-type ContentMeta = {
-  id: string;
-  title: string;
-  creatorName: string | null;
-  creatorHandle: string | null;
-};
+function formatPostDate(iso: string | null | undefined, lang: Lang): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
 
-export type ContentPerformanceRow = {
-  contentId: string;
-  title: string;
-  creator: string;
-  clicks: number;
-  sales: number;
-  revenue: number;
-  conversionRate: number;
-};
+function formatEngagement(row: PerfRow): string {
+  const rate = calcEngagementRate(row.views, row.likes, row.comments, row.shares);
+  if (rate == null) return "—";
+  return `${rate.toFixed(1)}%`;
+}
 
-function formatConvRate(value: number): string {
-  return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
+function ContentThumb({ item }: { item: PerfRow }) {
+  const isImage = isImageContentFile(item);
+  const isVideo = isVideoContentFile(item);
+  const boxStyle: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    overflow: "hidden",
+    flexShrink: 0,
+    background: "#F3F4F6",
+    border: "1px solid #EFEFEF",
+  };
+
+  if (isImage) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={item.file_url} alt="" style={{ ...boxStyle, objectFit: "cover", display: "block" }} />
+    );
+  }
+  if (isVideo) {
+    return <video src={item.file_url} style={{ ...boxStyle, objectFit: "cover", display: "block" }} muted />;
+  }
+  return (
+    <div
+      style={{
+        ...boxStyle,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 10,
+        color: "#9A9A9A",
+        padding: 4,
+        textAlign: "center",
+        wordBreak: "break-word",
+      }}
+    >
+      {item.file_name.slice(0, 8)}
+    </div>
+  );
+}
+
+function StatsToast({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 24,
+        right: 24,
+        background: "#1A1A1A",
+        color: "#FFFFFF",
+        padding: "12px 18px",
+        borderRadius: 10,
+        fontSize: 13,
+        fontWeight: 500,
+        zIndex: 1200,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        fontFamily: "inherit",
+      }}
+    >
+      {message}
+    </div>
+  );
 }
 
 export function CampaignContentPerformancePanel({
@@ -56,51 +115,25 @@ export function CampaignContentPerformancePanel({
   campaignId: string;
   isMobile?: boolean;
 }) {
-  const [rows, setRows] = useState<ContentPerformanceRow[]>([]);
+  const [rows, setRows] = useState<PerfRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const load = useCallback(async () => {
     if (!brandId) return;
-    const [metricsRes, contentRes] = await Promise.all([
-      fetch(
-        `/api/links/metrics?brand_id=${encodeURIComponent(brandId)}&campaign_id=${encodeURIComponent(campaignId)}&days=90`,
-        { cache: "no-store" },
-      ),
-      fetch(
-        `/api/content?brandId=${encodeURIComponent(brandId)}&campaignId=${encodeURIComponent(campaignId)}`,
-        { cache: "no-store" },
-      ),
-    ]);
-
-    const metricsData = (await metricsRes.json()) as { links?: ContentLinkRow[] };
-    const contentData = (await contentRes.json()) as { ok?: boolean; items?: ContentMeta[] };
-
-    const contentById = new Map<string, ContentMeta>();
-    for (const item of contentData.items ?? []) {
-      contentById.set(item.id, item);
-    }
-
-    const perf: ContentPerformanceRow[] = [];
-    for (const link of metricsData.links ?? []) {
-      if (!link.content_id) continue;
-      const meta = contentById.get(link.content_id);
-      const creator =
-        meta?.creatorName ||
-        (meta?.creatorHandle ? `@${meta.creatorHandle.replace(/^@/, "")}` : null) ||
-        (link.creator_username ? `@${link.creator_username.replace(/^@/, "")}` : "—");
-      perf.push({
-        contentId: link.content_id,
-        title: meta?.title?.trim() || "—",
-        creator,
-        clicks: link.metrics?.clicks ?? 0,
-        sales: link.metrics?.sales ?? 0,
-        revenue: link.metrics?.revenue ?? 0,
-        conversionRate: link.metrics?.conversionRate ?? 0,
-      });
-    }
-
-    perf.sort((a, b) => b.revenue - a.revenue || b.clicks - a.clicks);
-    setRows(perf);
+    const res = await fetch(
+      `/api/content?brandId=${encodeURIComponent(brandId)}&campaignId=${encodeURIComponent(campaignId)}`,
+      { cache: "no-store" },
+    );
+    const data = (await res.json()) as { ok?: boolean; items?: ContentListItem[] };
+    const withPostUrl = (data.items ?? []).filter((item) => item.post_url);
+    setRows(sortPerfRows(withPostUrl));
   }, [brandId, campaignId]);
 
   useEffect(() => {
@@ -125,6 +158,52 @@ export function CampaignContentPerformancePanel({
     };
   }, [brandId, load]);
 
+  const refreshStats = async (contentId: string) => {
+    setRefreshingId(contentId);
+    try {
+      const res = await fetch("/api/content/refresh-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentId }),
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        pending?: boolean;
+        stats?: {
+          views: number | null;
+          likes: number | null;
+          comments: number | null;
+          shares: number | null;
+          postedAt: string | null;
+        };
+      };
+
+      if (data.ok && data.stats) {
+        setRows((prev) =>
+          sortPerfRows(
+            prev.map((row) =>
+              row.id === contentId
+                ? {
+                    ...row,
+                    views: data.stats!.views,
+                    likes: data.stats!.likes,
+                    comments: data.stats!.comments,
+                    shares: data.stats!.shares,
+                    posted_at: data.stats!.postedAt,
+                    stats_updated_at: new Date().toISOString(),
+                  }
+                : row,
+            ),
+          ),
+        );
+      } else if (data.pending) {
+        showToast(lang === "fr" ? "Stats indisponibles pour le moment" : "Stats unavailable for now");
+      }
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
   const thStyle: React.CSSProperties = {
     padding: "12px 14px",
     fontSize: 12,
@@ -148,12 +227,14 @@ export function CampaignContentPerformancePanel({
 
   return (
     <section style={{ marginTop: isMobile ? 28 : 36 }}>
+      {toast ? <StatsToast message={toast} /> : null}
+
       <AnalyticsSectionHeader
         title={lang === "fr" ? "Performance par contenu" : "Performance by content"}
         info={
           lang === "fr"
-            ? "Clics et ventes attribués aux liens trackés créés pour chaque contenu (thentrack.it/l/…)."
-            : "Clicks and sales attributed to tracked links created for each content piece (thentrack.it/l/…)."
+            ? "Statistiques TikTok des posts liés par les créateurs (vues, likes, engagement)."
+            : "TikTok stats for posts linked by creators (views, likes, engagement)."
         }
         lang={lang}
       />
@@ -172,35 +253,96 @@ export function CampaignContentPerformancePanel({
         ) : empty ? (
           <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
             {lang === "fr"
-              ? "Aucun lien tracké par contenu pour l'instant. Les liens sont créés automatiquement quand un créateur envoie du contenu."
-              : "No per-content tracked links yet. Links are created automatically when a creator uploads content."}
+              ? "Aucun contenu avec URL TikTok pour l'instant. Les créateurs peuvent ajouter l'URL lors de l'envoi."
+              : "No content with a TikTok URL yet. Creators can add the URL when uploading."}
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 680 }}>
               <thead>
                 <tr>
                   <th style={thStyle}>{lang === "fr" ? "Contenu" : "Content"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "Créateur" : "Creator"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "Clics" : "Clicks"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "Ventes" : "Sales"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "CA" : "Revenue"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "Taux conv." : "Conv %"}</th>
+                  <th style={thStyle}>{lang === "fr" ? "Vues" : "Views"}</th>
+                  <th style={thStyle}>Likes</th>
+                  <th style={thStyle}>{lang === "fr" ? "Engagement" : "Engagement"}</th>
+                  <th style={thStyle}>{lang === "fr" ? "Date du post" : "Post date"}</th>
+                  <th style={thStyle} />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.contentId}>
-                    <td style={{ ...tdStyle, fontWeight: 500, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {row.title}
-                    </td>
-                    <td style={tdStyle}>{row.creator}</td>
-                    <td style={{ ...tdStyle, fontWeight: 600 }}>{row.clicks}</td>
-                    <td style={tdStyle}>{row.sales}</td>
-                    <td style={tdStyle}>{formatCurrency(row.revenue, lang)}</td>
-                    <td style={tdStyle}>{formatConvRate(row.conversionRate)}</td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const pending = !row.stats_updated_at;
+                  const title = row.title?.trim() || row.file_name || "—";
+                  const refreshing = refreshingId === row.id;
+
+                  return (
+                    <tr key={row.id}>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                          <ContentThumb item={row} />
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontWeight: 500,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: isMobile ? 140 : 220,
+                              }}
+                              title={title}
+                            >
+                              {title}
+                            </div>
+                            {pending ? (
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  marginTop: 4,
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  color: "#6B7280",
+                                  background: "#F3F4F6",
+                                  borderRadius: 6,
+                                  padding: "2px 7px",
+                                }}
+                              >
+                                {lang === "fr" ? "En attente" : "Pending"}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: pending ? 400 : 600 }}>
+                        {pending ? "—" : formatCompactStat(row.views, lang)}
+                      </td>
+                      <td style={tdStyle}>{pending ? "—" : formatCompactStat(row.likes, lang)}</td>
+                      <td style={tdStyle}>{pending ? "—" : formatEngagement(row)}</td>
+                      <td style={tdStyle}>{pending ? "—" : formatPostDate(row.posted_at, lang)}</td>
+                      <td style={{ ...tdStyle, textAlign: "right" }}>
+                        <button
+                          type="button"
+                          onClick={() => void refreshStats(row.id)}
+                          disabled={refreshing}
+                          style={{
+                            border: "1px solid #E5E5E5",
+                            background: "#FFF",
+                            borderRadius: 8,
+                            padding: "6px 12px",
+                            fontSize: 12,
+                            fontWeight: 500,
+                            cursor: refreshing ? "wait" : "pointer",
+                            fontFamily: "inherit",
+                            color: "#1A1A1A",
+                            opacity: refreshing ? 0.6 : 1,
+                            minWidth: 88,
+                          }}
+                        >
+                          {refreshing ? "…" : lang === "fr" ? "Actualiser" : "Refresh"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

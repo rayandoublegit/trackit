@@ -1,3 +1,13 @@
+export type ContentPostStatsFields = {
+  post_url?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  posted_at?: string | null;
+  stats_updated_at?: string | null;
+};
+
 export type ContentListItem = {
   id: string;
   title: string;
@@ -12,7 +22,33 @@ export type ContentListItem = {
   creatorName?: string | null;
   creatorHandle?: string | null;
   campaignNames?: string[];
-};
+} & ContentPostStatsFields;
+
+export const CONTENT_STATS_SELECT =
+  "post_url, views, likes, comments, shares, posted_at, stats_updated_at";
+
+export function formatCompactStat(n: number | null | undefined, lang: "en" | "fr" = "fr"): string {
+  if (n == null || !Number.isFinite(n)) return "0";
+  const fmt = (value: number, suffix: string) => {
+    const raw = value >= 100 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
+    const num = lang === "fr" ? raw.replace(".", ",") : raw;
+    return `${num}${suffix}`;
+  };
+  if (n >= 1_000_000) return fmt(n / 1_000_000, "M");
+  if (n >= 1_000) return fmt(n / 1_000, "k");
+  return String(Math.round(n));
+}
+
+export function calcEngagementRate(
+  views: number | null | undefined,
+  likes: number | null | undefined,
+  comments: number | null | undefined,
+  shares: number | null | undefined,
+): number | null {
+  if (!views || views <= 0) return null;
+  const engagement = (likes ?? 0) + (comments ?? 0) + (shares ?? 0);
+  return (engagement / views) * 100;
+}
 
 export function isImageContentFile(item: Pick<ContentListItem, "file_url" | "file_type" | "file_name">): boolean {
   if (item.file_type?.startsWith("image/")) return true;

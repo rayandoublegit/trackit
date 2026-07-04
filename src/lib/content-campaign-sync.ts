@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCreatorHandle } from "@/lib/creator-account";
+import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
 
 type CreatorMembership = {
   creatorRowId: string;
@@ -287,8 +288,7 @@ export async function loadBrandContentForCreators(
     return { data: [] as Record<string, unknown>[], error: null as Error | null };
   }
 
-  const select =
-    "id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at";
+  const select = `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`;
 
   const byRow =
     creatorRowIds.length > 0

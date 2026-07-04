@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
+import { ContentPostStatsDisplay } from "./ContentPostStats";
+import { InfoTip } from "./analytics-metric-cards";
 
 const BLUE = "#0047FF";
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -21,6 +23,13 @@ type ContentItem = {
   created_at: string;
   brandName: string;
   linkUrl?: string | null;
+  post_url?: string | null;
+  views?: number | null;
+  likes?: number | null;
+  comments?: number | null;
+  shares?: number | null;
+  posted_at?: string | null;
+  stats_updated_at?: string | null;
 };
 
 const externFont = "'InterDisplay', 'Inter Display', sans-serif";
@@ -122,6 +131,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const [brandId, setBrandId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [postUrl, setPostUrl] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -190,6 +200,16 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       return;
     }
 
+    const trimmedPostUrl = postUrl.trim();
+    if (trimmedPostUrl && !/tiktok\.com\//i.test(trimmedPostUrl)) {
+      setError(
+        lang === "fr"
+          ? "L'URL doit être un lien TikTok (tiktok.com)."
+          : "URL must be a TikTok link (tiktok.com).",
+      );
+      return;
+    }
+
     setUploading(true);
     setError(null);
     setSuccess(null);
@@ -222,7 +242,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       let lastCreatorRowId = uploadBrand.creatorRowId;
       let latestLinkUrl: string | null = null;
 
-      for (const file of pendingFiles) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const file = pendingFiles[i];
         const path = `${userId}/${uploadBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
@@ -245,6 +266,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
             fileName: file.name,
             fileType: file.type || null,
             fileSize: file.size,
+            ...(i === 0 && trimmedPostUrl ? { postUrl: trimmedPostUrl } : {}),
           }),
         });
         const data = (await res.json()) as {
@@ -271,6 +293,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       setPendingFiles([]);
       setTitle("");
       setNotes("");
+      setPostUrl("");
       setLastUploadedLink(latestLinkUrl);
       setSuccess(
         lang === "fr"
@@ -353,22 +376,18 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           </p>
         )}
         {!loading && brands.length === 0 && linkError && (
-          <div
+          <p
             style={{
-              marginBottom: 20,
-              padding: "14px 16px",
-              borderRadius: 12,
-              background: "#FFF7ED",
-              border: "1px solid #FED7AA",
+              margin: "0 0 20px",
               fontSize: 13,
-              color: "#9A3412",
+              color: "#DC2626",
               lineHeight: 1.5,
             }}
           >
             {lang === "fr"
               ? "Aucune marque associée. Vérifiez dans Paramètres que votre pseudo correspond à celui de la marque, ou acceptez l'invitation reçue."
               : "No linked brand. Check Settings to confirm your handle matches the brand's records, or accept your invite."}
-          </div>
+          </p>
         )}
         <div
           style={{
@@ -516,7 +535,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               )}
 
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
-                {lang === "fr" ? "Titre (optionnel)" : "Title (optional)"}
+                {lang === "fr" ? "Titre" : "Title"}
               </label>
               <input
                 type="text"
@@ -527,14 +546,35 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               />
 
               <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
-                {lang === "fr" ? "Notes (optionnel)" : "Notes (optional)"}
+                {lang === "fr" ? "Notes" : "Notes"}
               </label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder={lang === "fr" ? "Contexte, version, instructions…" : "Context, version, notes…"}
                 rows={4}
-                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 20 }}
+                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 16 }}
+              />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                  {lang === "fr" ? "Ajouter un URL" : "Add a URL"}
+                </label>
+                <InfoTip
+                  lang={lang}
+                  text={
+                    lang === "fr"
+                      ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement. La marque voit ces stats dans sa campagne et peut mesurer la performance de votre contenu."
+                      : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement. Your brand sees these stats in their campaign and can measure how your content performs."
+                  }
+                />
+              </div>
+              <input
+                type="url"
+                value={postUrl}
+                onChange={(e) => setPostUrl(e.target.value)}
+                placeholder="https://www.tiktok.com/@toncompte/video/..."
+                style={{ ...inputStyle, marginBottom: 20 }}
               />
 
               {error && <p style={{ fontSize: 13, color: "#C62828", margin: "0 0 12px" }}>{error}</p>}
@@ -584,6 +624,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                       {item.notes && (
                         <p style={{ fontSize: 13, color: "#7A7A7A", margin: "8px 0 0", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{item.notes}</p>
                       )}
+                      <ContentPostStatsDisplay item={item} lang={lang} />
                       {isVideoFile(item) && (
                         <video
                           src={item.file_url}
