@@ -11,16 +11,48 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Ecrit le code promo sur le createur (service role: bypass RLS).
-// Appele quand une marque genere un lien d'affiliation avec un code, pour
-// que l'attribution des ventes (Shopify sync + ventes manuelles) retrouve
-// le createur via creators.discount_code.
+async function syncCrmSnapshot(
+  userId: string,
+  handle: string,
+  code: string,
+  affiliateRef?: string | null
+) {
+  const normalized = normalizeCreatorHandle(handle);
+  if (!normalized) return;
+
+  const { data: savedRows } = await supabaseAdmin
+    .from("discovery_saved")
+    .select("id, creator_username, snapshot")
+    .eq("user_id", userId);
+
+  const row = (savedRows ?? []).find(
+    (r) => normalizeCreatorHandle(String(r.creator_username || "")) === normalized
+  );
+  if (!row?.id) return;
+
+  const snap =
+    row.snapshot && typeof row.snapshot === "object"
+      ? { ...(row.snapshot as Record<string, unknown>) }
+      : {};
+  const crm =
+    snap.crm && typeof snap.crm === "object"
+      ? { ...(snap.crm as Record<string, unknown>) }
+      : {};
+  crm.promoCode = code;
+  if (affiliateRef) crm.affiliateRef = affiliateRef;
+  snap.crm = crm;
+
+  await supabaseAdmin.from("discovery_saved").update({ snapshot: snap }).eq("id", row.id);
+}
+
+// Ecrit le code promo (+ ref affiliation) sur le createur et le CRM Gérer.
 export async function POST(request: Request) {
   const body = await request.json();
   const userId = String(body.userId || "");
   let creatorId = String(body.creatorId || "");
   const handle = String(body.handle || body.creator || "").trim();
   const code = String(body.code || "").trim().toUpperCase();
+  const affiliateRef = String(body.ref || body.affiliateRef || "").trim().toLowerCase() || null;
 
   if (!userId || !code) {
     return NextResponse.json({ ok: false, error: "Missing userId or code" }, { status: 400 });
@@ -55,5 +87,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Failed to update creator" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, creatorId, code });
+  if (affiliateRef) {
+    const withRef = await supabaseAdmin
+      .from("creators")
+      .update({ affiliate_ref: affiliateRef })
+      .eq("id", creatorId)
+      .eq("user_id", userId);
+    // Column may not exist yet — ignore.
+    if (withRef.error && !withRef.error.message.toLowerCase().includes("affiliate_ref")) {
+      /* ignore non-column errors silently for attribution path */
+    }
+  }
+
+  const { data: creatorRow } = await supabaseAdmin
+    .from("creators")
+    .select("handle")
+    .eq("id", creatorId)
+    .maybeSingle();
+
+  const creatorHandle = handle || String(creatorRow?.handle || "");
+  if (creatorHandle) {
+    await syncCrmSnapshot(userId, creatorHandle, code, affiliateRef);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    creatorId,
+    code,
+    ref: affiliateRef,
+    link: affiliateRef ? `/r/${affiliateRef}` : null,
+  });
 }

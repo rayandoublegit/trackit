@@ -21,6 +21,12 @@ import {
 import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, formatTrendLabel, isWithinPeriod, resolveAnalyticsDateBounds, analyticsPeriodLabel, ANALYTICS_PERIOD_OPTIONS, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
+import {
+  InteractiveLineChart,
+  MetricInsightCard,
+  ProfitabilityMark,
+  trendToSeries,
+} from "./analytics-metric-cards";
 import { formatCurrency, formatCurrencyWithCode, type DisplayCurrency } from "@/lib/useCurrency";
 import {
   compactNumberToInput,
@@ -418,12 +424,12 @@ function computeCampaignPeriodTotals(
   return { sales: salesTotal, commission: commissionTotal };
 }
 
-function computeCampaignScopedSalesTrend(
+function computeCampaignScopedMetricTrend(
   sales: SaleRow[],
   campaignId: string,
-  _creatorIds: string[],
   creatorCounts: Record<string, string[]>,
   campaignMeta: Record<string, CampaignSalesMeta>,
+  metric: (sale: SaleRow) => number,
   now = new Date(),
   customBounds?: { start: Date; end: Date },
 ): PeriodTrend {
@@ -433,7 +439,7 @@ function computeCampaignScopedSalesTrend(
   const sumInPeriod = (start: Date, end: Date) =>
     sales
       .filter((sale) => belongsToCampaign(sale) && isWithinPeriod(sale.created_at, start, end))
-      .reduce((sum, sale) => sum + (Number(sale.order_amount) || 0), 0);
+      .reduce((sum, sale) => sum + metric(sale), 0);
 
   if (customBounds) {
     const durationMs = customBounds.end.getTime() - customBounds.start.getTime();
@@ -452,6 +458,55 @@ function computeCampaignScopedSalesTrend(
   const prevMonthStart = new Date(prevMonthEnd.getFullYear(), prevMonthEnd.getMonth(), 1);
 
   return computeTrend(sumInPeriod(monthStart, monthEnd), sumInPeriod(prevMonthStart, prevMonthEnd));
+}
+
+function computeCampaignScopedSalesTrend(
+  sales: SaleRow[],
+  campaignId: string,
+  _creatorIds: string[],
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+  now = new Date(),
+  customBounds?: { start: Date; end: Date },
+): PeriodTrend {
+  return computeCampaignScopedMetricTrend(
+    sales,
+    campaignId,
+    creatorCounts,
+    campaignMeta,
+    (sale) => Number(sale.order_amount) || 0,
+    now,
+    customBounds,
+  );
+}
+
+function buildCampaignTimeline(
+  sales: SaleRow[],
+  campaignId: string,
+  creatorCounts: Record<string, string[]>,
+  campaignMeta: Record<string, CampaignSalesMeta>,
+  dateBounds?: { start: Date; end: Date },
+): CampaignAnalyticsTimelinePoint[] {
+  const dayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
+  for (const sale of sales) {
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
+    const day = new Date(String(sale.created_at)).toISOString().slice(0, 10);
+    const agg = dayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
+    agg.revenue += Number(sale.order_amount) || 0;
+    agg.commission += Number(sale.commission_amount) || 0;
+    agg.salesCount += 1;
+    dayMap.set(day, agg);
+  }
+  return Array.from(dayMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, agg]) => ({
+      date,
+      revenue: agg.revenue,
+      commission: agg.commission,
+      salesCount: agg.salesCount,
+      net: Math.max(0, agg.revenue - agg.commission),
+    }));
 }
 
 function sumCommissionByCreator(sales: SaleRow[]): Map<string, number> {
@@ -498,7 +553,18 @@ function computeCreatorCampaignRoi(revenue: number, brandCost: number): number |
 
 function formatCampaignRoi(roi: number | null | undefined): string {
   if (roi == null || roi <= 0) return "—";
-  return `${roi.toFixed(1)}x`;
+  return `${roi.toFixed(1)}×`;
+}
+
+function CampaignRoiCell({ roi }: { roi: number | null | undefined }) {
+  if (roi == null || roi <= 0) return <span>—</span>;
+  const profitable = roi >= 1;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, color: profitable ? "#166534" : "#991B1B" }}>
+      <ProfitabilityMark profitable={profitable} />
+      {formatCampaignRoi(roi)}
+    </span>
+  );
 }
 
 function resolveCampaignCreatorIds(
@@ -509,11 +575,23 @@ function resolveCampaignCreatorIds(
   return [...new Set(ids)];
 }
 
+type CampaignAnalyticsTimelinePoint = {
+  date: string;
+  revenue: number;
+  commission: number;
+  salesCount: number;
+  net: number;
+};
+
 type CampaignAnalyticsSnapshot = {
   rows: CampaignCreatorRow[];
   monthRows: CampaignCreatorRow[];
   totals: { sales: number; commission: number };
   salesTrend: PeriodTrend;
+  commissionTrend: PeriodTrend;
+  netRevenueTrend: PeriodTrend;
+  roiTrend: PeriodTrend;
+  timeline: CampaignAnalyticsTimelinePoint[];
   creatorCount: number;
   pendingPayouts: number;
   pendingCreatorCount: number;
@@ -670,6 +748,31 @@ async function fetchCampaignAnalyticsSnapshot(
     new Date(),
     dateBounds,
   );
+  const commissionTrend = computeCampaignScopedMetricTrend(
+    salesRows,
+    campaign.id,
+    creatorCounts,
+    campaignMeta,
+    (sale) => Number(sale.commission_amount) || 0,
+    new Date(),
+    dateBounds,
+  );
+  const netRevenueTrend = computeCampaignScopedMetricTrend(
+    salesRows,
+    campaign.id,
+    creatorCounts,
+    campaignMeta,
+    (sale) => Math.max(0, (Number(sale.order_amount) || 0) - (Number(sale.commission_amount) || 0)),
+    new Date(),
+    dateBounds,
+  );
+  const timeline = buildCampaignTimeline(
+    salesRows,
+    campaign.id,
+    creatorCounts,
+    campaignMeta,
+    dateBounds,
+  );
 
   const totalBrandCost = rows.reduce(
     (sum, row) => sum + computeCreatorBrandCost(row.commission, row.commissionPaid),
@@ -677,11 +780,31 @@ async function fetchCampaignAnalyticsSnapshot(
   );
   const roi = computeCreatorCampaignRoi(totals.sales, totalBrandCost);
 
+  const prevTotals = (() => {
+    if (!dateBounds) return { sales: 0, commission: 0 };
+    const durationMs = dateBounds.end.getTime() - dateBounds.start.getTime();
+    const prevEnd = new Date(dateBounds.start.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - durationMs);
+    prevStart.setHours(0, 0, 0, 0);
+    prevEnd.setHours(23, 59, 59, 999);
+    return computeCampaignPeriodTotals(salesRows, campaign.id, creatorCounts, campaignMeta, {
+      start: prevStart,
+      end: prevEnd,
+    });
+  })();
+  const prevBrandCost = prevTotals.commission;
+  const prevRoi = computeCreatorCampaignRoi(prevTotals.sales, prevBrandCost);
+  const roiTrend = computeTrend(roi ?? 0, prevRoi ?? 0);
+
   return {
     rows,
     monthRows,
     totals,
     salesTrend,
+    commissionTrend,
+    netRevenueTrend,
+    roiTrend,
+    timeline,
     creatorCount: resolvedCreatorIds.length,
     pendingPayouts,
     pendingCreatorCount,
@@ -3528,11 +3651,16 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         if (!cancelled) setAnalytics(snapshot);
       } catch {
         if (!cancelled) {
+          const flatTrend: PeriodTrend = { current: 0, previous: 0, changePct: 0, direction: "flat" };
           setAnalytics({
             rows: [],
             monthRows: [],
             totals: { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 },
-            salesTrend: { current: 0, previous: 0, changePct: 0, direction: "flat" },
+            salesTrend: flatTrend,
+            commissionTrend: flatTrend,
+            netRevenueTrend: flatTrend,
+            roiTrend: flatTrend,
+            timeline: [],
             creatorCount: campaign.creators ?? campaign.creatorIds?.length ?? 0,
             pendingPayouts: 0,
             pendingCreatorCount: 0,
@@ -3580,16 +3708,27 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const pendingPayouts = analytics?.pendingPayouts ?? 0;
   const pendingCreatorCount = analytics?.pendingCreatorCount ?? 0;
   const activeCreators = analytics?.activeCreators ?? 0;
-  const salesTrendSub = formatSalesTrendSub(
-    analytics?.salesTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" },
-    lang,
-  );
+  const salesTrend = analytics?.salesTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
+  const commissionTrend = analytics?.commissionTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
+  const netRevenueTrend = analytics?.netRevenueTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
+  const roiTrend = analytics?.roiTrend ?? { current: 0, previous: 0, changePct: 0, direction: "flat" as const };
+  const timeline = analytics?.timeline ?? [];
+  const revenueSeries = timeline.map((p) => ({ date: p.date, value: p.revenue }));
+  const commissionSeries = timeline.map((p) => ({ date: p.date, value: p.commission }));
+  const netSeries = timeline.map((p) => ({ date: p.date, value: p.net }));
+  const salesCountSeries = timeline.map((p) => ({ date: p.date, value: p.salesCount }));
+  const roiSeries = timeline.map((p) => ({
+    date: p.date,
+    value: p.commission > 0 ? p.revenue / p.commission : 0,
+  }));
+  const isProfitable = (roi ?? 0) >= 1 || (totals.commission === 0 && totals.sales > 0);
   const pendingPayoutsSub =
     pendingPayouts > 0
       ? lang === "fr"
         ? `${pendingCreatorCount} créateur${pendingCreatorCount > 1 ? "s" : ""} à payer`
         : `${pendingCreatorCount} creator${pendingCreatorCount > 1 ? "s" : ""} to pay`
       : formatPendingPayoutsSub(0, lang);
+  const money = (v: number) => formatCurrencyWithCode(v, currency);
 
   const handleExport = async (format: "csv" | "xlsx") => {
     if (!supabase) return;
@@ -3700,77 +3839,144 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       )}
       {tab === "analytics" && (
         <>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 16,
-        }}
-      >
-        <Kpi
-          title={lang === "fr" ? "Créateurs" : "Creators"}
-          value={String(creatorCount)}
-          sub={lang === "fr" ? "dans cette campagne" : "in this campaign"}
-        />
-        <Kpi
-          title={lang === "fr" ? "Ventes" : "Sales"}
-          value={formatCurrencyWithCode(totals.sales, currency)}
-          sub={salesTrendSub.text}
-          subColor={salesTrendSub.color}
-        />
-        <Kpi
-          title={lang === "fr" ? "Commission" : "Commission"}
-          value={formatCurrencyWithCode(totals.commission, currency)}
-          sub={lang === "fr" ? "dû aux créateurs" : "owed to creators"}
-        />
-        <Kpi
-          title={lang === "fr" ? "Moyenne par créateur" : "Avg per Creator"}
-          value={formatCurrencyWithCode(avgPerCreator, currency)}
-          sub={lang === "fr" ? "ventes générées" : "sales driven"}
-        />
-      </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 16,
+              overflowX: "auto",
+              paddingBottom: 10,
+              marginBottom: 24,
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            <MetricInsightCard
+              title={lang === "fr" ? "Revenus" : "Revenue"}
+              info={
+                lang === "fr"
+                  ? "Somme des commandes attribuées à cette campagne sur la période."
+                  : "Sum of orders attributed to this campaign in the selected period."
+              }
+              value={money(totals.sales)}
+              trend={salesTrend}
+              series={revenueSeries}
+              formatPoint={money}
+              lang={lang}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Revenus nets" : "Net revenue"}
+              info={
+                lang === "fr"
+                  ? "Revenus de la campagne moins les commissions dues aux créateurs."
+                  : "Campaign revenue minus commissions owed to creators."
+              }
+              value={money(netRevenue)}
+              trend={netRevenueTrend}
+              series={netSeries}
+              formatPoint={money}
+              lang={lang}
+              profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Rentabilité (ROI)" : "Profitability (ROI)"}
+              info={
+                lang === "fr"
+                  ? "Revenus divisés par le coût créateur. Au-dessus de 1×, la campagne est rentable."
+                  : "Revenue divided by creator cost. Above 1×, the campaign is profitable."
+              }
+              value={formatCampaignRoi(roi)}
+              trend={roiTrend}
+              series={roiSeries}
+              formatPoint={(v) => `${v.toFixed(1)}×`}
+              lang={lang}
+              profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Commissions" : "Commissions"}
+              info={
+                lang === "fr"
+                  ? "Commissions dues aux créateurs pour les ventes de cette campagne."
+                  : "Commissions owed to creators for sales in this campaign."
+              }
+              value={money(totals.commission)}
+              trend={commissionTrend}
+              series={commissionSeries}
+              formatPoint={money}
+              lang={lang}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Ventes" : "Sales"}
+              info={
+                lang === "fr"
+                  ? "Nombre de commandes attribuées à cette campagne."
+                  : "Number of orders attributed to this campaign."
+              }
+              value={String(salesCountSeries.reduce((s, p) => s + p.value, 0))}
+              series={salesCountSeries}
+              formatPoint={(v) =>
+                lang === "fr"
+                  ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
+                  : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
+              }
+              lang={lang}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Moyenne / créateur" : "Avg per creator"}
+              info={
+                lang === "fr"
+                  ? "Revenus moyens générés par créateur dans la campagne."
+                  : "Average revenue driven per creator in this campaign."
+              }
+              value={money(avgPerCreator)}
+              series={trendToSeries(salesTrend)}
+              formatPoint={money}
+              lang={lang}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Créateurs actifs" : "Active creators"}
+              info={
+                lang === "fr"
+                  ? `Créateurs ayant généré au moins une vente (${activeCreators} sur ${creatorCount} dans la campagne).`
+                  : `Creators who drove at least one sale (${activeCreators} of ${creatorCount} in campaign).`
+              }
+              value={String(activeCreators)}
+              formatPoint={(v) => String(Math.round(v))}
+              lang={lang}
+            />
+            <MetricInsightCard
+              title={lang === "fr" ? "Paiements en attente" : "Pending payouts"}
+              info={
+                lang === "fr"
+                  ? `Solde restant à verser aux créateurs de cette campagne. ${pendingPayoutsSub}`
+                  : `Balance still owed to creators in this campaign. ${pendingPayoutsSub}`
+              }
+              value={money(pendingPayouts)}
+              formatPoint={money}
+              lang={lang}
+            />
+          </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
-          gap: 16,
-          marginBottom: 24,
-        }}
-      >
-        <Kpi
-          title={lang === "fr" ? "Revenus nets" : "Net revenue"}
-          value={formatCurrencyWithCode(netRevenue, currency)}
-          sub={lang === "fr" ? "après commissions" : "after commissions"}
-        />
-        <Kpi
-          title={lang === "fr" ? "Paiements en attente" : "Pending payouts"}
-          value={formatCurrencyWithCode(pendingPayouts, currency)}
-          sub={pendingPayoutsSub}
-        />
-        <Kpi
-          title="ROI"
-          value={formatCampaignRoi(roi)}
-          sub={lang === "fr" ? "revenus / coût créateur" : "revenue / creator cost"}
-        />
-        <Kpi
-          title={lang === "fr" ? "Créateurs actifs" : "Active creators"}
-          value={String(activeCreators)}
-          sub={lang === "fr" ? `sur ${creatorCount} dans la campagne` : `of ${creatorCount} in campaign`}
-        />
-      </div>
+          {revenueSeries.length >= 2 ? (
+            <div style={{ marginBottom: 24, border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
+                  {lang === "fr" ? "Revenus dans le temps" : "Revenue over time"}
+                </h3>
+              </div>
+              <InteractiveLineChart lang={lang} points={revenueSeries} formatValue={money} height={200} />
+            </div>
+          ) : null}
 
-        <AnalyticsTab
-          lang={lang}
-          campaign={campaign}
-          isMobile={isMobile}
-          currency={currency}
-          rows={analytics?.rows ?? []}
-          monthRows={analytics?.monthRows ?? []}
-          loading={analyticsLoading}
-          periodLabel={analyticsPeriodLabel(analyticsPeriod, lang)}
-        />
+          <AnalyticsTab
+            lang={lang}
+            campaign={campaign}
+            isMobile={isMobile}
+            currency={currency}
+            rows={analytics?.rows ?? []}
+            monthRows={analytics?.monthRows ?? []}
+            loading={analyticsLoading}
+            periodLabel={analyticsPeriodLabel(analyticsPeriod, lang)}
+          />
         </>
       )}
     </div>
@@ -3983,7 +4189,7 @@ function AnalyticsTab({
                         ) : null}
                       </td>
                       <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
-                      <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCampaignRoi(row.roi)}</td>
+                      <td style={{ padding: "14px" }}><CampaignRoiCell roi={row.roi} /></td>
                       <td style={{ padding: "14px" }}>
                         <CampaignCreatorStatusBadge lang={lang} active={row.salesAmount > 0} />
                       </td>
@@ -4034,7 +4240,7 @@ function AnalyticsTab({
                   <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
                   <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
                   <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
-                  <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCampaignRoi(row.roi)}</td>
+                  <td style={{ padding: "14px" }}><CampaignRoiCell roi={row.roi} /></td>
                 </tr>
             ))
           )}

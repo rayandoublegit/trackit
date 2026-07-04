@@ -238,6 +238,7 @@ function NotificationList({
   lang,
   onMarkRead,
   onDismiss,
+  onOpenAction,
 }: {
   visible: NotificationItem[];
   hydrated: boolean;
@@ -245,6 +246,7 @@ function NotificationList({
   lang: "en" | "fr";
   onMarkRead: (id: string) => void;
   onDismiss: (id: string) => void;
+  onOpenAction?: (action: NonNullable<NotificationItem["action"]>) => void;
 }) {
   if (!hydrated) {
     return (
@@ -284,11 +286,15 @@ function NotificationList({
             key={n.id}
             role="button"
             tabIndex={0}
-            onClick={() => onMarkRead(n.id)}
+            onClick={() => {
+              onMarkRead(n.id);
+              if (n.action) onOpenAction?.(n.action);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 onMarkRead(n.id);
+                if (n.action) onOpenAction?.(n.action);
               }
             }}
             style={{
@@ -366,9 +372,11 @@ function NotificationList({
 export function NotificationsPanel({
   userId,
   onUnreadChange,
+  onOpenAction,
 }: {
   userId?: string;
   onUnreadChange?: (count: number) => void;
+  onOpenAction?: (action: NonNullable<NotificationItem["action"]>) => void;
 }) {
   const lang = useLang();
   const {
@@ -475,6 +483,7 @@ export function NotificationsPanel({
           lang={lang}
           onMarkRead={markRead}
           onDismiss={dismiss}
+          onOpenAction={onOpenAction}
         />
       </div>
     </div>

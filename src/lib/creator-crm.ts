@@ -10,6 +10,8 @@ export type CreatorContentRef = {
 
 export type CreatorCrm = {
   promoCode?: string;
+  /** Public referral slug for /r/{affiliateRef} */
+  affiliateRef?: string;
   label?: string;
   phone?: string;
   address?: string;
@@ -62,6 +64,7 @@ export function crmFromSnapshot(snapshot: Record<string, unknown> | null | undef
         : typeof c.rate === "string"
           ? c.rate
           : undefined,
+    affiliateRef: typeof c.affiliateRef === "string" ? c.affiliateRef : undefined,
     label: typeof c.label === "string" ? c.label : undefined,
     phone: typeof c.phone === "string" ? c.phone : undefined,
     address: typeof c.address === "string" ? c.address : undefined,

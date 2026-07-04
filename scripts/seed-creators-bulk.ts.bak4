@@ -19,8 +19,7 @@ config({ path: ".env.local" });
 const SEED_TARGET = Number(process.env.SEED_TARGET ?? 1500);
 const PER_NICHE = Number(process.env.SEED_PER_NICHE ?? 8);
 const CONCURRENCY = Number(process.env.SEED_CONCURRENCY ?? 5);
-const MIN_FOLLOWERS = Number(process.env.SEED_MIN_FOLLOWERS ?? 5000);
-const MAX_FOLLOWERS = Number(process.env.SEED_MAX_FOLLOWERS ?? 0);
+const MIN_FOLLOWERS = 5000;
 const SEED_PAGES = Number(process.env.SEED_PAGES ?? 1);
 const FR_ONLY = process.env.SEED_FR_ONLY === "1";
 const SEED_NICHES = (process.env.SEED_NICHES ?? "").split(",").map((x) => x.trim()).filter(Boolean);
@@ -31,18 +30,6 @@ const NICHE_OF_QUERY = new Map<string, string>();
 const NICHE_RELEVANCE: Record<string, string[]> = {
   "e-commerce": ["ecommerce", "e-commerce", "ecom", "dropshipping", "shopify", "amazon fba", "print on demand", "online business", "business", "marketing", "entrepreneur", "vente en ligne", "boutique"],
   saas: ["saas", "startup", "tech", "software", "no code", "nocode", "indie hacker", "founder", "build in public", "ai", "developer", "entrepreneur", "business", "b2b"],
-  fitness: ["fitness", "musculation", "workout", "gym", "coach", "sport", "training", "crossfit", "yoga", "running", "nutrition sportive", "calisthenics"],
-  food: ["food", "cuisine", "recette", "recipe", "cooking", "patisserie", "baking", "chef", "meal", "nutrition"],
-  beauty: ["beauty", "beaute", "skincare", "makeup", "maquillage", "cheveux", "hair", "cosmetique", "soin", "nail"],
-  fashion: ["fashion", "mode", "style", "outfit", "streetwear", "ootd", "vetement", "friperie", "thrift"],
-  travel: ["travel", "voyage", "trip", "tourisme", "backpack", "vanlife", "destination", "adventure"],
-  pets: ["pets", "animaux", "chien", "dog", "chat", "cat", "dressage", "veterinaire", "animal"],
-  lifestyle: ["lifestyle", "productivite", "productivity", "organisation", "minimalisme", "routine", "developpement personnel", "self improvement", "motivation"],
-  finance: ["finance", "investissement", "investing", "bourse", "crypto", "budget", "epargne", "argent", "money", "immobilier", "trading"],
-  tech: ["tech", "technologie", "gadget", "smartphone", "apple", "android", "ia", "ai", "informatique", "setup", "gaming"],
-  home: ["home", "deco", "decoration", "interieur", "diy", "jardinage", "plantes", "renovation", "menage", "organisation maison"],
-  parenting: ["parenting", "parentalite", "maman", "papa", "bebe", "enfant", "grossesse", "famille", "education enfant"],
-  wellness: ["wellness", "bien etre", "sante", "meditation", "mental", "sommeil", "stress", "nutrition", "holistique", "mindfulness"],
 };
 for (const n of SEED_NICHES) {
   for (const q of (FR_NICHE_QUERIES as Record<string, string[]>)[n] ?? []) NICHE_OF_QUERY.set(q, n);
@@ -106,7 +93,6 @@ async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<
     const profile = parseProfile(pRaw);
     const followers = profile.followers || Number(u.follower_count || 0);
     if (followers < MIN_FOLLOWERS) return "skip";
-    if (MAX_FOLLOWERS > 0 && followers > MAX_FOLLOWERS) return "skip";
     const videos = parseVideos(vRaw);
     const rich = parseVideosRich(vRaw);
     const row = buildEnrichmentRow(username, { ...profile, followers }, videos, Date.now(), rich);
@@ -127,15 +113,14 @@ async function enrichAndStore(u: SCUser, t: Target, seen: Set<string>): Promise<
       if (c) {
         if (forced) {
           // Quality gate: Claude's detected niches/bio must overlap the target domain.
-          const hay = [c.primaryNiche, ...(c.niches ?? [])].join(" ").toLowerCase();
+          const hay = [c.primaryNiche, ...(c.niches ?? []), profile.bio ?? ""].join(" ").toLowerCase();
           const ok = (NICHE_RELEVANCE[forced] ?? []).some((k) => hay.includes(k));
           if (!ok) return "skip";
         }
-        if (FR_ONLY && c.language && c.language !== "fr") return "skip";
         extra = {
           primary_niche: forced ?? c.primaryNiche,
           niches: Array.from(new Set([...(forced ? [forced] : []), ...c.niches, c.primaryNiche])),
-          language: forced ? (c.language ?? null) : (c.language ?? t.l ?? null),
+          language: c.language ?? t.l ?? null,
           country_code: c.countryCode ?? t.c ?? null,
           email: c.email,
         };

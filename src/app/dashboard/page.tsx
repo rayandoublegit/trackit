@@ -30,6 +30,7 @@ import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
+import { CreatorAffiliateReadPanel } from "./CreatorAffiliateReadPanel";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { AnalyticsView } from "./AnalyticsView";
@@ -76,6 +77,7 @@ import {
   ensureNotificationsReset,
   getStoredUnreadCount,
   NOTIFICATIONS_UPDATED_EVENT,
+  notifyFeedbackIfNeeded,
   notifyShopifyConnected,
   notifyWelcomeIfNeeded,
   playWelcomeSoundIfUnread,
@@ -254,6 +256,10 @@ function DashboardPageContent() {
     setNotificationsUserId(user.id);
     ensureNotificationsReset();
     notifyWelcomeIfNeeded(user.id, lang);
+    // Brands only — wait until profile role is known (loading false) so creators never get this.
+    if (!loading && !isCreator) {
+      notifyFeedbackIfNeeded(user.id, lang);
+    }
     setNotificationUnread(getStoredUnreadCount());
     const refreshUnread = () => {
       setNotificationsUserId(user.id);
@@ -276,7 +282,7 @@ function DashboardPageContent() {
       window.removeEventListener("pointerdown", retryWelcome, { capture: true });
       removeSoundUnlock();
     };
-  }, [user?.id, lang]);
+  }, [user?.id, lang, isCreator, loading]);
 
   const loadSidebarCounts = useCallback(async (userId: string) => {
     if (!supabase) return;
@@ -4732,6 +4738,7 @@ function DashboardTopBar({
   onConnectShopify: () => void;
 }) {
   const [accountOpen, setAccountOpen] = useState(false);
+  const [affiliatePanelOpen, setAffiliatePanelOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -4875,7 +4882,16 @@ function DashboardTopBar({
               pointerEvents: notificationsOpen ? "auto" : "none",
             }}
           >
-            <NotificationsPanel userId={userId} onUnreadChange={onNotificationUnreadChange} />
+            <NotificationsPanel
+              userId={userId}
+              onUnreadChange={onNotificationUnreadChange}
+              onOpenAction={(action) => {
+                if (action === "feedback") {
+                  onNavigate("feedback");
+                  setNotificationsOpen(false);
+                }
+              }}
+            />
           </div>
         </div>
 
@@ -4930,6 +4946,19 @@ function DashboardTopBar({
               <SettingsIcon />
               {lang === "fr" ? "Paramètres" : "Settings"}
             </button>
+            {isCreator && (
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setAccountOpen(false);
+                  setAffiliatePanelOpen(true);
+                }}
+              >
+                <AffiliateIcon />
+                {lang === "fr" ? "Lien d'affiliation" : "Affiliate link"}
+              </button>
+            )}
             {!isCreator && (
               <button type="button" style={menuItemStyle} onClick={() => navAndClose("billing")}>
                 <BillingIcon />
@@ -4975,6 +5004,13 @@ function DashboardTopBar({
         )}
       </div>
       </div>
+      {isCreator && affiliatePanelOpen && userId && (
+        <CreatorAffiliateReadPanel
+          lang={lang}
+          userId={userId}
+          onClose={() => setAffiliatePanelOpen(false)}
+        />
+      )}
     </header>
   );
 }

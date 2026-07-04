@@ -1319,18 +1319,21 @@ function buildCumulativeValues(buckets: CommissionDayBucket[]) {
   });
 }
 
-function buildSmoothLinePath(points: { x: number; y: number }[]) {
+/** Straight segments only — readable, no exaggerated curves. */
+function buildLinePath(points: { x: number; y: number }[]) {
   if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
+}
 
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const cpx = (prev.x + curr.x) / 2;
-    d += ` C ${cpx} ${prev.y}, ${cpx} ${curr.y}, ${curr.x} ${curr.y}`;
+function chartAxisIndices(count: number): number[] {
+  if (count <= 1) return [0];
+  if (count <= 4) return Array.from({ length: count }, (_, i) => i);
+  const ticks = Math.min(5, count);
+  const indices = new Set<number>([0, count - 1]);
+  for (let i = 1; i < ticks - 1; i++) {
+    indices.add(Math.round((i / (ticks - 1)) * (count - 1)));
   }
-  return d;
+  return [...indices].sort((a, b) => a - b);
 }
 
 const PAYOUT_CHART_BLUE = "#0047FF";
@@ -1348,9 +1351,9 @@ function PayoutCommissionChart({
 }) {
   const cumulative = useMemo(() => buildCumulativeValues(buckets), [buckets]);
   const chartW = 640;
-  const chartH = 96;
-  const padX = 2;
-  const padY = 10;
+  const chartH = 120;
+  const padX = 12;
+  const padY = 14;
   const innerW = chartW - padX * 2;
   const innerH = chartH - padY * 2;
   const maxY = Math.max(...cumulative, 0.01);
@@ -1361,35 +1364,63 @@ function PayoutCommissionChart({
     y: padY + innerH - (value / maxY) * innerH,
   }));
 
-  const linePath = buildSmoothLinePath(points);
+  const linePath = buildLinePath(points);
   const areaPath =
     points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z`
+      ? `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${baselineY} L ${points[0].x.toFixed(2)} ${baselineY} Z`
       : "";
   const flatLine = `M ${padX} ${baselineY} L ${padX + innerW} ${baselineY}`;
   const hasActivity = cumulative.some((value, index) => value > 0 || buckets[index]?.earned > 0);
+  const axisIndices = chartAxisIndices(buckets.length);
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
       <svg
         viewBox={`0 0 ${chartW} ${chartH}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={lang === "fr" ? "Évolution cumulative des commissions" : "Cumulative commission trend"}
-        style={{ width: "100%", height: isMobile ? 88 : 112, display: "block" }}
+        style={{ width: "100%", height: isMobile ? 100 : 128, display: "block" }}
       >
         <defs>
           <linearGradient id="payoutCommissionFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0.14" />
+            <stop offset="0%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0.1" />
             <stop offset="100%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0" />
           </linearGradient>
         </defs>
+        {/* Light baseline */}
+        <line
+          x1={padX}
+          y1={baselineY}
+          x2={padX + innerW}
+          y2={baselineY}
+          stroke="#EFEFEF"
+          strokeWidth="1"
+        />
         {!hasActivity ? (
-          <path d={flatLine} fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
+          <path d={flatLine} fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeDasharray="4 4" />
         ) : (
           <>
             <path d={areaPath} fill="url(#payoutCommissionFill)" />
-            <path d={linePath} fill="none" stroke={PAYOUT_CHART_BLUE} strokeWidth="2.5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d={linePath}
+              fill="none"
+              stroke={PAYOUT_CHART_BLUE}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {points.map((p, i) => (
+              <circle
+                key={`pt-${buckets[i]?.dateKey ?? i}`}
+                cx={p.x}
+                cy={p.y}
+                r={buckets.length > 20 ? 2.5 : 3.5}
+                fill="#FFFFFF"
+                stroke={PAYOUT_CHART_BLUE}
+                strokeWidth="1.75"
+              />
+            ))}
           </>
         )}
       </svg>
@@ -1397,15 +1428,18 @@ function PayoutCommissionChart({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          gap: 12,
+          gap: 8,
           fontSize: 11,
-          color: "#9CA3AF",
+          color: "#9A9A9A",
           letterSpacing: "-0.01em",
           marginTop: 10,
         }}
       >
-        <span>{formatTimelineAxisLabel(buckets[0]?.dateKey ?? "", lang, period)}</span>
-        <span>{formatTimelineAxisLabel(buckets[buckets.length - 1]?.dateKey ?? "", lang, period)}</span>
+        {axisIndices.map((idx) => (
+          <span key={`axis-${buckets[idx]?.dateKey ?? idx}`} style={{ flex: 1, textAlign: idx === 0 ? "left" : idx === buckets.length - 1 ? "right" : "center" }}>
+            {formatTimelineAxisLabel(buckets[idx]?.dateKey ?? "", lang, period)}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1710,15 +1744,42 @@ const payoutPageSecondaryBtn: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
+const payoutDrawerFont = "'InterDisplay', 'Inter Display', sans-serif";
+
+const payoutDrawerAction: React.CSSProperties = {
+  fontFamily: payoutDrawerFont,
+  letterSpacing: "-0.02em",
+  fontSize: 13,
+  borderRadius: 8,
+};
+
+const payoutDrawerBtnPrimary: React.CSSProperties = {
+  ...payoutDrawerAction,
+  fontWeight: 600,
+  color: "#FFF",
+  background: "#1A1A1A",
+  border: "none",
+  padding: "10px 14px",
+  cursor: "pointer",
+};
+
+const payoutDrawerBtnSecondary: React.CSSProperties = {
+  ...payoutDrawerAction,
+  fontWeight: 500,
+  color: "#1A1A1A",
+  background: "#FFF",
+  border: "1px solid #E5E5E5",
+  padding: "10px 14px",
+  cursor: "pointer",
+};
+
 function CreatorPayoutPage({
   creator,
   lang,
-  isMobile,
-  plan,
-  userId,
   payingId,
   registeringId,
   payoutFieldsRef,
+  salesRevenue = 0,
   onCreatorChange,
   onClose,
   onPayManual,
@@ -1733,174 +1794,119 @@ function CreatorPayoutPage({
   payingId: string | null;
   registeringId: string | null;
   payoutFieldsRef: React.RefObject<CreatorPayoutMethodFieldsHandle | null>;
+  /** Sum of order amounts generated by this creator (brand revenue). */
+  salesRevenue?: number;
   onCreatorChange: (next: PayoutTableCreator) => void;
   onClose: () => void;
   onPayManual: () => void | Promise<void>;
   onPayStripe: () => void | Promise<void>;
   onConnectStripeBank: () => void | Promise<void>;
 }) {
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
-  const contentMax = 840;
-  const pagePrimaryBtn: React.CSSProperties = {
-    ...payoutPagePrimaryBtn,
-    padding: "16px 28px",
-    fontSize: 17,
-    borderRadius: 12,
-  };
-  const pageSecondaryBtn: React.CSSProperties = {
-    ...payoutPageSecondaryBtn,
-    padding: "16px 28px",
-    fontSize: 17,
-    borderRadius: 12,
-  };
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   const name = creator.full_name || creator.handle || creator.username || "Creator";
   const handle = creator.handle || creator.username || "";
   const balance = Number(creator.balance) || 0;
+  const totalEarned = Number(creator.total_earned) || 0;
   const platform = salePlatformFromCreator(creator.platform);
   const followers = Number(creator.followers) || 0;
   const engagement = Number(creator.engagement_rate) || 0;
   const discountCode = creator.discount_code?.trim() || null;
   const email = creator.email?.trim() || null;
-
   const canPayManual = balance > 0 && creatorHasPaymentMethod(creator) && payingId !== creator.id;
 
-  const metaChipStyle: React.CSSProperties = {
+  // Brand revenue (sales) vs cost (commissions earned = paid + still owed).
+  const costToBrand = totalEarned;
+  const revenue = Number(salesRevenue) || 0;
+  const hasProfitSignal = revenue > 0 || costToBrand > 0;
+  const isProfitable = hasProfitSignal && revenue > costToBrand;
+
+  const sectionTitle: React.CSSProperties = {
+    fontSize: 16,
+    fontWeight: 600,
+    color: "#1A1A1A",
+    marginBottom: 14,
+    letterSpacing: "-0.02em",
+  };
+
+  const statBox: React.CSSProperties = {
+    flex: 1,
+    minWidth: 0,
+    border: "1px solid #EFEFEF",
+    borderRadius: 12,
+    padding: "16px 18px",
+    background: "#FFF",
+  };
+
+  const pillBase: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: 6,
-    fontSize: 13,
-    color: "#4B5563",
+    gap: 5,
+    fontSize: 12,
+    fontWeight: 600,
+    padding: "4px 10px",
+    borderRadius: 20,
     letterSpacing: "-0.01em",
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
-      <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
-        <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 28px", letterSpacing: "-0.03em" }}>
-          {lang === "fr" ? "Payer le créateur" : "Pay creator"}
-        </h1>
-
-        <div
-          style={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            gap: isMobile ? 14 : 18,
-            marginBottom: 32,
-            padding: isMobile ? "16px" : "20px 22px",
-            border: "1px solid #EFEFEF",
-            borderRadius: 16,
-            background: "#FAFAFA",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? 14 : 18, flex: 1, minWidth: 0 }}>
-          <CreatorAvatar
-            src={creator.avatar_url}
-            username={creator.handle}
-            displayName={name}
-            size={isMobile ? 56 : 64}
-            alt={name}
-          />
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
-                marginBottom: 8,
-              }}
-            >
-              <div style={{ fontSize: isMobile ? 17 : 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", lineHeight: 1.2 }}>
-                {name}
-              </div>
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 10px",
-                  borderRadius: 999,
-                  background: "#FFFFFF",
-                  border: "1px solid #E5E5E5",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#1A1A1A",
-                }}
-              >
-                <SalePlatformLogo platform={platform} />
-                {platformLabel(platform)}
-              </span>
-            </div>
-
-            {handle && (
-              <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em", marginBottom: 10 }}>
-                @{String(handle).replace(/^@/, "")}
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexWrap: "wrap", gap: isMobile ? "8px 14px" : "10px 18px", alignItems: "center" }}>
-              {followers > 0 && (
-                <span style={metaChipStyle}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" />
-                    <circle cx="9" cy="7" r="4" stroke="#9A9A9A" strokeWidth="1.8" />
-                    <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" />
-                  </svg>
-                  {fmtFollowerCount(followers)} {lang === "fr" ? "abonnés" : "followers"}
-                </span>
-              )}
-              {engagement > 0 && (
-                <span style={metaChipStyle}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M3 17l5-5 4 4 8-8" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {engagement.toFixed(1)}% {lang === "fr" ? "engagement" : "engagement"}
-                </span>
-              )}
-              {(creator.total_sales ?? 0) > 0 && (
-                <span style={metaChipStyle}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4H6z" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  {creator.total_sales} {lang === "fr" ? "vente(s)" : "sale(s)"}
-                </span>
-              )}
-              {discountCode && (
-                <span
-                  style={{
-                    ...metaChipStyle,
-                    padding: "4px 10px",
-                    borderRadius: 8,
-                    background: "#F0F6FF",
-                    color: "#0047FF",
-                    fontWeight: 600,
-                  }}
-                >
-                  {lang === "fr" ? "Code" : "Code"} · {discountCode}
-                </span>
-              )}
-            </div>
-
-            {email && (
-              <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 10, letterSpacing: "-0.01em" }}>
-                {email}
-              </div>
-            )}
-          </div>
-          </div>
-
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.4)",
+        zIndex: 1100,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(560px, 100%)",
+          height: "100%",
+          background: "#FFF",
+          overflowY: "auto",
+          transform: shown ? "translateX(0)" : "translateX(40px)",
+          opacity: shown ? 1 : 0,
+          transition: "transform .18s ease, opacity .18s ease",
+          padding: "28px 28px 56px",
+          boxSizing: "border-box",
+          fontFamily: payoutDrawerFont,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              ...payoutDrawerAction,
+              background: "none",
+              border: "none",
+              color: "#9A9A9A",
+              fontWeight: 500,
+              fontSize: 14,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {lang === "fr" ? "Retour" : "Back"}
+          </button>
           <button
             type="button"
             disabled={!canPayManual}
             onClick={() => void onPayManual()}
             style={{
-              ...pagePrimaryBtn,
-              background: "#1A1A1A",
-              flexShrink: 0,
-              alignSelf: isMobile ? "stretch" : "center",
-              opacity: canPayManual ? 1 : 0.5,
-              whiteSpace: "nowrap",
+              ...payoutDrawerBtnPrimary,
+              fontSize: 14,
+              padding: "11px 16px",
+              opacity: canPayManual ? 1 : 0.45,
+              cursor: canPayManual ? "pointer" : "default",
             }}
           >
             {payingId === creator.id
@@ -1915,45 +1921,137 @@ function CreatorPayoutPage({
           </button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginBottom: 36 }}>
-          <div style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: "24px 26px", background: "#FAFAFA" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10, textTransform: "uppercase" }}>
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 32 }}>
+          <CreatorAvatar
+            src={creator.avatar_url}
+            username={creator.handle}
+            displayName={name}
+            size={64}
+            alt={name}
+            priority
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {name}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              {handle && <span style={{ fontSize: 14, color: "#9A9A9A" }}>@{String(handle).replace(/^@/, "")}</span>}
+              <span
+                style={{
+                  ...pillBase,
+                  fontWeight: 500,
+                  color: "#1A1A1A",
+                  background: "#F5F5F5",
+                }}
+              >
+                <SalePlatformLogo platform={platform} />
+                {platformLabel(platform)}
+              </span>
+              {discountCode && (
+                <span
+                  style={{
+                    ...pillBase,
+                    fontWeight: 500,
+                    color: "#1A1A1A",
+                    background: "#F5F5F5",
+                  }}
+                >
+                  {lang === "fr" ? "Code" : "Code"} · {discountCode}
+                </span>
+              )}
+              {hasProfitSignal && (
+                <span
+                  style={{
+                    ...pillBase,
+                    color: isProfitable ? "#166534" : "#991B1B",
+                    background: isProfitable ? "#DCFCE7" : "#FEE2E2",
+                  }}
+                >
+                  <span
+                    aria-hidden
+                    style={{
+                      display: "inline-block",
+                      width: 13,
+                      height: 12,
+                      flexShrink: 0,
+                      backgroundColor: "currentColor",
+                      WebkitMaskImage: "url(/images/trackit-mark.svg)",
+                      WebkitMaskSize: "contain",
+                      WebkitMaskRepeat: "no-repeat",
+                      WebkitMaskPosition: "center",
+                      maskImage: "url(/images/trackit-mark.svg)",
+                      maskSize: "contain",
+                      maskRepeat: "no-repeat",
+                      maskPosition: "center",
+                    }}
+                  />
+                  {isProfitable
+                    ? lang === "fr"
+                      ? "Rentable"
+                      : "Profitable"
+                    : lang === "fr"
+                      ? "Non rentable"
+                      : "Not profitable"}
+                </span>
+              )}
+            </div>
+            {(followers > 0 || engagement > 0) && (
+              <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+                {followers > 0 && (
+                  <span>
+                    {fmtFollowerCount(followers)} {lang === "fr" ? "abonnés" : "followers"}
+                  </span>
+                )}
+                {engagement > 0 && <span>{engagement.toFixed(1)}% ER</span>}
+              </div>
+            )}
+            {email && (
+              <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 8, letterSpacing: "-0.01em" }}>{email}</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
+          <div style={statBox}>
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
               {lang === "fr" ? "Solde à payer" : "Balance owed"}
             </div>
-            <div style={{ fontSize: 42, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
               {formatCurrency(balance, lang)}
             </div>
           </div>
-          <div style={{ border: "1px solid #E5E7EB", borderRadius: 14, padding: "24px 26px", background: "#FAFAFA" }}>
-            <div style={{ fontSize: 17, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.75 }}>
-              <div>
-                <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Total gagné" : "Total earned"}</span>
-                {" · "}
-                <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{formatCurrency(Number(creator.total_earned) || 0, lang)}</span>
-              </div>
-              <div>
-                <span style={{ color: "#9A9A9A" }}>{lang === "fr" ? "Ventes" : "Sales"}</span>
-                {" · "}
-                <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{creator.total_sales || 0}</span>
-              </div>
+          <div style={statBox}>
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
+              {lang === "fr" ? "Total gagné" : "Total earned"}
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              {formatCurrency(totalEarned, lang)}
+            </div>
+          </div>
+          <div style={statBox}>
+            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
+              {lang === "fr" ? "Ventes" : "Sales"}
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              {creator.total_sales || 0}
             </div>
           </div>
         </div>
 
         <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+          <div style={sectionTitle}>
             {lang === "fr" ? "Méthode de paiement actuelle" : "Current payment method"}
           </div>
           {creatorHasPaymentMethod(creator) ? (
-            <p style={{ margin: 0, fontSize: 17, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.55 }}>
+            <p style={{ margin: 0, fontSize: 15, color: "#1A1A1A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
               <span style={{ fontWeight: 600 }}>{paymentMethodLabel(creator, lang)}</span>
-              <span style={{ color: "#7A7A7A" }}> · </span>
-              <span style={{ wordBreak: "break-all" }}>
+              <span style={{ color: "#9A9A9A" }}> · </span>
+              <span style={{ wordBreak: "break-all", color: "#7A7A7A" }}>
                 {creator.paypal_link || creator.revolut_link || creator.iban}
               </span>
             </p>
           ) : (
-            <p style={{ margin: 0, fontSize: 16, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
+            <p style={{ margin: 0, fontSize: 15, color: "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
               {lang === "fr"
                 ? "Aucun moyen de paiement renseigné. Ajoutez PayPal, Revolut ou IBAN ci-dessous."
                 : "No payment method on file. Add PayPal, Revolut, or IBAN below."}
@@ -1961,30 +2059,33 @@ function CreatorPayoutPage({
           )}
         </div>
 
-        <div style={{ marginBottom: 44 }}>
-          <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 18, letterSpacing: "-0.02em" }}>
+        <div style={{ marginBottom: 36 }}>
+          <div style={sectionTitle}>
             {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
           </div>
           <CreatorPayoutMethodFields
             ref={payoutFieldsRef}
             creator={creator}
             lang={lang}
-            size="large"
+            size="default"
             onUpdate={onCreatorChange}
             onDraftChange={onCreatorChange}
           />
         </div>
 
-        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {creator.stripe_account_id ? (
             <button
               type="button"
               disabled={balance <= 0 || payingId === creator.id}
               onClick={() => void onPayStripe()}
               style={{
-                ...pagePrimaryBtn,
-                opacity: balance > 0 ? 1 : 0.5,
-                width: isMobile ? "100%" : undefined,
+                ...payoutDrawerBtnPrimary,
+                width: "100%",
+                fontSize: 14,
+                padding: "12px 16px",
+                opacity: balance > 0 ? 1 : 0.45,
+                cursor: balance > 0 ? "pointer" : "default",
               }}
             >
               {payingId === creator.id
@@ -1998,7 +2099,12 @@ function CreatorPayoutPage({
               type="button"
               disabled={registeringId === creator.id}
               onClick={() => void onConnectStripeBank()}
-              style={{ ...pageSecondaryBtn, width: isMobile ? "100%" : undefined }}
+              style={{
+                ...payoutDrawerBtnSecondary,
+                width: "100%",
+                fontSize: 14,
+                padding: "12px 16px",
+              }}
             >
               {registeringId === creator.id
                 ? lang === "fr"
@@ -2009,10 +2115,6 @@ function CreatorPayoutPage({
                   : "Connect bank account (Stripe)"}
             </button>
           )}
-
-          <button type="button" onClick={onClose} style={{ ...pageSecondaryBtn, width: isMobile ? "100%" : undefined }}>
-            {lang === "fr" ? "Retour" : "Back"}
-          </button>
         </div>
       </div>
     </div>
@@ -2239,6 +2341,13 @@ export function PayoutsView({
     };
   }, []);
 
+  const activeCreatorSalesRevenue = useMemo(() => {
+    if (!activeCreator?.id) return 0;
+    return trackedSales
+      .filter((s) => String(s.creator_id) === String(activeCreator.id))
+      .reduce((sum, s) => sum + (Number(s.order_amount) || 0), 0);
+  }, [activeCreator?.id, trackedSales]);
+
   const payoutOverviewStats = useMemo(
     () => computePayoutOverviewStats(creators, completedPayouts, trackedSales),
     [creators, completedPayouts, trackedSales],
@@ -2403,79 +2512,75 @@ export function PayoutsView({
     );
   }
 
-  if (payoutCreatorId && activeCreator) {
-    return (
-      <>
-        <CreatorPayoutPage
-          creator={activeCreator}
-          lang={lang}
-          isMobile={isMobile}
-          plan={plan}
-          userId={userId}
-          payingId={payingId}
-          registeringId={registeringId}
-          payoutFieldsRef={payoutFieldsRef}
-          onCreatorChange={(next) => {
-            setActiveCreator(next);
-            setCreators((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
-          }}
-          onClose={closeCreatorPayout}
-          onPayManual={() => void paySelectedCreator()}
-          onPayStripe={async () => {
-            if (!canUseManualPayouts(plan as PlanTier)) {
-              alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
-              return;
-            }
-            const amount = Number(activeCreator.balance) || 0;
-            if (!amount || amount <= 0) return;
-            primeNotificationSound();
-            setPayingId(activeCreator.id);
-            try {
-              const res = await fetch("/api/payouts", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ userId, creatorId: activeCreator.id, amount }),
-              });
-              const data = await res.json();
-              if (data.success) {
-                notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
-                const r = await fetch(`/api/creators-list?userId=${userId}`);
-                const list = await r.json();
-                if (Array.isArray(list)) setCreators(list);
-                void loadCompletedPayouts();
-                dispatchPayoutsUpdated();
-                closeCreatorPayout();
-              } else {
-                alert(data.error || "Payout failed");
-              }
-            } catch {
-              alert("Payout failed");
-            } finally {
-              setPayingId(null);
-            }
-          }}
-          onConnectStripeBank={async () => {
-            setRegisteringId(activeCreator.id);
-            try {
-              const res = await fetch("/api/payouts/connect", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ creatorId: activeCreator.id, email: activeCreator.email }),
-              });
-              const data = await res.json();
-              if (data.url) window.open(data.url, "_blank");
-              else alert(data.error || "Could not start bank connection");
-            } catch {
-              alert("Could not start bank connection");
-            } finally {
-              setRegisteringId(null);
-            }
-          }}
-        />
-        {confirmPayModal}
-      </>
-    );
-  }
+  const payoutDrawer = payoutCreatorId && activeCreator ? (
+    <CreatorPayoutPage
+      creator={activeCreator}
+      lang={lang}
+      isMobile={isMobile}
+      plan={plan}
+      userId={userId}
+      payingId={payingId}
+      registeringId={registeringId}
+      payoutFieldsRef={payoutFieldsRef}
+      salesRevenue={activeCreatorSalesRevenue}
+      onCreatorChange={(next) => {
+        setActiveCreator(next);
+        setCreators((list) => list.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+      }}
+      onClose={closeCreatorPayout}
+      onPayManual={() => void paySelectedCreator()}
+      onPayStripe={async () => {
+        if (!canUseManualPayouts(plan as PlanTier)) {
+          alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
+          return;
+        }
+        const amount = Number(activeCreator.balance) || 0;
+        if (!amount || amount <= 0) return;
+        primeNotificationSound();
+        setPayingId(activeCreator.id);
+        try {
+          const res = await fetch("/api/payouts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, creatorId: activeCreator.id, amount }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
+            const r = await fetch(`/api/creators-list?userId=${userId}`);
+            const list = await r.json();
+            if (Array.isArray(list)) setCreators(list);
+            void loadCompletedPayouts();
+            dispatchPayoutsUpdated();
+            closeCreatorPayout();
+          } else {
+            alert(data.error || "Payout failed");
+          }
+        } catch {
+          alert("Payout failed");
+        } finally {
+          setPayingId(null);
+        }
+      }}
+      onConnectStripeBank={async () => {
+        setRegisteringId(activeCreator.id);
+        try {
+          const res = await fetch("/api/payouts/connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ creatorId: activeCreator.id, email: activeCreator.email }),
+          });
+          const data = await res.json();
+          if (data.url) window.open(data.url, "_blank");
+          else alert(data.error || "Could not start bank connection");
+        } catch {
+          alert("Could not start bank connection");
+        } finally {
+          setRegisteringId(null);
+        }
+      }}
+    />
+  ) : null;
 
   return (
     <>
@@ -2600,6 +2705,7 @@ export function PayoutsView({
           )}
         </div>
 
+      {payoutDrawer}
       {confirmPayModal}
 
       </div>

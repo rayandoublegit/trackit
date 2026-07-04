@@ -21,6 +21,14 @@ import {
 } from "@/lib/managed-creator-commission";
 import { notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
+import {
+  AnalyticsChartCard as ChartCard,
+  InteractiveLineChart,
+  MetricInsightCard,
+  ProfitabilityMark,
+  trendColors,
+  trendToSeries,
+} from "./analytics-metric-cards";
 
 const btnPrimary: React.CSSProperties = {
   background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
@@ -198,7 +206,13 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const totalRevenue = analyticsData?.totalRevenue || 0;
   const totalCommissions = analyticsData?.totalCommissions || 0;
   const accruedCommissions = analyticsData?.accruedCommissions || 0;
-  const revenueTimeline = (analyticsData?.revenueTimeline || []) as Array<{ date: string; revenue: number }>;
+  const revenueTimeline = (analyticsData?.revenueTimeline || []) as Array<{
+    date: string;
+    revenue: number;
+    commission?: number;
+    salesCount?: number;
+    net?: number;
+  }>;
   const platformBreakdown = (analyticsData?.platformBreakdown || []) as Array<{ platform: string; revenue: number; commission: number; salesCount: number }>;
   const outreachByPlatform = (analyticsData?.outreachByPlatform || []) as Array<{ platform: string; sent: number; replied: number; converted: number; bestMessage: string }>;
   const followUpImpact = analyticsData?.followUpImpact as
@@ -207,14 +221,50 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const netRevenue = Math.max(0, totalRevenue - accruedCommissions);
   const conversionRate = outreachMessagesSent > 0 ? Math.round((converted / outreachMessagesSent) * 100) : 0;
   const avgCommissionRate = totalRevenue > 0 ? Math.round((accruedCommissions / totalRevenue) * 100) : 0;
+  const overallRoi = accruedCommissions > 0 ? totalRevenue / accruedCommissions : 0;
+  const isProfitable = overallRoi >= 1 || (accruedCommissions === 0 && totalRevenue > 0);
   const trends = analyticsData?.trends as
     | {
         revenue?: PeriodTrend;
         commissions?: PeriodTrend;
+        accruedCommissions?: PeriodTrend;
+        netRevenue?: PeriodTrend;
+        roi?: PeriodTrend;
         outreachSent?: PeriodTrend;
         responseRate?: PeriodTrend;
+        converted?: PeriodTrend;
       }
     | undefined;
+
+  const revenueSeries = useMemo(
+    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.revenue) || 0 })),
+    [revenueTimeline],
+  );
+  const commissionSeries = useMemo(
+    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.commission) || 0 })),
+    [revenueTimeline],
+  );
+  const netSeries = useMemo(
+    () =>
+      revenueTimeline.map((p) => ({
+        date: p.date,
+        value: Number(p.net ?? Math.max(0, (Number(p.revenue) || 0) - (Number(p.commission) || 0))),
+      })),
+    [revenueTimeline],
+  );
+  const salesCountSeries = useMemo(
+    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.salesCount) || 0 })),
+    [revenueTimeline],
+  );
+  const roiSeries = useMemo(
+    () =>
+      revenueTimeline.map((p) => {
+        const commission = Number(p.commission) || 0;
+        const revenue = Number(p.revenue) || 0;
+        return { date: p.date, value: commission > 0 ? revenue / commission : 0 };
+      }),
+    [revenueTimeline],
+  );
 
   const [showSaleModal, setShowSaleModal] = useState(false);
   const [saleCreators, setSaleCreators] = useState<{ id: string; label: string; handle: string; commission?: number }[]>([]);
@@ -510,42 +560,159 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           />
         </div>
         {saleModal}
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
-          <KpiCard
-            title={lang === "fr" ? "Revenus totaux des créateurs" : "Total Revenue from Creators"}
+        <div className="analytics-metric-scroll" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 10, marginBottom: 24, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+          <MetricInsightCard
+            title={lang === "fr" ? "Revenus totaux" : "Total revenue"}
+            info={
+              lang === "fr"
+                ? "Somme des commandes générées par vos créateurs sur la période sélectionnée."
+                : "Sum of orders driven by your creators in the selected period."
+            }
             value={formatCurrency(totalRevenue, lang)}
             trend={compare ? trends?.revenue : undefined}
+            series={revenueSeries}
+            formatPoint={(v) => formatCurrency(v, lang)}
             lang={lang}
           />
-          <KpiCard
-            title={lang === "fr" ? "Créateurs contactés" : "Total Creators Contacted"}
-            value={String(totalSent)}
-            trend={compare ? trends?.outreachSent : undefined}
+          <MetricInsightCard
+            title={lang === "fr" ? "Revenus nets" : "Net revenue"}
+            info={
+              lang === "fr"
+                ? "Revenus générés moins les commissions dues aux créateurs."
+                : "Revenue generated minus commissions owed to creators."
+            }
+            value={formatCurrency(netRevenue, lang)}
+            trend={compare ? trends?.netRevenue : undefined}
+            series={netSeries}
+            formatPoint={(v) => formatCurrency(v, lang)}
+            lang={lang}
+            profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Rentabilité (ROI)" : "Profitability (ROI)"}
+            info={
+              lang === "fr"
+                ? "Revenus divisés par les commissions dues. Au-dessus de 1×, le partenariat est rentable."
+                : "Revenue divided by commissions owed. Above 1×, the partnership is profitable."
+            }
+            value={overallRoi > 0 ? `${overallRoi.toFixed(1)}×` : "—"}
+            trend={compare ? trends?.roi : undefined}
+            series={roiSeries}
+            formatPoint={(v) => `${v.toFixed(1)}×`}
+            lang={lang}
+            profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Commissions dues" : "Commissions owed"}
+            info={
+              lang === "fr"
+                ? "Commissions calculées sur les ventes de la période, qu’elles soient payées ou non."
+                : "Commissions calculated on sales in this period, whether paid or not."
+            }
+            value={formatCurrency(accruedCommissions, lang)}
+            trend={compare ? trends?.accruedCommissions : undefined}
+            series={commissionSeries}
+            formatPoint={(v) => formatCurrency(v, lang)}
             lang={lang}
           />
-          <KpiCard
-            title={lang === "fr" ? "Taux de réponse" : "Response Rate"}
-            value={`${responseRate}%`}
-            trend={compare ? trends?.responseRate : undefined}
-            lang={lang}
-          />
-          <KpiCard
-            title={lang === "fr" ? "Commissions totales payées" : "Total Commissions Paid"}
+          <MetricInsightCard
+            title={lang === "fr" ? "Commissions payées" : "Commissions paid"}
+            info={
+              lang === "fr"
+                ? "Montant déjà versé aux créateurs sur la période."
+                : "Amount already paid out to creators in this period."
+            }
             value={formatCurrency(totalCommissions, lang)}
             trend={compare ? trends?.commissions : undefined}
+            series={trendToSeries(trends?.commissions)}
+            formatPoint={(v) => formatCurrency(v, lang)}
+            lang={lang}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Ventes" : "Sales"}
+            info={
+              lang === "fr"
+                ? "Nombre de commandes attribuées à vos créateurs sur la période."
+                : "Number of orders attributed to your creators in this period."
+            }
+            value={String(analyticsData?.salesCount || salesCountSeries.reduce((s, p) => s + p.value, 0))}
+            series={salesCountSeries}
+            formatPoint={(v) =>
+              lang === "fr"
+                ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
+                : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
+            }
+            lang={lang}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Créateurs contactés" : "Creators contacted"}
+            info={
+              lang === "fr"
+                ? "Nombre de créateurs uniques contactés via l’outreach sur la période."
+                : "Unique creators contacted via outreach in this period."
+            }
+            value={String(totalSent)}
+            trend={compare ? trends?.outreachSent : undefined}
+            series={trendToSeries(trends?.outreachSent)}
+            formatPoint={(v) => String(Math.round(v))}
+            lang={lang}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Taux de réponse" : "Response rate"}
+            info={
+              lang === "fr"
+                ? "Part des messages d’outreach ayant reçu une réponse."
+                : "Share of outreach messages that received a reply."
+            }
+            value={`${responseRate}%`}
+            trend={compare ? trends?.responseRate : undefined}
+            series={trendToSeries(trends?.responseRate)}
+            formatPoint={(v) => `${Math.round(v)}%`}
+            lang={lang}
+          />
+          <MetricInsightCard
+            title={lang === "fr" ? "Convertis" : "Converted"}
+            info={
+              lang === "fr"
+                ? "Créateurs passés partenaires après un message d’outreach."
+                : "Creators who became partners after outreach."
+            }
+            value={String(converted)}
+            trend={compare ? trends?.converted : undefined}
+            series={trendToSeries(trends?.converted)}
+            formatPoint={(v) => String(Math.round(v))}
             lang={lang}
           />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <ChartCard title={lang === "fr" ? "Revenus par créateur dans le temps" : "Revenue by Creator Over Time"}>
-            {revenueTimeline.length > 0 ? (
-              <RevenueTimelineChart lang={lang} points={revenueTimeline} />
+          <ChartCard
+            title={lang === "fr" ? "Revenus dans le temps" : "Revenue over time"}
+            info={
+              lang === "fr"
+                ? "Évolution quotidienne des revenus générés par vos créateurs."
+                : "Daily revenue driven by your creators."
+            }
+          >
+            {revenueSeries.length > 0 ? (
+              <InteractiveLineChart
+                lang={lang}
+                points={revenueSeries}
+                formatValue={(v) => formatCurrency(v, lang)}
+                height={200}
+              />
             ) : (
               <ChartEmpty lang={lang} />
             )}
           </ChartCard>
-          <ChartCard title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}>
+          <ChartCard
+            title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}
+            info={
+              lang === "fr"
+                ? "Entonnoir envoyé → répondu → converti pour vos messages d’outreach."
+                : "Funnel from sent → replied → converted for your outreach messages."
+            }
+          >
             {outreachMessagesSent > 0 ? (
               <FunnelBarChart lang={lang} totalSent={outreachMessagesSent} responseRate={responseRate} converted={converted} />
             ) : (
@@ -554,7 +721,15 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           </ChartCard>
         </div>
 
-        <ChartCard title={lang === "fr" ? "Meilleurs créateurs ce mois" : "Top Performing Creators This Month"} style={{ marginBottom: 20 }}>
+        <ChartCard
+          title={lang === "fr" ? "Meilleurs créateurs" : "Top performing creators"}
+          info={
+            lang === "fr"
+              ? "Classement des créateurs par ventes générées, commissions et rentabilité (ROI)."
+              : "Creators ranked by sales driven, commissions, and profitability (ROI)."
+          }
+          style={{ marginBottom: 20 }}
+        >
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
               <thead>
@@ -599,7 +774,18 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                       ) : null}
                     </td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>{hasAdvancedAnalytics ? `${r.roi.toFixed(1)}x` : "—"}</td>
+                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>
+                      {hasAdvancedAnalytics ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <ProfitabilityMark profitable={r.roi >= 1} />
+                          <span style={{ color: r.roi >= 1 ? "#166534" : r.roi > 0 ? "#991B1B" : "#9A9A9A" }}>
+                            {r.roi > 0 ? `${r.roi.toFixed(1)}×` : "—"}
+                          </span>
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
                 ))}
@@ -627,7 +813,14 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
         </ChartCard>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
-          <ChartCard title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}>
+          <ChartCard
+            title={lang === "fr" ? "Ratio commission / revenus" : "Commission vs Revenue Ratio"}
+            info={
+              lang === "fr"
+                ? "Part des revenus conservée après commissions créateurs."
+                : "Share of revenue kept after creator commissions."
+            }
+          >
             {hasAdvancedAnalytics && totalRevenue > 0 ? (
               <>
                 <DonutChart lang={lang} netPct={Math.round((netRevenue / totalRevenue) * 100)} />
@@ -643,7 +836,14 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
               <ChartEmpty lang={lang} />
             )}
           </ChartCard>
-          <ChartCard title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}>
+          <ChartCard
+            title={lang === "fr" ? "Répartition par plateforme" : "Platform Breakdown"}
+            info={
+              lang === "fr"
+                ? "Revenus générés par plateforme (TikTok, Instagram, YouTube…)."
+                : "Revenue driven by platform (TikTok, Instagram, YouTube…)."
+            }
+          >
             {platformBreakdown.length > 0 ? (
               <PlatformBreakdownChart lang={lang} rows={platformBreakdown} />
             ) : (
@@ -652,7 +852,15 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           </ChartCard>
         </div>
 
-        <ChartCard title={lang === "fr" ? "Performance des campagnes" : "Campaign Performance"} style={{ marginBottom: 20 }}>
+        <ChartCard
+          title={lang === "fr" ? "Performance des campagnes" : "Campaign Performance"}
+          info={
+            lang === "fr"
+              ? "Ventes, commissions et ROI par campagne sur la période."
+              : "Sales, commissions, and ROI by campaign for this period."
+          }
+          style={{ marginBottom: 20 }}
+        >
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
@@ -673,7 +881,16 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                   <td style={{ padding: "12px 8px" }}>{c.creatorCount ?? 0}</td>
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalSales ?? 0, lang)}</td>
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalCommissions ?? 0, lang)}</td>
-                  <td style={{ padding: "12px 8px" }}>{c.roi && c.roi > 0 ? `${c.roi.toFixed(1)}x` : "—"}</td>
+                  <td style={{ padding: "12px 8px" }}>
+                    {c.roi && c.roi > 0 ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, color: c.roi >= 1 ? "#166534" : "#991B1B" }}>
+                        <ProfitabilityMark profitable={c.roi >= 1} />
+                        {c.roi.toFixed(1)}×
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{formatCampaignStartDate(c.start_date || c.created_at, lang)}</td>
                   <td style={{ padding: "12px 8px" }}><CampaignStatus lang={lang} status={String(c.status || "Draft")} /></td>
                 </tr>
@@ -683,7 +900,15 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           </div>
         </ChartCard>
 
-        <ChartCard title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"} style={{ marginBottom: 20 }}>
+        <ChartCard
+          title={lang === "fr" ? "Détail des messages" : "Outreach Breakdown"}
+          info={
+            lang === "fr"
+              ? "Détail des envois, réponses et conversions par plateforme."
+              : "Sent, replies, and conversions broken down by platform."
+          }
+          style={{ marginBottom: 20 }}
+        >
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
             <MiniStat label={lang === "fr" ? "Total envoyé" : "Total sent"} value={String(outreachMessagesSent)} />
             <MiniStat label={lang === "fr" ? "Taux de réponse" : "Reply rate"} value={`${responseRate}%`} />
@@ -720,7 +945,14 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           </div>
         </ChartCard>
 
-        <ChartCard title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}>
+        <ChartCard
+          title={lang === "fr" ? "Impact des relances" : "Follow Up Impact"}
+          info={
+            lang === "fr"
+              ? "Compare le taux de réponse avec et sans message de relance."
+              : "Compares reply rate with and without a follow-up message."
+          }
+        >
           {(followUpImpact?.withFollowUp?.sent || 0) + (followUpImpact?.withoutFollowUp?.sent || 0) > 0 ? (
             <FollowUpImpactChart lang={lang} withFollowUp={followUpImpact?.withFollowUp} withoutFollowUp={followUpImpact?.withoutFollowUp} />
           ) : (
@@ -784,12 +1016,6 @@ function CompareToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) 
   );
 }
 
-function trendColors(direction: PeriodTrend["direction"]) {
-  if (direction === "up") return { fg: "#1FB567", bg: "rgba(31,181,103,0.12)" };
-  if (direction === "down") return { fg: "#E53935", bg: "rgba(229,57,53,0.12)" };
-  return { fg: "#9A9A9A", bg: "#F5F5F5" };
-}
-
 function TrendStat({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
   const { fg, bg } = trendColors(trend.direction);
   const label = formatTrendLabel(trend.changePct, lang);
@@ -816,67 +1042,6 @@ function TrendStat({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
         {lang === "fr" ? "revenus" : "revenue"}
       </span>
     </span>
-  );
-}
-
-function KpiCard({
-  title,
-  value,
-  sub,
-  subColor,
-  trend,
-  lang,
-}: {
-  title: string;
-  value: string;
-  sub?: string;
-  subColor?: string;
-  trend?: PeriodTrend;
-  lang?: "en" | "fr";
-}) {
-  const showTrend = trend && lang;
-  const { fg, bg } = showTrend ? trendColors(trend.direction) : { fg: "", bg: "" };
-  return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
-      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: sub || showTrend ? 6 : 0 }}>
-        <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em" }}>{value}</div>
-        {showTrend ? (
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 600,
-              color: fg,
-              background: bg,
-              padding: "4px 8px",
-              borderRadius: 6,
-              letterSpacing: "-0.02em",
-            }}
-          >
-            <span aria-hidden>{trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→"}</span>
-            {formatTrendLabel(trend.changePct, lang)}
-          </span>
-        ) : null}
-      </div>
-      {sub ? <div style={{ fontSize: 12, color: subColor || "#9A9A9A", letterSpacing: "-0.01em" }}>{sub}</div> : null}
-      {showTrend ? (
-        <div style={{ fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-          {lang === "fr" ? "vs période précédente" : "vs previous period"}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function ChartCard({ title, children, style }: { title: string; children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, ...style }}>
-      <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 16px", letterSpacing: "-0.02em" }}>{title}</h3>
-      {children}
-    </div>
   );
 }
 
@@ -982,23 +1147,6 @@ function DonutChart({ lang, netPct }: { lang: "en" | "fr"; netPct: number }) {
         <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="600" fill="#1A1A1A">{netPct}%</text>
         <text x="80" y="94" textAnchor="middle" fontSize="11" fill="#9A9A9A">{lang === "fr" ? "Revenus nets" : "Net revenue"}</text>
       </svg>
-    </div>
-  );
-}
-
-function RevenueTimelineChart({ lang, points }: { lang: "en" | "fr"; points: Array<{ date: string; revenue: number }> }) {
-  const max = Math.max(...points.map((p) => p.revenue), 1);
-  return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180, paddingTop: 8 }}>
-      {points.map((p) => {
-        const h = Math.max(8, Math.round((p.revenue / max) * 100));
-        return (
-          <div key={p.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 28 }}>
-            <div style={{ width: "100%", maxWidth: 40, height: `${h}%`, minHeight: 8, background: "#0047FF", borderRadius: "6px 6px 0 0" }} title={formatCurrency(p.revenue, lang)} />
-            <span style={{ fontSize: 10, color: "#9A9A9A" }}>{p.date.slice(5)}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }

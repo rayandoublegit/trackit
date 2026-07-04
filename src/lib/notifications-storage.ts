@@ -3,6 +3,8 @@ import { playNotificationSound } from "@/lib/notification-sound";
 
 export type NotificationKind = "payout" | "campaign" | "outreach" | "team" | "system";
 
+export type NotificationAction = "feedback";
+
 export type NotificationItem = {
   id: string;
   kind: NotificationKind;
@@ -10,6 +12,8 @@ export type NotificationItem = {
   body: string;
   time: string;
   read: boolean;
+  /** Optional navigation target when the notification is clicked. */
+  action?: NotificationAction;
 };
 
 const LEGACY_STORAGE_KEY = "trackit_notifications";
@@ -78,9 +82,25 @@ function newNotificationId() {
 }
 
 function notificationFingerprint(
-  input: Pick<NotificationItem, "kind" | "title" | "body">
+  input: Pick<NotificationItem, "kind" | "title" | "body" | "action">
 ) {
-  return `${input.kind}\0${input.title}\0${input.body}`;
+  return `${input.kind}\0${input.title}\0${input.body}\0${input.action ?? ""}`;
+}
+
+const FEEDBACK_INTERVAL_MS = 5 * 24 * 60 * 60 * 1000;
+const FEEDBACK_LAST_KEY_PREFIX = "trackit_feedback_notif_at_";
+
+export function isFeedbackNotification(notification: NotificationItem) {
+  if (notification.action === "feedback") return true;
+  return (
+    notification.kind === "system" &&
+    (notification.title === "Laisser un feedback de ce que vous pensez de Trackit" ||
+      notification.title === "Leave feedback about what you think of Trackit")
+  );
+}
+
+function feedbackLastKey(userId: string) {
+  return `${FEEDBACK_LAST_KEY_PREFIX}${userId}`;
 }
 
 function dedupeNotifications(items: NotificationItem[]): NotificationItem[] {
@@ -333,6 +353,53 @@ export function notifySaleRecorded(
         : `${formatCurrency(orderAmount, lang)} order · ${formatCurrency(commissionAmount, lang)} commission.`,
     time: formatNotificationTime(lang),
   }, userId);
+}
+
+/**
+ * Brand-only feedback reminder — at most once every 5 days.
+ * Clicking the notification opens the feedback page.
+ */
+export function notifyFeedbackIfNeeded(userId: string, lang: "en" | "fr"): boolean {
+  if (typeof window === "undefined") return false;
+  setNotificationsUserId(userId);
+
+  const lastAt = Number(localStorage.getItem(feedbackLastKey(userId)) || "0");
+  if (Number.isFinite(lastAt) && Date.now() - lastAt < FEEDBACK_INTERVAL_MS) {
+    return false;
+  }
+
+  const existing = loadNotifications();
+  // Don't stack unread feedback reminders.
+  if (existing.some((n) => isFeedbackNotification(n) && !n.read)) {
+    return false;
+  }
+
+  // Drop previous feedback notifications so a fresh unread one can appear.
+  const withoutFeedback = existing.filter((n) => !isFeedbackNotification(n));
+  saveNotifications(withoutFeedback);
+
+  playNotificationSound();
+
+  const item: NotificationItem = {
+    id: newNotificationId(),
+    kind: "system",
+    title:
+      lang === "fr"
+        ? "Laisser un feedback de ce que vous pensez de Trackit"
+        : "Leave feedback about what you think of Trackit",
+    body:
+      lang === "fr"
+        ? "Cliquez pour ouvrir la page et partager votre avis."
+        : "Click to open the page and share your thoughts.",
+    time: formatNotificationTime(lang),
+    read: false,
+    action: "feedback",
+  };
+
+  saveNotifications([item, ...withoutFeedback]);
+  localStorage.setItem(feedbackLastKey(userId), String(Date.now()));
+  dispatchNotificationsUpdated();
+  return true;
 }
 
 /** Welcome notification — once per user, ever (persisted in localStorage). */

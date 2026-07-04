@@ -351,14 +351,24 @@ export async function GET(request: Request) {
     })
     .sort((a, b) => b.periodRevenue - a.periodRevenue);
 
-  const revenueDayMap = new Map<string, number>();
+  const revenueDayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
   for (const sale of periodSales) {
     const day = new Date(String(sale.created_at)).toISOString().slice(0, 10);
-    revenueDayMap.set(day, (revenueDayMap.get(day) || 0) + (Number(sale.order_amount) || 0));
+    const agg = revenueDayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
+    agg.revenue += Number(sale.order_amount) || 0;
+    agg.commission += Number(sale.commission_amount) || 0;
+    agg.salesCount += 1;
+    revenueDayMap.set(day, agg);
   }
   const revenueTimeline = Array.from(revenueDayMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, revenue]) => ({ date, revenue }));
+    .map(([date, agg]) => ({
+      date,
+      revenue: agg.revenue,
+      commission: agg.commission,
+      salesCount: agg.salesCount,
+      net: Math.max(0, agg.revenue - agg.commission),
+    }));
 
   const platformSalesMap = new Map<string, { revenue: number; commission: number; count: number }>();
   for (const sale of periodSales) {
@@ -479,8 +489,18 @@ export async function GET(request: Request) {
     trends: {
       revenue: computeTrend(currentSales.revenue, previousSales.revenue),
       commissions: computeTrend(currentPaidCommissions, previousPaidCommissions),
+      accruedCommissions: computeTrend(currentSales.commissions, previousSales.commissions),
+      netRevenue: computeTrend(
+        Math.max(0, currentSales.revenue - currentSales.commissions),
+        Math.max(0, previousSales.revenue - previousSales.commissions),
+      ),
+      roi: computeTrend(
+        currentSales.commissions > 0 ? currentSales.revenue / currentSales.commissions : 0,
+        previousSales.commissions > 0 ? previousSales.revenue / previousSales.commissions : 0,
+      ),
       outreachSent: computeTrend(currentOutreach.contactedCreators, previousOutreach.contactedCreators),
       responseRate: computeTrend(currentOutreach.responseRate, previousOutreach.responseRate),
+      converted: computeTrend(currentOutreach.converted ?? 0, previousOutreach.converted ?? 0),
     },
   });
 }

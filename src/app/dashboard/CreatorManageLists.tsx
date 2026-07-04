@@ -22,6 +22,7 @@ import { CreatorDetailDrawer } from "./CreatorDetailDrawer";
 import { CreatorImportPanel } from "./CreatorImportPanel";
 import { CreatorScriptPanel } from "./CreatorScriptPanel";
 import { CreatorContentBrandPanel } from "./CreatorContentBrandPanel";
+import { CreatorAffiliatePanel } from "./CreatorAffiliatePanel";
 import { CreatorListTable } from "./CreatorListTable";
 import { emailFromRow, type CreatorCrm, crmFromSnapshot } from "@/lib/creator-crm";
 import { useLang } from "@/lib/useLang";
@@ -311,6 +312,7 @@ export function CreatorManageLists({
   const [brandId, setBrandId] = useState<string | null>(null);
   const [scriptTarget, setScriptTarget] = useState<SavedRow | null>(null);
   const [contentTarget, setContentTarget] = useState<SavedRow | null>(null);
+  const [affiliateTarget, setAffiliateTarget] = useState<SavedRow | null>(null);
 
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -674,6 +676,32 @@ export function CreatorManageLists({
     );
   }
 
+  if (affiliateTarget && brandId) {
+    const snap =
+      affiliateTarget.snapshot && typeof affiliateTarget.snapshot === "object"
+        ? (affiliateTarget.snapshot as Record<string, unknown>)
+        : {};
+    const crm = crmFromSnapshot(snap);
+    return (
+      <CreatorAffiliatePanel
+        lang={lang}
+        isMobile={isMobile}
+        userId={brandId}
+        creatorUsername={affiliateTarget.creator_username}
+        displayName={affiliateTarget.display_name}
+        platform={affiliateTarget.platform ?? undefined}
+        avatarUrl={affiliateTarget.avatar_url}
+        promoCode={crm.promoCode}
+        commissionRate={crm.commissionRate}
+        affiliateRef={crm.affiliateRef}
+        onClose={() => setAffiliateTarget(null)}
+        onAssigned={({ promoCode, affiliateRef }) => {
+          void onCrmChange(affiliateTarget.creator_username, { promoCode, affiliateRef });
+        }}
+      />
+    );
+  }
+
   if (selectedListId && selectedList) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
@@ -807,6 +835,7 @@ export function CreatorManageLists({
               onCrmChange={(username, patch) => void onCrmChange(username, patch)}
               onOpenScript={(row) => setScriptTarget(row)}
               onOpenContent={(row) => setContentTarget(row)}
+              onOpenAffiliate={(row) => setAffiliateTarget(row)}
               onDelete={(username) => void onDeleteCreator(username)}
             />
           )}

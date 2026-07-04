@@ -257,6 +257,16 @@ export function discoveryCopy(lang: Lang) {
     // List table columns
     colLastEmail: fr ? "Dernier e-mail" : "Last email",
     colConversation: fr ? "Conversation" : "Conversation",
+    colAffiliateLink: fr ? "Lien d'affiliation" : "Affiliate link",
+    affiliateGenerate: fr ? "Générer" : "Generate",
+    affiliatePanelBack: fr ? "Retour à la liste" : "Back to list",
+    affiliatePanelSubtitle: (name: string) =>
+      fr ? `Lien de parrainage pour ${name}` : `Referral link for ${name}`,
+    affiliateLinkLabel: fr ? "Lien généré" : "Generated link",
+    affiliateCodeLabel: fr ? "Code promo" : "Promo code",
+    affiliateCopyLink: fr ? "Copier le lien" : "Copy link",
+    affiliateCopyCode: fr ? "Copier le code" : "Copy code",
+    affiliateCopied: fr ? "Copié" : "Copied",
     colCommission: fr ? "Commission" : "Commission",
     invalidCommission: fr ? "Entrez un pourcentage entre 0 et 100" : "Enter a percentage between 0 and 100",
     colPromoCode: fr ? "Code promo" : "Promo code",
