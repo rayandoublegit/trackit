@@ -106,6 +106,80 @@ export function formatTrendLabel(changePct: number | null, lang: "en" | "fr"): s
   return `${formatted}%`;
 }
 
+/** Local calendar day key `YYYY-MM-DD` (avoids UTC off-by-one). */
+export function toDayKey(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Day key from an ISO timestamp, using local calendar day. */
+export function dayKeyFromIso(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return toDayKey(d);
+}
+
+/** Every calendar day from start→end inclusive. */
+export function eachDayKeys(start: Date, end: Date): string[] {
+  const keys: string[] = [];
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  while (cur.getTime() <= last.getTime()) {
+    keys.push(toDayKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return keys;
+}
+
+export type TimelineDayValue = {
+  date: string;
+  revenue: number;
+  commission: number;
+  salesCount: number;
+  net: number;
+};
+
+/** Fill missing days in a period with zeros so charts cover the full range. */
+export function fillTimelineDays(
+  points: Array<Partial<TimelineDayValue> & { date: string }>,
+  start: Date,
+  end: Date,
+): TimelineDayValue[] {
+  const map = new Map<string, TimelineDayValue>();
+  for (const p of points) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date)) continue;
+    map.set(p.date, {
+      date: p.date,
+      revenue: Number(p.revenue) || 0,
+      commission: Number(p.commission) || 0,
+      salesCount: Number(p.salesCount) || 0,
+      net: Number(p.net ?? Math.max(0, (Number(p.revenue) || 0) - (Number(p.commission) || 0))),
+    });
+  }
+  return eachDayKeys(start, end).map((date) => {
+    const existing = map.get(date);
+    if (existing) return existing;
+    return { date, revenue: 0, commission: 0, salesCount: 0, net: 0 };
+  });
+}
+
+/** Chart series points for a filled period. */
+export function fillChartSeries(
+  points: Array<{ date: string; value: number }>,
+  start: Date,
+  end: Date,
+): Array<{ date: string; value: number }> {
+  const map = new Map<string, number>();
+  for (const p of points) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date)) continue;
+    map.set(p.date, Number(p.value) || 0);
+  }
+  return eachDayKeys(start, end).map((date) => ({ date, value: map.get(date) ?? 0 }));
+}
+
 export function resolveAnalyticsDateBounds(
   range: AnalyticsDateRange,
   options?: {

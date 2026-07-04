@@ -7,21 +7,27 @@ import {
   type AnalyticsDateRange,
 } from "@/lib/analytics-periods";
 
+export const HERO_PERIOD_OPTIONS: AnalyticsDateRange[] = ["today", "3d", "7d", "30d", "90d"];
+
 export function AnalyticsPeriodDropdown({
   value,
   onChange,
   lang,
   options = ANALYTICS_PERIOD_OPTIONS,
   align = "left",
+  variant = "default",
 }: {
   value: AnalyticsDateRange;
   onChange: (value: AnalyticsDateRange) => void;
   lang: "en" | "fr";
   options?: AnalyticsDateRange[];
   align?: "left" | "right";
+  /** `subtle` matches the hero chart period control (bordered, compact). */
+  variant?: "default" | "subtle";
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const subtle = variant === "subtle";
 
   useEffect(() => {
     if (!open) return;
@@ -35,7 +41,7 @@ export function AnalyticsPeriodDropdown({
   }, [open]);
 
   return (
-    <div ref={rootRef} style={{ position: "relative" }}>
+    <div ref={rootRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -45,14 +51,14 @@ export function AnalyticsPeriodDropdown({
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          background: "#F5F5F5",
-          border: "none",
-          borderRadius: 10,
-          padding: "8px 12px",
-          fontSize: 13,
+          background: subtle ? "#FFFFFF" : "#F5F5F5",
+          border: subtle ? "1px solid #E5E7EB" : "none",
+          borderRadius: subtle ? 8 : 10,
+          padding: subtle ? "5px 10px" : "8px 12px",
+          fontSize: subtle ? 12 : 13,
           fontWeight: 500,
-          color: "#1A1A1A",
-          letterSpacing: "-0.02em",
+          color: subtle ? "#6B7280" : "#1A1A1A",
+          letterSpacing: "-0.01em",
           cursor: "pointer",
           fontFamily: "inherit",
           whiteSpace: "nowrap",
@@ -85,7 +91,7 @@ export function AnalyticsPeriodDropdown({
             borderRadius: 12,
             boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
             padding: 6,
-            zIndex: 40,
+            zIndex: 50,
           }}
         >
           {options.map((period) => {

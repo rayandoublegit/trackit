@@ -6,7 +6,12 @@ import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
-import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
+import {
+  fillChartSeries,
+  formatTrendLabel,
+  getPeriodBounds,
+  type PeriodTrend,
+} from "@/lib/analytics-periods";
 import { campaignStatusLabel } from "@/lib/campaign-status";
 import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { SplitHeaderActions } from "./SplitHeaderActions";
@@ -23,9 +28,12 @@ import { notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
 import {
   AnalyticsChartCard as ChartCard,
+  AnalyticsSectionHeader,
+  HeroMetricChart,
   InteractiveLineChart,
-  MetricInsightCard,
-  ProfitabilityMark,
+  MetricPanelCard,
+  ProfitabilityPill,
+  SummaryMetricCard,
   trendColors,
   trendToSeries,
 } from "./analytics-metric-cards";
@@ -236,34 +244,49 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
       }
     | undefined;
 
+  const periodBounds = useMemo(() => {
+    const periodRange = range === "custom" ? "30d" : range;
+    return getPeriodBounds(periodRange);
+  }, [range]);
+
   const revenueSeries = useMemo(
-    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.revenue) || 0 })),
-    [revenueTimeline],
+    () =>
+      fillChartSeries(
+        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.revenue) || 0 })),
+        periodBounds.start,
+        periodBounds.end,
+      ),
+    [revenueTimeline, periodBounds],
   );
   const commissionSeries = useMemo(
-    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.commission) || 0 })),
-    [revenueTimeline],
+    () =>
+      fillChartSeries(
+        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.commission) || 0 })),
+        periodBounds.start,
+        periodBounds.end,
+      ),
+    [revenueTimeline, periodBounds],
   );
   const netSeries = useMemo(
     () =>
-      revenueTimeline.map((p) => ({
-        date: p.date,
-        value: Number(p.net ?? Math.max(0, (Number(p.revenue) || 0) - (Number(p.commission) || 0))),
-      })),
-    [revenueTimeline],
+      fillChartSeries(
+        revenueTimeline.map((p) => ({
+          date: p.date,
+          value: Number(p.net ?? Math.max(0, (Number(p.revenue) || 0) - (Number(p.commission) || 0))),
+        })),
+        periodBounds.start,
+        periodBounds.end,
+      ),
+    [revenueTimeline, periodBounds],
   );
   const salesCountSeries = useMemo(
-    () => revenueTimeline.map((p) => ({ date: p.date, value: Number(p.salesCount) || 0 })),
-    [revenueTimeline],
-  );
-  const roiSeries = useMemo(
     () =>
-      revenueTimeline.map((p) => {
-        const commission = Number(p.commission) || 0;
-        const revenue = Number(p.revenue) || 0;
-        return { date: p.date, value: commission > 0 ? revenue / commission : 0 };
-      }),
-    [revenueTimeline],
+      fillChartSeries(
+        revenueTimeline.map((p) => ({ date: p.date, value: Number(p.salesCount) || 0 })),
+        periodBounds.start,
+        periodBounds.end,
+      ),
+    [revenueTimeline, periodBounds],
   );
 
   const [showSaleModal, setShowSaleModal] = useState(false);
@@ -560,8 +583,25 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
           />
         </div>
         {saleModal}
-        <div className="analytics-metric-scroll" style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 10, marginBottom: 24, scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
-          <MetricInsightCard
+
+        <AnalyticsSectionHeader
+          title={lang === "fr" ? "Vue d’ensemble" : "Overview"}
+          info={
+            lang === "fr"
+              ? "Indicateurs clés de performance sur la période sélectionnée."
+              : "Key performance indicators for the selected period."
+          }
+          lang={lang}
+        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: 14,
+            marginBottom: 28,
+          }}
+        >
+          <SummaryMetricCard
             title={lang === "fr" ? "Revenus totaux" : "Total revenue"}
             info={
               lang === "fr"
@@ -570,11 +610,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={formatCurrency(totalRevenue, lang)}
             trend={compare ? trends?.revenue : undefined}
-            series={revenueSeries}
-            formatPoint={(v) => formatCurrency(v, lang)}
             lang={lang}
           />
-          <MetricInsightCard
+          <SummaryMetricCard
             title={lang === "fr" ? "Revenus nets" : "Net revenue"}
             info={
               lang === "fr"
@@ -583,12 +621,10 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={formatCurrency(netRevenue, lang)}
             trend={compare ? trends?.netRevenue : undefined}
-            series={netSeries}
-            formatPoint={(v) => formatCurrency(v, lang)}
             lang={lang}
             profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
           />
-          <MetricInsightCard
+          <SummaryMetricCard
             title={lang === "fr" ? "Rentabilité (ROI)" : "Profitability (ROI)"}
             info={
               lang === "fr"
@@ -597,12 +633,62 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={overallRoi > 0 ? `${overallRoi.toFixed(1)}×` : "—"}
             trend={compare ? trends?.roi : undefined}
-            series={roiSeries}
-            formatPoint={(v) => `${v.toFixed(1)}×`}
             lang={lang}
             profitability={totalRevenue > 0 || accruedCommissions > 0 ? isProfitable : undefined}
           />
-          <MetricInsightCard
+        </div>
+
+        <HeroMetricChart
+          title={lang === "fr" ? "Revenus nets" : "Net revenue"}
+          info={
+            lang === "fr"
+              ? "Revenus générés moins les commissions dues aux créateurs. Survolez la courbe pour le détail par jour."
+              : "Revenue generated minus commissions owed to creators. Hover the chart for daily detail."
+          }
+          value={formatCurrency(netRevenue, lang)}
+          trend={trends?.netRevenue}
+          series={netSeries}
+          formatPoint={(v) => formatCurrency(v, lang)}
+          lang={lang}
+          period={range === "custom" ? "30d" : range}
+          onPeriodChange={(next) => {
+            if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+              setRange(next);
+            }
+          }}
+        />
+        <HeroMetricChart
+          title={lang === "fr" ? "Revenus" : "Revenue"}
+          info={
+            lang === "fr"
+              ? "Somme des commandes générées par vos créateurs. Survolez la courbe pour le détail par jour."
+              : "Sum of orders driven by your creators. Hover the chart for daily detail."
+          }
+          value={formatCurrency(totalRevenue, lang)}
+          trend={trends?.revenue}
+          series={revenueSeries}
+          formatPoint={(v) => formatCurrency(v, lang)}
+          lang={lang}
+          period={range === "custom" ? "30d" : range}
+          onPeriodChange={(next) => {
+            if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
+              setRange(next);
+            }
+          }}
+          accent="#0F766E"
+        />
+
+        <AnalyticsSectionHeader
+          title={lang === "fr" ? "Autres métriques" : "Other metrics"}
+          info={
+            lang === "fr"
+              ? "Commissions et volume de ventes sur la période."
+              : "Commissions and sales volume for the period."
+          }
+          lang={lang}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 28 }}>
+          <MetricPanelCard
             title={lang === "fr" ? "Commissions dues" : "Commissions owed"}
             info={
               lang === "fr"
@@ -614,21 +700,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             series={commissionSeries}
             formatPoint={(v) => formatCurrency(v, lang)}
             lang={lang}
+            chartVariant="bars"
           />
-          <MetricInsightCard
-            title={lang === "fr" ? "Commissions payées" : "Commissions paid"}
-            info={
-              lang === "fr"
-                ? "Montant déjà versé aux créateurs sur la période."
-                : "Amount already paid out to creators in this period."
-            }
-            value={formatCurrency(totalCommissions, lang)}
-            trend={compare ? trends?.commissions : undefined}
-            series={trendToSeries(trends?.commissions)}
-            formatPoint={(v) => formatCurrency(v, lang)}
-            lang={lang}
-          />
-          <MetricInsightCard
+          <MetricPanelCard
             title={lang === "fr" ? "Ventes" : "Sales"}
             info={
               lang === "fr"
@@ -643,8 +717,28 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                 : `${Math.round(v)} sale${Math.round(v) === 1 ? "" : "s"}`
             }
             lang={lang}
+            chartVariant="bars"
           />
-          <MetricInsightCard
+        </div>
+
+        <AnalyticsSectionHeader
+          title={lang === "fr" ? "Outreach & activité" : "Outreach & activity"}
+          info={
+            lang === "fr"
+              ? "Performance de vos messages et conversions en partenaires."
+              : "Outreach performance and partner conversions."
+          }
+          lang={lang}
+        />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: 14,
+            marginBottom: 14,
+          }}
+        >
+          <SummaryMetricCard
             title={lang === "fr" ? "Créateurs contactés" : "Creators contacted"}
             info={
               lang === "fr"
@@ -653,11 +747,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={String(totalSent)}
             trend={compare ? trends?.outreachSent : undefined}
-            series={trendToSeries(trends?.outreachSent)}
-            formatPoint={(v) => String(Math.round(v))}
             lang={lang}
           />
-          <MetricInsightCard
+          <SummaryMetricCard
             title={lang === "fr" ? "Taux de réponse" : "Response rate"}
             info={
               lang === "fr"
@@ -666,11 +758,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={`${responseRate}%`}
             trend={compare ? trends?.responseRate : undefined}
-            series={trendToSeries(trends?.responseRate)}
-            formatPoint={(v) => `${Math.round(v)}%`}
             lang={lang}
           />
-          <MetricInsightCard
+          <SummaryMetricCard
             title={lang === "fr" ? "Convertis" : "Converted"}
             info={
               lang === "fr"
@@ -679,39 +769,18 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             }
             value={String(converted)}
             trend={compare ? trends?.converted : undefined}
-            series={trendToSeries(trends?.converted)}
-            formatPoint={(v) => String(Math.round(v))}
             lang={lang}
           />
         </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 28 }}>
           <ChartCard
-            title={lang === "fr" ? "Revenus dans le temps" : "Revenue over time"}
-            info={
-              lang === "fr"
-                ? "Évolution quotidienne des revenus générés par vos créateurs."
-                : "Daily revenue driven by your creators."
-            }
-          >
-            {revenueSeries.length > 0 ? (
-              <InteractiveLineChart
-                lang={lang}
-                points={revenueSeries}
-                formatValue={(v) => formatCurrency(v, lang)}
-                height={200}
-              />
-            ) : (
-              <ChartEmpty lang={lang} />
-            )}
-          </ChartCard>
-          <ChartCard
-            title={lang === "fr" ? "Performance des messages" : "Outreach Performance"}
+            title={lang === "fr" ? "Performance des messages" : "Outreach performance"}
             info={
               lang === "fr"
                 ? "Entonnoir envoyé → répondu → converti pour vos messages d’outreach."
                 : "Funnel from sent → replied → converted for your outreach messages."
             }
+            lang={lang}
           >
             {outreachMessagesSent > 0 ? (
               <FunnelBarChart lang={lang} totalSent={outreachMessagesSent} responseRate={responseRate} converted={converted} />
@@ -719,7 +788,44 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
               <ChartEmpty lang={lang} />
             )}
           </ChartCard>
+          <ChartCard
+            title={lang === "fr" ? "Commissions payées" : "Commissions paid"}
+            info={
+              lang === "fr"
+                ? "Montant déjà versé aux créateurs sur la période."
+                : "Amount already paid out to creators in this period."
+            }
+            lang={lang}
+          >
+            <div style={{ fontSize: 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 12 }}>
+              {formatCurrency(totalCommissions, lang)}
+            </div>
+            {trends?.commissions && compare ? (
+              <div style={{ marginBottom: 12 }}>
+                <InteractiveLineChart
+                  lang={lang}
+                  points={trendToSeries(trends.commissions)}
+                  formatValue={(v) => formatCurrency(v, lang)}
+                  height={120}
+                />
+              </div>
+            ) : (
+              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
+                {lang === "fr" ? "Activez la comparaison pour voir la tendance." : "Enable compare to see the trend."}
+              </p>
+            )}
+          </ChartCard>
         </div>
+
+        <AnalyticsSectionHeader
+          title={lang === "fr" ? "Détail & classements" : "Details & rankings"}
+          info={
+            lang === "fr"
+              ? "Tableaux détaillés par créateur, campagne et plateforme."
+              : "Detailed tables by creator, campaign, and platform."
+          }
+          lang={lang}
+        />
 
         <ChartCard
           title={lang === "fr" ? "Meilleurs créateurs" : "Top performing creators"}
@@ -776,11 +882,11 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                     <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
                     <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>
                       {hasAdvancedAnalytics ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <ProfitabilityMark profitable={r.roi >= 1} />
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <span style={{ color: r.roi >= 1 ? "#166534" : r.roi > 0 ? "#991B1B" : "#9A9A9A" }}>
                             {r.roi > 0 ? `${r.roi.toFixed(1)}×` : "—"}
                           </span>
+                          {r.roi > 0 ? <ProfitabilityPill profitable={r.roi >= 1} lang={lang} /> : null}
                         </span>
                       ) : (
                         "—"
@@ -883,9 +989,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                   <td style={{ padding: "12px 8px" }}>{formatCurrency(c.totalCommissions ?? 0, lang)}</td>
                   <td style={{ padding: "12px 8px" }}>
                     {c.roi && c.roi > 0 ? (
-                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontWeight: 500, color: c.roi >= 1 ? "#166534" : "#991B1B" }}>
-                        <ProfitabilityMark profitable={c.roi >= 1} />
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: c.roi >= 1 ? "#166534" : "#991B1B" }}>
                         {c.roi.toFixed(1)}×
+                        <ProfitabilityPill profitable={c.roi >= 1} lang={lang} />
                       </span>
                     ) : (
                       "—"

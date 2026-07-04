@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
   computeTrend,
+  dayKeyFromIso,
+  fillTimelineDays,
   getPeriodBounds,
   isWithinPeriod,
   type AnalyticsDateRange,
@@ -353,22 +355,26 @@ export async function GET(request: Request) {
 
   const revenueDayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
   for (const sale of periodSales) {
-    const day = new Date(String(sale.created_at)).toISOString().slice(0, 10);
+    const day = dayKeyFromIso(String(sale.created_at));
+    if (!day) continue;
     const agg = revenueDayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
     agg.revenue += Number(sale.order_amount) || 0;
     agg.commission += Number(sale.commission_amount) || 0;
     agg.salesCount += 1;
     revenueDayMap.set(day, agg);
   }
-  const revenueTimeline = Array.from(revenueDayMap.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, agg]) => ({
+  // Full period: every day, including zeros — so charts show all months in range.
+  const revenueTimeline = fillTimelineDays(
+    Array.from(revenueDayMap.entries()).map(([date, agg]) => ({
       date,
       revenue: agg.revenue,
       commission: agg.commission,
       salesCount: agg.salesCount,
       net: Math.max(0, agg.revenue - agg.commission),
-    }));
+    })),
+    start,
+    end,
+  );
 
   const platformSalesMap = new Map<string, { revenue: number; commission: number; count: number }>();
   for (const sale of periodSales) {

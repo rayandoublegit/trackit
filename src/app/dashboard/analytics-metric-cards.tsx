@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { formatTrendLabel, type PeriodTrend } from "@/lib/analytics-periods";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { analyticsPeriodLabel, formatTrendLabel, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
 import { useLang } from "@/lib/useLang";
+import { AnalyticsPeriodDropdown, HERO_PERIOD_OPTIONS } from "./AnalyticsPeriodDropdown";
 
 export type ChartPoint = { date: string; value: number };
 
 export function trendColors(direction: PeriodTrend["direction"]) {
-  if (direction === "up") return { fg: "#1FB567", bg: "rgba(31,181,103,0.12)" };
-  if (direction === "down") return { fg: "#E53935", bg: "rgba(229,57,53,0.12)" };
-  return { fg: "#9A9A9A", bg: "#F5F5F5" };
+  if (direction === "up") return { fg: "#166534", bg: "#DCFCE7" };
+  if (direction === "down") return { fg: "#991B1B", bg: "#FEE2E2" };
+  return { fg: "#6B7280", bg: "#F3F4F6" };
 }
 
 export function trendToSeries(trend?: PeriodTrend): ChartPoint[] {
@@ -20,53 +22,125 @@ export function trendToSeries(trend?: PeriodTrend): ChartPoint[] {
   ];
 }
 
-export function ProfitabilityMark({ profitable, size = 12 }: { profitable: boolean; size?: number }) {
-  const color = profitable ? "#166534" : "#991B1B";
+/** Simple rentable / non-rentable text pill (no logo). */
+export function ProfitabilityPill({
+  profitable,
+  lang,
+}: {
+  profitable: boolean;
+  lang: "en" | "fr";
+}) {
+  const { fg, bg } = profitable
+    ? { fg: "#166534", bg: "#DCFCE7" }
+    : { fg: "#991B1B", bg: "#FEE2E2" };
   return (
     <span
-      aria-hidden
       style={{
-        display: "inline-block",
-        width: size,
-        height: size * 0.93,
-        flexShrink: 0,
-        backgroundColor: color,
-        WebkitMaskImage: "url(/images/trackit-mark.svg)",
-        WebkitMaskSize: "contain",
-        WebkitMaskRepeat: "no-repeat",
-        WebkitMaskPosition: "center",
-        maskImage: "url(/images/trackit-mark.svg)",
-        maskSize: "contain",
-        maskRepeat: "no-repeat",
-        maskPosition: "center",
+        display: "inline-flex",
+        alignItems: "center",
+        fontSize: 11,
+        fontWeight: 600,
+        color: fg,
+        background: bg,
+        padding: "3px 8px",
+        borderRadius: 999,
+        letterSpacing: "-0.01em",
+        whiteSpace: "nowrap",
       }}
-    />
+    >
+      {profitable
+        ? lang === "fr"
+          ? "Rentable"
+          : "Profitable"
+        : lang === "fr"
+          ? "Non rentable"
+          : "Not profitable"}
+    </span>
   );
 }
 
 export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
   const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) {
+      setPos(null);
+      return;
+    }
+    const rect = btnRef.current.getBoundingClientRect();
+    const width = 240;
+    const left = Math.min(
+      Math.max(12, rect.left + rect.width / 2 - width / 2),
+      window.innerWidth - width - 12,
+    );
+    const preferBelow = rect.top < 120;
+    setPos({
+      top: preferBelow ? rect.bottom + 8 : rect.top - 8,
+      left,
+    });
+  }, [open]);
+
+  const tooltip =
+    open && pos && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            role="tooltip"
+            style={{
+              position: "fixed",
+              top: pos.top,
+              left: pos.left,
+              width: 240,
+              transform: pos.top > (btnRef.current?.getBoundingClientRect().bottom ?? 0) ? "none" : "translateY(-100%)",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid #E5E5E5",
+              background: "#FFFFFF",
+              boxShadow: "0 10px 28px rgba(0,0,0,0.12)",
+              color: "#5A5A5A",
+              fontSize: 12,
+              fontWeight: 400,
+              lineHeight: 1.45,
+              letterSpacing: "-0.01em",
+              zIndex: 10000,
+              pointerEvents: "none",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
+              {lang === "fr" ? "En savoir plus" : "Learn more"}
+            </div>
+            {text}
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
-    <span
-      style={{ position: "relative", display: "inline-flex", alignItems: "center" }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
+    <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
       <button
+        ref={btnRef}
         type="button"
         aria-label={lang === "fr" ? "En savoir plus" : "Learn more"}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          setOpen((v) => !v);
+        }}
         style={{
-          width: 16,
-          height: 16,
+          width: 18,
+          height: 18,
           borderRadius: "50%",
-          border: "1px solid #D0D0D0",
-          background: "#FFF",
-          color: "#9A9A9A",
-          fontSize: 10,
-          fontWeight: 600,
-          fontFamily: "inherit",
+          border: "1.5px solid #C4C4C4",
+          background: "#FFFFFF",
+          color: "#6B7280",
+          fontSize: 11,
+          fontWeight: 700,
+          fontFamily: "Georgia, serif",
+          fontStyle: "italic",
           lineHeight: 1,
           padding: 0,
           cursor: "help",
@@ -77,35 +151,7 @@ export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
       >
         i
       </button>
-      {open ? (
-        <span
-          role="tooltip"
-          style={{
-            position: "absolute",
-            left: "50%",
-            bottom: "calc(100% + 8px)",
-            transform: "translateX(-50%)",
-            width: 220,
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid #EFEFEF",
-            background: "#FFF",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-            color: "#5A5A5A",
-            fontSize: 12,
-            fontWeight: 400,
-            lineHeight: 1.45,
-            letterSpacing: "-0.01em",
-            zIndex: 20,
-            pointerEvents: "none",
-          }}
-        >
-          <span style={{ display: "block", fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
-            {lang === "fr" ? "En savoir plus" : "Learn more"}
-          </span>
-          {text}
-        </span>
-      ) : null}
+      {tooltip}
     </span>
   );
 }
@@ -123,7 +169,7 @@ export function TrendPill({ trend, lang }: { trend: PeriodTrend; lang: "en" | "f
         fontWeight: 600,
         color: fg,
         background: bg,
-        padding: "4px 8px",
+        padding: "4px 9px",
         borderRadius: 999,
         letterSpacing: "-0.02em",
         whiteSpace: "nowrap",
@@ -137,7 +183,482 @@ export function TrendPill({ trend, lang }: { trend: PeriodTrend; lang: "en" | "f
   );
 }
 
-export function MetricInsightCard({
+function TrendInline({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
+  const { fg } = trendColors(trend.direction);
+  const sign = trend.direction === "up" ? "+" : trend.direction === "down" ? "−" : "";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: fg, letterSpacing: "-0.02em" }}>
+        {sign}
+        {formatTrendLabel(trend.changePct, lang)}
+      </span>
+      <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+        {lang === "fr" ? "vs période préc." : "vs prev. period"}
+      </span>
+    </span>
+  );
+}
+
+/** Compact top-row summary card (Leadwave-style). */
+export function SummaryMetricCard({
+  title,
+  info,
+  value,
+  trend,
+  lang,
+  profitability,
+}: {
+  title: string;
+  info: string;
+  value: string;
+  trend?: PeriodTrend;
+  lang: "en" | "fr";
+  profitability?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        background: "#FFFFFF",
+        border: "1px solid #EFEFEF",
+        borderRadius: 14,
+        padding: "18px 18px 16px",
+        minHeight: 120,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.01em" }}>{title}</span>
+        <InfoTip text={info} lang={lang} />
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
+        {value}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: "auto" }}>
+        {trend ? <TrendInline trend={trend} lang={lang} /> : null}
+        {profitability != null ? <ProfitabilityPill profitable={profitability} lang={lang} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** Always produce at least 2 points so a chart can render. */
+export function ensureChartSeries(
+  series: ChartPoint[] | undefined,
+  trend?: PeriodTrend,
+  fallbackValue = 0,
+): ChartPoint[] {
+  const points = series?.filter((p) => Number.isFinite(p.value)) ?? [];
+  if (points.length >= 2) return points;
+  if (points.length === 1) {
+    return [{ date: "prev", value: Number(trend?.previous) || 0 }, points[0]];
+  }
+  if (trend) return trendToSeries(trend);
+  return [
+    { date: "prev", value: 0 },
+    { date: "curr", value: fallbackValue },
+  ];
+}
+
+/** Nice axis ticks (e.g. 0, 1000, 2000, 3000). */
+function niceAxisTicks(min: number, max: number, targetCount = 5): number[] {
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max, lo + 1);
+  const range = hi - lo;
+  const rough = range / Math.max(1, targetCount - 1);
+  const power = Math.pow(10, Math.floor(Math.log10(Math.max(rough, 1e-9))));
+  const err = rough / power;
+  const step = err >= 5 ? 5 * power : err >= 2 ? 2 * power : power;
+  const start = Math.floor(lo / step) * step;
+  const end = Math.ceil(hi / step) * step;
+  const ticks: number[] = [];
+  for (let v = start; v <= end + step * 0.001; v += step) {
+    ticks.push(Math.round(v * 1e6) / 1e6);
+  }
+  if (ticks.length < 2) return [0, hi];
+  return ticks;
+}
+
+/** Compact axis labels: 1000 → 1k, 1_000_000 → 1M */
+function formatAxisTick(n: number): string {
+  const abs = Math.abs(n);
+  if (abs >= 1_000_000_000) {
+    const v = n / 1_000_000_000;
+    return `${Number.isInteger(v) ? v : v.toFixed(1)}B`;
+  }
+  if (abs >= 1_000_000) {
+    const v = n / 1_000_000;
+    return `${Number.isInteger(v) ? v : v.toFixed(1)}M`;
+  }
+  if (abs >= 1_000) {
+    const v = n / 1_000;
+    return `${Number.isInteger(v) ? v : v.toFixed(1)}k`;
+  }
+  return String(Math.round(n));
+}
+
+function pickXLabelIndices(count: number, maxLabels = 7): number[] {
+  if (count <= maxLabels) return Array.from({ length: count }, (_, i) => i);
+  const indices = new Set<number>([0, count - 1]);
+  const inner = maxLabels - 2;
+  for (let i = 1; i <= inner; i++) {
+    indices.add(Math.round((i / (inner + 1)) * (count - 1)));
+  }
+  return [...indices].sort((a, b) => a - b);
+}
+
+/** Prefer month labels (févr., mars…) when the series spans multiple months. */
+function pickAxisLabels(
+  points: ChartPoint[],
+  lang: "en" | "fr",
+): Array<{ index: number; label: string }> {
+  const dated = points
+    .map((p, index) => ({ p, index }))
+    .filter(({ p }) => /^\d{4}-\d{2}-\d{2}$/.test(p.date));
+
+  if (dated.length === 0) {
+    return pickXLabelIndices(points.length, 6).map((index) => ({
+      index,
+      label: formatChartDate(points[index]?.date, lang, true),
+    }));
+  }
+
+  const months = new Set(dated.map(({ p }) => p.date.slice(0, 7)));
+  if (months.size >= 2) {
+    const seen = new Set<string>();
+    const labels: Array<{ index: number; label: string }> = [];
+    for (const { p, index } of dated) {
+      const monthKey = p.date.slice(0, 7);
+      if (seen.has(monthKey)) continue;
+      seen.add(monthKey);
+      labels.push({ index, label: formatMonthLabel(p.date, lang) });
+    }
+    return labels;
+  }
+
+  // Single month: show day labels across the period.
+  return pickXLabelIndices(points.length, 7).map((index) => ({
+    index,
+    label: formatChartDate(points[index]?.date, lang, true),
+  }));
+}
+
+function formatMonthLabel(raw: string, lang: "en" | "fr"): string {
+  const d = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return raw;
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short" });
+}
+
+/**
+ * Full-width frameless metric + interactive chart (Leadwave / Total Revenue style).
+ * Straight segments, Y-axis ticks, hover crosshair + dark tooltip.
+ */
+export function HeroMetricChart({
+  title,
+  info,
+  value,
+  trend,
+  series,
+  formatPoint,
+  lang,
+  period,
+  onPeriodChange,
+  periodOptions = HERO_PERIOD_OPTIONS,
+  accent = "#3B82F6",
+}: {
+  title: string;
+  info: string;
+  value: string;
+  trend?: PeriodTrend;
+  series?: ChartPoint[];
+  formatPoint: (value: number) => string;
+  lang: "en" | "fr";
+  period: AnalyticsDateRange;
+  onPeriodChange: (period: AnalyticsDateRange) => void;
+  periodOptions?: AnalyticsDateRange[];
+  accent?: string;
+}) {
+  const periodLabel = analyticsPeriodLabel(period, lang).toLowerCase();
+  const points = ensureChartSeries(series, trend, trend?.current ?? 0);
+  const [hover, setHover] = useState<number | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const gradId = useId().replace(/:/g, "");
+  const [width, setWidth] = useState(720);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const update = () => setWidth(Math.max(240, el.clientWidth));
+    update();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    ro?.observe(el);
+    return () => ro?.disconnect();
+  }, []);
+
+  const height = 300;
+  const padL = 52;
+  const padR = 12;
+  const padTop = 12;
+  const padBottom = 32;
+  const chartH = height - padTop - padBottom;
+  const chartW = Math.max(1, width - padL - padR);
+
+  const values = points.map((p) => p.value);
+  const dataMin = Math.min(...values);
+  const dataMax = Math.max(...values);
+  const ticks = niceAxisTicks(Math.min(0, dataMin), dataMax <= 0 ? 1 : dataMax, 5);
+  const scaleMin = ticks[0];
+  const scaleMax = ticks[ticks.length - 1];
+  const useLog = scaleMax / Math.max(scaleMin, 1) >= 40 && dataMax > 0;
+
+  const yFor = (v: number) => {
+    if (useLog) {
+      const minL = Math.log10(Math.max(scaleMin, 1));
+      const maxL = Math.log10(Math.max(scaleMax, 10));
+      const valL = Math.log10(Math.max(v, 1));
+      const t = (valL - minL) / Math.max(maxL - minL, 1e-9);
+      return padTop + chartH - t * chartH;
+    }
+    const span = Math.max(scaleMax - scaleMin, 1e-9);
+    return padTop + chartH - ((v - scaleMin) / span) * chartH;
+  };
+
+  const logTicks = useLog
+    ? (() => {
+        const out: number[] = [];
+        let p = Math.pow(10, Math.floor(Math.log10(Math.max(dataMax, 10))));
+        while (p >= 1 && out.length < 6) {
+          out.push(p);
+          p /= 10;
+        }
+        if (!out.includes(1) && dataMax >= 1) out.push(1);
+        return out.sort((a, b) => a - b);
+      })()
+    : ticks;
+
+  const axisTicks = useLog ? logTicks : ticks;
+
+  const coords = points.map((p, i) => {
+    const x = padL + (points.length === 1 ? chartW / 2 : (i / (points.length - 1)) * chartW);
+    const y = yFor(p.value);
+    return { x, y, ...p };
+  });
+
+  // Straight segments only (no rounded joins).
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(2)} ${c.y.toFixed(2)}`).join(" ");
+  const areaPath =
+    coords.length > 0
+      ? `${linePath} L ${coords[coords.length - 1].x.toFixed(2)} ${(padTop + chartH).toFixed(2)} L ${coords[0].x.toFixed(2)} ${(padTop + chartH).toFixed(2)} Z`
+      : "";
+
+  const active = hover != null ? coords[hover] : null;
+  const axisLabels = pickAxisLabels(points, lang);
+
+  const onMove = (clientX: number) => {
+    const el = wrapRef.current;
+    if (!el || coords.length === 0) return;
+    const rect = el.getBoundingClientRect();
+    const x = clientX - rect.left;
+    let best = 0;
+    let bestDist = Infinity;
+    coords.forEach((c, i) => {
+      const d = Math.abs(c.x - x);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    setHover(best);
+  };
+
+  const trendLine = trend ? formatHeroTrendLine(trend, formatPoint, periodLabel, lang) : null;
+  const trendColor =
+    trend?.direction === "down" ? "#DC2626" : trend?.direction === "up" ? accent : "#6B7280";
+
+  return (
+    <div style={{ width: "100%", marginBottom: 40 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.01em" }}>{title}</span>
+          <InfoTip text={info} lang={lang} />
+        </div>
+        <AnalyticsPeriodDropdown
+          value={period}
+          onChange={onPeriodChange}
+          lang={lang}
+          options={periodOptions}
+          align="right"
+          variant="subtle"
+        />
+      </div>
+
+      <div style={{ fontSize: 40, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.05em", lineHeight: 1.05, marginBottom: 6 }}>
+        {value}
+      </div>
+      {trendLine ? (
+        <div style={{ fontSize: 13, fontWeight: 500, color: trendColor, letterSpacing: "-0.01em", marginBottom: 20 }}>
+          {trendLine}
+        </div>
+      ) : (
+        <div style={{ height: 20, marginBottom: 20 }} />
+      )}
+
+      <div
+        ref={wrapRef}
+        style={{ position: "relative", width: "100%", height, cursor: "crosshair", userSelect: "none" }}
+        onMouseLeave={() => setHover(null)}
+        onMouseMove={(e) => onMove(e.clientX)}
+        onTouchStart={(e) => {
+          const t = e.touches[0];
+          if (t) onMove(t.clientX);
+        }}
+        onTouchMove={(e) => {
+          const t = e.touches[0];
+          if (t) onMove(t.clientX);
+        }}
+      >
+        <svg width={width} height={height} style={{ display: "block", overflow: "visible" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.18" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {axisTicks.map((tick) => {
+            const y = yFor(tick);
+            return (
+              <g key={`tick-${tick}`}>
+                <line
+                  x1={padL}
+                  y1={y}
+                  x2={padL + chartW}
+                  y2={y}
+                  stroke="#E5E7EB"
+                  strokeWidth={1}
+                  strokeDasharray="3 5"
+                />
+                <text
+                  x={padL - 10}
+                  y={y + 4}
+                  textAnchor="end"
+                  fill="#9CA3AF"
+                  fontSize={11}
+                  fontFamily="inherit"
+                >
+                  {formatAxisTick(tick)}
+                </text>
+              </g>
+            );
+          })}
+
+          {areaPath ? <path d={areaPath} fill={`url(#${gradId})`} /> : null}
+          {linePath ? (
+            <path
+              d={linePath}
+              fill="none"
+              stroke={accent}
+              strokeWidth={2}
+              strokeLinejoin="miter"
+              strokeLinecap="butt"
+            />
+          ) : null}
+
+          {active ? (
+            <>
+              <line
+                x1={active.x}
+                y1={padTop}
+                x2={active.x}
+                y2={padTop + chartH}
+                stroke={accent}
+                strokeWidth={1.5}
+                strokeOpacity={0.4}
+              />
+              <circle cx={active.x} cy={active.y} r={8} fill={accent} fillOpacity={0.12} />
+              <circle cx={active.x} cy={active.y} r={4} fill="#FFFFFF" stroke={accent} strokeWidth={2.5} />
+            </>
+          ) : null}
+
+          {axisLabels.map(({ index, label }) => {
+            const c = coords[index];
+            if (!c) return null;
+            return (
+              <text
+                key={`x-${index}-${label}`}
+                x={c.x}
+                y={height - 8}
+                textAnchor="middle"
+                fill="#9CA3AF"
+                fontSize={11}
+                fontFamily="inherit"
+              >
+                {label}
+              </text>
+            );
+          })}
+        </svg>
+
+        {active ? (
+          <div
+            style={{
+              position: "absolute",
+              left: Math.min(Math.max(active.x - 72, 4), Math.max(4, width - 156)),
+              top: Math.max(4, active.y - 68),
+              minWidth: 136,
+              padding: "9px 12px",
+              borderRadius: 8,
+              background: "#1F2937",
+              color: "#FFFFFF",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.2)",
+              pointerEvents: "none",
+              zIndex: 6,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 3 }}>
+              {formatChartDate(active.date, lang, false)}
+            </div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.8)", letterSpacing: "-0.01em" }}>
+              {formatPoint(active.value)}
+            </div>
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: -5,
+                width: 10,
+                height: 10,
+                marginLeft: -5,
+                background: "#1F2937",
+                transform: "rotate(45deg)",
+              }}
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function formatHeroTrendLine(
+  trend: PeriodTrend,
+  formatPoint: (value: number) => string,
+  periodLabel: string,
+  lang: "en" | "fr",
+) {
+  const delta = trend.current - trend.previous;
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
+  const absFormatted = formatPoint(Math.abs(delta));
+  const pctSign = trend.direction === "up" ? "+" : trend.direction === "down" ? "−" : "";
+  const pct = formatTrendLabel(trend.changePct, lang);
+  return `${sign}${absFormatted} (${pctSign}${pct}) · ${periodLabel}`;
+}
+
+/** Full-width analytics panel with chart (stacked layout). */
+export function MetricPanelCard({
   title,
   info,
   value,
@@ -146,6 +667,7 @@ export function MetricInsightCard({
   formatPoint,
   lang,
   profitability,
+  chartVariant = "line",
 }: {
   title: string;
   info: string;
@@ -155,59 +677,60 @@ export function MetricInsightCard({
   formatPoint: (value: number) => string;
   lang: "en" | "fr";
   profitability?: boolean;
+  chartVariant?: "line" | "bars";
 }) {
-  const points = series && series.length > 0 ? series : trendToSeries(trend);
+  const points = ensureChartSeries(series, trend, trend?.current ?? 0);
   return (
     <div
       style={{
-        flex: "0 0 280px",
-        width: 280,
-        minHeight: 280,
-        scrollSnapAlign: "start",
-        background: "#FFF",
+        background: "#FFFFFF",
         border: "1px solid #EFEFEF",
         borderRadius: 16,
-        padding: "18px 18px 14px",
-        display: "flex",
-        flexDirection: "column",
+        padding: "20px 22px 16px",
         boxSizing: "border-box",
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-          <span
-            style={{
-              fontSize: 13,
-              fontWeight: 500,
-              color: "#1A1A1A",
-              letterSpacing: "-0.02em",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {title}
-          </span>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{title}</span>
           <InfoTip text={info} lang={lang} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          {profitability != null ? <ProfitabilityMark profitable={profitability} size={13} /> : null}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {profitability != null ? <ProfitabilityPill profitable={profitability} lang={lang} /> : null}
           {trend ? <TrendPill trend={trend} lang={lang} /> : null}
         </div>
       </div>
-      <div style={{ fontSize: 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.1, marginBottom: 12 }}>
+      <div style={{ fontSize: 34, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.045em", lineHeight: 1.1, marginBottom: 14 }}>
         {value}
       </div>
-      <div style={{ marginTop: "auto" }}>
-        {points.length >= 2 ? (
-          <InteractiveLineChart lang={lang} points={points} formatValue={formatPoint} height={112} compact />
-        ) : (
-          <div style={{ height: 112, display: "flex", alignItems: "center", justifyContent: "center", color: "#C0C0C0", fontSize: 12 }}>
-            {lang === "fr" ? "Pas encore de courbe" : "No chart yet"}
-          </div>
-        )}
-      </div>
+      {chartVariant === "bars" ? (
+        <BarSparkline lang={lang} points={points} formatValue={formatPoint} height={140} />
+      ) : (
+        <InteractiveLineChart lang={lang} points={points} formatValue={formatPoint} height={140} />
+      )}
     </div>
+  );
+}
+
+/** @deprecated use MetricPanelCard — kept for gradual migration */
+export function MetricInsightCard(props: Parameters<typeof MetricPanelCard>[0]) {
+  return <MetricPanelCard {...props} />;
+}
+
+/** @deprecated Trackit logo mark removed — use ProfitabilityPill */
+export function ProfitabilityMark({ profitable }: { profitable: boolean; size?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: profitable ? "#166534" : "#991B1B",
+        display: "inline-block",
+        flexShrink: 0,
+      }}
+    />
   );
 }
 
@@ -226,8 +749,8 @@ export function InteractiveLineChart({
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const gradId = useRef(`analyticsLineFill_${Math.random().toString(36).slice(2, 9)}`).current;
-  const [width, setWidth] = useState(compact ? 244 : 320);
+  const gradId = useId().replace(/:/g, "");
+  const [width, setWidth] = useState(compact ? 244 : 480);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -239,9 +762,9 @@ export function InteractiveLineChart({
     return () => ro?.disconnect();
   }, []);
 
-  const padX = compact ? 4 : 8;
-  const padTop = compact ? 12 : 16;
-  const padBottom = compact ? 22 : 28;
+  const padX = 4;
+  const padTop = 14;
+  const padBottom = 24;
   const chartH = height - padTop - padBottom;
   const chartW = Math.max(1, width - padX * 2);
   const values = points.map((p) => p.value);
@@ -262,8 +785,8 @@ export function InteractiveLineChart({
       : "";
 
   const active = hover != null ? coords[hover] : null;
-  const firstLabel = formatChartDate(points[0]?.date, lang, compact);
-  const lastLabel = formatChartDate(points[points.length - 1]?.date, lang, compact);
+  const firstLabel = formatChartDate(points[0]?.date, lang, true);
+  const lastLabel = formatChartDate(points[points.length - 1]?.date, lang, true);
 
   const onMove = (clientX: number) => {
     const el = wrapRef.current;
@@ -306,12 +829,12 @@ export function InteractiveLineChart({
         </defs>
         {areaPath ? <path d={areaPath} fill={`url(#${gradId})`} /> : null}
         {linePath ? (
-          <path d={linePath} fill="none" stroke="#1A1A1A" strokeWidth={compact ? 1.6 : 2} strokeLinejoin="round" strokeLinecap="round" />
+          <path d={linePath} fill="none" stroke="#1A1A1A" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         ) : null}
         {active ? (
           <>
             <line x1={active.x} y1={padTop} x2={active.x} y2={padTop + chartH} stroke="#E5E5E5" strokeWidth={1} />
-            <circle cx={active.x} cy={active.y} r={4} fill="#FFF" stroke="#1A1A1A" strokeWidth={2} />
+            <circle cx={active.x} cy={active.y} r={4.5} fill="#FFF" stroke="#1A1A1A" strokeWidth={2} />
           </>
         ) : null}
       </svg>
@@ -330,20 +853,20 @@ export function InteractiveLineChart({
         }}
       >
         <span>{firstLabel}</span>
-        <span>{lastLabel}</span>
+        {points.length > 2 ? <span>{lastLabel}</span> : null}
       </div>
       {active ? (
         <div
           style={{
             position: "absolute",
-            left: Math.min(Math.max(active.x - 70, 0), Math.max(0, width - 140)),
-            top: Math.max(0, active.y - 58),
-            width: 140,
+            left: Math.min(Math.max(active.x - 72, 0), Math.max(0, width - 148)),
+            top: Math.max(0, active.y - 56),
+            minWidth: 132,
             padding: "8px 10px",
             borderRadius: 10,
-            border: "1px solid #EFEFEF",
+            border: "1px solid #E5E5E5",
             background: "#FFF",
-            boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             pointerEvents: "none",
             zIndex: 5,
           }}
@@ -352,6 +875,80 @@ export function InteractiveLineChart({
             {formatChartDate(active.date, lang, false)}
           </div>
           <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{formatValue(active.value)}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function BarSparkline({
+  lang,
+  points,
+  formatValue,
+  height = 140,
+}: {
+  lang: "en" | "fr";
+  points: ChartPoint[];
+  formatValue: (value: number) => string;
+  height?: number;
+}) {
+  const [hover, setHover] = useState<number | null>(null);
+  const max = Math.max(...points.map((p) => p.value), 1);
+  const active = hover != null ? points[hover] : null;
+
+  return (
+    <div style={{ position: "relative", height }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: height - 24, paddingTop: 8 }}>
+        {points.map((p, i) => {
+          const h = Math.max(4, Math.round((p.value / max) * 100));
+          const isActive = hover === i;
+          return (
+            <div
+              key={`${p.date}-${i}`}
+              style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+            >
+              <div
+                title={`${formatChartDate(p.date, lang, false)} · ${formatValue(p.value)}`}
+                style={{
+                  width: "100%",
+                  maxWidth: 28,
+                  height: `${h}%`,
+                  minHeight: 4,
+                  background: isActive ? "#1A1A1A" : "#D4D4D4",
+                  borderRadius: "4px 4px 0 0",
+                  transition: "background 0.15s",
+                  cursor: "pointer",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>
+        <span>{formatChartDate(points[0]?.date, lang, true)}</span>
+        <span>{formatChartDate(points[points.length - 1]?.date, lang, true)}</span>
+      </div>
+      {active ? (
+        <div
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            transform: "translateX(-50%)",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: "1px solid #E5E5E5",
+            background: "#FFF",
+            boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
+            pointerEvents: "none",
+            zIndex: 5,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{formatChartDate(active.date, lang, false)}</div>
+          <div style={{ fontSize: 12, color: "#7A7A7A" }}>{formatValue(active.value)}</div>
         </div>
       ) : null}
     </div>
@@ -371,6 +968,23 @@ export function formatChartDate(raw: string | undefined, lang: "en" | "fr", comp
   });
 }
 
+export function AnalyticsSectionHeader({
+  title,
+  info,
+  lang,
+}: {
+  title: string;
+  info?: string;
+  lang: "en" | "fr";
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.03em" }}>{title}</h2>
+      {info ? <InfoTip text={info} lang={lang} /> : null}
+    </div>
+  );
+}
+
 export function AnalyticsChartCard({
   title,
   info,
@@ -388,28 +1002,10 @@ export function AnalyticsChartCard({
   const lang = langProp ?? langHook;
   return (
     <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, ...style }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 16 }}>
         <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>{title}</h3>
         {info ? <InfoTip text={info} lang={lang} /> : null}
       </div>
-      {children}
-    </div>
-  );
-}
-
-export function MetricCardsScroller({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        overflowX: "auto",
-        paddingBottom: 10,
-        marginBottom: 24,
-        scrollSnapType: "x mandatory",
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
       {children}
     </div>
   );
