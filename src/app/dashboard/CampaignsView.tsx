@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignContentTab } from "./CampaignContentTab";
+import { CampaignLinksTab } from "./CampaignLinksTab";
 import { CampaignAffiliateLinksPanel } from "./CampaignAffiliateLinksPanel";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
@@ -68,7 +69,7 @@ type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
 type BoardTab = "active" | "drafts" | "finished";
 type CampaignSort = "recent" | "name";
-type DetailTab = "creators" | "analytics" | "content";
+type DetailTab = "creators" | "analytics" | "content" | "links";
 type CampaignDateRange = { start: string; end: string };
 
 type CampaignAnalyticsExport = {
@@ -3574,6 +3575,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
     { id: "content", label: lang === "fr" ? "Contenu" : "Content" },
+    { id: "links", label: lang === "fr" ? "Liens" : "Links" },
   ];
 
   const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
@@ -3716,6 +3718,15 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           isMobile={isMobile}
         />
       )}
+      {tab === "links" && (
+        <CampaignLinksTab
+          lang={lang}
+          brandId={userId}
+          campaignId={campaign.id}
+          campaignCreatorIds={campaign.creatorIds ?? []}
+          isMobile={isMobile}
+        />
+      )}
       {tab === "analytics" && (
         <>
           <div
@@ -3822,6 +3833,10 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
             campaignId={campaign.id}
             campaignName={campaign.name}
             isMobile={isMobile}
+            onGoToLinksTab={() => {
+              setTab("links");
+              onTabChange?.("links");
+            }}
           />
 
           <AnalyticsSectionHeader

@@ -3,16 +3,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
+import { formatCurrency } from "@/lib/useCurrency";
 import { AnalyticsBarChart, AnalyticsSectionHeader } from "./analytics-metric-cards";
 
 type LinkMetrics = {
   clicks: number;
   uniques: number;
+  sales: number;
+  revenue: number;
+  commission: number;
+  conversionRate: number;
   byDay: Record<string, number>;
   devices: Record<string, number>;
   countries: Record<string, number>;
   sources: Record<string, number>;
 };
+
+type LinkTotals = {
+  clicks: number;
+  uniques: number;
+  sales: number;
+  revenue: number;
+  commission: number;
+};
+
+function formatConvRate(value: number): string {
+  return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
+}
 
 type AffiliateLinkRow = {
   id: string;
@@ -60,15 +77,23 @@ export function CampaignAffiliateLinksPanel({
   campaignId,
   campaignName,
   isMobile,
+  onGoToLinksTab,
 }: {
   lang: Lang;
   brandId?: string;
   campaignId: string;
   campaignName: string;
   isMobile?: boolean;
+  onGoToLinksTab?: () => void;
 }) {
   const [links, setLinks] = useState<AffiliateLinkRow[]>([]);
-  const [totals, setTotals] = useState({ clicks: 0, uniques: 0 });
+  const [totals, setTotals] = useState<LinkTotals>({
+    clicks: 0,
+    uniques: 0,
+    sales: 0,
+    revenue: 0,
+    commission: 0,
+  });
   const [days, setDays] = useState<(typeof PERIOD_OPTIONS)[number]>(30);
   const [loading, setLoading] = useState(true);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
@@ -81,12 +106,20 @@ export function CampaignAffiliateLinksPanel({
     );
     const data = (await res.json()) as {
       links?: AffiliateLinkRow[];
-      totals?: { clicks: number; uniques: number };
+      totals?: LinkTotals;
     };
     const rows = Array.isArray(data.links) ? data.links : [];
     rows.sort((a, b) => (b.metrics?.clicks ?? 0) - (a.metrics?.clicks ?? 0));
     setLinks(rows);
-    setTotals(data.totals ?? { clicks: 0, uniques: 0 });
+    setTotals(
+      data.totals ?? {
+        clicks: 0,
+        uniques: 0,
+        sales: 0,
+        revenue: 0,
+        commission: 0,
+      },
+    );
   }, [brandId, campaignId, days]);
 
   useEffect(() => {
@@ -155,8 +188,8 @@ export function CampaignAffiliateLinksPanel({
         title={lang === "fr" ? "Liens d'affiliation" : "Affiliate links"}
         info={
           lang === "fr"
-            ? "Clics et visiteurs uniques sur vos liens courts thentrack.it/l/… pour cette campagne."
-            : "Clicks and unique visitors on your short thentrack.it/l/… links for this campaign."
+            ? "Clics, ventes, chiffre d'affaires et visiteurs uniques sur vos liens courts thentrack.it/l/… pour cette campagne."
+            : "Clicks, sales, revenue and unique visitors on your short thentrack.it/l/… links for this campaign."
         }
         lang={lang}
       />
@@ -190,7 +223,7 @@ export function CampaignAffiliateLinksPanel({
               minWidth: 0,
             }}
           >
-            <div style={{ flex: 1, minWidth: 0, paddingRight: isMobile ? 16 : 24 }}>
+            <div style={{ flex: 1, minWidth: 0, paddingRight: isMobile ? 12 : 20 }}>
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "Clics" : "Clicks"}
               </div>
@@ -199,7 +232,25 @@ export function CampaignAffiliateLinksPanel({
               </div>
             </div>
             <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0, paddingLeft: isMobile ? 16 : 24 }}>
+            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "0 12px" : "0 20px" }}>
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+                {lang === "fr" ? "Ventes" : "Sales"}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+                {loading ? "…" : totals.sales}
+              </div>
+            </div>
+            <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "0 12px" : "0 20px" }}>
+              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+                {lang === "fr" ? "CA total" : "Total revenue"}
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+                {loading ? "…" : formatCurrency(totals.revenue, lang)}
+              </div>
+            </div>
+            <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0, paddingLeft: isMobile ? 12 : 20 }}>
               <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "Visiteurs uniques" : "Unique visitors"}
               </div>
@@ -244,11 +295,29 @@ export function CampaignAffiliateLinksPanel({
           </div>
         ) : links.length === 0 ? (
           <div style={{ padding: "40px 16px", textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
+            <p style={{ margin: "0 0 12px", fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
               {lang === "fr"
-                ? "Générez un lien d'affiliation depuis Gérer vos créateurs — les clics apparaîtront ici."
-                : "Generate an affiliate link from Manage creators — clicks will appear here."}
+                ? "Générez votre premier lien d'affiliation depuis votre campagne."
+                : "Generate your first affiliate link from your campaign."}
             </p>
+            {onGoToLinksTab ? (
+              <button
+                type="button"
+                onClick={onGoToLinksTab}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#0047FF",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {lang === "fr" ? "Aller à l'onglet Liens →" : "Go to Links tab →"}
+              </button>
+            ) : null}
           </div>
         ) : (
           <>
@@ -275,16 +344,20 @@ export function CampaignAffiliateLinksPanel({
             </div>
 
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980 }}>
                 <thead>
                   <tr>
                     <th style={thStyle}>{lang === "fr" ? "Lien" : "Link"}</th>
                     <th style={thStyle}>{lang === "fr" ? "Créateur" : "Creator"}</th>
                     <th style={thStyle}>{lang === "fr" ? "Campagne" : "Campaign"}</th>
                     <th style={thStyle}>{lang === "fr" ? "Clics" : "Clicks"}</th>
-                    <th style={thStyle}>{lang === "fr" ? "Uniques" : "Uniques"}</th>
-                    <th style={thStyle}>{lang === "fr" ? "Top source" : "Top source"}</th>
-                    <th style={thStyle}>{lang === "fr" ? "Top appareil" : "Top device"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Visiteurs un." : "Uniques"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Ventes" : "Sales"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "CA" : "Revenue"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Commission" : "Commission"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Taux conv." : "Conv %"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Meilleure source" : "Top source"}</th>
+                    <th style={thStyle}>{lang === "fr" ? "Meilleur appareil" : "Top device"}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -339,6 +412,10 @@ export function CampaignAffiliateLinksPanel({
                         <td style={{ ...tdStyle, color: "#6B7280" }}>{campaignName}</td>
                         <td style={{ ...tdStyle, fontWeight: 600 }}>{link.metrics?.clicks ?? 0}</td>
                         <td style={tdStyle}>{link.metrics?.uniques ?? 0}</td>
+                        <td style={tdStyle}>{link.metrics?.sales ?? 0}</td>
+                        <td style={tdStyle}>{formatCurrency(link.metrics?.revenue ?? 0, lang)}</td>
+                        <td style={tdStyle}>{formatCurrency(link.metrics?.commission ?? 0, lang)}</td>
+                        <td style={tdStyle}>{formatConvRate(link.metrics?.conversionRate ?? 0)}</td>
                         <td style={tdStyle}>{topSource}</td>
                         <td style={tdStyle}>{topDevice}</td>
                       </tr>
