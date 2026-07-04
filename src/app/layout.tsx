@@ -1,18 +1,44 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { Analytics } from "@vercel/analytics/next";
+import { SeoJsonLd } from "@/components/SeoJsonLd";
+import {
+  DEFAULT_DESCRIPTION,
+  DEFAULT_TITLE,
+  buildPageMetadata,
+  buildRootMetadataVerification,
+  organizationJsonLd,
+  softwareApplicationJsonLd,
+  websiteJsonLd,
+} from "@/lib/site-seo";
 import "./fonts.module.css";
 import "./landing.css";
 import "./chaotic-work.css";
 import "./hero-doodles.css";
 
 export const metadata: Metadata = {
+  ...buildPageMetadata({
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    path: "/",
+  }),
+  title: {
+    default: DEFAULT_TITLE,
+    template: "%s | Trackit",
+  },
+  alternates: {
+    canonical: "/",
+    types: {
+      "application/rss+xml": "/blog/feed.xml",
+    },
+  },
   icons: {
     icon: "/favicon.png",
     apple: "/favicon.png",
   },
-  title: "Trackit — Find creators. Track sales. Pay commissions.",
-  description: "Find creators, track sales, and pay commissions.",
+  applicationName: "Trackit",
+  category: "business",
+  verification: buildRootMetadataVerification(),
 };
 
 export const viewport = {
@@ -44,6 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ))}
       </head>
       <body>
+        <SeoJsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()]} />
         {children}
         <Script
           id="microsoft-clarity"

@@ -15,6 +15,8 @@ import { getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
 import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
 import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
+import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
+import { SocialFooterLinks } from "@/components/SocialFooterLinks";
 import { planCtaAction, planCtaLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
 
@@ -310,6 +312,7 @@ export default function TrackitLanding() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [langOpen, setLangOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState<number | null>(0);
   const lang = useLang();
 
   useEffect(() => {
@@ -387,6 +390,13 @@ export default function TrackitLanding() {
   footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
   footer_terms: lang === "fr" ? "Conditions générales" : "Terms & Conditions",
   footer_privacy: lang === "fr" ? "Politique de confidentialité" : "Privacy Policy",
+  footer_blog: lang === "fr" ? "Blog" : "Blog",
+  footer_solutions: lang === "fr" ? "Solutions" : "Solutions",
+  footer_about: lang === "fr" ? "À propos" : "About",
+  faq_title: lang === "fr" ? "Questions fréquentes sur Trackit" : "Frequently asked questions about Trackit",
+  faq_subtitle: lang === "fr"
+    ? "Tout ce que vous devez savoir sur la plateforme Trackit."
+    : "Everything you need to know about the Trackit platform.",
   traditional_title: lang === "fr" ? "Plateformes Traditionnelles" : "Traditional Platforms",
   trad_1: lang === "fr" ? "Découverte de créateurs" : "Creator discovery",
   trad_2: lang === "fr" ? "Génération de messages IA" : "AI outreach generation",
@@ -416,6 +426,7 @@ export default function TrackitLanding() {
   const scalePricingFeatures = getPlanPricingFeatureLines("scale", lang);
   const plan = normalizePlan(currentPlan);
   const currency = lang === "fr" ? "eur" : "usd";
+  const faqItems = lang === "fr" ? HOME_FAQ_FR : HOME_FAQ_EN;
 
   useEffect(() => {
     let cancelled = false;
@@ -1608,6 +1619,39 @@ export default function TrackitLanding() {
 
       </section>
 
+      {/* FAQ — visible for users and search engines */}
+      <section className="seo-faq" aria-labelledby="trackit-faq-title">
+        <div className="seo-faq-inner">
+          <h2 id="trackit-faq-title" className="seo-faq-title">{t.faq_title}</h2>
+          <p className="seo-faq-subtitle">{t.faq_subtitle}</p>
+          <div className="seo-faq-list">
+            {faqItems.map((item, i) => {
+              const open = faqOpen === i;
+              return (
+                <div key={item.question} className={`seo-faq-item${open ? " seo-faq-item--open" : ""}`}>
+                  <button
+                    type="button"
+                    className="seo-faq-question"
+                    aria-expanded={open}
+                    onClick={() => setFaqOpen(open ? null : i)}
+                  >
+                    <span>{item.question}</span>
+                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="seo-faq-chevron">
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  {open ? <div className="seo-faq-answer">{item.answer}</div> : null}
+                </div>
+              );
+            })}
+          </div>
+          <div className="seo-faq-links">
+            <Link href="/blog">{t.footer_blog}</Link>
+            <Link href="/solutions/creator-affiliate-platform">{t.footer_solutions}</Link>
+          </div>
+        </div>
+      </section>
+
       {/* FOOTER */}
       <footer className="footer">
         <div className="footer-top">
@@ -1619,16 +1663,15 @@ export default function TrackitLanding() {
             <div className="footer-tag">{t.footer_tagline}</div>
           </div>
           <div className="footer-socials">
-            <a href="https://x.com/rayanvsr" target="_blank" rel="noopener noreferrer" aria-label="X">
-              <svg viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-            </a>
+            <SocialFooterLinks />
           </div>
         </div>
         <div className="footer-bottom">
           <div>Copyright © Trackit.Inc {t.footer_rights}</div>
           <div className="footer-links">
+            <Link href="/about">{t.footer_about}</Link>
+            <Link href="/blog">{t.footer_blog}</Link>
+            <Link href="/solutions">{t.footer_solutions}</Link>
             <Link href="/terms">{t.footer_terms}</Link>
             <Link href="/privacy">{t.footer_privacy}</Link>
           </div>
