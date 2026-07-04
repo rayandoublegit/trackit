@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
 import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
@@ -114,10 +115,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Creator not linked to brand" }, { status: 403 });
   }
 
+  // Performance-by-content: creator may submit the TikTok post URL.
+  const postUrl = typeof body.postUrl === "string" && /tiktok\.com\//.test(body.postUrl) ? body.postUrl.trim() : null;
+  let stats: { views: number | null; likes: number | null; comments: number | null; shares: number | null; postedAt: string | null } | null = null;
+  if (postUrl) {
+    try {
+      stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+    } catch (e) {
+      // No credits / API down: store the URL anyway, stats stay pending.
+      console.error("post stats fetch skipped:", (e as Error).message);
+    }
+  }
+
   const { data, error } = await admin
     .from("creator_content")
     .insert({
       brand_id: targetBrandId,
+      post_url: postUrl,
+      views: stats?.views ?? null,
+      likes: stats?.likes ?? null,
+      comments: stats?.comments ?? null,
+      shares: stats?.shares ?? null,
+      posted_at: stats?.postedAt ?? null,
+      stats_updated_at: stats ? new Date().toISOString() : null,
       creator_row_id: targetCreatorRowId,
       creator_user_id: userId,
       title,
@@ -142,39 +162,11 @@ export async function POST(request: Request) {
     console.error("campaign content sync failed:", campaignSyncErr.message);
   }
 
-  // C1: create a tracked sub-link dedicated to THIS content, so revenue can be
-  // attributed per post. Best-effort: content upload never fails because of it.
-  let linkUrl: string | null = null;
-  try {
-    const [{ data: cr }, { data: shop }, { data: cc }] = await Promise.all([
-      admin.from("creators").select("handle").eq("id", targetCreatorRowId).maybeSingle(),
-      admin.from("shopify_stores").select("shop_domain").eq("user_id", targetBrandId).limit(1).maybeSingle(),
-      admin.from("campaign_content").select("campaign_id").eq("content_id", data.id).limit(1).maybeSingle(),
-    ]);
-    if (shop?.shop_domain) {
-      const slug = "c" + Math.random().toString(36).slice(2, 9);
-      const { error: linkErr } = await admin.from("affiliate_links").insert({
-        slug,
-        brand_id: targetBrandId,
-        creator_username: cr?.handle ?? null,
-        campaign_id: cc?.campaign_id ?? null,
-        content_id: data.id,
-        destination_url: `https://${shop.shop_domain}`,
-        active: true,
-      });
-      if (!linkErr) linkUrl = `https://thentrack.it/l/${slug}`;
-      else console.error("content link creation failed:", linkErr.message);
-    }
-  } catch (e) {
-    console.error("content link creation error:", e);
-  }
-
   return NextResponse.json({
     ok: true,
     id: data.id,
     brandId: targetBrandId,
     creatorRowId: targetCreatorRowId,
-    linkUrl,
   });
 }
 

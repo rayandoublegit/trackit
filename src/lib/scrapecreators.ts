@@ -112,3 +112,33 @@ export async function searchTikTokUsersRaw(query: string, cursor?: number): Prom
   const c = cursor ? `&cursor=${cursor}` : "";
   return scGet(`/v1/tiktok/search/users?query=${encodeURIComponent(query)}${c}`);
 }
+
+// Fetch a single TikTok video by its public URL (post performance).
+export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
+  const key = process.env.SCRAPECREATORS_API_KEY;
+  if (!key) throw new Error("SCRAPECREATORS_API_KEY missing");
+  const res = await fetch(
+    `https://api.scrapecreators.com/v1/tiktok/video?url=${encodeURIComponent(postUrl)}`,
+    { headers: { "x-api-key": key } }
+  );
+  if (!res.ok) throw new Error(`video fetch ${res.status}`);
+  return res.json();
+}
+
+// Defensive parse across ScrapeCreators response shapes.
+export function parseVideoStats(raw: any): {
+  views: number | null; likes: number | null; comments: number | null;
+  shares: number | null; postedAt: string | null;
+} {
+  const d = raw?.aweme_detail ?? raw?.data ?? raw ?? {};
+  const st = d.statistics ?? d.stats ?? {};
+  const n = (v: unknown) => (typeof v === "number" ? v : v != null && !isNaN(Number(v)) ? Number(v) : null);
+  const created = n(d.create_time);
+  return {
+    views: n(st.play_count ?? st.playCount ?? st.views),
+    likes: n(st.digg_count ?? st.diggCount ?? st.likes),
+    comments: n(st.comment_count ?? st.commentCount ?? st.comments),
+    shares: n(st.share_count ?? st.shareCount ?? st.shares),
+    postedAt: created ? new Date(created * 1000).toISOString() : null,
+  };
+}
