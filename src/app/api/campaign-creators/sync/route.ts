@@ -93,12 +93,19 @@ export async function POST(request: Request) {
               ? existing.historical_sales_attached
               : attachHistoricalSales;
 
+      const joinedAt =
+        !existing
+          ? new Date().toISOString()
+          : existing.historical_sales_attached && !historicalSalesAttached
+            ? new Date().toISOString()
+            : existing.created_at;
+
       return {
         user_id: userId,
         campaign_id: campaignId,
         creator_id: creatorId,
         historical_sales_attached: historicalSalesAttached,
-        created_at: existing?.created_at ?? new Date().toISOString(),
+        created_at: joinedAt,
       };
     });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { parseFollowersCount } from "@/lib/parse-creator-import";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
 import { activateCreatorDashboard } from "@/lib/active-dashboard-creators";
 import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
@@ -82,7 +83,9 @@ export async function POST(request: Request) {
   if (platform) update.platform = platform;
   if (avatarUrl) update.avatar_url = avatarUrl;
   if (niche) update.niche = niche;
-  if (followers !== undefined && followers !== null && followers !== "") update.followers = Number(followers);
+  if (followers !== undefined && followers !== null && followers !== "") {
+    update.followers = parseFollowersCount(String(followers));
+  }
   if (engagement !== undefined && engagement !== null && engagement !== "") update.engagement_rate = Number(engagement);
 
   let { error } = await admin

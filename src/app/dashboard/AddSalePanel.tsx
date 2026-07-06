@@ -17,6 +17,7 @@ import { enrichCreatorsWithAvatars } from "@/lib/enrich-creator-avatars";
 import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
 import { notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
+import { toDayKey } from "@/lib/analytics-periods";
 import {
   selectionAccentText,
   selectionCardStyle,
@@ -110,7 +111,7 @@ export function AddSalePanel({
   const [loadingCreators, setLoadingCreators] = useState(false);
   const [creatorId, setCreatorId] = useState("");
   const [amount, setAmount] = useState("");
-  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [saleDate, setSaleDate] = useState(() => toDayKey(new Date()));
   const [campaignId, setCampaignId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -275,6 +276,7 @@ export function AddSalePanel({
           amount,
           date: saleDate || undefined,
           campaignId: resolvedCampaignId,
+          tzOffset: new Date().getTimezoneOffset(),
         }),
       });
       const data = (await res.json()) as {
@@ -529,9 +531,8 @@ export function AddSalePanel({
                 {lang === "fr" ? `Montant de la commande (${amountCurrency})` : `Order amount (${amountCurrency})`}
               </div>
               <input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={lang === "fr" ? "149,90" : "149.90"}

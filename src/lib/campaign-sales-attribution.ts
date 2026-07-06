@@ -1,3 +1,5 @@
+import { dayKeyFromIso } from "@/lib/analytics-periods";
+
 export type CampaignSalesMeta = { status: string; created_at?: string };
 
 export type SaleAttributionRow = {
@@ -87,9 +89,10 @@ function saleCountsForCampaignLink(
   const meta = linkMeta?.[`${campaignId}:${creatorId}`];
   if (!meta || meta.historical_sales_attached) return true;
 
-  const saleTime = sale.created_at ? new Date(sale.created_at).getTime() : Date.now();
-  const joinedTime = new Date(meta.joined_at).getTime();
-  return saleTime >= joinedTime;
+  const saleDay = dayKeyFromIso(sale.created_at) ?? dayKeyFromIso(new Date().toISOString());
+  const joinDay = dayKeyFromIso(meta.joined_at);
+  if (!saleDay || !joinDay) return true;
+  return saleDay >= joinDay;
 }
 
 /** Whether a sale belongs to a campaign view (creator roster + historical sales rules). */

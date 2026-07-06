@@ -6,6 +6,7 @@ import {
   fillTimelineDays,
   getPeriodBounds,
   isWithinPeriod,
+  parseTzOffsetMinutes,
   type AnalyticsDateRange,
 } from "@/lib/analytics-periods";
 import {
@@ -53,8 +54,9 @@ export async function GET(request: Request) {
   const range = parseRange(searchParams.get("range"));
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
+  const tzOffset = parseTzOffsetMinutes(searchParams.get("tzOffset"));
   const periodRange = range === "custom" || range === "all" ? "30d" : range;
-  const { start, end, prevStart, prevEnd } = getPeriodBounds(periodRange);
+  const { start, end, prevStart, prevEnd } = getPeriodBounds(periodRange, new Date(), tzOffset);
 
   const { data: profile } = await supabaseAdmin
     .from("profiles")
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
   const salesRows = (salesData || []) as SaleAttributionRow[];
 
   const sumSales = (from: Date, to: Date) => {
-    const rows = salesRows.filter((s) => isWithinPeriod(s.created_at, from, to));
+    const rows = salesRows.filter((s) => isWithinPeriod(s.created_at, from, to, tzOffset));
     return {
       revenue: rows.reduce((sum, s) => sum + (Number(s.order_amount) || 0), 0),
       commissions: rows.reduce((sum, s) => sum + (Number(s.commission_amount) || 0), 0),
@@ -85,7 +87,7 @@ export async function GET(request: Request) {
   const totalRevenue = currentSales.revenue;
   const accruedCommissions = currentSales.commissions;
 
-  const periodSales = salesRows.filter((s) => isWithinPeriod(s.created_at, start, end));
+  const periodSales = salesRows.filter((s) => isWithinPeriod(s.created_at, start, end, tzOffset));
 
   const { data: payoutsData } = await supabaseAdmin
     .from("payouts")
@@ -96,7 +98,7 @@ export async function GET(request: Request) {
     const rows = (payoutsData || []).filter((p) => {
       if (String(p.status || "").toLowerCase() !== "paid") return false;
       const dateStr = p.paid_at || p.created_at;
-      return isWithinPeriod(dateStr, from, to);
+      return isWithinPeriod(dateStr, from, to, tzOffset);
     });
     return rows.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   };
@@ -114,7 +116,7 @@ export async function GET(request: Request) {
     const amount = Number(p.amount) || 0;
     paidByCreatorAllTime.set(creatorId, (paidByCreatorAllTime.get(creatorId) || 0) + amount);
     const dateStr = p.paid_at || p.created_at;
-    if (isWithinPeriod(dateStr, start, end)) {
+    if (isWithinPeriod(dateStr, start, end, tzOffset)) {
       paidByCreatorPeriod.set(creatorId, (paidByCreatorPeriod.get(creatorId) || 0) + amount);
     }
   }
@@ -127,7 +129,7 @@ export async function GET(request: Request) {
   const outreachRows = (outreachData || []) as OutreachRow[];
 
   const outreachInPeriod = (from: Date, to: Date) => {
-    const rows = outreachRows.filter((o) => isWithinPeriod(o.created_at, from, to));
+    const rows = outreachRows.filter((o) => isWithinPeriod(o.created_at, from, to, tzOffset));
     const sent = rows.length;
     const contactedCreators = new Set(
       rows
@@ -152,7 +154,7 @@ export async function GET(request: Request) {
   const responseRate = currentOutreach.responseRate;
   const converted = currentOutreach.converted;
 
-  const periodOutreach = outreachRows.filter((o) => isWithinPeriod(o.created_at, start, end));
+  const periodOutreach = outreachRows.filter((o) => isWithinPeriod(o.created_at, start, end, tzOffset));
 
   const outreachByPlatform: Array<{
     platform: string;
@@ -351,10 +353,10 @@ export async function GET(request: Request) {
     .sort((a, b) => b.periodRevenue - a.periodRevenue);
 
   // Timeline spans previous period → current period so bar charts can compare both.
-  const timelineSales = salesRows.filter((s) => isWithinPeriod(s.created_at, prevStart, end));
+  const timelineSales = salesRows.filter((s) => isWithinPeriod(s.created_at, prevStart, end, tzOffset));
   const revenueDayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
   for (const sale of timelineSales) {
-    const day = dayKeyFromIso(String(sale.created_at));
+    const day = dayKeyFromIso(String(sale.created_at), tzOffset);
     if (!day) continue;
     const agg = revenueDayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
     agg.revenue += Number(sale.order_amount) || 0;
@@ -373,6 +375,7 @@ export async function GET(request: Request) {
     })),
     prevStart,
     end,
+    tzOffset,
   );
 
   const platformSalesMap = new Map<string, { revenue: number; commission: number; count: number }>();

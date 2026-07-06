@@ -6,6 +6,25 @@ import {
   commissionNotConfiguredMessage,
   resolveCommissionRateForManualSale,
 } from "@/lib/managed-creator-commission";
+import { endOfLocalDayIso, parseTzOffsetMinutes, toDayKey } from "@/lib/analytics-periods";
+
+function resolveManualSaleCreatedAt(dateInput?: string, tzOffsetMinutes?: number): string {
+  if (!dateInput?.trim()) return new Date().toISOString();
+  const trimmed = dateInput.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const todayKey = toDayKey(new Date(), tzOffsetMinutes);
+    if (trimmed === todayKey) return new Date().toISOString();
+    return endOfLocalDayIso(trimmed, tzOffsetMinutes ?? 0);
+  }
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString();
+  return parsed.toISOString();
+}
+
+function parseOrderAmount(raw: string): number {
+  const normalized = String(raw || "").trim().replace(/\s/g, "").replace(/,/g, ".");
+  return parseFloat(normalized);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +49,11 @@ export async function POST(request: NextRequest) {
   const userId = authedUserId;
   const creatorId = String(body.creatorId || "");
   const campaignId = String(body.campaignId || "");
-  const orderAmount = parseFloat(String(body.amount || "0"));
+  const orderAmount = parseOrderAmount(String(body.amount || "0"));
 
   if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
   if (!creatorId) return NextResponse.json({ ok: false, error: "No creatorId" }, { status: 400 });
-  if (!orderAmount || orderAmount <= 0 || orderAmount > 1000000) {
+  if (!orderAmount || !Number.isFinite(orderAmount) || orderAmount <= 0) {
     return NextResponse.json({ ok: false, error: "Invalid amount" }, { status: 400 });
   }
 
@@ -119,6 +138,7 @@ export async function POST(request: NextRequest) {
 
   const commissionRate = managedCommission.rate;
   const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
+  const tzOffset = parseTzOffsetMinutes(body.tzOffset != null ? String(body.tzOffset) : null);
 
   const { error } = await supabaseAdmin.from("sales").insert({
     creator_id: creator.id,
@@ -130,7 +150,7 @@ export async function POST(request: NextRequest) {
     campaign_id: linkedCampaignId,
     shop_domain: "manual",
     status: "paid",
-    created_at: body.date ? new Date(body.date).toISOString() : new Date().toISOString(),
+    created_at: resolveManualSaleCreatedAt(body.date ? String(body.date) : undefined, tzOffset),
   });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

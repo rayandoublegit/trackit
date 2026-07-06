@@ -78,6 +78,26 @@ describe("campaign sales attribution", () => {
     expect(attributeSaleToCampaigns(newSale, creatorCounts, linkMeta).sort()).toEqual(["campA", "campB"]);
   });
 
+  it("counts same-day sales after join when historical_sales_attached is false", () => {
+    const linkMeta = buildCampaignCreatorLinkMap([
+      {
+        campaign_id: "campA",
+        creator_id: "creator1",
+        historical_sales_attached: false,
+        created_at: "2026-06-01T18:00:00.000Z",
+      },
+    ]);
+
+    const sameDaySale = {
+      creator_id: "creator1",
+      order_amount: 80,
+      commission_amount: 8,
+      created_at: "2026-06-01T08:00:00.000Z",
+    };
+
+    expect(isSaleAttributedToCampaign(sameDaySale, "campA", creatorCounts, linkMeta)).toBe(true);
+  });
+
   it("includes all brand sales when historical_sales_attached is true", () => {
     const linkMeta = buildCampaignCreatorLinkMap([
       {

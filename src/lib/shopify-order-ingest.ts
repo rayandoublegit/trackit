@@ -316,7 +316,7 @@ export type IngestShopifyOrderResult = {
   creatorId?: string;
   commissionAmount?: number;
   orderAmount?: number;
-  skipReason?: "no_codes" | "no_match" | "no_commission" | "db_error";
+  skipReason?: "no_codes" | "no_match" | "no_commission" | "db_error" | "suppressed";
   error?: string;
 };
 
@@ -389,6 +389,16 @@ export async function ingestShopifyOrder(
   const status = order.financial_status === "paid" ? "paid" : "pending";
   const shopDomain = normalizeShopDomain(options.shopDomain);
   const shopifyOrderId = String(order.id);
+
+  const { data: suppressed } = await admin
+    .from("sales_suppressions")
+    .select("id")
+    .eq("user_id", options.userId)
+    .eq("shopify_order_id", shopifyOrderId)
+    .maybeSingle();
+  if (suppressed) {
+    return { matched: false, isNew: false, skipReason: "suppressed" };
+  }
 
   const { data: existing } = await admin
     .from("sales")

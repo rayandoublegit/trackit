@@ -544,8 +544,9 @@ function resolveCampaignCreatorIds(
   campaign: Campaign,
   creatorCounts: Record<string, string[]>,
 ): string[] {
-  const ids = (campaign.creatorIds?.length ? campaign.creatorIds : creatorCounts[campaign.id] ?? []).map(String);
-  return [...new Set(ids)];
+  const fromDb = (creatorCounts[campaign.id] ?? []).map(String);
+  const fromCampaign = (campaign.creatorIds ?? []).map(String);
+  return [...new Set([...fromDb, ...fromCampaign])];
 }
 
 type CampaignAnalyticsTimelinePoint = {
@@ -1406,10 +1407,18 @@ export function CampaignsView({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const finalIds = [...new Set(campaignData.creatorIds.map(String))];
+    const { creatorCounts } = await getCampaignCreatorAttribution(user.id);
+    const existingIds = (creatorCounts[campaignId] ?? []).map(String);
+    const incomingIds = campaignData.creatorIds.map(String);
+    const finalIds = [...new Set([...existingIds, ...incomingIds])];
     const creatorAttachments: Record<string, boolean> = {};
     for (const entry of campaignData.creatorSalesAttachments ?? []) {
       creatorAttachments[entry.creatorId] = entry.attach;
+    }
+    for (const creatorId of incomingIds) {
+      if (!existingIds.includes(creatorId) && !(creatorId in creatorAttachments)) {
+        creatorAttachments[creatorId] = false;
+      }
     }
     const ok = await syncCampaignCreators(user.id, campaignId, finalIds, {
       creatorAttachments: Object.keys(creatorAttachments).length ? creatorAttachments : undefined,
@@ -3482,61 +3491,56 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     );
   }, [campaign.id]);
 
+  const refreshCampaignAnalytics = useCallback(async () => {
+    if (!supabase) {
+      setAnalytics(null);
+      return;
+    }
+
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setAnalytics(null);
+        return;
+      }
+      resolvedUserId = user.id;
+    }
+
+    try {
+      const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, analyticsDateBounds);
+      setAnalytics(snapshot);
+    } catch {
+      const flatTrend: PeriodTrend = { current: 0, previous: 0, changePct: 0, direction: "flat" };
+      setAnalytics({
+        rows: [],
+        monthRows: [],
+        totals: { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 },
+        salesTrend: flatTrend,
+        commissionTrend: flatTrend,
+        netRevenueTrend: flatTrend,
+        roiTrend: flatTrend,
+        timeline: [],
+        creatorCount: campaign.creators ?? campaign.creatorIds?.length ?? 0,
+        pendingPayouts: 0,
+        pendingCreatorCount: 0,
+        activeCreators: 0,
+        roi: null,
+      });
+    }
+  }, [campaign, userId, analyticsDateBounds]);
+
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       setAnalyticsLoading(true);
-      if (!supabase) {
-        if (!cancelled) {
-          setAnalytics(null);
-          setAnalyticsLoading(false);
-        }
-        return;
-      }
-
-      let resolvedUserId = userId;
-      if (!resolvedUserId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          if (!cancelled) {
-            setAnalytics(null);
-            setAnalyticsLoading(false);
-          }
-          return;
-        }
-        resolvedUserId = user.id;
-      }
-
-      try {
-        const snapshot = await fetchCampaignAnalyticsSnapshot(campaign, resolvedUserId, analyticsDateBounds);
-        if (!cancelled) setAnalytics(snapshot);
-      } catch {
-        if (!cancelled) {
-          const flatTrend: PeriodTrend = { current: 0, previous: 0, changePct: 0, direction: "flat" };
-          setAnalytics({
-            rows: [],
-            monthRows: [],
-            totals: { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 },
-            salesTrend: flatTrend,
-            commissionTrend: flatTrend,
-            netRevenueTrend: flatTrend,
-            roiTrend: flatTrend,
-            timeline: [],
-            creatorCount: campaign.creators ?? campaign.creatorIds?.length ?? 0,
-            pendingPayouts: 0,
-            pendingCreatorCount: 0,
-            activeCreators: 0,
-            roi: null,
-          });
-        }
-      } finally {
-        if (!cancelled) setAnalyticsLoading(false);
-      }
+      await refreshCampaignAnalytics();
+      if (!cancelled) setAnalyticsLoading(false);
     };
 
     void load();
-    const onRefresh = () => void load();
+    const onRefresh = () => void refreshCampaignAnalytics();
     window.addEventListener(SALES_UPDATED_EVENT, onRefresh);
     window.addEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
     window.addEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
@@ -3547,7 +3551,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
       window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
     };
-  }, [campaign, userId, analyticsDateBounds]);
+  }, [refreshCampaignAnalytics]);
 
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
@@ -3810,6 +3814,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
                   ? analyticsPeriod
                   : undefined
               }
+              onSalesChange={refreshCampaignAnalytics}
             />
           </div>
 
@@ -5424,10 +5429,26 @@ function NewCampaignOnboarding({
       if (!isAddCreatorsMode && attachCreatorSales && creatorIds.length > 0) {
         return creatorIds.map((id) => ({ creatorId: id, attach: true }));
       }
-      const manual = addedCreators
-        .filter((entry) => entry.creatorId && entry.historicalSalesAttached)
-        .map((entry) => ({ creatorId: entry.creatorId as string, attach: true }));
-      return manual.length ? manual : undefined;
+      if (isAddCreatorsMode && existingCampaign) {
+        const existingIds = new Set((existingCampaign.creatorIds ?? []).map(String));
+        const newlyAdded = addedCreators.filter(
+          (entry) => entry.creatorId && !existingIds.has(entry.creatorId),
+        );
+        if (newlyAdded.length === 0) return undefined;
+        return newlyAdded.map((entry) => ({
+          creatorId: entry.creatorId as string,
+          attach: Boolean(entry.historicalSalesAttached),
+        }));
+      }
+      if (!isAddCreatorsMode && !attachCreatorSales) {
+        return addedCreators
+          .filter((entry) => entry.creatorId)
+          .map((entry) => ({
+            creatorId: entry.creatorId as string,
+            attach: Boolean(entry.historicalSalesAttached),
+          }));
+      }
+      return undefined;
     })();
     return {
       name: name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),

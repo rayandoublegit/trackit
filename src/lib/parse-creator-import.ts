@@ -129,7 +129,7 @@ function usernameFromProfileUrl(url: string): string | null {
 export function parseFollowersCount(raw: string): number {
   const s = raw.trim().toLowerCase().replace(/,/g, "").replace(/\s/g, "");
   if (!s) return 0;
-  const m = s.match(/^([\d.]+)([km])?$/);
+  const m = s.match(/^([\d.]+)([kmb])?$/);
   if (!m) {
     const n = parseFloat(s);
     return Number.isFinite(n) ? Math.round(n) : 0;
@@ -137,6 +137,7 @@ export function parseFollowersCount(raw: string): number {
   let n = parseFloat(m[1]);
   if (m[2] === "k") n *= 1_000;
   if (m[2] === "m") n *= 1_000_000;
+  if (m[2] === "b") n *= 1_000_000_000;
   return Math.round(n);
 }
 

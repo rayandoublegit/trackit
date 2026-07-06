@@ -348,12 +348,28 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
 
             <div>
               <label style={labelStyle}>{lang === "fr" ? "Abonnés" : "Followers"}</label>
-              <input type="number" value={followers} onChange={(e) => setFollowers(e.target.value)} placeholder="10000" className="ncm-field" style={inputStyle} />
+              <input
+                type="text"
+                inputMode="numeric"
+                value={followers}
+                onChange={(e) => setFollowers(e.target.value)}
+                placeholder={lang === "fr" ? "Ex : 10M, 1.2B, 45000000" : "e.g. 10M, 1.2B, 45000000"}
+                className="ncm-field"
+                style={inputStyle}
+              />
             </div>
 
             <div>
               <label style={labelStyle}>{lang === "fr" ? "Taux d'engagement (%)" : "Engagement rate (%)"}</label>
-              <input type="number" value={engagement} onChange={(e) => setEngagement(e.target.value)} placeholder="3.5" className="ncm-field" style={inputStyle} />
+              <input
+                type="text"
+                inputMode="decimal"
+                value={engagement}
+                onChange={(e) => setEngagement(e.target.value)}
+                placeholder="3.5"
+                className="ncm-field"
+                style={inputStyle}
+              />
             </div>
 
             <div>

@@ -23,7 +23,7 @@ export async function DELETE(request: NextRequest) {
 
   const { data: sale, error: fetchErr } = await supabaseAdmin
     .from("sales")
-    .select("id, user_id, creator_id, order_amount, commission_amount")
+    .select("id, user_id, creator_id, order_amount, commission_amount, shopify_order_id, shop_domain")
     .eq("id", id)
     .eq("user_id", authedUserId)
     .maybeSingle();
@@ -37,6 +37,18 @@ export async function DELETE(request: NextRequest) {
     .eq("id", sale.creator_id)
     .eq("user_id", authedUserId)
     .maybeSingle();
+
+  const shopifyOrderId = String(sale.shopify_order_id || "").trim();
+  const isManualSale = sale.shop_domain === "manual" || shopifyOrderId.startsWith("manual_");
+  if (shopifyOrderId && !isManualSale) {
+    const { error: suppressErr } = await supabaseAdmin.from("sales_suppressions").upsert(
+      { user_id: authedUserId, shopify_order_id: shopifyOrderId },
+      { onConflict: "user_id,shopify_order_id" },
+    );
+    if (suppressErr) {
+      console.error("sales suppression record failed:", suppressErr.message);
+    }
+  }
 
   const { error: deleteErr } = await supabaseAdmin.from("sales").delete().eq("id", id).eq("user_id", authedUserId);
   if (deleteErr) return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });

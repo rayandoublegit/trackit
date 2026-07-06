@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/useCurrency";
-import { dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
+import { dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import { getPeriodBounds, isWithinPeriod, type AnalyticsDateRange } from "@/lib/analytics-periods";
 import { getCampaignCreatorAttribution } from "@/lib/db";
 import { isSaleAttributedToCampaign } from "@/lib/campaign-sales-attribution";
@@ -126,6 +126,7 @@ export function AnalyticsSalesPanel({
   campaignId,
   campaignCreatorIds,
   syncRange,
+  onSalesChange,
 }: {
   userId?: string;
   lang: "en" | "fr";
@@ -133,6 +134,8 @@ export function AnalyticsSalesPanel({
   campaignId?: string;
   campaignCreatorIds?: string[];
   syncRange?: Exclude<AnalyticsDateRange, "all" | "custom">;
+  /** Called after a sale is deleted so parent analytics can refresh immediately. */
+  onSalesChange?: () => void | Promise<void>;
 }) {
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,8 +208,8 @@ export function AnalyticsSalesPanel({
     const ok = window.confirm(
       shopify
         ? lang === "fr"
-          ? "Supprimer cette vente de Trackit ? Elle pourrait réapparaître lors d'une prochaine synchro Shopify."
-          : "Remove this sale from Trackit? It may reappear on the next Shopify sync."
+          ? "Supprimer cette vente de Trackit ? Elle ne sera pas réimportée lors des prochaines synchros Shopify."
+          : "Remove this sale from Trackit? It will not be re-imported on future Shopify syncs."
         : lang === "fr"
           ? "Supprimer cette vente ? La commission du créateur sera ajustée."
           : "Delete this sale? The creator's commission will be adjusted.",
@@ -221,6 +224,8 @@ export function AnalyticsSalesPanel({
         setSales((list) => list.filter((row) => row.id !== sale.id));
         dispatchSalesUpdated();
         dispatchPayoutsUpdated();
+        dispatchCampaignsUpdated();
+        await onSalesChange?.();
       }
     } finally {
       setDeletingId(null);

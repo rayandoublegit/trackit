@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     no_match: 0,
     no_commission: 0,
     db_error: 0,
+    suppressed: 0,
   };
   const dbErrors: string[] = [];
 

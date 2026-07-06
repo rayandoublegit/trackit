@@ -50,16 +50,21 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const [sortKey, setSortKey] = useState<SortKey>("sales");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
+  const tzOffset = new Date().getTimezoneOffset();
+
   const refreshAnalytics = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/analytics?userId=${userId}&range=${range}`);
+      const res = await fetch(
+        `/api/analytics?userId=${userId}&range=${range}&tzOffset=${tzOffset}`,
+        { cache: "no-store" },
+      );
       const data = await res.json();
       setAnalyticsData(data);
     } catch {
       /* keep current data */
     }
-  }, [userId, range]);
+  }, [userId, range, tzOffset]);
 
   useEffect(() => {
     if (!userId) {
@@ -74,7 +79,10 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
       let data: Record<string, unknown> | null = null;
 
       const fetchAnalytics = async (activeRange: DateRange) => {
-        const res = await fetch(`/api/analytics?userId=${userId}&range=${activeRange}`);
+        const res = await fetch(
+          `/api/analytics?userId=${userId}&range=${activeRange}&tzOffset=${tzOffset}`,
+          { cache: "no-store" },
+        );
         return res.json() as Promise<Record<string, unknown>>;
       };
 
@@ -106,7 +114,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return () => {
       cancelled = true;
     };
-  }, [userId, shopifyStore, range]);
+  }, [userId, shopifyStore, range, tzOffset]);
 
   useEffect(() => {
     if (!userId) return;
@@ -516,6 +524,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             lang={lang}
             isMobile={isMobile}
             syncRange={range === "custom" ? "30d" : range}
+            onSalesChange={refreshAnalytics}
           />
         </div>
 
