@@ -6,8 +6,14 @@ export const dynamic = "force-dynamic";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
+
+type ExistingLinkRow = {
+  creator_id: string;
+  historical_sales_attached: boolean;
+  created_at: string;
+};
 
 // Sync the creators linked to a campaign (service role: bypasses RLS).
 export async function POST(request: Request) {
@@ -17,6 +23,12 @@ export async function POST(request: Request) {
   const creatorIds: string[] = Array.isArray(body.creatorIds)
     ? body.creatorIds.map((id: unknown) => String(id)).filter(Boolean)
     : [];
+  const attachHistoricalSales =
+    typeof body.attachHistoricalSales === "boolean" ? body.attachHistoricalSales : false;
+  const creatorAttachments =
+    body.creatorAttachments && typeof body.creatorAttachments === "object"
+      ? (body.creatorAttachments as Record<string, boolean>)
+      : {};
 
   if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
   if (!campaignId) return NextResponse.json({ ok: false, error: "No campaignId" }, { status: 400 });
@@ -29,6 +41,23 @@ export async function POST(request: Request) {
   if (!campaignRow || String(campaignRow.user_id) !== userId) {
     return NextResponse.json({ ok: false, error: "Campaign not found" }, { status: 404 });
   }
+
+  const { data: existingLinks } = await supabaseAdmin
+    .from("campaign_creators")
+    .select("creator_id, historical_sales_attached, created_at")
+    .eq("campaign_id", campaignId)
+    .eq("user_id", userId);
+
+  const existingByCreator = new Map<string, ExistingLinkRow>(
+    (existingLinks || []).map((row) => [
+      String(row.creator_id),
+      {
+        creator_id: String(row.creator_id),
+        historical_sales_attached: row.historical_sales_attached !== false,
+        created_at: String(row.created_at || new Date().toISOString()),
+      },
+    ]),
+  );
 
   const { error: deleteError } = await supabaseAdmin
     .from("campaign_creators")
@@ -52,11 +81,26 @@ export async function POST(request: Request) {
   const validCreatorIds = new Set((creatorRows || []).map((c) => String(c.id)));
   const rows = creatorIds
     .filter((id) => validCreatorIds.has(id))
-    .map((creatorId) => ({
-      user_id: userId,
-      campaign_id: campaignId,
-      creator_id: creatorId,
-    }));
+    .map((creatorId) => {
+      const existing = existingByCreator.get(creatorId);
+      const explicitAttach = creatorAttachments[creatorId];
+      const historicalSalesAttached =
+        explicitAttach === true
+          ? true
+          : explicitAttach === false
+            ? false
+            : existing
+              ? existing.historical_sales_attached
+              : attachHistoricalSales;
+
+      return {
+        user_id: userId,
+        campaign_id: campaignId,
+        creator_id: creatorId,
+        historical_sales_attached: historicalSalesAttached,
+        created_at: existing?.created_at ?? new Date().toISOString(),
+      };
+    });
 
   const { error: insertError } = await supabaseAdmin.from("campaign_creators").insert(rows);
   if (insertError) {

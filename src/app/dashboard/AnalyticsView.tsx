@@ -147,7 +147,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
       const periodCommission = Number(c.periodCommission ?? 0);
       const paidPeriod = Number(c.commissionPaidPeriod ?? 0);
       const paidAllTime = Number(c.commissionPaid ?? 0);
-      const commission = paidPeriod > 0 ? paidPeriod : periodCommission > 0 ? periodCommission : paidAllTime;
+      const commission = paidPeriod > 0 ? paidPeriod : periodCommission;
       const roi = Number(c.roi ?? (periodCommission > 0 ? revenue / periodCommission : 0));
       const handle = (c.handle || "").replace(/^@/, "");
       return {
@@ -495,7 +495,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
               }
               value={String(periodSalesCount || analyticsData?.salesCount || 0)}
               trend={compare ? salesVolumeTrend : undefined}
-              series={salesCountSeriesFull}
+              series={salesCountSeries}
               formatPoint={(v) =>
                 lang === "fr"
                   ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
@@ -515,6 +515,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
             userId={userId}
             lang={lang}
             isMobile={isMobile}
+            syncRange={range === "custom" ? "30d" : range}
           />
         </div>
 

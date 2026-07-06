@@ -1012,7 +1012,11 @@ export function HeroBarChartCard({
 }) {
   const rawPoints = ensureChartSeries(series, trend, trend?.current ?? 0);
   const stepDays = barChartStepDaysForPeriod(period, rawPoints.length);
-  const points = sampleSeriesEveryNDays(toCumulativeSeries(rawPoints), stepDays);
+  const useIncremental = period === "today" || period === "3d" || period === "7d";
+  const points = sampleSeriesEveryNDays(
+    useIncremental ? rawPoints : toCumulativeSeries(rawPoints),
+    stepDays,
+  );
   return (
     <div
       style={{

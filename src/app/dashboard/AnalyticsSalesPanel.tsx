@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatCurrency } from "@/lib/useCurrency";
-import { SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
-import { AnalyticsPeriodDropdown, HERO_PERIOD_OPTIONS } from "./AnalyticsPeriodDropdown";
+import { dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import { getPeriodBounds, isWithinPeriod, type AnalyticsDateRange } from "@/lib/analytics-periods";
+import { getCampaignCreatorAttribution } from "@/lib/db";
+import { isSaleAttributedToCampaign } from "@/lib/campaign-sales-attribution";
 
 type TrackedSale = {
   id: string;
@@ -24,8 +25,6 @@ type TrackedSale = {
     platform?: string;
   } | null;
 };
-
-type TimeFilter = "today" | "yesterday" | "week";
 
 async function fetchTrackedSales(userId: string): Promise<TrackedSale[]> {
   const { supabase } = await import("@/lib/supabase");
@@ -52,46 +51,7 @@ function saleCreatorMeta(sale: TrackedSale) {
 }
 
 function isShopifySale(sale: TrackedSale) {
-  return !!(sale.shopify_order_id || sale.shop_domain);
-}
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function endOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(23, 59, 59, 999);
-  return x;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function saleInTimeFilter(sale: TrackedSale, filter: TimeFilter, now = new Date()) {
-  const created = new Date(sale.created_at);
-  if (Number.isNaN(created.getTime())) return false;
-  if (filter === "today") return isSameDay(created, now);
-  if (filter === "yesterday") {
-    const y = new Date(now);
-    y.setDate(y.getDate() - 1);
-    return isSameDay(created, y);
-  }
-  const weekStart = startOfDay(now);
-  weekStart.setDate(weekStart.getDate() - 6);
-  return created >= weekStart && created <= endOfDay(now);
-}
-
-function formatSaleTime(iso: string, lang: "en" | "fr") {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString(lang === "fr" ? "fr-FR" : "en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return !!(sale.shopify_order_id || sale.shop_domain) && sale.shop_domain !== "manual";
 }
 
 function saleMatchesSearch(sale: TrackedSale, query: string) {
@@ -139,114 +99,133 @@ function SaleTimelineIcon({ shopify }: { shopify: boolean }) {
       }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M12 5v14M5 12h14"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
+        <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
       </svg>
     </span>
   );
 }
+
+const deleteBtnStyle: React.CSSProperties = {
+  border: "1px solid #FECACA",
+  background: "#FFF",
+  color: "#DC2626",
+  borderRadius: 8,
+  padding: "4px 8px",
+  fontSize: 11,
+  fontWeight: 500,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  letterSpacing: "-0.01em",
+  flexShrink: 0,
+};
 
 export function AnalyticsSalesPanel({
   userId,
   lang,
   isMobile,
   campaignId,
-  periodOptions = HERO_PERIOD_OPTIONS,
+  campaignCreatorIds,
+  syncRange,
 }: {
   userId?: string;
   lang: "en" | "fr";
   isMobile?: boolean;
-  /** When set, only sales linked to this campaign are shown. */
   campaignId?: string;
-  periodOptions?: AnalyticsDateRange[];
+  campaignCreatorIds?: string[];
+  syncRange?: Exclude<AnalyticsDateRange, "all" | "custom">;
 }) {
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [loading, setLoading] = useState(true);
-  const [listPeriod, setListPeriod] = useState<AnalyticsDateRange>("7d");
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("today");
   const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [creatorCounts, setCreatorCounts] = useState<Record<string, string[]>>({});
+  const [linkMeta, setLinkMeta] = useState<Record<string, { historical_sales_attached: boolean; joined_at: string }>>({});
 
-  useEffect(() => {
+  const loadSales = useCallback(async () => {
     if (!userId) {
       setSales([]);
+      setCreatorCounts({});
+      setLinkMeta({});
       setLoading(false);
       return;
     }
+    setLoading(true);
+    const [rows, attribution] = await Promise.all([
+      fetchTrackedSales(userId),
+      campaignId ? getCampaignCreatorAttribution(userId) : Promise.resolve({ creatorCounts: {}, linkMeta: {} }),
+    ]);
+    setSales(rows);
+    setCreatorCounts(attribution.creatorCounts);
+    setLinkMeta(attribution.linkMeta);
+    setLoading(false);
+  }, [userId, campaignId]);
 
+  useEffect(() => {
     let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      const rows = await fetchTrackedSales(userId);
-      if (!cancelled) {
-        setSales(rows);
-        setLoading(false);
-      }
-    };
-
-    void load();
-    const onUpdate = () => void load();
+    void (async () => {
+      await loadSales();
+      if (cancelled) return;
+    })();
+    const onUpdate = () => void loadSales();
     window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
     return () => {
       cancelled = true;
       window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
     };
-  }, [userId]);
+  }, [loadSales]);
 
   const scopedSales = useMemo(() => {
     if (!campaignId) return sales;
-    return sales.filter((sale) => String(sale.campaign_id || "") === campaignId);
-  }, [sales, campaignId]);
+    const roster =
+      campaignCreatorIds?.map(String) ??
+      creatorCounts[campaignId]?.map(String) ??
+      [];
+    if (roster.length === 0) {
+      return sales.filter((sale) => String(sale.campaign_id || "") === campaignId);
+    }
+    const countsForCampaign = { [campaignId]: roster };
+    return sales.filter((sale) => isSaleAttributedToCampaign(sale, campaignId, countsForCampaign, linkMeta));
+  }, [sales, campaignId, campaignCreatorIds, creatorCounts, linkMeta]);
 
   const periodBounds = useMemo(() => {
-    if (listPeriod === "all" || listPeriod === "custom") {
-      return getPeriodBounds("7d");
-    }
-    return getPeriodBounds(listPeriod);
-  }, [listPeriod]);
+    if (!syncRange) return null;
+    return getPeriodBounds(syncRange);
+  }, [syncRange]);
 
   const filteredSales = useMemo(() => {
-    return scopedSales.filter(
-      (sale) =>
-        isWithinPeriod(sale.created_at, periodBounds.start, periodBounds.end) &&
-        saleInTimeFilter(sale, timeFilter) &&
-        saleMatchesSearch(sale, search),
+    return scopedSales.filter((sale) => {
+      if (periodBounds && !isWithinPeriod(sale.created_at, periodBounds.start, periodBounds.end)) return false;
+      return saleMatchesSearch(sale, search);
+    });
+  }, [scopedSales, periodBounds, search]);
+
+  const removeSale = async (sale: TrackedSale) => {
+    if (!userId || deletingId) return;
+    const shopify = isShopifySale(sale);
+    const ok = window.confirm(
+      shopify
+        ? lang === "fr"
+          ? "Supprimer cette vente de Trackit ? Elle pourrait réapparaître lors d'une prochaine synchro Shopify."
+          : "Remove this sale from Trackit? It may reappear on the next Shopify sync."
+        : lang === "fr"
+          ? "Supprimer cette vente ? La commission du créateur sera ajustée."
+          : "Delete this sale? The creator's commission will be adjusted.",
     );
-  }, [scopedSales, periodBounds, timeFilter, search]);
+    if (!ok) return;
 
-  const todayCount = useMemo(
-    () => scopedSales.filter((sale) => saleInTimeFilter(sale, "today")).length,
-    [scopedSales],
-  );
-
-  const filterLabels: { id: TimeFilter; label: string }[] = [
-    { id: "today", label: lang === "fr" ? "Aujourd'hui" : "Today" },
-    { id: "yesterday", label: lang === "fr" ? "Hier" : "Yesterday" },
-    { id: "week", label: lang === "fr" ? "Cette semaine" : "This week" },
-  ];
-
-  const summaryText =
-    timeFilter === "today"
-      ? lang === "fr"
-        ? (
-            <>
-              <strong style={{ color: "#1A1A1A", fontWeight: 600 }}>{todayCount}</strong>
-              {" "}nouvelle{todayCount > 1 ? "s" : ""} vente{todayCount > 1 ? "s" : ""} aujourd'hui
-            </>
-          )
-        : (
-            <>
-              <strong style={{ color: "#1A1A1A", fontWeight: 600 }}>{todayCount}</strong>
-              {" "}new sale{todayCount === 1 ? "" : "s"} today
-            </>
-          )
-      : lang === "fr"
-        ? `${filteredSales.length} vente${filteredSales.length > 1 ? "s" : ""}`
-        : `${filteredSales.length} sale${filteredSales.length === 1 ? "" : "s"}`;
+    setDeletingId(sale.id);
+    try {
+      const res = await fetch(`/api/sales?id=${encodeURIComponent(sale.id)}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+      if (res.ok && data.ok) {
+        setSales((list) => list.filter((row) => row.id !== sale.id));
+        dispatchSalesUpdated();
+        dispatchPayoutsUpdated();
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <aside
@@ -268,55 +247,18 @@ export function AnalyticsSalesPanel({
           boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
           display: "flex",
           flexDirection: "column",
-          flex: 1,
-          minHeight: isMobile ? undefined : 420,
+          flex: isMobile ? undefined : 1,
+          height: isMobile ? 480 : 420,
+          maxHeight: isMobile ? 480 : 420,
+          minHeight: isMobile ? 280 : 420,
           minWidth: 0,
           overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 14 }}>
+        <div style={{ marginBottom: 14 }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.03em" }}>
             {lang === "fr" ? "Dernières ventes" : "Latest sales"}
           </h2>
-          <AnalyticsPeriodDropdown
-            value={listPeriod === "all" || listPeriod === "custom" ? "7d" : listPeriod}
-            onChange={(next) => {
-              if (next === "today" || next === "3d" || next === "7d" || next === "30d" || next === "90d") {
-                setListPeriod(next);
-              }
-            }}
-            lang={lang}
-            options={periodOptions}
-            align="right"
-            variant="subtle"
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 5, marginBottom: 10, flexWrap: "wrap" }}>
-          {filterLabels.map((f) => {
-            const active = timeFilter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setTimeFilter(f.id)}
-                style={{
-                  padding: "5px 10px",
-                  borderRadius: 999,
-                  border: active ? "1px solid #1A1A1A" : "1px solid #E5E5E5",
-                  background: active ? "#1A1A1A" : "#FFFFFF",
-                  color: active ? "#FFFFFF" : "#1A1A1A",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  fontFamily: "inherit",
-                  cursor: "pointer",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {f.label}
-              </button>
-            );
-          })}
         </div>
 
         <div style={{ position: "relative", marginBottom: 12 }}>
@@ -352,16 +294,24 @@ export function AnalyticsSalesPanel({
           />
         </div>
 
-        <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 14px", letterSpacing: "-0.02em" }}>
-          {loading ? (lang === "fr" ? "Chargement…" : "Loading…") : summaryText}
-        </p>
-
-        <div style={{ flex: 1, overflowY: "auto", minHeight: 0, paddingRight: 2 }}>
-          {!loading && filteredSales.length === 0 ? (
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "scroll",
+            overflowX: "hidden",
+            paddingRight: 4,
+            marginRight: -2,
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {loading ? (
+            <div style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 12 }}>
+              {lang === "fr" ? "Chargement…" : "Loading…"}
+            </div>
+          ) : filteredSales.length === 0 ? (
             <div style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 12, lineHeight: 1.5 }}>
-              {lang === "fr"
-                ? "Aucune vente pour ce filtre."
-                : "No sales for this filter."}
+              {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
             </div>
           ) : (
             <div style={{ position: "relative", paddingLeft: 4 }}>
@@ -404,13 +354,38 @@ export function AnalyticsSalesPanel({
                   >
                     <SaleTimelineIcon shopify={shopify} />
                     <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.3 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: 8,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: "#1A1A1A",
+                            letterSpacing: "-0.02em",
+                            lineHeight: 1.3,
+                          }}
+                        >
                           {title}
                         </div>
-                        <div style={{ fontSize: 11, color: "#9A9A9A", whiteSpace: "nowrap", flexShrink: 0, letterSpacing: "-0.01em" }}>
-                          {formatSaleTime(sale.created_at, lang)}
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void removeSale(sale)}
+                          disabled={deletingId === sale.id}
+                          style={{
+                            ...deleteBtnStyle,
+                            opacity: deletingId === sale.id ? 0.6 : 1,
+                            cursor: deletingId === sale.id ? "wait" : "pointer",
+                          }}
+                        >
+                          {lang === "fr" ? "Supprimer" : "Delete"}
+                        </button>
                       </div>
                       <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, letterSpacing: "-0.02em" }}>
                         @{handle} · {amount}

@@ -624,7 +624,7 @@ function DashboardPageContent() {
       {showSectionGap && sidebarCollapsed && items.length > 0 && <div style={{ height: 16 }} />}
       {items.map((item) => {
         if (item.children?.length) {
-          return (
+  return (
             <SidebarNavGroup
               key={item.id}
               collapsed={sidebarCollapsed}
@@ -798,7 +798,7 @@ function DashboardPageContent() {
                 )}
               </p>
             </div>
-          </div>
+              </div>
         ) : (
           <>
         {view === "dashboard" && (
@@ -935,7 +935,7 @@ function DashboardPageContent() {
                 plan={plan}
                 onUpgrade={handleUpgradePro}
               />
-            </div>
+        </div>
           )
         )}
         {view === "content" && user && isCreator && (
@@ -1778,7 +1778,7 @@ function OutreachView({
         {toast && (
           <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
             {toast}
-          </div>
+        </div>
         )}
 
         <OutreachHistorySection
@@ -1790,7 +1790,7 @@ function OutreachView({
           onUpgradeScale={onUpgradeScale}
           refreshKey={historyRefreshKey}
         />
-        </div>
+          </div>
 
       {panel === "import" && (
         <ImportTemplatePanel
@@ -2012,7 +2012,7 @@ function BulkImportTemplatesPanel({
           <input type="file" accept=".csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
         </label>
         {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
-          </div>
+        </div>
       <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>Columns: name, subject, opening, body, cta</p>
       {error && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 8 }}>{error}</p>}
     </OutreachPanelShell>
@@ -2079,22 +2079,22 @@ function SeeTemplatesPanel({
           {templates.map((t) => (
             <div key={t.id} style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 14, background: "#FAFAFA" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                <div>
+            <div>
                   <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{templateDisplayName(t.name)}</div>
                   {t.imported && (
                     <span style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2, display: "block" }}>
                       {lang === "fr" ? "Importé" : "Imported"}
                     </span>
                   )}
-              </div>
+            </div>
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
-              </div>
+            </div>
               <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
                 {buildOutreachPreview(messageFromTemplate(t), t.cta)}
+          </div>
               </div>
-              </div>
-          ))}
-            </div>
+            ))}
+          </div>
           )}
       <button type="button" style={{ ...btnSecondary, width: "100%", marginTop: 20 }} onClick={onCreate}>{lang === "fr" ? "+ Créer un modèle" : "+ Create template"}</button>
     </OutreachPanelShell>
@@ -2148,7 +2148,7 @@ function InfluencerPicker({
     return (
       <div style={{ padding: layout === "page" ? 20 : 16, borderRadius: 10, border: "1px dashed #E5E5E5", fontSize: layout === "page" ? 14 : 13, color: "#6B7280", textAlign: "center", lineHeight: 1.5 }}>
         {lang === "fr" ? "Aucun créateur sauvegardé. Ajoutez-en depuis Découverte ou Créateurs." : "No saved creators yet. Add creators from Discovery or Creators."}
-      </div>
+        </div>
     );
   }
 
@@ -2183,7 +2183,7 @@ function InfluencerPicker({
                   : "Select all"}
           </button>
         )}
-      </div>
+          </div>
       {extraSelected.map((handle) => (
         <div
           key={handle}
@@ -2206,7 +2206,7 @@ function InfluencerPicker({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: layout === "page" ? 14 : 13, fontWeight: 500, color: "#FFFFFF" }}>{handle}</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)" }}>{lang === "fr" ? "Sélectionné" : "Selected"}</div>
-          </div>
+        </div>
           <button
             type="button"
             onClick={() => onChange(selected.filter((h) => h !== handle))}
@@ -2214,7 +2214,7 @@ function InfluencerPicker({
           >
             {lang === "fr" ? "Retirer" : "Remove"}
           </button>
-        </div>
+          </div>
       ))}
       {influencers.map((inf) => {
         const on = selected.includes(inf.handle);
@@ -2247,8 +2247,8 @@ function InfluencerPicker({
                 {emailMode
                   ? email || (lang === "fr" ? "Aucun email" : "No email")
                   : inf.platform}
-              </div>
-                  </div>
+        </div>
+      </div>
             {!missingEmail && (
             <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${on ? "#FFFFFF" : "#D0D0D0"}`, background: on ? "#FFFFFF" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center" }}>
               {on && <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={TRACKIT_SELECTION_BLUE} strokeWidth="2.5" strokeLinecap="round"/></svg>}
@@ -2659,7 +2659,7 @@ function SendOutreachPanel({
             {OUTREACH_DM_PLATFORMS.map((p) => {
               const on = dmPlatform === p;
               const pill = selectionPillColors(on);
-              return (
+  return (
                 <button
                   key={p}
                   type="button"
@@ -2683,7 +2683,7 @@ function SendOutreachPanel({
             <label style={{ display: "block", ...pageStyles.fieldLabel }}>
               {lang === "fr" ? "Email de la marque" : "Brand email"}
             </label>
-            <input
+              <input
               type="email"
               value={senderEmail}
               onChange={(e) => setSenderEmail(e.target.value)}
@@ -2696,7 +2696,7 @@ function SendOutreachPanel({
                 ? "L'envoi se fait depuis cette adresse. Connectez-vous à Gmail ou Outlook avec ce compte si une fenêtre s'ouvre."
                 : "Sending happens from this address. Sign in to Gmail or Outlook with this account if a window opens."}
             </p>
-          </div>
+            </div>
         )}
 
         <div style={{ marginBottom: pageStyles.sectionGap }}>
@@ -2709,7 +2709,7 @@ function SendOutreachPanel({
             selected={selectedInfluencers}
             onChange={setSelectedInfluencers}
           />
-        </div>
+            </div>
 
         {isEmail && resolvedRecipients.length > 0 && (
           <div style={{ marginBottom: pageStyles.sectionGap }}>
@@ -2721,7 +2721,7 @@ function SendOutreachPanel({
                 : lang === "fr"
                   ? "Destinataire"
                   : "Recipient"}
-            </div>
+              </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {resolvedRecipients.map((row, index) => (
                 <div
@@ -2753,9 +2753,9 @@ function SendOutreachPanel({
                         : lang === "fr"
                           ? "Cc"
                           : "Cc"}
-                    </div>
-                  </div>
-                  <input
+              </div>
+              </div>
+              <input
                     type="email"
                     value={creatorEmailOverrides[normalizeCreatorHandle(row.handle)] ?? row.email}
                     onChange={(e) => {
@@ -2765,7 +2765,7 @@ function SendOutreachPanel({
                     style={{ ...pageStyles.input, flex: 1, minWidth: 0, maxWidth: 280 }}
                     autoComplete="off"
                   />
-                </div>
+              </div>
               ))}
             </div>
             {isBatchEmail && (
@@ -2775,8 +2775,8 @@ function SendOutreachPanel({
                   : "Batch send: first creator as primary recipient, others in Cc."}
               </p>
             )}
-          </div>
-        )}
+            </div>
+          )}
 
         {isEmail && missingEmailHandles.length > 0 && (
           <p style={{ margin: `0 0 ${pageStyles.sectionGap}px`, fontSize: 13, color: "#1A1A1A", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
@@ -2991,7 +2991,7 @@ function ShopifyConnectPage({
     <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
         <div
-          style={{
+                  style={{
             display: "grid",
             gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
             gap: isMobile ? 48 : 64,
@@ -3053,7 +3053,7 @@ function ShopifyConnectPage({
                   autoFocus
                   onKeyDown={(e) => e.key === "Enter" && onConnect()}
                 />
-              </div>
+                  </div>
             </div>
 
             <div style={{ marginBottom: 28 }}>
@@ -3075,8 +3075,8 @@ function ShopifyConnectPage({
             )}
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              <button
-                type="button"
+                  <button
+                    type="button"
                 className="hero-cta-shopify-dark"
                 onClick={onConnect}
                 disabled={connecting}
@@ -3093,8 +3093,8 @@ function ShopifyConnectPage({
               </button>
               <button type="button" style={shopifyConnectSecondaryBtn} onClick={onClose} disabled={connecting}>
                 {lang === "fr" ? "Annuler" : "Cancel"}
-              </button>
-            </div>
+                  </button>
+        </div>
 
             <div
               style={{
@@ -3121,8 +3121,8 @@ function ShopifyConnectPage({
                 }}
                 aria-label={lang === "fr" ? "Tutoriel connexion Shopify" : "Shopify connect tutorial"}
               />
-            </div>
           </div>
+        </div>
 
           <div
             style={{
@@ -3180,7 +3180,7 @@ function ShopifyConnectPage({
                       : "Create a custom app in Shopify Admin (Settings → Apps and sales channels → Develop apps), enable the Admin API with read_orders, then paste your .myshopify.com domain and access token above."}
                   </p>
                 </div>
-              </div>
+                </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 {steps.map((step, index) => (
@@ -3203,7 +3203,7 @@ function ShopifyConnectPage({
                       {index < steps.length - 1 && (
                         <div style={{ width: 2, flex: 1, minHeight: 16, background: "#E5E7EB", marginTop: 8, borderRadius: 999 }} />
                       )}
-                    </div>
+          </div>
                     <div style={{ paddingTop: 2 }}>
                       <p style={{ fontSize: 12, fontWeight: 600, color: "#0047FF", margin: "0 0 4px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
                         {lang === "fr" ? `Étape ${index + 1}` : `Step ${index + 1}`}
@@ -3214,8 +3214,8 @@ function ShopifyConnectPage({
                       <p style={{ fontSize: 14, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
                         {step.description}
                       </p>
-                    </div>
-                  </div>
+        </div>
+              </div>
                 ))}
               </div>
             </div>

@@ -67,6 +67,14 @@ export function formatContentBytes(size: number | null | undefined): string {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export async function deleteBrandContent(brandId: string, contentId: string): Promise<boolean> {
+  const res = await fetch(
+    `/api/content?id=${encodeURIComponent(contentId)}&brandId=${encodeURIComponent(brandId)}`,
+    { method: "DELETE" },
+  );
+  return res.ok;
+}
+
 export function safeContentFileName(name: string): string {
   return name.replace(/[^\w.\-()+ ]/g, "_").slice(0, 120);
 }

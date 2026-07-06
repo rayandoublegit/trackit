@@ -582,6 +582,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     return buildCreatorVideoPreviews(detail.username, {
       videoThumbnails: detail.videoThumbnails,
       topVideos: detail.topVideos,
+      limit: 3,
     });
   }, [detail]);
 

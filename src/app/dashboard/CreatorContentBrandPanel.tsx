@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { ContentFileActions } from "./ContentFileActions";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
-const BLUE = "#0047FF";
 
 type ContentItem = {
   id: string;
@@ -212,15 +212,14 @@ export function CreatorContentBrandPanel({
                   }}
                 />
               )}
-              <a
-                href={item.file_url}
-                target="_blank"
-                rel="noreferrer"
-                download={item.file_name}
-                style={{ fontSize: 14, color: BLUE, fontWeight: 500, textDecoration: "none" }}
-              >
-                {item.file_name} →
-              </a>
+              <ContentFileActions
+                lang={lang}
+                brandId={brandId}
+                contentId={item.id}
+                fileUrl={item.file_url}
+                fileName={item.file_name}
+                openLabel={item.file_name}
+              />
             </div>
           ))}
         </div>

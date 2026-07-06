@@ -4,8 +4,9 @@ import type { CSSProperties, ReactNode } from "react";
 import { useLang } from "@/lib/useLang";
 import type { PlanTier } from "@/lib/plan-limits";
 
-const SUPPORT_EMAIL = "support@trackit.app";
-const CALENDLY_BOOKING_URL = process.env.NEXT_PUBLIC_CALENDLY_BOOKING_URL ?? "";
+const SUPPORT_EMAIL = "hello@thentrack.it";
+const CALENDLY_BOOKING_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_BOOKING_URL ?? "https://calendly.com/hello-thentrack/30min";
 const BLUE = "#0047FF";
 
 const btnPrimary: CSSProperties = {
@@ -169,8 +170,8 @@ export function HelpCenterView({ isMobile, plan: _plan = "free" }: { isMobile?: 
           title={lang === "fr" ? "Réserver un appel" : "Book a call"}
           text={
             lang === "fr"
-              ? "Planifiez un créneau de 15 minutes avec notre équipe pour de l'aide personnalisée."
-              : "Schedule a 15-minute slot with our team for personalized help."
+              ? "Planifiez un créneau de 30 minutes avec notre équipe pour de l'aide personnalisée."
+              : "Schedule a 30-minute slot with our team for personalized help."
           }
           action={lang === "fr" ? "Réserver un appel" : "Book a call"}
           href={CALENDLY_BOOKING_URL || undefined}

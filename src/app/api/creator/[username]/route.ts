@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 function mapTopVideos(raw: unknown) {
   if (!Array.isArray(raw)) return [];
-  return raw.map((row) => {
+  return raw.slice(0, 3).map((row) => {
     const v = row as { id?: string; cover?: string; shareUrl?: string; playUrl?: string; playCount?: number };
     return {
       id: v.id ?? "",
@@ -25,7 +25,7 @@ function mapVideoThumbnails(videoThumbnails: unknown, topVideos: unknown) {
   return displayVideoThumbnails(
     Array.isArray(videoThumbnails) ? videoThumbnails : [],
     Array.isArray(topVideos) ? topVideos : [],
-    6
+    3
   ).map((t) => ({
     views: t.views,
     thumbnail: clientImageUrl(t.thumbnail) || null,

@@ -9,9 +9,8 @@ import {
 } from "@/lib/content-shared";
 import { AddBrandContentPanel } from "./AddBrandContentPanel";
 import { CampaignContentPerformancePanel } from "./CampaignContentPerformancePanel";
+import { ContentFileActions } from "./ContentFileActions";
 import { ContentPostStatsDisplay } from "./ContentPostStats";
-
-const BLUE = "#0047FF";
 
 const addContentBtn: React.CSSProperties = {
   background: "#1A1A1A",
@@ -285,22 +284,14 @@ export function CampaignContentTab({
                 </div>
 
                 <div style={{ marginTop: "auto", paddingTop: 4 }}>
-                  <a
-                    href={item.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: BLUE,
-                      textDecoration: "none",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    {lang === "fr" ? "Ouvrir le fichier" : "Open file"} →
-                  </a>
+                  <ContentFileActions
+                    lang={lang}
+                    brandId={brandId}
+                    contentId={item.id}
+                    fileUrl={item.file_url}
+                    fileName={item.file_name}
+                    openLabel={lang === "fr" ? "Ouvrir le fichier" : "Open file"}
+                  />
                 </div>
               </div>
             </article>

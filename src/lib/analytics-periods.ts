@@ -68,9 +68,11 @@ export function getPeriodBounds(
 }
 
 export function isWithinPeriod(isoDate: string | null | undefined, start: Date, end: Date) {
-  if (!isoDate) return false;
-  const t = new Date(isoDate).getTime();
-  return t >= start.getTime() && t <= end.getTime();
+  const key = dayKeyFromIso(isoDate);
+  if (!key) return false;
+  const startKey = toDayKey(start);
+  const endKey = toDayKey(end);
+  return key >= startKey && key <= endKey;
 }
 
 export function computeTrend(current: number, previous: number): PeriodTrend {

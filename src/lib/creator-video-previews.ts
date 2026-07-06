@@ -18,7 +18,7 @@ export function buildCreatorVideoPreviews(
   username: string,
   opts: { videoThumbnails?: VideoThumb[]; topVideos?: TopVideo[]; limit?: number }
 ): VideoPreview[] {
-  const limit = opts.limit ?? 6;
+  const limit = opts.limit ?? 3;
   const out: VideoPreview[] = [];
   const seen = new Set<string>();
 

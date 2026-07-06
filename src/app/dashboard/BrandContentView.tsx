@@ -9,6 +9,7 @@ import {
   type ContentListItem,
 } from "@/lib/content-shared";
 import { AddBrandContentPanel } from "./AddBrandContentPanel";
+import { ContentFileActions } from "./ContentFileActions";
 
 const BLUE = "#0047FF";
 
@@ -39,7 +40,7 @@ function formatDate(iso: string, lang: "fr" | "en") {
   }
 }
 
-function ContentCard({ item, lang }: { item: ContentListItem; lang: "fr" | "en" }) {
+function ContentCard({ item, lang, brandId }: { item: ContentListItem; lang: "fr" | "en"; brandId?: string }) {
   const isImage = isImageContentFile(item);
   const isVideo = isVideoContentFile(item);
 
@@ -105,14 +106,16 @@ function ContentCard({ item, lang }: { item: ContentListItem; lang: "fr" | "en" 
             ))}
           </div>
         ) : null}
-        <a
-          href={item.file_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: "inline-block", marginTop: 12, fontSize: 13, fontWeight: 500, color: BLUE, textDecoration: "none" }}
-        >
-          {lang === "fr" ? "Télécharger" : "Download"} →
-        </a>
+        <div style={{ marginTop: 12 }}>
+          <ContentFileActions
+          lang={lang}
+          brandId={brandId}
+          contentId={item.id}
+          fileUrl={item.file_url}
+          fileName={item.file_name}
+          openLabel={lang === "fr" ? "Télécharger" : "Download"}
+          />
+        </div>
       </div>
     </article>
   );
@@ -221,7 +224,7 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
             }}
           >
             {items.map((item) => (
-              <ContentCard key={item.id} item={item} lang={lang} />
+              <ContentCard key={item.id} item={item} lang={lang} brandId={userId} />
             ))}
           </div>
         )}

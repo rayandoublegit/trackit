@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
-import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorCounts, syncCampaignCreators } from "@/lib/db";
+import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorAttribution, syncCampaignCreators, attachCreatorSalesToCampaign, fetchCreatorBrandSalesSummary } from "@/lib/db";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignContentTab } from "./CampaignContentTab";
 import { CampaignLinksTab } from "./CampaignLinksTab";
@@ -45,7 +45,12 @@ import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { isDetailTab } from "@/lib/dashboard-navigation";
 import { avatarFromDiscoverySavedRow, buildAvatarByHandleFromSavedRows } from "@/lib/creator-avatar";
-import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
+import {
+  computeCampaignSalesTotals,
+  isSaleAttributedToCampaign,
+  type CampaignCreatorLinkMap,
+  type CampaignSalesMeta,
+} from "@/lib/campaign-sales-attribution";
 import {
   enrichCreatorsWithAvatars,
   enrichCreatorsWithSavedAvatarsClient,
@@ -93,6 +98,9 @@ type CampaignCreatorRow = {
   commission: number;
   commissionPaid: number;
   roi: number | null;
+  historicalSalesAttached?: boolean;
+  brandSalesCount?: number;
+  brandSalesRevenue?: number;
 };
 
 type Campaign = {
@@ -262,15 +270,17 @@ async function fetchCampaignBoardData(resolvedUserId: string): Promise<{
   sales: SaleRow[];
   creators: CreatorBalanceRow[];
 }> {
-  const [campaignData, salesResult, creatorsResult, creatorCounts] = await Promise.all([
+  const [campaignData, salesResult, creatorsResult, attribution] = await Promise.all([
     getCampaigns(resolvedUserId),
     supabase!
       .from("sales")
       .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
       .eq("user_id", resolvedUserId),
     supabase!.from("creators").select("balance").eq("user_id", resolvedUserId),
-    getCampaignCreatorCounts(resolvedUserId),
+    getCampaignCreatorAttribution(resolvedUserId),
   ]);
+
+  const { creatorCounts, linkMeta } = attribution;
 
   const campaignMeta: Record<string, CampaignSalesMeta> = {};
   for (const row of campaignData) {
@@ -281,7 +291,7 @@ async function fetchCampaignBoardData(resolvedUserId: string): Promise<{
   }
 
   const salesRows = (salesResult.data || []) as SaleRow[];
-  const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, campaignMeta);
+  const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, linkMeta);
 
   return {
     campaigns: dedupeCampaignRows(campaignData).map((row) =>
@@ -312,72 +322,6 @@ function dedupeCampaignRows<T extends Record<string, unknown>>(rows: T[]): T[] {
   });
 }
 
-type CampaignSalesMeta = { status: string; created_at?: string };
-
-function pickCampaignForCreatorSale(
-  creatorId: string,
-  creatorCounts: Record<string, string[]>,
-  campaignMeta: Record<string, CampaignSalesMeta>,
-): string | null {
-  const campaignIds = Object.keys(creatorCounts).filter((campaignId) =>
-    creatorCounts[campaignId].includes(creatorId),
-  );
-  if (campaignIds.length === 0) return null;
-  if (campaignIds.length === 1) return campaignIds[0];
-
-  const active = campaignIds
-    .filter((id) => (campaignMeta[id]?.status || "").toLowerCase() === "active")
-    .sort((a, b) => (campaignMeta[b]?.created_at || "").localeCompare(campaignMeta[a]?.created_at || ""));
-  if (active[0]) return active[0];
-
-  const byRecency = [...campaignIds].sort((a, b) =>
-    (campaignMeta[b]?.created_at || "").localeCompare(campaignMeta[a]?.created_at || ""),
-  );
-  return byRecency[0] ?? null;
-}
-
-function resolveSaleCampaignId(
-  sale: SaleRow,
-  creatorCounts: Record<string, string[]>,
-  campaignMeta: Record<string, CampaignSalesMeta>,
-): string | null {
-  if (sale.campaign_id) return String(sale.campaign_id);
-  if (!sale.creator_id) return null;
-  return pickCampaignForCreatorSale(String(sale.creator_id), creatorCounts, campaignMeta);
-}
-
-function isSaleAttributedToCampaign(
-  sale: SaleRow,
-  campaignId: string,
-  creatorCounts: Record<string, string[]>,
-  campaignMeta: Record<string, CampaignSalesMeta>,
-): boolean {
-  return resolveSaleCampaignId(sale, creatorCounts, campaignMeta) === campaignId;
-}
-
-function computeCampaignSalesTotals(
-  sales: SaleRow[],
-  creatorCounts: Record<string, string[]>,
-  campaignMeta: Record<string, CampaignSalesMeta>,
-): Record<string, { sales: number; commission: number }> {
-  const totals: Record<string, { sales: number; commission: number }> = {};
-
-  const add = (campaignId: string, orderAmount: number, commissionAmount: number) => {
-    if (!totals[campaignId]) totals[campaignId] = { sales: 0, commission: 0 };
-    totals[campaignId].sales += orderAmount;
-    totals[campaignId].commission += commissionAmount;
-  };
-
-  for (const sale of sales) {
-    const orderAmount = Number(sale.order_amount) || 0;
-    const commissionAmount = Number(sale.commission_amount) || 0;
-    const attributedId = resolveSaleCampaignId(sale, creatorCounts, campaignMeta);
-    if (attributedId) add(attributedId, orderAmount, commissionAmount);
-  }
-
-  return totals;
-}
-
 type CreatorCampaignStats = { salesCount: number; salesAmount: number; commission: number };
 
 function computeCreatorStatsForCampaign(
@@ -387,6 +331,7 @@ function computeCreatorStatsForCampaign(
   creatorCounts: Record<string, string[]>,
   campaignMeta: Record<string, CampaignSalesMeta>,
   dateBounds?: { start: Date; end: Date },
+  linkMeta?: CampaignCreatorLinkMap,
 ): Record<string, CreatorCampaignStats> {
   const totals: Record<string, CreatorCampaignStats> = {};
 
@@ -399,7 +344,7 @@ function computeCreatorStatsForCampaign(
 
   for (const sale of sales) {
     if (!sale.creator_id) continue;
-    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, linkMeta)) continue;
     if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
 
     add(String(sale.creator_id), Number(sale.order_amount) || 0, Number(sale.commission_amount) || 0);
@@ -414,12 +359,13 @@ function computeCampaignPeriodTotals(
   creatorCounts: Record<string, string[]>,
   campaignMeta: Record<string, CampaignSalesMeta>,
   dateBounds?: { start: Date; end: Date },
+  linkMeta?: CampaignCreatorLinkMap,
 ): { sales: number; commission: number } {
   let salesTotal = 0;
   let commissionTotal = 0;
 
   for (const sale of sales) {
-    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, linkMeta)) continue;
     if (dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
     salesTotal += Number(sale.order_amount) || 0;
     commissionTotal += Number(sale.commission_amount) || 0;
@@ -436,9 +382,10 @@ function computeCampaignScopedMetricTrend(
   metric: (sale: SaleRow) => number,
   now = new Date(),
   customBounds?: { start: Date; end: Date },
+  linkMeta?: CampaignCreatorLinkMap,
 ): PeriodTrend {
   const belongsToCampaign = (sale: SaleRow) =>
-    isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta);
+    isSaleAttributedToCampaign(sale, campaignId, creatorCounts, linkMeta);
 
   const sumInPeriod = (start: Date, end: Date) =>
     sales
@@ -472,6 +419,7 @@ function computeCampaignScopedSalesTrend(
   campaignMeta: Record<string, CampaignSalesMeta>,
   now = new Date(),
   customBounds?: { start: Date; end: Date },
+  linkMeta?: CampaignCreatorLinkMap,
 ): PeriodTrend {
   return computeCampaignScopedMetricTrend(
     sales,
@@ -481,6 +429,7 @@ function computeCampaignScopedSalesTrend(
     (sale) => Number(sale.order_amount) || 0,
     now,
     customBounds,
+    linkMeta,
   );
 }
 
@@ -499,6 +448,7 @@ function buildCampaignTimeline(
   creatorCounts: Record<string, string[]>,
   campaignMeta: Record<string, CampaignSalesMeta>,
   dateBounds?: { start: Date; end: Date },
+  linkMeta?: CampaignCreatorLinkMap,
 ): CampaignAnalyticsTimelinePoint[] {
   // Include previous period → current so bar charts can bridge both.
   const spanStart = dateBounds ? previousBoundsFromCurrent(dateBounds).start : undefined;
@@ -506,7 +456,7 @@ function buildCampaignTimeline(
 
   const dayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
   for (const sale of sales) {
-    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, campaignMeta)) continue;
+    if (!isSaleAttributedToCampaign(sale, campaignId, creatorCounts, linkMeta)) continue;
     if (spanStart && spanEnd && !isWithinPeriod(sale.created_at, spanStart, spanEnd)) continue;
     if (!spanStart && dateBounds && !isWithinPeriod(sale.created_at, dateBounds.start, dateBounds.end)) continue;
     const day = dayKeyFromIso(String(sale.created_at));
@@ -627,14 +577,16 @@ async function fetchCampaignAnalyticsSnapshot(
   resolvedUserId: string,
   dateBounds?: { start: Date; end: Date },
 ): Promise<CampaignAnalyticsSnapshot> {
-  const [creatorCounts, campaignData, salesResult] = await Promise.all([
-    getCampaignCreatorCounts(resolvedUserId),
+  const [attribution, campaignData, salesResult] = await Promise.all([
+    getCampaignCreatorAttribution(resolvedUserId),
     getCampaigns(resolvedUserId),
     supabase!
       .from("sales")
       .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
       .eq("user_id", resolvedUserId),
   ]);
+
+  const { creatorCounts, linkMeta } = attribution;
 
   const resolvedCreatorIds = resolveCampaignCreatorIds(campaign, creatorCounts);
 
@@ -667,6 +619,7 @@ async function fetchCampaignAnalyticsSnapshot(
     creatorCounts,
     campaignMeta,
     dateBounds,
+    linkMeta,
   );
 
   const displayCreatorIds = [
@@ -689,6 +642,11 @@ async function fetchCampaignAnalyticsSnapshot(
 
   const creatorMap = new Map(creatorProfiles.map((c) => [String(c.id), c]));
 
+  const brandSalesSummary =
+    resolvedCreatorIds.length > 0
+      ? await fetchCreatorBrandSalesSummary(resolvedUserId, resolvedCreatorIds)
+      : {};
+
   const buildCreatorRow = (id: string, s: CreatorCampaignStats): CampaignCreatorRow => {
     const c = creatorMap.get(id);
     const commissionPaid = attributePaidToCampaignScope(
@@ -697,6 +655,8 @@ async function fetchCampaignAnalyticsSnapshot(
       totalCommissionByCreator.get(id) || 0,
     );
     const brandCost = computeCreatorBrandCost(s.commission, commissionPaid);
+    const linkKey = `${campaign.id}:${id}`;
+    const brandSales = brandSalesSummary[id];
     return {
       id,
       handle: c?.handle ?? "—",
@@ -708,6 +668,9 @@ async function fetchCampaignAnalyticsSnapshot(
       commission: s.commission,
       commissionPaid,
       roi: computeCreatorCampaignRoi(s.salesAmount, brandCost),
+      historicalSalesAttached: linkMeta[linkKey]?.historical_sales_attached ?? true,
+      brandSalesCount: brandSales?.count ?? 0,
+      brandSalesRevenue: brandSales?.revenue ?? 0,
     };
   };
 
@@ -727,6 +690,7 @@ async function fetchCampaignAnalyticsSnapshot(
     creatorCounts,
     campaignMeta,
     topCreatorBounds,
+    linkMeta,
   );
   const topCreatorIds = [...new Set([...resolvedCreatorIds, ...Object.keys(topStats)])];
   const monthRows: CampaignCreatorRow[] = topCreatorIds
@@ -748,6 +712,7 @@ async function fetchCampaignAnalyticsSnapshot(
     creatorCounts,
     campaignMeta,
     dateBounds,
+    linkMeta,
   );
 
   let pendingPayouts = 0;
@@ -770,6 +735,7 @@ async function fetchCampaignAnalyticsSnapshot(
     campaignMeta,
     new Date(),
     dateBounds,
+    linkMeta,
   );
   const commissionTrend = computeCampaignScopedMetricTrend(
     salesRows,
@@ -779,6 +745,7 @@ async function fetchCampaignAnalyticsSnapshot(
     (sale) => Number(sale.commission_amount) || 0,
     new Date(),
     dateBounds,
+    linkMeta,
   );
   const netRevenueTrend = computeCampaignScopedMetricTrend(
     salesRows,
@@ -788,6 +755,7 @@ async function fetchCampaignAnalyticsSnapshot(
     (sale) => Math.max(0, (Number(sale.order_amount) || 0) - (Number(sale.commission_amount) || 0)),
     new Date(),
     dateBounds,
+    linkMeta,
   );
   const timeline = buildCampaignTimeline(
     salesRows,
@@ -795,6 +763,7 @@ async function fetchCampaignAnalyticsSnapshot(
     creatorCounts,
     campaignMeta,
     dateBounds,
+    linkMeta,
   );
 
   const totalBrandCost = rows.reduce(
@@ -813,7 +782,7 @@ async function fetchCampaignAnalyticsSnapshot(
     return computeCampaignPeriodTotals(salesRows, campaign.id, creatorCounts, campaignMeta, {
       start: prevStart,
       end: prevEnd,
-    });
+    }, linkMeta);
   })();
   const prevBrandCost = prevTotals.commission;
   const prevRoi = computeCreatorCampaignRoi(prevTotals.sales, prevBrandCost);
@@ -1265,6 +1234,19 @@ export function CampaignsView({
     autoPayout?: boolean;
     creatorIds?: string[];
     creatorCommissions?: { creatorId: string; commission_rate: number }[];
+    attachCreatorSales?: boolean;
+    creatorSalesAttachments?: Array<{ creatorId: string; attach: boolean }>;
+  };
+
+  const buildCreatorSyncOptions = (campaignData: Pick<CampaignFormData, "attachCreatorSales" | "creatorSalesAttachments">) => {
+    const creatorAttachments: Record<string, boolean> = {};
+    for (const entry of campaignData.creatorSalesAttachments ?? []) {
+      creatorAttachments[entry.creatorId] = entry.attach;
+    }
+    return {
+      attachHistoricalSales: Boolean(campaignData.attachCreatorSales),
+      creatorAttachments: Object.keys(creatorAttachments).length ? creatorAttachments : undefined,
+    };
   };
 
   const persistCampaignCreators = async (
@@ -1273,7 +1255,7 @@ export function CampaignsView({
     campaignData: CampaignFormData,
   ) => {
     const creatorIds = campaignData.creatorIds ?? [];
-    await syncCampaignCreators(resolvedUserId, campaignId, creatorIds);
+    await syncCampaignCreators(resolvedUserId, campaignId, creatorIds, buildCreatorSyncOptions(campaignData));
     for (const entry of campaignData.creatorCommissions ?? []) {
       await supabase!
         .from("creators")
@@ -1393,7 +1375,7 @@ export function CampaignsView({
       });
       if (saved) {
       const creatorIds = campaignData.creatorIds ?? [];
-      await syncCampaignCreators(user.id, String(saved.id), creatorIds);
+      await syncCampaignCreators(user.id, String(saved.id), creatorIds, buildCreatorSyncOptions(campaignData));
       for (const entry of campaignData.creatorCommissions ?? []) {
         await supabase
           .from("creators")
@@ -1417,6 +1399,7 @@ export function CampaignsView({
     campaignData: {
       creatorIds: string[];
       creatorCommissions: { creatorId: string; commission_rate: number }[];
+      creatorSalesAttachments?: Array<{ creatorId: string; attach: boolean }>;
     },
   ) => {
     if (!supabase) return;
@@ -1424,7 +1407,13 @@ export function CampaignsView({
     if (!user) return;
 
     const finalIds = [...new Set(campaignData.creatorIds.map(String))];
-    const ok = await syncCampaignCreators(user.id, campaignId, finalIds);
+    const creatorAttachments: Record<string, boolean> = {};
+    for (const entry of campaignData.creatorSalesAttachments ?? []) {
+      creatorAttachments[entry.creatorId] = entry.attach;
+    }
+    const ok = await syncCampaignCreators(user.id, campaignId, finalIds, {
+      creatorAttachments: Object.keys(creatorAttachments).length ? creatorAttachments : undefined,
+    });
     if (!ok) {
       alert(lang === "fr" ? "Impossible d'ajouter les créateurs." : "Could not add creators.");
       return;
@@ -1463,18 +1452,7 @@ export function CampaignsView({
     dispatchCampaignsUpdated();
   };
 
-  const handleUpdateCampaign = async (campaignId: string, campaignData: {
-    name: string;
-    description?: string;
-    platform: string;
-    startDate?: string;
-    endDate?: string;
-    commissionType: string;
-    commissionRate: number;
-    autoPayout: boolean;
-    creatorIds: string[];
-    creatorCommissions?: { creatorId: string; commission_rate: number }[];
-  }) => {
+  const handleUpdateCampaign = async (campaignId: string, campaignData: CampaignFormData) => {
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1487,11 +1465,11 @@ export function CampaignsView({
       end_date: campaignData.endDate,
       commission_type: campaignData.commissionType,
       commission_rate: campaignData.commissionRate,
-      auto_payout: campaignData.autoPayout,
+      auto_payout: campaignData.autoPayout ?? false,
     });
     if (!updated) return;
 
-    await syncCampaignCreators(user.id, campaignId, campaignData.creatorIds);
+    await syncCampaignCreators(user.id, campaignId, campaignData.creatorIds ?? [], buildCreatorSyncOptions(campaignData));
     for (const entry of campaignData.creatorCommissions ?? []) {
       await supabase
         .from("creators")
@@ -3605,7 +3583,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const netSeries = timeline
     .filter((p) => !currentStartKey || p.date >= currentStartKey)
     .map((p) => ({ date: p.date, value: p.net }));
-  const salesCountSeriesFull = timeline.map((p) => ({ date: p.date, value: p.salesCount }));
   const salesCountSeries = timeline
     .filter((p) => !currentStartKey || p.date >= currentStartKey)
     .map((p) => ({ date: p.date, value: p.salesCount }));
@@ -3702,6 +3679,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           rows={analytics?.rows ?? []}
           loading={analyticsLoading}
           currency={currency}
+          userId={userId}
           onAddCreator={onAddCreators}
         />
       )}
@@ -3797,7 +3775,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
                 }
                 value={String(periodSalesCount)}
                 trend={salesTrend}
-                series={salesCountSeriesFull}
+                series={salesCountSeries}
                 formatPoint={(v) =>
                   lang === "fr"
                     ? `${Math.round(v)} vente${Math.round(v) === 1 ? "" : "s"}`
@@ -3818,6 +3796,20 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               lang={lang}
               isMobile={isMobile}
               campaignId={campaign.id}
+              campaignCreatorIds={
+                analytics?.rows?.map((row) => String(row.id)) ??
+                campaign.creatorIds?.map(String) ??
+                []
+              }
+              syncRange={
+                analyticsPeriod === "today" ||
+                analyticsPeriod === "3d" ||
+                analyticsPeriod === "7d" ||
+                analyticsPeriod === "30d" ||
+                analyticsPeriod === "90d"
+                  ? analyticsPeriod
+                  : undefined
+              }
             />
           </div>
 
@@ -3878,6 +3870,7 @@ function CreatorsTab({
   rows,
   loading,
   currency,
+  userId,
   onAddCreator,
 }: {
   lang: "en" | "fr";
@@ -3885,8 +3878,34 @@ function CreatorsTab({
   rows: CampaignCreatorRow[];
   loading: boolean;
   currency: DisplayCurrency;
+  userId?: string;
   onAddCreator: () => void;
 }) {
+  const [attachingId, setAttachingId] = useState<string | null>(null);
+
+  const handleAttachSales = async (row: CampaignCreatorRow) => {
+    if (!userId || attachingId) return;
+    const count = row.brandSalesCount ?? 0;
+    const revenue = row.brandSalesRevenue ?? 0;
+    if (count <= 0) return;
+    const ok = window.confirm(
+      lang === "fr"
+        ? `Rattacher ${count} vente${count > 1 ? "s" : ""} (${formatCurrency(revenue, lang)}) de ce créateur à cette campagne ?`
+        : `Attach ${count} sale${count > 1 ? "s" : ""} (${formatCurrency(revenue, lang)}) from this creator to this campaign?`,
+    );
+    if (!ok) return;
+    setAttachingId(row.id);
+    try {
+      const success = await attachCreatorSalesToCampaign(userId, campaign.id, row.id);
+      if (success) {
+        dispatchCampaignsUpdated();
+        dispatchSalesUpdated();
+      }
+    } finally {
+      setAttachingId(null);
+    }
+  };
+
   const headers = [
     lang === "fr" ? "Créateur" : "Creator",
     lang === "fr" ? "Pseudo" : "Handle",
@@ -3911,7 +3930,7 @@ function CreatorsTab({
           rows.map((row) => (
             <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
             <td style={{ padding: "14px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <CreatorAvatar
                     src={row.avatar_url}
                     username={row.handle}
@@ -3919,7 +3938,48 @@ function CreatorsTab({
                     size={32}
                     alt={row.full_name || row.handle}
                   />
-                  <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                    {!row.historicalSalesAttached && (row.brandSalesCount ?? 0) > 0 ? (
+                      <div
+                        style={{
+                          marginTop: 8,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "#FFF7ED",
+                          border: "1px solid #FED7AA",
+                          maxWidth: 360,
+                        }}
+                      >
+                        <p style={{ margin: "0 0 8px", fontSize: 12, color: "#9A3412", lineHeight: 1.45 }}>
+                          {lang === "fr"
+                            ? "Les ventes de ce créateur ne sont pas rattachées à cette campagne."
+                            : "This creator's sales are not attached to this campaign."}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={attachingId === row.id}
+                          onClick={() => void handleAttachSales(row)}
+                          style={{
+                            border: "none",
+                            background: "#1A1A1A",
+                            color: "#FFFFFF",
+                            borderRadius: 8,
+                            padding: "6px 12px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: attachingId === row.id ? "wait" : "pointer",
+                            fontFamily: "inherit",
+                            opacity: attachingId === row.id ? 0.7 : 1,
+                          }}
+                        >
+                          {lang === "fr"
+                            ? `Rattacher les ventes (${row.brandSalesCount})`
+                            : `Attach sales (${row.brandSalesCount})`}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
             </td>
               <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
@@ -4177,7 +4237,7 @@ function PayoutsTab({
       }
 
       try {
-        const creatorCounts = await getCampaignCreatorCounts(resolvedUserId);
+        const { creatorCounts, linkMeta } = await getCampaignCreatorAttribution(resolvedUserId);
         const creatorIds = [
           ...new Set(
             (campaign.creatorIds?.length ? campaign.creatorIds : creatorCounts[campaign.id] ?? []).map(String),
@@ -4245,6 +4305,8 @@ function PayoutsTab({
           creatorIds,
           creatorCounts,
           campaignMeta,
+          undefined,
+          linkMeta,
         );
 
         const creatorMap = new Map(
@@ -4655,6 +4717,9 @@ type AddedCampaignCreator = {
   commissionType: "percent" | "flat";
   commissionRate: string;
   discountCode?: string;
+  historicalSalesAttached?: boolean;
+  brandSalesCount?: number;
+  brandSalesRevenue?: number;
 };
 
 function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | "fr") {
@@ -4694,7 +4759,12 @@ function parseHandlesFromCsv(text: string): string[] {
 
 function buildCampaignDescription(
   hashtags: string,
-  flags: { flagMissingTags: boolean; flagMissingDisclosure: boolean; trackAllCreatorContent: boolean },
+  flags: {
+    flagMissingTags: boolean;
+    flagMissingDisclosure: boolean;
+    trackAllCreatorContent: boolean;
+    attachCreatorSales: boolean;
+  },
 ): string {
   return JSON.stringify({ version: 1, hashtags, ...flags });
 }
@@ -4704,12 +4774,14 @@ function parseCampaignDescription(description?: string): {
   flagMissingTags: boolean;
   flagMissingDisclosure: boolean;
   trackAllCreatorContent: boolean;
+  attachCreatorSales: boolean;
 } {
   const defaults = {
     hashtags: "",
     flagMissingTags: false,
     flagMissingDisclosure: false,
     trackAllCreatorContent: true,
+    attachCreatorSales: false,
   };
   if (!description?.trim()) return defaults;
   try {
@@ -4720,6 +4792,7 @@ function parseCampaignDescription(description?: string): {
         flagMissingTags: Boolean(parsed.flagMissingTags),
         flagMissingDisclosure: Boolean(parsed.flagMissingDisclosure),
         trackAllCreatorContent: parsed.trackAllCreatorContent !== false,
+        attachCreatorSales: Boolean(parsed.attachCreatorSales),
       };
     }
   } catch {
@@ -4883,6 +4956,7 @@ function NewCampaignOnboarding({
   onAddCreators?: (data: {
     creatorIds: string[];
     creatorCommissions: { creatorId: string; commission_rate: number }[];
+    creatorSalesAttachments?: Array<{ creatorId: string; attach: boolean }>;
   }) => void | Promise<void>;
   onUpdate?: (campaignData: {
     name: string;
@@ -4942,6 +5016,7 @@ function NewCampaignOnboarding({
   const [flagMissingTags, setFlagMissingTags] = useState(false);
   const [flagMissingDisclosure, setFlagMissingDisclosure] = useState(false);
   const [trackAllCreatorContent, setTrackAllCreatorContent] = useState(true);
+  const [attachCreatorSales, setAttachCreatorSales] = useState(false);
   const [start, setStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [addedCreators, setAddedCreators] = useState<AddedCampaignCreator[]>([]);
   const [savedCreators, setSavedCreators] = useState<SavedCreatorOption[]>([]);
@@ -4958,6 +5033,69 @@ function NewCampaignOnboarding({
   const initialCampaignCreatorIdsRef = useRef<Set<string>>(new Set());
   const hasPreloadedCampaignCreatorsRef = useRef(false);
   const hasPrefilledCampaignRef = useRef(false);
+
+  const addedCreatorIdsKey = useMemo(
+    () => addedCreators.map((entry) => entry.creatorId || normalizeHandle(entry.handle)).join("|"),
+    [addedCreators],
+  );
+
+  useEffect(() => {
+    if (addedCreators.length === 0) return;
+    let cancelled = false;
+
+    void (async () => {
+      let resolvedUserId = userId;
+      if (!resolvedUserId && supabase) {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      }
+      if (!resolvedUserId) return;
+
+      const ids = [
+        ...new Set(addedCreators.map((entry) => entry.creatorId).filter(Boolean) as string[]),
+      ];
+      if (ids.length === 0) return;
+
+      const summary = await fetchCreatorBrandSalesSummary(resolvedUserId, ids);
+      if (cancelled) return;
+
+      setAddedCreators((list) =>
+        list.map((entry) => {
+          if (!entry.creatorId) return entry;
+          const stats = summary[entry.creatorId];
+          if (!stats) return entry;
+          return {
+            ...entry,
+            brandSalesCount: stats.count,
+            brandSalesRevenue: stats.revenue,
+          };
+        }),
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addedCreatorIdsKey, userId]);
+
+  const confirmAttachCreatorSales = (entry: AddedCampaignCreator): boolean => {
+    const count = entry.brandSalesCount ?? 0;
+    const revenue = entry.brandSalesRevenue ?? 0;
+    if (count <= 0) return false;
+    return window.confirm(
+      lang === "fr"
+        ? `Rattacher ${count} vente${count > 1 ? "s" : ""} (${formatCurrency(revenue, lang)}) de ce créateur à cette campagne ?`
+        : `Attach ${count} sale${count > 1 ? "s" : ""} (${formatCurrency(revenue, lang)}) from this creator to this campaign?`,
+    );
+  };
+
+  const markCreatorSalesAttached = (key: string) => {
+    const entry = addedCreators.find((item) => item.key === key);
+    if (!entry || !confirmAttachCreatorSales(entry)) return;
+    setAddedCreators((list) =>
+      list.map((item) => (item.key === key ? { ...item, historicalSalesAttached: true } : item)),
+    );
+  };
 
   const maxCreators = getMaxManagedCreators(plan);
   const remainingSlots =
@@ -4997,6 +5135,7 @@ function NewCampaignOnboarding({
     setFlagMissingTags(parsed.flagMissingTags);
     setFlagMissingDisclosure(parsed.flagMissingDisclosure);
     setTrackAllCreatorContent(parsed.trackAllCreatorContent);
+    setAttachCreatorSales(parsed.attachCreatorSales);
     const startValue = toDateInputValue(existingCampaign.startRaw ?? existingCampaign.start);
     if (startValue) setStart(startValue);
     hasPrefilledCampaignRef.current = true;
@@ -5281,9 +5420,23 @@ function NewCampaignOnboarding({
   const buildCampaignPayload = async () => {
     const { creatorIds, creatorCommissions } = await resolveCreatorPayload();
     const primaryRate = creatorCommissions.length > 0 ? creatorCommissions[0].commission_rate : 10;
+    const creatorSalesAttachments = (() => {
+      if (!isAddCreatorsMode && attachCreatorSales && creatorIds.length > 0) {
+        return creatorIds.map((id) => ({ creatorId: id, attach: true }));
+      }
+      const manual = addedCreators
+        .filter((entry) => entry.creatorId && entry.historicalSalesAttached)
+        .map((entry) => ({ creatorId: entry.creatorId as string, attach: true }));
+      return manual.length ? manual : undefined;
+    })();
     return {
       name: name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),
-      description: buildCampaignDescription(hashtags, { flagMissingTags, flagMissingDisclosure, trackAllCreatorContent }),
+      description: buildCampaignDescription(hashtags, {
+        flagMissingTags,
+        flagMissingDisclosure,
+        trackAllCreatorContent,
+        attachCreatorSales,
+      }),
       platform: isEditMode && existingCampaign?.platform ? existingCampaign.platform : "All",
       startDate: normalizeDate(start),
       endDate: isEditMode ? existingCampaign?.endRaw ?? normalizeDate(existingCampaign?.end) : undefined,
@@ -5292,6 +5445,8 @@ function NewCampaignOnboarding({
       autoPayout: isEditMode ? Boolean(existingCampaign?.autoPayout) : false,
       creatorIds,
       creatorCommissions,
+      attachCreatorSales: isAddCreatorsMode ? undefined : attachCreatorSales,
+      creatorSalesAttachments,
     };
   };
 
@@ -5326,6 +5481,7 @@ function NewCampaignOnboarding({
         await onAddCreators({
           creatorIds: payload.creatorIds,
           creatorCommissions: payload.creatorCommissions,
+          creatorSalesAttachments: payload.creatorSalesAttachments,
         });
         return;
       }
@@ -5472,6 +5628,22 @@ function NewCampaignOnboarding({
                       ? "Toutes les publications des créateurs de la campagne seront suivies, pas seulement celles avec vos mots-clés."
                       : "All posts from campaign creators will be tracked, not only those matching your keywords.",
                 },
+                ...(!isAddCreatorsMode
+                  ? [
+                      {
+                        checked: attachCreatorSales,
+                        onChange: setAttachCreatorSales,
+                        label:
+                          lang === "fr"
+                            ? "Rattacher les ventes passées des créateurs à cette campagne"
+                            : "Attach creators' past sales to this campaign",
+                        hint:
+                          lang === "fr"
+                            ? "Inclut les ventes déjà générées par les créateurs sélectionnés. Désactivé, les analytiques démarrent à zéro."
+                            : "Includes sales already driven by selected creators. When off, campaign analytics start from zero.",
+                      },
+                    ]
+                  : []),
               ].map((row) => (
                 <label key={row.label} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
                   <input
@@ -5725,6 +5897,52 @@ function NewCampaignOnboarding({
                           ) : null}
                         </div>
                         <div style={{ fontSize: 13, color: "#1A1A1A" }}>@{entry.handle.replace(/^@/, "")}</div>
+                        {isAddCreatorsMode &&
+                        !isExistingInCampaign &&
+                        !entry.historicalSalesAttached &&
+                        (entry.brandSalesCount ?? 0) > 0 ? (
+                          <div
+                            style={{
+                              marginTop: 8,
+                              padding: "10px 12px",
+                              borderRadius: 8,
+                              background: "#FFF7ED",
+                              border: "1px solid #FED7AA",
+                            }}
+                          >
+                            <p style={{ margin: "0 0 8px", fontSize: 12, color: "#9A3412", lineHeight: 1.45 }}>
+                              {lang === "fr"
+                                ? "Les ventes de ce créateur ne sont pas rattachées à cette campagne."
+                                : "This creator's sales are not attached to this campaign."}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => markCreatorSalesAttached(entry.key)}
+                              style={{
+                                border: "none",
+                                background: "#1A1A1A",
+                                color: "#FFFFFF",
+                                borderRadius: 8,
+                                padding: "6px 12px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              {lang === "fr"
+                                ? `Rattacher les ventes (${entry.brandSalesCount})`
+                                : `Attach sales (${entry.brandSalesCount})`}
+                            </button>
+                          </div>
+                        ) : null}
+                        {entry.historicalSalesAttached && (entry.brandSalesCount ?? 0) > 0 ? (
+                          <div style={{ marginTop: 6, fontSize: 12, color: "#166534", fontWeight: 500 }}>
+                            {lang === "fr"
+                              ? `${entry.brandSalesCount} vente(s) rattachée(s)`
+                              : `${entry.brandSalesCount} sale(s) attached`}
+                          </div>
+                        ) : null}
                       </div>
                       <button
                         type="button"

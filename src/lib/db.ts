@@ -171,32 +171,113 @@ export async function deleteCampaign(campaignId: string): Promise<boolean> {
   }
 }
 
-export async function getCampaignCreatorCounts(userId: string): Promise<Record<string, string[]>> {
-  if (!supabase) return {};
+import {
+  buildCampaignCreatorLinkMap,
+  buildCreatorCountsFromLinks,
+  type CampaignCreatorLinkMap,
+} from "@/lib/campaign-sales-attribution";
+
+export type CampaignCreatorLinkRow = {
+  campaign_id: string;
+  creator_id: string;
+  historical_sales_attached: boolean;
+  created_at: string;
+};
+
+export async function getCampaignCreatorLinks(userId: string): Promise<CampaignCreatorLinkRow[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("campaign_creators")
-    .select("campaign_id, creator_id")
+    .select("campaign_id, creator_id, historical_sales_attached, created_at")
     .eq("user_id", userId);
   if (error) {
-    console.error("getCampaignCreatorCounts error:", error);
-    return {};
+    console.error("getCampaignCreatorLinks error:", error);
+    return [];
   }
-  const map: Record<string, string[]> = {};
-  for (const row of data || []) {
-    const campaignId = String(row.campaign_id);
-    if (!map[campaignId]) map[campaignId] = [];
-    map[campaignId].push(String(row.creator_id));
-  }
-  return map;
+  return (data || []).map((row) => ({
+    campaign_id: String(row.campaign_id),
+    creator_id: String(row.creator_id),
+    historical_sales_attached: row.historical_sales_attached !== false,
+    created_at: String(row.created_at || new Date(0).toISOString()),
+  }));
 }
 
-export async function syncCampaignCreators(userId: string, campaignId: string, creatorIds: string[]) {
+export async function getCampaignCreatorAttribution(userId: string): Promise<{
+  creatorCounts: Record<string, string[]>;
+  linkMeta: CampaignCreatorLinkMap;
+}> {
+  const links = await getCampaignCreatorLinks(userId);
+  return {
+    creatorCounts: buildCreatorCountsFromLinks(links),
+    linkMeta: buildCampaignCreatorLinkMap(links),
+  };
+}
+
+export async function getCampaignCreatorCounts(userId: string): Promise<Record<string, string[]>> {
+  const { creatorCounts } = await getCampaignCreatorAttribution(userId);
+  return creatorCounts;
+}
+
+export async function attachCreatorSalesToCampaign(
+  userId: string,
+  campaignId: string,
+  creatorId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch("/api/campaign-creators/attach-sales", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, campaignId, creatorId }),
+    });
+    const payload = (await res.json().catch(() => ({}))) as { ok?: boolean };
+    return res.ok && Boolean(payload.ok);
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchCreatorBrandSalesSummary(
+  userId: string,
+  creatorIds: string[],
+): Promise<Record<string, { count: number; revenue: number; commission: number }>> {
+  if (creatorIds.length === 0) return {};
+  try {
+    const res = await fetch(
+      `/api/campaign-creators/sales-summary?userId=${encodeURIComponent(userId)}&creatorIds=${encodeURIComponent(creatorIds.join(","))}`,
+      { cache: "no-store" },
+    );
+    const data = (await res.json()) as {
+      ok?: boolean;
+      creators?: Record<string, { count: number; revenue: number; commission: number }>;
+    };
+    if (!res.ok || !data.ok) return {};
+    return data.creators ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function syncCampaignCreators(
+  userId: string,
+  campaignId: string,
+  creatorIds: string[],
+  options?: {
+    attachHistoricalSales?: boolean;
+    creatorAttachments?: Record<string, boolean>;
+  },
+) {
   // Routed through a service-role API so the write isn't subject to browser-session RLS.
   try {
     const res = await fetch("/api/campaign-creators/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId, campaignId, creatorIds }),
+      body: JSON.stringify({
+        userId,
+        campaignId,
+        creatorIds,
+        attachHistoricalSales: options?.attachHistoricalSales,
+        creatorAttachments: options?.creatorAttachments,
+      }),
     });
     const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (!res.ok || !payload.ok) {

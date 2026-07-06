@@ -309,7 +309,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   const base = dbRowToCreator(c);
   const estCostPerPost = estimatedCostPerPost(base.followersCount);
   const tv = Array.isArray(c.top_videos) ? (c.top_videos as Record<string, unknown>[]) : [];
-  const topVideos: FeedVideo[] = tv.slice(0, 6).map((v) => ({
+  const topVideos: FeedVideo[] = tv.slice(0, 3).map((v) => ({
     id: String(v.id ?? ""),
     cover: clientImageUrl(String(v.cover ?? "")),
     shareUrl: String(v.shareUrl ?? ""),

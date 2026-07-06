@@ -6,7 +6,11 @@ import {
   resolveCampaignContentIds,
   resolveCreatorRowIdsByHandle,
 } from "@/lib/content-campaign-sync";
-import { backfillDiscoveryContentRefs, syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
+import {
+  backfillDiscoveryContentRefs,
+  removeContentRefFromDiscoverySaved,
+  syncContentRefToDiscoverySaved,
+} from "@/lib/content-creator-sync";
 import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -210,4 +214,34 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ ok: true, id: data.id, creatorRowId });
+}
+
+// DELETE — brand removes uploaded content
+export async function DELETE(request: Request) {
+  const admin = getSupabaseAdmin();
+  if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id")?.trim();
+  const brandId = searchParams.get("brandId")?.trim();
+  if (!id || !brandId) return NextResponse.json({ error: "Missing id or brandId" }, { status: 400 });
+
+  const { data: row, error: fetchErr } = await admin
+    .from("creator_content")
+    .select("id, creator_row_id")
+    .eq("id", id)
+    .eq("brand_id", brandId)
+    .maybeSingle();
+  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (!row) return NextResponse.json({ error: "Content not found" }, { status: 404 });
+
+  const { error } = await admin.from("creator_content").delete().eq("id", id).eq("brand_id", brandId);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (row.creator_row_id) {
+    const syncErr = await removeContentRefFromDiscoverySaved(admin, brandId, String(row.creator_row_id), id);
+    if (syncErr) console.error("discovery content ref cleanup failed:", syncErr.message);
+  }
+
+  return NextResponse.json({ ok: true });
 }

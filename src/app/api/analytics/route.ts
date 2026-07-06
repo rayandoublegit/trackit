@@ -9,9 +9,9 @@ import {
   type AnalyticsDateRange,
 } from "@/lib/analytics-periods";
 import {
-  attributeSaleToCampaign,
+  attributeSaleToCampaigns,
+  buildCampaignCreatorLinkMap,
   buildCreatorCountsFromLinks,
-  type CampaignSalesMeta,
   type SaleAttributionRow,
 } from "@/lib/campaign-sales-attribution";
 import { dedupeCampaignRows, normalizeCampaignStatus } from "@/lib/campaign-status";
@@ -299,9 +299,6 @@ export async function GET(request: Request) {
   };
 
   let creatorPerfMap = buildCreatorPerfMap(periodSales);
-  if (creatorPerfMap.size === 0 && salesRows.length > 0) {
-    creatorPerfMap = buildCreatorPerfMap(salesRows);
-  }
 
   const missingCreatorIds = [...creatorPerfMap.keys()].filter((id) => !creatorInfoMap.has(id));
   if (missingCreatorIds.length > 0) {
@@ -405,7 +402,7 @@ export async function GET(request: Request) {
 
   const { data: ccLinks } = await supabaseAdmin
     .from("campaign_creators")
-    .select("campaign_id, creator_id")
+    .select("campaign_id, creator_id, historical_sales_attached, created_at")
     .eq("user_id", userId);
 
   const creatorCounts = buildCreatorCountsFromLinks(
@@ -414,14 +411,14 @@ export async function GET(request: Request) {
       creator_id: String(l.creator_id),
     })),
   );
-
-  const campaignMeta: Record<string, CampaignSalesMeta> = {};
-  for (const row of campaignsRaw || []) {
-    campaignMeta[String(row.id)] = {
-      status: String(row.status ?? ""),
-      created_at: typeof row.created_at === "string" ? row.created_at : undefined,
-    };
-  }
+  const linkMeta = buildCampaignCreatorLinkMap(
+    (ccLinks || []).map((l) => ({
+      campaign_id: String(l.campaign_id),
+      creator_id: String(l.creator_id),
+      historical_sales_attached: l.historical_sales_attached,
+      created_at: l.created_at,
+    })),
+  );
 
   const creatorCountByCampaign = new Map<string, number>();
   for (const link of ccLinks || []) {
@@ -430,13 +427,13 @@ export async function GET(request: Request) {
   }
 
   const campaignTotalsMap = new Map<string, { sales: number; commissions: number }>();
-  for (const sale of salesRows) {
-    const campaignId = attributeSaleToCampaign(sale, creatorCounts, campaignMeta);
-    if (!campaignId) continue;
-    const agg = campaignTotalsMap.get(campaignId) || { sales: 0, commissions: 0 };
-    agg.sales += Number(sale.order_amount) || 0;
-    agg.commissions += Number(sale.commission_amount) || 0;
-    campaignTotalsMap.set(campaignId, agg);
+  for (const sale of periodSales) {
+    for (const campaignId of attributeSaleToCampaigns(sale, creatorCounts, linkMeta)) {
+      const agg = campaignTotalsMap.get(campaignId) || { sales: 0, commissions: 0 };
+      agg.sales += Number(sale.order_amount) || 0;
+      agg.commissions += Number(sale.commission_amount) || 0;
+      campaignTotalsMap.set(campaignId, agg);
+    }
   }
 
   const campaignsData = dedupeCampaignRows((campaignsRaw || []) as Array<Record<string, unknown>>)
