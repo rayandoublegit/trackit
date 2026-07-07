@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import {
@@ -54,6 +54,7 @@ function MetricCard({
 
 export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
+  useDisplayCurrency();
   const { stats, loading, error } = useCreatorStats(userId);
   const [period, setPeriod] = useState<AnalyticsDateRange>("30d");
   const allSales = stats?.sales ?? [];

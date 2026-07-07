@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import { getPeriodBounds, isWithinPeriod, type AnalyticsDateRange } from "@/lib/analytics-periods";
 import { getCampaignCreatorAttribution } from "@/lib/db";
@@ -137,6 +137,7 @@ export function AnalyticsSalesPanel({
   /** Called after a sale is deleted so parent analytics can refresh immediately. */
   onSalesChange?: () => void | Promise<void>;
 }) {
+  useDisplayCurrency();
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

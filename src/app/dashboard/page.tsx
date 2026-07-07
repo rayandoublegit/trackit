@@ -93,6 +93,7 @@ import {
   writeDashboardBootstrap,
 } from "@/lib/dashboard-bootstrap-cache";
 import { useLang } from "@/lib/useLang";
+import { useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
 import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
@@ -159,6 +160,7 @@ function getSidebarSectionLabels(lang: "en" | "fr"): Record<Exclude<SidebarNavSe
 }
 
 function DashboardPageContent() {
+  useDisplayCurrency();
   const router = useRouter();
   const searchParams = useSearchParams();
   const lang = useLang();

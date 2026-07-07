@@ -11,7 +11,7 @@ import {
   canUseStripeConnectPayouts,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import {
   formatPaymentLabel,
   formatPaymentLabelShort,
@@ -2169,6 +2169,7 @@ export function PayoutsView({
   onConnectShopify?: () => void;
 }) {
   const lang = useLang();
+  useDisplayCurrency();
   const { navState, navigate } = useDashboardNavigation();
   const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
   const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useLang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import type { DashboardView } from "@/lib/dashboard-view-storage";
 
@@ -279,6 +279,7 @@ function CreatorHomeOverview({
   userId?: string;
   onNavigate: (view: DashboardView) => void;
 }) {
+  useDisplayCurrency();
   const { stats, loading, error } = useCreatorStats(userId);
 
   const firstName = stats?.creatorName?.replace(/^@/, "").split(" ")[0] ?? "";

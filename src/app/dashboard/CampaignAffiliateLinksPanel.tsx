@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { AnalyticsBarChart, AnalyticsSectionHeader } from "./analytics-metric-cards";
 
 type LinkMetrics = {
@@ -86,6 +86,7 @@ export function CampaignAffiliateLinksPanel({
   isMobile?: boolean;
   onGoToLinksTab?: () => void;
 }) {
+  useDisplayCurrency();
   const [links, setLinks] = useState<AffiliateLinkRow[]>([]);
   const [totals, setTotals] = useState<LinkTotals>({
     clicks: 0,

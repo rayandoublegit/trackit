@@ -26,6 +26,13 @@ export function dispatchCampaignsUpdated() {
   window.dispatchEvent(new CustomEvent(CAMPAIGNS_UPDATED_EVENT));
 }
 
+export const CONTENT_UPDATED_EVENT = "trackit:content-updated";
+
+export function dispatchContentUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CONTENT_UPDATED_EVENT));
+}
+
 export function followUpIn3Days() {
   const d = new Date();
   d.setDate(d.getDate() + 3);

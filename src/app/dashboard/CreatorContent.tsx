@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { CONTENT_UPDATED_EVENT, dispatchContentUpdated } from "@/lib/outreach-history-events";
 import { supabase } from "@/lib/supabase";
 import { ContentPostStatsDisplay } from "./ContentPostStats";
 import { InfoTip } from "./analytics-metric-cards";
@@ -177,8 +178,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       body: JSON.stringify({ userId }),
     }).then(() => load());
     const onUpdated = () => void load();
-    window.addEventListener("trackit:content-updated", onUpdated);
-    return () => window.removeEventListener("trackit:content-updated", onUpdated);
+    window.addEventListener(CONTENT_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(CONTENT_UPDATED_EVENT, onUpdated);
   }, [userId]);
 
 
@@ -300,7 +301,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à la marque.`
           : `${uploaded} file${uploaded > 1 ? "s" : ""} sent to the brand.`,
       );
-      window.dispatchEvent(new CustomEvent("trackit:content-updated"));
+      dispatchContentUpdated();
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : lang === "fr" ? "Échec de l'envoi." : "Upload failed.");
@@ -314,7 +315,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     await fetch(`/api/creator/content?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
       method: "DELETE",
     });
-    window.dispatchEvent(new CustomEvent("trackit:content-updated"));
+    dispatchContentUpdated();
     setItems((list) => list.filter((i) => i.id !== id));
   };
 

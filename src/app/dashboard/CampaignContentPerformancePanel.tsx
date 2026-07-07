@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
+import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import {
   calcEngagementRate,
   formatCompactStat,
@@ -150,13 +151,12 @@ export function CampaignContentPerformancePanel({
         if (!cancelled) setLoading(false);
       }
     })();
-    const onUpdated = () => void load();
-    window.addEventListener("trackit:content-updated", onUpdated);
     return () => {
       cancelled = true;
-      window.removeEventListener("trackit:content-updated", onUpdated);
     };
   }, [brandId, load]);
+
+  useAnalyticsAutoRefresh(load, { pollIntervalMs: 20_000, enabled: !!brandId });
 
   const refreshStats = async (contentId: string) => {
     setRefreshingId(contentId);
@@ -253,8 +253,8 @@ export function CampaignContentPerformancePanel({
         ) : empty ? (
           <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
             {lang === "fr"
-              ? "Aucun contenu avec URL TikTok pour l'instant. Les créateurs peuvent ajouter l'URL lors de l'envoi."
-              : "No content with a TikTok URL yet. Creators can add the URL when uploading."}
+              ? "Aucun contenu avec URL TikTok pour l'instant. Ajoutez une URL lors de l'envoi de contenu ou demandez aux créateurs de le faire."
+              : "No content with a TikTok URL yet. Add a URL when uploading content or ask creators to include one."}
           </p>
         ) : (
           <div style={{ overflowX: "auto" }}>

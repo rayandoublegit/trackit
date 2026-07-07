@@ -15,13 +15,15 @@ export function formatCompactNumber(n: number): string {
   return String(rounded);
 }
 
-export function formatCompactCurrency(n: number, lang: "en" | "fr"): string {
-  if (!Number.isFinite(n)) return lang === "fr" ? "0 €" : "$0";
+import type { DisplayCurrency } from "@/lib/locale-preferences";
+
+export function formatCompactCurrency(n: number, currency: DisplayCurrency): string {
+  if (!Number.isFinite(n)) return currency === "EUR" ? "0 €" : "$0";
   if (Math.abs(n) >= 1_000) {
     const compact = formatCompactNumber(n);
-    return lang === "fr" ? `${compact} €` : `$${compact}`;
+    return currency === "EUR" ? `${compact} €` : `$${compact}`;
   }
-  if (lang === "fr") {
+  if (currency === "EUR") {
     return `${Math.round(n).toLocaleString("fr-FR")} €`;
   }
   return `$${Math.round(n).toLocaleString("en-US")}`;

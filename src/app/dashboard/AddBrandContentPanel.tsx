@@ -5,12 +5,14 @@ import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
 import { safeContentFileName } from "@/lib/content-shared";
+import { dispatchContentUpdated } from "@/lib/outreach-history-events";
 import {
   selectionCardStyle,
   selectionTextPrimary,
   selectionTextSecondary,
 } from "@/lib/selection-card-styles";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { InfoTip } from "./analytics-metric-cards";
 
 const BLUE = "#0047FF";
 const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
@@ -59,6 +61,7 @@ export function AddBrandContentPanel({
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [postUrl, setPostUrl] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
@@ -78,6 +81,7 @@ export function AddBrandContentPanel({
     setTitle("");
     setNotes("");
     setPendingFiles([]);
+    setPostUrl("");
     setDragOver(false);
     setMessage("");
     setMessageTone("error");
@@ -130,6 +134,12 @@ export function AddBrandContentPanel({
       setMessage(lang === "fr" ? "Ajoutez au moins un fichier." : "Add at least one file.");
       return;
     }
+    const trimmedPostUrl = postUrl.trim();
+    if (trimmedPostUrl && !/tiktok\.com\//i.test(trimmedPostUrl)) {
+      setMessageTone("error");
+      setMessage(lang === "fr" ? "L'URL doit être un lien TikTok (tiktok.com)." : "URL must be a TikTok link (tiktok.com).");
+      return;
+    }
     if (!supabase) {
       setMessageTone("error");
       setMessage(lang === "fr" ? "Stockage indisponible." : "Storage unavailable.");
@@ -140,7 +150,8 @@ export function AddBrandContentPanel({
     setMessage("");
     try {
       let uploaded = 0;
-      for (const file of pendingFiles) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        const file = pendingFiles[i];
         const path = `brand-upload/${brandId}/${creatorRowId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeContentFileName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
@@ -163,6 +174,7 @@ export function AddBrandContentPanel({
             fileName: file.name,
             fileType: file.type || null,
             fileSize: file.size,
+            ...(i === 0 && trimmedPostUrl ? { postUrl: trimmedPostUrl } : {}),
           }),
         });
         const data = (await res.json()) as { ok?: boolean; error?: string };
@@ -176,7 +188,7 @@ export function AddBrandContentPanel({
           ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} ajouté${uploaded > 1 ? "s" : ""}.`
           : `${uploaded} file${uploaded > 1 ? "s" : ""} added.`,
       );
-      window.dispatchEvent(new CustomEvent("trackit:content-updated"));
+      dispatchContentUpdated();
       onSuccess?.();
       setTimeout(() => onClose(), 400);
     } catch (err) {
@@ -448,6 +460,34 @@ export function AddBrandContentPanel({
                   ))}
                 </ul>
               ) : null}
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                  {lang === "fr" ? "Liens URL" : "URL links"}
+                </label>
+                <InfoTip
+                  lang={lang}
+                  text={
+                    lang === "fr"
+                      ? "Collez l'URL du post TikTok publié pour récupérer les vues, likes et l'engagement. Les stats apparaîtront dans Performance par contenu."
+                      : "Paste the published TikTok post URL to fetch views, likes, and engagement. Stats will show in Performance by content."
+                  }
+                />
+              </div>
+              <input
+                type="url"
+                value={postUrl}
+                onChange={(e) => setPostUrl(e.target.value)}
+                placeholder="https://www.tiktok.com/@compte/video/..."
+                style={inputStyle}
+              />
+              <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", lineHeight: 1.45 }}>
+                {lang === "fr"
+                  ? "Optionnel — associé au premier fichier envoyé."
+                  : "Optional — linked to the first uploaded file."}
+              </p>
             </div>
 
             {message ? (

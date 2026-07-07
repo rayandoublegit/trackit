@@ -7,6 +7,7 @@ import {
   isVideoContentFile,
   type ContentListItem,
 } from "@/lib/content-shared";
+import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import { AddBrandContentPanel } from "./AddBrandContentPanel";
 import { CampaignContentPerformancePanel } from "./CampaignContentPerformancePanel";
 import { ContentFileActions } from "./ContentFileActions";
@@ -88,6 +89,8 @@ export function CampaignContentTab({
       window.removeEventListener("trackit:content-updated", onUpdated);
     };
   }, [brandId, campaignId, loadItems]);
+
+  useAnalyticsAutoRefresh(loadItems, { enabled: !!brandId, pollIntervalMs: 20_000 });
 
   const header = (
     <div

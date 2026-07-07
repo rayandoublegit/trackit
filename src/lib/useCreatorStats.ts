@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
+import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 
 export type CreatorStatsData = {
   linked: boolean;
@@ -61,20 +61,7 @@ export function useCreatorStats(userId?: string) {
     void reload();
   }, [reload]);
 
-  useEffect(() => {
-    if (!userId) return;
-    const onRefresh = () => {
-      void reload();
-    };
-    window.addEventListener(SALES_UPDATED_EVENT, onRefresh);
-    window.addEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
-    const interval = window.setInterval(onRefresh, 30000);
-    return () => {
-      window.removeEventListener(SALES_UPDATED_EVENT, onRefresh);
-      window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
-      window.clearInterval(interval);
-    };
-  }, [userId, reload]);
+  useAnalyticsAutoRefresh(reload, { enabled: !!userId });
 
   return { stats, loading, error, reload };
 }

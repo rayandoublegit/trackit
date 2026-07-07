@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import {
   fillChartSeries,
@@ -14,7 +14,8 @@ import {
   type PeriodTrend,
 } from "@/lib/analytics-periods";
 import { campaignStatusLabel } from "@/lib/campaign-status";
-import { OUTREACH_HISTORY_UPDATED_EVENT, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchSalesUpdated } from "@/lib/outreach-history-events";
+import { dispatchSalesUpdated } from "@/lib/outreach-history-events";
+import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { AddSalePanel } from "./AddSalePanel";
@@ -39,6 +40,7 @@ export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang
 }
 
 function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
+  useDisplayCurrency();
   const isFree = plan === "free";
   const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
@@ -116,20 +118,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     };
   }, [userId, shopifyStore, range, tzOffset]);
 
-  useEffect(() => {
-    if (!userId) return;
-
-    window.addEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
-    window.addEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
-    window.addEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
-    window.addEventListener(CAMPAIGNS_UPDATED_EVENT, refreshAnalytics);
-    return () => {
-      window.removeEventListener(OUTREACH_HISTORY_UPDATED_EVENT, refreshAnalytics);
-      window.removeEventListener(PAYOUTS_UPDATED_EVENT, refreshAnalytics);
-      window.removeEventListener(SALES_UPDATED_EVENT, refreshAnalytics);
-      window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, refreshAnalytics);
-    };
-  }, [userId, refreshAnalytics]);
+  useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId });
 
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);

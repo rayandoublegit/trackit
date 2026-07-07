@@ -21,6 +21,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
+import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
 import { computeTrend, dayKeyFromIso, fillTimelineDays, formatTrendLabel, isWithinPeriod, resolveAnalyticsDateBounds, analyticsPeriodLabel, ANALYTICS_PERIOD_OPTIONS, toDayKey, type AnalyticsDateRange, type PeriodTrend } from "@/lib/analytics-periods";
 import {
@@ -31,7 +32,8 @@ import {
 } from "./analytics-metric-cards";
 import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 import { AddSalePanel } from "./AddSalePanel";
-import { formatCurrency, formatCurrencyWithCode, type DisplayCurrency } from "@/lib/useCurrency";
+import { formatCurrency, formatCurrencyWithCode, useDisplayCurrency, useSetDisplayCurrency, type DisplayCurrency } from "@/lib/useCurrency";
+import { getDisplayCurrency } from "@/lib/locale-preferences";
 import {
   compactNumberToInput,
   formatCompactCurrency,
@@ -2849,7 +2851,7 @@ function CompactKpi({
   sub,
   subColor,
   value,
-  currency,
+  showAsCurrency,
   onCommit,
 }: {
   lang: "en" | "fr";
@@ -2857,7 +2859,7 @@ function CompactKpi({
   sub: string;
   subColor?: string;
   value: number;
-  currency?: boolean;
+  showAsCurrency?: boolean;
   onCommit: (next: number) => void;
 }) {
   const [draft, setDraft] = useState(() => compactNumberToInput(value));
@@ -2901,7 +2903,7 @@ function CompactKpi({
     setDraft(compactNumberToInput(parsed));
   };
 
-  const displayValue = currency ? formatCompactCurrency(value, lang) : formatCompactNumber(value);
+  const displayValue = showAsCurrency ? formatCompactCurrency(value, getDisplayCurrency(lang)) : formatCompactNumber(value);
 
   return (
     <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
@@ -3443,7 +3445,8 @@ function CampaignDetailToolbar({
 function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onManualSaleAdded, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onManualSaleAdded?: (saleDate?: string) => void | Promise<void>; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>(initialTab);
   const [addSaleOpen, setAddSaleOpen] = useState(false);
-  const [currency, setCurrency] = useState<DisplayCurrency>(lang === "fr" ? "EUR" : "USD");
+  const displayCurrency = useDisplayCurrency();
+  const setDisplayCurrency = useSetDisplayCurrency();
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsDateRange>("30d");
   const [customDateRange, setCustomDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
   const [analytics, setAnalytics] = useState<CampaignAnalyticsSnapshot | null>(null);
@@ -3540,18 +3543,12 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     };
 
     void load();
-    const onRefresh = () => void refreshCampaignAnalytics();
-    window.addEventListener(SALES_UPDATED_EVENT, onRefresh);
-    window.addEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
-    window.addEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
-
     return () => {
       cancelled = true;
-      window.removeEventListener(SALES_UPDATED_EVENT, onRefresh);
-      window.removeEventListener(PAYOUTS_UPDATED_EVENT, onRefresh);
-      window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, onRefresh);
     };
   }, [refreshCampaignAnalytics]);
+
+  useAnalyticsAutoRefresh(refreshCampaignAnalytics);
 
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
@@ -3595,7 +3592,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     .filter((p) => !currentStartKey || p.date >= currentStartKey)
     .map((p) => ({ date: p.date, value: p.commission > 0 ? p.revenue / p.commission : 0 }));
   const isProfitable = (roi ?? 0) >= 1 || (totals.commission === 0 && totals.sales > 0);
-  const money = (v: number) => formatCurrencyWithCode(v, currency);
+  const money = (v: number) => formatCurrencyWithCode(v, displayCurrency);
 
   const handleExport = async (format: "csv" | "xlsx") => {
     if (!supabase) return;
@@ -3615,7 +3612,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       const data: CampaignAnalyticsExport = {
         campaignName: campaign.name,
         dateRange: exportDateRange,
-        currency,
+        currency: displayCurrency,
         rows: snapshot.rows,
         totals: snapshot.totals,
         pendingPayouts: snapshot.pendingPayouts,
@@ -3639,8 +3636,8 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         lang={lang}
         campaign={campaign}
         isMobile={isMobile}
-        currency={currency}
-        setCurrency={setCurrency}
+        currency={displayCurrency}
+        setCurrency={setDisplayCurrency}
         onBack={onBack}
         onStatusChange={onStatusChange}
         onAddCreators={onAddCreators}
@@ -3682,7 +3679,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           campaign={campaign}
           rows={analytics?.rows ?? []}
           loading={analyticsLoading}
-          currency={currency}
+          currency={displayCurrency}
           userId={userId}
           onAddCreator={onAddCreators}
         />
@@ -3843,7 +3840,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
             lang={lang}
             campaign={campaign}
             isMobile={isMobile}
-            currency={currency}
+            currency={displayCurrency}
             rows={analytics?.rows ?? []}
             monthRows={analytics?.monthRows ?? []}
             loading={analyticsLoading}

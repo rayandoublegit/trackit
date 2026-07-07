@@ -12,6 +12,7 @@ import {
   syncContentRefToDiscoverySaved,
 } from "@/lib/content-creator-sync";
 import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
+import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -160,9 +161,13 @@ export async function POST(request: Request) {
   const fileName = (body?.fileName as string | undefined)?.trim();
   const fileType = (body?.fileType as string | undefined)?.trim() || null;
   const fileSize = typeof body?.fileSize === "number" ? body.fileSize : null;
+  const postUrlRaw = typeof body?.postUrl === "string" ? body.postUrl.trim() : "";
 
   if (!brandId || !creatorRowId || !title || !fileUrl || !fileName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+  if (postUrlRaw && !/tiktok\.com\//i.test(postUrlRaw)) {
+    return NextResponse.json({ error: "URL must be a TikTok link (tiktok.com)." }, { status: 400 });
   }
 
   const { data: creator, error: creatorErr } = await admin
@@ -185,6 +190,16 @@ export async function POST(request: Request) {
     );
   }
 
+  const postUrl = postUrlRaw && /tiktok\.com\//i.test(postUrlRaw) ? postUrlRaw : null;
+  let stats: { views: number | null; likes: number | null; comments: number | null; shares: number | null; postedAt: string | null } | null = null;
+  if (postUrl) {
+    try {
+      stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+    } catch (e) {
+      console.error("post stats fetch skipped:", (e as Error).message);
+    }
+  }
+
   const { data, error } = await admin
     .from("creator_content")
     .insert({
@@ -197,6 +212,13 @@ export async function POST(request: Request) {
       file_name: fileName,
       file_type: fileType,
       file_size: fileSize,
+      post_url: postUrl,
+      views: stats?.views ?? null,
+      likes: stats?.likes ?? null,
+      comments: stats?.comments ?? null,
+      shares: stats?.shares ?? null,
+      posted_at: stats?.postedAt ?? null,
+      stats_updated_at: stats ? new Date().toISOString() : null,
     })
     .select("id")
     .single();

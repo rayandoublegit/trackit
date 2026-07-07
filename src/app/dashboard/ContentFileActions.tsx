@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { deleteBrandContent } from "@/lib/content-shared";
+import { dispatchContentUpdated } from "@/lib/outreach-history-events";
 
 const BLUE = "#0047FF";
 
@@ -50,7 +51,7 @@ export function ContentFileActions({
     try {
       const success = await deleteBrandContent(brandId, contentId);
       if (success) {
-        window.dispatchEvent(new CustomEvent("trackit:content-updated"));
+        dispatchContentUpdated();
         onDeleted?.();
       }
     } finally {

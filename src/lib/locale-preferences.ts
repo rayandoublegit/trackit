@@ -3,14 +3,42 @@ export type DiscoveryLocation = "" | "FR" | "US" | "GB" | "DE" | "ES" | "IT" | "
 export type DiscoveryLanguage = "" | "french" | "english" | "spanish" | "italian" | "german" | "portuguese";
 
 export const TRACKIT_LANG_KEY = "trackit_lang";
+export const TRACKIT_CURRENCY_KEY = "trackit_currency";
 export const TRACKIT_DISCOVERY_LOCATION_KEY = "trackit_discovery_location";
 export const TRACKIT_DISCOVERY_LANGUAGE_KEY = "trackit_discovery_language";
 
 export const LOCALE_UPDATED_EVENT = "trackit-locale-updated";
+export const CURRENCY_UPDATED_EVENT = "trackit-currency-updated";
+
+export type DisplayCurrency = "USD" | "EUR";
 
 function notifyLocaleUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(LOCALE_UPDATED_EVENT));
+}
+
+function notifyCurrencyUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CURRENCY_UPDATED_EVENT));
+}
+
+export function defaultDisplayCurrency(lang?: AppLang): DisplayCurrency {
+  return lang === "fr" ? "EUR" : "USD";
+}
+
+export function getDisplayCurrency(lang?: AppLang): DisplayCurrency {
+  if (typeof window === "undefined") return defaultDisplayCurrency(lang);
+  const stored = localStorage.getItem(TRACKIT_CURRENCY_KEY);
+  if (stored === "USD" || stored === "EUR") return stored;
+  const fallback = defaultDisplayCurrency(lang ?? getAppLang());
+  localStorage.setItem(TRACKIT_CURRENCY_KEY, fallback);
+  return fallback;
+}
+
+export function setDisplayCurrency(currency: DisplayCurrency): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(TRACKIT_CURRENCY_KEY, currency);
+  notifyCurrencyUpdated();
 }
 
 export function detectAppLangFromBrowser(): AppLang {
@@ -70,6 +98,7 @@ export function clearUserSessionStorage(): void {
   if (typeof window === "undefined") return;
   const preserved: Record<string, string | null> = {
     [TRACKIT_LANG_KEY]: localStorage.getItem(TRACKIT_LANG_KEY),
+    [TRACKIT_CURRENCY_KEY]: localStorage.getItem(TRACKIT_CURRENCY_KEY),
     [TRACKIT_DISCOVERY_LOCATION_KEY]: localStorage.getItem(TRACKIT_DISCOVERY_LOCATION_KEY),
     [TRACKIT_DISCOVERY_LANGUAGE_KEY]: localStorage.getItem(TRACKIT_DISCOVERY_LANGUAGE_KEY),
   };

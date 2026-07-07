@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
@@ -11,7 +11,6 @@ import {
   isValidProfileUsername,
   normalizeProfileUsername,
   profileUsernameInvalidMessage,
-  profileUsernameSaveError,
   profileUsernameStatusColor,
   profileUsernameStatusMessage,
   profileUsernameTakenMessage,
@@ -33,6 +32,7 @@ const labelStyle: React.CSSProperties = {
 export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string; isMobile?: boolean; onSaved?: () => void }) {
   const lang = useLang();
   const [fullName, setFullName] = useState("");
+  const [initialFullName, setInitialFullName] = useState("");
   const [username, setUsername] = useState("");
   const [initialUsername, setInitialUsername] = useState("");
   const [usernameStatus, setUsernameStatus] = useState<ProfileUsernameStatus>("idle");
@@ -42,6 +42,8 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const hydratedRef = useRef(false);
+  const savingRef = useRef(false);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
   const [stripeConnected, setStripeConnected] = useState(false);
@@ -85,14 +87,20 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       if (!supabase || !userId) { setLoading(false); return; }
       const { data } = await supabase.from("profiles").select("full_name, username, avatar_url").eq("id", userId).maybeSingle();
       if (!cancelled && data) {
-        setFullName(data.full_name ?? "");
-        setUsername(data.username ?? "");
-        setInitialUsername(data.username ?? "");
-        setUsernameStatus(data.username ? "available" : "idle");
+        const loadedName = data.full_name ?? "";
+        const loadedUsername = data.username ?? "";
+        setFullName(loadedName);
+        setInitialFullName(loadedName);
+        setUsername(loadedUsername);
+        setInitialUsername(loadedUsername);
+        setUsernameStatus(loadedUsername ? "available" : "idle");
         const resolved = data.avatar_url && supabase ? await resolveAvatarUrl(supabase, userId, data.avatar_url) : data.avatar_url;
         if (!cancelled) setAvatarUrl(resolved ?? null);
       }
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        hydratedRef.current = true;
+      }
     };
     void load();
     return () => { cancelled = true; };
@@ -196,49 +204,106 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
     setAvatarPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f); });
   };
 
-  const handleSave = async () => {
-    if (!supabase || !userId) return;
+  const canPersist = useCallback(() => {
     const cleanUsername = normalizeProfileUsername(username);
-    if (cleanUsername && !isValidProfileUsername(cleanUsername)) {
-      setError(profileUsernameInvalidMessage(lang));
-      return;
+    const currentUsername = normalizeProfileUsername(initialUsername);
+    if (cleanUsername && !isValidProfileUsername(cleanUsername)) return false;
+    if (cleanUsername && cleanUsername !== currentUsername) {
+      if (usernameStatus === "checking" || usernameStatus === "taken" || usernameStatus === "invalid") return false;
     }
-    if (cleanUsername && cleanUsername !== normalizeProfileUsername(initialUsername)) {
+    return true;
+  }, [username, initialUsername, usernameStatus]);
+
+  const hasPendingChanges = useCallback(() => {
+    return (
+      fullName.trim() !== initialFullName.trim()
+      || normalizeProfileUsername(username) !== normalizeProfileUsername(initialUsername)
+      || avatarFile !== null
+    );
+  }, [fullName, initialFullName, username, initialUsername, avatarFile]);
+
+  const persistProfile = useCallback(async (options?: { silent?: boolean }) => {
+    if (!supabase || !userId || savingRef.current) return false;
+    if (!hasPendingChanges()) return true;
+    if (!canPersist()) return false;
+
+    const cleanUsername = normalizeProfileUsername(username);
+    const currentUsername = normalizeProfileUsername(initialUsername);
+    const usernameToSave = cleanUsername || currentUsername;
+
+    if (cleanUsername && !isValidProfileUsername(cleanUsername)) {
+      if (!options?.silent) setError(profileUsernameInvalidMessage(lang));
+      return false;
+    }
+    if (cleanUsername && cleanUsername !== currentUsername) {
       if (usernameStatus === "checking") {
-        setError(lang === "fr" ? "Vérification du pseudo en cours…" : "Checking username availability…");
-        return;
+        if (!options?.silent) setError(lang === "fr" ? "Vérification du pseudo en cours…" : "Checking username availability…");
+        return false;
       }
       if (usernameStatus === "taken") {
-        setError(profileUsernameTakenMessage(lang));
-        return;
+        if (!options?.silent) setError(profileUsernameTakenMessage(lang));
+        return false;
       }
       if (usernameStatus !== "available") {
-        setError(profileUsernameInvalidMessage(lang));
-        return;
+        if (!options?.silent) setError(profileUsernameInvalidMessage(lang));
+        return false;
       }
     }
-    setSaving(true); setError(""); setSaved(false);
+
+    savingRef.current = true;
+    setSaving(true);
+    if (!options?.silent) setError("");
+    setSaved(false);
+
     try {
       let newAvatarUrl = avatarUrl;
       if (avatarFile) {
         const ext = avatarFile.name.split(".").pop() || "jpg";
         const path = `${userId}/avatar.${ext}`;
         const { error: upErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
-        if (upErr) { setError(upErr.message); return; }
+        if (upErr) {
+          if (!options?.silent) setError(upErr.message);
+          return false;
+        }
         const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
         newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
       }
-      const { error: updErr } = await supabase.from("profiles").update({ full_name: fullName.trim(), username: cleanUsername || null, avatar_url: newAvatarUrl, updated_at: new Date().toISOString() }).eq("id", userId);
-      if (updErr) { setError(profileUsernameSaveError(updErr, lang)); return; }
-      setUsername(cleanUsername);
-      setInitialUsername(cleanUsername);
+
+      const res = await fetch("/api/creator/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          username: usernameToSave,
+          avatar_url: newAvatarUrl,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; profile?: { full_name?: string; username?: string; avatar_url?: string | null } };
+      if (!res.ok) {
+        const msg = res.status === 409
+          ? profileUsernameTakenMessage(lang)
+          : (data.error || (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
+        if (!options?.silent) setError(msg);
+        return false;
+      }
+
+      const savedUsername = normalizeProfileUsername(data.profile?.username ?? usernameToSave);
+      const savedName = data.profile?.full_name ?? fullName.trim();
+      setFullName(savedName);
+      setInitialFullName(savedName);
+      setUsername(savedUsername);
+      setInitialUsername(savedUsername);
+      setUsernameStatus(savedUsername ? "available" : "idle");
+
       const resolved = newAvatarUrl && supabase ? await resolveAvatarUrl(supabase, userId, newAvatarUrl) : newAvatarUrl;
       setAvatarUrl(resolved ?? null);
       setAvatarFile(null);
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
       setSaved(true);
       onSaved?.();
-      if (userId && cleanUsername) {
+
+      if (savedUsername) {
         await fetch("/api/creator/sync-brand-link", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -246,10 +311,37 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         });
       }
       void loadBrandMemberships();
+      return true;
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  };
+  }, [
+    avatarFile,
+    avatarPreview,
+    avatarUrl,
+    canPersist,
+    fullName,
+    hasPendingChanges,
+    initialUsername,
+    lang,
+    onSaved,
+    userId,
+    username,
+    usernameStatus,
+  ]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || loading) return;
+    if (!hasPendingChanges() || !canPersist()) return;
+    const timer = setTimeout(() => { void persistProfile({ silent: true }); }, 800);
+    return () => clearTimeout(timer);
+  }, [fullName, username, loading, hasPendingChanges, canPersist, persistProfile]);
+
+  useEffect(() => {
+    if (!hydratedRef.current || loading || !avatarFile) return;
+    void persistProfile({ silent: true });
+  }, [avatarFile, loading, persistProfile]);
 
   if (loading) {
     return (
@@ -452,13 +544,18 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         {error && (
           <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>
         )}
-        {saved && (
+        {saved && !saving && (
           <div style={{ fontSize: 14, color: "#1A7F37", padding: "10px 12px", borderRadius: 10, background: "rgba(26,127,55,0.08)", marginBottom: 14 }}>
             {lang === "fr" ? "Modifications enregistrées." : "Changes saved."}
           </div>
         )}
+        {saving && (
+          <div style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", padding: "10px 12px", borderRadius: 10, background: "rgba(0,0,0,0.04)", marginBottom: 14 }}>
+            {lang === "fr" ? "Enregistrement..." : "Saving..."}
+          </div>
+        )}
 
-        <button type="button" onClick={handleSave} disabled={saving || signingOut} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: saving || signingOut ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving || signingOut ? 0.7 : 1 }}>
+        <button type="button" onClick={() => void persistProfile()} disabled={saving || signingOut} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: saving || signingOut ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving || signingOut ? 0.7 : 1 }}>
           {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer" : "Save")}
         </button>
 

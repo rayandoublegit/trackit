@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDisplayCurrency } from "@/lib/useCurrency";
 import { supabase } from "@/lib/supabase";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
@@ -117,7 +118,7 @@ export function AddSalePanel({
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
 
-  const amountCurrency = lang === "fr" ? "EUR" : "USD";
+  const amountCurrency = useDisplayCurrency();
   const selectedCommission = creatorId ? commissionByCreatorId[creatorId] : undefined;
   const hasSelectedCommission = selectedCommission != null;
   const canSubmit = Boolean(creatorId && amount && !submitting && hasSelectedCommission);
