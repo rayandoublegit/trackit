@@ -7,6 +7,7 @@ import {
   resolveCommissionRateForManualSale,
 } from "@/lib/managed-creator-commission";
 import { endOfLocalDayIso, parseTzOffsetMinutes, toDayKey } from "@/lib/analytics-periods";
+import { buildPresetShopifySaleMeta, isManualSaleAsShopifyAccount } from "@/lib/account-presets";
 
 function resolveManualSaleCreatedAt(dateInput?: string, tzOffsetMinutes?: number): string {
   if (!dateInput?.trim()) return new Date().toISOString();
@@ -140,15 +141,31 @@ export async function POST(request: NextRequest) {
   const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
   const tzOffset = parseTzOffsetMinutes(body.tzOffset != null ? String(body.tzOffset) : null);
 
+  const [{ data: profile }, { data: authUser }] = await Promise.all([
+    supabaseAdmin.from("profiles").select("shopify_store, username").eq("id", userId).maybeSingle(),
+    supabaseAdmin.auth.admin.getUserById(userId),
+  ]);
+
+  const recordAsShopify = isManualSaleAsShopifyAccount({
+    email: authUser?.user?.email,
+    username: profile?.username,
+  });
+
+  const presetMeta = recordAsShopify ? buildPresetShopifySaleMeta(profile?.shopify_store) : null;
+  const discountCodeUsed =
+    campaignDiscountCode ||
+    creator.discount_code ||
+    (recordAsShopify ? "shopify" : "manual");
+
   const { error } = await supabaseAdmin.from("sales").insert({
     creator_id: creator.id,
     user_id: userId,
-    shopify_order_id: `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    shopify_order_id: presetMeta?.shopify_order_id ?? `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     order_amount: orderAmount,
     commission_amount: commissionAmount,
-    discount_code_used: campaignDiscountCode || creator.discount_code || "manual",
+    discount_code_used: discountCodeUsed,
     campaign_id: linkedCampaignId,
-    shop_domain: "manual",
+    shop_domain: presetMeta?.shop_domain ?? "manual",
     status: "paid",
     created_at: resolveManualSaleCreatedAt(body.date ? String(body.date) : undefined, tzOffset),
   });
