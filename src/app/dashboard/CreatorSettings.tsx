@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
@@ -311,7 +312,16 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
       setSaved(true);
       onSaved?.();
-      dispatchProfileUpdated();
+      patchDashboardBootstrap(userId, {
+        full_name: savedName,
+        username: savedUsername,
+        avatar_url: resolved ?? newAvatarUrl,
+      });
+      dispatchProfileUpdated({
+        full_name: savedName,
+        username: savedUsername,
+        avatar_url: resolved ?? newAvatarUrl,
+      });
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
 
       if (savedUsername) {

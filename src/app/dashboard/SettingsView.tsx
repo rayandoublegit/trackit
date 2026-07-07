@@ -7,7 +7,8 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type DisplayCurrency } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type DisplayCurrency, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { formatCurrency, useDisplayCurrency, useSetDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
@@ -17,7 +18,6 @@ import {
   isValidProfileUsername,
   normalizeProfileUsername,
   profileUsernameInvalidMessage,
-  profileUsernameSaveError,
   profileUsernameStatusColor,
   profileUsernameStatusMessage,
   profileUsernameTakenMessage,
@@ -240,7 +240,18 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
   }, []);
 
   useEffect(() => {
-    const onProfileUpdated = () => { void reloadProfile(); };
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
+      if (detail) {
+        setProfile((prev) => prev ? {
+          ...prev,
+          ...(detail.full_name !== undefined ? { full_name: detail.full_name } : {}),
+          ...(detail.username !== undefined ? { username: detail.username } : {}),
+          ...(detail.avatar_url !== undefined ? { avatar_url: detail.avatar_url } : {}),
+        } : prev);
+      }
+      void reloadProfile();
+    };
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
   }, []);
@@ -673,22 +684,35 @@ function ProfileSettings({
       newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
     }
 
-    const { error } = await supabase
-      .from("profiles")
-      .update({
+    const profileRes = await fetch("/api/profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
         full_name: fullName.trim(),
         username: trimmedUsername,
         avatar_url: newAvatarUrl,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
-
-    setSaving(false);
-    if (error) {
-      setMessage({ text: profileUsernameSaveError(error, lang), type: "error" });
+      }),
+    });
+    const profileData = (await profileRes.json().catch(() => ({}))) as {
+      error?: string;
+      profile?: { full_name?: string; username?: string; avatar_url?: string | null };
+    };
+    if (!profileRes.ok) {
+      setSaving(false);
+      setMessage({
+        text: profileRes.status === 409
+          ? profileUsernameTakenMessage(lang)
+          : (profileData.error || (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile.")),
+        type: "error",
+      });
       return;
     }
 
+    setSaving(false);
+
+    const savedUsername = normalizeProfileUsername(profileData.profile?.username ?? trimmedUsername);
+    const savedName = profileData.profile?.full_name ?? fullName.trim();
     const resolved = newAvatarUrl && supabase
       ? await resolveAvatarUrl(supabase, userId, newAvatarUrl)
       : newAvatarUrl;
@@ -700,17 +724,26 @@ function ProfileSettings({
       URL.revokeObjectURL(avatarPreview);
       setAvatarPreview(null);
     }
-    if (previousUsername && trimmedUsername && previousUsername !== trimmedUsername) {
-      renameCachedAvatarUrl(previousUsername, trimmedUsername, resolved ?? newAvatarUrl);
-    } else if (trimmedUsername && resolved) {
-      setCachedAvatarUrl(trimmedUsername, resolved);
+    if (previousUsername && savedUsername && previousUsername !== savedUsername) {
+      renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? newAvatarUrl);
+    } else if (savedUsername && resolved) {
+      setCachedAvatarUrl(savedUsername, resolved);
     }
+    patchDashboardBootstrap(userId, {
+      full_name: savedName,
+      username: savedUsername,
+      avatar_url: resolved ?? newAvatarUrl,
+    });
     onSaved({
-      full_name: fullName.trim(),
-      username: trimmedUsername,
+      full_name: savedName,
+      username: savedUsername,
       avatar_url: resolved,
     });
-    dispatchProfileUpdated();
+    dispatchProfileUpdated({
+      full_name: savedName,
+      username: savedUsername,
+      avatar_url: resolved ?? newAvatarUrl,
+    });
     setMessage({ text: "Changes saved successfully.", type: "success" });
   };
 

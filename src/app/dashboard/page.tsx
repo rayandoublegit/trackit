@@ -85,7 +85,7 @@ import {
   setNotificationsUserId,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
-import { PROFILE_UPDATED_EVENT } from "@/lib/locale-preferences";
+import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import {
@@ -546,8 +546,17 @@ function DashboardPageContent() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const onProfileUpdated = () => {
+    const onProfileUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
       setAvatarBroken(false);
+      if (detail) {
+        setProfile((prev) => prev ? {
+          ...prev,
+          ...(detail.full_name !== undefined ? { full_name: detail.full_name } : {}),
+          ...(detail.username !== undefined ? { username: detail.username } : {}),
+          ...(detail.avatar_url !== undefined ? { avatar_url: detail.avatar_url } : {}),
+        } : prev);
+      }
       void reloadProfile(user.id);
     };
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);

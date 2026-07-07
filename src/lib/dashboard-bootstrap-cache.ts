@@ -41,6 +41,15 @@ export function writeDashboardBootstrap(cache: DashboardBootstrapCache): void {
   }
 }
 
+export function patchDashboardBootstrap(
+  userId: string,
+  patch: Partial<Pick<DashboardBootstrapCache, "full_name" | "username" | "avatar_url" | "business_name" | "shopify_store" | "plan">>,
+): void {
+  const existing = readDashboardBootstrap(userId);
+  if (!existing) return;
+  writeDashboardBootstrap({ ...existing, ...patch });
+}
+
 export function clearDashboardBootstrap(): void {
   if (typeof window === "undefined") return;
   try {

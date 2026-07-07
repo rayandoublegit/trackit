@@ -11,9 +11,15 @@ export const LOCALE_UPDATED_EVENT = "trackit-locale-updated";
 export const CURRENCY_UPDATED_EVENT = "trackit-currency-updated";
 export const PROFILE_UPDATED_EVENT = "trackit-profile-updated";
 
-export function dispatchProfileUpdated() {
+export type ProfileUpdatedDetail = {
+  full_name?: string | null;
+  username?: string | null;
+  avatar_url?: string | null;
+};
+
+export function dispatchProfileUpdated(detail?: ProfileUpdatedDetail) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
+  window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT, { detail }));
 }
 
 export type DisplayCurrency = "USD" | "EUR";
