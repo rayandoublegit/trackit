@@ -85,6 +85,7 @@ import {
   setNotificationsUserId,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
+import { PROFILE_UPDATED_EVENT } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import {
@@ -541,7 +542,17 @@ function DashboardPageContent() {
   useEffect(() => {
     avatarRetryRef.current = false;
     setAvatarBroken(false);
-  }, [profile?.avatar_url]);
+  }, [profile?.avatar_url, profile?.username]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const onProfileUpdated = () => {
+      setAvatarBroken(false);
+      void reloadProfile(user.id);
+    };
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+  }, [user?.id, reloadProfile]);
 
   const sidebarNavEntries = useMemo(
     () => (isCreator ? buildCreatorSidebarNavEntries(lang) : buildSidebarNavEntries(lang, sidebarCounts)),

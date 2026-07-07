@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT } from "@/lib/locale-preferences";
+import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 import {
@@ -114,9 +115,11 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
     const onRefresh = () => void loadBrandMemberships();
     window.addEventListener("trackit:creators-saved", onRefresh);
     window.addEventListener("trackit:content-updated", onRefresh);
+    window.addEventListener(PROFILE_UPDATED_EVENT, onRefresh);
     return () => {
       window.removeEventListener("trackit:creators-saved", onRefresh);
       window.removeEventListener("trackit:content-updated", onRefresh);
+      window.removeEventListener(PROFILE_UPDATED_EVENT, onRefresh);
     };
   }, [userId]);
 
@@ -290,6 +293,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
       const savedUsername = normalizeProfileUsername(data.profile?.username ?? usernameToSave);
       const savedName = data.profile?.full_name ?? fullName.trim();
+      const previousUsername = normalizeProfileUsername(initialUsername);
       setFullName(savedName);
       setInitialFullName(savedName);
       setUsername(savedUsername);
@@ -298,10 +302,17 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
       const resolved = newAvatarUrl && supabase ? await resolveAvatarUrl(supabase, userId, newAvatarUrl) : newAvatarUrl;
       setAvatarUrl(resolved ?? null);
+      if (previousUsername && savedUsername && previousUsername !== savedUsername) {
+        renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? newAvatarUrl);
+      } else if (savedUsername && resolved) {
+        setCachedAvatarUrl(savedUsername, resolved);
+      }
       setAvatarFile(null);
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
       setSaved(true);
       onSaved?.();
+      dispatchProfileUpdated();
+      window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
 
       if (savedUsername) {
         await fetch("/api/creator/sync-brand-link", {

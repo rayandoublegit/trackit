@@ -28,6 +28,10 @@ function resolveDisplaySrc(username: string, src?: string | null): string {
 }
 
 function resolveTargetSrc(displaySrc: string, username: string, rawSrc?: string | null): string {
+  const stableFromProp = rawSrc?.trim();
+  if (stableFromProp && isStableAvatarStorageUrl(stableFromProp)) return stableFromProp;
+  if (displaySrc && isStableAvatarStorageUrl(displaySrc)) return displaySrc;
+
   const cached = username ? getCachedAvatarUrl(username) : null;
   if (cached && isStableAvatarStorageUrl(cached)) return cached;
   if (displaySrc) return displaySrc;

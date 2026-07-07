@@ -7,7 +7,8 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, type DisplayCurrency } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type DisplayCurrency } from "@/lib/locale-preferences";
+import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { formatCurrency, useDisplayCurrency, useSetDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
@@ -211,29 +212,37 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
 
+  const reloadProfile = async () => {
+    if (!supabase) return;
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) return;
+    setUser(authUser);
+    const { data } = await supabase
+      .from("profiles")
+      .select("full_name, username, avatar_url, business_name, business_type, niche, shopify_store_url")
+      .eq("id", authUser.id)
+      .maybeSingle();
+    if (data) {
+      const avatar_url = await resolveAvatarUrl(supabase, authUser.id, data.avatar_url);
+      setProfile({ ...data, avatar_url });
+    }
+  };
+
   useEffect(() => {
     if (!supabase) {
       setLoading(false);
       return;
     }
     void (async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) {
-        setLoading(false);
-        return;
-      }
-      setUser(authUser);
-      const { data } = await supabase
-        .from("profiles")
-        .select("full_name, username, avatar_url, business_name, business_type, niche, shopify_store_url")
-        .eq("id", authUser.id)
-        .maybeSingle();
-      if (data) {
-        const avatar_url = await resolveAvatarUrl(supabase, authUser.id, data.avatar_url);
-        setProfile({ ...data, avatar_url });
-      }
+      await reloadProfile();
       setLoading(false);
     })();
+  }, []);
+
+  useEffect(() => {
+    const onProfileUpdated = () => { void reloadProfile(); };
+    window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
+    return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
   }, []);
 
   return (
@@ -684,17 +693,24 @@ function ProfileSettings({
       ? await resolveAvatarUrl(supabase, userId, newAvatarUrl)
       : newAvatarUrl;
 
+    const previousUsername = normalizeProfileUsername(initialUsername);
     setAvatarUrl(resolved);
     setAvatarFile(null);
     if (avatarPreview) {
       URL.revokeObjectURL(avatarPreview);
       setAvatarPreview(null);
     }
+    if (previousUsername && trimmedUsername && previousUsername !== trimmedUsername) {
+      renameCachedAvatarUrl(previousUsername, trimmedUsername, resolved ?? newAvatarUrl);
+    } else if (trimmedUsername && resolved) {
+      setCachedAvatarUrl(trimmedUsername, resolved);
+    }
     onSaved({
       full_name: fullName.trim(),
       username: trimmedUsername,
       avatar_url: resolved,
     });
+    dispatchProfileUpdated();
     setMessage({ text: "Changes saved successfully.", type: "success" });
   };
 

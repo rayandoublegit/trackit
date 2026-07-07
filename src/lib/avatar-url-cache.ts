@@ -90,6 +90,34 @@ export function setCachedAvatarUrl(username: string, url: string): void {
   writeStorage(stored);
 }
 
+export function clearCachedAvatarUrl(username: string): void {
+  const key = normalizeKey(username);
+  if (!key) return;
+  memory.delete(key);
+  const stored = readStorage();
+  if (stored[key]) {
+    delete stored[key];
+    writeStorage(stored);
+  }
+}
+
+/** Move avatar cache when a creator renames their handle. */
+export function renameCachedAvatarUrl(
+  oldUsername: string,
+  newUsername: string,
+  avatarUrl?: string | null,
+): void {
+  const oldKey = normalizeKey(oldUsername);
+  const newKey = normalizeKey(newUsername);
+  if (!oldKey || !newKey || oldKey === newKey) return;
+
+  const existing = avatarUrl?.trim() || getCachedAvatarUrl(oldUsername);
+  clearCachedAvatarUrl(oldUsername);
+  if (existing && isPersistableAvatarUrl(existing)) {
+    setCachedAvatarUrl(newUsername, existing);
+  }
+}
+
 function normalizeHandle(username?: string | null): string {
   return (username ?? "").replace(/^@/, "").trim().toLowerCase();
 }

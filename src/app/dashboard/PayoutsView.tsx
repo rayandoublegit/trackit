@@ -20,7 +20,6 @@ import {
 } from "./usePaymentMethods";
 import { notifyCreatorPaid, notifyFundsAdded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
-import { dispatchPayoutsUpdated, dispatchSalesUpdated, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 import {
   dismissSaleFeedItems,
   loadDismissedSaleIds,
@@ -32,6 +31,8 @@ import { PayItWelcomeLoading, PayItWelcomeView, usePayItActivity } from "./PayIt
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGateModalProps, type GateFeatureKey } from "@/lib/plan-marketing";
+import { dayKeyFromIso, getPeriodBounds, isWithinPeriod } from "@/lib/analytics-periods";
+import { dispatchPayoutsUpdated, dispatchSalesUpdated, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 
 function PaywallModal({
   featureKey,
@@ -1002,30 +1003,21 @@ type CommissionDayBucket = {
   paid: number;
 };
 
-function dayKeyFromIso(iso: string | null | undefined) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 function buildCommissionTimeline(
   sales: TrackedSale[],
   completedPayouts: CompletedPayout[],
   dayCount = 30,
+  tzOffset = new Date().getTimezoneOffset(),
 ): CommissionDayBucket[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayKey = dayKeyFromIso(new Date().toISOString(), tzOffset) ?? "";
+  const end = new Date(`${todayKey}T12:00:00`);
 
   const buckets: CommissionDayBucket[] = [];
   for (let i = dayCount - 1; i >= 0; i--) {
-    const d = new Date(today);
+    const d = new Date(end);
     d.setDate(d.getDate() - i);
     buckets.push({
-      dateKey: dayKeyFromIso(d.toISOString()) ?? "",
+      dateKey: dayKeyFromIso(d.toISOString(), tzOffset) ?? "",
       earned: 0,
       paid: 0,
     });
@@ -1034,13 +1026,13 @@ function buildCommissionTimeline(
   const byDay = new Map(buckets.map((bucket) => [bucket.dateKey, bucket]));
 
   for (const sale of sales) {
-    const key = dayKeyFromIso(sale.created_at);
+    const key = dayKeyFromIso(sale.created_at, tzOffset);
     const bucket = key ? byDay.get(key) : undefined;
     if (bucket) bucket.earned = round2(bucket.earned + (Number(sale.commission_amount) || 0));
   }
 
   for (const payout of completedPayouts) {
-    const key = dayKeyFromIso(payout.paid_at || payout.created_at);
+    const key = dayKeyFromIso(payout.paid_at || payout.created_at, tzOffset);
     const bucket = key ? byDay.get(key) : undefined;
     if (bucket) bucket.paid = round2(bucket.paid + (Number(payout.amount) || 0));
   }
@@ -1052,6 +1044,13 @@ type PayoutOverviewPeriod = "today" | "7d" | "30d" | "all";
 
 const PAYOUT_OVERVIEW_PERIODS: PayoutOverviewPeriod[] = ["today", "7d", "30d", "all"];
 
+function isIsoInPayoutPeriod(iso: string | null | undefined, period: PayoutOverviewPeriod, tzOffset: number) {
+  if (!iso) return false;
+  if (period === "all") return true;
+  const bounds = getPeriodBounds(period, new Date(), tzOffset);
+  return isWithinPeriod(iso, bounds.start, bounds.end, tzOffset);
+}
+
 function payoutOverviewPeriodLabel(period: PayoutOverviewPeriod, lang: "en" | "fr") {
   if (period === "today") return lang === "fr" ? "Aujourd'hui" : "Today";
   if (period === "7d") return lang === "fr" ? "7 derniers jours" : "Last 7 days";
@@ -1059,65 +1058,65 @@ function payoutOverviewPeriodLabel(period: PayoutOverviewPeriod, lang: "en" | "f
   return lang === "fr" ? "Globalité" : "All time";
 }
 
-function saleDayKey(sale: TrackedSale) {
-  return dayKeyFromIso(sale.created_at);
+function saleDayKey(sale: TrackedSale, tzOffset: number) {
+  return dayKeyFromIso(sale.created_at, tzOffset);
 }
 
-function isSaleInPeriod(sale: TrackedSale, period: PayoutOverviewPeriod) {
-  const key = saleDayKey(sale);
-  if (!key) return false;
-  if (period === "all") return true;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const saleDate = new Date(`${key}T12:00:00`);
-  if (Number.isNaN(saleDate.getTime())) return false;
-
-  if (period === "today") return key === dayKeyFromIso(today.toISOString());
-
-  const dayCount = period === "7d" ? 7 : 30;
-  const start = new Date(today);
-  start.setDate(start.getDate() - (dayCount - 1));
-  return saleDate >= start && saleDate <= today;
+function isSaleInPeriod(sale: TrackedSale, period: PayoutOverviewPeriod, tzOffset: number) {
+  return isIsoInPayoutPeriod(sale.created_at, period, tzOffset);
 }
 
-function countSalesInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod) {
-  return sales.filter((sale) => isSaleInPeriod(sale, period)).length;
+function isPayoutInPeriod(payout: CompletedPayout, period: PayoutOverviewPeriod, tzOffset: number) {
+  return isIsoInPayoutPeriod(payout.paid_at || payout.created_at, period, tzOffset);
 }
 
-function sumCommissionsInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod) {
+function countSalesInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod, tzOffset: number) {
+  return sales.filter((sale) => isSaleInPeriod(sale, period, tzOffset)).length;
+}
+
+function sumCommissionsInPeriod(sales: TrackedSale[], period: PayoutOverviewPeriod, tzOffset: number) {
   return round2(
     sales
-      .filter((sale) => isSaleInPeriod(sale, period))
+      .filter((sale) => isSaleInPeriod(sale, period, tzOffset))
       .reduce((sum, sale) => sum + (Number(sale.commission_amount) || 0), 0),
   );
 }
 
-function allTimeDayCount(sales: TrackedSale[]) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let earliest: Date | null = null;
+function sumPayoutsInPeriod(payouts: CompletedPayout[], period: PayoutOverviewPeriod, tzOffset: number) {
+  return round2(
+    payouts
+      .filter((payout) => isPayoutInPeriod(payout, period, tzOffset))
+      .reduce((sum, payout) => sum + (Number(payout.amount) || 0), 0),
+  );
+}
+
+function countPayoutsInPeriod(payouts: CompletedPayout[], period: PayoutOverviewPeriod, tzOffset: number) {
+  return payouts.filter((payout) => isPayoutInPeriod(payout, period, tzOffset)).length;
+}
+
+function allTimeDayCount(sales: TrackedSale[], tzOffset: number) {
+  const todayKey = dayKeyFromIso(new Date().toISOString(), tzOffset);
+  let earliestKey: string | null = null;
 
   for (const sale of sales) {
-    const key = saleDayKey(sale);
+    const key = saleDayKey(sale, tzOffset);
     if (!key) continue;
-    const d = new Date(`${key}T12:00:00`);
-    if (Number.isNaN(d.getTime())) continue;
-    if (!earliest || d < earliest) earliest = d;
+    if (!earliestKey || key < earliestKey) earliestKey = key;
   }
 
-  if (!earliest) return 30;
-  const span = Math.ceil((today.getTime() - earliest.getTime()) / 86400000) + 1;
+  if (!earliestKey || !todayKey) return 30;
+  const start = new Date(`${earliestKey}T12:00:00`);
+  const end = new Date(`${todayKey}T12:00:00`);
+  const span = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
   return Math.min(90, Math.max(7, span));
 }
 
 function buildTodayHourlyTimeline(
   sales: TrackedSale[],
   completedPayouts: CompletedPayout[],
+  tzOffset: number,
 ): CommissionDayBucket[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayKey = dayKeyFromIso(today.toISOString()) ?? "";
+  const todayKey = dayKeyFromIso(new Date().toISOString(), tzOffset) ?? "";
 
   const buckets: CommissionDayBucket[] = Array.from({ length: 24 }, (_, hour) => ({
     dateKey: `${todayKey}T${String(hour).padStart(2, "0")}`,
@@ -1126,7 +1125,7 @@ function buildTodayHourlyTimeline(
   }));
 
   for (const sale of sales) {
-    const key = saleDayKey(sale);
+    const key = saleDayKey(sale, tzOffset);
     if (key !== todayKey) continue;
     const hour = new Date(sale.created_at).getHours();
     if (hour >= 0 && hour < 24) {
@@ -1135,7 +1134,7 @@ function buildTodayHourlyTimeline(
   }
 
   for (const payout of completedPayouts) {
-    const key = dayKeyFromIso(payout.paid_at || payout.created_at);
+    const key = dayKeyFromIso(payout.paid_at || payout.created_at, tzOffset);
     if (key !== todayKey) continue;
     const hour = new Date(payout.paid_at || payout.created_at || "").getHours();
     if (hour >= 0 && hour < 24) {
@@ -1150,11 +1149,12 @@ function buildOverviewTimeline(
   sales: TrackedSale[],
   completedPayouts: CompletedPayout[],
   period: PayoutOverviewPeriod,
+  tzOffset: number,
 ): CommissionDayBucket[] {
-  if (period === "today") return buildTodayHourlyTimeline(sales, completedPayouts);
-  if (period === "7d") return buildCommissionTimeline(sales, completedPayouts, 7);
-  if (period === "30d") return buildCommissionTimeline(sales, completedPayouts, 30);
-  return buildCommissionTimeline(sales, completedPayouts, allTimeDayCount(sales));
+  if (period === "today") return buildTodayHourlyTimeline(sales, completedPayouts, tzOffset);
+  if (period === "7d") return buildCommissionTimeline(sales, completedPayouts, 7, tzOffset);
+  if (period === "30d") return buildCommissionTimeline(sales, completedPayouts, 30, tzOffset);
+  return buildCommissionTimeline(sales, completedPayouts, allTimeDayCount(sales, tzOffset), tzOffset);
 }
 
 function formatTimelineAxisLabel(dateKey: string, lang: "en" | "fr", period: PayoutOverviewPeriod) {
@@ -1522,21 +1522,32 @@ function PayoutsOverviewPanel({
   isMobile?: boolean;
 }) {
   const [period, setPeriod] = useState<PayoutOverviewPeriod>("30d");
+  const tzOffset = useMemo(() => new Date().getTimezoneOffset(), []);
 
   const timeline = useMemo(
-    () => buildOverviewTimeline(sales, completedPayouts, period),
-    [sales, completedPayouts, period],
+    () => buildOverviewTimeline(sales, completedPayouts, period, tzOffset),
+    [sales, completedPayouts, period, tzOffset],
   );
 
   const periodCommission = useMemo(() => {
     if (period === "all") return stats.totalCommissionsEarned;
-    return sumCommissionsInPeriod(sales, period);
-  }, [period, sales, stats.totalCommissionsEarned]);
+    return sumCommissionsInPeriod(sales, period, tzOffset);
+  }, [period, sales, stats.totalCommissionsEarned, tzOffset]);
 
   const periodSalesCount = useMemo(() => {
     if (period === "all") return stats.totalTrackedSales;
-    return countSalesInPeriod(sales, period);
-  }, [period, sales, stats.totalTrackedSales]);
+    return countSalesInPeriod(sales, period, tzOffset);
+  }, [period, sales, stats.totalTrackedSales, tzOffset]);
+
+  const periodPaid = useMemo(() => {
+    if (period === "all") return stats.totalPaid;
+    return sumPayoutsInPeriod(completedPayouts, period, tzOffset);
+  }, [period, completedPayouts, stats.totalPaid, tzOffset]);
+
+  const periodPayoutCount = useMemo(() => {
+    if (period === "all") return stats.completedPaymentsCount;
+    return countPayoutsInPeriod(completedPayouts, period, tzOffset);
+  }, [period, completedPayouts, stats.completedPaymentsCount, tzOffset]);
 
   const commissionsLabel =
     period === "all"
@@ -1586,13 +1597,21 @@ function PayoutsOverviewPanel({
           : `${stats.readyToPay} ready · ${stats.missingPaymentDetails} missing details`;
 
   const paidSub =
-    stats.completedPaymentsCount === 0
-      ? lang === "fr"
-        ? "Aucun paiement enregistré"
-        : "No payments recorded yet"
-      : lang === "fr"
-        ? `${stats.completedPaymentsCount} paiement${stats.completedPaymentsCount > 1 ? "s" : ""} effectué${stats.completedPaymentsCount > 1 ? "s" : ""}`
-        : `${stats.completedPaymentsCount} payment${stats.completedPaymentsCount > 1 ? "s" : ""} completed`;
+    periodPayoutCount === 0
+      ? period === "today"
+        ? lang === "fr"
+          ? "Aucun paiement aujourd'hui"
+          : "No payments today"
+        : lang === "fr"
+          ? "Aucun paiement sur cette période"
+          : "No payments in this period"
+      : period === "all"
+        ? lang === "fr"
+          ? `${periodPayoutCount} paiement${periodPayoutCount > 1 ? "s" : ""} effectué${periodPayoutCount > 1 ? "s" : ""}`
+          : `${periodPayoutCount} payment${periodPayoutCount > 1 ? "s" : ""} completed`
+        : lang === "fr"
+          ? `${periodPayoutCount} paiement${periodPayoutCount > 1 ? "s" : ""} sur la période`
+          : `${periodPayoutCount} payment${periodPayoutCount > 1 ? "s" : ""} in period`;
 
   return (
     <div
@@ -1664,8 +1683,8 @@ function PayoutsOverviewPanel({
             hint={pendingSub}
           />
           <StripeOverviewSideMetric
-            label={lang === "fr" ? "Déjà versé" : "Already paid"}
-            value={formatCurrency(stats.totalPaid, lang)}
+            label={period === "all" ? (lang === "fr" ? "Déjà versé" : "Already paid") : lang === "fr" ? "Versé sur la période" : "Paid in period"}
+            value={formatCurrency(periodPaid, lang)}
             hint={paidSub}
             showDivider={false}
           />
@@ -2815,17 +2834,67 @@ function formatTransactionDate(iso: string, lang: "en" | "fr") {
   });
 }
 
-function groupTransactionsByMonth(rows: TransactionRow[]) {
+function formatTransactionDayLabel(dayKey: string, lang: "en" | "fr") {
+  if (dayKey === "unknown") return "—";
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const d = new Date(year, (month || 1) - 1, day || 1);
+  if (Number.isNaN(d.getTime())) return dayKey;
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function isTransactionInPeriod(row: TransactionRow, period: PayoutOverviewPeriod, tzOffset: number) {
+  return isIsoInPayoutPeriod(row.date, period, tzOffset);
+}
+
+function groupTransactionsByPeriod(
+  rows: TransactionRow[],
+  period: PayoutOverviewPeriod,
+  lang: "en" | "fr",
+  tzOffset: number,
+) {
+  if (period === "all") {
+    const groups = new Map<string, TransactionRow[]>();
+    for (const row of rows) {
+      const key = transactionMonthKey(row.date);
+      const list = groups.get(key) ?? [];
+      list.push(row);
+      groups.set(key, list);
+    }
+    return [...groups.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, items]) => ({
+        key,
+        label: formatTransactionMonthLabel(key, lang),
+        items,
+      }));
+  }
+
+  if (period === "today") {
+    const todayKey = dayKeyFromIso(new Date().toISOString(), tzOffset) ?? "today";
+    return rows.length
+      ? [{ key: todayKey, label: lang === "fr" ? "Aujourd'hui" : "Today", items: rows }]
+      : [];
+  }
+
   const groups = new Map<string, TransactionRow[]>();
   for (const row of rows) {
-    const key = transactionMonthKey(row.date);
+    const key = dayKeyFromIso(row.date, tzOffset) ?? "unknown";
     const list = groups.get(key) ?? [];
     list.push(row);
     groups.set(key, list);
   }
   return [...groups.entries()]
     .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([key, items]) => ({ key, items }));
+    .map(([key, items]) => ({
+      key,
+      label: formatTransactionDayLabel(key, lang),
+      items,
+    }));
 }
 
 function transactionKindLabel(kind: TransactionKind, lang: "en" | "fr") {
@@ -2856,6 +2925,7 @@ export function TransactionsView({
   onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
+  useDisplayCurrency();
   const { navigate } = useDashboardNavigation();
   const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
   const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
@@ -2864,7 +2934,9 @@ export function TransactionsView({
   const [payouts, setPayouts] = useState<CompletedPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TransactionFilter>("all");
+  const [period, setPeriod] = useState<PayoutOverviewPeriod>("30d");
   const [search, setSearch] = useState("");
+  const tzOffset = useMemo(() => new Date().getTimezoneOffset(), []);
 
   useEffect(() => {
     if (!userId) {
@@ -2895,9 +2967,13 @@ export function TransactionsView({
     void load();
     const onUpdate = () => void load();
     window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
+    window.addEventListener(PAYOUTS_UPDATED_EVENT, onUpdate);
+    window.addEventListener("trackit:creators-saved", onUpdate);
     return () => {
       cancelled = true;
       window.removeEventListener(SALES_UPDATED_EVENT, onUpdate);
+      window.removeEventListener(PAYOUTS_UPDATED_EVENT, onUpdate);
+      window.removeEventListener("trackit:creators-saved", onUpdate);
     };
   }, [userId]);
 
@@ -2906,15 +2982,19 @@ export function TransactionsView({
   const filteredRows = useMemo(() => {
     const query = search.trim().toLowerCase();
     return rows.filter((row) => {
+      if (!isTransactionInPeriod(row, period, tzOffset)) return false;
       if (filter !== "all" && row.kind !== filter) return false;
       if (!query) return true;
       const name = String(row.creatorName || row.creatorHandle || "").toLowerCase();
       const handle = String(row.creatorHandle || "").toLowerCase();
       return name.includes(query) || handle.includes(query);
     });
-  }, [rows, filter, search]);
+  }, [rows, filter, search, period, tzOffset]);
 
-  const groupedRows = useMemo(() => groupTransactionsByMonth(filteredRows), [filteredRows]);
+  const groupedRows = useMemo(
+    () => groupTransactionsByPeriod(filteredRows, period, lang, tzOffset),
+    [filteredRows, period, lang, tzOffset],
+  );
 
   const thStyle: React.CSSProperties = {
     padding: "16px 22px",
@@ -3019,6 +3099,7 @@ export function TransactionsView({
 
   const resetFilters = () => {
     setFilter("all");
+    setPeriod("30d");
     setSearch("");
   };
 
@@ -3049,12 +3130,26 @@ export function TransactionsView({
             marginBottom: 20,
           }}
         >
-          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
             {filterBtn("all", lang === "fr" ? "Toutes" : "All")}
             {filterBtn("commission", lang === "fr" ? "Commissions" : "Commissions")}
             {filterBtn("payout", lang === "fr" ? "Paiements" : "Payouts")}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: "10px 14px", minWidth: isMobile ? "100%" : 280 }}>
+          <PayoutOverviewPeriodSelect value={period} onChange={setPeriod} lang={lang} />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            background: "#FAFAFA",
+            border: "1px solid #EFEFEF",
+            borderRadius: 12,
+            padding: "10px 14px",
+            minWidth: isMobile ? "100%" : 280,
+            marginBottom: 20,
+          }}
+        >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
               <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
@@ -3067,7 +3162,6 @@ export function TransactionsView({
               style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
             />
           </div>
-        </div>
 
         <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 720 : undefined }}>
@@ -3094,16 +3188,16 @@ export function TransactionsView({
                         ? "Vos transactions apparaîtront ici."
                         : "Your transactions will appear here."
                       : lang === "fr"
-                        ? "Aucune transaction ne correspond à votre recherche."
-                        : "No transactions match your search."}
+                        ? "Aucune transaction sur cette période."
+                        : "No transactions in this period."}
                   </td>
                 </tr>
               ) : (
-                groupedRows.map(({ key, items }) => (
+                groupedRows.map(({ key, label, items }) => (
                   <Fragment key={key}>
                     <tr>
                       <td colSpan={4} style={sectionRowStyle}>
-                        {formatTransactionMonthLabel(key, lang)}
+                        {label}
                       </td>
                     </tr>
                     {items.map((row) => {

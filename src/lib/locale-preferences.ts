@@ -9,6 +9,12 @@ export const TRACKIT_DISCOVERY_LANGUAGE_KEY = "trackit_discovery_language";
 
 export const LOCALE_UPDATED_EVENT = "trackit-locale-updated";
 export const CURRENCY_UPDATED_EVENT = "trackit-currency-updated";
+export const PROFILE_UPDATED_EVENT = "trackit-profile-updated";
+
+export function dispatchProfileUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
+}
 
 export type DisplayCurrency = "USD" | "EUR";
 
