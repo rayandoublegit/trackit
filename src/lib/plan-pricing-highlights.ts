@@ -6,6 +6,8 @@ import {
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
   FREE_LIFETIME_DISCOVERIES,
+  FREE_MAX_CAMPAIGNS,
+  FREE_MAX_MANUAL_SALES,
   FREE_MAX_MANAGED_CREATORS,
   FREE_RESULTS_PER_SEARCH,
   PRO_MAX_CAMPAIGNS,
@@ -49,6 +51,21 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         id: "creators",
         label: fr ? "Créateurs suivis" : "Tracked creators",
         value: String(FREE_MAX_MANAGED_CREATORS),
+      },
+      {
+        id: "campaigns",
+        label: fr ? "Campagnes" : "Campaigns",
+        value: String(FREE_MAX_CAMPAIGNS),
+      },
+      {
+        id: "sales",
+        label: fr ? "Ventes" : "Sales",
+        value: fr ? `Ajout manuel, ${FREE_MAX_MANUAL_SALES} max` : `Manual entry, ${FREE_MAX_MANUAL_SALES} max`,
+      },
+      {
+        id: "commissions",
+        label: fr ? "Commissions" : "Commissions",
+        value: fr ? "Calcul automatique inclus" : "Automatic calculation included",
       },
       {
         id: "save",

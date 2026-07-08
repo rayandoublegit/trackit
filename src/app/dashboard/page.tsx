@@ -3696,7 +3696,7 @@ function IntegrationsView({
                             )}
                             {plan === "free" ? (
                               <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
-                                {lang === "fr" ? "Shopify nécessite le plan Starter. " : "Shopify requires the Starter plan. "}
+                                {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Starter. " : "Free includes manual sales. Shopify requires the Starter plan. "}
                                 <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                                   {lang === "fr" ? "Passer à Starter →" : "Upgrade to Starter →"}
                                 </button>

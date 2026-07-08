@@ -239,6 +239,24 @@ export function creatorMatchesNicheFilter(
   return Boolean(primary && tags.has(primary));
 }
 
+/** Client/server guard: country and language filters (null country_code passes when country set). */
+export function creatorMatchesGeoFilter(
+  creator: { countryCode?: string | null; language?: string },
+  opts: { country?: string; language?: string }
+): boolean {
+  if (opts.language) {
+    const want = opts.language.toLowerCase();
+    const lang = String(creator.language ?? "").toLowerCase();
+    if (lang !== want) return false;
+  }
+  if (opts.country) {
+    const want = opts.country.toUpperCase();
+    const cc = creator.countryCode?.toUpperCase() ?? null;
+    if (cc && cc !== want) return false;
+  }
+  return true;
+}
+
 // Tags valides pour une niche: canonique + synonymes (NICHE_TOKENS) + sous-niches.
 // On reste sur des tags d'array (niches.cs.{...}), jamais d'ILIKE de bio, donc
 // pas de pollution cross-niche. Les sous-niches scrapees rentables remontent.

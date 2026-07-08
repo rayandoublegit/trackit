@@ -6,9 +6,7 @@ import {
   BASIC_MONTHLY_AI_MESSAGES,
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
-  FREE_LIFETIME_DISCOVERIES,
-  FREE_MAX_MANAGED_CREATORS,
-  FREE_RESULTS_PER_SEARCH,
+  FREE_MAX_CAMPAIGNS,
   PRO_MAX_CAMPAIGNS,
   PRO_MAX_MANAGED_CREATORS,
   PRO_MONTHLY_DISCOVERIES,
@@ -31,6 +29,7 @@ import {
   getMaxActiveCampaigns,
   getMaxManagedCreators,
   getDailyDiscoveryLimit,
+  isGrowthOrAbove,
   maxShopifyStores,
   type PlanTier,
 } from "@/lib/plan-limits";
@@ -122,7 +121,7 @@ export function getPlanMarketingFeatures(
 export function getPlanCardDescription(tier: PlanTier, lang: Lang): string {
   const fr = lang === "fr";
   if (tier === "free") {
-    return fr ? "Commencez sans engagement." : "Get started with no commitment.";
+    return fr ? "Testez Trackit avec une vraie mini-campagne." : "Test Trackit with a real mini campaign.";
   }
   if (tier === "basic") {
     return fr
@@ -157,6 +156,7 @@ export type GateFeatureKey =
   | "discovery"
   | "ai-outreach"
   | "bulk-import"
+  | "lists"
   | "auto-follow-up";
 
 export type LimitGateKind = "campaigns" | "creators" | "discoveries" | "shopify-stores";
@@ -252,11 +252,11 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   },
   campaigns: {
     requiredTier: "basic",
-    check: (plan) => plan !== "free",
+    check: () => true,
     title: { en: "Campaigns", fr: "Campagnes" },
     description: {
-      en: "Launch and manage creator campaigns with tracking and commissions.",
-      fr: "Lancez et gérez des campagnes créateurs avec suivi et commissions.",
+      en: "Free includes 1 active campaign. Upgrade for more campaigns and higher limits.",
+      fr: "Le plan Free inclut 1 campagne active. Passez au plan supérieur pour plus de campagnes et de limites.",
     },
   },
   integrations: {
@@ -313,6 +313,15 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
       fr: "Importez tous vos modèles et créateurs depuis un CSV en un clic.",
     },
   },
+  lists: {
+    requiredTier: "basic",
+    check: isGrowthOrAbove,
+    title: { en: "Creator lists", fr: "Listes créateurs" },
+    description: {
+      en: "Organize saved creators into lists and folders on Starter.",
+      fr: "Organisez vos créateurs sauvegardés en listes et dossiers sur Starter.",
+    },
+  },
   "auto-follow-up": {
     requiredTier: "pro",
     check: canUseAutoFollowUp,
@@ -335,7 +344,7 @@ export function getManagedCreatorLimitLabel(plan: PlanTier, lang: Lang): string 
   if (plan === "basic") {
     return fr ? "jusqu'à 25 créateurs" : "up to 25 creators";
   }
-  return fr ? "jusqu'à 3 créateurs" : "up to 3 creators";
+  return fr ? "jusqu'à 5 créateurs" : "up to 5 creators";
 }
 
 export function getNextTierForCreatorLimit(plan: PlanTier): PlanTier {
@@ -420,8 +429,8 @@ export function getLimitUpgradeModalProps(
     const description =
       currentPlan === "free"
         ? fr
-          ? `Le plan gratuit n'inclut pas de campagnes actives. Passez à ${planName} pour jusqu'à ${BASIC_MAX_CAMPAIGNS} campagnes.`
-          : `Free doesn't include active campaigns. Upgrade to ${planName} for up to ${BASIC_MAX_CAMPAIGNS} campaigns.`
+          ? `Le plan gratuit inclut ${FREE_MAX_CAMPAIGNS} campagne active. Passez à ${planName} pour jusqu'à ${BASIC_MAX_CAMPAIGNS} campagnes.`
+          : `Free includes ${FREE_MAX_CAMPAIGNS} active campaign. Upgrade to ${planName} for up to ${BASIC_MAX_CAMPAIGNS} campaigns.`
         : nextMax == null
           ? fr
             ? `Votre plan inclut ${max} campagnes actives. Passez à ${planName} pour des campagnes illimitées.`

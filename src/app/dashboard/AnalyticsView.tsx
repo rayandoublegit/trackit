@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
-import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
+import { canUseAdvancedAnalytics, canUseFullAnalytics, type PlanTier } from "@/lib/plan-limits";
+import { UpgradeModal } from "./UpgradeModal";
 import {
   fillChartSeries,
   computeTrend,
@@ -32,17 +33,19 @@ import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 type DateRange = "today" | "3d" | "7d" | "30d" | "90d" | "custom";
 type SortKey = "sales" | "commission" | "roi" | "creator";
 
-export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
+export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onUpgradeBasic?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
   if (props.isCreator) {
     return <CreatorAnalytics userId={props.userId} isMobile={props.isMobile} />;
   }
   return <BrandAnalyticsView {...props} />;
 }
 
-function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
+function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onUpgradeBasic, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onUpgradeBasic?: () => void; onConnectShopify?: () => void }) {
   useDisplayCurrency();
-  const isFree = plan === "free";
-  const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
+  const tier = (plan ?? "free") as PlanTier;
+  const isFree = tier === "free";
+  const hasFullAnalytics = canUseFullAnalytics(tier);
+  const hasAdvancedAnalytics = canUseAdvancedAnalytics(tier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -69,7 +72,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   }, [userId, range, tzOffset]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !hasFullAnalytics) {
       setLoadingData(false);
       return;
     }
@@ -116,9 +119,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return () => {
       cancelled = true;
     };
-  }, [userId, shopifyStore, range, tzOffset]);
+  }, [userId, shopifyStore, range, tzOffset, hasFullAnalytics]);
 
-  useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId });
+  useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId && hasFullAnalytics });
 
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
@@ -558,8 +561,8 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                   </tr>
                 ) : sortedCreators.map((r, i) => (
                   <tr key={r.id} style={{ borderBottom: "1px solid #F5F5F5", position: "relative" }}>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}><RankBadge rank={r.rank} /></td>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none", userSelect: isFree && i >= 2 ? "none" : "auto" }}>
+                    <td style={{ padding: "12px 8px" }}><RankBadge rank={r.rank} /></td>
+                    <td style={{ padding: "12px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <CreatorAvatar src={r.avatar_url} username={r.handle} displayName={r.creator} size={36} alt={r.creator} />
                         <div style={{ minWidth: 0 }}>
@@ -570,8 +573,8 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "12px 8px", color: "#7A7A7A", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{r.platform}</td>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>
+                    <td style={{ padding: "12px 8px", color: "#7A7A7A" }}>{r.platform}</td>
+                    <td style={{ padding: "12px 8px" }}>
                       <div style={{ fontWeight: 500, color: "#1A1A1A" }}>{formatCurrency(r.sales, lang)}</div>
                       {r.salesCount > 0 ? (
                         <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 2 }}>
@@ -579,8 +582,8 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                         </div>
                       ) : null}
                     </td>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}>{formatCurrency(r.commission, lang)}</td>
-                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: isFree && i >= 2 ? "blur(4px)" : !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>
+                    <td style={{ padding: "12px 8px" }}>{formatCurrency(r.commission, lang)}</td>
+                    <td style={{ padding: "12px 8px", fontWeight: 500, filter: !hasAdvancedAnalytics ? "blur(4px)" : "none", userSelect: !hasAdvancedAnalytics ? "none" : "auto" }}>
                       {hasAdvancedAnalytics ? (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                           <span style={{ color: r.roi >= 1 ? "#166534" : r.roi > 0 ? "#991B1B" : "#9A9A9A" }}>
@@ -592,18 +595,10 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                         "—"
                       )}
                     </td>
-                    <td style={{ padding: "12px 8px", filter: isFree && i >= 2 ? "blur(4px)" : "none" }}><StatusBadge lang={lang} status={r.status} /></td>
+                    <td style={{ padding: "12px 8px" }}><StatusBadge lang={lang} status={r.status} /></td>
                   </tr>
                 ))}
-                {isFree && (
-                  <tr>
-                    <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
-                      <span style={{ fontSize: 13, color: "#0047FF", fontWeight: 500 }}>
-                        {lang === "fr" ? "🔒 Passez à Starter pour voir tous vos créateurs →" : "🔒 Upgrade to Starter to unlock all creator data →"}
-                      </span>
-                    </td>
-                  </tr>
-                )}
+
                 {!hasAdvancedAnalytics && !isFree && (
                   <tr>
                     <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>

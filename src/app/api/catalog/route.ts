@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   catalogRowToFeedCreator,
   CREATOR_LIST_COLUMNS,
+  creatorMatchesGeoFilter,
   creatorMatchesNicheFilter,
   nicheOrClause,
   type FeedCreator,
@@ -77,14 +78,8 @@ export async function GET(req: NextRequest) {
       .order("followers", { ascending: false, nullsFirst: false })
       .range(from, to);
 
-    if (language && country) {
-      // Language is strict (a creator has ONE content language). Country narrows within it.
-      q = q.eq("language", language);
-    } else if (language) {
-      q = q.eq("language", language);
-    } else if (country) {
-      q = q.eq("country_code", country);
-    }
+    if (language) q = q.eq("language", language);
+    if (country) q = q.or(`country_code.eq.${country},country_code.is.null`);
 
     if (niche) {
       const or = nicheOrClause(niche);
@@ -105,6 +100,8 @@ export async function GET(req: NextRequest) {
         const cor = nicheOrClause(niche);
         if (cor) cq = cq.or(cor);
       }
+      if (language) cq = cq.eq("language", language);
+      if (country) cq = cq.or(`country_code.eq.${country},country_code.is.null`);
       const cr = await cq;
       curatedRows = (cr.data ?? []) as unknown as Record<string, unknown>[];
     }
@@ -134,6 +131,17 @@ export async function GET(req: NextRequest) {
             niches: Array.isArray(row.niches) ? (row.niches as string[]) : [],
           },
           niche
+        )
+      );
+    }
+    if (country || language) {
+      rows = rows.filter((row) =>
+        creatorMatchesGeoFilter(
+          {
+            countryCode: typeof row.country_code === "string" ? row.country_code : null,
+            language: typeof row.language === "string" ? row.language : "",
+          },
+          { country, language }
         )
       );
     }

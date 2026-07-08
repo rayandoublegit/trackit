@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { normalizePlan, BASIC_MAX_MANAGED_CREATORS, PRO_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
+import { normalizePlan, BASIC_MAX_MANAGED_CREATORS, FREE_MAX_MANAGED_CREATORS, PRO_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
 import { formatPricingAmount, getPlanMonthlyPrice, planDisplayName } from "@/lib/plan-marketing";
 import {
   fetchProfileUsernameAvailability,
@@ -22,7 +22,7 @@ type SettingsLang = "en" | "fr";
 
 function planSummaryLine(tier: PlanTier, lang: SettingsLang): string {
   if (tier === "free") {
-    return lang === "fr" ? "Plan Free · 3 créateurs gérés" : "Free plan · 3 managed creators";
+    return lang === "fr" ? `Plan Free · ${FREE_MAX_MANAGED_CREATORS} créateurs suivis` : `Free plan · ${FREE_MAX_MANAGED_CREATORS} tracked creators`;
   }
   const name = planDisplayName(tier, lang);
   const price = getPlanMonthlyPrice(tier);
@@ -75,7 +75,7 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     upgrade_plan: "Upgrade plan →",
     manage_plan: "Manage plan →",
     scale_max: "You're on the highest plan. 🔥",
-    analyses_free: "Free plan · 3 managed creators",
+    analyses_free: `Free plan · ${FREE_MAX_MANAGED_CREATORS} tracked creators`,
     danger_title: "Danger Zone",
     danger_sub: "These actions are permanent and cannot be undone.",
     sign_out: "Sign out",
@@ -123,7 +123,7 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     upgrade_plan: "Améliorer le plan →",
     manage_plan: "Gérer le plan →",
     scale_max: "Tu es sur le plan le plus élevé. 🔥",
-    analyses_free: "Plan Free · 3 créateurs gérés",
+    analyses_free: `Plan Free · ${FREE_MAX_MANAGED_CREATORS} créateurs suivis`,
     danger_title: "Zone de danger",
     danger_sub: "Ces actions sont permanentes et ne peuvent pas être annulées.",
     sign_out: "Se déconnecter",

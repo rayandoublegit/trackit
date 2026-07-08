@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { isGrowthOrAbove, normalizePlan } from "@/lib/plan-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,12 @@ export async function POST(request: NextRequest) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   const name = String(body.name ?? "").trim();
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
+
+  const { data: profile } = await admin.from("profiles").select("plan").eq("id", userId).maybeSingle();
+  const plan = normalizePlan(profile?.plan);
+  if (!isGrowthOrAbove(plan)) {
+    return NextResponse.json({ error: "Upgrade required", code: "plan_required" }, { status: 402 });
+  }
 
   const { count } = await admin.from("discovery_folders").select("id", { count: "exact", head: true }).eq("user_id", userId);
   const { data, error } = await admin

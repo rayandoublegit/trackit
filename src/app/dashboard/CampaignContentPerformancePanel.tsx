@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
+import { videoEmbedPlayUrl } from "@/lib/creator-video";
+import { TikTokEmbedModal } from "@/app/dashboard/TikTokEmbedPlayer";
 import {
   calcEngagementRate,
   formatCompactStat,
@@ -120,6 +122,7 @@ export function CampaignContentPerformancePanel({
   const [loading, setLoading] = useState(true);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [playingPostUrl, setPlayingPostUrl] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -228,6 +231,13 @@ export function CampaignContentPerformancePanel({
   return (
     <section style={{ marginTop: isMobile ? 28 : 36 }}>
       {toast ? <StatsToast message={toast} /> : null}
+      {playingPostUrl ? (
+        <TikTokEmbedModal
+          shareUrl={playingPostUrl}
+          title={lang === "fr" ? "Vidéo TikTok" : "TikTok video"}
+          onClose={() => setPlayingPostUrl(null)}
+        />
+      ) : null}
 
       <AnalyticsSectionHeader
         title={lang === "fr" ? "Performance par contenu" : "Performance by content"}
@@ -274,11 +284,29 @@ export function CampaignContentPerformancePanel({
                   const pending = !row.stats_updated_at;
                   const title = row.title?.trim() || row.file_name || "—";
                   const refreshing = refreshingId === row.id;
+                  const canPlayPost = Boolean(row.post_url && videoEmbedPlayUrl(row.post_url));
 
                   return (
                     <tr key={row.id}>
                       <td style={tdStyle}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => { if (canPlayPost && row.post_url) setPlayingPostUrl(row.post_url); }}
+                          disabled={!canPlayPost}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                            minWidth: 0,
+                            width: "100%",
+                            padding: 0,
+                            border: "none",
+                            background: "transparent",
+                            textAlign: "left",
+                            cursor: canPlayPost ? "pointer" : "default",
+                            fontFamily: "inherit",
+                          }}
+                        >
                           <ContentThumb item={row} />
                           <div style={{ minWidth: 0 }}>
                             <div
@@ -308,9 +336,13 @@ export function CampaignContentPerformancePanel({
                               >
                                 {lang === "fr" ? "En attente" : "Pending"}
                               </span>
+                            ) : canPlayPost ? (
+                              <span style={{ display: "inline-block", marginTop: 4, fontSize: 11, color: "#0047FF", fontWeight: 500 }}>
+                                {lang === "fr" ? "▶ Lire la vidéo" : "▶ Play video"}
+                              </span>
                             ) : null}
                           </div>
-                        </div>
+                        </button>
                       </td>
                       <td style={{ ...tdStyle, fontWeight: pending ? 400 : 600 }}>
                         {pending ? "—" : formatCompactStat(row.views, lang)}

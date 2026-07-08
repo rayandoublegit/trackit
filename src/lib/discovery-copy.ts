@@ -145,6 +145,17 @@ export function discoveryCopy(lang: Lang) {
     authenticity: fr ? "Authenticité" : "Authenticity",
     reachPerFollower: fr ? "Portée / abonnés" : "Reach / followers",
     postsAnalyzed: fr ? "Posts analysés" : "Posts analyzed",
+    likeRate: fr ? "Taux de likes" : "Like rate",
+    commentRate: fr ? "Taux de commentaires" : "Comment rate",
+    shareRate: fr ? "Taux de partages" : "Share rate",
+    estCpm: fr ? "CPM estimé" : "Est. CPM",
+    estCostPerPost: fr ? "Coût post estimé" : "Est. cost / post",
+    valueScore: fr ? "Score valeur" : "Value score",
+    postFrequency: fr ? "Fréquence de post" : "Posting frequency",
+    postsPerWeek: (n: number) => (fr ? `${n.toFixed(1)} / semaine` : `${n.toFixed(1)} / week`),
+    creatorTier: fr ? "Taille créateur" : "Creator tier",
+    engagementByFollower: fr ? "Engagement / abonnés" : "Engagement / followers",
+    brandSignals: fr ? "Signaux marque" : "Brand signals",
     performanceSection: fr ? "Performance" : "Performance",
     lockedAnalysis: fr ? "Analyse réservée aux plans payants" : "Analysis available on paid plans",
     popularPosts: fr ? "Popular posts" : "Popular posts",
@@ -195,7 +206,6 @@ export function discoveryCopy(lang: Lang) {
     emptySaved: fr
       ? "Aucun créateur sauvegardé. Va dans Recherche et clique « Sauvegarder » sur un créateur."
       : "No saved creators yet. Go to Discovery and click Save on a creator.",
-    valueScore: fr ? "Renta" : "Value",
     followersAbbr: fr ? "ab." : "fol.",
     // Manage lists (Gérer)
     managePageTitle: fr ? "Gérer vos créateurs" : "Manage Creators",

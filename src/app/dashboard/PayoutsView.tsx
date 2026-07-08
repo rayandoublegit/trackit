@@ -2373,7 +2373,7 @@ export function PayoutsView({
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
     if (!canUseManualPayouts(plan as PlanTier)) {
-      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on the Starter plan and above.");
+      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Starter." : "Manual creator payouts are available on the Starter plan and above.");
       return;
     }
     const amount = Number(creator.balance) || 0;
@@ -2549,7 +2549,7 @@ export function PayoutsView({
       onPayManual={() => void paySelectedCreator()}
       onPayStripe={async () => {
         if (!canUseManualPayouts(plan as PlanTier)) {
-          alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on Starter plan and above.");
+          alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Starter." : "Manual creator payouts are available on the Starter plan and above.");
           return;
         }
         const amount = Number(activeCreator.balance) || 0;

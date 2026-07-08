@@ -13,7 +13,7 @@ import {
   syncDiscoveryQuota,
 } from "@/lib/discovery-quota";
 import type { FeedCreator } from "@/lib/discovery-feed";
-import { creatorMatchesNicheFilter, isCuratedFeedCreator } from "@/lib/discovery-feed";
+import { creatorMatchesGeoFilter, creatorMatchesNicheFilter, isCuratedFeedCreator } from "@/lib/discovery-feed";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
@@ -89,8 +89,8 @@ const EMPTY_FILTERS: FilterState = {
   platform: "tiktok",
   followersRange: "",
   engagement: "",
-  country: "FR",
-  language: "fr",
+  country: "",
+  language: "",
   age: "",
   viewsFrom: "",
   viewsTo: "",
@@ -176,13 +176,22 @@ function toParams(f: FilterState, debouncedSearch = ""): Record<string, string> 
 function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<string>): FeedCreator[] {
   const curated = list.filter((c) => isCuratedFeedCreator(c));
   const regular = list.filter((c) => !isCuratedFeedCreator(c));
+  const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
 
-  const filterRegular = (input: FeedCreator[]): FeedCreator[] => {
+  const applyRowFilters = (input: FeedCreator[]): FeedCreator[] => {
     let out = input;
-    const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
 
     if (!isGlobalSearch && f.niche) {
       out = out.filter((c) => creatorMatchesNicheFilter(c, f.niche));
+    }
+
+    if (!isGlobalSearch && (f.country || f.language)) {
+      out = out.filter((c) =>
+        creatorMatchesGeoFilter(c, {
+          country: f.country || undefined,
+          language: f.language || undefined,
+        })
+      );
     }
 
     if (!isGlobalSearch && f.platform) {
@@ -201,6 +210,7 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
     if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
     else if (f.engagement === "6+") out = out.filter((c) => c.engagementRate >= 6);
     else if (f.engagement === "9+") out = out.filter((c) => c.engagementRate >= 9);
+    else if (f.engagement === "12+") out = out.filter((c) => c.engagementRate >= 12);
 
     if (!isGlobalSearch) {
       const q = f.search.trim().toLowerCase().replace(/^@/, "");
@@ -220,26 +230,8 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
     return out;
   };
 
-  const filterCurated = (input: FeedCreator[]): FeedCreator[] => {
-    let out = input;
-    const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
-    if (!isGlobalSearch) {
-      const q = f.search.trim().toLowerCase().replace(/^@/, "");
-      if (q) {
-        out = out.filter(
-          (c) =>
-            c.username.toLowerCase().includes(q) ||
-            c.displayName.toLowerCase().includes(q) ||
-            (c.email?.toLowerCase().includes(q) ?? false),
-        );
-      }
-    }
-    if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
-    return out;
-  };
-
-  const curatedOut = filterCurated(curated);
-  const regularOut = filterRegular(regular);
+  const curatedOut = applyRowFilters(curated);
+  const regularOut = applyRowFilters(regular);
   const seen = new Set<string>();
   const merged: FeedCreator[] = [];
   for (const c of [...curatedOut, ...regularOut]) {
@@ -948,6 +940,18 @@ const FREE_VISIBLE = 6;
 const SCALE_PAGE_LIMIT = 48;
 const ALL_NICHES_CHUNK = 1000;
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+const FREE_DISCOVERY_GATE_LOCK_KEY = "trackit_free_discovery_gate_locked";
+
+function readFreeDiscoveryGateLock(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(FREE_DISCOVERY_GATE_LOCK_KEY) === "1";
+}
+
+function writeFreeDiscoveryGateLock(locked: boolean) {
+  if (typeof window === "undefined") return;
+  if (locked) window.localStorage.setItem(FREE_DISCOVERY_GATE_LOCK_KEY, "1");
+  else window.localStorage.removeItem(FREE_DISCOVERY_GATE_LOCK_KEY);
+}
 
 export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
   const lang = useLang();
@@ -963,14 +967,14 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const [savedUsernames, setSavedUsernames] = useState<Set<string>>(new Set());
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItem[]>([]);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(() => !(plan === "free" && readFreeDiscoveryGateLock()));
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
   const [discoveriesResetAt, setDiscoveriesResetAt] = useState<Date | null>(null);
-  const [showDiscoveryGate, setShowDiscoveryGate] = useState(false);
+  const [showDiscoveryGate, setShowDiscoveryGate] = useState(() => plan === "free" && readFreeDiscoveryGateLock());
 
   const openCreator = (creator: FeedCreator) => {
     setSelected(creator);
@@ -996,10 +1000,29 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const poolHasMoreRef = useRef(true);
   const scrolledRef = useRef(false);
   const loadingNextRef = useRef(false);
+  const loadMoreArmedRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+  const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const discoveryUsedRef = useRef(0);
+  const freeGateLockedRef = useRef(plan === "free" && readFreeDiscoveryGateLock());
+  const gatedTeaserRef = useRef<FeedCreator[]>([]);
+  const SCROLL_ARM_PX = 80;
+  const BOTTOM_RESET_PX = 48;
 
   const allNichesBrowse = useMemo(() => isAllNichesBrowse(filters), [filters]);
   const planResultCap = resultsPerSearch;
   const batchSize = allNichesBrowse ? ALL_NICHES_CHUNK : (planResultCap ?? SCALE_PAGE_LIMIT);
+
+  const lockFreeDiscoveryGate = useCallback(() => {
+    if (plan !== "free") return;
+    freeGateLockedRef.current = true;
+    writeFreeDiscoveryGateLock(true);
+  }, [plan]);
+
+  const unlockFreeDiscoveryGate = useCallback(() => {
+    freeGateLockedRef.current = false;
+    writeFreeDiscoveryGateLock(false);
+  }, []);
 
   useEffect(() => {
     const q = filters.search.trim();
@@ -1007,8 +1030,21 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     return () => clearTimeout(timer);
   }, [filters.search]);
 
+  useEffect(() => {
+    if (plan === "free") {
+      freeGateLockedRef.current = readFreeDiscoveryGateLock();
+      if (freeGateLockedRef.current) {
+        setShowDiscoveryGate(true);
+        setHasMore(false);
+      }
+      return;
+    }
+    unlockFreeDiscoveryGate();
+  }, [plan, unlockFreeDiscoveryGate]);
+
   const apiParams = useMemo(() => toParams(filters, debouncedSearch), [filters, debouncedSearch]);
   const isGlobalSearch = debouncedSearch.trim().replace(/^@/, "").length >= 2;
+  const shouldShowAllNichesTeaser = !isPaid && allNichesBrowse;
 
   const discoverAndFetch = useCallback(async (
     batchIndex: number,
@@ -1016,15 +1052,19 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   ): Promise<{ count: number; blocked?: boolean }> => {
     const gen = fetchGenRef.current;
     const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse && !isGlobalSearch;
+    const shouldSyncQuota = hasDiscoveryCap && discoveryLimit != null;
+    let quotaBlocked = false;
+    let quotaUsedBefore = 0;
+    const gateLockedTeaser = plan === "free" && freeGateLockedRef.current;
+
+    if (gateLockedTeaser) {
+      setShowDiscoveryGate(true);
+      setHasMore(false);
+    }
 
     const off = batchIndex * batchSize;
     const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(batchSize) }).toString();
-
-    // Start catalog immediately; check quota in parallel (don't serialize).
-    const catalogPromise = fetch(`/api/catalog?${qs}`).then((r) => r.json());
-
-    let quotaUsedBefore = 0;
-    if (countsTowardQuota) {
+    if (shouldSyncQuota) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: 0 };
       const { data: { user } } = await supabase.auth.getUser();
@@ -1032,18 +1072,18 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       const quota = await syncDiscoveryQuota(supabase, user.id, plan);
       if (!quota) return { count: 0 };
       setDiscoveriesResetAt(quota.resetAt);
+      discoveryUsedRef.current = Math.max(discoveryUsedRef.current, quota.used ?? 0);
       if (quota.blocked) {
+        lockFreeDiscoveryGate();
         setShowDiscoveryGate(true);
         setHasMore(false);
-        return { count: 0, blocked: true };
+        quotaBlocked = true;
+      } else {
+        quotaUsedBefore = quota.used ?? 0;
       }
-      setShowDiscoveryGate(false);
-      quotaUsedBefore = quota.used ?? 0;
-    } else if (allNichesBrowse) {
-      setShowDiscoveryGate(false);
     }
 
-    const d = await catalogPromise;
+    const d = await fetch(`/api/catalog?${qs}`).then((r) => r.json());
     if (gen !== fetchGenRef.current) return { count: 0 };
 
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
@@ -1058,7 +1098,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       return true;
     });
 
-    if (mode === "append") {
+    const gateTeaserOnly = gateLockedTeaser || quotaBlocked;
+    if (mode === "append" && !gateTeaserOnly) {
       setCreators((prev) => {
         const mergedSeen = new Set(prev.map((c) => c.username));
         const unique = deduped.filter((c) => {
@@ -1071,41 +1112,65 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     } else {
       setCreators(deduped);
     }
+    if (gateTeaserOnly) gatedTeaserRef.current = deduped;
 
-    if (countsTowardQuota) {
+    if (gateTeaserOnly) {
+      setShowDiscoveryGate(true);
+      setHasMore(false);
+      return { count: deduped.length, blocked: true };
+    }
+
+    if (countsTowardQuota && !quotaBlocked) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: deduped.length };
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { count: deduped.length };
-      const next = await incrementDiscoveryQuota(supabase, user.id, plan, quotaUsedBefore);
-      if (next >= discoveryLimit!) {
-        setHasMore(false);
-      } else {
-        setHasMore(true);
-      }
+      const currentUsed = Math.max(quotaUsedBefore, discoveryUsedRef.current);
+      const next = await incrementDiscoveryQuota(supabase, user.id, plan, currentUsed);
+      discoveryUsedRef.current = next;
+      const exhausted = next >= discoveryLimit!;
+      if (exhausted) lockFreeDiscoveryGate();
+      setShowDiscoveryGate(exhausted);
+      setHasMore(apiHasMore && !exhausted);
+    } else if (quotaBlocked) {
+      setHasMore(false);
     } else {
       setHasMore(poolHasMoreRef.current);
     }
 
-    return { count: deduped.length };
-  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, batchSize, allNichesBrowse, isGlobalSearch]);
+    return { count: deduped.length, blocked: quotaBlocked };
+  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, batchSize, allNichesBrowse, isGlobalSearch, lockFreeDiscoveryGate]);
 
   useEffect(() => {
     fetchGenRef.current += 1;
     batchIndexRef.current = 0;
     poolHasMoreRef.current = true;
     let cancelled = false;
-    setHasMore(true);
+    const gated = plan === "free" && freeGateLockedRef.current;
+    setLoading(true);
+    setHasMore(!gated);
     setError(null);
+    if (gated) {
+      setShowDiscoveryGate(true);
+    }
     scrolledRef.current = false;
+    loadMoreArmedRef.current = false;
+    lastScrollTopRef.current = 0;
+    const el = isMobile ? scrollRootRef.current : mainRef.current;
+    if (el) el.scrollTo({ top: 0, behavior: "auto" });
     discoverAndFetch(0, "replace")
       .catch(() => { if (!cancelled) setError("network"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [discoverAndFetch]);
+  }, [discoverAndFetch, isMobile, plan]);
 
   useEffect(() => {
     if (!hasDiscoveryCap) return;
+    if (plan === "free" && freeGateLockedRef.current) {
+      setShowDiscoveryGate(true);
+      setHasMore(false);
+      return;
+    }
     void (async () => {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return;
@@ -1114,9 +1179,12 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       const quota = await syncDiscoveryQuota(supabase, user.id, plan);
       if (!quota) return;
       setDiscoveriesResetAt(quota.resetAt);
-      setShowDiscoveryGate(!isAllNichesBrowse(filters) && quota.blocked);
+      discoveryUsedRef.current = quota.used ?? 0;
+      if (plan === "free" && quota.blocked) lockFreeDiscoveryGate();
+      setShowDiscoveryGate(quota.blocked);
+      if (quota.blocked) setHasMore(false);
     })();
-  }, [plan, hasDiscoveryCap, filters.niche]);
+  }, [plan, hasDiscoveryCap, filters, lockFreeDiscoveryGate]);
 
   useEffect(() => {
     if (!hasDiscoveryCap || !showDiscoveryGate) return;
@@ -1130,7 +1198,9 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       const quota = await syncDiscoveryQuota(supabase, user.id, plan);
       if (quota) {
         setDiscoveriesResetAt(quota.resetAt);
+        discoveryUsedRef.current = quota.used ?? 0;
         setShowDiscoveryGate(quota.blocked);
+        if (quota.blocked) setHasMore(false);
       }
     };
     void tick();
@@ -1162,14 +1232,10 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const loadNextBatch = useCallback(async () => {
     if (loadingNextRef.current || loadingMore || loading) return;
     if (showDiscoveryGate) return;
-    if (allNichesBrowse && !hasMore) return;
-
-    if (!hasMore && hasDiscoveryCap && !allNichesBrowse) {
-      setShowDiscoveryGate(true);
-      return;
-    }
+    if (!hasMore) return;
 
     loadingNextRef.current = true;
+    loadMoreArmedRef.current = false;
     setLoadingMore(true);
     try {
       let nextBatch = batchIndexRef.current + 1;
@@ -1186,29 +1252,67 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       loadingNextRef.current = false;
       setLoadingMore(false);
     }
-  }, [loadingMore, loading, hasMore, showDiscoveryGate, hasDiscoveryCap, allNichesBrowse, discoverAndFetch]);
+  }, [loadingMore, loading, hasMore, showDiscoveryGate, hasDiscoveryCap, allNichesBrowse, discoverAndFetch, isMobile]);
 
   useEffect(() => {
     if (loading || loadingMore) return;
     const el = isMobile ? scrollRootRef.current : mainRef.current;
     if (!el) return;
     const onScroll = () => {
-      if (el.scrollTop > 80) scrolledRef.current = true;
+      const isScrollingDown = el.scrollTop > lastScrollTopRef.current;
+      lastScrollTopRef.current = el.scrollTop;
+
+      if (el.scrollTop > SCROLL_ARM_PX) scrolledRef.current = true;
       if (!scrolledRef.current) return;
-      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 600;
-      if (!nearBottom) return;
-      void loadNextBatch();
+
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distanceFromBottom > BOTTOM_RESET_PX) {
+        loadMoreArmedRef.current = true;
+      }
+
+      if (!isScrollingDown) return;
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, [loading, loadingMore, loadNextBatch, isMobile]);
 
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore || showDiscoveryGate) return;
+    const root = isMobile ? scrollRootRef.current : mainRef.current;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!root || !sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        if (entry.intersectionRatio < 1) return;
+        if (!scrolledRef.current || !loadMoreArmedRef.current) return;
+        loadMoreArmedRef.current = false;
+        void loadNextBatch();
+      },
+      {
+        root,
+        threshold: 1,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loading, loadingMore, hasMore, showDiscoveryGate, loadNextBatch, isMobile, creators.length]);
+
   const filtered = useMemo(() => {
-    const base = applyClientFilters(creators, filters, savedUsernames);
+    const clientFiltered = applyClientFilters(creators, filters, savedUsernames);
+    const base =
+      showDiscoveryGate && clientFiltered.length === 0
+        ? (creators.length > 0 ? creators : gatedTeaserRef.current)
+        : clientFiltered;
     const curated = base.filter((c) => isCuratedFeedCreator(c));
     const regular = base.filter((c) => !isCuratedFeedCreator(c));
-    const sortedRegular =
-      sort === "engagement"
+    const shouldPreserveBatchOrder = !isPaid && Boolean(filters.niche.trim()) && !isGlobalSearch;
+    const sortedRegular = shouldPreserveBatchOrder
+      ? regular
+      : sort === "engagement"
         ? [...regular].sort((a, b) => b.engagementRate - a.engagementRate)
         : sort === "followers"
           ? [...regular].sort((a, b) => b.followersCount - a.followersCount)
@@ -1221,16 +1325,13 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       out.push(c);
     }
     return out;
-  }, [creators, filters, savedUsernames, sort]);
+  }, [creators, filters, savedUsernames, sort, isPaid, isGlobalSearch, showDiscoveryGate]);
   const visibleCreators = filtered;
-  const items = isPaid ? visibleCreators : visibleCreators.slice(0, FREE_VISIBLE + 2);
-  const hasMoreFree = !isPaid && visibleCreators.length > FREE_VISIBLE;
-  const displayCount = filtered.length;
-  // Creator count hidden during global search (results are query-driven, not niche-scoped).
-  const showCreatorCount = Boolean(filters.niche.trim()) && !isGlobalSearch;
-  const batchNote = showCreatorCount && planResultCap != null ? t.resultsCappedAt(planResultCap) : "";
   const discoveryGateActive = showDiscoveryGate;
-  const feedGateActive = discoveryGateActive || hasMoreFree;
+  const hasProgressiveFreeTeaser = !isPaid && (shouldShowAllNichesTeaser || discoveryGateActive);
+  const items = hasProgressiveFreeTeaser ? visibleCreators.slice(0, FREE_VISIBLE + 2) : visibleCreators;
+  const hasMoreFree = hasProgressiveFreeTeaser && visibleCreators.length > FREE_VISIBLE;
+  const feedGateActive = hasProgressiveFreeTeaser && (hasMoreFree || discoveryGateActive);
   const searchQuery = debouncedSearch.trim();
   const isCreatorSearchMiss =
     !loading && !error && !discoveryGateActive && searchQuery.replace(/^@/, "").length >= 2 && filtered.length === 0;
@@ -1352,11 +1453,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
             }}
           >
             <div style={{ minWidth: 0 }}>
-              {showCreatorCount ? (
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
-                  {loading ? t.loading : `${t.creatorCount(displayCount)}${batchNote}`}
-                </p>
-              ) : loading ? (
+              {loading && !discoveryGateActive ? (
                 <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
                   {t.loading}
                 </p>
@@ -1394,11 +1491,6 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
           </div>
 
           {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
-          {!loading && !error && filtered.length === 0 && discoveryGateActive && (
-            <div style={{ position: "relative", minHeight: 320 }}>
-              <FeedGateOverlay lang={lang} onUpgrade={onUpgrade} />
-            </div>
-          )}
           {!loading && !error && isCreatorSearchMiss && (
             <div
               style={{
@@ -1445,7 +1537,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
             </div>
           )}
 
-          <div style={{ position: "relative" }}>
+          <div style={{ position: "relative", minHeight: feedGateActive && items.length === 0 ? 320 : undefined }}>
             <div
               style={{
                 display: "flex",
@@ -1475,9 +1567,16 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
                   </div>
                 );
               })}
+              {!feedGateActive && hasMore && (
+                <div
+                  ref={loadMoreSentinelRef}
+                  aria-hidden="true"
+                  style={{ height: 1, width: "100%" }}
+                />
+              )}
             </div>
 
-            {feedGateActive && items.length > 0 && (
+            {feedGateActive && (
               <FeedGateOverlay lang={lang} onUpgrade={onUpgrade} />
             )}
           </div>

@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { getAuthedUserId } from "@/lib/api-auth";
+import { getManualSalesLimit, normalizePlan } from "@/lib/plan-limits";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
   commissionNotConfiguredMessage,
@@ -34,7 +35,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Manual sale entry — for brands without Shopify (SaaS, Starter plan, etc).
+// Manual sale entry — for brands without Shopify or teams logging sales by hand.
 // Mirrors /api/shopify/sync: inserts into `sales` and credits the creator.
 export async function POST(request: NextRequest) {
   const authedUserId = await getAuthedUserId(request);
@@ -56,6 +57,31 @@ export async function POST(request: NextRequest) {
   if (!creatorId) return NextResponse.json({ ok: false, error: "No creatorId" }, { status: 400 });
   if (!orderAmount || !Number.isFinite(orderAmount) || orderAmount <= 0) {
     return NextResponse.json({ ok: false, error: "Invalid amount" }, { status: 400 });
+  }
+
+  const { data: profilePlan } = await supabaseAdmin
+    .from("profiles")
+    .select("plan")
+    .eq("id", userId)
+    .maybeSingle();
+  const plan = normalizePlan(profilePlan?.plan);
+  const manualSalesLimit = getManualSalesLimit(plan);
+  if (manualSalesLimit != null) {
+    const { count } = await supabaseAdmin
+      .from("sales")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .or("shop_domain.eq.manual,shopify_order_id.like.manual_%");
+    if ((count ?? 0) >= manualSalesLimit) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Free plan limit reached: ${manualSalesLimit} manual sales max.`,
+          errorFr: `Limite du plan Free atteinte : ${manualSalesLimit} ventes manuelles max.`,
+        },
+        { status: 402 }
+      );
+    }
   }
 
   // Creator must belong to this user (same ownership rule as the sync).
@@ -141,17 +167,17 @@ export async function POST(request: NextRequest) {
   const commissionAmount = parseFloat(((orderAmount * commissionRate) / 100).toFixed(2));
   const tzOffset = parseTzOffsetMinutes(body.tzOffset != null ? String(body.tzOffset) : null);
 
-  const [{ data: profile }, { data: authUser }] = await Promise.all([
+  const [{ data: accountProfile }, { data: authUser }] = await Promise.all([
     supabaseAdmin.from("profiles").select("shopify_store, username").eq("id", userId).maybeSingle(),
     supabaseAdmin.auth.admin.getUserById(userId),
   ]);
 
   const recordAsShopify = isManualSaleAsShopifyAccount({
     email: authUser?.user?.email,
-    username: profile?.username,
+    username: accountProfile?.username,
   });
 
-  const presetMeta = recordAsShopify ? buildPresetShopifySaleMeta(profile?.shopify_store) : null;
+  const presetMeta = recordAsShopify ? buildPresetShopifySaleMeta(accountProfile?.shopify_store) : null;
   const discountCodeUsed =
     campaignDiscountCode ||
     creator.discount_code ||

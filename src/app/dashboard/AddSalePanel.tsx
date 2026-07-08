@@ -19,6 +19,7 @@ import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
 import { notifySaleRecorded } from "@/lib/notifications-storage";
 import { primeNotificationSound } from "@/lib/notification-sound";
 import { toDayKey } from "@/lib/analytics-periods";
+import { FREE_MAX_MANUAL_SALES } from "@/lib/plan-limits";
 import {
   selectionAccentText,
   selectionCardStyle,
@@ -323,8 +324,8 @@ export function AddSalePanel({
       ? `Campagne « ${campaign.name} » — la commission est calculée automatiquement.`
       : `Campaign "${campaign.name}" — commission is calculated automatically.`
     : lang === "fr"
-      ? "Enregistrez une vente générée par un créateur. La commission est calculée automatiquement."
-      : "Record a sale driven by a creator. Commission is calculated automatically.";
+      ? `Enregistrez une vente générée par un créateur. La commission est calculée automatiquement. Plan Free : ${FREE_MAX_MANUAL_SALES} ventes manuelles max.`
+      : `Record a sale driven by a creator. Commission is calculated automatically. Free plan: ${FREE_MAX_MANUAL_SALES} manual sales max.`;
 
   return createPortal(
     <div

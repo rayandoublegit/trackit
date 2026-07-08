@@ -1139,16 +1139,17 @@ export function CampaignsView({
   const detailId = campaignNav?.type === "detail" ? campaignNav.id : null;
   const detailInitialTab =
     campaignNav?.type === "detail" && isDetailTab(campaignNav.tab) ? campaignNav.tab : "analytics";
+  const activeCampaignCount = campaigns.filter((c) => c.status === "Active" || c.status === "Paused").length;
 
   const tryOpenNewCampaign = () => {
-    if (hasReachedCampaignLimit(plan, campaigns.length)) {
+    if (hasReachedCampaignLimit(plan, activeCampaignCount)) {
       setUpgradeModalOpen(true);
       return;
     }
     navigate({ view: "campaigns", campaign: { type: "new" } });
   };
 
-  const canOpenNewCampaign = !hasReachedCampaignLimit(plan, campaigns.length);
+  const canOpenNewCampaign = !hasReachedCampaignLimit(plan, activeCampaignCount);
 
   const refreshCampaignBoard = useCallback(async () => {
     if (!supabase) return;
@@ -1313,6 +1314,10 @@ export function CampaignsView({
 
   const handleLaunchDraft = async (draftId: string, campaignData: CampaignFormData) => {
     if (creatingCampaignRef.current) return;
+    if (hasReachedCampaignLimit(plan, activeCampaignCount)) {
+      setUpgradeModalOpen(true);
+      return;
+    }
     creatingCampaignRef.current = true;
 
     try {
@@ -1376,7 +1381,10 @@ export function CampaignsView({
         auto_payout: campaignData.autoPayout || false,
         status: "active",
       });
-      if (saved) {
+      if (!saved) {
+        setUpgradeModalOpen(true);
+        return;
+      }
       const creatorIds = campaignData.creatorIds ?? [];
       await syncCampaignCreators(user.id, String(saved.id), creatorIds, buildCreatorSyncOptions(campaignData));
       for (const entry of campaignData.creatorCommissions ?? []) {
@@ -1387,11 +1395,10 @@ export function CampaignsView({
           .eq("user_id", user.id);
       }
       const mapped = mapDbCampaign(saved as Record<string, unknown>, creatorIds);
-        setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
-        notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"), user.id);
-        dispatchCampaignsUpdated();
-        navigate({ view: "campaigns" }, { replace: true });
-      }
+      setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
+      notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"), user.id);
+      dispatchCampaignsUpdated();
+      navigate({ view: "campaigns" }, { replace: true });
     } finally {
       creatingCampaignRef.current = false;
     }
@@ -4391,7 +4398,7 @@ function PayoutsTab({
 
   const handlePayCreator = (creator: PayableCreator) => {
     if (!canUseManualPayouts(plan)) {
-      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on the Starter plan and above.");
+      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Starter." : "Manual creator payouts are available on the Starter plan and above.");
       return;
     }
     const amount = creator.balance;

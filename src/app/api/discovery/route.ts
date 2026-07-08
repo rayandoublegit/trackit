@@ -92,6 +92,7 @@ export async function POST(request: Request) {
     .order("followers", { ascending: false })
     .limit(40);
   if (f.language) curatedQ = curatedQ.eq("language", f.language);
+  if (f.countryCode) curatedQ = curatedQ.or(`country_code.eq.${f.countryCode},country_code.is.null`);
   if (nicheOr) curatedQ = curatedQ.or(nicheOr);
 
   let scrapedQ = supabaseAdmin

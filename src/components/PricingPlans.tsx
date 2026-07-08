@@ -366,7 +366,7 @@ export function PricingPlans({
           <div className="pricing-card">
             <div className="pricing-card-top">
               <div className="pricing-logo"><img src={TRACKIT_LOGO_URL} alt="" /></div>
-              <div className="pricing-name">Free</div>
+              <div className="pricing-name">{marketingPlanDisplayName("free", lang)}</div>
               <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
               <div className="pricing-price">
                 <span className="pricing-amount">{formatPricingAmount(0, lang)}</span>

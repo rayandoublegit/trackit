@@ -1,18 +1,19 @@
 export type PlanTier = "free" | "basic" | "pro" | "scale";
 
-export const FREE_LIFETIME_DISCOVERIES = 5;
+export const FREE_LIFETIME_DISCOVERIES = 10;
 export const BASIC_MONTHLY_DISCOVERIES = 30;
 export const PRO_MONTHLY_DISCOVERIES = 100;
 
-export const FREE_RESULTS_PER_SEARCH = 5;
+export const FREE_RESULTS_PER_SEARCH = 15;
 export const BASIC_RESULTS_PER_SEARCH = 25;
 export const PRO_RESULTS_PER_SEARCH = 50;
 
-export const FREE_MAX_CAMPAIGNS = 0;
+export const FREE_MAX_CAMPAIGNS = 1;
 export const BASIC_MAX_CAMPAIGNS = 5;
 export const PRO_MAX_CAMPAIGNS = 15;
 
-export const FREE_MAX_MANAGED_CREATORS = 3;
+export const FREE_MAX_MANAGED_CREATORS = 5;
+export const FREE_MAX_MANUAL_SALES = 10;
 export const BASIC_MAX_MANAGED_CREATORS = 25;
 export const PRO_MAX_MANAGED_CREATORS = 100;
 
@@ -102,6 +103,18 @@ export function hasReachedManagedCreatorLimit(plan: PlanTier, creatorCount: numb
   const max = getMaxManagedCreators(plan);
   if (max == null) return false;
   return creatorCount >= max;
+}
+
+/** Manual sales cap; free = 10 total manual sales, paid plans = unlimited. */
+export function getManualSalesLimit(plan: PlanTier): number | null {
+  if (plan === "free") return FREE_MAX_MANUAL_SALES;
+  return null;
+}
+
+export function hasReachedManualSalesLimit(plan: PlanTier, manualSalesCount: number): boolean {
+  const max = getManualSalesLimit(plan);
+  if (max == null) return false;
+  return manualSalesCount >= max;
 }
 
 export const BASIC_MONTHLY_AI_MESSAGES = 100;

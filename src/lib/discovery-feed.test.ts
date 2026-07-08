@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rankFeed, creatorMatchesNicheFilter, nicheCatalogOrClause, nicheOrClause } from "@/lib/discovery-feed";
+import { rankFeed, creatorMatchesNicheFilter, creatorMatchesGeoFilter, nicheCatalogOrClause, nicheOrClause } from "@/lib/discovery-feed";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 
 function creator(p: Partial<DiscoveryCreatorResult> & { username: string }): DiscoveryCreatorResult {
@@ -84,5 +84,21 @@ describe("creatorMatchesNicheFilter", () => {
     expect(creatorMatchesNicheFilter({ primaryNiche: "saas" }, "saas")).toBe(true);
     expect(creatorMatchesNicheFilter({ niches: ["startup"] }, "saas")).toBe(false);
     expect(creatorMatchesNicheFilter({ niches: ["fitness"] }, "saas")).toBe(false);
+  });
+});
+
+describe("creatorMatchesGeoFilter", () => {
+  it("matches country + language together", () => {
+    const frFitness = { countryCode: "FR", language: "fr" };
+    const usLifestyle = { countryCode: "US", language: "en" };
+    expect(creatorMatchesGeoFilter(frFitness, { country: "FR", language: "fr" })).toBe(true);
+    expect(creatorMatchesGeoFilter(frFitness, { country: "US", language: "en" })).toBe(false);
+    expect(creatorMatchesGeoFilter(usLifestyle, { country: "US", language: "en" })).toBe(true);
+    expect(creatorMatchesGeoFilter(usLifestyle, { country: "FR", language: "fr" })).toBe(false);
+  });
+
+  it("allows null country_code when country filter is set", () => {
+    expect(creatorMatchesGeoFilter({ countryCode: null, language: "fr" }, { country: "FR", language: "fr" })).toBe(true);
+    expect(creatorMatchesGeoFilter({ countryCode: "DE", language: "fr" }, { country: "FR", language: "fr" })).toBe(false);
   });
 });

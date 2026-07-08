@@ -7,6 +7,7 @@ export type VideoPreview = {
   cover: string;
   views: number;
   videoId: string | null;
+  shareUrl: string | null;
   streamUrl: string | null;
 };
 
@@ -30,10 +31,10 @@ export function buildCreatorVideoPreviews(
     views: number;
   }) => {
     const cover = clientImageUrl(item.cover);
-    const videoId = item.id?.trim() || extractVideoId(item.shareUrl) || null;
+    const videoId = item.id?.trim() || extractVideoId(item.shareUrl) || extractVideoId(item.playUrl) || null;
     const dedupe = videoId || item.shareUrl || cover;
     if (!dedupe || seen.has(dedupe)) return;
-    if (!cover && !videoId) return;
+    if (!cover && !videoId && !item.shareUrl?.trim()) return;
     seen.add(dedupe);
     const streamUrl = clientVideoUrl(item.playUrl) || null;
     out.push({
@@ -41,6 +42,7 @@ export function buildCreatorVideoPreviews(
       cover,
       views: item.views,
       videoId,
+      shareUrl: item.shareUrl?.trim() || null,
       streamUrl,
     });
   };

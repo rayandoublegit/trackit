@@ -18,7 +18,7 @@ export function freeStayAnywayCtaLabel(lang: "fr" | "en"): string {
 
 /** Badge above pricing grid when the user is on the free plan. */
 export function freePlanBadgeLabel(lang: "fr" | "en"): string {
-  return lang === "fr" ? "Plan free" : "Free plan";
+  return lang === "fr" ? "Plan Free" : "Free plan";
 }
 
 /** Free-tier CTA when the user is on a paid plan (downgrade path). */

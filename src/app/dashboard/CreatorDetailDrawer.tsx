@@ -4,13 +4,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { buildCreatorVideoPreviews } from "@/lib/creator-video-previews";
-import {
-  cacheCreatorVideoStreams,
-  getCachedCreatorVideoStream,
-  prefetchCreatorVideoStreams,
-  resolveCreatorVideoStream,
-  warmCreatorVideoStream,
-} from "@/lib/creator-video-stream-cache";
+import { TikTokEmbedPlayer, tiktokEmbedSrc } from "@/app/dashboard/TikTokEmbedPlayer";
+import type { ValueTier } from "@/lib/creator-value";
 import { pipelineStages } from "@/lib/pipeline";
 import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
@@ -176,20 +171,6 @@ function DrawerSection({ title, children, first }: { title?: string; children: R
   );
 }
 
-function Locked({ children, onUpgrade, label }: { children: ReactNode; onUpgrade: () => void; label: string }) {
-  return (
-    <div style={{ position: "relative" }}>
-      <div style={{ filter: "blur(6px)", opacity: 0.5, pointerEvents: "none", userSelect: "none" }}>{children}</div>
-      <button type="button" onClick={onUpgrade}
-        style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-          background: "rgba(255,255,255,0.35)", border: "none", borderRadius: 10, cursor: "pointer",
-          color: "#0047FF", fontSize: 13, fontWeight: 600, fontFamily: drawerFont, letterSpacing: "-0.025em" }}>
-        {label}
-      </button>
-    </div>
-  );
-}
-
 function TrendUpIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
@@ -210,6 +191,44 @@ function MetricBarRow({ label, value, pct, trend }: { label: string; value: stri
         <span style={{ fontSize: 14, fontWeight: 600, color: trend ? "#15803D" : "#1A1A1A", letterSpacing: "-0.02em" }}>{value}</span>
       </div>
     </div>
+  );
+}
+
+function fmtRate(num: number, denom: number): string {
+  if (!denom) return "—";
+  return `${((num / denom) * 100).toFixed(2)}%`;
+}
+
+function valueTierLabel(tier: ValueTier, lang: Lang): string {
+  const labels: Record<ValueTier, { fr: string; en: string }> = {
+    nano: { fr: "Nano", en: "Nano" },
+    micro: { fr: "Micro", en: "Micro" },
+    mid: { fr: "Mid", en: "Mid" },
+    macro: { fr: "Macro", en: "Macro" },
+    mega: { fr: "Mega", en: "Mega" },
+  };
+  return lang === "fr" ? labels[tier].fr : labels[tier].en;
+}
+
+function BrandSignalsGrid({ d, lang }: { d: CreatorDetail; lang: Lang }) {
+  const t = discoveryCopy(lang);
+  const avgViews = d.avgViews || 0;
+
+  return (
+    <>
+      <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "24px 0 12px", letterSpacing: "-0.02em" }}>{t.brandSignals}</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+        <Stat label={t.likeRate} value={fmtRate(d.avgLikes ?? 0, avgViews)} />
+        <Stat label={t.commentRate} value={fmtRate(d.avgComments ?? 0, avgViews)} />
+        <Stat label={t.shareRate} value={fmtRate(d.avgShares ?? 0, avgViews)} />
+        <Stat label={t.estCpm} value={d.estCpm > 0 ? `$${d.estCpm}` : "—"} accent />
+        <Stat label={t.estCostPerPost} value={d.estCostPerPost > 0 ? `$${d.estCostPerPost.toLocaleString()}` : "—"} />
+        <Stat label={t.valueScore} value={d.valueScore > 0 ? `${d.valueScore}/100` : "—"} accent />
+        <Stat label={t.postFrequency} value={d.postFrequency > 0 ? t.postsPerWeek(d.postFrequency) : "—"} />
+        <Stat label={t.creatorTier} value={d.valueTier ? valueTierLabel(d.valueTier, lang) : "—"} />
+        <Stat label={t.engagementByFollower} value={d.engagementByFollower > 0 ? `${d.engagementByFollower.toFixed(2)}%` : "—"} />
+      </div>
+    </>
   );
 }
 
@@ -259,130 +278,35 @@ function VideoCover({ cover, previewKey }: { cover: string; previewKey: string }
   );
 }
 
-function VideoTile({ v, playing, onPlay, username, lang }: {
-  v: { key: string; cover: string; views: number; videoId: string | null; streamUrl: string | null };
+function VideoTile({ v, playing, onPlay, lang }: {
+  v: { key: string; cover: string; views: number; videoId: string | null; shareUrl: string | null };
   playing: boolean;
   onPlay: () => void;
-  username: string;
   lang: Lang;
 }) {
   const t = discoveryCopy(lang);
-  const [resolvedStream, setResolvedStream] = useState<string | null>(() => {
-    if (v.streamUrl) return v.streamUrl;
-    if (v.videoId) return getCachedCreatorVideoStream(username, v.videoId);
-    return null;
-  });
-  const [loadError, setLoadError] = useState(false);
+  const canPlay = Boolean(tiktokEmbedSrc(v.videoId, v.shareUrl, true));
 
-  useEffect(() => {
-    if (v.streamUrl && v.videoId) {
-      cacheCreatorVideoStreams(username, { [v.videoId]: v.streamUrl });
-    }
-  }, [username, v.streamUrl, v.videoId]);
-
-  useEffect(() => {
-    if (!v.videoId || v.streamUrl || getCachedCreatorVideoStream(username, v.videoId)) return;
-    let cancelled = false;
-    void resolveCreatorVideoStream(username, v.videoId).then((url) => {
-      if (!cancelled && url) setResolvedStream((prev) => prev ?? url);
-    });
-    return () => { cancelled = true; };
-  }, [username, v.videoId, v.streamUrl]);
-
-  const warmStream = () => {
-    const url =
-      v.streamUrl ||
-      (v.videoId ? getCachedCreatorVideoStream(username, v.videoId) : null) ||
-      resolvedStream;
-    if (url) warmCreatorVideoStream(url);
-    else if (v.videoId) {
-      void resolveCreatorVideoStream(username, v.videoId).then((next) => {
-        if (next) warmCreatorVideoStream(next);
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (!playing) return;
-
-    const cached =
-      v.streamUrl ||
-      (v.videoId ? getCachedCreatorVideoStream(username, v.videoId) : null);
-    if (cached) {
-      setResolvedStream(cached);
-      setLoadError(false);
-      warmCreatorVideoStream(cached);
-      return;
-    }
-
-    if (!v.videoId) {
-      setLoadError(true);
-      return;
-    }
-
-    let cancelled = false;
-    setLoadError(false);
-    void resolveCreatorVideoStream(username, v.videoId).then((url) => {
-      if (cancelled) return;
-      if (url) {
-        setResolvedStream(url);
-        warmCreatorVideoStream(url);
-      } else {
-        setLoadError(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [playing, v.streamUrl, v.videoId, username]);
-
-  if (playing && resolvedStream) {
-    return (
-      <video
-        key={v.key}
-        src={resolvedStream}
-        controls
-        autoPlay
-        playsInline
-        preload="auto"
-        poster={v.cover || undefined}
-        style={{ width: "100%", aspectRatio: "9 / 16", borderRadius: 10, background: "#000", objectFit: "cover" }}
-      />
-    );
-  }
-
-  if (playing && loadError) {
+  if (playing && canPlay) {
     return (
       <div
         style={{
           width: "100%",
           aspectRatio: "9 / 16",
           borderRadius: 10,
-          background: "#111",
-          color: "#FFF",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 12,
-          padding: 12,
-          textAlign: "center",
-          fontFamily: drawerFont,
-          letterSpacing: "-0.025em",
+          overflow: "hidden",
+          background: "#000",
         }}
       >
-        {lang === "fr" ? "Vidéo indisponible" : "Video unavailable"}
+        <TikTokEmbedPlayer videoId={v.videoId} shareUrl={v.shareUrl} title={t.playVideo} />
       </div>
     );
   }
 
-  const canPlay = Boolean(v.streamUrl || v.videoId);
   return (
     <button
       type="button"
       aria-label={t.playVideo}
-      onPointerEnter={warmStream}
-      onFocus={warmStream}
       onClick={() => { if (canPlay) onPlay(); }}
       disabled={!canPlay}
       style={{
@@ -412,7 +336,7 @@ function VideoTile({ v, playing, onPlay, username, lang }: {
             pointerEvents: "none",
           }}
         >
-          {playing ? "…" : "▶"}
+          ▶
         </span>
       )}
       {v.views > 0 && (
@@ -586,21 +510,6 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     });
   }, [detail]);
 
-  useEffect(() => {
-    if (!detail?.username || videos.length === 0) return;
-    const streams: Record<string, string> = {};
-    const ids: string[] = [];
-    for (const v of videos) {
-      if (v.videoId && v.streamUrl) streams[v.videoId] = v.streamUrl;
-      if (v.videoId) ids.push(v.videoId);
-    }
-    if (Object.keys(streams).length) cacheCreatorVideoStreams(detail.username, streams);
-    void prefetchCreatorVideoStreams(detail.username, ids);
-    const first = videos.find((v) => v.streamUrl || (v.videoId && getCachedCreatorVideoStream(detail.username, v.videoId)));
-    const warmUrl = first?.streamUrl || (first?.videoId ? getCachedCreatorVideoStream(detail.username, first.videoId) : null);
-    if (warmUrl) warmCreatorVideoStream(warmUrl);
-  }, [detail?.username, videos]);
-
   if (!creator || !detail) return null;
 
   const d = detail;
@@ -636,11 +545,11 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
               <span style={{ fontSize: 13, color: "#9A9A9A" }}>@{d.username}</span>
               <PlatformPill platform={d.platform} />
               <div style={{ position: "relative" }}>
-                <button type="button" onClick={() => (isPaid ? setFolderOpen((o) => !o) : onUpgrade())}
+                <button type="button" onClick={() => setFolderOpen((o) => !o)}
                   style={drawerBtnSecondary}>
                   {t.folders}{inFolders.size ? ` (${inFolders.size})` : ""} ▾
                 </button>
-                {folderOpen && isPaid && (
+                {folderOpen && (
                   <div style={{ position: "absolute", top: "110%", left: 0, zIndex: 10, background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 10, padding: 10, width: 230, boxShadow: "0 8px 24px rgba(0,0,0,0.14)" }}>
                     {folders.length === 0 && <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8 }}>{t.noFoldersYet}</div>}
                     {folders.map((f) => (
@@ -719,26 +628,15 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
           </div>
         </DrawerSection>
 
-        {isPaid ? (
-          <DrawerSection title={t.performanceSection}>
-            <ContentAnalyticsPanel d={d} lang={lang} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 20 }}>
-              <Stat label={t.authenticity} value={`${d.authenticityScore}/100`} />
-              <Stat label={t.reachPerFollower} value={`${reachPct > 0 ? reachPct : Math.round((d.viewsPerFollower ?? 0) * 100)}%`} />
-              <Stat label={t.postsAnalyzed} value={String(d.postsAnalyzed ?? 0)} />
-            </div>
-          </DrawerSection>
-        ) : (
-          <DrawerSection title={t.performanceSection}>
-            <Locked onUpgrade={onUpgrade} label={t.lockedAnalysis}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-                <Stat label={t.authenticity} value="92/100" />
-                <Stat label={t.reachPerFollower} value="48%" />
-                <Stat label={t.postsAnalyzed} value="12" />
-              </div>
-            </Locked>
-          </DrawerSection>
-        )}
+        <DrawerSection title={t.performanceSection}>
+          <ContentAnalyticsPanel d={d} lang={lang} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 20 }}>
+            <Stat label={t.authenticity} value={`${d.authenticityScore}/100`} />
+            <Stat label={t.reachPerFollower} value={`${reachPct > 0 ? reachPct : Math.round((d.viewsPerFollower ?? 0) * 100)}%`} />
+            <Stat label={t.postsAnalyzed} value={String(d.postsAnalyzed ?? 0)} />
+          </div>
+          <BrandSignalsGrid d={d} lang={lang} />
+        </DrawerSection>
 
         <DrawerSection title={t.popularPosts}>
           {videos.length === 0 ? (
@@ -751,7 +649,6 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                   v={v}
                   playing={playing === v.key}
                   onPlay={() => setPlaying(v.key)}
-                  username={d.username}
                   lang={lang}
                 />
               ))}

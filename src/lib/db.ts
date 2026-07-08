@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { hasReachedCampaignLimit, normalizePlan } from "@/lib/plan-limits";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -100,6 +101,16 @@ export async function saveCampaign(userId: string, campaign: {
   status: string;
 }) {
   if (!supabase) return null;
+  const [{ data: profile }, { data: existingCampaigns }] = await Promise.all([
+    supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
+    supabase.from("campaigns").select("status").eq("user_id", userId),
+  ]);
+  const plan = normalizePlan(profile?.plan);
+  const activeCampaignCount = (existingCampaigns ?? []).filter(
+    (row) => row.status === "Active" || row.status === "Paused"
+  ).length;
+  const nextCampaignIsActive = campaign.status === "Active" || campaign.status === "Paused";
+  if (nextCampaignIsActive && hasReachedCampaignLimit(plan, activeCampaignCount)) return null;
   const { data, error } = await supabase
     .from("campaigns")
     .insert({ user_id: userId, ...campaign })
@@ -119,8 +130,43 @@ export async function getCampaigns(userId: string) {
   return data || [];
 }
 
+function isActiveCampaignStatus(status: string | null | undefined): boolean {
+  const s = String(status ?? "").toLowerCase();
+  return s === "active" || s === "paused";
+}
+
+async function wouldExceedActiveCampaignLimit(
+  userId: string,
+  excludeCampaignId?: string,
+): Promise<boolean> {
+  if (!supabase) return true;
+  const [{ data: profile }, { data: campaigns }] = await Promise.all([
+    supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
+    supabase.from("campaigns").select("id, status").eq("user_id", userId),
+  ]);
+  const plan = normalizePlan(profile?.plan);
+  const activeCampaignCount = (campaigns ?? []).filter(
+    (row) => row.id !== excludeCampaignId && isActiveCampaignStatus(row.status),
+  ).length;
+  return hasReachedCampaignLimit(plan, activeCampaignCount);
+}
+
 export async function updateCampaignStatus(campaignId: string, status: string): Promise<boolean> {
   if (!supabase) return false;
+  if (isActiveCampaignStatus(status)) {
+    const { data: existing } = await supabase
+      .from("campaigns")
+      .select("user_id, status")
+      .eq("id", campaignId)
+      .maybeSingle();
+    if (
+      existing?.user_id &&
+      !isActiveCampaignStatus(existing.status) &&
+      await wouldExceedActiveCampaignLimit(existing.user_id, campaignId)
+    ) {
+      return false;
+    }
+  }
   const { error } = await supabase
     .from("campaigns")
     .update({ status })
@@ -144,6 +190,20 @@ export async function updateCampaign(campaignId: string, campaign: {
   status?: string;
 }) {
   if (!supabase) return null;
+  if (campaign.status && isActiveCampaignStatus(campaign.status)) {
+    const { data: existing } = await supabase
+      .from("campaigns")
+      .select("user_id, status")
+      .eq("id", campaignId)
+      .maybeSingle();
+    if (
+      existing?.user_id &&
+      !isActiveCampaignStatus(existing.status) &&
+      await wouldExceedActiveCampaignLimit(existing.user_id, campaignId)
+    ) {
+      return null;
+    }
+  }
   const { data, error } = await supabase
     .from("campaigns")
     .update(campaign)
