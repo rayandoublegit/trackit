@@ -95,11 +95,8 @@ export function InvitationsView({
         <UpgradeModal
           lang={lang}
           featureKey="invitations"
+          currentPlan={plan}
           onClose={() => setUpgradeModalOpen(false)}
-          onPrimary={() => {
-            setUpgradeModalOpen(false);
-            void onUpgrade?.();
-          }}
           showAllPlansLink={Boolean(onViewPricing)}
         />
       )}

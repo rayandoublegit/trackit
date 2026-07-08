@@ -3,9 +3,10 @@
 import type { CSSProperties } from "react";
 import {
   FEATURE_GATES,
-  getPlanMarketingFeatures,
+  getGatePlanBullets,
   planDisplayName,
   PLAN_PRICES,
+  runTierUpgrade,
   type GateFeatureKey,
 } from "@/lib/plan-marketing";
 import type { Lang } from "@/lib/useLang";
@@ -42,7 +43,7 @@ export function UpgradeGate({
   const requiredName = planDisplayName(gate.requiredTier, lang);
   const title = gate.title[lang];
   const description = gate.description[lang];
-  const highlights = getPlanMarketingFeatures(gate.requiredTier, lang, "compact").slice(0, 5);
+  const highlights = getGatePlanBullets(gate.requiredTier, lang);
 
   const monthlyPrice =
     gate.requiredTier === "scale"
@@ -163,7 +164,7 @@ export function UpgradeGate({
               justifyContent: "center",
             }}
           >
-            <button type="button" style={btnPrimary} onClick={() => void onUpgrade()}>
+            <button type="button" style={btnPrimary} onClick={() => runTierUpgrade(gate.requiredTier, lang)}>
               {ctaLabel}
             </button>
             {onViewPricing ? (

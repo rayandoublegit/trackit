@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import type { Lang } from "@/lib/useLang";
 import {
   annualPriceIds,
   getGrowthPriceId,
@@ -62,6 +63,25 @@ export function getPriceIdForUpgrade(
   if (plan === "growth") return getProPriceId(currency, annual);
   if (plan === "pro") return getScalePriceId(currency, annual);
   return undefined;
+}
+
+export type PaidPlanTier = Exclude<PlanTier, "free">;
+
+function checkoutCurrencyFromLang(lang: Lang): "usd" | "eur" {
+  return lang === "fr" ? "eur" : "usd";
+}
+
+/** Stripe price ID for a dashboard plan tier (lang → EUR/USD). */
+export function getPriceIdForPlanTier(tier: PaidPlanTier, lang: Lang, annual = false): string {
+  const currency = checkoutCurrencyFromLang(lang);
+  if (tier === "basic") return getGrowthPriceId(currency, annual);
+  if (tier === "pro") return getProPriceId(currency, annual);
+  return getScalePriceId(currency, annual);
+}
+
+/** Start Stripe checkout for a plan tier from an upgrade gate or modal. */
+export async function checkoutPlanTier(tier: PaidPlanTier, lang: Lang, annual = false): Promise<void> {
+  await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual));
 }
 
 export async function handleUpgrade(

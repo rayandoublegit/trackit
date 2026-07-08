@@ -30,7 +30,7 @@ import {
   hasReachedManagedCreatorLimit,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
+import { getLimitUpgradeModalProps, runTierUpgrade } from "@/lib/plan-marketing";
 import { clientImageUrl } from "@/lib/client-image-url";
 import { UpgradeModal } from "./UpgradeModal";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
@@ -2091,17 +2091,13 @@ export function DiscoveryView({
   const dailyDiscoveryLimit = getDailyDiscoveryLimit(plan);
   const handleDiscoveryUpgrade = () => {
     if (!discoveryLimitModal) return;
-    if (discoveryLimitModal.requiredTier === "scale") void onUpgradeScale?.();
-    else if (discoveryLimitModal.requiredTier === "pro") void onUpgradePro?.();
-    else void onUpgrade();
+    runTierUpgrade(discoveryLimitModal.requiredTier, lang);
   };
 
   const handleCreatorLimitUpgrade = () => {
     const modal = getLimitUpgradeModalProps("creators", plan, lang);
     if (!modal) return;
-    if (modal.requiredTier === "scale") void onUpgradeScale?.();
-    else if (modal.requiredTier === "pro") void onUpgradePro?.();
-    else void onUpgrade();
+    runTierUpgrade(modal.requiredTier, lang);
   };
 
   const creatorLimitModal = getLimitUpgradeModalProps("creators", plan, lang);
@@ -2969,7 +2965,10 @@ export function DiscoveryView({
           onClose={() => setUpgradeModalOpen(false)}
           limitKind="creators"
           currentPlan={plan}
-          onPrimary={handleCreatorLimitUpgrade}
+          onPrimary={() => {
+            setUpgradeModalOpen(false);
+            handleCreatorLimitUpgrade();
+          }}
           showAllPlansLink={false}
         />
       )}

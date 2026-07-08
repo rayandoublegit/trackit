@@ -34,7 +34,8 @@ import {
   maxShopifyStores,
   type PlanTier,
 } from "@/lib/plan-limits";
-import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
+import { formatPricingHighlightLine, getPlanPricingFeatureLines, getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
+import { checkoutPlanTier } from "@/lib/checkout";
 
 /** Customer-facing plan names. Internal tiers: free | basic | pro | scale. */
 export const PLAN_PRICES = {
@@ -100,15 +101,22 @@ export function planDisplayName(tier: PlanTier, lang: Lang): string {
 
 export type MarketingVariant = "compact" | "pricing" | "full";
 
+/** Top feature lines for upgrade gates — skips empty “includes” rows. */
+export function getGatePlanBullets(tier: PlanTier, lang: Lang, max = 5): string[] {
+  return getPlanPricingHighlights(tier, lang)
+    .filter((h) => h.value.trim().length > 0)
+    .map(formatPricingHighlightLine)
+    .slice(0, max);
+}
+
 /** Feature bullets for pricing grids, billing cards, and upgrade gates — from plan-pricing-highlights. */
 export function getPlanMarketingFeatures(
   tier: PlanTier,
   lang: Lang,
   variant: MarketingVariant = "pricing",
 ): string[] {
-  const lines = getPlanPricingFeatureLines(tier, lang);
-  if (variant === "compact") return lines.slice(0, 5);
-  return lines;
+  if (variant === "compact") return getGatePlanBullets(tier, lang, 5);
+  return getPlanPricingFeatureLines(tier, lang);
 }
 
 export function getPlanCardDescription(tier: PlanTier, lang: Lang): string {
@@ -200,10 +208,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   invitations: {
     requiredTier: "pro",
     check: canInviteCreators,
-    title: { en: "Creator portal", fr: "Portail créateur" },
+    title: { en: "Invitations", fr: "Invitations" },
     description: {
-      en: "Invite creators and give them a dedicated dashboard to track earnings and upload content.",
-      fr: "Invitez des créateurs avec un dashboard dédié pour suivre leurs gains et envoyer du contenu.",
+      en: "Invite creators to your program with dedicated portal access.",
+      fr: "Invitez des créateurs avec un portail dédié pour suivre leurs gains et leur contenu.",
     },
   },
   "creator-content": {
@@ -360,7 +368,7 @@ export type GateModalProps = {
 export function getGateModalProps(featureKey: GateFeatureKey, lang: Lang): GateModalProps {
   const gate = FEATURE_GATES[featureKey];
   const planName = planDisplayName(gate.requiredTier, lang);
-  const bullets = getPlanMarketingFeatures(gate.requiredTier, lang, "compact").slice(0, 5);
+  const bullets = getGatePlanBullets(gate.requiredTier, lang);
   const fr = lang === "fr";
 
   return {
@@ -395,7 +403,7 @@ export function getLimitUpgradeModalProps(
   if (!nextTier) return null;
 
   const planName = planDisplayName(nextTier, lang);
-  const bullets = getPlanMarketingFeatures(nextTier, lang, "compact").slice(0, 5);
+  const bullets = getGatePlanBullets(nextTier, lang);
   const fr = lang === "fr";
 
   if (kind === "campaigns") {
@@ -514,14 +522,29 @@ export function formatUpgradePrimaryLabel(tier: PlanTier, lang: Lang): string {
 export function runGateUpgrade(
   key: GateFeatureKey,
   lang: Lang,
-  handlers: {
+  handlers?: {
     onUpgrade?: () => void;
     onUpgradePro?: () => void;
     onUpgradeScale?: () => void;
   },
 ): void {
   const props = getGateModalProps(key, lang);
-  if (props.requiredTier === "scale") void handlers.onUpgradeScale?.();
-  else if (props.requiredTier === "pro") void handlers.onUpgradePro?.();
-  else void handlers.onUpgrade?.();
+  const tier = props.requiredTier;
+  if (tier === "free") return;
+  void checkoutPlanTier(tier, lang).catch((err) => {
+    if (handlers) {
+      if (tier === "scale") void handlers.onUpgradeScale?.();
+      else if (tier === "pro") void handlers.onUpgradePro?.();
+      else void handlers.onUpgrade?.();
+      return;
+    }
+    alert(err instanceof Error ? err.message : "Could not start checkout");
+  });
+}
+
+export function runTierUpgrade(tier: PlanTier, lang: Lang): void {
+  if (tier === "free") return;
+  void checkoutPlanTier(tier, lang).catch((err) => {
+    alert(err instanceof Error ? err.message : "Could not start checkout");
+  });
 }

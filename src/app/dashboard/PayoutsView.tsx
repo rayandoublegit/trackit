@@ -30,7 +30,7 @@ import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { PayItWelcomeLoading, PayItWelcomeView, usePayItActivity } from "./PayItWelcomeView";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { UpgradeModal } from "./UpgradeModal";
-import { getGateModalProps, type GateFeatureKey } from "@/lib/plan-marketing";
+import { getGateModalProps, runTierUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
 import { dayKeyFromIso, getPeriodBounds, isWithinPeriod } from "@/lib/analytics-periods";
 import { dispatchPayoutsUpdated, dispatchSalesUpdated, PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
 
@@ -57,9 +57,7 @@ function PaywallModal({
       onClose={onClose}
       onPrimary={() => {
         onClose();
-        if (gate.requiredTier === "scale") void onUpgradeScale?.();
-        else if (gate.requiredTier === "pro") void onUpgradePro?.();
-        else void onUpgrade?.();
+        runTierUpgrade(gate.requiredTier, lang);
       }}
     />
   );

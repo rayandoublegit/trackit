@@ -30,6 +30,7 @@ import { discoveryCopy } from "@/lib/discovery-copy";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { supabase } from "@/lib/supabase";
 import type { GateFeatureKey } from "@/lib/plan-marketing";
+import { runGateUpgrade } from "@/lib/plan-marketing";
 import { UpgradeModal } from "./UpgradeModal";
 
 const ALL_LIST_ID = "__all__";
@@ -644,7 +645,7 @@ export function CreatorManageLists({
       onClose={() => setUpgradeFeature(null)}
       onPrimary={() => {
         setUpgradeFeature(null);
-        void (onUpgradePro ?? onUpgrade)?.();
+        if (upgradeFeature) runGateUpgrade(upgradeFeature, lang);
       }}
     />
   ) : null;

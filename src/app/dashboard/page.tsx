@@ -3470,10 +3470,6 @@ function IntegrationsView({
           lang={lang}
           featureKey="integrations"
           onClose={() => setUpgradeModalOpen(false)}
-          onPrimary={() => {
-            setUpgradeModalOpen(false);
-            void onUpgradePro?.();
-          }}
         />
       )}
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
@@ -3772,10 +3768,6 @@ function AutomationView({
           lang={lang}
           featureKey="automation"
           onClose={() => setUpgradeModalOpen(false)}
-          onPrimary={() => {
-            setUpgradeModalOpen(false);
-            void onUpgradePro?.();
-          }}
         />
       )}
       <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
@@ -4095,10 +4087,6 @@ function AffiliatesView({
           lang={lang}
           featureKey="affiliates"
           onClose={() => setUpgradeModalOpen(false)}
-          onPrimary={() => {
-            setUpgradeModalOpen(false);
-            void onUpgrade?.();
-          }}
         />
       )}
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Affiliés" : "Affiliates"} subtitle={lang === "fr" ? "Chaque créateur reçoit un lien de parrainage et un code promo uniques. Les ventes sont suivies automatiquement." : "Every creator gets a unique referral link and discount code. Sales tracked automatically."} right={

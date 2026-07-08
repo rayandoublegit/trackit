@@ -42,7 +42,7 @@ import {
   parseCompactNumber,
 } from "@/lib/compact-number";
 import { UpgradeModal } from "./UpgradeModal";
-import { getLimitUpgradeModalProps } from "@/lib/plan-marketing";
+import { getLimitUpgradeModalProps, runGateUpgrade, runTierUpgrade } from "@/lib/plan-marketing";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { isDetailTab } from "@/lib/dashboard-navigation";
@@ -1776,9 +1776,9 @@ function CampaignUpgradeModal({
   if (!modal) return null;
 
   const handlePrimary = () => {
-    if (modal.requiredTier === "scale") void onUpgradeScale?.();
-    else if (modal.requiredTier === "pro") void onUpgradePro?.();
-    else void onUpgrade();
+    if (!modal) return;
+    onClose();
+    runTierUpgrade(modal.requiredTier, lang);
   };
 
   return (

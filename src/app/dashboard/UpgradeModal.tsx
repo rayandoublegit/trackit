@@ -4,6 +4,7 @@ import {
   formatUpgradePrimaryLabel,
   getGateModalProps,
   getLimitUpgradeModalProps,
+  runTierUpgrade,
   type GateFeatureKey,
   type LimitGateKind,
 } from "@/lib/plan-marketing";
@@ -92,7 +93,13 @@ export function UpgradeModal({
       onPrimary();
       return;
     }
-    window.location.href = "/#pricing";
+    const tier = resolved?.requiredTier;
+    if (tier && tier !== "free") {
+      onClose();
+      runTierUpgrade(tier, lang);
+      return;
+    }
+    window.location.href = "/pricing";
   };
 
   return (
@@ -284,7 +291,7 @@ export function UpgradeModal({
               <button
                 type="button"
                 onClick={() => {
-                  window.location.href = "/#pricing";
+                  window.location.href = "/pricing";
                 }}
                 style={{
                   background: "none",

@@ -148,11 +148,8 @@ export function ScriptsManager({
         <UpgradeModal
           lang={lang}
           featureKey="scripts"
+          currentPlan={plan}
           onClose={() => setUpgradeModalOpen(false)}
-          onPrimary={() => {
-            setUpgradeModalOpen(false);
-            void onUpgrade?.();
-          }}
         />
       )}
     <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", marginTop: standalone ? 0 : 32 }}>
