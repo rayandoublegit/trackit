@@ -599,7 +599,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
                   <tr>
                     <td colSpan={7} style={{ padding: "16px 8px", textAlign: "center", background: "#F8F9FF", borderTop: "1px solid #E5EDFF" }}>
                       <span style={{ fontSize: 13, color: "#0047FF", fontWeight: 500 }}>
-                        {lang === "fr" ? "🔒 Passez à Growth pour voir tous vos créateurs →" : "🔒 Upgrade to Growth to unlock all creator data →"}
+                        {lang === "fr" ? "🔒 Passez à Starter pour voir tous vos créateurs →" : "🔒 Upgrade to Starter to unlock all creator data →"}
                       </span>
                     </td>
                   </tr>

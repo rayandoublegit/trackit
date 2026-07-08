@@ -4,14 +4,13 @@ import { useMemo, useState } from "react";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { StripePriceMatrix } from "@/lib/stripe-config";
 import { useStripePrices } from "@/lib/use-stripe-prices";
-import { getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
+import { getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal } from "@/lib/plan-marketing";
+import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
@@ -36,7 +35,9 @@ function PricingCard({
   lang,
   name,
   desc,
-  price,
+  monthlyPrice,
+  annualMonthlyPrice,
+  annualTotal,
   annual,
   onToggleAnnual,
   features,
@@ -46,25 +47,26 @@ function PricingCard({
   highlight,
   pill,
   disabled,
-  annualPill,
   ctaLoading,
 }: {
   lang: "fr" | "en";
   name: string;
   desc: string;
-  price: number;
+  monthlyPrice: number;
+  annualMonthlyPrice: number;
+  annualTotal: number;
   annual: boolean;
   onToggleAnnual: () => void;
-  features: string[];
+  features: PricingHighlight[];
   ctaClassName?: string;
   onClick: () => void;
   ctaLabel: string;
   highlight?: boolean;
   pill?: string;
   disabled?: boolean;
-  annualPill?: string;
   ctaLoading?: boolean;
 }) {
+  const displayPrice = annual ? annualMonthlyPrice : monthlyPrice;
   return (
     <div className={`pricing-wrap${highlight ? " pricing-wrap-hero" : ""}`}>
       <div className="pricing-toggle">
@@ -81,7 +83,7 @@ function PricingCard({
           <span className="toggle-label">{lang === "fr" ? "Annuel" : "Annually"}</span>
         </div>
         {pill ? <div className="pricing-toggle-pill">{pill}</div> : null}
-        {!pill && annualPill ? <div className="pricing-toggle-pill">{annualPill}</div> : null}
+        {!pill && annual ? <div className="pricing-toggle-pill">{annualFreeMonthsBadge(lang)}</div> : null}
       </div>
 
       <div className={`pricing-card${highlight ? " pricing-card-hero" : ""}`}>
@@ -90,9 +92,16 @@ function PricingCard({
           <div className="pricing-logo"><img src={TRACKIT_LOGO_URL} alt="" /></div>
           <div className="pricing-name">{name}</div>
           <div className="pricing-desc">{desc}</div>
-          <div className="pricing-price">
-            <span className="pricing-amount">{formatCurrency(price, lang)}</span>
-            <span className="pricing-period">{annual ? (lang === "fr" ? "par an" : "/year") : (lang === "fr" ? "/mois" : "/month")}</span>
+          <div>
+            <div className="pricing-price">
+              <span className="pricing-amount">{formatPricingAmount(displayPrice, lang)}</span>
+              <span className="pricing-period">{lang === "fr" ? "/mois" : "/month"}</span>
+            </div>
+            {annual ? (
+              <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
+                {annualBilledSubtitle(annualTotal, lang)}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className="pricing-divider" />
@@ -157,13 +166,13 @@ export function PricingPlans({
   const [scaleAnnual, setScaleAnnual] = useState(false);
   const [payingTier, setPayingTier] = useState<PaidTier | null>(null);
 
-  const currency = lang === "fr" ? "eur" : "usd";
+  const currency = checkoutCurrencyFromLang(lang);
   const plan = normalizePlan(currentPlan);
 
-  const growthFeatures = useMemo(() => getPlanPricingFeatureLines("basic", lang), [lang]);
-  const proFeatures = useMemo(() => getPlanPricingFeatureLines("pro", lang), [lang]);
-  const scaleFeatures = useMemo(() => getPlanPricingFeatureLines("scale", lang), [lang]);
-  const freeFeatures = useMemo(() => getPlanPricingFeatureLines("free", lang), [lang]);
+  const growthFeatures = useMemo(() => getPlanPricingHighlights("basic", lang), [lang]);
+  const proFeatures = useMemo(() => getPlanPricingHighlights("pro", lang), [lang]);
+  const scaleFeatures = useMemo(() => getPlanPricingHighlights("scale", lang), [lang]);
+  const freeFeatures = useMemo(() => getPlanPricingHighlights("free", lang), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     if (onBeforeCheckout && !getOnboardingPayload) {
@@ -238,15 +247,19 @@ export function PricingPlans({
   const defaultFreeCta =
     plan === "free" ? freeStayAnywayCtaLabel(lang) : preferFreeCtaLabel(lang);
 
+  const starterName = marketingPlanDisplayName("basic", lang);
+  const proName = marketingPlanDisplayName("pro", lang);
+  const businessName = marketingPlanDisplayName("scale", lang);
+
   const growthCta =
     paidCtaLabel ??
-    planCtaLabel(lang, growthAction, "Growth", plan, "basic", subscriptionInterval, growthAnnual);
+    planCtaLabel(lang, growthAction, starterName, plan, "basic", subscriptionInterval, growthAnnual);
   const proCta =
     paidCtaLabel ??
-    planCtaLabel(lang, proAction, "Pro", plan, "pro", subscriptionInterval, proAnnual);
+    planCtaLabel(lang, proAction, proName, plan, "pro", subscriptionInterval, proAnnual);
   const scaleCta =
     paidCtaLabel ??
-    planCtaLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, scaleAnnual);
+    planCtaLabel(lang, scaleAction, businessName, plan, "scale", subscriptionInterval, scaleAnnual);
 
   const freeLabel = freeCtaLabel ?? defaultFreeCta;
 
@@ -289,9 +302,11 @@ export function PricingPlans({
       <div className="pricing-grid">
         <PricingCard
           lang={lang}
-          name="Growth"
+          name={starterName}
           desc={getPlanCardDescription("basic", lang)}
-          price={growthAnnual ? GROWTH_ANNUAL : GROWTH_MONTHLY}
+          monthlyPrice={GROWTH_MONTHLY}
+          annualMonthlyPrice={getPlanAnnualMonthlyEquivalent("basic")}
+          annualTotal={getPlanAnnualTotal("basic")}
           annual={growthAnnual}
           onToggleAnnual={() => setGrowthAnnual((v) => !v)}
           features={growthFeatures}
@@ -299,14 +314,15 @@ export function PricingPlans({
           onClick={() => void startCheckout("basic", growthAnnual)}
           disabled={!paidCtaLabel && growthAction === "current"}
           ctaLoading={payingTier === "basic" || loadingPrices}
-          annualPill={lang === "fr" ? "−20% annuel" : "Save 20% annual"}
         />
 
         <PricingCard
           lang={lang}
-          name="Pro"
+          name={proName}
           desc={getPlanCardDescription("pro", lang)}
-          price={proAnnual ? PRO_ANNUAL : PRO_MONTHLY}
+          monthlyPrice={PRO_MONTHLY}
+          annualMonthlyPrice={getPlanAnnualMonthlyEquivalent("pro")}
+          annualTotal={getPlanAnnualTotal("pro")}
           annual={proAnnual}
           onToggleAnnual={() => setProAnnual((v) => !v)}
           features={proFeatures}
@@ -320,16 +336,18 @@ export function PricingPlans({
 
         <PricingCard
           lang={lang}
-          name="Scale"
+          name={businessName}
           desc={getPlanCardDescription("scale", lang)}
-          price={scaleAnnual ? SCALE_ANNUAL : SCALE_MONTHLY}
+          monthlyPrice={SCALE_MONTHLY}
+          annualMonthlyPrice={getPlanAnnualMonthlyEquivalent("scale")}
+          annualTotal={getPlanAnnualTotal("scale")}
           annual={scaleAnnual}
           onToggleAnnual={() => setScaleAnnual((v) => !v)}
           features={scaleFeatures}
           ctaLabel={scaleCta}
           onClick={() => void startCheckout("scale", scaleAnnual)}
           ctaClassName="pricing-cta pricing-cta-dark"
-          pill={lang === "fr" ? "Pour les agences" : "For agencies"}
+          pill={lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand"}
           disabled={!paidCtaLabel && scaleAction === "current"}
           ctaLoading={payingTier === "scale" || loadingPrices}
         />
@@ -341,7 +359,7 @@ export function PricingPlans({
               <div className="pricing-name">Free</div>
               <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
               <div className="pricing-price">
-                <span className="pricing-amount">{formatCurrency(0, lang)}</span>
+                <span className="pricing-amount">{formatPricingAmount(0, lang)}</span>
                 <span className="pricing-period">{lang === "fr" ? "/mois" : "/month"}</span>
               </div>
             </div>

@@ -2910,8 +2910,14 @@ body { padding-top: 80px; }
   letter-spacing: -0.02em;
 }
 
-.check-icon {
+.check-icon,
+.pricing-feature-icon {
   flex-shrink: 0;
+}
+
+.pricing-feature-icon-shopify {
+  display: block;
+  object-fit: contain;
 }
 
 .pricing-cta {

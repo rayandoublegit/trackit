@@ -1,22 +1,22 @@
 export type PlanTier = "free" | "basic" | "pro" | "scale";
 
 export const FREE_LIFETIME_DISCOVERIES = 5;
-export const BASIC_MONTHLY_DISCOVERIES = 20;
-export const PRO_MONTHLY_DISCOVERIES = 50;
+export const BASIC_MONTHLY_DISCOVERIES = 30;
+export const PRO_MONTHLY_DISCOVERIES = 100;
 
 export const FREE_RESULTS_PER_SEARCH = 5;
-export const BASIC_RESULTS_PER_SEARCH = 10;
-export const PRO_RESULTS_PER_SEARCH = 25;
+export const BASIC_RESULTS_PER_SEARCH = 25;
+export const PRO_RESULTS_PER_SEARCH = 50;
 
 export const FREE_MAX_CAMPAIGNS = 0;
-export const BASIC_MAX_CAMPAIGNS = 3;
+export const BASIC_MAX_CAMPAIGNS = 5;
 export const PRO_MAX_CAMPAIGNS = 15;
 
 export const FREE_MAX_MANAGED_CREATORS = 3;
-export const BASIC_MAX_MANAGED_CREATORS = 15;
-export const PRO_MAX_MANAGED_CREATORS = 50;
+export const BASIC_MAX_MANAGED_CREATORS = 25;
+export const PRO_MAX_MANAGED_CREATORS = 100;
 
-export const BASIC_MAX_SHOPIFY_STORES = 0;
+export const BASIC_MAX_SHOPIFY_STORES = 1;
 export const PRO_MAX_SHOPIFY_STORES = 1;
 export const SCALE_MAX_SHOPIFY_STORES = 3;
 
@@ -42,7 +42,7 @@ export function isScalePlan(plan: PlanTier): boolean {
   return plan === "scale";
 }
 
-/** Discovery cap; free = lifetime pool, basic = monthly pool, `null` = unlimited (Pro + Scale). */
+/** Discovery cap; free = lifetime pool, basic/pro = monthly pool, `null` = unlimited (Scale). */
 export function getDailyDiscoveryLimit(plan: PlanTier): number | null {
   if (plan === "free") return FREE_LIFETIME_DISCOVERIES;
   if (plan === "basic") return BASIC_MONTHLY_DISCOVERIES;
@@ -179,9 +179,9 @@ export function canUseScripts(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
-/** Pro + Scale only: Shopify integration + per-creator sales tracking. */
+/** Starter+: Shopify integration + per-creator sales tracking. */
 export function canUseShopify(plan: PlanTier): boolean {
-  return isProOrAbove(plan);
+  return isGrowthOrAbove(plan);
 }
 
 export function canUseAffiliates(plan: PlanTier): boolean {
@@ -202,7 +202,7 @@ export function canUseFullAutomationAgent(plan: PlanTier): boolean {
 }
 
 export function canChangeShopifyStore(plan: PlanTier): boolean {
-  return isProOrAbove(plan);
+  return isGrowthOrAbove(plan);
 }
 
 export function maxShopifyStores(plan: PlanTier): number {

@@ -153,8 +153,8 @@ export default function V2Page() {
       q: lang === "fr" ? "Le prix va-t-il changer ?" : "Will pricing change?",
       a:
         lang === "fr"
-          ? "Les abonnés actuels conservent leur tarif. v2 apporte plus de valeur aux mêmes plans Growth, Pro et Scale."
-          : "Current subscribers keep their rate. v2 brings more value to the same Growth, Pro, and Scale plans.",
+          ? "Les abonnés actuels conservent leur tarif. v2 apporte plus de valeur aux mêmes plans Starter, Pro et Business."
+          : "Current subscribers keep their rate. v2 brings more value to the same Starter, Pro, and Business plans.",
     },
     {
       q: lang === "fr" ? "Dois-je faire quelque chose ?" : "Do I need to do anything?",

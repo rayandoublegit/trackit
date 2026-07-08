@@ -48,6 +48,7 @@ import { OutreachHistorySection } from "./OutreachView";
 import { UpgradeModal } from "./UpgradeModal";
 import { runGateUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { checkoutCurrencyFromLang } from "@/lib/plan-marketing";
 import {
   canAddAnotherShopifyStore,
   canBulkImportTemplatesCsv,
@@ -499,7 +500,7 @@ function DashboardPageContent() {
     check();
   }, [user?.id]);
 
-  const checkoutCurrency = lang === "fr" ? "eur" : "usd";
+  const checkoutCurrency = checkoutCurrencyFromLang(lang);
 
   const handleUpgradeBasic = useCallback(async () => {
     try {
@@ -3367,8 +3368,8 @@ function IntegrationsView({
     if (!canAddAnotherShopifyStore(plan, storeCount) && !changingStore) {
       setShopError(
         lang === "fr"
-          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Scale pour jusqu'à 3 boutiques.`
-          : `Store limit of ${storeLimit} reached. Upgrade to Scale for up to 3 stores.`
+          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Business pour jusqu'à 3 boutiques.`
+          : `Store limit of ${storeLimit} reached. Upgrade to Business for up to 3 stores.`
       );
       if (plan === "pro") void onUpgradeScale?.();
       else if (plan === "basic") void onUpgradePro?.();
@@ -3704,7 +3705,7 @@ function IntegrationsView({
                           <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
                             {lang === "fr" ? "1 boutique sur Pro. " : "1 store on Pro. "}
                             <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                              {lang === "fr" ? "Jusqu'à 3 boutiques sur Scale →" : "Up to 3 stores on Scale →"}
+                              {lang === "fr" ? "Jusqu'à 3 boutiques sur Business →" : "Up to 3 stores on Business →"}
                             </button>
                           </p>
                         ) : null}
@@ -3813,8 +3814,8 @@ function AutomationView({
                   : "Build an agent"
                 : workflows
                   ? lang === "fr"
-                    ? "Débloquer l'agent complet (Scale)"
-                    : "Unlock full agent (Scale)"
+                    ? "Débloquer l'agent complet (Business)"
+                    : "Unlock full agent (Business)"
                   : lang === "fr"
                     ? "Créer un agent"
                     : "Build an agent"}
@@ -4809,14 +4810,14 @@ function TrackitTagline({ sidebar, collapsed }: { sidebar?: boolean; collapsed?:
 function planLabel(lang: "en" | "fr", isCreator: boolean, isScale: boolean, isPro: boolean, isBasic: boolean): string {
   if (isCreator) return lang === "fr" ? "Créateur" : "Creator";
   if (lang === "fr") {
-    if (isScale) return "Plan Scale";
+    if (isScale) return "Plan Business";
     if (isPro) return "Plan Pro";
-    if (isBasic) return "Plan Growth";
+    if (isBasic) return "Plan Starter";
     return "Plan gratuit";
   }
-  if (isScale) return "Scale Plan";
+  if (isScale) return "Business Plan";
   if (isPro) return "Pro Plan";
-  if (isBasic) return "Growth Plan";
+  if (isBasic) return "Starter Plan";
   return "Free Plan";
 }
 

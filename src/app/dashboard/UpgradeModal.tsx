@@ -39,7 +39,7 @@ function parseUpgradeMessage(message: string, lang: "en" | "fr") {
   const contentLines = lines.slice(1).filter((line) => !ctaLines.includes(line));
   const description = contentLines[0] ?? "";
   const bullets = [...contentLines.slice(1), ...ctaTail];
-  const planMatch = `${title} ${primaryLabel}`.match(/\b(Growth|Pro|Scale)\b/i);
+  const planMatch = `${title} ${primaryLabel}`.match(/\b(Starter|Pro|Business)\b/i);
   const planBadge = planMatch?.[1];
 
   return { title, description, bullets, primaryLabel, planBadge };

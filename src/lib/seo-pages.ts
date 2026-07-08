@@ -37,7 +37,7 @@ export const SEO_PAGES: SeoPage[] = [
       {
         question: "How much does Trackit cost?",
         answer:
-          "Trackit offers a free plan to get started. Paid Pro and Scale plans unlock higher limits for growing programs. See trackit pricing at thentrack.it/pricing.",
+          "Trackit offers a free plan to get started. Paid Pro and Business plans unlock higher limits for growing programs. See trackit pricing at thentrack.it/pricing.",
       },
     ],
     sections: [

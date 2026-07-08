@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang, type Lang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
 import { TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
+import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
@@ -86,16 +85,22 @@ function planCardButtonLabel(
 function currentPlanPrice(
   plan: PlanTier,
   interval: BillingInterval | null,
-): { amount: number; period: "month" | "year" } | null {
+): { amount: number; period: "month" | "year"; billedAnnually?: number } | null {
   if (plan === "free") return null;
   const isAnnual = interval === "year";
   if (plan === "scale") {
-    return { amount: isAnnual ? SCALE_ANNUAL : SCALE_MONTHLY, period: isAnnual ? "year" : "month" };
+    return isAnnual
+      ? { amount: getPlanAnnualMonthlyEquivalent("scale"), period: "month", billedAnnually: SCALE_ANNUAL }
+      : { amount: SCALE_MONTHLY, period: "month" };
   }
   if (plan === "pro") {
-    return { amount: isAnnual ? PRO_ANNUAL : PRO_MONTHLY, period: isAnnual ? "year" : "month" };
+    return isAnnual
+      ? { amount: getPlanAnnualMonthlyEquivalent("pro"), period: "month", billedAnnually: PRO_ANNUAL }
+      : { amount: PRO_MONTHLY, period: "month" };
   }
-  return { amount: isAnnual ? GROWTH_ANNUAL : GROWTH_MONTHLY, period: isAnnual ? "year" : "month" };
+  return isAnnual
+    ? { amount: getPlanAnnualMonthlyEquivalent("basic"), period: "month", billedAnnually: GROWTH_ANNUAL }
+    : { amount: GROWTH_MONTHLY, period: "month" };
 }
 
 function planFeatures(lang: Lang, tier: PaidTier): string[] {
@@ -196,7 +201,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
   const [nextBillingDate, setNextBillingDate] = useState<number | null>(null);
 
-  const currency = lang === "fr" ? "eur" : "usd";
+  const currency = checkoutCurrencyFromLang(lang);
   const pad = isMobile ? "24px 16px 48px" : "32px 40px 48px";
 
   useEffect(() => {
@@ -404,14 +409,14 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
     }[] => [
       {
         tier: "basic",
-        name: "Growth",
+        name: planDisplayName("basic", lang),
         description: getPlanCardDescription("basic", lang),
         monthly: GROWTH_MONTHLY,
         annualTotal: GROWTH_ANNUAL,
       },
       {
         tier: "pro",
-        name: "Pro",
+        name: planDisplayName("pro", lang),
         description: getPlanCardDescription("pro", lang),
         monthly: PRO_MONTHLY,
         annualTotal: PRO_ANNUAL,
@@ -419,7 +424,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
       },
       {
         tier: "scale",
-        name: "Scale",
+        name: planDisplayName("scale", lang),
         description: getPlanCardDescription("scale", lang),
         monthly: SCALE_MONTHLY,
         annualTotal: SCALE_ANNUAL,
@@ -489,16 +494,15 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                   lang === "fr" ? "Gratuit" : "Free"
                 ) : activePrice ? (
                   <>
-                    {formatCurrency(activePrice.amount, lang)}
+                    {formatPricingAmount(activePrice.amount, lang)}
                     <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
-                      {activePrice.period === "year"
-                        ? lang === "fr"
-                          ? "/an"
-                          : "/year"
-                        : lang === "fr"
-                          ? "/mois"
-                          : "/month"}
+                      {lang === "fr" ? "/mois" : "/month"}
                     </span>
+                    {activePrice.billedAnnually ? (
+                      <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em", fontWeight: 400 }}>
+                        {annualBilledSubtitle(activePrice.billedAnnually, lang)}
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -600,7 +604,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                   borderRadius: 6,
                 }}
               >
-                −20%
+                {annualFreeMonthsBadge(lang)}
               </span>
             )}
           </div>
@@ -619,8 +623,8 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
             const action = planLoading
               ? "upgrade"
               : planAction(currentPlan, card.tier, subscriptionInterval, annual);
-            const price = annual ? card.annualTotal : card.monthly;
-            const period = annual ? (lang === "fr" ? "/an" : "/year") : lang === "fr" ? "/mois" : "/month";
+            const price = annual ? getPlanAnnualMonthlyEquivalent(card.tier) : card.monthly;
+            const period = lang === "fr" ? "/mois" : "/month";
             const isCurrent = action === "current";
             const buttonLabel = planCardButtonLabel(
               lang,
@@ -688,10 +692,15 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                 <p style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A", margin: "0 0 16px", lineHeight: 1.45, letterSpacing: "-0.01em", minHeight: 40 }}>
                   {card.description}
                 </p>
-                <div style={{ fontSize: 32, fontWeight: 600, color: isCurrent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 20 }}>
-                  {formatCurrency(price, lang)}
+                <div style={{ fontSize: 32, fontWeight: 600, color: isCurrent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.04em", marginBottom: annual ? 6 : 20 }}>
+                  {formatPricingAmount(price, lang)}
                   <span style={{ fontSize: 13, fontWeight: 400, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A" }}>{period}</span>
                 </div>
+                {annual ? (
+                  <div style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A", marginBottom: 20, letterSpacing: "-0.02em" }}>
+                    {annualBilledSubtitle(card.annualTotal, lang)}
+                  </div>
+                ) : null}
 
                 <ul style={{ listStyle: "none", margin: "0 0 24px", padding: 0, flex: 1 }}>
                   {planFeatures(lang, card.tier).map((feature) => (

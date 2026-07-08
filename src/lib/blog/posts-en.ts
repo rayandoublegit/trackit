@@ -292,7 +292,7 @@ export const POSTS_EN: BlogPost[] = [
           "Share tracked links and monitor sales.",
         ],
       },
-      { type: "h2", text: "Scaling with Trackit Pro and Scale" },
+      { type: "h2", text: "Scaling with Trackit Pro and Business" },
       {
         type: "p",
         text: "When your creator roster grows, upgrade for higher limits, advanced analytics, and team workflows. Trackit grows with your program — from first creator to full affiliate engine.",
@@ -303,7 +303,7 @@ export const POSTS_EN: BlogPost[] = [
     slug: "trackit-pricing-and-plans-guide",
     title: "Trackit pricing and plans explained",
     description:
-      "Compare Trackit Free, Pro, and Scale plans — features, limits, and which plan fits your creator program.",
+      "Compare Trackit Free, Starter, Pro, and Business plans — features, limits, and which plan fits your creator program.",
     category: "Platform",
     locale: "en",
     publishedAt: "2026-02-22T10:00:00.000Z",
@@ -314,19 +314,24 @@ export const POSTS_EN: BlogPost[] = [
     blocks: [
       {
         type: "p",
-        text: "Trackit offers a free plan to get started, plus Pro and Scale for brands running active creator programs. All plans include core discovery and tracking — paid plans unlock higher limits and advanced features.",
+        text: "Trackit offers a free plan to get started, plus Starter, Pro, and Business for brands running active creator programs. All plans include core discovery and tracking — paid plans unlock higher limits and advanced features.",
       },
       { type: "h2", text: "Trackit Free" },
       {
         type: "p",
         text: "Ideal for testing creator marketing. Explore discovery, run a small campaign, and validate the channel before committing budget.",
       },
+      { type: "h2", text: "Trackit Starter" },
+      {
+        type: "p",
+        text: "Your entry point for launching a creator program — discovery, outreach templates, manual payouts, and tracked affiliate links.",
+      },
       { type: "h2", text: "Trackit Pro" },
       {
         type: "p",
         text: "For brands with an active roster. More creators, outreach volume, and analytics to manage ongoing partnerships.",
       },
-      { type: "h2", text: "Trackit Scale" },
+      { type: "h2", text: "Trackit Business" },
       {
         type: "p",
         text: "For teams scaling multiple campaigns. Highest limits, priority workflows, and everything in Pro for high-volume programs.",

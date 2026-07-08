@@ -548,7 +548,7 @@ export default function AdminConsolePage() {
                     <div style={{ fontSize: 11, fontWeight: 500, color: "#9A9A9A", marginBottom: 12, letterSpacing: "0.02em" }}>CHANGER DE PLAN</div>
                     <div style={{ display: "flex", gap: 8 }}>
                       {(["growth", "pro", "scale"] as const).map((plan) => {
-                        const planLabel = { growth: "Growth (19$)", pro: "Pro (39$)", scale: "Scale (99$)" }[plan];
+                        const planLabel = { growth: "Starter (49$)", pro: "Pro (99$)", scale: "Business (199$)" }[plan];
                         const isCurrent = String(detailUser.plan ?? "").toLowerCase() === plan;
                         return (
                           <button

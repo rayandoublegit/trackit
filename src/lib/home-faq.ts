@@ -19,7 +19,7 @@ export const HOME_FAQ_EN: FaqItem[] = [
   {
     question: "Is Trackit free to start?",
     answer:
-      "Yes. Trackit offers a free plan so you can explore creator discovery and core workflows before upgrading to Pro or Scale as your program grows.",
+      "Yes. Trackit offers a free plan so you can explore creator discovery and core workflows before upgrading to Pro or Business as your program grows.",
   },
   {
     question: "How is Trackit different from spreadsheets?",
@@ -52,7 +52,7 @@ export const HOME_FAQ_FR: FaqItem[] = [
   {
     question: "Trackit est-il gratuit pour commencer ?",
     answer:
-      "Oui. Trackit propose un plan gratuit pour explorer la découverte de créateurs et les fonctionnalités essentielles avant de passer au plan Pro ou Scale.",
+      "Oui. Trackit propose un plan gratuit pour explorer la découverte de créateurs et les fonctionnalités essentielles avant de passer au plan Pro ou Business.",
   },
   {
     question: "En quoi Trackit est différent d'un tableur ?",

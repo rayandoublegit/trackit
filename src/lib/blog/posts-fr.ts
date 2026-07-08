@@ -242,9 +242,9 @@ export const POSTS_FR: BlogPost[] = [
   },
   {
     slug: "tarifs-trackit-plans-expliques",
-    title: "Tarifs Trackit : plans Free, Pro et Scale expliqués",
+    title: "Tarifs Trackit : plans Free, Starter, Pro et Business expliqués",
     description:
-      "Comparez les plans Trackit Free, Pro et Scale — fonctionnalités, limites et quel plan choisir pour votre programme créateurs.",
+      "Comparez les plans Trackit Free, Starter, Pro et Business — fonctionnalités, limites et quel plan choisir pour votre programme créateurs.",
     category: "Plateforme",
     locale: "fr",
     publishedAt: "2026-02-22T10:00:00.000Z",
@@ -256,19 +256,24 @@ export const POSTS_FR: BlogPost[] = [
     blocks: [
       {
         type: "p",
-        text: "Trackit propose un plan gratuit pour démarrer, plus Pro et Scale pour les marques avec un programme créateurs actif. Tous les plans incluent la découverte et le suivi — les plans payants débloquent des limites plus élevées.",
+        text: "Trackit propose un plan gratuit pour démarrer, plus Starter, Pro et Business pour les marques avec un programme créateurs actif. Tous les plans incluent la découverte et le suivi — les plans payants débloquent des limites plus élevées.",
       },
       { type: "h2", text: "Trackit Free" },
       {
         type: "p",
         text: "Idéal pour tester le marketing créateurs. Explorez la découverte, lancez une petite campagne et validez le canal avant d'investir.",
       },
+      { type: "h2", text: "Trackit Starter" },
+      {
+        type: "p",
+        text: "Le point d'entrée pour lancer un programme créateurs — découverte, modèles d'outreach, paiements manuels et liens d'affiliation trackés.",
+      },
       { type: "h2", text: "Trackit Pro" },
       {
         type: "p",
         text: "Pour les marques avec un roster actif. Plus de créateurs, plus d'outreach et des analytics pour gérer des partenariats en cours.",
       },
-      { type: "h2", text: "Trackit Scale" },
+      { type: "h2", text: "Trackit Business" },
       {
         type: "p",
         text: "Pour les équipes qui scalent plusieurs campagnes. Limites maximales et tout le plan Pro pour les programmes à fort volume.",

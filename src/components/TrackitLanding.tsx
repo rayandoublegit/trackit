@@ -8,11 +8,10 @@ import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-s
 import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { applyAppLocale } from "@/lib/locale-preferences";
-import { formatCurrency } from "@/lib/useCurrency";
+import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanCardDescription, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
+import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
 import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
@@ -243,7 +242,7 @@ function ProcessCommissionStack({ lang }: { lang: "en" | "fr" }) {
               <p className="commission-sheet__creator">{payout.creator}</p>
               <p className="commission-sheet__payment">
                 {paidToCreator}{" "}
-                <strong>{formatCurrency(payout.amount, lang)}</strong>{" "}
+                <strong>{formatPricingAmount(payout.amount, lang)}</strong>{" "}
                 {toThisCreator}
               </p>
             </div>
@@ -330,13 +329,13 @@ export default function TrackitLanding() {
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
   hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
   hero_italic: lang === "fr" ? "A un seul endroit." : "All in one place.",
-  hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : `Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No ${formatCurrency(300, lang)}/month enterprise tools.`,
+  hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : `Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No ${formatPricingAmount(300, lang)}/month enterprise tools.`,
   hero_cta: lang === "fr" ? "Commencer" : "Get Started",
   hero_cta_hover: lang === "fr" ? "Gratuit !!" : "For Free!!",
   hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
   hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
-  hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatCurrency(0, lang)} Manual Bank`,
+  hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatPricingAmount(0, lang)} Manual Bank`,
   hero_bank_line2: lang === "fr" ? "Bancaires Manuels" : "Transfers",
   section_does_everything: lang === "fr" ? "Trackit fait tout" : "Trackit does everything",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
@@ -374,11 +373,11 @@ export default function TrackitLanding() {
   why_sub_line1: lang === "fr" ? "Conçu pour les marques" : "",
   why_sub_line2: lang === "fr" ? "comme la vôtre" : "",
   why_sub2: lang === "fr" ? "Pas pour les entreprises." : "Not for enterprise",
-  why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : `Every other tool was built for agencies with 10 people and ${formatCurrency(500, lang)}/month budgets. Trackit was built for lean Shopify brands who need results not complexity.`,
+  why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : "Every other tool was built for agencies with 10 people and $500/month budgets. Trackit was built for lean Shopify brands who need results not complexity.",
   pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
-  pricing_save: lang === "fr" ? "−20% annuel" : "Save 20% annual",
+  pricing_save: annualFreeMonthsBadge(lang),
   pricing_pro_desc: lang === "fr" ? "Pour les agences et les équipes qui passent à l'échelle." : "Built for agencies and teams scaling creator programs.",
-  pricing_scale_pill: lang === "fr" ? "Pour les agences" : "For agencies",
+  pricing_scale_pill: lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand",
   pricing_most_popular: lang === "fr" ? "Le plus populaire" : "Most Popular",
   pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
   pricing_free_cta: lang === "fr" ? "Démarrer gratuitement →" : "Start free →",
@@ -420,12 +419,15 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Entrepôt de données unifié" : "Unified data lakehouse",
 };
 
-  const freePricingFeatures = getPlanPricingFeatureLines("free", lang);
-  const growthPricingFeatures = getPlanPricingFeatureLines("basic", lang);
-  const proPricingFeatures = getPlanPricingFeatureLines("pro", lang);
-  const scalePricingFeatures = getPlanPricingFeatureLines("scale", lang);
+  const freePricingFeatures = getPlanPricingHighlights("free", lang);
+  const growthPricingFeatures = getPlanPricingHighlights("basic", lang);
+  const proPricingFeatures = getPlanPricingHighlights("pro", lang);
+  const scalePricingFeatures = getPlanPricingHighlights("scale", lang);
   const plan = normalizePlan(currentPlan);
-  const currency = lang === "fr" ? "eur" : "usd";
+  const currency = checkoutCurrencyFromLang(lang);
+  const starterName = planDisplayName("basic", lang);
+  const proName = planDisplayName("pro", lang);
+  const businessName = planDisplayName("scale", lang);
   const faqItems = lang === "fr" ? HOME_FAQ_FR : HOME_FAQ_EN;
 
   useEffect(() => {
@@ -466,9 +468,9 @@ export default function TrackitLanding() {
   const proAction = planCtaAction(plan, "pro", subscriptionInterval, trackitAnnual);
   const scaleAction = planCtaAction(plan, "scale", subscriptionInterval, proAnnual);
 
-  const growthCtaLabel = planCtaLabel(lang, growthAction, "Growth", plan, "basic", subscriptionInterval, basicAnnual);
-  const proCtaLabel = planCtaLabel(lang, proAction, "Pro", plan, "pro", subscriptionInterval, trackitAnnual);
-  const scaleCtaLabel = planCtaLabel(lang, scaleAction, "Scale", plan, "scale", subscriptionInterval, proAnnual);
+  const growthCtaLabel = planCtaLabel(lang, growthAction, starterName, plan, "basic", subscriptionInterval, basicAnnual);
+  const proCtaLabel = planCtaLabel(lang, proAction, proName, plan, "pro", subscriptionInterval, trackitAnnual);
+  const scaleCtaLabel = planCtaLabel(lang, scaleAction, businessName, plan, "scale", subscriptionInterval, proAnnual);
 
   const payingLabel = lang === "fr" ? "Paiement…" : "Paying…";
   const portalLabel = lang === "fr" ? "Chargement…" : "Loading…";
@@ -1497,16 +1499,25 @@ export default function TrackitLanding() {
                 </button>
                 <span className="toggle-label">{t.pricing_annually}</span>
               </div>
-              <div className="pricing-toggle-pill">{t.pricing_save}</div>
+              {basicAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
             </div>
             <div className="pricing-card">
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">Growth</div>
+                <div className="pricing-name">{starterName}</div>
                 <div className="pricing-desc">{getPlanCardDescription("basic", lang)}</div>
-                <div className="pricing-price">
-                  <span className="pricing-amount">{basicAnnual ? formatCurrency(PLAN_PRICES.growthAnnual, lang) : formatCurrency(PLAN_PRICES.growthMonthly, lang)}</span>
-                  <span className="pricing-period">{basicAnnual ? t.pricing_year : t.pricing_month}</span>
+                <div>
+                  <div className="pricing-price">
+                    <span className="pricing-amount">
+                      {formatPricingAmount(basicAnnual ? getPlanAnnualMonthlyEquivalent("basic") : PLAN_PRICES.growthMonthly, lang)}
+                    </span>
+                    <span className="pricing-period">{t.pricing_month}</span>
+                  </div>
+                  {basicAnnual ? (
+                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
+                      {annualBilledSubtitle(getPlanAnnualTotal("basic"), lang)}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="pricing-divider"></div>
@@ -1529,16 +1540,26 @@ export default function TrackitLanding() {
                 </button>
                 <span className="toggle-label">{t.pricing_annually}</span>
               </div>
+              {trackitAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
             </div>
             <div className="pricing-card pricing-card-hero">
               <span className="pricing-badge-most-popular">{t.pricing_most_popular}</span>
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">Pro</div>
+                <div className="pricing-name">{proName}</div>
                 <div className="pricing-desc">{getPlanCardDescription("pro", lang)}</div>
-                <div className="pricing-price">
-                  <span className="pricing-amount">{trackitAnnual ? formatCurrency(PLAN_PRICES.proAnnual, lang) : formatCurrency(PLAN_PRICES.proMonthly, lang)}</span>
-                  <span className="pricing-period">{trackitAnnual ? t.pricing_year : t.pricing_month}</span>
+                <div>
+                  <div className="pricing-price">
+                    <span className="pricing-amount">
+                      {formatPricingAmount(trackitAnnual ? getPlanAnnualMonthlyEquivalent("pro") : PLAN_PRICES.proMonthly, lang)}
+                    </span>
+                    <span className="pricing-period">{t.pricing_month}</span>
+                  </div>
+                  {trackitAnnual ? (
+                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
+                      {annualBilledSubtitle(getPlanAnnualTotal("pro"), lang)}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="pricing-divider"></div>
@@ -1562,15 +1583,25 @@ export default function TrackitLanding() {
                 <span className="toggle-label">{t.pricing_annually}</span>
               </div>
               <div className="pricing-toggle-pill">{t.pricing_scale_pill}</div>
+              {proAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
             </div>
             <div className="pricing-card">
               <div className="pricing-card-top">
                 <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">Scale</div>
+                <div className="pricing-name">{businessName}</div>
                 <div className="pricing-desc">{getPlanCardDescription("scale", lang)}</div>
-                <div className="pricing-price">
-                  <span className="pricing-amount">{proAnnual ? formatCurrency(PLAN_PRICES.scaleAnnual, lang) : formatCurrency(PLAN_PRICES.scaleMonthly, lang)}</span>
-                  <span className="pricing-period">{proAnnual ? t.pricing_year : t.pricing_month}</span>
+                <div>
+                  <div className="pricing-price">
+                    <span className="pricing-amount">
+                      {formatPricingAmount(proAnnual ? getPlanAnnualMonthlyEquivalent("scale") : PLAN_PRICES.scaleMonthly, lang)}
+                    </span>
+                    <span className="pricing-period">{t.pricing_month}</span>
+                  </div>
+                  {proAnnual ? (
+                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
+                      {annualBilledSubtitle(getPlanAnnualTotal("scale"), lang)}
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <div className="pricing-divider"></div>
@@ -1586,7 +1617,7 @@ export default function TrackitLanding() {
                 <div className="pricing-name">Free</div>
                 <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
                 <div className="pricing-price">
-                  <span className="pricing-amount">{formatCurrency(0, lang)}</span>
+                  <span className="pricing-amount">{formatPricingAmount(0, lang)}</span>
                   <span className="pricing-period">{t.pricing_month}</span>
                 </div>
               </div>

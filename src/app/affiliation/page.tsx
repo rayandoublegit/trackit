@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useLang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatPricingAmount, PLAN_PRICES } from "@/lib/plan-marketing";
 import { AffiliationHeroSection } from "@/components/AffiliationHeroSection";
 import { AffiliationStepMotion } from "@/components/AffiliationStepMotion";
 import "../affiliation-hero.css";
@@ -39,7 +39,7 @@ export default function AffiliationPage() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const earnings = Math.round(users * 19 * 0.2);
+  const earnings = Math.round(users * PLAN_PRICES.proMonthly * 0.2);
 
   const canSubmit =
     formData.firstName &&
@@ -63,8 +63,8 @@ export default function AffiliationPage() {
       q: lang === "fr" ? "Quand suis-je payé ?" : "When do I get paid?",
       a:
         lang === "fr"
-          ? `Les paiements sont traités le 1er de chaque mois pour les gains du mois précédent. Paiement minimum de ${formatCurrency(20, lang)}.`
-          : `Payouts are processed on the 1st of every month for the previous month's earnings. Minimum payout is ${formatCurrency(20, lang)}.`,
+          ? `Les paiements sont traités le 1er de chaque mois pour les gains du mois précédent. Paiement minimum de ${formatPricingAmount(20, lang)}.`
+          : `Payouts are processed on the 1st of every month for the previous month's earnings. Minimum payout is ${formatPricingAmount(20, lang)}.`,
     },
     {
       q: lang === "fr" ? "Combien de temps dure le cookie ?" : "How long does the cookie last?",
@@ -103,8 +103,8 @@ export default function AffiliationPage() {
       title: lang === "fr" ? "Ils s'inscrivent et paient" : "They sign up and pay",
       desc:
         lang === "fr"
-          ? "Votre audience découvre Trackit. Quand ils passent à Basic ou Pro, la vente vous est attribuée."
-          : "Your audience discovers Trackit. When they upgrade to Basic or Pro, the sale is attributed to you.",
+          ? "Votre audience découvre Trackit. Quand ils passent à Starter ou Pro, la vente vous est attribuée."
+          : "Your audience discovers Trackit. When they upgrade to Starter or Pro, the sale is attributed to you.",
     },
     {
       step: "3" as const,
@@ -289,11 +289,11 @@ export default function AffiliationPage() {
           >
             <span style={{ fontSize: 13, color: SUBTEXT, letterSpacing: "-0.01em" }}>
               {lang === "fr"
-                ? `Votre commission (20% de ${formatCurrency(19, lang)}/mois par utilisateur)`
-                : `Your commission (20% of ${formatCurrency(19, lang)}/mo per user)`}
+                ? `Votre commission (20% de ${formatPricingAmount(PLAN_PRICES.proMonthly, lang)}/mois par utilisateur)`
+                : `Your commission (20% of ${formatPricingAmount(PLAN_PRICES.proMonthly, lang)}/mo per user)`}
             </span>
             <span style={{ fontSize: 14, fontWeight: 600, color: BLUE, letterSpacing: "-0.02em" }}>
-              {formatCurrency(earnings, lang)}/mo
+              {formatPricingAmount(earnings, lang)}/mo
             </span>
           </div>
 
@@ -301,7 +301,7 @@ export default function AffiliationPage() {
             <div className="affiliation-earnings-label">
               {lang === "fr" ? "Vos gains mensuels estimés" : "Your estimated monthly earnings"}
             </div>
-            <div className="affiliation-earnings-amount">{formatCurrency(earnings, lang)}</div>
+            <div className="affiliation-earnings-amount">{formatPricingAmount(earnings, lang)}</div>
             <div className="affiliation-earnings-sub">
               {lang === "fr" ? "par mois · récurrent" : "per month · recurring"}
             </div>

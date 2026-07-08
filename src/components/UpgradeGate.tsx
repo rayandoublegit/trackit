@@ -9,7 +9,7 @@ import {
   type GateFeatureKey,
 } from "@/lib/plan-marketing";
 import type { Lang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
+import { formatPricingAmount } from "@/lib/plan-marketing";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
@@ -102,7 +102,7 @@ export function UpgradeGate({
               marginBottom: 14,
             }}
           >
-            {requiredName} · {formatCurrency(monthlyPrice, lang)}
+            {requiredName} · {formatPricingAmount(monthlyPrice, lang)}
             {lang === "fr" ? "/mois" : "/mo"}
           </div>
           <h3

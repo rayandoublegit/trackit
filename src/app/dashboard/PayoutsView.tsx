@@ -697,7 +697,7 @@ export function PaymentMethodsBillingSection() {
             : "Add a card"}
       </button>
       <div style={{ padding: "12px 14px", background: "#FAFAFA", borderRadius: 10, fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-        Switch to annual billing — save 20%
+        {lang === "fr" ? "Passez à la facturation annuelle — 2 mois offerts" : "Switch to annual billing — 2 months free"}
       </div>
     </>
   );
@@ -2375,7 +2375,7 @@ export function PayoutsView({
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
     if (!canUseManualPayouts(plan as PlanTier)) {
-      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on the Growth plan and above.");
+      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on the Starter plan and above.");
       return;
     }
     const amount = Number(creator.balance) || 0;
@@ -2551,7 +2551,7 @@ export function PayoutsView({
       onPayManual={() => void paySelectedCreator()}
       onPayStripe={async () => {
         if (!canUseManualPayouts(plan as PlanTier)) {
-          alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on Growth plan and above.");
+          alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on Starter plan and above.");
           return;
         }
         const amount = Number(activeCreator.balance) || 0;
@@ -2689,13 +2689,13 @@ export function PayoutsView({
                   </div>
                   {!canUseStripeConnectPayouts(plan) && (
                     <p style={{ fontSize: 13, color: "#7A7A7A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
-                      {lang === "fr" ? "Disponible sur le plan Scale. " : "Available on the Scale plan. "}
+                      {lang === "fr" ? "Disponible sur le plan Business. " : "Available on the Business plan. "}
                       <button
                         type="button"
                         onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()}
                         style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
                       >
-                        {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
+                        {lang === "fr" ? "Passer à Business →" : "Upgrade to Business →"}
                       </button>
                     </p>
                   )}

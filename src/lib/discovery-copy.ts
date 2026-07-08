@@ -1,4 +1,10 @@
 import type { Lang } from "@/lib/useLang";
+import {
+  BASIC_MONTHLY_DISCOVERIES,
+  BASIC_RESULTS_PER_SEARCH,
+  PRO_MONTHLY_DISCOVERIES,
+  PRO_RESULTS_PER_SEARCH,
+} from "@/lib/plan-limits";
 
 export function discoveryCopy(lang: Lang) {
   const fr = lang === "fr";
@@ -105,11 +111,11 @@ export function discoveryCopy(lang: Lang) {
     discoveryLimitTitle: (limit: number) =>
       fr ? `Vous avez utilisé vos ${limit} découvertes` : `You've used your ${limit} discoveries`,
     discoveryLimitSubtitleBasic: fr
-      ? "Passez à Pro pour 50 découvertes/mois et 25 résultats par recherche."
-      : "Upgrade to Pro for 50 discoveries/month and 25 results per search.",
+      ? `Passez à Pro pour ${PRO_MONTHLY_DISCOVERIES} découvertes/mois et ${PRO_RESULTS_PER_SEARCH} résultats par recherche.`
+      : `Upgrade to Pro for ${PRO_MONTHLY_DISCOVERIES} discoveries/month and ${PRO_RESULTS_PER_SEARCH} results per search.`,
     discoveryLimitSubtitleFree: fr
-      ? "Passez à Growth pour 20 découvertes/mois et 10 résultats par recherche."
-      : "Upgrade to Growth for 20 discoveries/month and 10 results per search.",
+      ? `Passez à Starter pour ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois et ${BASIC_RESULTS_PER_SEARCH} résultats par recherche.`
+      : `Upgrade to Starter for ${BASIC_MONTHLY_DISCOVERIES} discoveries/month and ${BASIC_RESULTS_PER_SEARCH} results per search.`,
     discoveryLimitSubtitlePro: fr
       ? "Passez à Scale pour des découvertes et résultats illimités."
       : "Upgrade to Scale for unlimited discoveries and results.",

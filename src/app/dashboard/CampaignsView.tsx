@@ -4429,7 +4429,7 @@ function PayoutsTab({
 
   const handlePayCreator = (creator: PayableCreator) => {
     if (!canUseManualPayouts(plan)) {
-      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Growth." : "Payouts are available on the Growth plan and above.");
+      alert(lang === "fr" ? "Les paiements sont disponibles à partir du plan Starter." : "Payouts are available on the Starter plan and above.");
       return;
     }
     const amount = creator.balance;

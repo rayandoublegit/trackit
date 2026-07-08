@@ -10,7 +10,7 @@ import { useLang, type Lang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type DisplayCurrency, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
-import { formatCurrency, useDisplayCurrency, useSetDisplayCurrency } from "@/lib/useCurrency";
+import { useDisplayCurrency, useSetDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import {
@@ -24,19 +24,12 @@ import {
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
 
-import { PLAN_PRICES } from "@/lib/plan-marketing";
+import { PLAN_PRICES, planDisplayName, formatPricingAmount, checkoutCurrencyFromLang } from "@/lib/plan-marketing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
 const PRO_MONTHLY = PLAN_PRICES.proMonthly;
 const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
-
-function planDisplayName(plan: PlanTier, lang: Lang): string {
-  if (plan === "scale") return "Scale";
-  if (plan === "pro") return "Pro";
-  if (plan === "basic") return "Growth";
-  return lang === "fr" ? "Gratuit" : "Free";
-}
 
 function planMonthlyPrice(plan: PlanTier): number {
   if (plan === "scale") return SCALE_MONTHLY;
@@ -824,7 +817,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
   const [nextBillingDate, setNextBillingDate] = useState<number | null>(null);
 
-  const currency = lang === "fr" ? "eur" : "usd";
+  const currency = checkoutCurrencyFromLang(lang);
 
   useEffect(() => {
     let cancelled = false;
@@ -966,7 +959,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                 </span>
               ) : (
                 <>
-                  {formatCurrency(planMonthlyPrice(currentPlan), lang)}
+                  {formatPricingAmount(planMonthlyPrice(currentPlan), lang)}
                   <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>{lang === "fr" ? "/mois" : "/month"}</span>
                 </>
               )}
@@ -1001,7 +994,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "growth"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `Growth ${formatCurrency(GROWTH_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("basic", lang)} ${formatPricingAmount(GROWTH_MONTHLY, lang)}/mo →`}
                   </button>
                   <button
                     type="button"
@@ -1011,7 +1004,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}/mo →`}
                   </button>
                 </>
               )}
@@ -1025,7 +1018,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `Pro ${formatCurrency(PRO_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}/mo →`}
                   </button>
                   <button
                     type="button"
@@ -1035,7 +1028,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "scale"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `Scale ${formatCurrency(SCALE_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}/mo →`}
                   </button>
                 </>
               )}
@@ -1048,7 +1041,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                 >
                   {loading === "scale"
                     ? lang === "fr" ? "Chargement..." : "Loading..."
-                    : `Scale ${formatCurrency(SCALE_MONTHLY, lang)}/mo →`}
+                    : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}/mo →`}
                 </button>
               )}
             </div>

@@ -1,8 +1,8 @@
 import type { Lang } from "@/lib/useLang";
-import { formatCurrency } from "@/lib/useCurrency";
 import {
   BASIC_MAX_CAMPAIGNS,
   BASIC_MAX_MANAGED_CREATORS,
+  BASIC_MAX_SHOPIFY_STORES,
   BASIC_MONTHLY_AI_MESSAGES,
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
@@ -13,7 +13,6 @@ import {
   PRO_MAX_MANAGED_CREATORS,
   PRO_MONTHLY_DISCOVERIES,
   PRO_RESULTS_PER_SEARCH,
-  PRO_MAX_SHOPIFY_STORES,
   SCALE_MAX_SHOPIFY_STORES,
   canUseAutoFollowUp,
   canBulkImportTemplatesCsv,
@@ -31,23 +30,69 @@ import {
   getMaxActiveCampaigns,
   getMaxManagedCreators,
   getDailyDiscoveryLimit,
+  maxShopifyStores,
   type PlanTier,
 } from "@/lib/plan-limits";
 
 /** Customer-facing plan names. Internal tiers: free | basic | pro | scale. */
 export const PLAN_PRICES = {
-  growthMonthly: 19,
-  proMonthly: 39,
-  scaleMonthly: 99,
-  growthAnnual: 190,
-  proAnnual: 390,
-  scaleAnnual: 990,
+  growthMonthly: 49,
+  proMonthly: 99,
+  scaleMonthly: 199,
+  growthAnnual: 490,
+  proAnnual: 990,
+  scaleAnnual: 1990,
 } as const;
 
+/** Monthly equivalent shown on annual pricing cards (not the billed annual total). */
+export const PLAN_ANNUAL_MONTHLY_EQUIVALENT = {
+  growth: 41,
+  pro: 82.5,
+  scale: 166,
+} as const;
+
+export function checkoutCurrencyFromLang(lang: Lang): "usd" | "eur" {
+  return lang === "fr" ? "eur" : "usd";
+}
+
+/** Pricing/checkout amounts follow site language (fr → EUR, en → USD). */
+export function formatPricingAmount(amount: number, lang: Lang): string {
+  const currency = lang === "fr" ? "EUR" : "USD";
+  const locale = lang === "fr" ? "fr-FR" : "en-US";
+  const hasFraction = amount % 1 !== 0;
+  return amount.toLocaleString(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: hasFraction ? 2 : 0,
+    maximumFractionDigits: hasFraction ? 2 : 0,
+  });
+}
+
+export function getPlanAnnualMonthlyEquivalent(tier: Exclude<PlanTier, "free">): number {
+  if (tier === "basic") return PLAN_ANNUAL_MONTHLY_EQUIVALENT.growth;
+  if (tier === "pro") return PLAN_ANNUAL_MONTHLY_EQUIVALENT.pro;
+  return PLAN_ANNUAL_MONTHLY_EQUIVALENT.scale;
+}
+
+export function getPlanAnnualTotal(tier: Exclude<PlanTier, "free">): number {
+  if (tier === "basic") return PLAN_PRICES.growthAnnual;
+  if (tier === "pro") return PLAN_PRICES.proAnnual;
+  return PLAN_PRICES.scaleAnnual;
+}
+
+export function annualBilledSubtitle(annualTotal: number, lang: Lang): string {
+  const amount = formatPricingAmount(annualTotal, lang);
+  return lang === "fr" ? `facturé ${amount}/an` : `billed ${amount}/year`;
+}
+
+export function annualFreeMonthsBadge(lang: Lang): string {
+  return lang === "fr" ? "2 mois offerts" : "2 months free";
+}
+
 export function planDisplayName(tier: PlanTier, lang: Lang): string {
-  if (tier === "scale") return "Scale";
+  if (tier === "scale") return "Business";
   if (tier === "pro") return "Pro";
-  if (tier === "basic") return "Growth";
+  if (tier === "basic") return "Starter";
   return lang === "fr" ? "Gratuit" : "Free";
 }
 
@@ -57,26 +102,26 @@ function growthFeatureList(lang: Lang): string[] {
   const fr = lang === "fr";
   return fr
     ? [
-        `${BASIC_MONTHLY_DISCOVERIES} découvertes / mois`,
-        `${BASIC_RESULTS_PER_SEARCH} résultats par recherche`,
+        `${BASIC_MONTHLY_DISCOVERIES} recherches / mois`,
+        `${BASIC_RESULTS_PER_SEARCH} créateurs par recherche`,
         `${BASIC_MAX_CAMPAIGNS} campagnes actives`,
-        `${BASIC_MAX_MANAGED_CREATORS} créateurs gérés`,
-        `${BASIC_MONTHLY_AI_MESSAGES} messages IA / mois`,
-        "Modèles d'outreach (sauvegarde & import)",
-        "Paiements manuels",
-        "Tableau de bord analytique",
-        "Liens d'affiliation",
+        `${BASIC_MAX_MANAGED_CREATORS} créateurs suivis`,
+        `${BASIC_MAX_SHOPIFY_STORES} boutique Shopify connectée`,
+        "Liens d'affiliation trackés (clics, ventes, CA)",
+        "Commissions — calcul automatique",
+        "Outreach — modèles + historique",
+        "Paiements créateurs manuels",
       ]
     : [
-        `${BASIC_MONTHLY_DISCOVERIES} discoveries / month`,
-        `${BASIC_RESULTS_PER_SEARCH} results per search`,
+        `${BASIC_MONTHLY_DISCOVERIES} searches / month`,
+        `${BASIC_RESULTS_PER_SEARCH} creators per search`,
         `${BASIC_MAX_CAMPAIGNS} active campaigns`,
-        `${BASIC_MAX_MANAGED_CREATORS} managed creators`,
-        `${BASIC_MONTHLY_AI_MESSAGES} AI messages / month`,
-        "Outreach templates (save & import)",
-        "Manual payouts",
-        "Full analytics dashboard",
-        "Affiliate links & tracking",
+        `${BASIC_MAX_MANAGED_CREATORS} tracked creators`,
+        `${BASIC_MAX_SHOPIFY_STORES} connected Shopify store`,
+        "Tracked affiliate links (clicks, sales, revenue)",
+        "Commissions — automatic calculation",
+        "Outreach — templates + history",
+        "Manual creator payouts",
       ];
 }
 
@@ -84,34 +129,26 @@ function proFeatureList(lang: Lang): string[] {
   const fr = lang === "fr";
   return fr
     ? [
-        `${PRO_MONTHLY_DISCOVERIES} découvertes / mois`,
-        `${PRO_RESULTS_PER_SEARCH} résultats par recherche`,
+        "Tout Starter, plus",
+        `${PRO_MONTHLY_DISCOVERIES} recherches / mois`,
+        `${PRO_RESULTS_PER_SEARCH} créateurs par recherche`,
         `${PRO_MAX_CAMPAIGNS} campagnes actives`,
-        `${PRO_MAX_MANAGED_CREATORS} créateurs gérés`,
-        "Messages IA illimités",
-        "Import CSV en masse",
-        "Paiements auto + manuels",
-        "Analytiques avancées + ROI",
-        `Shopify (${PRO_MAX_SHOPIFY_STORES} boutique) + suivi ventes`,
-        "Portail créateur & invitations",
-        "Scripts & briefs créateurs",
-        "Workflows d'automatisation",
-        "Support prioritaire",
+        `${PRO_MAX_MANAGED_CREATORS} créateurs suivis`,
+        "Portail créateur — dashboard dédié",
+        "Contenu — upload + stats (vues, engagement)",
+        "Paiements créateurs automatiques via Stripe",
+        "Scripts & briefs inclus",
       ]
     : [
-        `${PRO_MONTHLY_DISCOVERIES} discoveries / month`,
-        `${PRO_RESULTS_PER_SEARCH} results per search`,
+        "Everything in Starter, plus",
+        `${PRO_MONTHLY_DISCOVERIES} searches / month`,
+        `${PRO_RESULTS_PER_SEARCH} creators per search`,
         `${PRO_MAX_CAMPAIGNS} active campaigns`,
-        `${PRO_MAX_MANAGED_CREATORS} managed creators`,
-        "Unlimited AI outreach",
-        "Bulk CSV import",
-        "Auto + manual payouts",
-        "Advanced analytics + ROI",
-        `Shopify (${PRO_MAX_SHOPIFY_STORES} store) + sales tracking`,
-        "Creator portal & invite links",
-        "Scripts & briefs for creators",
-        "Automation workflows",
-        "Priority support",
+        `${PRO_MAX_MANAGED_CREATORS} tracked creators`,
+        "Creator portal — dedicated dashboard",
+        "Content — upload + stats (views, engagement)",
+        "Automatic creator payouts via Stripe",
+        "Scripts & briefs included",
       ];
 }
 
@@ -119,24 +156,22 @@ function scaleFeatureList(lang: Lang): string[] {
   const fr = lang === "fr";
   return fr
     ? [
-        "Tout le plan Pro",
+        "Tout Pro, plus",
         "Découvertes illimitées",
         "Résultats illimités",
-        "Campagnes & créateurs illimités",
-        "Solde & Stripe Connect",
-        `Shopify multi-boutiques (${SCALE_MAX_SHOPIFY_STORES})`,
-        "Agent d'automatisation complet",
-        "Support dédié",
+        "Campagnes illimitées",
+        "Créateurs illimités",
+        `Shopify — ${SCALE_MAX_SHOPIFY_STORES} boutiques`,
+        "Support dédié, réponse prioritaire",
       ]
     : [
-        "Everything in Pro",
+        "Everything in Pro, plus",
         "Unlimited discoveries",
         "Unlimited results",
-        "Unlimited campaigns & creators",
-        "Balance & Stripe Connect",
-        `Multi-store Shopify (${SCALE_MAX_SHOPIFY_STORES})`,
-        "Full automation agent",
-        "Dedicated support",
+        "Unlimited campaigns",
+        "Unlimited creators",
+        `Shopify — ${SCALE_MAX_SHOPIFY_STORES} stores`,
+        "Dedicated support, priority response",
       ];
 }
 
@@ -164,49 +199,43 @@ function pricingFeatureList(tier: PlanTier, lang: Lang): string[] {
   if (tier === "basic") {
     return fr
       ? [
-          `${BASIC_MONTHLY_DISCOVERIES} découvertes / mois`,
-          `${BASIC_RESULTS_PER_SEARCH} résultats par recherche`,
+          `${BASIC_MONTHLY_DISCOVERIES} recherches / mois`,
+          `${BASIC_RESULTS_PER_SEARCH} créateurs par recherche`,
           `${BASIC_MAX_CAMPAIGNS} campagnes actives`,
-          `${BASIC_MAX_MANAGED_CREATORS} créateurs gérés`,
-          `${BASIC_MONTHLY_AI_MESSAGES} messages IA / mois`,
-          "Modèles d'outreach (sauvegarde & import)",
-          "Paiements manuels & analytiques",
-          "Liens d'affiliation",
+          `${BASIC_MAX_MANAGED_CREATORS} créateurs suivis`,
+          `${BASIC_MAX_SHOPIFY_STORES} boutique Shopify`,
+          "Liens d'affiliation trackés",
+          "Paiements créateurs manuels",
         ]
       : [
-          `${BASIC_MONTHLY_DISCOVERIES} discoveries / month`,
-          `${BASIC_RESULTS_PER_SEARCH} results per search`,
+          `${BASIC_MONTHLY_DISCOVERIES} searches / month`,
+          `${BASIC_RESULTS_PER_SEARCH} creators per search`,
           `${BASIC_MAX_CAMPAIGNS} active campaigns`,
-          `${BASIC_MAX_MANAGED_CREATORS} managed creators`,
-          `${BASIC_MONTHLY_AI_MESSAGES} AI messages / month`,
-          "Outreach templates (save & import)",
-          "Manual payouts & analytics",
-          "Affiliate links & tracking",
+          `${BASIC_MAX_MANAGED_CREATORS} tracked creators`,
+          `${BASIC_MAX_SHOPIFY_STORES} Shopify store`,
+          "Tracked affiliate links",
+          "Manual creator payouts",
         ];
   }
   if (tier === "pro") {
     return fr
       ? [
-          `${PRO_MONTHLY_DISCOVERIES} découvertes / mois`,
-          `${PRO_RESULTS_PER_SEARCH} résultats par recherche`,
+          `${PRO_MONTHLY_DISCOVERIES} recherches / mois`,
+          `${PRO_RESULTS_PER_SEARCH} créateurs par recherche`,
           `${PRO_MAX_CAMPAIGNS} campagnes actives`,
-          `${PRO_MAX_MANAGED_CREATORS} créateurs gérés`,
-          "Messages IA illimités",
-          `Shopify (${PRO_MAX_SHOPIFY_STORES} boutique) + suivi ventes`,
-          "Paiements auto + manuels",
-          "Portail créateur, invitations & scripts",
-          "Automatisations & support prioritaire",
+          `${PRO_MAX_MANAGED_CREATORS} créateurs suivis`,
+          "Portail créateur + contenu",
+          "Paiements automatiques via Stripe",
+          "Scripts & briefs inclus",
         ]
       : [
-          `${PRO_MONTHLY_DISCOVERIES} discoveries / month`,
-          `${PRO_RESULTS_PER_SEARCH} results per search`,
+          `${PRO_MONTHLY_DISCOVERIES} searches / month`,
+          `${PRO_RESULTS_PER_SEARCH} creators per search`,
           `${PRO_MAX_CAMPAIGNS} active campaigns`,
-          `${PRO_MAX_MANAGED_CREATORS} managed creators`,
-          "Unlimited AI outreach",
-          `Shopify (${PRO_MAX_SHOPIFY_STORES} store) + sales tracking`,
-          "Auto + manual payouts",
-          "Creator portal, invites & scripts",
-          "Automation workflows & priority support",
+          `${PRO_MAX_MANAGED_CREATORS} tracked creators`,
+          "Creator portal + content",
+          "Automatic payouts via Stripe",
+          "Scripts & briefs included",
         ];
   }
   return scaleFeatureList(lang);
@@ -219,17 +248,17 @@ export function getPlanCardDescription(tier: PlanTier, lang: Lang): string {
   }
   if (tier === "basic") {
     return fr
-      ? "L'entrée idéale pour lancer votre programme créateurs."
-      : "Your entry point — start fast without overcommitting.";
+      ? "Trackez vos premières ventes créateurs."
+      : "Track your first creator sales.";
   }
   if (tier === "pro") {
     return fr
-      ? "Le meilleur rapport qualité-prix. Le choix de la plupart des marques."
-      : "Best value. The plan most brands choose.";
+      ? "Opérez vos campagnes de bout en bout."
+      : "Run your campaigns end to end.";
   }
   return fr
-    ? "Tout Pro, plus multi-boutiques et automatisation complète."
-    : "Everything in Pro, plus multi-store power and full automation.";
+    ? "Tout, sans limites."
+    : "Everything, without limits.";
 }
 
 /** Feature bullets for pricing grids, billing cards, and upgrade gates — derived from plan-limits. */
@@ -360,7 +389,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     },
   },
   integrations: {
-    requiredTier: "pro",
+    requiredTier: "basic",
     check: canUseShopify,
     title: { en: "Shopify", fr: "Shopify" },
     description: {
@@ -400,8 +429,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: (plan) => plan !== "free",
     title: { en: "AI outreach", fr: "Outreach IA" },
     description: {
-      en: `Generate personalized outreach with ${BASIC_MONTHLY_AI_MESSAGES} AI messages per month on Growth, or unlimited on Pro.`,
-      fr: `Générez des messages personnalisés avec ${BASIC_MONTHLY_AI_MESSAGES} messages IA/mois sur Growth, ou illimités sur Pro.`,
+      en: `Generate personalized outreach with ${BASIC_MONTHLY_AI_MESSAGES} AI messages per month on Starter, or unlimited on Pro.`,
+      fr: `Générez des messages personnalisés avec ${BASIC_MONTHLY_AI_MESSAGES} messages IA/mois sur Starter, ou illimités sur Pro.`,
     },
   },
   "bulk-import": {
@@ -427,10 +456,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
 export function getManagedCreatorLimitLabel(plan: PlanTier, lang: Lang): string {
   const fr = lang === "fr";
   if (plan === "pro") {
-    return fr ? "jusqu'à 50 créateurs" : "up to 50 creators";
+    return fr ? "jusqu'à 100 créateurs" : "up to 100 creators";
   }
   if (plan === "basic") {
-    return fr ? "jusqu'à 15 créateurs" : "up to 15 creators";
+    return fr ? "jusqu'à 25 créateurs" : "up to 25 creators";
   }
   return fr ? "jusqu'à 3 créateurs" : "up to 3 creators";
 }
@@ -481,8 +510,8 @@ export function getGateModalProps(featureKey: GateFeatureKey, lang: Lang): GateM
 export function getNextTierForLimit(kind: LimitGateKind, plan: PlanTier): PlanTier | null {
   if (plan === "scale") return null;
   if (kind === "shopify-stores") {
-    if (plan === "pro") return "scale";
-    return "pro";
+    if (plan === "pro" || plan === "basic") return "scale";
+    return "basic";
   }
   if (plan === "free") return "basic";
   if (plan === "basic") return "pro";
@@ -571,8 +600,8 @@ export function getLimitUpgradeModalProps(
     const description =
       nextTier === "scale"
         ? fr
-          ? "Passez à Scale pour des découvertes et résultats illimités."
-          : "Upgrade to Scale for unlimited discoveries and results."
+          ? `Passez à ${planName} pour des découvertes et résultats illimités.`
+          : `Upgrade to ${planName} for unlimited discoveries and results.`
         : fr
           ? `Passez à ${planName} pour ${nextLimit} découvertes/mois et ${nextTier === "pro" ? PRO_RESULTS_PER_SEARCH : BASIC_RESULTS_PER_SEARCH} résultats par recherche.`
           : `Upgrade to ${planName} for ${nextLimit} discoveries/month and ${nextTier === "pro" ? PRO_RESULTS_PER_SEARCH : BASIC_RESULTS_PER_SEARCH} results per search.`;
@@ -591,11 +620,11 @@ export function getLimitUpgradeModalProps(
   const description =
     nextTier === "scale"
       ? fr
-        ? `Pro inclut ${PRO_MAX_SHOPIFY_STORES} boutique Shopify. Passez à ${planName} pour jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques.`
-        : `Pro includes ${PRO_MAX_SHOPIFY_STORES} Shopify store. Upgrade to ${planName} for up to ${SCALE_MAX_SHOPIFY_STORES} stores.`
+        ? `Votre plan inclut ${maxShopifyStores(currentPlan)} boutique${maxShopifyStores(currentPlan) > 1 ? "s" : ""} Shopify. Passez à ${planName} pour jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques.`
+        : `Your plan includes ${maxShopifyStores(currentPlan)} Shopify store${maxShopifyStores(currentPlan) > 1 ? "s" : ""}. Upgrade to ${planName} for up to ${SCALE_MAX_SHOPIFY_STORES} stores.`
       : fr
-        ? `Shopify est disponible à partir du plan ${planName} (${PRO_MAX_SHOPIFY_STORES} boutique).`
-        : `Shopify is available on the ${planName} plan (${PRO_MAX_SHOPIFY_STORES} store).`;
+        ? `Shopify est disponible à partir du plan ${planName} (${BASIC_MAX_SHOPIFY_STORES} boutique).`
+        : `Shopify is available on the ${planName} plan (${BASIC_MAX_SHOPIFY_STORES} store).`;
   return {
     title,
     description,
@@ -612,7 +641,7 @@ export function formatUpgradePrimaryLabel(tier: PlanTier, lang: Lang): string {
   if (price == null || price === 0) {
     return lang === "fr" ? `Passer à ${name}` : `Upgrade to ${name}`;
   }
-  const amount = formatCurrency(price, lang);
+  const amount = formatPricingAmount(price, lang);
   return lang === "fr" ? `Passer à ${name} ${amount}/mois` : `Upgrade to ${name} ${amount}/mo`;
 }
 

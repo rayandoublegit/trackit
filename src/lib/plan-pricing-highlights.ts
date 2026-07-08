@@ -2,6 +2,7 @@ import type { Lang } from "@/lib/useLang";
 import {
   BASIC_MAX_CAMPAIGNS,
   BASIC_MAX_MANAGED_CREATORS,
+  BASIC_MAX_SHOPIFY_STORES,
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
   FREE_LIFETIME_DISCOVERIES,
@@ -9,7 +10,6 @@ import {
   FREE_RESULTS_PER_SEARCH,
   PRO_MAX_CAMPAIGNS,
   PRO_MAX_MANAGED_CREATORS,
-  PRO_MAX_SHOPIFY_STORES,
   PRO_MONTHLY_DISCOVERIES,
   PRO_RESULTS_PER_SEARCH,
   SCALE_MAX_SHOPIFY_STORES,
@@ -23,6 +23,8 @@ export type PricingHighlight = {
 };
 
 export function formatPricingHighlightLine(item: PricingHighlight): string {
+  if (!item.value.trim()) return item.label;
+  if (!item.label.trim()) return item.value;
   return `${item.label} — ${item.value}`;
 }
 
@@ -38,13 +40,15 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       },
       {
         id: "search",
-        label: fr ? "Par recherche" : "Per search",
-        value: fr ? `${FREE_RESULTS_PER_SEARCH} résultats` : `${FREE_RESULTS_PER_SEARCH} results`,
+        label: fr ? "Résultats" : "Results",
+        value: fr
+          ? `${FREE_RESULTS_PER_SEARCH} créateurs par recherche`
+          : `${FREE_RESULTS_PER_SEARCH} creators per search`,
       },
       {
         id: "creators",
-        label: fr ? "Créateurs" : "Creators",
-        value: fr ? `${FREE_MAX_MANAGED_CREATORS} gérés` : `${FREE_MAX_MANAGED_CREATORS} managed`,
+        label: fr ? "Créateurs suivis" : "Tracked creators",
+        value: String(FREE_MAX_MANAGED_CREATORS),
       },
       {
         id: "save",
@@ -59,42 +63,51 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${BASIC_MONTHLY_DISCOVERIES} / mois` : `${BASIC_MONTHLY_DISCOVERIES} / mo`,
+        value: fr ? `${BASIC_MONTHLY_DISCOVERIES} recherches/mois` : `${BASIC_MONTHLY_DISCOVERIES} searches/mo`,
       },
       {
         id: "search",
-        label: fr ? "Par recherche" : "Per search",
-        value: fr ? `${BASIC_RESULTS_PER_SEARCH} résultats` : `${BASIC_RESULTS_PER_SEARCH} results`,
+        label: fr ? "Résultats" : "Results",
+        value: fr
+          ? `${BASIC_RESULTS_PER_SEARCH} créateurs par recherche`
+          : `${BASIC_RESULTS_PER_SEARCH} creators per search`,
       },
       {
         id: "campaigns",
         label: fr ? "Campagnes" : "Campaigns",
-        value: String(BASIC_MAX_CAMPAIGNS),
+        value: fr ? `${BASIC_MAX_CAMPAIGNS} actives` : `${BASIC_MAX_CAMPAIGNS} active`,
       },
       {
         id: "creators",
-        label: fr ? "Créateurs" : "Creators",
+        label: fr ? "Créateurs suivis" : "Tracked creators",
         value: String(BASIC_MAX_MANAGED_CREATORS),
       },
       {
-        id: "templates",
-        label: fr ? "Outreach" : "Outreach",
-        value: fr ? "Modèles + import" : "Templates + import",
+        id: "shopify",
+        label: "Shopify",
+        value: fr
+          ? `${BASIC_MAX_SHOPIFY_STORES} boutique connectée`
+          : `${BASIC_MAX_SHOPIFY_STORES} connected store`,
+      },
+      {
+        id: "affiliate",
+        label: fr ? "Liens d'affiliation" : "Affiliate links",
+        value: fr ? "Trackés (clics, ventes, CA)" : "Tracked (clicks, sales, revenue)",
       },
       {
         id: "commissions",
         label: fr ? "Commissions" : "Commissions",
-        value: fr ? "Suivi ventes" : "Sale tracking",
+        value: fr ? "Calcul automatique" : "Automatic calculation",
+      },
+      {
+        id: "templates",
+        label: "Outreach",
+        value: fr ? "Modèles + historique" : "Templates + history",
       },
       {
         id: "payout",
-        label: fr ? "Paiements" : "Payouts",
+        label: fr ? "Paiements créateurs" : "Creator payouts",
         value: fr ? "Manuels" : "Manual",
-      },
-      {
-        id: "affiliate",
-        label: fr ? "Affiliation" : "Affiliates",
-        value: fr ? "Liens trackés" : "Tracked links",
       },
     ];
   }
@@ -102,44 +115,48 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
   if (tier === "pro") {
     return [
       {
+        id: "includes-starter",
+        label: fr ? "Tout Starter, plus" : "Everything in Starter, plus",
+        value: "",
+      },
+      {
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${PRO_MONTHLY_DISCOVERIES} / mois` : `${PRO_MONTHLY_DISCOVERIES} / mo`,
+        value: fr ? `${PRO_MONTHLY_DISCOVERIES} recherches/mois` : `${PRO_MONTHLY_DISCOVERIES} searches/mo`,
       },
       {
         id: "search",
-        label: fr ? "Par recherche" : "Per search",
-        value: fr ? `${PRO_RESULTS_PER_SEARCH} résultats` : `${PRO_RESULTS_PER_SEARCH} results`,
+        label: fr ? "Résultats" : "Results",
+        value: fr
+          ? `${PRO_RESULTS_PER_SEARCH} créateurs par recherche`
+          : `${PRO_RESULTS_PER_SEARCH} creators per search`,
       },
       {
         id: "campaigns",
         label: fr ? "Campagnes" : "Campaigns",
-        value: String(PRO_MAX_CAMPAIGNS),
+        value: fr ? `${PRO_MAX_CAMPAIGNS} actives` : `${PRO_MAX_CAMPAIGNS} active`,
       },
       {
         id: "creators",
-        label: fr ? "Créateurs" : "Creators",
+        label: fr ? "Créateurs suivis" : "Tracked creators",
         value: String(PRO_MAX_MANAGED_CREATORS),
       },
       {
         id: "creator-dashboard",
-        label: fr ? "Dashboard créateur" : "Creator dashboard",
-        value: fr ? "Portail dédié" : "Dedicated portal",
+        label: fr ? "Portail créateur" : "Creator portal",
+        value: fr ? "Dashboard dédié à vos créateurs" : "Dedicated dashboard for your creators",
       },
       {
         id: "creator-content",
-        label: fr ? "Contenu créateur" : "Creator content",
-        value: fr ? "Upload & sync" : "Upload & sync",
-      },
-      {
-        id: "shopify",
-        label: "Shopify",
-        value: fr ? `${PRO_MAX_SHOPIFY_STORES} boutique` : `${PRO_MAX_SHOPIFY_STORES} store`,
+        label: fr ? "Contenu" : "Content",
+        value: fr
+          ? "Upload + stats de performance (vues, engagement)"
+          : "Upload + performance stats (views, engagement)",
       },
       {
         id: "payout",
-        label: fr ? "Paiements" : "Payouts",
-        value: fr ? "Auto + manuel" : "Auto + manual",
+        label: fr ? "Paiements créateurs" : "Creator payouts",
+        value: fr ? "Automatiques via Stripe" : "Automatic via Stripe",
       },
       {
         id: "automation",
@@ -151,14 +168,19 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
 
   return [
     {
-      id: "stack",
-      label: "Pro",
-      value: fr ? "Tout inclus" : "Everything",
+      id: "includes-pro",
+      label: fr ? "Tout Pro, plus" : "Everything in Pro, plus",
+      value: "",
     },
     {
       id: "discoveries",
       label: fr ? "Découvertes" : "Discoveries",
       value: fr ? "Illimitées" : "Unlimited",
+    },
+    {
+      id: "search",
+      label: fr ? "Résultats" : "Results",
+      value: fr ? "Illimités" : "Unlimited",
     },
     {
       id: "campaigns",
@@ -171,34 +193,14 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       value: fr ? "Illimités" : "Unlimited",
     },
     {
-      id: "creator-dashboard",
-      label: fr ? "Dashboard créateur" : "Creator dashboard",
-      value: fr ? "Illimité" : "Unlimited",
-    },
-    {
-      id: "creator-content",
-      label: fr ? "Contenu créateur" : "Creator content",
-      value: fr ? "Campagnes sync" : "Campaign sync",
-    },
-    {
       id: "shopify",
       label: "Shopify",
       value: fr ? `${SCALE_MAX_SHOPIFY_STORES} boutiques` : `${SCALE_MAX_SHOPIFY_STORES} stores`,
     },
     {
-      id: "payout",
-      label: "Stripe",
-      value: fr ? "Connect + solde" : "Connect + balance",
-    },
-    {
-      id: "automation",
-      label: fr ? "Agent IA" : "AI agent",
-      value: fr ? "Complet" : "Full access",
-    },
-    {
       id: "support",
       label: "Support",
-      value: fr ? "Dédié" : "Dedicated",
+      value: fr ? "Dédié, réponse prioritaire" : "Dedicated, priority response",
     },
   ];
 }
