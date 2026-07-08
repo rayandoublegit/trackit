@@ -1,11 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import {
-  CURRENCY_UPDATED_EVENT,
-  getDisplayCurrency,
-  setDisplayCurrency as persistDisplayCurrency,
-  TRACKIT_CURRENCY_KEY,
+  defaultDisplayCurrency,
+  getAppLang,
   type DisplayCurrency,
 } from "@/lib/locale-preferences";
 import { useLang } from "@/lib/useLang";
@@ -19,44 +17,22 @@ export function formatCurrencyWithCode(amount: number | string, currency: Displa
   return num.toLocaleString(locale, { style: "currency", currency, maximumFractionDigits: 0 });
 }
 
-/** Formats using the dashboard display currency (localStorage). */
+/** Formats using the currency implied by app language (fr → EUR, en → USD). */
 export function formatCurrency(amount: number | string, lang?: "en" | "fr"): string {
-  return formatCurrencyWithCode(amount, getDisplayCurrency(lang));
+  const resolvedLang = lang ?? (typeof window !== "undefined" ? getAppLang() : "en");
+  return formatCurrencyWithCode(amount, defaultDisplayCurrency(resolvedLang));
 }
 
 export function useDisplayCurrency(): DisplayCurrency {
   const lang = useLang();
-  const [currency, setCurrency] = useState<DisplayCurrency>(() => getDisplayCurrency(lang));
-
-  useEffect(() => {
-    const refresh = () => setCurrency(getDisplayCurrency());
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === TRACKIT_CURRENCY_KEY) refresh();
-    };
-
-    window.addEventListener(CURRENCY_UPDATED_EVENT, refresh);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(CURRENCY_UPDATED_EVENT, refresh);
-      window.removeEventListener("storage", onStorage);
-    };
-  }, []);
-
-  return currency;
-}
-
-export function useSetDisplayCurrency() {
-  return useCallback((currency: DisplayCurrency) => {
-    persistDisplayCurrency(currency);
-  }, []);
+  return defaultDisplayCurrency(lang);
 }
 
 export function useCurrencyFormat() {
   const currency = useDisplayCurrency();
-  const setCurrency = useSetDisplayCurrency();
   const format = useCallback(
     (amount: number | string) => formatCurrencyWithCode(amount, currency),
     [currency],
   );
-  return { currency, setCurrency, format };
+  return { currency, format };
 }

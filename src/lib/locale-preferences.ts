@@ -39,14 +39,10 @@ export function defaultDisplayCurrency(lang?: AppLang): DisplayCurrency {
 }
 
 export function getDisplayCurrency(lang?: AppLang): DisplayCurrency {
-  if (typeof window === "undefined") return defaultDisplayCurrency(lang);
-  const stored = localStorage.getItem(TRACKIT_CURRENCY_KEY);
-  if (stored === "USD" || stored === "EUR") return stored;
-  const fallback = defaultDisplayCurrency(lang ?? getAppLang());
-  localStorage.setItem(TRACKIT_CURRENCY_KEY, fallback);
-  return fallback;
+  return defaultDisplayCurrency(lang ?? (typeof window !== "undefined" ? getAppLang() : "en"));
 }
 
+/** @deprecated Currency follows app language; kept for locale sync on language change. */
 export function setDisplayCurrency(currency: DisplayCurrency): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TRACKIT_CURRENCY_KEY, currency);
@@ -98,6 +94,7 @@ export function setDiscoveryPrefs(location: DiscoveryLocation, language: Discove
 
 export function applyAppLocale(lang: AppLang): void {
   setAppLang(lang);
+  setDisplayCurrency(defaultDisplayCurrency(lang));
   if (lang === "fr") {
     setDiscoveryPrefs("FR", "french");
     return;

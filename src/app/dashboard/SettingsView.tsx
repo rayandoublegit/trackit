@@ -7,10 +7,10 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type DisplayCurrency, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
-import { useDisplayCurrency, useSetDisplayCurrency } from "@/lib/useCurrency";
+import { useDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import {
@@ -441,8 +441,6 @@ function GeneralSettings({
   onSaved: (patch: Partial<ProfileRow>) => void;
 }) {
   const lang = useLang();
-  const currency = useDisplayCurrency();
-  const setCurrency = useSetDisplayCurrency();
   const [storeName, setStoreName] = useState(initialBusinessName);
   const [websiteUrl, setWebsiteUrl] = useState(initialShopifyUrl);
   const [niche, setNiche] = useState(initialNiche);
@@ -501,13 +499,6 @@ function GeneralSettings({
     <Card>
       <Field label={lang === "fr" ? "Nom de la boutique" : "Store name"}>
         <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Acme Co." style={inputStyle} />
-      </Field>
-      <Field label={lang === "fr" ? "Devise par défaut" : "Default currency"}>
-        <SegmentedToggle
-          options={["EUR", "USD"]}
-          value={currency}
-          onChange={(value) => setCurrency(value as DisplayCurrency)}
-        />
       </Field>
       <Field label={lang === "fr" ? "Langue par défaut" : "Default language"}>
         <SegmentedToggle

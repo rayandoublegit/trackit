@@ -32,7 +32,7 @@ import {
 } from "./analytics-metric-cards";
 import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 import { AddSalePanel } from "./AddSalePanel";
-import { formatCurrency, formatCurrencyWithCode, useDisplayCurrency, useSetDisplayCurrency, type DisplayCurrency } from "@/lib/useCurrency";
+import { formatCurrency, formatCurrencyWithCode, useDisplayCurrency, type DisplayCurrency } from "@/lib/useCurrency";
 import { getDisplayCurrency } from "@/lib/locale-preferences";
 import {
   compactNumberToInput,
@@ -3159,8 +3159,6 @@ function CampaignDetailToolbar({
   lang,
   campaign,
   isMobile,
-  currency,
-  setCurrency,
   onBack,
   onStatusChange,
   onAddCreators,
@@ -3170,8 +3168,6 @@ function CampaignDetailToolbar({
   lang: "en" | "fr";
   campaign: Campaign;
   isMobile?: boolean;
-  currency: DisplayCurrency;
-  setCurrency: (value: DisplayCurrency) => void;
   onBack: () => void;
   onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>;
   onAddCreators: () => void;
@@ -3179,14 +3175,11 @@ function CampaignDetailToolbar({
   onExport: (format: "csv" | "xlsx") => void | Promise<void>;
 }) {
   const [statusOpen, setStatusOpen] = useState(false);
-  const [currencyOpen, setCurrencyOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
-  const currencyRef = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(statusRef, statusOpen, () => setStatusOpen(false));
-  useClickOutside(currencyRef, currencyOpen, () => setCurrencyOpen(false));
   useClickOutside(moreRef, moreOpen, () => setMoreOpen(false));
 
   const isPaused = campaign.status === "Paused";
@@ -3333,34 +3326,6 @@ function CampaignDetailToolbar({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 14, flexWrap: "wrap" }}>
-        <div ref={currencyRef} style={{ position: "relative" }}>
-          <button type="button" onClick={() => setCurrencyOpen((open) => !open)} style={toolbarControl}>
-            {currency}
-            <ChevronDownIcon />
-          </button>
-          {currencyOpen && (
-            <div style={dropdownPanel}>
-              {(["USD", "EUR"] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  style={{
-                    ...menuItemStyle,
-                    fontWeight: currency === code ? 600 : 400,
-                    background: currency === code ? "#F5F5F5" : "transparent",
-                  }}
-                  onClick={() => {
-                    setCurrency(code);
-                    setCurrencyOpen(false);
-                  }}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         <div ref={moreRef} style={{ position: "relative" }}>
           <button
             type="button"
@@ -3446,7 +3411,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const [tab, setTab] = useState<DetailTab>(initialTab);
   const [addSaleOpen, setAddSaleOpen] = useState(false);
   const displayCurrency = useDisplayCurrency();
-  const setDisplayCurrency = useSetDisplayCurrency();
   const [analyticsPeriod, setAnalyticsPeriod] = useState<AnalyticsDateRange>("30d");
   const [customDateRange, setCustomDateRange] = useState<CampaignDateRange>(() => defaultCampaignDateRange(campaign));
   const [analytics, setAnalytics] = useState<CampaignAnalyticsSnapshot | null>(null);
@@ -3636,8 +3600,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         lang={lang}
         campaign={campaign}
         isMobile={isMobile}
-        currency={displayCurrency}
-        setCurrency={setDisplayCurrency}
         onBack={onBack}
         onStatusChange={onStatusChange}
         onAddCreators={onAddCreators}
