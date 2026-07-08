@@ -6,7 +6,8 @@ import { useLang, type Lang } from "@/lib/useLang";
 import { TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanMarketingFeatures, getPlanCardDescription, planDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent } from "@/lib/plan-marketing";
+import { getPlanCardDescription, planDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent } from "@/lib/plan-marketing";
+import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
@@ -104,7 +105,7 @@ function currentPlanPrice(
 }
 
 function planFeatures(lang: Lang, tier: PaidTier): string[] {
-  return getPlanMarketingFeatures(tier, lang, "pricing");
+  return getPlanPricingFeatureLines(tier, lang);
 }
 
 function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
@@ -406,6 +407,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
       monthly: number;
       annualTotal: number;
       popular?: boolean;
+      pill?: string;
     }[] => [
       {
         tier: "basic",
@@ -428,6 +430,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
         description: getPlanCardDescription("scale", lang),
         monthly: SCALE_MONTHLY,
         annualTotal: SCALE_ANNUAL,
+        pill: lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand",
       },
     ],
     [lang],
@@ -665,7 +668,25 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                       letterSpacing: "-0.01em",
                     }}
                   >
-                    {lang === "fr" ? "Populaire" : "Popular"}
+                    {lang === "fr" ? "Le plus populaire" : "Most Popular"}
+                  </span>
+                )}
+                {card.pill && !isCurrent && !card.popular && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 16,
+                      right: 16,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: "#6B7280",
+                      background: "#F3F4F6",
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {card.pill}
                   </span>
                 )}
                 {isCurrent && (

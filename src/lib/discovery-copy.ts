@@ -117,8 +117,8 @@ export function discoveryCopy(lang: Lang) {
       ? `Passez à Starter pour ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois et ${BASIC_RESULTS_PER_SEARCH} résultats par recherche.`
       : `Upgrade to Starter for ${BASIC_MONTHLY_DISCOVERIES} discoveries/month and ${BASIC_RESULTS_PER_SEARCH} results per search.`,
     discoveryLimitSubtitlePro: fr
-      ? "Passez à Scale pour des découvertes et résultats illimités."
-      : "Upgrade to Scale for unlimited discoveries and results.",
+      ? "Passez à Business pour des découvertes et résultats illimités."
+      : "Upgrade to Business for unlimited discoveries and results.",
     discoveryResetIn: (countdown: string) =>
       fr ? `Réinitialisation dans ${countdown}` : `Resets in ${countdown}`,
     discoveryUpgradeCta: (planName: string) =>

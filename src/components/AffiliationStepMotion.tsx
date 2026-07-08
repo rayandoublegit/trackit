@@ -1,6 +1,14 @@
+"use client";
+
+import { formatPricingAmount, PLAN_PRICES } from "@/lib/plan-marketing";
+import { useLang } from "@/lib/useLang";
+
 type StepVariant = "1" | "2" | "3";
 
 export function AffiliationStepMotion({ step }: { step: StepVariant }) {
+  const lang = useLang();
+  const proPrice = formatPricingAmount(PLAN_PRICES.proMonthly, lang);
+
   if (step === "1") {
     return (
       <div className="aff-step-motion aff-step-motion--share" aria-hidden>
@@ -38,7 +46,7 @@ export function AffiliationStepMotion({ step }: { step: StepVariant }) {
           <div className="aff-step-motion__flow-line" />
           <div className="aff-step-motion__plan">
             <span className="aff-step-motion__plan-badge">Pro</span>
-            <span className="aff-step-motion__plan-price">€99</span>
+            <span className="aff-step-motion__plan-price">{proPrice}</span>
             <span className="aff-step-motion__plan-check">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                 <path d="M5 12l5 5L19 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { normalizePlan, BASIC_MAX_MANAGED_CREATORS, PRO_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
+import { formatPricingAmount, getPlanMonthlyPrice, planDisplayName } from "@/lib/plan-marketing";
 import {
   fetchProfileUsernameAvailability,
   isValidProfileUsername,
@@ -17,6 +19,25 @@ import {
 } from "@/lib/profile-username";
 
 type SettingsLang = "en" | "fr";
+
+function planSummaryLine(tier: PlanTier, lang: SettingsLang): string {
+  if (tier === "free") {
+    return lang === "fr" ? "Plan Free · 3 créateurs gérés" : "Free plan · 3 managed creators";
+  }
+  const name = planDisplayName(tier, lang);
+  const price = getPlanMonthlyPrice(tier);
+  const formatted = price != null ? formatPricingAmount(price, lang) : "";
+  const period = lang === "fr" ? "/mois" : "/mo";
+  if (tier === "scale") {
+    return lang === "fr"
+      ? `${name} · ${formatted}${period} · créateurs illimités`
+      : `${name} · ${formatted}${period} · unlimited creators`;
+  }
+  const creators = tier === "basic" ? BASIC_MAX_MANAGED_CREATORS : PRO_MAX_MANAGED_CREATORS;
+  return lang === "fr"
+    ? `${name} · ${formatted}${period} · ${creators} créateurs suivis`
+    : `${name} · ${formatted}${period} · ${creators} tracked creators`;
+}
 
 const settingsT: Record<SettingsLang, Record<string, string>> = {
   en: {
@@ -55,9 +76,6 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     manage_plan: "Manage plan →",
     scale_max: "You're on the highest plan. 🔥",
     analyses_free: "Free plan · 3 managed creators",
-    analyses_spark: "Starter · €49/mo · 25 managed creators",
-    analyses_build: "Pro · €99/mo · 100 managed creators",
-    analyses_scale: "Business · €199/mo · unlimited creators",
     danger_title: "Danger Zone",
     danger_sub: "These actions are permanent and cannot be undone.",
     sign_out: "Sign out",
@@ -106,9 +124,6 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     manage_plan: "Gérer le plan →",
     scale_max: "Tu es sur le plan le plus élevé. 🔥",
     analyses_free: "Plan Free · 3 créateurs gérés",
-    analyses_spark: "Starter · 49€/mois · 25 créateurs suivis",
-    analyses_build: "Pro · 99€/mois · 100 créateurs suivis",
-    analyses_scale: "Business · 199€/mois · créateurs illimités",
     danger_title: "Zone de danger",
     danger_sub: "Ces actions sont permanentes et ne peuvent pas être annulées.",
     sign_out: "Se déconnecter",
@@ -789,25 +804,22 @@ export default function SettingsPage() {
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{t.current_plan}</div>
               <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 4 }}>
-                {plan === "free" ? "Free" : plan === "spark" ? "Spark" : plan === "build" ? "Build" : "Scale"}
+                {planDisplayName(normalizePlan(plan), locale)}
               </div>
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)" }}>
-                {plan === "free" ? t.analyses_free :
-                 plan === "spark" ? t.analyses_spark :
-                 plan === "build" ? t.analyses_build :
-                 t.analyses_scale}
+                {planSummaryLine(normalizePlan(plan), locale)}
               </div>
             </div>
             <div style={{
               width: 10,
               height: 10,
               borderRadius: "50%",
-              background: plan === "free" ? "rgba(255,255,255,0.3)" : plan === "spark" ? "#facc15" : plan === "build" ? "#60a5fa" : "#4ade80",
+              background: plan === "free" ? "rgba(255,255,255,0.3)" : normalizePlan(plan) === "basic" ? "#facc15" : normalizePlan(plan) === "pro" ? "#60a5fa" : "#4ade80",
               flexShrink: 0,
             }} />
           </div>
 
-          {plan !== "scale" ? (
+          {normalizePlan(plan) !== "scale" ? (
             <Link
               href="/pricing"
               style={{
