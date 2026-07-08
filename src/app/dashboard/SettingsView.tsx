@@ -24,7 +24,8 @@ import {
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
 
-import { PLAN_PRICES, planDisplayName, formatPricingAmount, checkoutCurrencyFromLang } from "@/lib/plan-marketing";
+import { PLAN_PRICES, planDisplayName, formatPricingAmount, checkoutCurrencyFromLang, annualFreeMonthsBadge } from "@/lib/plan-marketing";
+import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
@@ -794,6 +795,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const [portalLoading, setPortalLoading] = useState(false);
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [planLoading, setPlanLoading] = useState(true);
+  const [annual, setAnnual] = useState(false);
   const [invoices, setInvoices] = useState<
     {
       id: string;
@@ -809,14 +811,18 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const [nextBillingDate, setNextBillingDate] = useState<number | null>(null);
 
   const currency = checkoutCurrencyFromLang(lang);
+  const periodShort = lang === "fr" ? "/mois" : "/mo";
 
   useEffect(() => {
     let cancelled = false;
     void fetch("/api/billing/plan", { credentials: "include" })
       .then(async (res) => {
-        const data = (await res.json()) as { plan?: string; error?: string };
+        const data = (await res.json()) as { plan?: string; billingInterval?: BillingInterval | null; error?: string };
         if (!res.ok) throw new Error(data.error ?? "Failed to load plan");
-        if (!cancelled) setCurrentPlan(normalizePlan(data.plan));
+        if (!cancelled) {
+          setCurrentPlan(normalizePlan(data.plan));
+          if (data.billingInterval === "year") setAnnual(true);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -920,10 +926,10 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
     try {
       const priceId =
         target === "growth"
-          ? getGrowthPriceId(currency)
+          ? getGrowthPriceId(currency, annual)
           : target === "pro"
-            ? getProPriceId(currency)
-            : getScalePriceId(currency);
+            ? getProPriceId(currency, annual)
+            : getScalePriceId(currency, annual);
       await handleUpgrade(priceId);
     } catch (err) {
       console.error("Checkout error:", err);
@@ -974,7 +980,52 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
             )}
           </div>
           {!planLoading && currentPlan !== "scale" && (
-            <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: isMobile ? "center" : "flex-end" }}>
+                <span style={{ fontSize: 13, color: annual ? "#9A9A9A" : "#1A1A1A", fontWeight: annual ? 400 : 600 }}>
+                  {lang === "fr" ? "Mensuel" : "Monthly"}
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={annual}
+                  onClick={() => setAnnual((v) => !v)}
+                  style={{
+                    width: 44,
+                    height: 24,
+                    borderRadius: 999,
+                    border: "none",
+                    background: annual ? "#0047FF" : "#E5E5E5",
+                    position: "relative",
+                    cursor: "pointer",
+                    padding: 0,
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 2,
+                      left: annual ? 22 : 2,
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      background: "#FFFFFF",
+                      transition: "left 0.2s ease",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
+                    }}
+                  />
+                </button>
+                <span style={{ fontSize: 13, color: annual ? "#1A1A1A" : "#9A9A9A", fontWeight: annual ? 600 : 400 }}>
+                  {lang === "fr" ? "Annuel" : "Annual"}
+                </span>
+                {annual && (
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "-0.01em" }}>
+                    {annualFreeMonthsBadge(lang)}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column" : "row", flexWrap: "wrap" }}>
               {currentPlan === "free" && (
                 <>
                   <button
@@ -985,7 +1036,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "growth"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `${planDisplayName("basic", lang)} ${formatPricingAmount(GROWTH_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("basic", lang)} ${formatPricingAmount(GROWTH_MONTHLY, lang)}${periodShort} →`}
                   </button>
                   <button
                     type="button"
@@ -995,7 +1046,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}${periodShort} →`}
                   </button>
                 </>
               )}
@@ -1009,7 +1060,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("pro", lang)} ${formatPricingAmount(PRO_MONTHLY, lang)}${periodShort} →`}
                   </button>
                   <button
                     type="button"
@@ -1019,7 +1070,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                   >
                     {loading === "scale"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
-                      : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}/mo →`}
+                      : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}${periodShort} →`}
                   </button>
                 </>
               )}
@@ -1032,9 +1083,10 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                 >
                   {loading === "scale"
                     ? lang === "fr" ? "Chargement..." : "Loading..."
-                    : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}/mo →`}
+                    : `${planDisplayName("scale", lang)} ${formatPricingAmount(SCALE_MONTHLY, lang)}${periodShort} →`}
                 </button>
               )}
+              </div>
             </div>
           )}
         </div>

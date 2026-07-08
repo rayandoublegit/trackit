@@ -23,6 +23,7 @@ import {
   canUseAffiliates,
   canUseAutomationWorkflows,
   canUseBalance,
+  canUseCreatorPortal,
   canUseFullAnalytics,
   canUseManualPayouts,
   canUseScripts,
@@ -137,6 +138,7 @@ export type GateFeatureKey =
   | "balance"
   | "transactions"
   | "invitations"
+  | "creator-content"
   | "scripts"
   | "analytics"
   | "automation"
@@ -202,6 +204,15 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     description: {
       en: "Invite creators and give them a dedicated dashboard to track earnings and upload content.",
       fr: "Invitez des créateurs avec un dashboard dédié pour suivre leurs gains et envoyer du contenu.",
+    },
+  },
+  "creator-content": {
+    requiredTier: "pro",
+    check: canUseCreatorPortal,
+    title: { en: "Creator content", fr: "Contenu créateur" },
+    description: {
+      en: "Upload creator content and track performance stats (views, engagement).",
+      fr: "Importez le contenu de vos créateurs et suivez les performances (vues, engagement).",
     },
   },
   scripts: {
@@ -307,6 +318,9 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
 
 export function getManagedCreatorLimitLabel(plan: PlanTier, lang: Lang): string {
   const fr = lang === "fr";
+  if (plan === "scale") {
+    return fr ? "créateurs illimités" : "unlimited creators";
+  }
   if (plan === "pro") {
     return fr ? "jusqu'à 100 créateurs" : "up to 100 creators";
   }

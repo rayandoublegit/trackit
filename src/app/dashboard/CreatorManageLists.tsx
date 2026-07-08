@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
+import { canUseCreatorPortal, canUseScripts } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { pipelineStages } from "@/lib/pipeline";
 import {
@@ -28,6 +29,8 @@ import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { supabase } from "@/lib/supabase";
+import type { GateFeatureKey } from "@/lib/plan-marketing";
+import { UpgradeModal } from "./UpgradeModal";
 
 const ALL_LIST_ID = "__all__";
 
@@ -282,11 +285,13 @@ export function CreatorManageLists({
   isMobile,
   plan = "free",
   onUpgrade,
+  onUpgradePro,
   onReachOut,
 }: {
   isMobile?: boolean;
   plan?: PlanTier;
   onUpgrade?: () => void;
+  onUpgradePro?: () => void;
   onReachOut?: (creator: FeedCreator) => void;
 }) {
   const lang = useLang();
@@ -311,6 +316,7 @@ export function CreatorManageLists({
   const [brandId, setBrandId] = useState<string | null>(null);
   const [scriptTarget, setScriptTarget] = useState<SavedRow | null>(null);
   const [contentTarget, setContentTarget] = useState<SavedRow | null>(null);
+  const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
 
   const [search, setSearch] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -614,6 +620,35 @@ export function CreatorManageLists({
   const importFolderId =
     selectedListId && selectedListId !== ALL_LIST_ID ? selectedListId : null;
 
+  const tryOpenContent = (row: SavedRow) => {
+    if (!canUseCreatorPortal(plan)) {
+      setUpgradeFeature("creator-content");
+      return;
+    }
+    setContentTarget(row);
+  };
+
+  const tryOpenScript = (row: SavedRow) => {
+    if (!canUseScripts(plan)) {
+      setUpgradeFeature("scripts");
+      return;
+    }
+    setScriptTarget(row);
+  };
+
+  const upgradeModal = upgradeFeature ? (
+    <UpgradeModal
+      lang={lang}
+      featureKey={upgradeFeature}
+      currentPlan={plan}
+      onClose={() => setUpgradeFeature(null)}
+      onPrimary={() => {
+        setUpgradeFeature(null);
+        void (onUpgradePro ?? onUpgrade)?.();
+      }}
+    />
+  ) : null;
+
   if (importOpen) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
@@ -628,9 +663,10 @@ export function CreatorManageLists({
     );
   }
 
-  if (contentTarget && brandId) {
+  if (contentTarget && brandId && canUseCreatorPortal(plan)) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
+        {upgradeModal}
         <CreatorContentBrandPanel
           lang={lang}
           isMobile={isMobile}
@@ -644,9 +680,10 @@ export function CreatorManageLists({
     );
   }
 
-  if (scriptTarget && brandId) {
+  if (scriptTarget && brandId && canUseScripts(plan)) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
+        {upgradeModal}
         <CreatorScriptPanel
           lang={lang}
           isMobile={isMobile}
@@ -677,6 +714,7 @@ export function CreatorManageLists({
   if (selectedListId && selectedList) {
     return (
       <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
+        {upgradeModal}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
             <button
@@ -805,8 +843,8 @@ export function CreatorManageLists({
               onStatusChange={(username, status) => void onStatusChange(username, status)}
               onNotesChange={(username, notes) => void onNotesChange(username, notes)}
               onCrmChange={(username, patch) => void onCrmChange(username, patch)}
-              onOpenScript={(row) => setScriptTarget(row)}
-              onOpenContent={(row) => setContentTarget(row)}
+              onOpenScript={(row) => tryOpenScript(row)}
+              onOpenContent={(row) => tryOpenContent(row)}
               onDelete={(username) => void onDeleteCreator(username)}
             />
           )}
@@ -827,6 +865,7 @@ export function CreatorManageLists({
 
   return (
     <div style={{ padding: pad, background: "#FFFFFF", minHeight: "100%" }}>
+        {upgradeModal}
         <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 16, flexWrap: "wrap" }}>
         <h1

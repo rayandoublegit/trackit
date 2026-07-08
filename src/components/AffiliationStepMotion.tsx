@@ -8,6 +8,8 @@ type StepVariant = "1" | "2" | "3";
 export function AffiliationStepMotion({ step }: { step: StepVariant }) {
   const lang = useLang();
   const proPrice = formatPricingAmount(PLAN_PRICES.proMonthly, lang);
+  const payoutSample = formatPricingAmount(3.8, lang);
+  const currencySymbol = lang === "fr" ? "€" : "$";
 
   if (step === "1") {
     return (
@@ -65,10 +67,10 @@ export function AffiliationStepMotion({ step }: { step: StepVariant }) {
           <div className="aff-step-motion__coin-stack">
             <span className="aff-step-motion__coin aff-step-motion__coin--back" />
             <span className="aff-step-motion__coin aff-step-motion__coin--mid" />
-            <span className="aff-step-motion__coin aff-step-motion__coin--front">€</span>
+            <span className="aff-step-motion__coin aff-step-motion__coin--front">{currencySymbol}</span>
           </div>
           <div className="aff-step-motion__payout-meta">
-            <span className="aff-step-motion__payout-amount">+€3.80</span>
+            <span className="aff-step-motion__payout-amount">+{payoutSample}</span>
             <span className="aff-step-motion__payout-label">20% · monthly</span>
           </div>
         </div>

@@ -65,6 +65,7 @@ import {
   isGrowthOrAbove,
   isScalePlan,
   maxShopifyStores,
+  SCALE_MAX_SHOPIFY_STORES,
   normalizePlan,
   type PlanTier,
 } from "@/lib/plan-limits";
@@ -3686,29 +3687,36 @@ function IntegrationsView({
                                 ? "Changer de boutique"
                                 : "Change my store"}
                           </button>
-                        ) : canChangeShopifyStore(plan) ? (
-                          <button
-                            type="button"
-                            onClick={() => openConnectPage(activeShop?.replace(/\.myshopify\.com$/, "") || "", true)}
-                            style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12 }}
-                          >
-                            {lang === "fr" ? "Changer de boutique" : "Change my store"}
-                          </button>
-                        ) : plan === "basic" ? (
-                          <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
-                            {lang === "fr" ? "Shopify nécessite le plan Pro. " : "Shopify requires the Pro plan. "}
-                            <button type="button" onClick={() => void onUpgradePro?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                              {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
-                            </button>
-                          </p>
-                        ) : plan === "pro" ? (
-                          <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
-                            {lang === "fr" ? "1 boutique sur Pro. " : "1 store on Pro. "}
-                            <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                              {lang === "fr" ? "Jusqu'à 3 boutiques sur Business →" : "Up to 3 stores on Business →"}
-                            </button>
-                          </p>
-                        ) : null}
+                        ) : (
+                          <>
+                            {canChangeShopifyStore(plan) && (
+                              <button
+                                type="button"
+                                onClick={() => openConnectPage(activeShop?.replace(/\.myshopify\.com$/, "") || "", true)}
+                                style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
+                              >
+                                {lang === "fr" ? "Changer de boutique" : "Change my store"}
+                              </button>
+                            )}
+                            {plan === "free" ? (
+                              <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                                {lang === "fr" ? "Shopify nécessite le plan Starter. " : "Shopify requires the Starter plan. "}
+                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                  {lang === "fr" ? "Passer à Starter →" : "Upgrade to Starter →"}
+                                </button>
+                              </p>
+                            ) : (plan === "basic" || plan === "pro") ? (
+                              <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                                {lang === "fr"
+                                  ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Business. `
+                                  : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Business. `}
+                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                  {lang === "fr" ? "Passer à Business →" : "Upgrade to Business →"}
+                                </button>
+                              </p>
+                            ) : null}
+                          </>
+                        )}
                       </>
                     ) : (
                       shopError ? <div style={{ color: "#dc2626", fontSize: 12, marginTop: 8 }}>{shopError}</div> : null

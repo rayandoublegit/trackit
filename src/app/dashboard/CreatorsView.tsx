@@ -8,6 +8,7 @@ export function CreatorsView({
   isMobile,
   plan = "free",
   onUpgrade,
+  onUpgradePro,
   onReachOut,
 }: {
   isMobile?: boolean;
@@ -18,5 +19,5 @@ export function CreatorsView({
   userId?: string;
   onReachOut?: (creator: FeedCreator) => void;
 }) {
-  return <CreatorManageLists isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} onReachOut={onReachOut} />;
+  return <CreatorManageLists isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onReachOut={onReachOut} />;
 }

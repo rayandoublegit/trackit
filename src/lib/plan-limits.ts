@@ -58,7 +58,7 @@ export function hasUnlimitedDiscoveries(plan: PlanTier): boolean {
   return plan === "scale";
 }
 
-/** Max creators shown per search; `null` = unlimited (Pro + Scale). */
+/** Max creators shown per search; `null` = unlimited (Scale). */
 export function getResultsPerSearchLimit(plan: PlanTier): number | null {
   if (plan === "free") return FREE_RESULTS_PER_SEARCH;
   if (plan === "basic") return BASIC_RESULTS_PER_SEARCH;
@@ -148,9 +148,9 @@ export function canUseAutoPayouts(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
-/** Scale only: Stripe Connect auto payouts. */
+/** Pro + Scale: Stripe Connect auto payouts. */
 export function canUseStripeConnectPayouts(plan: PlanTier): boolean {
-  return plan === "scale";
+  return isProOrAbove(plan);
 }
 
 /** Scale only: brand wallet balance (fund account & pay creators). */

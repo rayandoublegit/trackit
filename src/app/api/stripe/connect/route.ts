@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { canUseStripeConnectPayouts, normalizePlan } from "@/lib/plan-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +28,13 @@ export async function POST(request: Request) {
     // Look up existing connect account for this user
     const { data: profile } = await supabaseAdmin
       .from("profiles")
-      .select("stripe_connect_account_id")
+      .select("stripe_connect_account_id, plan")
       .eq("id", userId)
       .single();
+
+    if (!canUseStripeConnectPayouts(normalizePlan(profile?.plan))) {
+      return NextResponse.json({ error: "Stripe Connect requires Pro plan or above" }, { status: 403 });
+    }
 
     let accountId = profile?.stripe_connect_account_id as string | null;
 
