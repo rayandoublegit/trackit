@@ -14,9 +14,9 @@ function pick(...values: (string | undefined | null)[]): string {
 
 /** Canonical monthly USD prices on the Trackit Stripe account. */
 export const TRACKIT_STRIPE_DEFAULT_PRICE_IDS = {
-  growthUsdMonthly: "price_1Tc60RFC3qsxzaqxCgGq0ksL",
-  proUsdMonthly: "price_1Tc62BFC3qsxzaqxxsk8mIyO",
-  scaleUsdMonthly: "price_1Tc64lFC3qsxzaqxTxhKyCpf",
+  growthUsdMonthly: "price_1TqjEaFC3qsxzaqxn9nK4EQI",
+  proUsdMonthly: "price_1TqjJDFC3qsxzaqxDMMkHIkc",
+  scaleUsdMonthly: "price_1TqjKAFC3qsxzaqx7XaWFRNr",
 } as const;
 
 /** Map server env keys → client env keys for next.config `env`. */
