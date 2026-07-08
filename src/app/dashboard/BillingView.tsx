@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang, type Lang } from "@/lib/useLang";
 import { TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
-import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade, upgradeToPlanTier } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanCardDescription, planDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent } from "@/lib/plan-marketing";
 import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
@@ -391,7 +391,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
             : "Missing Stripe price ID for this plan. Check configuration.",
         );
       }
-      await handleUpgrade(priceId);
+      await upgradeToPlanTier(target, lang, annual);
     } catch (err) {
       alert(err instanceof Error ? err.message : lang === "fr" ? "Impossible de démarrer le paiement" : "Could not start checkout");
     } finally {

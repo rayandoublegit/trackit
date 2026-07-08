@@ -1,7 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
+import { checkoutPlanMetadata } from "@/lib/checkout";
+import { normalizePlan } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { syncFromStripeSubscription } from "@/lib/stripe-billing";
+import {
+  getGrowthPriceId,
+  getProPriceId,
+  getScalePriceId,
+} from "@/lib/stripe-config";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +23,11 @@ const VALID_ROLES = new Set(["user", "staff", "admin"]);
  *  - action "cancelNow": annule immediatement l'abonnement Stripe
  */
 function priceIdForPlan(plan: string): string | null {
-  // Mappe un plan Trackit vers son price_id mensuel, via les memes env vars que le checkout.
-  // On prend la 1ere valeur definie (priorite au server-side, fallback NEXT_PUBLIC).
-  const pick = (...vals: (string | undefined)[]) => vals.find((v) => v && v.trim()) ?? null;
-  switch (plan) {
-    case "growth":
-      return pick(process.env.STRIPE_GROWTH_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID);
-    case "pro":
-      return pick(process.env.STRIPE_PRO2_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID);
-    case "scale":
-      return pick(process.env.STRIPE_SCALE_PRICE_ID, process.env.NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID);
-    default:
-      return null;
-  }
+  const normalized = normalizePlan(plan);
+  if (normalized === "basic") return getGrowthPriceId("usd") || null;
+  if (normalized === "pro") return getProPriceId("usd") || null;
+  if (normalized === "scale") return getScalePriceId("usd") || null;
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -141,14 +141,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const newPlan = (value ?? "").toLowerCase();
+    const newPlan = normalizePlan(value);
     const newPriceId = priceIdForPlan(newPlan);
     if (!newPriceId) {
-      return NextResponse.json({ error: "Plan inconnu ou price_id manquant: " + newPlan }, { status: 400 });
+      return NextResponse.json({ error: "Plan inconnu ou price_id manquant: " + String(value) }, { status: 400 });
     }
     try {
       const stripe = new Stripe(stripeKey);
-      // On recupere l'item d'abonnement courant pour le remplacer (pas en ajouter un second).
       const sub = await stripe.subscriptions.retrieve(target.stripe_subscription_id);
       const currentItem = sub.items.data[0];
       if (!currentItem) {
@@ -160,12 +159,16 @@ export async function POST(req: NextRequest) {
       await stripe.subscriptions.update(target.stripe_subscription_id, {
         items: [{ id: currentItem.id, price: newPriceId }],
         proration_behavior: "create_prorations",
+        metadata: {
+          ...sub.metadata,
+          userId: target.id,
+          plan: checkoutPlanMetadata(newPlan),
+        },
       });
-      // Reflet immediat en base
-      await db
-        .from("profiles")
-        .update({ plan: newPlan, subscription_active: true, subscription_status: "active" })
-        .eq("id", userId);
+      const refreshed = await stripe.subscriptions.retrieve(target.stripe_subscription_id, {
+        expand: ["items.data.price"],
+      });
+      await syncFromStripeSubscription(db, stripe, refreshed, userId);
       return NextResponse.json({ ok: true, userId, action, plan: newPlan });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Stripe error";

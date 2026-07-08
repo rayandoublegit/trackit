@@ -1,7 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type Stripe from "stripe";
-import { resolvePlanFromCheckout } from "@/lib/checkout";
+import { checkoutPlanMetadata, resolvePlanFromCheckout } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
+import { PLAN_RANK } from "@/lib/pricing-cta";
+import {
+  assertNonEmptyStripePriceId,
+  getGrowthPriceId,
+  getProPriceId,
+  getScalePriceId,
+  stripePriceEnvCandidates,
+} from "@/lib/stripe-config";
+
+export type PaidPlanTier = Exclude<PlanTier, "free">;
 
 export type SubscriptionStatus =
   | "active"
@@ -60,6 +70,33 @@ export function planFromPriceId(priceId: string | null | undefined): PlanTier {
   return resolvePlanFromCheckout(priceId, null);
 }
 
+function pickBestActiveSubscription(
+  subscriptions: Stripe.Subscription[]
+): Stripe.Subscription {
+  return subscriptions.reduce((best, sub) => {
+    const rank = PLAN_RANK[planFromSubscription(sub)];
+    const bestRank = PLAN_RANK[planFromSubscription(best)];
+    if (rank !== bestRank) return rank > bestRank ? sub : best;
+    return (sub.created ?? 0) > (best.created ?? 0) ? sub : best;
+  });
+}
+
+function priceIdForPaidTier(
+  tier: PaidPlanTier,
+  currency: "usd" | "eur",
+  annual: boolean
+): string {
+  if (tier === "basic") return getGrowthPriceId(currency, annual);
+  if (tier === "pro") return getProPriceId(currency, annual);
+  return getScalePriceId(currency, annual);
+}
+
+function stripeTierKey(tier: PaidPlanTier): "growth" | "pro" | "scale" {
+  if (tier === "basic") return "growth";
+  if (tier === "pro") return "pro";
+  return "scale";
+}
+
 export type BillingInterval = "month" | "year";
 
 export type ActiveSubscriptionInfo = {
@@ -89,10 +126,12 @@ export async function getActiveSubscriptionInfo(
     expand: ["data.items.data.price"],
   });
 
-  const activeSub = subscriptions.data.find((sub) =>
+  const activeSubs = subscriptions.data.filter((sub) =>
     subscriptionGrantsPaidAccess(sub.status)
   );
-  if (!activeSub) return null;
+  if (activeSubs.length === 0) return null;
+
+  const activeSub = pickBestActiveSubscription(activeSubs);
 
   const price = subscriptionPrice(activeSub);
   const priceId = price?.id ?? null;
@@ -410,6 +449,95 @@ export async function syncSubscriptionPlanForUser(
     stripeSubscriptionId: null,
   });
   return { plan: "free", subscriptionInfo: null };
+}
+
+/**
+ * Upgrade/downgrade or switch billing interval on the user's active Stripe subscription.
+ * Returns no_subscription when checkout (new subscription) should be used instead.
+ */
+export async function changeSubscriptionPlanForUser(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  userId: string,
+  targetTier: PaidPlanTier,
+  annual: boolean,
+  email?: string | null
+): Promise<
+  | { updated: true; plan: PlanTier }
+  | { updated: false; reason: "no_subscription" }
+> {
+  const customerId = await resolveStripeCustomerId(
+    supabase,
+    stripe,
+    userId,
+    email
+  );
+  if (!customerId) {
+    return { updated: false, reason: "no_subscription" };
+  }
+
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: "all",
+    limit: 20,
+    expand: ["data.items.data.price"],
+  });
+
+  const activeSubs = subscriptions.data.filter((sub) =>
+    subscriptionGrantsPaidAccess(sub.status)
+  );
+  if (activeSubs.length === 0) {
+    return { updated: false, reason: "no_subscription" };
+  }
+
+  const subscription = pickBestActiveSubscription(activeSubs);
+  const item = subscription.items.data[0];
+  if (!item?.id) {
+    throw new Error("Active subscription has no line items");
+  }
+
+  const currentPrice = subscriptionPrice(subscription);
+  const currency: "usd" | "eur" =
+    currentPrice?.currency === "eur" ? "eur" : "usd";
+  const tierKey = stripeTierKey(targetTier);
+  const newPriceId = priceIdForPaidTier(targetTier, currency, annual);
+
+  assertNonEmptyStripePriceId(
+    newPriceId,
+    stripePriceEnvCandidates(tierKey, currency, annual)
+  );
+
+  const currentPriceId =
+    typeof item.price === "string" ? item.price : item.price?.id ?? null;
+
+  if (currentPriceId !== newPriceId) {
+    await stripe.subscriptions.update(subscription.id, {
+      items: [{ id: item.id, price: newPriceId }],
+      proration_behavior: "create_prorations",
+      metadata: {
+        ...subscription.metadata,
+        userId: String(userId),
+        plan: checkoutPlanMetadata(targetTier),
+      },
+    });
+  }
+
+  const refreshed = await stripe.subscriptions.retrieve(subscription.id, {
+    expand: ["items.data.price"],
+  });
+  await syncFromStripeSubscription(supabase, stripe, refreshed, userId);
+
+  for (const sub of activeSubs) {
+    if (sub.id !== subscription.id) {
+      try {
+        await stripe.subscriptions.cancel(sub.id);
+      } catch (err) {
+        console.warn("stripe-billing: failed to cancel duplicate subscription", sub.id, err);
+      }
+    }
+  }
+
+  return { updated: true, plan: planFromSubscription(refreshed) };
 }
 
 /** After Checkout redirect — verify session and sync plan (webhook fallback). */

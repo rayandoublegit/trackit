@@ -10,6 +10,7 @@ import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
+import { upgradeToPlanTier } from "@/lib/checkout";
 import { useLang } from "@/lib/useLang";
 
 const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -209,6 +210,15 @@ export function PricingPlans({
 
     const onboarding = getOnboardingPayload ? await getOnboardingPayload() : undefined;
     if (getOnboardingPayload && !onboarding) return;
+
+    if (!onboarding && resolvedUserId) {
+      try {
+        await upgradeToPlanTier(tier, lang, annual);
+        return;
+      } finally {
+        setPayingTier(null);
+      }
+    }
 
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const res = await fetch("/api/create-checkout", {

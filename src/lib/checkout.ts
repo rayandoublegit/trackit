@@ -80,8 +80,40 @@ export function getPriceIdForPlanTier(tier: PaidPlanTier, lang: Lang, annual = f
 }
 
 /** Start Stripe checkout for a plan tier from an upgrade gate or modal. */
+export async function upgradeToPlanTier(
+  tier: PaidPlanTier,
+  lang: Lang,
+  annual = false
+): Promise<void> {
+  const res = await fetch("/api/billing/change-plan", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tier, annual }),
+  });
+  const payload = (await res.json().catch(() => ({}))) as {
+    updated?: boolean;
+    noSubscription?: boolean;
+    error?: string;
+  };
+
+  if (res.ok && payload.updated) {
+    if (typeof window !== "undefined") {
+      window.location.href = `${window.location.origin}/dashboard?view=billing&upgraded=true`;
+    }
+    return;
+  }
+
+  if (res.status === 404 && payload.noSubscription) {
+    await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual));
+    return;
+  }
+
+  throw new Error(payload.error ?? "Could not change plan");
+}
+
 export async function checkoutPlanTier(tier: PaidPlanTier, lang: Lang, annual = false): Promise<void> {
-  await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual));
+  await upgradeToPlanTier(tier, lang, annual);
 }
 
 export async function handleUpgrade(

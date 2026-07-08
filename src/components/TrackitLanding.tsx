@@ -9,7 +9,7 @@ import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { applyAppLocale } from "@/lib/locale-preferences";
 import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade, upgradeToPlanTier } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
 import { PricingFeatureList } from "@/components/PricingFeatureList";
@@ -486,6 +486,10 @@ export default function TrackitLanding() {
             : getScalePriceId(currency, annual);
       if (!priceId?.trim()) {
         alert("Pricing not configured. Please contact support.");
+        return;
+      }
+      if (isLoggedIn) {
+        await upgradeToPlanTier(paid, lang, annual);
         return;
       }
       await handleUpgrade(priceId, { cancelUrl: window.location.href });
