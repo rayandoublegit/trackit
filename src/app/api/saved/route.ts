@@ -109,7 +109,7 @@ export async function PATCH(request: NextRequest) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
-  let body: { username?: string; status?: string; notes?: string; crm?: Record<string, unknown> };
+  let body: { username?: string; status?: string; notes?: string; crm?: Record<string, unknown>; avatarUrl?: string };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
   const username = String(body.username ?? "").trim().replace(/^@/, "");
   if (!username) return NextResponse.json({ error: "Missing username" }, { status: 400 });
@@ -118,7 +118,8 @@ export async function PATCH(request: NextRequest) {
   if (body.status !== undefined) patch.pipeline_status = body.status;
   if (body.notes !== undefined) patch.notes = body.notes;
 
-  if (body.crm !== undefined) {
+  if (body.avatarUrl !== undefined) {
+    const avatarUrl = String(body.avatarUrl ?? "").trim();
     const { data: existing } = await admin
       .from("discovery_saved")
       .select("snapshot")
@@ -129,6 +130,30 @@ export async function PATCH(request: NextRequest) {
       existing?.snapshot && typeof existing.snapshot === "object"
         ? (existing.snapshot as Record<string, unknown>)
         : {};
+    patch.avatar_url = avatarUrl;
+    patch.snapshot = { ...snapshot, avatarUrl };
+    await admin
+      .from("creators")
+      .update({ avatar_url: avatarUrl || null })
+      .eq("user_id", userId)
+      .ilike("handle", username);
+  }
+
+  if (body.crm !== undefined) {
+    const { data: existing } = await admin
+      .from("discovery_saved")
+      .select("snapshot")
+      .eq("user_id", userId)
+      .eq("creator_username", username)
+      .maybeSingle();
+    const snapshotFromDb =
+      existing?.snapshot && typeof existing.snapshot === "object"
+        ? (existing.snapshot as Record<string, unknown>)
+        : {};
+    const snapshot =
+      patch.snapshot && typeof patch.snapshot === "object"
+        ? { ...snapshotFromDb, ...(patch.snapshot as Record<string, unknown>) }
+        : snapshotFromDb;
     const prevCrm =
       snapshot.crm && typeof snapshot.crm === "object"
         ? (snapshot.crm as Record<string, unknown>)

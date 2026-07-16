@@ -14,6 +14,32 @@ function extractStoragePath(storedUrl: string, userId: string): string | null {
   return null;
 }
 
+/** Stable public URL suitable for persisting to profiles.avatar_url (never a signed URL). */
+export function toPersistableAvatarUrl(
+  client: SupabaseClient,
+  userId: string,
+  url: string | null | undefined
+): string | null {
+  if (!url?.trim()) return null;
+  const trimmed = url.trim();
+  const path = extractStoragePath(trimmed, userId);
+  if (!path) {
+    // Absolute non-storage URL — keep without query noise when possible
+    try {
+      const u = new URL(trimmed);
+      if (u.searchParams.has("token") || u.pathname.includes("/storage/v1/object/sign/")) {
+        return null;
+      }
+      u.search = "";
+      return u.toString();
+    } catch {
+      return trimmed.split("?")[0] || trimmed;
+    }
+  }
+  const { data } = client.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : null;
+}
+
 export async function resolveAvatarUrl(
   client: SupabaseClient,
   userId: string,
@@ -26,5 +52,7 @@ export async function resolveAvatarUrl(
     const { data, error } = await client.storage.from("avatars").createSignedUrl(extracted, 3600);
     if (!error && data?.signedUrl) return data.signedUrl;
   } catch {}
-  return storedUrl;
+  // Fall back to public URL (bucket is public) rather than an expired signed URL.
+  const { data } = client.storage.from("avatars").getPublicUrl(extracted);
+  return data.publicUrl || storedUrl;
 }

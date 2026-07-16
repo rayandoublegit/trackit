@@ -20,7 +20,7 @@ import {
 } from "@/lib/creator-avatar";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { prefetchCreatorAvatars } from "@/lib/avatar-url-cache";
-import { notifyOutreachSent } from "@/lib/notifications-storage";
+import { notifyCreatorReplied, notifyOutreachSent } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { selectionPillColors } from "@/lib/selection-card-styles";
@@ -1547,7 +1547,7 @@ export function OutreachHistorySection({
       const { data: { user } } = await supabase.auth.getUser();
       if (user) await updateOutreachStatus(user.id, item.id, "replied");
     }
-    updateStatus(item.id, "replied");
+    updateStatus(item.id, "replied", item);
     setManageEntry(null);
     dispatchOutreachHistoryUpdated();
   };
@@ -1589,7 +1589,8 @@ export function OutreachHistorySection({
     return { totalSent, replied, converted, replyRate };
   }, [entries]);
 
-  const updateStatus = (id: string, status: OutreachHistoryStatus) => {
+  const updateStatus = (id: string, status: OutreachHistoryStatus, source?: OutreachHistoryEntry) => {
+    const prev = entries.find((e) => e.id === id);
     setEntries((list) =>
       list.map((e) =>
         e.id === id
@@ -1612,6 +1613,10 @@ export function OutreachHistorySection({
           status,
           status === "replied" || status === "converted" ? null : undefined,
         );
+      }
+      if (status === "replied" && prev?.status !== "replied") {
+        const entry = source ?? prev;
+        notifyCreatorReplied(lang, entry?.creator || entry?.handle || "", user.id);
       }
       dispatchOutreachHistoryUpdated();
     })();

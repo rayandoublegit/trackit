@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { buildCreatorVideoPreviews } from "@/lib/creator-video-previews";
-import { TikTokEmbedPlayer, tiktokEmbedSrc } from "@/app/dashboard/TikTokEmbedPlayer";
+import { tiktokVideoWatchUrl } from "@/lib/creator-video";
 import type { ValueTier } from "@/lib/creator-value";
 import { pipelineStages } from "@/lib/pipeline";
 import {
   listSaved, saveCreator, unsave, setStage as apiSetStage, setNotes as apiSetNotes,
+  setCreatorAvatar,
   listFolders, createFolder, addToFolder, removeFromFolder, type FolderRow,
 } from "@/lib/workspace-client";
 import type { ContentAnalysis } from "@/lib/creator-content-analysis";
@@ -17,6 +18,8 @@ import { ProxiedImage } from "@/app/dashboard/ProxiedImage";
 import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
 import { discoveryCopy, daysAgoCopy, engagementInsightCopy } from "@/lib/discovery-copy";
 import type { Lang } from "@/lib/useLang";
+import { setCachedAvatarUrl } from "@/lib/avatar-url-cache";
+import { supabase } from "@/lib/supabase";
 
 export type CreatorDetail = FeedCreator & {
   avgLikes?: number; avgComments?: number; avgShares?: number;
@@ -278,43 +281,33 @@ function VideoCover({ cover, previewKey }: { cover: string; previewKey: string }
   );
 }
 
-function VideoTile({ v, playing, onPlay, lang }: {
-  v: { key: string; cover: string; views: number; videoId: string | null; shareUrl: string | null };
-  playing: boolean;
-  onPlay: () => void;
+function VideoTile({ v, username, lang }: {
+  v: { key: string; cover: string; views: number; videoId: string | null; shareUrl: string | null; streamUrl: string | null };
+  username: string;
   lang: Lang;
 }) {
   const t = discoveryCopy(lang);
-  const canPlay = Boolean(tiktokEmbedSrc(v.videoId, v.shareUrl, true));
-
-  if (playing && canPlay) {
-    return (
-      <div
-        style={{
-          width: "100%",
-          aspectRatio: "9 / 16",
-          borderRadius: 10,
-          overflow: "hidden",
-          background: "#000",
-        }}
-      >
-        <TikTokEmbedPlayer videoId={v.videoId} shareUrl={v.shareUrl} title={t.playVideo} />
-      </div>
-    );
-  }
+  const watchUrl = tiktokVideoWatchUrl({
+    id: v.videoId,
+    shareUrl: v.shareUrl,
+    username,
+  });
 
   return (
     <button
       type="button"
       aria-label={t.playVideo}
-      onClick={() => { if (canPlay) onPlay(); }}
-      disabled={!canPlay}
+      onClick={() => {
+        if (!watchUrl) return;
+        window.open(watchUrl, "_blank", "noopener,noreferrer");
+      }}
+      disabled={!watchUrl}
       style={{
         position: "relative",
         aspectRatio: "9 / 16",
         borderRadius: 10,
         border: "none",
-        cursor: canPlay ? "pointer" : "default",
+        cursor: watchUrl ? "pointer" : "default",
         padding: 0,
         background: "#EDEDED",
         display: "block",
@@ -323,7 +316,7 @@ function VideoTile({ v, playing, onPlay, lang }: {
       }}
     >
       <VideoCover cover={v.cover} previewKey={v.key} />
-      {canPlay && (
+      {watchUrl && (
         <span
           style={{
             position: "absolute",
@@ -359,7 +352,6 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
   const stages = pipelineStages(lang);
   const isPaid = plan !== "free";
   const [detail, setDetail] = useState<CreatorDetail | null>(creator);
-  const [playing, setPlaying] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
   const [analysis, setAnalysis] = useState<ContentAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
@@ -371,6 +363,8 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
   const [folderOpen, setFolderOpen] = useState(false);
   const [newFolder, setNewFolder] = useState("");
   const [saveBusy, setSaveBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!creator) return;
@@ -453,9 +447,38 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     onWorkspaceChange?.();
   };
 
+  const onAvatarFileChange = async (file: File | null) => {
+    if (!file || !creator || !saved || avatarBusy) return;
+    if (!file.type.startsWith("image/")) return;
+    setAvatarBusy(true);
+    try {
+      if (!supabase) return;
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const safeExt = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext) ? ext : "jpg";
+      const path = `${user.id}/creators/${creator.username.toLowerCase()}/avatar.${safeExt}`;
+      const { error: upErr } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+      if (upErr) return;
+      const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
+      const avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
+      const res = await setCreatorAvatar(creator.username, avatarUrl);
+      if (res.error) return;
+      setCachedAvatarUrl(creator.username, avatarUrl);
+      setDetail((prev) => (prev ? { ...prev, avatarUrl } : prev));
+      onWorkspaceChange?.();
+    } finally {
+      setAvatarBusy(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
   useEffect(() => {
     setDetail(creator);
-    setPlaying(null);
     if (!creator) return;
     setShown(false);
     const t = setTimeout(() => setShown(true), 10);
@@ -535,12 +558,78 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
         </div>
 
         <div style={{ display: "flex", gap: 14, alignItems: "flex-start", marginBottom: 24 }}>
-          <CreatorAvatar username={d.username} src={d.avatarUrl} displayName={d.displayName} size={62} alt={d.displayName} priority />
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <CreatorAvatar username={d.username} src={d.avatarUrl} displayName={d.displayName} size={62} alt={d.displayName} priority />
+            {saved && (
+              <>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  style={{ display: "none" }}
+                  onChange={(e) => void onAvatarFileChange(e.target.files?.[0] ?? null)}
+                />
+                <button
+                  type="button"
+                  disabled={avatarBusy}
+                  onClick={() => avatarInputRef.current?.click()}
+                  title={lang === "fr" ? "Changer la photo" : "Change photo"}
+                  style={{
+                    position: "absolute",
+                    right: -4,
+                    bottom: -4,
+                    width: 26,
+                    height: 26,
+                    borderRadius: "50%",
+                    border: "1px solid #E5E5E5",
+                    background: "#FFF",
+                    color: "#1A1A1A",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: avatarBusy ? "wait" : "pointer",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                    padding: 0,
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path d="M4 16l4.5-4.5a2 2 0 012.8 0L16 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M14 14l1.5-1.5a2 2 0 012.8 0L20 16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8" />
+                    <circle cx="9" cy="9" r="1.4" fill="currentColor" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
               <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.displayName}</div>
               {isVerified && <VerifiedBadge label={t.verifiedAccount} />}
             </div>
+            {saved && (
+              <button
+                type="button"
+                disabled={avatarBusy}
+                onClick={() => avatarInputRef.current?.click()}
+                style={{
+                  marginTop: 6,
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#0047FF",
+                  cursor: avatarBusy ? "wait" : "pointer",
+                  fontFamily: "inherit",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {avatarBusy
+                  ? (lang === "fr" ? "Mise à jour…" : "Updating…")
+                  : (lang === "fr" ? "Changer la photo" : "Change photo")}
+              </button>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13, color: "#9A9A9A" }}>@{d.username}</span>
               <PlatformPill platform={d.platform} />
@@ -647,8 +736,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 <VideoTile
                   key={v.key}
                   v={v}
-                  playing={playing === v.key}
-                  onPlay={() => setPlaying(v.key)}
+                  username={d.username}
                   lang={lang}
                 />
               ))}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractVideoId, videoEmbedUrl, videoEmbedPlayUrl } from "@/lib/creator-video";
+import { extractVideoId, tiktokVideoWatchUrl, videoEmbedUrl, videoEmbedPlayUrl } from "@/lib/creator-video";
 
 describe("extractVideoId", () => {
   it("pulls the id from a standard share url", () => {
@@ -21,35 +21,39 @@ describe("extractVideoId", () => {
   });
 });
 
-describe("videoEmbedUrl", () => {
-  it("builds an embed url from an id", () => {
-    expect(videoEmbedUrl("7311234567890123456")).toBe(
-      "https://www.tiktok.com/embed/v2/7311234567890123456"
+describe("tiktokVideoWatchUrl", () => {
+  it("keeps a normal share url", () => {
+    expect(tiktokVideoWatchUrl("https://www.tiktok.com/@sarah.fit/video/7311234567890123456")).toBe(
+      "https://www.tiktok.com/@sarah.fit/video/7311234567890123456"
     );
   });
-  it("builds from a share url", () => {
-    expect(videoEmbedUrl("https://www.tiktok.com/@x/video/123456")).toBe(
-      "https://www.tiktok.com/embed/v2/123456"
+  it("builds from id + username", () => {
+    expect(tiktokVideoWatchUrl({ id: "123456", username: "sarah.fit" })).toBe(
+      "https://www.tiktok.com/@sarah.fit/video/123456"
     );
   });
-  it("prefers id then falls back to shareUrl on an object", () => {
-    expect(
-      videoEmbedUrl({ id: "7311234567890123456", shareUrl: "https://www.tiktok.com/@x/video/123456" })
-    ).toBe("https://www.tiktok.com/embed/v2/7311234567890123456");
-    expect(videoEmbedUrl({ id: "", shareUrl: "https://www.tiktok.com/@x/video/123456" })).toBe(
-      "https://www.tiktok.com/embed/v2/123456"
-    );
+  it("builds from bare id without username", () => {
+    expect(tiktokVideoWatchUrl("123456")).toBe("https://www.tiktok.com/video/123456");
   });
   it("returns null when no id can be derived", () => {
-    expect(videoEmbedUrl(null)).toBeNull();
-    expect(videoEmbedUrl({ id: "", shareUrl: "nope" })).toBeNull();
+    expect(tiktokVideoWatchUrl(null)).toBeNull();
+    expect(tiktokVideoWatchUrl({ id: "", shareUrl: "nope" })).toBeNull();
   });
 });
 
-describe("videoEmbedPlayUrl", () => {
-  it("adds autoplay to an existing embed url", () => {
-    expect(videoEmbedPlayUrl("https://www.tiktok.com/embed/v2/123456")).toBe(
-      "https://www.tiktok.com/embed/v2/123456?autoplay=1"
+describe("videoEmbedUrl (legacy alias)", () => {
+  it("returns a watch url, not an embed url", () => {
+    expect(videoEmbedUrl("7311234567890123456")).toBe("https://www.tiktok.com/video/7311234567890123456");
+    expect(videoEmbedUrl("https://www.tiktok.com/@x/video/123456")).toBe(
+      "https://www.tiktok.com/@x/video/123456"
+    );
+  });
+});
+
+describe("videoEmbedPlayUrl (legacy alias)", () => {
+  it("returns a watch url", () => {
+    expect(videoEmbedPlayUrl({ id: "123456", username: "x" })).toBe(
+      "https://www.tiktok.com/@x/video/123456"
     );
   });
 });

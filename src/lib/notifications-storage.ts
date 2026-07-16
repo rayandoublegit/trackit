@@ -1,5 +1,9 @@
 import { formatCurrency } from "@/lib/useCurrency";
 import { playNotificationSound } from "@/lib/notification-sound";
+import {
+  isNotificationEnabled,
+  type NotificationPrefKey,
+} from "@/lib/notification-preferences";
 
 export type NotificationKind = "payout" | "campaign" | "outreach" | "team" | "system";
 
@@ -216,10 +220,18 @@ function resolveActiveUserId(userId?: string | null): string | null {
 }
 
 export function pushNotification(
-  input: Omit<NotificationItem, "id" | "read" | "time"> & { time?: string },
+  input: Omit<NotificationItem, "id" | "read" | "time"> & {
+    time?: string;
+    prefKey?: NotificationPrefKey;
+  },
   userId?: string | null
 ): NotificationItem | null {
-  if (!resolveActiveUserId(userId)) return null;
+  const uid = resolveActiveUserId(userId);
+  if (!uid) return null;
+
+  if (input.prefKey && !isNotificationEnabled(uid, input.prefKey, "push")) {
+    return null;
+  }
 
   const fp = notificationFingerprint(input);
   const existing = loadNotifications();
@@ -231,7 +243,10 @@ export function pushNotification(
   playNotificationSound();
 
   const item: NotificationItem = {
-    ...input,
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    action: input.action,
     id: newNotificationId(),
     read: false,
     time: input.time ?? "Just now",
@@ -343,6 +358,7 @@ export function notifySaleRecorded(
   const name = creatorName.trim() || (lang === "fr" ? "un créateur" : "a creator");
   pushNotification({
     kind: "campaign",
+    prefKey: "sale_tracked",
     title:
       lang === "fr"
         ? `Vente enregistrée — ${name}`
@@ -351,6 +367,27 @@ export function notifySaleRecorded(
       lang === "fr"
         ? `Commande de ${formatCurrency(orderAmount, lang)} · commission ${formatCurrency(commissionAmount, lang)}.`
         : `${formatCurrency(orderAmount, lang)} order · ${formatCurrency(commissionAmount, lang)} commission.`,
+    time: formatNotificationTime(lang),
+  }, userId);
+}
+
+export function notifyCreatorReplied(
+  lang: "en" | "fr",
+  creatorName: string,
+  userId?: string | null
+) {
+  const name = creatorName.trim() || (lang === "fr" ? "Un créateur" : "A creator");
+  pushNotification({
+    kind: "outreach",
+    prefKey: "outreach_reply",
+    title:
+      lang === "fr"
+        ? `${name} a répondu à votre message`
+        : `${name} replied to your outreach`,
+    body:
+      lang === "fr"
+        ? "Ouvrez Outreach pour continuer la conversation."
+        : "Open Outreach to continue the conversation.",
     time: formatNotificationTime(lang),
   }, userId);
 }

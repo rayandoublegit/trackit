@@ -67,6 +67,7 @@ export async function syncCreatorToDiscoverySaved(
     ...(accountEmail ? { accountEmail } : {}),
     crm: {
       ...prevCrm,
+      commissionRate,
       ...(promoCode ? { promoCode } : {}),
     },
   };

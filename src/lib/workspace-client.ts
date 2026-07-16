@@ -56,6 +56,19 @@ export async function setCrm(username: string, crm: Record<string, unknown>): Pr
   await fetch("/api/saved", { ...json({ username, crm }), method: "PATCH" });
 }
 
+export async function setCreatorAvatar(
+  username: string,
+  avatarUrl: string
+): Promise<{ ok?: boolean; error?: string }> {
+  const r = await fetch("/api/saved", {
+    ...json({ username, avatarUrl }),
+    method: "PATCH",
+  });
+  if (r.ok) return { ok: true };
+  const d = await r.json().catch(() => ({}));
+  return { error: d.error || "error" };
+}
+
 export async function unsave(username: string): Promise<{ ok?: boolean; error?: string; status?: number }> {
   const r = await fetch(`/api/saved?username=${encodeURIComponent(username)}`, { method: "DELETE" });
   if (r.ok) return { ok: true };

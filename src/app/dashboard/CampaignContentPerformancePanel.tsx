@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
-import { videoEmbedPlayUrl } from "@/lib/creator-video";
-import { TikTokEmbedModal } from "@/app/dashboard/TikTokEmbedPlayer";
+import { tiktokVideoWatchUrl } from "@/lib/creator-video";
 import {
   calcEngagementRate,
   formatCompactStat,
@@ -122,7 +121,6 @@ export function CampaignContentPerformancePanel({
   const [loading, setLoading] = useState(true);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [playingPostUrl, setPlayingPostUrl] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -231,13 +229,6 @@ export function CampaignContentPerformancePanel({
   return (
     <section style={{ marginTop: isMobile ? 28 : 36 }}>
       {toast ? <StatsToast message={toast} /> : null}
-      {playingPostUrl ? (
-        <TikTokEmbedModal
-          shareUrl={playingPostUrl}
-          title={lang === "fr" ? "Vidéo TikTok" : "TikTok video"}
-          onClose={() => setPlayingPostUrl(null)}
-        />
-      ) : null}
 
       <AnalyticsSectionHeader
         title={lang === "fr" ? "Performance par contenu" : "Performance by content"}
@@ -284,14 +275,23 @@ export function CampaignContentPerformancePanel({
                   const pending = !row.stats_updated_at;
                   const title = row.title?.trim() || row.file_name || "—";
                   const refreshing = refreshingId === row.id;
-                  const canPlayPost = Boolean(row.post_url && videoEmbedPlayUrl(row.post_url));
+                  const watchUrl = row.post_url
+                    ? tiktokVideoWatchUrl({
+                        shareUrl: row.post_url,
+                        username: row.creatorHandle,
+                      })
+                    : null;
+                  const canPlayPost = Boolean(watchUrl);
 
                   return (
                     <tr key={row.id}>
                       <td style={tdStyle}>
                         <button
                           type="button"
-                          onClick={() => { if (canPlayPost && row.post_url) setPlayingPostUrl(row.post_url); }}
+                          onClick={() => {
+                            if (!watchUrl) return;
+                            window.open(watchUrl, "_blank", "noopener,noreferrer");
+                          }}
                           disabled={!canPlayPost}
                           style={{
                             display: "flex",

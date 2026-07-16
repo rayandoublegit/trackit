@@ -1,15 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import {
+  applyAppLocale,
+  clearUserSessionStorage,
+  dispatchProfileUpdated,
+  getAppTimezone,
+  setAppTimezone,
+  PROFILE_UPDATED_EVENT,
+  type AppTimezone,
+  type ProfileUpdatedDetail,
+} from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
+import { resolveAvatarUrl, toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
+import {
+  loadNotificationPreferences,
+  saveNotificationPreferences,
+  NOTIFICATION_PREF_KEYS,
+  type NotificationPreferences,
+  type NotificationPrefKey,
+} from "@/lib/notification-preferences";
 import { useDisplayCurrency } from "@/lib/useCurrency";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
@@ -23,7 +38,6 @@ import {
   profileUsernameTakenMessage,
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
-
 import { PLAN_PRICES, planDisplayName, formatPricingAmount, checkoutCurrencyFromLang, annualFreeMonthsBadge } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
@@ -101,16 +115,16 @@ function businessTypeLabel(value: string, lang: Lang): string {
   return lang === "fr" ? map[value]?.fr ?? value : map[value]?.en ?? value;
 }
 
-function emailNotifLabel(key: string, lang: Lang): string {
-  const map: Record<string, { en: string; fr: string }> = {
-    "New creator replied to outreach": { en: "New creator replied to outreach", fr: "Un créateur a répondu à votre message" },
-    "Sale tracked from creator": { en: "Sale tracked from creator", fr: "Vente suivie depuis un créateur" },
-    "Commission threshold reached": { en: "Commission threshold reached", fr: "Seuil de commission atteint" },
-    "Follow up reminder": { en: "Follow up reminder", fr: "Rappel de relance" },
-    "Weekly performance report": { en: "Weekly performance report", fr: "Rapport de performance hebdomadaire" },
-    "New team member joined": { en: "New team member joined", fr: "Nouveau membre a rejoint l'équipe" },
+function emailNotifLabel(key: NotificationPrefKey, lang: Lang): string {
+  const map: Record<NotificationPrefKey, { en: string; fr: string }> = {
+    outreach_reply: { en: "New creator replied to outreach", fr: "Un créateur a répondu à votre message" },
+    sale_tracked: { en: "Sale tracked from creator", fr: "Vente suivie depuis un créateur" },
+    commission_threshold: { en: "Commission threshold reached", fr: "Seuil de commission atteint" },
+    follow_up_reminder: { en: "Follow up reminder", fr: "Rappel de relance" },
+    weekly_report: { en: "Weekly performance report", fr: "Rapport de performance hebdomadaire" },
+    team_joined: { en: "New team member joined", fr: "Nouveau membre a rejoint l'équipe" },
   };
-  return lang === "fr" ? map[key]?.fr ?? key : map[key]?.en ?? key;
+  return lang === "fr" ? map[key].fr : map[key].en;
 }
 
 function formatLastActive(text: string | undefined, lang: Lang): string {
@@ -217,8 +231,8 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
       .eq("id", authUser.id)
       .maybeSingle();
     if (data) {
-      const avatar_url = await resolveAvatarUrl(supabase, authUser.id, data.avatar_url);
-      setProfile({ ...data, avatar_url });
+      // Keep the DB URL as source of truth — never overwrite with a short-lived signed URL.
+      setProfile({ ...data });
     }
   };
 
@@ -323,7 +337,7 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
               />
             )}
             {tab === "billing" && <BillingSettings isMobile={isMobile} />}
-            {tab === "notifications" && <NotificationsSettings />}
+            {tab === "notifications" && user && <NotificationsSettings userId={user.id} />}
             {tab === "security" && <SecuritySettings onDeleteAccount={() => setDeleteModalOpen(true)} />}
           </>
         )}
@@ -448,10 +462,10 @@ function GeneralSettings({
   const [businessType, setBusinessType] = useState(
     (initialBusinessType && BUSINESS_TYPE_LABELS[initialBusinessType]) || "Ecommerce"
   );
+  const [timezone, setTimezone] = useState<AppTimezone>(() => getAppTimezone());
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     setStoreName(initialBusinessName);
@@ -463,12 +477,12 @@ function GeneralSettings({
   const disconnectAccount = async () => {
     if (!supabase) return;
     setSigningOut(true);
-  await supabase.auth.signOut({ scope: "global" });
-  clearUserSessionStorage();
-  window.location.href = "/auth";
+    await supabase.auth.signOut({ scope: "global" });
+    clearUserSessionStorage();
+    window.location.href = "/auth";
   };
 
-  const save = async () => {
+  const persistGeneral = async () => {
     if (!supabase) return;
     setSaving(true);
     setMessage(null);
@@ -487,13 +501,31 @@ function GeneralSettings({
       setMessage({ text: error.message, type: "error" });
       return;
     }
+    setAppTimezone(timezone);
     onSaved({
       business_name: storeName.trim(),
       shopify_store_url: websiteUrl.trim() || null,
       business_type: LABEL_TO_BUSINESS_TYPE[businessType] ?? "other",
       niche: niche.trim(),
     });
-    setMessage({ text: "Changes saved successfully.", type: "success" });
+    patchDashboardBootstrap(userId, { business_name: storeName.trim() });
+    setMessage({
+      text: lang === "fr" ? "Modifications enregistrées." : "Changes saved successfully.",
+      type: "success",
+    });
+  };
+
+  const save = async () => {
+    const storeChanged = storeName.trim() !== initialBusinessName.trim();
+    if (storeChanged) {
+      const ok = window.confirm(
+        lang === "fr"
+          ? "Êtes-vous sûr de vouloir changer le nom de cette boutique ?"
+          : "Are you sure you want to change this store name?"
+      );
+      if (!ok) return;
+    }
+    await persistGeneral();
   };
 
   return (
@@ -514,18 +546,22 @@ function GeneralSettings({
         />
       </Field>
       <Field label={lang === "fr" ? "Fuseau horaire" : "Timezone"}>
-        <select defaultValue="Europe/Paris" style={inputStyle}>
-          <option>Europe/Paris (GMT+1)</option>
-          <option>America/New_York (GMT-5)</option>
-          <option>America/Los_Angeles (GMT-8)</option>
-          <option>UTC</option>
+        <select
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value as AppTimezone)}
+          style={inputStyle}
+        >
+          <option value="Europe/Paris">Europe/Paris (GMT+1)</option>
+          <option value="America/New_York">America/New_York (GMT-5)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (GMT-8)</option>
+          <option value="UTC">UTC</option>
         </select>
       </Field>
       {message && (
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>
       )}
       <button type="button" onClick={() => void save()} disabled={saving || signingOut} style={{ ...btnPrimary, marginTop: 8, opacity: saving || signingOut ? 0.7 : 1 }}>
-        {saving ? "Saving..." : lang === "fr" ? "Sauvegarder" : "Save changes"}
+        {saving ? (lang === "fr" ? "Enregistrement…" : "Saving...") : lang === "fr" ? "Sauvegarder" : "Save changes"}
       </button>
 
       <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid #EFEFEF" }}>
@@ -569,7 +605,9 @@ function ProfileSettings({
   const lang = useLang();
   const [fullName, setFullName] = useState(initialFullName);
   const [username, setUsername] = useState(initialUsername);
-  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  /** Stable URL persisted in Supabase (never a signed URL). */
+  const [storedAvatarUrl, setStoredAvatarUrl] = useState<string | null>(initialAvatarUrl);
+  const [displayAvatarUrl, setDisplayAvatarUrl] = useState<string | null>(initialAvatarUrl);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -581,9 +619,19 @@ function ProfileSettings({
   useEffect(() => {
     setFullName(initialFullName);
     setUsername(initialUsername);
-    setAvatarUrl(initialAvatarUrl);
+    setStoredAvatarUrl(initialAvatarUrl);
     setUsernameStatus(initialUsername ? "available" : "idle");
-  }, [initialFullName, initialUsername, initialAvatarUrl]);
+    let cancelled = false;
+    void (async () => {
+      if (!supabase || !initialAvatarUrl) {
+        if (!cancelled) setDisplayAvatarUrl(initialAvatarUrl);
+        return;
+      }
+      const resolved = await resolveAvatarUrl(supabase, userId, initialAvatarUrl);
+      if (!cancelled) setDisplayAvatarUrl(resolved ?? initialAvatarUrl);
+    })();
+    return () => { cancelled = true; };
+  }, [initialFullName, initialUsername, initialAvatarUrl, userId]);
 
   useEffect(() => {
     const normalized = normalizeProfileUsername(username);
@@ -617,7 +665,7 @@ function ProfileSettings({
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
     if (f.size > 2 * 1024 * 1024) {
-      setMessage({ text: "Image must be under 2MB", type: "error" });
+      setMessage({ text: lang === "fr" ? "L'image doit faire moins de 2 Mo" : "Image must be under 2MB", type: "error" });
       return;
     }
     setMessage(null);
@@ -652,21 +700,23 @@ function ProfileSettings({
     setSaving(true);
     setMessage(null);
 
-    let newAvatarUrl = avatarUrl;
+    let persistAvatarUrl =
+      toPersistableAvatarUrl(supabase, userId, storedAvatarUrl) ?? storedAvatarUrl;
     const file = avatarFileRef.current;
     if (file) {
-      const ext = file.name.split(".").pop() || "jpg";
-      const path = `${userId}/avatar.${ext}`;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+      const path = `${userId}/avatar.${safeExt}`;
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(path, file, { upsert: true, contentType: file.type });
+        .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
       if (uploadError) {
         setSaving(false);
         setMessage({ text: uploadError.message, type: "error" });
         return;
       }
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-      newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
+      persistAvatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
     }
 
     const profileRes = await fetch("/api/profile", {
@@ -676,14 +726,31 @@ function ProfileSettings({
       body: JSON.stringify({
         full_name: fullName.trim(),
         username: trimmedUsername,
-        avatar_url: newAvatarUrl,
+        avatar_url: persistAvatarUrl,
       }),
     });
     const profileData = (await profileRes.json().catch(() => ({}))) as {
       error?: string;
       profile?: { full_name?: string; username?: string; avatar_url?: string | null };
     };
-    if (!profileRes.ok) {
+
+    // Fallback: if cookie auth fails, still persist via the browser session.
+    if (!profileRes.ok && profileRes.status === 401) {
+      const { error: directErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName.trim(),
+          username: trimmedUsername || null,
+          avatar_url: persistAvatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userId);
+      if (directErr) {
+        setSaving(false);
+        setMessage({ text: directErr.message, type: "error" });
+        return;
+      }
+    } else if (!profileRes.ok) {
       setSaving(false);
       setMessage({
         text: profileRes.status === 409
@@ -698,41 +765,51 @@ function ProfileSettings({
 
     const savedUsername = normalizeProfileUsername(profileData.profile?.username ?? trimmedUsername);
     const savedName = profileData.profile?.full_name ?? fullName.trim();
-    const resolved = newAvatarUrl && supabase
-      ? await resolveAvatarUrl(supabase, userId, newAvatarUrl)
-      : newAvatarUrl;
+    const savedAvatar =
+      toPersistableAvatarUrl(supabase, userId, profileData.profile?.avatar_url ?? persistAvatarUrl) ??
+      persistAvatarUrl;
+
+    const displayResolved = savedAvatar
+      ? (await resolveAvatarUrl(supabase, userId, savedAvatar)) ?? savedAvatar
+      : null;
 
     const previousUsername = normalizeProfileUsername(initialUsername);
-    setAvatarUrl(resolved);
+    setFullName(savedName);
+    setUsername(savedUsername);
+    setStoredAvatarUrl(savedAvatar);
+    setDisplayAvatarUrl(displayResolved);
     setAvatarFile(null);
     if (avatarPreview) {
       URL.revokeObjectURL(avatarPreview);
       setAvatarPreview(null);
     }
     if (previousUsername && savedUsername && previousUsername !== savedUsername) {
-      renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? newAvatarUrl);
-    } else if (savedUsername && resolved) {
-      setCachedAvatarUrl(savedUsername, resolved);
+      renameCachedAvatarUrl(previousUsername, savedUsername, savedAvatar ?? displayResolved);
+    } else if (savedUsername && savedAvatar) {
+      setCachedAvatarUrl(savedUsername, savedAvatar);
     }
     patchDashboardBootstrap(userId, {
       full_name: savedName,
       username: savedUsername,
-      avatar_url: resolved ?? newAvatarUrl,
+      avatar_url: savedAvatar,
     });
     onSaved({
       full_name: savedName,
       username: savedUsername,
-      avatar_url: resolved,
+      avatar_url: savedAvatar,
     });
     dispatchProfileUpdated({
       full_name: savedName,
       username: savedUsername,
-      avatar_url: resolved ?? newAvatarUrl,
+      avatar_url: savedAvatar,
     });
-    setMessage({ text: "Changes saved successfully.", type: "success" });
+    setMessage({
+      text: lang === "fr" ? "Modifications enregistrées." : "Changes saved successfully.",
+      type: "success",
+    });
   };
 
-  const displayAvatar = avatarPreview ?? avatarUrl;
+  const displayAvatar = avatarPreview ?? displayAvatarUrl;
   const initial = (fullName[0] || username[0] || "?").toUpperCase();
 
   return (
@@ -765,7 +842,7 @@ function ProfileSettings({
             type="text"
             value={username}
             onChange={(e) => {
-              setUsername(e.target.value.toLowerCase());
+              setUsername(e.target.value.replace(/^@/, "").toLowerCase());
               setMessage(null);
             }}
             placeholder="yourname"
@@ -782,11 +859,12 @@ function ProfileSettings({
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>
       )}
       <button type="button" onClick={() => void save()} disabled={saving} style={{ ...btnPrimary, marginTop: 8, opacity: saving ? 0.7 : 1 }}>
-        {saving ? "Saving..." : lang === "fr" ? "Sauvegarder" : "Save changes"}
+        {saving ? (lang === "fr" ? "Enregistrement…" : "Saving...") : lang === "fr" ? "Sauvegarder" : "Save changes"}
       </button>
     </Card>
   );
 }
+
 
 
 function BillingSettings({ isMobile }: { isMobile?: boolean }) {
@@ -1189,46 +1267,57 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   );
 }
 
-const EMAIL_NOTIFS = [
-  "New creator replied to outreach",
-  "Sale tracked from creator",
-  "Commission threshold reached",
-  "Follow up reminder",
-  "Weekly performance report",
-  "New team member joined",
-];
-
-function NotificationsSettings() {
+function NotificationsSettings({ userId }: { userId: string }) {
   const lang = useLang();
-  const [emailToggles, setEmailToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(EMAIL_NOTIFS.map((l, i) => [l, i % 2 === 0]))
-  );
-  const [pushToggles, setPushToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(EMAIL_NOTIFS.map((l, i) => [l, i % 3 !== 0]))
-  );
+  const [prefs, setPrefs] = useState<NotificationPreferences>(() => loadNotificationPreferences(userId));
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPrefs(loadNotificationPreferences(userId));
+  }, [userId]);
+
+  const updatePref = (
+    channel: "email" | "push",
+    key: NotificationPrefKey,
+    value: boolean
+  ) => {
+    setPrefs((prev) => {
+      const next: NotificationPreferences = {
+        email: { ...prev.email },
+        push: { ...prev.push },
+      };
+      next[channel][key] = value;
+      saveNotificationPreferences(userId, next);
+      return next;
+    });
+    setMessage(lang === "fr" ? "Préférence enregistrée." : "Preference saved.");
+  };
 
   return (
     <>
       <Card title={lang === "fr" ? "Notifications email" : "Email notifications"}>
-        {EMAIL_NOTIFS.map((label) => (
+        {NOTIFICATION_PREF_KEYS.map((key) => (
           <ToggleRow
-            key={`email-${label}`}
-            label={emailNotifLabel(label, lang)}
-            on={emailToggles[label]}
-            onToggle={() => setEmailToggles((t) => ({ ...t, [label]: !t[label] }))}
+            key={`email-${key}`}
+            label={emailNotifLabel(key, lang)}
+            on={prefs.email[key]}
+            onToggle={() => updatePref("email", key, !prefs.email[key])}
           />
         ))}
       </Card>
       <Card title={lang === "fr" ? "Notifications push" : "Push notifications"}>
-        {EMAIL_NOTIFS.map((label) => (
+        {NOTIFICATION_PREF_KEYS.map((key) => (
           <ToggleRow
-            key={`push-${label}`}
-            label={emailNotifLabel(label, lang)}
-            on={pushToggles[label]}
-            onToggle={() => setPushToggles((t) => ({ ...t, [label]: !t[label] }))}
+            key={`push-${key}`}
+            label={emailNotifLabel(key, lang)}
+            on={prefs.push[key]}
+            onToggle={() => updatePref("push", key, !prefs.push[key])}
           />
         ))}
       </Card>
+      {message && (
+        <p style={{ fontSize: 13, color: "#2E7D32", margin: "0 0 12px 0" }}>{message}</p>
+      )}
     </>
   );
 }

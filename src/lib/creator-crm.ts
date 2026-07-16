@@ -55,8 +55,7 @@ export type CreatorListMetrics = {
 export function crmFromSnapshot(snapshot: Record<string, unknown> | null | undefined): CreatorCrm {
   if (!snapshot || typeof snapshot !== "object") return {};
   const crm = snapshot.crm;
-  if (!crm || typeof crm !== "object") return {};
-  const c = crm as Record<string, unknown>;
+  const c = crm && typeof crm === "object" ? (crm as Record<string, unknown>) : {};
   return {
     promoCode:
       typeof c.promoCode === "string"
@@ -72,7 +71,10 @@ export function crmFromSnapshot(snapshot: Record<string, unknown> | null | undef
     lastEmail: typeof c.lastEmail === "string" ? c.lastEmail : undefined,
     conversations: typeof c.conversations === "string" ? c.conversations : undefined,
     commissionRate:
-      parseCommissionRate(c.commissionRate) ?? parseCommissionRate(c.commission_rate),
+      parseCommissionRate(c.commissionRate) ??
+      parseCommissionRate(c.commission_rate) ??
+      parseCommissionRate(snapshot.commissionRate) ??
+      parseCommissionRate(snapshot.commission_rate),
     documents: Array.isArray(c.documents) ? c.documents.map(String) : undefined,
     scripts: Array.isArray(c.scripts)
       ? c.scripts

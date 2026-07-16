@@ -4,6 +4,7 @@ export type DiscoveryLanguage = "" | "french" | "english" | "spanish" | "italian
 
 export const TRACKIT_LANG_KEY = "trackit_lang";
 export const TRACKIT_CURRENCY_KEY = "trackit_currency";
+export const TRACKIT_TIMEZONE_KEY = "trackit_timezone";
 export const TRACKIT_DISCOVERY_LOCATION_KEY = "trackit_discovery_location";
 export const TRACKIT_DISCOVERY_LANGUAGE_KEY = "trackit_discovery_language";
 
@@ -67,6 +68,30 @@ export function setAppLang(lang: AppLang): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TRACKIT_LANG_KEY, lang);
   notifyLocaleUpdated();
+}
+
+const DEFAULT_TIMEZONE = "Europe/Paris";
+const VALID_TIMEZONES = [
+  "Europe/Paris",
+  "America/New_York",
+  "America/Los_Angeles",
+  "UTC",
+] as const;
+
+export type AppTimezone = (typeof VALID_TIMEZONES)[number];
+
+export function getAppTimezone(): AppTimezone {
+  if (typeof window === "undefined") return DEFAULT_TIMEZONE;
+  const stored = localStorage.getItem(TRACKIT_TIMEZONE_KEY);
+  if (stored && (VALID_TIMEZONES as readonly string[]).includes(stored)) {
+    return stored as AppTimezone;
+  }
+  return DEFAULT_TIMEZONE;
+}
+
+export function setAppTimezone(timezone: AppTimezone): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(TRACKIT_TIMEZONE_KEY, timezone);
 }
 
 export function getDiscoveryLocation(): DiscoveryLocation {

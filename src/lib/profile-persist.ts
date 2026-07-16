@@ -5,6 +5,7 @@ import {
   isValidProfileUsername,
   normalizeProfileUsername,
 } from "@/lib/profile-username";
+import { toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
 
 export type ProfileSaveInput = {
   full_name?: string;
@@ -57,10 +58,17 @@ export async function saveUserProfile(
   if (!existing) return { error: "Profile not found", status: 404 };
 
   const previousUsername = normalizeProfileUsername(existing.username) || null;
-  const update: Record<string, string> = {};
+  const update: Record<string, string | null> = {};
 
   if (input.full_name !== undefined) update.full_name = input.full_name.trim();
-  if (typeof input.avatar_url === "string") update.avatar_url = input.avatar_url;
+  if (input.avatar_url === null) {
+    update.avatar_url = null;
+  } else if (typeof input.avatar_url === "string") {
+    update.avatar_url =
+      toPersistableAvatarUrl(admin, userId, input.avatar_url) ??
+      input.avatar_url.split("?")[0] ??
+      input.avatar_url;
+  }
 
   if (input.username !== undefined) {
     const normalized = normalizeProfileUsername(input.username);
@@ -114,8 +122,12 @@ export async function saveUserProfile(
   }
 
   const creatorPatch: Record<string, string> = {};
-  if (update.avatar_url) creatorPatch.avatar_url = update.avatar_url;
-  if (update.full_name) creatorPatch.full_name = update.full_name;
+  if (typeof update.avatar_url === "string" && update.avatar_url) {
+    creatorPatch.avatar_url = update.avatar_url;
+  }
+  if (typeof update.full_name === "string" && update.full_name) {
+    creatorPatch.full_name = update.full_name;
+  }
   if (newUsername) creatorPatch.handle = newUsername;
   if (Object.keys(creatorPatch).length) {
     await admin.from("creators").update(creatorPatch).eq("linked_user_id", userId);

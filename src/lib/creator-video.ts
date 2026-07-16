@@ -1,5 +1,4 @@
-// Helpers to play TikTok videos in-app via the official embed iframe.
-// We never link out to TikTok; we render https://www.tiktok.com/embed/v2/{id}.
+// Helpers for TikTok video ids / share URLs.
 
 /** Extract the numeric TikTok video id from a share URL or a raw id. */
 export function extractVideoId(input?: string | null): string | null {
@@ -10,33 +9,34 @@ export function extractVideoId(input?: string | null): string | null {
   return m ? m[1] : null;
 }
 
-type VideoRef = { id?: string | null; shareUrl?: string | null };
+type VideoRef = { id?: string | null; shareUrl?: string | null; username?: string | null };
 
-/** Build the in-app embed URL from an id, a share URL, or a {id, shareUrl}. */
-export function videoEmbedUrl(ref?: string | VideoRef | null): string | null {
+/** Public TikTok watch URL — opens the video on TikTok (no embed). */
+export function tiktokVideoWatchUrl(ref?: string | VideoRef | null): string | null {
   if (!ref) return null;
-  const id =
-    typeof ref === "string"
-      ? extractVideoId(ref)
-      : extractVideoId(ref.id) ?? extractVideoId(ref.shareUrl);
-  return id ? `https://www.tiktok.com/embed/v2/${id}` : null;
+  if (typeof ref === "string") {
+    const trimmed = ref.trim();
+    if (!trimmed) return null;
+    if (trimmed.includes("tiktok.com") && !trimmed.includes("/embed/")) return trimmed;
+    const id = extractVideoId(trimmed);
+    return id ? `https://www.tiktok.com/video/${id}` : null;
+  }
+  const share = ref.shareUrl?.trim() || "";
+  if (share.includes("tiktok.com") && !share.includes("/embed/")) return share;
+  const id = extractVideoId(ref.id) ?? extractVideoId(ref.shareUrl);
+  if (!id) return null;
+  const handle = ref.username?.trim().replace(/^@+/, "") || "";
+  return handle
+    ? `https://www.tiktok.com/@${handle}/video/${id}`
+    : `https://www.tiktok.com/video/${id}`;
 }
 
-/** Embed URL with autoplay for inline playback after user click. */
+/** @deprecated Use tiktokVideoWatchUrl — embed playback removed. */
+export function videoEmbedUrl(ref?: string | VideoRef | null): string | null {
+  return tiktokVideoWatchUrl(ref);
+}
+
+/** @deprecated Use tiktokVideoWatchUrl — embed playback removed. */
 export function videoEmbedPlayUrl(ref?: string | VideoRef | null): string | null {
-  if (!ref) return null;
-  if (typeof ref === "string" && ref.includes("/embed/v2/")) {
-    try {
-      const url = new URL(ref);
-      url.searchParams.set("autoplay", "1");
-      return url.toString();
-    } catch {
-      return ref;
-    }
-  }
-  const embed = videoEmbedUrl(ref);
-  if (!embed) return null;
-  const url = new URL(embed);
-  url.searchParams.set("autoplay", "1");
-  return url.toString();
+  return tiktokVideoWatchUrl(ref);
 }

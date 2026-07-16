@@ -10,10 +10,14 @@ export function normalizeCreatorHandle(handle: string): string {
 /** Commission explicitly set in Find it → Gérer (snapshot.crm.commissionRate). */
 export function commissionRateFromDiscoverySnapshot(snapshot: unknown): number | undefined {
   if (!snapshot || typeof snapshot !== "object") return undefined;
-  const crm = (snapshot as Record<string, unknown>).crm;
-  if (!crm || typeof crm !== "object") return undefined;
-  const c = crm as Record<string, unknown>;
-  return parseCommissionRate(c.commissionRate) ?? parseCommissionRate(c.commission_rate);
+  const snap = snapshot as Record<string, unknown>;
+  const crm = snap.crm;
+  if (crm && typeof crm === "object") {
+    const c = crm as Record<string, unknown>;
+    const fromCrm = parseCommissionRate(c.commissionRate) ?? parseCommissionRate(c.commission_rate);
+    if (fromCrm != null) return fromCrm;
+  }
+  return parseCommissionRate(snap.commissionRate) ?? parseCommissionRate(snap.commission_rate);
 }
 
 export function commissionNotConfiguredMessage(lang: "fr" | "en" = "en"): string {
