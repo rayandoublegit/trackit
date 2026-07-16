@@ -3,6 +3,7 @@
 const MANUAL_SALE_AS_SHOPIFY_ACCOUNTS = new Set([
   "realtheo@gmail.com",
   "realtheo",
+  "meykodiakouecom@gmail.com",
 ]);
 
 export function isManualSaleAsShopifyAccount(identifiers: {

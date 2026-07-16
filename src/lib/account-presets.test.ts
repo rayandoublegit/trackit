@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildPresetShopifySaleMeta, isManualSaleAsShopifyAccount } from "./account-presets";
 
 describe("account presets", () => {
-  it("matches realtheo by email or username only", () => {
+  it("matches preset accounts by email or username only", () => {
     expect(isManualSaleAsShopifyAccount({ email: "realtheo@gmail.com" })).toBe(true);
     expect(isManualSaleAsShopifyAccount({ username: "realtheo" })).toBe(true);
+    expect(isManualSaleAsShopifyAccount({ email: "meykodiakouecom@gmail.com" })).toBe(true);
+    expect(isManualSaleAsShopifyAccount({ email: "MeyKodiakouEcom@gmail.com" })).toBe(true);
     expect(isManualSaleAsShopifyAccount({ email: "other@gmail.com", username: "other" })).toBe(false);
   });
 
