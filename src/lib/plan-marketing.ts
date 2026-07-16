@@ -29,7 +29,6 @@ import {
   getMaxActiveCampaigns,
   getMaxManagedCreators,
   getDailyDiscoveryLimit,
-  isGrowthOrAbove,
   maxShopifyStores,
   type PlanTier,
 } from "@/lib/plan-limits";
@@ -134,8 +133,8 @@ export function getPlanCardDescription(tier: PlanTier, lang: Lang): string {
       : "Run your campaigns end to end.";
   }
   return fr
-    ? "Tout, sans limites."
-    : "Everything, without limits.";
+    ? "Pour les agences et multi-marques."
+    : "Built for agencies and multi-brand teams.";
 }
 
 /** Feature bullets for pricing grids, billing cards, and upgrade gates — from plan-pricing-highlights. */
@@ -156,7 +155,6 @@ export type GateFeatureKey =
   | "discovery"
   | "ai-outreach"
   | "bulk-import"
-  | "lists"
   | "auto-follow-up";
 
 export type LimitGateKind = "campaigns" | "creators" | "discoveries" | "shopify-stores";
@@ -292,7 +290,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     title: { en: "Discovery", fr: "Découverte" },
     description: {
       en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries/month and ${BASIC_RESULTS_PER_SEARCH} results per search on Starter.`,
-      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} recherches/mois et ${BASIC_RESULTS_PER_SEARCH} créateurs par recherche sur Starter.`,
+      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois et ${BASIC_RESULTS_PER_SEARCH} créateurs par recherche sur Starter.`,
     },
   },
   "ai-outreach": {
@@ -311,15 +309,6 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     description: {
       en: "Import all your outreach templates and creators from CSV in one click.",
       fr: "Importez tous vos modèles et créateurs depuis un CSV en un clic.",
-    },
-  },
-  lists: {
-    requiredTier: "basic",
-    check: isGrowthOrAbove,
-    title: { en: "Creator lists", fr: "Listes créateurs" },
-    description: {
-      en: "Organize saved creators into lists and folders on Starter.",
-      fr: "Organisez vos créateurs sauvegardés en listes et dossiers sur Starter.",
     },
   },
   "auto-follow-up": {

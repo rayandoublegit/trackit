@@ -131,6 +131,45 @@ export function getMonthlyAIMessageLimit(plan: PlanTier): number | null {
   return null;
 }
 
+function aiOutreachMonthKey(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Client-side monthly AI usage key (Starter quota). */
+export function getAiOutreachUsageStorageKey(userId?: string | null): string {
+  const uid = userId?.trim() || "anon";
+  return `trackit_ai_outreach_${uid}_${aiOutreachMonthKey()}`;
+}
+
+export function readAiOutreachUsage(userId?: string | null): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return Math.max(0, parseInt(localStorage.getItem(getAiOutreachUsageStorageKey(userId)) || "0", 10) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+export function incrementAiOutreachUsage(userId?: string | null): number {
+  if (typeof window === "undefined") return 0;
+  const next = readAiOutreachUsage(userId) + 1;
+  try {
+    localStorage.setItem(getAiOutreachUsageStorageKey(userId), String(next));
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+/** Returns true when generation is allowed; false when gated. */
+export function canGenerateAiOutreach(plan: PlanTier, userId?: string | null): boolean {
+  const limit = getMonthlyAIMessageLimit(plan);
+  if (limit == null) return true;
+  if (limit <= 0) return false;
+  return readAiOutreachUsage(userId) < limit;
+}
+
 export function canImportTemplates(plan: PlanTier): boolean {
   return isGrowthOrAbove(plan);
 }

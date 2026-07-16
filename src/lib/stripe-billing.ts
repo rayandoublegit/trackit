@@ -388,6 +388,23 @@ export async function clearSubscription(
       ? subscription.customer
       : subscription.customer?.id ?? null;
 
+  // Another active subscription may still exist (e.g. change-plan canceled a duplicate).
+  // Never downgrade to free while paid access remains.
+  if (customerId) {
+    const remaining = await getActiveSubscriptionInfo(stripe, customerId);
+    if (remaining && remaining.subscriptionId !== subscription.id) {
+      const activeSub = await stripe.subscriptions.retrieve(remaining.subscriptionId);
+      await syncFromStripeSubscription(supabase, stripe, activeSub, userId);
+      console.log("stripe-billing: kept paid plan after subscription delete", {
+        userId,
+        deletedSubscriptionId: subscription.id,
+        keptSubscriptionId: remaining.subscriptionId,
+        plan: remaining.plan,
+      });
+      return;
+    }
+  }
+
   await syncProfileSubscription(supabase, userId, {
     plan: "free",
     subscriptionStatus: "inactive",
@@ -413,6 +430,13 @@ export async function syncSubscriptionPlanForUser(
   userId: string,
   email?: string | null
 ): Promise<SyncedPlanResult> {
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", userId)
+    .maybeSingle();
+  const existingPlan = normalizePlan(existingProfile?.plan);
+
   const customerId = await resolveStripeCustomerId(
     supabase,
     stripe,
@@ -420,12 +444,14 @@ export async function syncSubscriptionPlanForUser(
     email
   );
 
+  // Soft failure: never silent-downgrade a paid profile when Stripe customer
+  // lookup fails (common race right after checkout).
   if (!customerId) {
-    await syncProfileSubscription(supabase, userId, {
-      plan: "free",
-      subscriptionStatus: "inactive",
+    console.warn("stripe-billing: sync skipped — no Stripe customer", {
+      userId,
+      existingPlan,
     });
-    return { plan: "free", subscriptionInfo: null };
+    return { plan: existingPlan, subscriptionInfo: null };
   }
 
   const subscriptionInfo = await getActiveSubscriptionInfo(stripe, customerId);
@@ -442,6 +468,7 @@ export async function syncSubscriptionPlanForUser(
     return { plan: subscriptionInfo.plan, subscriptionInfo };
   }
 
+  // Confirmed customer with no granting subscription → free.
   await syncProfileSubscription(supabase, userId, {
     plan: "free",
     subscriptionStatus: "inactive",

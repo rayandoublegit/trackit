@@ -92,6 +92,7 @@ import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import {
   buildBootstrapFromProfile,
+  patchDashboardBootstrap,
   readDashboardBootstrap,
   writeDashboardBootstrap,
 } from "@/lib/dashboard-bootstrap-cache";
@@ -410,8 +411,9 @@ function DashboardPageContent() {
   useEffect(() => {
     if (!user?.id || loading || searchParams.get("upgraded") !== "true") return;
 
-    let cancelled = false;
     const sessionId = searchParams.get("session_id");
+    let cancelled = false;
+    const userId = user.id;
 
     const syncPlan = async () => {
       try {
@@ -425,9 +427,18 @@ function DashboardPageContent() {
         if (cancelled || !res.ok || !data.plan) return;
         const nextPlan = normalizePlan(data.plan);
         setProfile((prev) => (prev ? { ...prev, plan: nextPlan } : prev));
+        patchDashboardBootstrap(userId, { plan: nextPlan });
         window.dispatchEvent(
           new CustomEvent("trackit-plan-updated", { detail: { plan: nextPlan } })
         );
+        if (nextPlan !== "free") {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has("upgraded") || url.searchParams.has("session_id")) {
+            url.searchParams.delete("upgraded");
+            url.searchParams.delete("session_id");
+            window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+          }
+        }
       } catch {
         /* retry on next poll */
       }
@@ -436,11 +447,6 @@ function DashboardPageContent() {
     void syncPlan();
     const t1 = window.setTimeout(() => void syncPlan(), 2000);
     const t2 = window.setTimeout(() => void syncPlan(), 5000);
-
-    const url = new URL(window.location.href);
-    url.searchParams.delete("upgraded");
-    url.searchParams.delete("session_id");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
 
     return () => {
       cancelled = true;

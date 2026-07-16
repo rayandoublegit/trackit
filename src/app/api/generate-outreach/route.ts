@@ -1,13 +1,51 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
 import {
   buildOutreachGenerationPrompt,
   parseOutreachGenerationResponse,
 } from "@/lib/outreach-ai-prompt";
+import { getMonthlyAIMessageLimit, normalizePlan } from "@/lib/plan-limits";
 
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.json({ error: "Not configured" }, { status: 500 });
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll() {},
+    },
+  });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  const plan = normalizePlan(profile?.plan);
+  const aiLimit = getMonthlyAIMessageLimit(plan);
+  if (aiLimit === 0) {
+    return NextResponse.json(
+      { error: "AI outreach requires Starter or higher" },
+      { status: 403 }
+    );
+  }
+
   const { creator, brand, tone, platform, lang } = await request.json();
 
   if (!creator?.username || !brand?.trim()) {

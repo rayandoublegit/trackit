@@ -3,6 +3,7 @@ import {
   BASIC_MAX_CAMPAIGNS,
   BASIC_MAX_MANAGED_CREATORS,
   BASIC_MAX_SHOPIFY_STORES,
+  BASIC_MONTHLY_AI_MESSAGES,
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
   FREE_LIFETIME_DISCOVERIES,
@@ -80,7 +81,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${BASIC_MONTHLY_DISCOVERIES} recherches/mois` : `${BASIC_MONTHLY_DISCOVERIES} searches/mo`,
+        value: fr ? `${BASIC_MONTHLY_DISCOVERIES} / mois` : `${BASIC_MONTHLY_DISCOVERIES} / month`,
       },
       {
         id: "search",
@@ -105,6 +106,11 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         value: fr
           ? `${BASIC_MAX_SHOPIFY_STORES} boutique connectée`
           : `${BASIC_MAX_SHOPIFY_STORES} connected store`,
+      },
+      {
+        id: "ai",
+        label: fr ? "Outreach IA" : "AI outreach",
+        value: fr ? `${BASIC_MONTHLY_AI_MESSAGES} messages / mois` : `${BASIC_MONTHLY_AI_MESSAGES} messages / month`,
       },
       {
         id: "affiliate",
@@ -139,7 +145,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${PRO_MONTHLY_DISCOVERIES} recherches/mois` : `${PRO_MONTHLY_DISCOVERIES} searches/mo`,
+        value: fr ? `${PRO_MONTHLY_DISCOVERIES} / mois` : `${PRO_MONTHLY_DISCOVERIES} / month`,
       },
       {
         id: "search",
@@ -157,6 +163,11 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         id: "creators",
         label: fr ? "Créateurs suivis" : "Tracked creators",
         value: String(PRO_MAX_MANAGED_CREATORS),
+      },
+      {
+        id: "ai",
+        label: fr ? "Outreach IA" : "AI outreach",
+        value: fr ? "Illimité" : "Unlimited",
       },
       {
         id: "creator-dashboard",

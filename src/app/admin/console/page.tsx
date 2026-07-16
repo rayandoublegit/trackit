@@ -554,7 +554,10 @@ export default function AdminConsolePage() {
                           pro: `Pro ($${PLAN_PRICES.proMonthly}/mo)`,
                           scale: `Business ($${PLAN_PRICES.scaleMonthly}/mo)`,
                         }[plan];
-                        const isCurrent = String(detailUser.plan ?? "").toLowerCase() === plan;
+                        const dbPlan = String(detailUser.plan ?? "").toLowerCase();
+                        const isCurrent =
+                          dbPlan === plan ||
+                          (plan === "growth" && (dbPlan === "basic" || dbPlan === "spark"));
                         return (
                           <button
                             key={plan}

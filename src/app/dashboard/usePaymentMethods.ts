@@ -108,9 +108,11 @@ export function usePaymentMethods() {
     };
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("trackit-plan-updated", onFocus);
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("trackit-plan-updated", onFocus);
     };
   }, []);
 

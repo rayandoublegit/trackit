@@ -37,12 +37,10 @@ export async function POST(request: NextRequest) {
     const stripe = new Stripe(stripeKey);
     const body = await request.json();
 
-    const { priceId, userId, email, analysisId, cancelUrl, onboarding } = body as {
+    const { priceId, userId, email, cancelUrl, onboarding } = body as {
       priceId?: string;
       userId?: string;
       email?: string;
-      analysisId?: string;
-      currency?: string;
       cancelUrl?: string;
       onboarding?: OnboardingSavePayload;
     };
@@ -79,63 +77,62 @@ export async function POST(request: NextRequest) {
     let resolvedUserId = userId ? String(userId) : null;
     let resolvedEmail = email ?? null;
 
-    if (onboarding) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      if (!supabaseUrl || !supabaseAnonKey || !admin) {
-        return NextResponse.json({ error: "Not configured" }, { status: 500 });
-      }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      const response = NextResponse.json({ ok: true });
-      const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    // Always prefer authenticated session user for paid checkout metadata.
+    if (supabaseUrl && supabaseAnonKey) {
+      const authClient = createServerClient(supabaseUrl, supabaseAnonKey, {
         cookies: {
           getAll() {
             return request.cookies.getAll();
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set(name, value, options);
-            });
-          },
+          setAll() {},
         },
       });
-
       const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+        data: { user: sessionUser },
+      } = await authClient.auth.getUser();
+
+      if (onboarding) {
+        if (!sessionUser || !admin) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        if (resolvedUserId && resolvedUserId !== sessionUser.id) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        resolvedUserId = sessionUser.id;
+        resolvedEmail = sessionUser.email ?? resolvedEmail;
+
+        const saved = await saveOnboardingProfileAdmin(admin, sessionUser.id, sessionUser.email, onboarding, {
+          markComplete: false,
+        });
+        if (!saved.ok) {
+          return NextResponse.json({ error: saved.error }, { status: 400 });
+        }
+      } else if (sessionUser) {
+        resolvedUserId = sessionUser.id;
+        resolvedEmail = sessionUser.email ?? resolvedEmail;
+      } else if (!resolvedUserId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      if (resolvedUserId && resolvedUserId !== user.id) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-      }
-
-      resolvedUserId = user.id;
-      resolvedEmail = user.email ?? resolvedEmail;
-
-      const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, onboarding, {
-        markComplete: false,
-      });
-      if (!saved.ok) {
-        return NextResponse.json({ error: saved.error }, { status: 400 });
-      }
+    } else if (onboarding) {
+      return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }
 
     const base = (appUrl ?? "http://localhost:3000").replace(/\/$/, "");
 
     const sparkPriceId = process.env.STRIPE_SPARK_PRICE_ID?.trim();
-    const isSpark = sparkPriceId && priceId === sparkPriceId;
+    const isSpark = Boolean(sparkPriceId && priceId === sparkPriceId);
     const isOneShot = priceId === "price_1TQzvsFC3qsxzaqxr3ydKYDS";
     const oneShotSuccessUrl = `${base}/analyze?oneshot=true`;
 
     const planMeta = checkoutPlanMetadata(resolvedPlan);
 
-    const checkoutSuccessBase =
-      analysisId && String(analysisId).trim()
-        ? `${base}/verdict/${String(analysisId).trim()}?upgraded=true`
-        : isOneShot
-          ? oneShotSuccessUrl
-          : `${base}/dashboard?view=billing&upgraded=true`;
+    // Always land on billing after paid checkout so sync-plan + UI refresh run.
+    const checkoutSuccessBase = isOneShot
+      ? oneShotSuccessUrl
+      : `${base}/dashboard?view=billing&upgraded=true`;
 
     const successUrl = checkoutSuccessBase.includes("?")
       ? `${checkoutSuccessBase}&session_id={CHECKOUT_SESSION_ID}`

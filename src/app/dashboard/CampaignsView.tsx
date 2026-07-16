@@ -1314,10 +1314,6 @@ export function CampaignsView({
 
   const handleLaunchDraft = async (draftId: string, campaignData: CampaignFormData) => {
     if (creatingCampaignRef.current) return;
-    if (hasReachedCampaignLimit(plan, activeCampaignCount)) {
-      setUpgradeModalOpen(true);
-      return;
-    }
     creatingCampaignRef.current = true;
 
     try {

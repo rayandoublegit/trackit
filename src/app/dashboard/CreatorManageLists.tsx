@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
-import { canUseCreatorPortal, canUseScripts, canBulkImportCreatorsCsv, isGrowthOrAbove } from "@/lib/plan-limits";
+import { canUseCreatorPortal, canUseScripts } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { pipelineStages } from "@/lib/pipeline";
 import {
@@ -529,10 +529,6 @@ export function CreatorManageLists({
   const onCreateList = async () => {
     const name = newListName.trim();
     if (!name) return;
-    if (!isGrowthOrAbove(plan)) {
-      setUpgradeFeature("lists");
-      return;
-    }
     const f = await createFolder(name);
     setNewListName("");
     setShowNewList(false);
@@ -541,14 +537,6 @@ export function CreatorManageLists({
     } else {
       void load();
     }
-  };
-
-  const tryOpenImport = () => {
-    if (!canBulkImportCreatorsCsv(plan)) {
-      setUpgradeFeature("bulk-import");
-      return;
-    }
-    setImportOpen(true);
   };
 
   const onDeleteList = async (e: React.MouseEvent, id: string) => {
@@ -767,7 +755,7 @@ export function CreatorManageLists({
               {selectedList.name}
             </h1>
           </div>
-          <button type="button" onClick={tryOpenImport} className="hero-cta-raised-light" style={ctaSize}>
+          <button type="button" onClick={() => setImportOpen(true)} className="hero-cta-raised-light" style={ctaSize}>
             {t.importBtn}
           </button>
         </div>
@@ -914,7 +902,7 @@ export function CreatorManageLists({
           <>
             <button
               type="button"
-              onClick={tryOpenImport}
+              onClick={() => setImportOpen(true)}
               className="hero-cta-raised-light"
               style={ctaSize}
             >

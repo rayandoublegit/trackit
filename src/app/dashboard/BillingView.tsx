@@ -11,6 +11,7 @@ import { getPlanPricingFeatureLines } from "@/lib/plan-pricing-highlights";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
+import { refreshPaymentMethods } from "./usePaymentMethods";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
 const PRO_MONTHLY = PLAN_PRICES.proMonthly;
@@ -324,6 +325,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
         setCurrentPlan(normalizePlan(detail.plan));
       }
       refreshBilling();
+      void refreshPaymentMethods();
     };
 
     window.addEventListener("focus", refreshBilling);

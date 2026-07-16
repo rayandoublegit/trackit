@@ -27,9 +27,12 @@ import { selectionPillColors } from "@/lib/selection-card-styles";
 import { buildCreatorEmailMap } from "@/lib/creator-crm";
 import { isValidEmailAddress, resolveCreatorEmail, sendOutreachEmail } from "@/lib/outreach-email";
 import {
+  canGenerateAiOutreach,
   canPersistTemplates,
   canUseAutoFollowUp,
   canUseUnlimitedAIOutreach,
+  getMonthlyAIMessageLimit,
+  incrementAiOutreachUsage,
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
@@ -528,27 +531,7 @@ function SaveTemplateModal({
   );
 }
 
-function outreachTodayDateKey() {
-  return new Date().toISOString().slice(0, 10);
-}
 
-function getOutreachGenerationsToday(): number {
-  const storedDate = localStorage.getItem("trackit_outreach_date");
-  if (storedDate !== outreachTodayDateKey()) return 0;
-  return parseInt(localStorage.getItem("trackit_outreach_today") || "0", 10);
-}
-
-function incrementOutreachGenerationsToday() {
-  const today = outreachTodayDateKey();
-  const storedDate = localStorage.getItem("trackit_outreach_date");
-  if (storedDate !== today) {
-    localStorage.setItem("trackit_outreach_date", today);
-    localStorage.setItem("trackit_outreach_today", "1");
-    return;
-  }
-  const count = getOutreachGenerationsToday() + 1;
-  localStorage.setItem("trackit_outreach_today", String(count));
-}
 
 
 function OutreachAIGeneratePanel({
@@ -658,15 +641,9 @@ function OutreachAIGeneratePanel({
   };
 
   const handleGenerate = async () => {
-    if (!canUseUnlimitedAIOutreach(plan)) {
-      const today = new Date().toDateString();
-      const key = "trackit_outreach_gen_" + today;
-      const used = parseInt(localStorage.getItem(key) || "0");
-      if (used >= 1) {
-        setUpgradeFeature("ai-outreach");
-        return;
-      }
-      localStorage.setItem(key, String(used + 1));
+    if (!canGenerateAiOutreach(plan)) {
+      setUpgradeFeature("ai-outreach");
+      return;
     }
     if (!selectedCreator || !brand.trim()) return;
     setGenerating(true);
@@ -687,6 +664,9 @@ function OutreachAIGeneratePanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error("Failed");
+      if (!canUseUnlimitedAIOutreach(plan) && getMonthlyAIMessageLimit(plan) != null) {
+        incrementAiOutreachUsage();
+      }
       setMessage(data.message);
       setEmailSubject(typeof data.subject === "string" ? data.subject : "");
       setShowSendFlow(false);

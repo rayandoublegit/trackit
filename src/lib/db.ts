@@ -130,43 +130,8 @@ export async function getCampaigns(userId: string) {
   return data || [];
 }
 
-function isActiveCampaignStatus(status: string | null | undefined): boolean {
-  const s = String(status ?? "").toLowerCase();
-  return s === "active" || s === "paused";
-}
-
-async function wouldExceedActiveCampaignLimit(
-  userId: string,
-  excludeCampaignId?: string,
-): Promise<boolean> {
-  if (!supabase) return true;
-  const [{ data: profile }, { data: campaigns }] = await Promise.all([
-    supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
-    supabase.from("campaigns").select("id, status").eq("user_id", userId),
-  ]);
-  const plan = normalizePlan(profile?.plan);
-  const activeCampaignCount = (campaigns ?? []).filter(
-    (row) => row.id !== excludeCampaignId && isActiveCampaignStatus(row.status),
-  ).length;
-  return hasReachedCampaignLimit(plan, activeCampaignCount);
-}
-
 export async function updateCampaignStatus(campaignId: string, status: string): Promise<boolean> {
   if (!supabase) return false;
-  if (isActiveCampaignStatus(status)) {
-    const { data: existing } = await supabase
-      .from("campaigns")
-      .select("user_id, status")
-      .eq("id", campaignId)
-      .maybeSingle();
-    if (
-      existing?.user_id &&
-      !isActiveCampaignStatus(existing.status) &&
-      await wouldExceedActiveCampaignLimit(existing.user_id, campaignId)
-    ) {
-      return false;
-    }
-  }
   const { error } = await supabase
     .from("campaigns")
     .update({ status })
@@ -190,20 +155,6 @@ export async function updateCampaign(campaignId: string, campaign: {
   status?: string;
 }) {
   if (!supabase) return null;
-  if (campaign.status && isActiveCampaignStatus(campaign.status)) {
-    const { data: existing } = await supabase
-      .from("campaigns")
-      .select("user_id, status")
-      .eq("id", campaignId)
-      .maybeSingle();
-    if (
-      existing?.user_id &&
-      !isActiveCampaignStatus(existing.status) &&
-      await wouldExceedActiveCampaignLimit(existing.user_id, campaignId)
-    ) {
-      return null;
-    }
-  }
   const { data, error } = await supabase
     .from("campaigns")
     .update(campaign)

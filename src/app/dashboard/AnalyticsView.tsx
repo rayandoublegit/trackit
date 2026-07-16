@@ -4,8 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
-import { canUseAdvancedAnalytics, canUseFullAnalytics, type PlanTier } from "@/lib/plan-limits";
-import { UpgradeModal } from "./UpgradeModal";
+import { canUseAdvancedAnalytics, type PlanTier } from "@/lib/plan-limits";
 import {
   fillChartSeries,
   computeTrend,
@@ -33,19 +32,17 @@ import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 type DateRange = "today" | "3d" | "7d" | "30d" | "90d" | "custom";
 type SortKey = "sales" | "commission" | "roi" | "creator";
 
-export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onUpgradeBasic?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
+export function AnalyticsView(props: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void; isCreator?: boolean }) {
   if (props.isCreator) {
     return <CreatorAnalytics userId={props.userId} isMobile={props.isMobile} />;
   }
   return <BrandAnalyticsView {...props} />;
 }
 
-function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onUpgradeBasic, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onUpgradeBasic?: () => void; onConnectShopify?: () => void }) {
+function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifyStore, onUpgradePro, onConnectShopify }: { userId?: string; isMobile?: boolean; lang?: string; plan?: PlanTier; shopifyStore?: string; onUpgradePro?: () => void; onConnectShopify?: () => void }) {
   useDisplayCurrency();
-  const tier = (plan ?? "free") as PlanTier;
-  const isFree = tier === "free";
-  const hasFullAnalytics = canUseFullAnalytics(tier);
-  const hasAdvancedAnalytics = canUseAdvancedAnalytics(tier);
+  const isFree = plan === "free";
+  const hasAdvancedAnalytics = canUseAdvancedAnalytics(plan as PlanTier);
   const langHook = useLang();
   const lang = langProp === "fr" || langProp === "en" ? langProp : langHook;
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -72,7 +69,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   }, [userId, range, tzOffset]);
 
   useEffect(() => {
-    if (!userId || !hasFullAnalytics) {
+    if (!userId) {
       setLoadingData(false);
       return;
     }
@@ -119,9 +116,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return () => {
       cancelled = true;
     };
-  }, [userId, shopifyStore, range, tzOffset, hasFullAnalytics]);
+  }, [userId, shopifyStore, range, tzOffset]);
 
-  useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId && hasFullAnalytics });
+  useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId });
 
   const shopifyConnected = !!(shopifyStore || analyticsData?.shopifyConnected);
   const HAS_DATA = !loadingData && (analyticsData?.hasData === true || shopifyConnected);
