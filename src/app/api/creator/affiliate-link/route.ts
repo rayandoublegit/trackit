@@ -77,10 +77,13 @@ async function crmAffiliateFor(
   };
 }
 
-async function latestAffiliateSlugForCreator(brandId: string, handle: string): Promise<string> {
+async function latestAffiliateLinkForCreator(
+  brandId: string,
+  handle: string
+): Promise<{ slug: string; destination_url: string }> {
   const { data, error } = await supabaseAdmin
     .from("affiliate_links")
-    .select("slug")
+    .select("slug, destination_url")
     .eq("brand_id", brandId)
     .eq("creator_username", handle)
     .eq("active", true)
@@ -89,11 +92,16 @@ async function latestAffiliateSlugForCreator(brandId: string, handle: string): P
     .maybeSingle();
 
   if (error) {
-    if (error.message.toLowerCase().includes("affiliate_links")) return "";
-    return "";
+    if (error.message.toLowerCase().includes("affiliate_links")) {
+      return { slug: "", destination_url: "" };
+    }
+    return { slug: "", destination_url: "" };
   }
 
-  return data?.slug?.trim() || "";
+  return {
+    slug: data?.slug?.trim() || "",
+    destination_url: data?.destination_url?.trim() || "",
+  };
 }
 
 /**
@@ -122,6 +130,7 @@ export async function GET(request: Request) {
     const handle = normalizeCreatorHandle(row.handle || "");
     let affiliateRef = row.affiliate_ref?.trim() || "";
     let code = row.discount_code?.trim() || "";
+    let destinationUrl = "";
 
     if (row.user_id && handle && (!affiliateRef || !code)) {
       const crm = await crmAffiliateFor(row.user_id, handle);
@@ -129,8 +138,10 @@ export async function GET(request: Request) {
       if (!code) code = crm.promoCode;
     }
 
-    if (!affiliateRef && row.user_id && handle) {
-      affiliateRef = await latestAffiliateSlugForCreator(row.user_id, handle);
+    if (row.user_id && handle) {
+      const latest = await latestAffiliateLinkForCreator(row.user_id, handle);
+      if (!affiliateRef) affiliateRef = latest.slug;
+      destinationUrl = latest.destination_url;
     }
 
     if (!affiliateRef && !code) continue;
@@ -138,7 +149,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       assigned: true,
-      link: affiliateRef ? buildTrackitShortLink(affiliateRef) : null,
+      link: affiliateRef ? buildTrackitShortLink(affiliateRef, destinationUrl || null) : null,
       ref: affiliateRef || null,
       code: code || null,
       handle: row.handle,

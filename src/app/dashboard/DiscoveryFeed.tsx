@@ -6,6 +6,7 @@ import {
   getDailyDiscoveryLimit,
   getResultsPerSearchLimit,
   hasDiscoveryDailyCap,
+  FREE_LIFETIME_DISCOVERIES,
 } from "@/lib/plan-limits";
 import {
   discoveryResetRemainingMs,
@@ -412,6 +413,7 @@ function NicheRequestSection({ lang, product }: { lang: "en" | "fr"; product: st
 function FilterSidebar({
   lang,
   isPaid,
+  isFree,
   filters,
   product,
   onProductChange,
@@ -422,6 +424,7 @@ function FilterSidebar({
 }: {
   lang: "en" | "fr";
   isPaid: boolean;
+  isFree: boolean;
   filters: FilterState;
   product: string;
   onProductChange: (v: string) => void;
@@ -433,6 +436,7 @@ function FilterSidebar({
   const t = discoveryCopy(lang);
   const searchLocked = !isPaid;
   const [platformNotice, setPlatformNotice] = useState<string | null>(null);
+  const [platformNoticeBlocked, setPlatformNoticeBlocked] = useState(false);
   const platformNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -442,9 +446,17 @@ function FilterSidebar({
   }, []);
 
   const showPlatformComingSoon = () => {
+    setPlatformNoticeBlocked(false);
     setPlatformNotice(t.morePlatformsComing);
     if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
     platformNoticeTimerRef.current = setTimeout(() => setPlatformNotice(null), 4000);
+  };
+
+  const showPlatformFreeBlocked = (label: string) => {
+    setPlatformNoticeBlocked(true);
+    setPlatformNotice(t.platformFreeBlocked(label));
+    if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
+    platformNoticeTimerRef.current = setTimeout(() => setPlatformNotice(null), 5000);
   };
 
   const platforms = [
@@ -493,11 +505,16 @@ function FilterSidebar({
         {platforms.map((p) => {
           const active = filters.platform === p.id;
           const paidOnly = p.id === "instagram" || p.id === "youtube";
+          const freeBlocked = isFree && paidOnly;
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => {
+                if (freeBlocked) {
+                  showPlatformFreeBlocked(p.label);
+                  return;
+                }
                 if (paidOnly) {
                   showPlatformComingSoon();
                   return;
@@ -510,15 +527,19 @@ function FilterSidebar({
                 borderRadius: 999,
                 border: active ? "1px solid #1A1A1A" : "1px solid #E5E5E5",
                 background: active ? "#1A1A1A" : "#FFFFFF",
-                color: active ? "#FFFFFF" : "#1A1A1A",
+                color: active ? "#FFFFFF" : freeBlocked ? "#9A9A9A" : "#1A1A1A",
                 fontSize: 12,
                 fontWeight: 500,
                 fontFamily: "inherit",
-                cursor: "pointer",
-                opacity: 1,
+                cursor: freeBlocked ? "not-allowed" : "pointer",
+                opacity: freeBlocked ? 0.72 : 1,
                 letterSpacing: "-0.01em",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
               }}
             >
+              {freeBlocked ? <Lock size={11} /> : null}
               {p.label}
             </button>
           );
@@ -531,7 +552,7 @@ function FilterSidebar({
             marginBottom: 16,
             padding: "4px 0",
             fontSize: 12,
-            color: "#0047FF",
+            color: platformNoticeBlocked ? "#7A5C00" : "#0047FF",
             letterSpacing: "-0.01em",
             lineHeight: 1.45,
           }}
@@ -824,6 +845,89 @@ function FeedListRow({
   );
 }
 
+function FreeDiscoveryBanner({
+  lang,
+  used,
+  limit,
+  allNichesBrowse,
+  onUpgrade,
+}: {
+  lang: "en" | "fr";
+  used: number;
+  limit: number;
+  allNichesBrowse: boolean;
+  onUpgrade: () => void;
+}) {
+  const t = discoveryCopy(lang);
+  const remaining = Math.max(0, limit - used);
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        padding: "14px 16px",
+        borderRadius: 14,
+        border: "1px solid #E8E4FF",
+        background: "linear-gradient(135deg, #F8F7FF 0%, #FFFFFF 55%)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 14,
+        flexWrap: "wrap",
+      }}
+    >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "#534AB7",
+              background: "#EEEDFE",
+              padding: "3px 8px",
+              borderRadius: 999,
+            }}
+          >
+            {t.discoveriesRemainingLifetime(used, limit)}
+          </span>
+          {remaining > 0 ? (
+            <span style={{ fontSize: 11, color: "#6B7280", letterSpacing: "-0.01em" }}>
+              {lang === "fr" ? `${remaining} restante${remaining > 1 ? "s" : ""}` : `${remaining} left`}
+            </span>
+          ) : null}
+        </div>
+        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.35 }}>
+          {t.freeDiscoveryBannerTitle}
+        </p>
+        <p style={{ margin: 0, fontSize: 12.5, color: "#6B7280", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+          {allNichesBrowse ? t.freeDiscoveryBannerBrowse : t.freeDiscoveryBannerBody}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onUpgrade}
+        style={{
+          flexShrink: 0,
+          border: "1px solid #D4D0F7",
+          background: "#FFFFFF",
+          color: "#534AB7",
+          borderRadius: 10,
+          padding: "8px 12px",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: "pointer",
+          fontFamily: "inherit",
+          letterSpacing: "-0.01em",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {lang === "fr" ? "Voir les plans →" : "See plans →"}
+      </button>
+    </div>
+  );
+}
+
 function UpgradeCtaButton({ lang, onClick, fullWidth }: { lang: "en" | "fr"; onClick: () => void; fullWidth?: boolean }) {
   const t = discoveryCopy(lang);
   return (
@@ -974,6 +1078,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
   const [discoveriesResetAt, setDiscoveriesResetAt] = useState<Date | null>(null);
+  const [discoveriesUsed, setDiscoveriesUsed] = useState(0);
   const [showDiscoveryGate, setShowDiscoveryGate] = useState(() => plan === "free" && readFreeDiscoveryGateLock());
 
   const openCreator = (creator: FeedCreator) => {
@@ -1073,6 +1178,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (!quota) return { count: 0 };
       setDiscoveriesResetAt(quota.resetAt);
       discoveryUsedRef.current = Math.max(discoveryUsedRef.current, quota.used ?? 0);
+      setDiscoveriesUsed(discoveryUsedRef.current);
       if (quota.blocked) {
         lockFreeDiscoveryGate();
         setShowDiscoveryGate(true);
@@ -1128,6 +1234,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       const currentUsed = Math.max(quotaUsedBefore, discoveryUsedRef.current);
       const next = await incrementDiscoveryQuota(supabase, user.id, plan, currentUsed);
       discoveryUsedRef.current = next;
+      setDiscoveriesUsed(next);
       const exhausted = next >= discoveryLimit!;
       if (exhausted) lockFreeDiscoveryGate();
       setShowDiscoveryGate(exhausted);
@@ -1180,6 +1287,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (!quota) return;
       setDiscoveriesResetAt(quota.resetAt);
       discoveryUsedRef.current = quota.used ?? 0;
+      setDiscoveriesUsed(quota.used ?? 0);
       if (plan === "free" && quota.blocked) lockFreeDiscoveryGate();
       setShowDiscoveryGate(quota.blocked);
       if (quota.blocked) setHasMore(false);
@@ -1199,6 +1307,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (quota) {
         setDiscoveriesResetAt(quota.resetAt);
         discoveryUsedRef.current = quota.used ?? 0;
+        setDiscoveriesUsed(quota.used ?? 0);
         setShowDiscoveryGate(quota.blocked);
         if (quota.blocked) setHasMore(false);
       }
@@ -1409,6 +1518,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       <FilterSidebar
         lang={lang}
         isPaid={isPaid}
+        isFree={plan === "free"}
         filters={filters}
         product={product}
         onProductChange={setProduct}
@@ -1489,6 +1599,16 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
               )}
             </div>
           </div>
+
+          {!isPaid && !discoveryGateActive && (
+            <FreeDiscoveryBanner
+              lang={lang}
+              used={discoveriesUsed}
+              limit={discoveryLimit ?? FREE_LIFETIME_DISCOVERIES}
+              allNichesBrowse={allNichesBrowse}
+              onUpgrade={onUpgrade}
+            />
+          )}
 
           {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
           {!loading && !error && isCreatorSearchMiss && (

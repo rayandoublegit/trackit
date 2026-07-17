@@ -203,9 +203,9 @@ export function CampaignLinksTab({
     }
   };
 
-  const copyLink = async (slug: string) => {
+  const copyLink = async (slug: string, destinationUrl?: string) => {
     try {
-      await navigator.clipboard.writeText(buildTrackitShortLink(slug));
+      await navigator.clipboard.writeText(buildTrackitShortLink(slug, destinationUrl));
       setCopiedSlug(slug);
       setTimeout(() => setCopiedSlug(null), 2000);
     } catch {
@@ -213,12 +213,13 @@ export function CampaignLinksTab({
     }
   };
 
-  const handleDelete = async (linkId: string, slug: string) => {
+  const handleDelete = async (linkId: string, slug: string, destinationUrl?: string) => {
     if (!brandId) return;
+    const label = buildTrackitShortLink(slug, destinationUrl);
     const confirmed = window.confirm(
       lang === "fr"
-        ? `Supprimer le lien thentrack.it/l/${slug} ?\n\nCette action est définitive.`
-        : `Delete link thentrack.it/l/${slug}?\n\nThis action cannot be undone.`,
+        ? `Supprimer le lien ${label} ?\n\nCette action est définitive.`
+        : `Delete link ${label}?\n\nThis action cannot be undone.`,
     );
     if (!confirmed) return;
 
@@ -290,8 +291,8 @@ export function CampaignLinksTab({
         </h3>
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>
           {lang === "fr"
-            ? "Le lien court thentrack.it/l/… redirige vers votre destination et enregistre les clics."
-            : "Short thentrack.it/l/… links redirect to your destination and track clicks."}
+            ? "Le lien court est généré à partir de votre URL de destination (ex. myboost.com/abc1234), redirige vers la base de cette boutique et enregistre les clics."
+            : "Short links are built from your destination URL (e.g. myboost.com/abc1234), redirect to that store’s base URL, and track clicks."}
         </p>
 
         {creators.length === 0 ? (
@@ -444,7 +445,7 @@ export function CampaignLinksTab({
             const creator = creators.find(
               (c) => c.handle.replace(/^@/, "").toLowerCase() === link.creator_username.replace(/^@/, "").toLowerCase(),
             );
-            const shortUrl = buildTrackitShortLink(link.slug);
+            const shortUrl = buildTrackitShortLink(link.slug, link.destination_url);
             return (
               <div
                 key={link.id}
@@ -477,7 +478,7 @@ export function CampaignLinksTab({
                   </div>
                   <button
                     type="button"
-                    onClick={() => void copyLink(link.slug)}
+                    onClick={() => void copyLink(link.slug, link.destination_url)}
                     style={{
                       border: "1px solid #E5E5E5",
                       background: "#FFF",
@@ -500,7 +501,7 @@ export function CampaignLinksTab({
                   <button
                     type="button"
                     disabled={deletingId === link.id}
-                    onClick={() => void handleDelete(link.id, link.slug)}
+                    onClick={() => void handleDelete(link.id, link.slug, link.destination_url)}
                     style={{
                       border: "1px solid #FECACA",
                       background: "#FFF",

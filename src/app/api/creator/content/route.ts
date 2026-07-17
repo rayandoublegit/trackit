@@ -59,12 +59,15 @@ export async function GET(request: Request) {
   if (contentIds.length) {
     const { data: linkRows } = await admin
       .from("affiliate_links")
-      .select("content_id, slug")
+      .select("content_id, slug, destination_url")
       .in("content_id", contentIds)
       .eq("active", true);
     for (const row of linkRows || []) {
       if (row.content_id && row.slug) {
-        linkByContent.set(String(row.content_id), buildTrackitShortLink(String(row.slug)));
+        linkByContent.set(
+          String(row.content_id),
+          buildTrackitShortLink(String(row.slug), row.destination_url ? String(row.destination_url) : null),
+        );
       }
     }
   }

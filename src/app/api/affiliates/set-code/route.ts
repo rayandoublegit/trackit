@@ -111,11 +111,25 @@ export async function POST(request: Request) {
     await syncCrmSnapshot(userId, creatorHandle, code, affiliateRef);
   }
 
+  let destinationUrl: string | null = null;
+  if (affiliateRef) {
+    const { data: linkRow } = await supabaseAdmin
+      .from("affiliate_links")
+      .select("destination_url")
+      .eq("brand_id", userId)
+      .eq("slug", affiliateRef)
+      .eq("active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    destinationUrl = linkRow?.destination_url ? String(linkRow.destination_url) : null;
+  }
+
   return NextResponse.json({
     ok: true,
     creatorId,
     code,
     ref: affiliateRef,
-    link: affiliateRef ? buildTrackitShortLink(affiliateRef) : null,
+    link: affiliateRef ? buildTrackitShortLink(affiliateRef, destinationUrl) : null,
   });
 }

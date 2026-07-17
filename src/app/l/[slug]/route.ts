@@ -51,7 +51,15 @@ export async function GET(
   });
   if (clickErr) console.error("[l/slug] click insert failed:", clickErr.message);
 
-  const dest = new URL(link.destination_url);
+  // Always land on the destination base (origin), with ref for attribution.
+  let dest: URL;
+  try {
+    const raw = String(link.destination_url || "").trim();
+    const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    dest = new URL(new URL(withProtocol).origin);
+  } catch {
+    return NextResponse.redirect(new URL("/", req.url), 302);
+  }
   if (!dest.searchParams.has("ref")) dest.searchParams.set("ref", slug);
   return NextResponse.redirect(dest.toString(), 302);
 }

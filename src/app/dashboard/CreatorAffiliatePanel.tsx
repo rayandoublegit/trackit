@@ -82,7 +82,15 @@ export function CreatorAffiliatePanel({
 
     setRef(nextRef);
     setCode(nextCode);
-    setLink(nextRef ? buildTrackitShortLink(nextRef) : "");
+    setLink(nextRef ? buildTrackitShortLink(nextRef, existing?.destinationUrl || existing?.link || null) : "");
+    if (existing?.destinationUrl) setDestinationUrl(existing.destinationUrl);
+    else if (existing?.link) {
+      try {
+        setDestinationUrl(new URL(existing.link).origin);
+      } catch {
+        /* ignore */
+      }
+    }
     setReady(true);
 
     if (supabase) {
@@ -92,10 +100,15 @@ export function CreatorAffiliatePanel({
         .eq("id", userId)
         .maybeSingle()
         .then(({ data }) => {
-          if (data?.shopify_store_url) setDestinationUrl(String(data.shopify_store_url));
+          if (data?.shopify_store_url) setDestinationUrl((prev) => prev || String(data.shopify_store_url));
         });
     }
   }, [userId, handle, promoCode, commissionRate, existingRef]);
+
+  useEffect(() => {
+    if (!ref || !destinationUrl.trim()) return;
+    setLink(buildTrackitShortLink(ref, destinationUrl.trim()));
+  }, [ref, destinationUrl]);
 
   const generateLink = async () => {
     if (!userId || !handle || !destinationUrl.trim()) return;
@@ -120,7 +133,7 @@ export function CreatorAffiliatePanel({
       }
 
       const nextRef = created.slug;
-      const nextLink = created.link || buildTrackitShortLink(nextRef);
+      const nextLink = created.link || buildTrackitShortLink(nextRef, destinationUrl.trim());
 
       const row: StoredAffiliate = {
         creator: handle.startsWith("@") ? handle : `@${handle}`,
@@ -132,6 +145,8 @@ export function CreatorAffiliatePanel({
         sales: existing?.sales ?? 0,
         commission: existing?.commission ?? 0,
         status: existing?.status ?? "Active",
+        destinationUrl: created.destination_url || destinationUrl.trim(),
+        link: nextLink,
       };
       const list = loadAffiliates(userId);
       saveAffiliates(userId, [row, ...list.filter((a) => !handlesMatch(a.creator, handle))]);
@@ -323,9 +338,6 @@ export function CreatorAffiliatePanel({
                 {copied === "link" ? t.affiliateCopied : t.affiliateCopyLink}
               </button>
             </div>
-            <p style={{ margin: "10px 0 0", fontSize: 13, color: "#9A9A9A", fontFamily: externFont }}>
-              /l/{ref}
-            </p>
           </div>
 
           <div>

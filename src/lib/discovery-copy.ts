@@ -2,6 +2,7 @@ import type { Lang } from "@/lib/useLang";
 import {
   BASIC_MONTHLY_DISCOVERIES,
   BASIC_RESULTS_PER_SEARCH,
+  FREE_LIFETIME_DISCOVERIES,
   PRO_MONTHLY_DISCOVERIES,
   PRO_RESULTS_PER_SEARCH,
 } from "@/lib/plan-limits";
@@ -101,6 +102,19 @@ export function discoveryCopy(lang: Lang) {
       ? "Rechercher un @créateur ou un email est réservé aux plans payants. Utilisez les filtres (niche, plateforme, engagement, pays…) pour explorer le catalogue."
       : "Searching for a @creator or email is available on paid plans. Use filters (niche, platform, engagement, country…) to browse the catalog.",
     morePlatformsComing: fr ? "Plus de plateformes bientôt" : "More platforms coming soon",
+    platformFreeBlocked: (platform: string) =>
+      fr
+        ? `${platform} est réservé aux plans payants — passez à Starter pour y accéder.`
+        : `${platform} is available on paid plans — upgrade to Starter to unlock it.`,
+    freeDiscoveryBannerTitle: fr
+      ? `${FREE_LIFETIME_DISCOVERIES} découvertes gratuites — à toi de jouer`
+      : `${FREE_LIFETIME_DISCOVERIES} free discoveries — start exploring`,
+    freeDiscoveryBannerBody: fr
+      ? "Filtre par niche, pays ou engagement pour cibler les créateurs qui matchent ta marque. Chaque recherche avec filtre compte dans ton quota."
+      : "Filter by niche, country, or engagement to find creators who fit your brand. Each filtered search counts toward your quota.",
+    freeDiscoveryBannerBrowse: fr
+      ? "Sans filtre de niche, tu parcours le catalogue librement — choisis une niche pour lancer une découverte."
+      : "Without a niche filter you can browse freely — pick a niche to run a discovery.",
     refreshResults: fr ? "Relancer la recherche" : "Refresh results",
     discoveriesRemaining: (used: number, limit: number) =>
       fr ? `${used}/${limit} découvertes ce mois` : `${used}/${limit} discoveries this month`,

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
-  buildTrackitShortLink,
+  buildAffiliateShortLink,
+  destinationBaseUrl,
   generateAffiliateSlug,
   normalizeCreatorUsername,
-  normalizeDestinationUrl,
 } from "@/lib/affiliate-short-link";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +51,8 @@ export async function POST(req: Request) {
   let destinationUrl: string;
   try {
     creatorUsername = normalizeCreatorUsername(creatorUsernameRaw);
-    destinationUrl = normalizeDestinationUrl(destinationRaw);
+    // Store the destination base (origin) — short links redirect here.
+    destinationUrl = destinationBaseUrl(destinationRaw);
   } catch {
     return NextResponse.json(
       { ok: false, error: "Invalid creator or destination URL", errorFr: "Créateur ou URL de destination invalide" },
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
     ok: true,
     id: inserted.id,
     slug: inserted.slug,
-    link: buildTrackitShortLink(inserted.slug),
+    link: buildAffiliateShortLink(inserted.destination_url, inserted.slug),
     destination_url: inserted.destination_url,
   });
 }

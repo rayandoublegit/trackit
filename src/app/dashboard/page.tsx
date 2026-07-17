@@ -3897,8 +3897,8 @@ function codeFromHandle(handle: string, discount: string) {
   return `${base}${pct}`;
 }
 
-function affiliateReferralLink(slug: string) {
-  return buildTrackitShortLink(slug);
+function affiliateReferralLink(slug: string, destinationUrl?: string | null) {
+  return buildTrackitShortLink(slug, destinationUrl);
 }
 
 async function runShopifyOrderSync(userId: string): Promise<Response> {
@@ -4050,7 +4050,7 @@ function AffiliatesView({
     }).catch(() => {});
   }, [affiliates, userId, affiliatesLoaded]);
 
-  const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => {
+  const handleAddAffiliate = (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code" | "destinationUrl" | "link">) => {
     setAffiliates((list) => [
       { ...row, clicks: 0, conversions: 0, sales: 0, commission: 0, status: "Active" },
       ...list,
@@ -4069,10 +4069,11 @@ function AffiliatesView({
   };
 
   const handleRemoveAffiliate = (affiliate: AffiliateRow) => {
+    const linkLabel = affiliate.link || affiliateReferralLink(affiliate.ref, affiliate.destinationUrl);
     const confirmed = window.confirm(
       lang === "fr"
-        ? `Supprimer ${affiliate.creator} et son lien d'affiliation (/l/${affiliate.ref}) ?\n\nCette action est définitive.`
-        : `Remove ${affiliate.creator} and their affiliate link (/l/${affiliate.ref})?\n\nThis cannot be undone.`
+        ? `Supprimer ${affiliate.creator} et son lien d'affiliation (${linkLabel}) ?\n\nCette action est définitive.`
+        : `Remove ${affiliate.creator} and their affiliate link (${linkLabel})?\n\nThis cannot be undone.`
     );
     if (!confirmed) return;
 
@@ -4152,7 +4153,7 @@ function AffiliatesView({
                     <div style={{ fontSize: 11, color: "#9A9A9A" }}>{a.platform}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{buildTrackitShortLink(a.ref)}</div>
+                <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.link || affiliateReferralLink(a.ref, a.destinationUrl)}</div>
                 <div style={{ fontSize: 12, color: "#1A1A1A", fontFamily: "monospace", fontWeight: 600 }}>{a.code}</div>
                 <div><span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>{affiliateStatusLabel(a.status, lang)}</span></div>
                 <div style={{ marginLeft: -14 }}>
@@ -4160,7 +4161,7 @@ function AffiliatesView({
                     lang={lang}
                     linkCopied={linkCopied}
                     codeCopied={codeCopied}
-                    onCopyLink={() => void copyAffiliateText(affiliateReferralLink(a.ref), a.ref, "link")}
+                    onCopyLink={() => void copyAffiliateText(a.link || affiliateReferralLink(a.ref, a.destinationUrl), a.ref, "link")}
                     onCopyCode={() => void copyAffiliateText(a.code, a.ref, "code")}
                     onRemove={() => handleRemoveAffiliate(a)}
                   />
@@ -4228,13 +4229,13 @@ function AddAffiliatePanel({
   userId: string;
   existingAffiliates: AffiliateRow[];
   onClose: () => void;
-  onAdd: (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code">) => void;
+  onAdd: (row: Pick<AffiliateRow, "creator" | "platform" | "ref" | "code" | "destinationUrl" | "link">) => void;
 }) {
   const lang = useLang();
   const [handle, setHandle] = useState("");
   const [platform, setPlatform] = useState("Instagram");
   const [discount, setDiscount] = useState("15");
-  const [generated, setGenerated] = useState<{ ref: string; code: string; link: string } | null>(null);
+  const [generated, setGenerated] = useState<{ ref: string; code: string; link: string; destinationUrl: string } | null>(null);
   const [copied, setCopied] = useState<"link" | "code" | null>(null);
   const [savedCreators, setSavedCreators] = useState<SavedCreatorPick[]>([]);
   const [loadingCreators, setLoadingCreators] = useState(true);
@@ -4314,8 +4315,9 @@ function AddAffiliatePanel({
       }
 
       const ref = created.slug;
-      const link = created.link || affiliateReferralLink(ref);
-      setGenerated({ ref, code, link });
+      const dest = created.destination_url || destinationUrl.trim();
+      const link = created.link || affiliateReferralLink(ref, dest);
+      setGenerated({ ref, code, link, destinationUrl: dest });
       setCopied(null);
 
       if (selected?.id && userId && code) {
@@ -4509,7 +4511,7 @@ function AddAffiliatePanel({
               <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Generated</div>
 
               <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Referral link</div>
+                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Lien généré" : "Generated link"}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.link}
@@ -4519,11 +4521,6 @@ function AddAffiliatePanel({
                   </button>
                 </div>
                 {copied === "link" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>Copied</div>}
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Chemin court" : "Short path"}</div>
-                <div style={{ fontSize: 13, color: "#1A1A1A", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em" }}>/l/{generated.ref}</div>
               </div>
 
               <div>
@@ -4565,7 +4562,14 @@ function AddAffiliatePanel({
                 }).catch(() => {});
               };
               persistCode();
-              onAdd({ creator: normalizedHandle, platform, ref: generated.ref, code: generated.code });
+              onAdd({
+                creator: normalizedHandle,
+                platform,
+                ref: generated.ref,
+                code: generated.code,
+                destinationUrl: generated.destinationUrl,
+                link: generated.link,
+              });
             }}
             style={{ ...btnPrimary, width: "100%", opacity: canAdd ? 1 : 0.45 }}
           >

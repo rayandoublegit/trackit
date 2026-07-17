@@ -8,6 +8,10 @@ export type StoredAffiliate = {
   sales: number;
   commission: number;
   status: string;
+  /** Destination base used to build the public short link (e.g. https://myboost.com/). */
+  destinationUrl?: string;
+  /** Cached public short link (destination host + slug). */
+  link?: string;
 };
 
 function storageKey(userId: string) {

@@ -154,9 +154,9 @@ export function CampaignAffiliateLinksPanel({
       .map(([date, value]) => ({ date, value }));
   }, [links]);
 
-  const copyLink = async (slug: string) => {
+  const copyLink = async (slug: string, destinationUrl?: string) => {
     try {
-      await navigator.clipboard.writeText(buildTrackitShortLink(slug));
+      await navigator.clipboard.writeText(buildTrackitShortLink(slug, destinationUrl));
       setCopiedSlug(slug);
       setTimeout(() => setCopiedSlug(null), 2000);
     } catch {
@@ -189,8 +189,8 @@ export function CampaignAffiliateLinksPanel({
         title={lang === "fr" ? "Liens d'affiliation" : "Affiliate links"}
         info={
           lang === "fr"
-            ? "Clics, ventes, chiffre d'affaires et visiteurs uniques sur vos liens courts thentrack.it/l/… pour cette campagne."
-            : "Clicks, sales, revenue and unique visitors on your short thentrack.it/l/… links for this campaign."
+            ? "Clics, ventes, chiffre d'affaires et visiteurs uniques sur vos liens d'affiliation (générés à partir de l'URL de destination) pour cette campagne."
+            : "Clicks, sales, revenue and unique visitors on your affiliate links (built from the destination URL) for this campaign."
         }
         lang={lang}
       />
@@ -365,7 +365,7 @@ export function CampaignAffiliateLinksPanel({
                   {links.map((link) => {
                     const topSource = formatSourceLabel(topEntry(link.metrics?.sources), lang);
                     const topDevice = formatDeviceLabel(topEntry(link.metrics?.devices), lang);
-                    const shortPath = `thentrack.it/l/${link.slug}`;
+                    const shortUrl = buildTrackitShortLink(link.slug, link.destination_url);
                     return (
                       <tr key={link.id}>
                         <td style={tdStyle}>
@@ -381,11 +381,11 @@ export function CampaignAffiliateLinksPanel({
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {shortPath}
+                              {shortUrl}
                             </span>
                             <button
                               type="button"
-                              onClick={() => void copyLink(link.slug)}
+                              onClick={() => void copyLink(link.slug, link.destination_url)}
                               style={{
                                 flexShrink: 0,
                                 border: "1px solid #E5E5E5",
