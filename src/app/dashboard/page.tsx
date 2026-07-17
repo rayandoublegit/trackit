@@ -76,6 +76,7 @@ import { NotesView } from "./NotesView";
 import { HomeOverviewView } from "./HomeOverviewView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsPanel } from "./NotificationsView";
+import { FrVideosBubble, FrYoutubeVideosPanel } from "./FrYoutubeVideosPanel";
 import {
   ensureNotificationsReset,
   getStoredUnreadCount,
@@ -209,6 +210,7 @@ function DashboardPageContent() {
   const isScale = isScalePlan(plan);
   const canUseBasicFeatures = isGrowthOrAbove(plan);
   const [notificationUnread, setNotificationUnread] = useState(0);
+  const [frVideosOpen, setFrVideosOpen] = useState(false);
   const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
@@ -248,6 +250,10 @@ function DashboardPageContent() {
       setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
     });
   }, []);
+
+  useEffect(() => {
+    if (lang !== "fr") setFrVideosOpen(false);
+  }, [lang]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -591,6 +597,7 @@ function DashboardPageContent() {
   }, [view]);
 
   const goToSidebarItem = (targetView: View) => {
+    setFrVideosOpen(false);
     navigate({ view: targetView });
     if (isMobile) setMobileSidebarOpen(false);
   };
@@ -786,6 +793,8 @@ function DashboardPageContent() {
           userId={user?.id}
           notificationUnread={notificationUnread}
           onNotificationUnreadChange={setNotificationUnread}
+          frVideosOpen={frVideosOpen}
+          onToggleFrVideos={() => setFrVideosOpen((v) => !v)}
           onNavigate={goToSidebarItem}
           onConnectShopify={() => goToSidebarItem("integrations")}
         />
@@ -793,12 +802,14 @@ function DashboardPageContent() {
           style={{
             flex: 1,
             minHeight: 0,
-            overflow: view === "discovery" ? "hidden" : "auto",
-            display: view === "discovery" ? "flex" : "block",
+            overflow: frVideosOpen || view === "discovery" ? "hidden" : "auto",
+            display: frVideosOpen || view === "discovery" ? "flex" : "block",
             flexDirection: "column",
           }}
         >
-        {creatorAccessRevoked ? (
+        {frVideosOpen && lang === "fr" ? (
+          <FrYoutubeVideosPanel isMobile={isMobile} onClose={() => setFrVideosOpen(false)} />
+        ) : creatorAccessRevoked ? (
           <div
             style={{
               flex: 1,
@@ -4840,6 +4851,8 @@ function DashboardTopBar({
   userId,
   notificationUnread,
   onNotificationUnreadChange,
+  frVideosOpen,
+  onToggleFrVideos,
   onNavigate,
   onConnectShopify,
 }: {
@@ -4855,6 +4868,8 @@ function DashboardTopBar({
   userId?: string;
   notificationUnread: number;
   onNotificationUnreadChange: (count: number) => void;
+  frVideosOpen: boolean;
+  onToggleFrVideos: () => void;
   onNavigate: (view: View) => void;
   onConnectShopify: () => void;
 }) {
@@ -4934,6 +4949,16 @@ function DashboardTopBar({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
+        {lang === "fr" ? (
+          <FrVideosBubble
+            active={frVideosOpen}
+            onClick={() => {
+              setAccountOpen(false);
+              setNotificationsOpen(false);
+              onToggleFrVideos();
+            }}
+          />
+        ) : null}
         <div ref={notificationsRef} style={{ position: "relative" }}>
           <button
             type="button"
