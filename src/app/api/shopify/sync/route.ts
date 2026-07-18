@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import {
   buildShopifySyncMaps,
   extractDiscountCodes,
@@ -17,7 +18,9 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const userId = String(body.userId || "");
+  const access = await requireWorkspaceAccess(request, body.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const credentials = await resolveShopifyCredentials(supabaseAdmin, userId);

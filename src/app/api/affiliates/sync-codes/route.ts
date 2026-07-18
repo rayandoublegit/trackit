@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { syncAffiliateEntriesToCreators } from "@/lib/creator-promo-codes";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,9 @@ const supabaseAdmin = createClient(
 /** Persists affiliate-panel codes (local list) onto creators.discount_code in Supabase. */
 export async function POST(request: Request) {
   const body = await request.json();
-  const userId = String(body.userId || "");
+  const access = await requireWorkspaceAccess(request, body.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
   const entries = Array.isArray(body.entries) ? body.entries : [];
 
   if (!userId) {

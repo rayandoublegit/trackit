@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { parseFollowersCount } from "@/lib/parse-creator-import";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
@@ -31,8 +32,11 @@ async function addCreatorToFolder(
 // GET : liste les créateurs récemment arrivés (needs_review = true) pour cette marque
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const brandId = searchParams.get("brandId");
-  if (!brandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
+  const requestedBrandId = searchParams.get("brandId");
+  if (!requestedBrandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
+  const access = await requireWorkspaceAccess(request, requestedBrandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ ok: true, creators: [] });
 
@@ -50,7 +54,9 @@ export async function GET(request: Request) {
 // POST : la marque valide/complète un créateur -> needs_review = false + champs
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const brandId = (body?.brandId as string | undefined)?.trim();
+  const access = await requireWorkspaceAccess(request, body?.brandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   const creatorId = (body?.creatorId as string | undefined)?.trim();
   const commissionRate = body?.commissionRate;
   const discountCode = (body?.discountCode as string | undefined)?.trim() || null;

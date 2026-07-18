@@ -55,6 +55,7 @@ export function CreatorScriptPanel({
   const [error, setError] = useState<string | null>(null);
   const [existing, setExisting] = useState<ExistingScript[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(true);
+  const [openedScript, setOpenedScript] = useState<ExistingScript | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,6 +205,209 @@ export function CreatorScriptPanel({
     color: "#1A1A1A",
     background: "#FFFFFF",
   };
+
+  if (openedScript) {
+    const formatDate = (iso: string) => {
+      try {
+        return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      } catch {
+        return "";
+      }
+    };
+
+    return (
+      <div style={{ minHeight: "100%" }}>
+        <img
+          src={TRACKIT_LOGO}
+          alt="Trackit"
+          style={{ height: 40, width: "auto", display: "block", marginBottom: 20, opacity: 0.9 }}
+        />
+        <button
+          type="button"
+          onClick={() => setOpenedScript(null)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            fontSize: 15,
+            fontWeight: 600,
+            color: "#1A1A1A",
+            fontFamily: "inherit",
+            padding: 0,
+            marginBottom: 28,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {lang === "fr" ? "Retour aux scripts" : "Back to scripts"}
+        </button>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "260px 1fr",
+            gap: isMobile ? 24 : 40,
+            alignItems: "start",
+          }}
+        >
+          {!isMobile && (
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                {lang === "fr" ? "Scripts envoyés" : "Sent scripts"}
+              </p>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {existing.map((s) => {
+                  const active = s.id === openedScript.id;
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenedScript(s)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          borderRadius: 10,
+                          background: active ? "#F0F4FF" : "transparent",
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          marginBottom: 2,
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 13,
+                            fontWeight: active ? 600 : 500,
+                            color: active ? "#0047FF" : "#1A1A1A",
+                            letterSpacing: "-0.01em",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            marginBottom: 2,
+                          }}
+                        >
+                          {s.title}
+                        </span>
+                        <span style={{ display: "block", fontSize: 11, color: "#9A9A9A" }}>{formatDate(s.created_at)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #EFEFEF",
+              borderRadius: 16,
+              padding: isMobile ? "22px 18px" : "30px 34px",
+            }}
+          >
+            <h1
+              style={{
+                fontSize: isMobile ? 22 : 26,
+                fontWeight: 600,
+                color: "#1A1A1A",
+                margin: "0 0 6px",
+                letterSpacing: "-0.03em",
+                lineHeight: 1.3,
+              }}
+            >
+              {openedScript.title}
+            </h1>
+            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 22px" }}>
+              {formatDate(openedScript.created_at)} · {displayName}
+            </p>
+
+            {openedScript.content ? (
+              <p
+                style={{
+                  fontSize: 15,
+                  color: "#1A1A1A",
+                  margin: 0,
+                  lineHeight: 1.7,
+                  whiteSpace: "pre-wrap",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {openedScript.content}
+              </p>
+            ) : (
+              <p style={{ fontSize: 14, color: "#9A9A9A", margin: 0 }}>
+                {lang === "fr" ? "Ce script n'a pas de texte." : "This script has no text content."}
+              </p>
+            )}
+
+            {openedScript.file_url && (
+              <a
+                href={openedScript.file_url}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginTop: 24,
+                  fontSize: 14,
+                  color: "#0047FF",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                }}
+              >
+                {lang === "fr" ? "Voir le fichier joint" : "View attached file"} →
+              </a>
+            )}
+          </div>
+
+          {isMobile && existing.length > 1 && (
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                {lang === "fr" ? "Autres scripts" : "Other scripts"}
+              </p>
+              <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                {existing.filter((s) => s.id !== openedScript.id).map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenedScript(s)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "none",
+                        background: "transparent",
+                        padding: "10px 0",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        borderBottom: "1px solid #F0F0F0",
+                      }}
+                    >
+                      <span style={{ display: "block", fontSize: 13, fontWeight: 500, color: "#1A1A1A", marginBottom: 2 }}>{s.title}</span>
+                      <span style={{ display: "block", fontSize: 11, color: "#9A9A9A" }}>{formatDate(s.created_at)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100%" }}>
@@ -405,28 +609,37 @@ export function CreatorScriptPanel({
                     <li
                       key={s.id}
                       style={{
-                        padding: "12px 0",
                         borderBottom: index < existing.length - 1 ? "1px solid #F0F0F0" : "none",
                       }}
                     >
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: s.content || s.file_url ? 4 : 0, letterSpacing: "-0.02em" }}>
-                        {s.title}
-                      </div>
-                      {s.content && (
-                        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 4px", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
-                          {s.content.length > 160 ? `${s.content.slice(0, 160)}…` : s.content}
-                        </p>
-                      )}
-                      {s.file_url && (
-                        <a
-                          href={s.file_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ fontSize: 13, color: "#0047FF", fontWeight: 500, textDecoration: "none" }}
-                        >
-                          {lang === "fr" ? "Voir le fichier" : "View file"} →
-                        </a>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setOpenedScript(s)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          border: "none",
+                          background: "transparent",
+                          padding: "12px 0",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: s.content || s.file_url ? 4 : 0 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {s.title}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#0047FF", fontWeight: 500, flexShrink: 0, whiteSpace: "nowrap" }}>
+                            {lang === "fr" ? "Ouvrir →" : "Open →"}
+                          </span>
+                        </div>
+                        {s.content && (
+                          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                            {s.content.length > 160 ? `${s.content.slice(0, 160)}…` : s.content}
+                          </p>
+                        )}
+                      </button>
                     </li>
                   ))}
                 </ul>

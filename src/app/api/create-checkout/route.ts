@@ -5,6 +5,7 @@ import { checkoutPlanMetadata, resolvePlanFromCheckout } from "@/lib/checkout";
 import { saveOnboardingProfileAdmin, type OnboardingSavePayload } from "@/lib/onboarding-save";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 import {
   assertNonEmptyStripePriceId,
   getStripePriceEnvVarNames,
@@ -111,8 +112,9 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: saved.error }, { status: 400 });
         }
       } else if (sessionUser) {
-        resolvedUserId = sessionUser.id;
-        resolvedEmail = sessionUser.email ?? resolvedEmail;
+        const workspace = await resolveWorkspaceContextForUser(sessionUser);
+        resolvedUserId = workspace.ownerId;
+        resolvedEmail = workspace.ownerEmail ?? resolvedEmail;
       } else if (!resolvedUserId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import {
   backfillCampaignContent,
   backfillCreatorContentToCampaigns,
@@ -79,10 +80,13 @@ export async function GET(request: Request) {
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
   const { searchParams } = new URL(request.url);
-  const brandId = searchParams.get("brandId");
+  const requestedBrandId = searchParams.get("brandId");
   const targetHandle = searchParams.get("targetHandle")?.trim().replace(/^@/, "") || null;
   const campaignId = searchParams.get("campaignId")?.trim() || null;
-  if (!brandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
+  if (!requestedBrandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
+  const access = await requireWorkspaceAccess(request, requestedBrandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
 
   if (campaignId) {
     const { ids: contentIds, error: resolveErr } = await resolveCampaignContentIds(admin, brandId, campaignId);
@@ -153,7 +157,9 @@ export async function POST(request: Request) {
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
   const body = await request.json().catch(() => null);
-  const brandId = (body?.brandId as string | undefined)?.trim();
+  const access = await requireWorkspaceAccess(request, body?.brandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   const creatorRowId = (body?.creatorRowId as string | undefined)?.trim();
   const title = (body?.title as string | undefined)?.trim();
   const notes = (body?.notes as string | undefined)?.trim() || null;
@@ -245,8 +251,11 @@ export async function DELETE(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id")?.trim();
-  const brandId = searchParams.get("brandId")?.trim();
-  if (!id || !brandId) return NextResponse.json({ error: "Missing id or brandId" }, { status: 400 });
+  const requestedBrandId = searchParams.get("brandId")?.trim();
+  if (!id || !requestedBrandId) return NextResponse.json({ error: "Missing id or brandId" }, { status: 400 });
+  const access = await requireWorkspaceAccess(request, requestedBrandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
 
   const { data: row, error: fetchErr } = await admin
     .from("creator_content")

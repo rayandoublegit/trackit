@@ -205,7 +205,17 @@ const LABEL_TO_BUSINESS_TYPE: Record<string, string> = {
   Other: "other",
 };
 
-export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: () => void; isMobile?: boolean }) {
+export function SettingsView({
+  onProfileUpdate,
+  isMobile,
+  workspaceUserId,
+  workspaceEmail,
+}: {
+  onProfileUpdate?: () => void;
+  isMobile?: boolean;
+  workspaceUserId?: string;
+  workspaceEmail?: string | null;
+}) {
   useDisplayCurrency();
   const lang = useLang();
   const [tab, setTab] = useState<SettingsTab>("general");
@@ -224,11 +234,14 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
     if (!supabase) return;
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) return;
-    setUser(authUser);
+    const effectiveUser = workspaceUserId
+      ? ({ ...authUser, id: workspaceUserId, email: workspaceEmail ?? authUser.email } as User)
+      : authUser;
+    setUser(effectiveUser);
     const { data } = await supabase
       .from("profiles")
       .select("full_name, username, avatar_url, business_name, business_type, niche, shopify_store_url")
-      .eq("id", authUser.id)
+      .eq("id", effectiveUser.id)
       .maybeSingle();
     if (data) {
       // Keep the DB URL as source of truth — never overwrite with a short-lived signed URL.
@@ -245,7 +258,7 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
       await reloadProfile();
       setLoading(false);
     })();
-  }, []);
+  }, [workspaceUserId, workspaceEmail]);
 
   useEffect(() => {
     const onProfileUpdated = (event: Event) => {
@@ -262,7 +275,7 @@ export function SettingsView({ onProfileUpdate, isMobile }: { onProfileUpdate?: 
     };
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
-  }, []);
+  }, [workspaceUserId, workspaceEmail]);
 
   return (
     <>

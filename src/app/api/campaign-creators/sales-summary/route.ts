@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,15 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId")?.trim();
+  const requestedUserId = searchParams.get("userId")?.trim();
   const creatorIdsParam = searchParams.get("creatorIds")?.trim();
 
-  if (!userId || !creatorIdsParam) {
+  if (!requestedUserId || !creatorIdsParam) {
     return NextResponse.json({ ok: false, error: "Missing userId or creatorIds" }, { status: 400 });
   }
+  const access = await requireWorkspaceAccess(request, requestedUserId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
 
   const creatorIds = [...new Set(creatorIdsParam.split(",").map((id) => id.trim()).filter(Boolean))];
   if (creatorIds.length === 0) {

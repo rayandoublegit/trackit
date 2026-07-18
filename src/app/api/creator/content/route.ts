@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
@@ -11,7 +12,9 @@ export const dynamic = "force-dynamic";
 // GET — list content uploaded by this creator + brands they can upload to
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const admin = getSupabaseAdmin();
@@ -92,7 +95,9 @@ export async function POST(request: Request) {
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
   const body = await request.json().catch(() => null);
-  const userId = (body?.userId as string | undefined)?.trim();
+  const access = await requireActorAccess(request, body?.userId);
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   const brandId = (body?.brandId as string | undefined)?.trim() || null;
   const creatorRowId = (body?.creatorRowId as string | undefined)?.trim() || null;
   const title = (body?.title as string | undefined)?.trim();
@@ -182,7 +187,9 @@ export async function DELETE(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
-  const userId = searchParams.get("userId");
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!id || !userId) return NextResponse.json({ error: "Missing id or userId" }, { status: 400 });
 
   const { error } = await admin

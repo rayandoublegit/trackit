@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { syncScriptRefToDiscoverySaved } from "@/lib/script-creator-sync";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +11,14 @@ const supabaseAdmin = createClient(
 );
 
 // GET : liste les scripts d'une marque
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const brandId = searchParams.get("brandId");
   const targetHandle = searchParams.get("targetHandle")?.trim().replace(/^@/, "") || null;
   if (!brandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
+  const authorizedWorkspaceId = await getAuthedUserId(request);
+  if (!authorizedWorkspaceId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (authorizedWorkspaceId !== brandId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   let targetCreatorId: string | null = null;
   if (targetHandle) {
@@ -59,7 +63,7 @@ export async function GET(request: Request) {
 }
 
 // POST : crée un script
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const brandId = (body?.brandId as string | undefined)?.trim();
   const title = (body?.title as string | undefined)?.trim();
@@ -68,6 +72,9 @@ export async function POST(request: Request) {
   const targetCreatorId = (body?.targetCreatorId as string | undefined)?.trim() || null;
 
   if (!brandId || !title) return NextResponse.json({ error: "Missing brandId or title" }, { status: 400 });
+  const authorizedWorkspaceId = await getAuthedUserId(request);
+  if (!authorizedWorkspaceId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (authorizedWorkspaceId !== brandId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { data, error } = await supabaseAdmin
     .from("scripts")
@@ -88,11 +95,14 @@ export async function POST(request: Request) {
 }
 
 // DELETE : supprime un script (par la marque)
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const brandId = searchParams.get("brandId");
   if (!id || !brandId) return NextResponse.json({ error: "Missing id or brandId" }, { status: 400 });
+  const authorizedWorkspaceId = await getAuthedUserId(request);
+  if (!authorizedWorkspaceId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (authorizedWorkspaceId !== brandId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { error } = await supabaseAdmin
     .from("scripts")

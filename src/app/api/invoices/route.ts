@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getActiveSubscriptionInfo, resolveStripeCustomerId } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -100,13 +101,14 @@ export async function GET(request: NextRequest) {
   }
 
   const stripe = new Stripe(stripeKey);
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   try {
     const customerId = await resolveStripeCustomerId(
       admin,
       stripe,
-      user.id,
-      user.email
+      workspace.ownerId,
+      workspace.ownerEmail
     );
 
     if (!customerId) {

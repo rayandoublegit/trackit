@@ -4,6 +4,7 @@ import Stripe from "stripe";
 import { listStripeBillingPaymentMethods } from "@/lib/billing-payment-methods";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -40,16 +41,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const stripe = new Stripe(stripeKey);
+    const workspace = await resolveWorkspaceContextForUser(user);
 
     const { data: profile } = await admin
       .from("profiles")
       .select("stripe_customer_id, stripe_subscription_id")
-      .eq("id", user.id)
+      .eq("id", workspace.ownerId)
       .maybeSingle();
 
     const customerId =
       (profile?.stripe_customer_id as string | null) ??
-      (await resolveStripeCustomerId(admin, stripe, user.id, user.email));
+      (await resolveStripeCustomerId(admin, stripe, workspace.ownerId, workspace.ownerEmail));
 
     if (!customerId) {
       return NextResponse.json({ methods: [], hasStripeCustomer: false });

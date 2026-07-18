@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { listCreatorBrandMemberships, syncCreatorRowsByProfileHandle } from "@/lib/creator-account";
 import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
 import { backfillDiscoveryContentRefs } from "@/lib/content-creator-sync";
@@ -9,7 +10,9 @@ export const dynamic = "force-dynamic";
 /** Re-synchronise le lien créateur ↔ marque via le pseudo du profil (onboarding). */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const userId = (body?.userId as string | undefined)?.trim();
+  const access = await requireActorAccess(request, body?.userId);
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const admin = getSupabaseAdmin();

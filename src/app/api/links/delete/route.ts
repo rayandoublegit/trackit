@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid body", errorFr: "Corps de requête invalide" }, { status: 400 });
   }
 
-  const brandId = String(body.brandId || "").trim();
+  const access = await requireWorkspaceAccess(req, body.brandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   const linkId = String(body.linkId || body.id || "").trim();
 
   if (!brandId || !linkId) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 const supa = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,10 +10,13 @@ const supa = createClient(
 // GET /api/links/metrics?brand_id=...&campaign_id=...(optional)&days=30
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  const brandId = sp.get("brand_id");
+  const requestedBrandId = sp.get("brand_id");
   const campaignId = sp.get("campaign_id");
   const days = Math.min(Number(sp.get("days") ?? 30), 365);
-  if (!brandId) return NextResponse.json({ error: "brand_id required" }, { status: 400 });
+  if (!requestedBrandId) return NextResponse.json({ error: "brand_id required" }, { status: 400 });
+  const access = await requireWorkspaceAccess(req, requestedBrandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
 
   let lq = supa
     .from("affiliate_links")

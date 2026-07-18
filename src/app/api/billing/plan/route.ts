@@ -12,6 +12,7 @@ import {
   syncProfileSubscription,
   type BillingInterval,
 } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -51,11 +52,12 @@ export async function GET(request: NextRequest) {
   if (!admin) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   const { data: profile } = await admin
     .from("profiles")
     .select("plan, subscription_active")
-    .eq("id", user.id)
+    .eq("id", workspace.ownerId)
     .maybeSingle();
 
   let plan: PlanTier = normalizePlan(profile?.plan);
@@ -70,8 +72,8 @@ export async function GET(request: NextRequest) {
     const customerId = await resolveStripeCustomerId(
       admin,
       stripe,
-      user.id,
-      user.email
+      workspace.ownerId,
+      workspace.ownerEmail
     );
 
     if (customerId) {
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
         hasActiveSubscription = ACTIVE_STATUSES.has(subscriptionInfo.status);
 
         if (normalizePlan(profile?.plan) !== plan || !profile?.subscription_active) {
-          await syncProfileSubscription(admin, user.id, {
+          await syncProfileSubscription(admin, workspace.ownerId, {
             plan,
             subscriptionStatus: mapStripeSubscriptionStatus(subscriptionInfo.status),
             stripeCustomerId: customerId,
@@ -116,7 +118,7 @@ export async function GET(request: NextRequest) {
           hasActiveSubscription = true;
 
           if (normalizePlan(profile?.plan) !== plan || !profile?.subscription_active) {
-            await syncProfileSubscription(admin, user.id, {
+            await syncProfileSubscription(admin, workspace.ownerId, {
               plan,
               subscriptionStatus: mapStripeSubscriptionStatus(activeSub.status),
               stripeCustomerId: customerId,
@@ -128,7 +130,7 @@ export async function GET(request: NextRequest) {
         } else if (hasActiveSubscription || plan !== "free") {
           plan = "free";
           hasActiveSubscription = false;
-          await syncProfileSubscription(admin, user.id, {
+          await syncProfileSubscription(admin, workspace.ownerId, {
             plan: "free",
             subscriptionStatus: "inactive",
             stripeCustomerId: customerId,

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { normalizeCreatorHandle } from "@/lib/managed-creator-commission";
 import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
@@ -109,7 +110,9 @@ async function latestAffiliateLinkForCreator(
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = (searchParams.get("userId") || "").trim();
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) {
     return NextResponse.json({ ok: false, error: "Missing userId" }, { status: 400 });
   }

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   computeTrend,
   dayKeyFromIso,
@@ -16,6 +16,7 @@ import {
   type SaleAttributionRow,
 } from "@/lib/campaign-sales-attribution";
 import { dedupeCampaignRows, normalizeCampaignStatus } from "@/lib/campaign-status";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -48,11 +49,14 @@ function outreachReplyScore(status: string): number {
   return 0;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
   const range = parseRange(searchParams.get("range"));
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
+  const authorizedWorkspaceId = await getAuthedUserId(request);
+  if (!authorizedWorkspaceId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (authorizedWorkspaceId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const tzOffset = parseTzOffsetMinutes(searchParams.get("tzOffset"));
   const periodRange = range === "custom" || range === "all" ? "30d" : range;

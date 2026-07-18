@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { randomBytes } from "crypto";
 
@@ -28,7 +29,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 });
   }
 
-  const brandId = (body.brandId || "").trim();
+  const access = await requireWorkspaceAccess(req, body.brandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   if (!brandId) {
     return NextResponse.json({ ok: false, error: "Missing brandId" }, { status: 400 });
   }

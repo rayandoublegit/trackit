@@ -7,6 +7,7 @@ import {
   syncFromCheckoutSession,
   syncSubscriptionPlanForUser,
 } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -50,18 +51,19 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(stripeKey);
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   try {
     let result = sessionId
-      ? await syncFromCheckoutSession(admin, stripe, sessionId, user.id)
+      ? await syncFromCheckoutSession(admin, stripe, sessionId, workspace.ownerId)
       : null;
 
     if (!result) {
       result = await syncSubscriptionPlanForUser(
         admin,
         stripe,
-        user.id,
-        user.email
+        workspace.ownerId,
+        workspace.ownerEmail
       );
     }
 

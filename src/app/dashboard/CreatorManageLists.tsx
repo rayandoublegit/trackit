@@ -285,12 +285,14 @@ const inputStyle: React.CSSProperties = {
 export function CreatorManageLists({
   isMobile,
   plan = "free",
+  workspaceUserId,
   onUpgrade,
   onUpgradePro,
   onReachOut,
 }: {
   isMobile?: boolean;
   plan?: PlanTier;
+  workspaceUserId?: string;
   onUpgrade?: () => void;
   onUpgradePro?: () => void;
   onReachOut?: (creator: FeedCreator) => void;
@@ -360,7 +362,7 @@ export function CreatorManageLists({
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      setBrandId(user.id);
+      setBrandId(workspaceUserId ?? user.id);
       const meta = user.user_metadata as Record<string, unknown> | undefined;
       const name =
         (typeof meta?.full_name === "string" && meta.full_name) ||
@@ -369,7 +371,7 @@ export function CreatorManageLists({
         "";
       setCreatedByName(name);
     })();
-  }, []);
+  }, [workspaceUserId]);
 
   const listRows = useMemo((): CreatorListRow[] => {
     const allLastUpdate = rows.reduce<string | null>((max, r) => {

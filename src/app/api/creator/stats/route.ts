@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { buildCreatorStatsPayload } from "@/lib/creator-account";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,9 @@ const supabaseAdmin = createClient(
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = (searchParams.get("userId") || "").trim();
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const result = await buildCreatorStatsPayload(supabaseAdmin, userId);

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = (await req.json()) as { userId?: string };
-    const userId = body.userId;
+    const body = (await req.json().catch(() => ({}))) as { userId?: string };
 
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
@@ -32,9 +32,14 @@ export async function POST(req: NextRequest) {
       data: { user: cookieUser },
     } = await supabase.auth.getUser();
 
-    const resolvedUserId = cookieUser?.id ?? userId;
-    if (!resolvedUserId) {
+    if (!cookieUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const workspace = await resolveWorkspaceContextForUser(cookieUser);
+    const resolvedUserId = workspace.ownerId;
+    if (body.userId?.trim() && body.userId.trim() !== resolvedUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const admin = getSupabaseAdmin();
@@ -43,16 +48,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { data: authUser, error } = await admin.auth.admin.getUserById(resolvedUserId);
-    if (error || !authUser?.user?.email) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    const resolvedEmail = workspace?.ownerEmail ?? authUser?.user?.email ?? null;
+    if (error || !resolvedEmail) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const stripe = new Stripe(stripeKey);
     const customerId = await resolveStripeCustomerId(
       admin,
       stripe,
       resolvedUserId,
-      authUser.user.email
+      resolvedEmail
     );
 
     if (!customerId) {

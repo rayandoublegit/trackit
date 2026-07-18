@@ -1,36 +1,15 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-async function getAuthedUser(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll() {},
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-  return user;
-}
-
 export async function GET(request: NextRequest) {
-  const user = await getAuthedUser(request);
-  if (!user) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -42,7 +21,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await admin
     .from("creators")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -54,8 +33,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const user = await getAuthedUser(request);
-  if (!user) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -80,7 +59,7 @@ export async function POST(request: NextRequest) {
     .from("creators")
     .upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         handle: username,
         full_name: String(body.display_name ?? username),
         avatar_url: String(body.avatar_url ?? ""),
@@ -103,8 +82,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const user = await getAuthedUser(request);
-  if (!user) {
+  const userId = await getAuthedUserId(request);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -121,7 +100,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  let query = admin.from("creators").delete().eq("user_id", user.id);
+  let query = admin.from("creators").delete().eq("user_id", userId);
   if (creatorId) query = query.eq("id", creatorId);
   else if (handle) query = query.eq("handle", handle);
 

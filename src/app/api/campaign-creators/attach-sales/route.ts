@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,9 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const userId = String(body?.userId || "").trim();
+  const access = await requireWorkspaceAccess(request, body?.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
   const campaignId = String(body?.campaignId || "").trim();
   const creatorId = String(body?.creatorId || "").trim();
 

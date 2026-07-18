@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { backfillCampaignContent } from "@/lib/content-campaign-sync";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,9 @@ type ExistingLinkRow = {
 // Sync the creators linked to a campaign (service role: bypasses RLS).
 export async function POST(request: Request) {
   const body = await request.json();
-  const userId = String(body.userId || "");
+  const access = await requireWorkspaceAccess(request, body.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
   const campaignId = String(body.campaignId || "");
   const creatorIds: string[] = Array.isArray(body.creatorIds)
     ? body.creatorIds.map((id: unknown) => String(id)).filter(Boolean)

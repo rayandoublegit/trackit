@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { findCreatorRowsForProfile } from "@/lib/creator-account";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,9 @@ async function findCreatorContext(userId: string) {
 // GET : liste les scripts destinés à ce créateur
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const { brandIds, creatorRowIds } = await findCreatorContext(userId);
@@ -65,7 +68,9 @@ export async function GET(request: Request) {
 // POST : marque un script comme vu/fait
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
-  const userId = (body?.userId as string | undefined)?.trim();
+  const access = await requireActorAccess(request, body?.userId);
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   const scriptId = (body?.scriptId as string | undefined)?.trim();
   const status = (body?.status as string | undefined)?.trim() || "done";
   if (!userId || !scriptId) return NextResponse.json({ error: "Missing userId or scriptId" }, { status: 400 });

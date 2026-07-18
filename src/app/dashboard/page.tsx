@@ -27,7 +27,7 @@ import {
 } from "@/lib/selection-card-styles";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
-import { supabase } from "@/lib/supabase";
+import { setWorkspaceClientIdentity, supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
@@ -76,7 +76,6 @@ import { NotesView } from "./NotesView";
 import { HomeOverviewView } from "./HomeOverviewView";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsPanel } from "./NotificationsView";
-import { FrVideosBubble, FrYoutubeVideosPanel } from "./FrYoutubeVideosPanel";
 import {
   ensureNotificationsReset,
   getStoredUnreadCount,
@@ -98,6 +97,7 @@ import {
   writeDashboardBootstrap,
 } from "@/lib/dashboard-bootstrap-cache";
 import { useLang } from "@/lib/useLang";
+import type { WorkspaceProfile } from "@/lib/workspace-access";
 import { useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
@@ -171,6 +171,10 @@ function DashboardPageContent() {
   const lang = useLang();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null>(null);
+  const [actorProfile, setActorProfile] = useState<WorkspaceProfile | null>(null);
+  const [workspaceDelegated, setWorkspaceDelegated] = useState(false);
+  const [workspaceOwnerEmail, setWorkspaceOwnerEmail] = useState<string | null>(null);
+  const [workspaceAccessError, setWorkspaceAccessError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -210,7 +214,6 @@ function DashboardPageContent() {
   const isScale = isScalePlan(plan);
   const canUseBasicFeatures = isGrowthOrAbove(plan);
   const [notificationUnread, setNotificationUnread] = useState(0);
-  const [frVideosOpen, setFrVideosOpen] = useState(false);
   const [sidebarCounts, setSidebarCounts] = useState({ activeCampaigns: 0, savedCreators: 0 });
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarRetryRef = useRef(false);
@@ -244,16 +247,12 @@ function DashboardPageContent() {
     }));
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (authUser) {
-      writeDashboardBootstrap(buildBootstrapFromProfile(authUser, profileData));
+      writeDashboardBootstrap(buildBootstrapFromProfile({ ...authUser, id: userId }, profileData));
     }
     void resolveAvatarUrl(supabase, userId, profileData.avatar_url).then((avatar_url) => {
       setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
     });
   }, []);
-
-  useEffect(() => {
-    if (lang !== "fr") setFrVideosOpen(false);
-  }, [lang]);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -343,11 +342,50 @@ function DashboardPageContent() {
           return;
         }
 
-        const cached = readDashboardBootstrap(authUser.id);
+        type WorkspaceContextResponse = {
+          ok?: boolean;
+          blocked?: boolean;
+          error?: string;
+          ownerId?: string;
+          ownerEmail?: string | null;
+          delegated?: boolean;
+          actorProfile?: WorkspaceProfile | null;
+          ownerProfile?: WorkspaceProfile | null;
+        };
+
+        let workspaceContext: WorkspaceContextResponse | null = null;
+        try {
+          const workspaceRes = await fetch("/api/workspace/context", {
+            credentials: "include",
+            cache: "no-store",
+          });
+          workspaceContext = (await workspaceRes.json()) as WorkspaceContextResponse;
+          if (!workspaceRes.ok && workspaceContext.blocked) {
+            setWorkspaceAccessError(
+              workspaceContext.error ||
+                (lang === "fr"
+                  ? "Le compte principal n'est pas encore disponible."
+                  : "The principal account is not available yet."),
+            );
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Normal accounts can safely fall back to their own workspace.
+        }
+
+        const workspaceId = workspaceContext?.ownerId || authUser.id;
+        const workspaceUser = { ...authUser, id: workspaceId } as User;
+        setWorkspaceClientIdentity(authUser.id, workspaceId);
+        setActorProfile(workspaceContext?.actorProfile ?? null);
+        setWorkspaceDelegated(Boolean(workspaceContext?.delegated && workspaceId !== authUser.id));
+        setWorkspaceOwnerEmail(workspaceContext?.ownerEmail ?? authUser.email ?? null);
+
+        const cached = readDashboardBootstrap(workspaceId);
         if (cached?.onboarding_completed) {
           if (cached.isCreator) setIsCreator(true);
           setShopifyStore(cached.shopify_store);
-          setUser(authUser);
+          setUser(workspaceUser);
           avatarRetryRef.current = false;
           setAvatarBroken(false);
           setProfile({
@@ -361,11 +399,15 @@ function DashboardPageContent() {
           setLoading(false);
         }
 
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
-          .eq("id", authUser.id)
-          .maybeSingle();
+        let profileData = workspaceContext?.ownerProfile ?? null;
+        if (!profileData) {
+          const result = await supabase
+            .from("profiles")
+            .select("id, onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
+            .eq("id", workspaceId)
+            .maybeSingle();
+          profileData = result.data as WorkspaceProfile | null;
+        }
 
         if (cancelled) return;
 
@@ -384,7 +426,7 @@ function DashboardPageContent() {
         }
 
         setShopifyStore(profileData.shopify_store || null);
-        setUser(authUser);
+        setUser(workspaceUser);
         avatarRetryRef.current = false;
         setAvatarBroken(false);
         setProfile({
@@ -395,10 +437,10 @@ function DashboardPageContent() {
           shopify_store: profileData.shopify_store ?? null,
           plan: normalizePlan(profileData.plan),
         });
-        writeDashboardBootstrap(buildBootstrapFromProfile(authUser, profileData));
+        writeDashboardBootstrap(buildBootstrapFromProfile(workspaceUser, profileData));
         setLoading(false);
 
-        void resolveAvatarUrl(supabase, authUser.id, profileData.avatar_url).then((avatar_url) => {
+        void resolveAvatarUrl(supabase, workspaceId, profileData.avatar_url).then((avatar_url) => {
           if (cancelled) return;
           setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
         });
@@ -412,7 +454,7 @@ function DashboardPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, lang]);
 
   useEffect(() => {
     if (!user?.id || loading || searchParams.get("upgraded") !== "true") return;
@@ -597,7 +639,6 @@ function DashboardPageContent() {
   }, [view]);
 
   const goToSidebarItem = (targetView: View) => {
-    setFrVideosOpen(false);
     navigate({ view: targetView });
     if (isMobile) setMobileSidebarOpen(false);
   };
@@ -621,6 +662,31 @@ function DashboardPageContent() {
 
   if (loading) {
     return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
+  }
+
+  if (workspaceAccessError) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#FAFAFA",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          fontFamily: "'InterDisplay', 'Inter Display', sans-serif",
+        }}
+      >
+        <div style={{ maxWidth: 440, textAlign: "center", background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 18, padding: "32px 34px" }}>
+          <h1 style={{ margin: "0 0 10px", fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+            {lang === "fr" ? "Espace principal indisponible" : "Principal workspace unavailable"}
+          </h1>
+          <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.55 }}>
+            {workspaceAccessError}
+          </p>
+        </div>
+      </div>
+    );
   }
 
   const sidebarWidth = sidebarCollapsed ? 48 : 128;
@@ -783,6 +849,8 @@ function DashboardPageContent() {
         <DashboardTopBar
           lang={lang}
           profile={profile}
+          actorProfile={actorProfile}
+          workspaceDelegated={workspaceDelegated}
           avatarBroken={avatarBroken}
           onAvatarError={handleSidebarAvatarError}
           shopifyConnected={Boolean(shopifyStore ?? profile?.shopify_store)}
@@ -793,8 +861,6 @@ function DashboardPageContent() {
           userId={user?.id}
           notificationUnread={notificationUnread}
           onNotificationUnreadChange={setNotificationUnread}
-          frVideosOpen={frVideosOpen}
-          onToggleFrVideos={() => setFrVideosOpen((v) => !v)}
           onNavigate={goToSidebarItem}
           onConnectShopify={() => goToSidebarItem("integrations")}
         />
@@ -802,14 +868,12 @@ function DashboardPageContent() {
           style={{
             flex: 1,
             minHeight: 0,
-            overflow: frVideosOpen || view === "discovery" ? "hidden" : "auto",
-            display: frVideosOpen || view === "discovery" ? "flex" : "block",
+            overflow: view === "discovery" ? "hidden" : "auto",
+            display: view === "discovery" ? "flex" : "block",
             flexDirection: "column",
           }}
         >
-        {frVideosOpen && lang === "fr" ? (
-          <FrYoutubeVideosPanel isMobile={isMobile} onClose={() => setFrVideosOpen(false)} />
-        ) : creatorAccessRevoked ? (
+        {creatorAccessRevoked ? (
           <div
             style={{
               flex: 1,
@@ -859,6 +923,7 @@ function DashboardPageContent() {
           <DiscoveryFeed
             isMobile={isMobile}
             plan={plan}
+            workspaceUserId={user?.id}
             onUpgrade={openWebsitePricing}
             onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
@@ -1020,7 +1085,12 @@ function DashboardPageContent() {
           isCreator ? (
             <CreatorSettings userId={user.id} isMobile={isMobile} onSaved={() => void reloadProfile(user.id)} />
           ) : (
-            <SettingsView isMobile={isMobile} onProfileUpdate={() => void reloadProfile(user.id)} />
+            <SettingsView
+              isMobile={isMobile}
+              workspaceUserId={user.id}
+              workspaceEmail={workspaceOwnerEmail}
+              onProfileUpdate={() => void reloadProfile(user.id)}
+            />
           )
         )}
         {view === "billing" && user && (
@@ -4841,6 +4911,8 @@ function planLabel(lang: "en" | "fr", isCreator: boolean, isScale: boolean, isPr
 function DashboardTopBar({
   lang,
   profile,
+  actorProfile,
+  workspaceDelegated,
   avatarBroken,
   onAvatarError,
   shopifyConnected,
@@ -4851,13 +4923,13 @@ function DashboardTopBar({
   userId,
   notificationUnread,
   onNotificationUnreadChange,
-  frVideosOpen,
-  onToggleFrVideos,
   onNavigate,
   onConnectShopify,
 }: {
   lang: "en" | "fr";
   profile: { full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null;
+  actorProfile: WorkspaceProfile | null;
+  workspaceDelegated: boolean;
   avatarBroken: boolean;
   onAvatarError: () => void;
   shopifyConnected: boolean;
@@ -4868,14 +4940,13 @@ function DashboardTopBar({
   userId?: string;
   notificationUnread: number;
   onNotificationUnreadChange: (count: number) => void;
-  frVideosOpen: boolean;
-  onToggleFrVideos: () => void;
   onNavigate: (view: View) => void;
   onConnectShopify: () => void;
 }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [affiliatePanelOpen, setAffiliatePanelOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [actorAvatarBroken, setActorAvatarBroken] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
@@ -4891,8 +4962,15 @@ function DashboardTopBar({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [accountOpen, notificationsOpen]);
 
-  const initials = (profile?.full_name?.[0] || profile?.username?.[0] || "?").toUpperCase();
-  const username = profile?.username ? `@${profile.username}` : initials;
+  useEffect(() => {
+    setActorAvatarBroken(false);
+  }, [actorProfile?.avatar_url]);
+
+  const displayProfile = workspaceDelegated && actorProfile ? actorProfile : profile;
+  const initials = (displayProfile?.full_name?.[0] || displayProfile?.username?.[0] || "?").toUpperCase();
+  const ownerInitials = (profile?.full_name?.[0] || profile?.username?.[0] || "?").toUpperCase();
+  const username = displayProfile?.username ? `@${displayProfile.username}` : initials;
+  const ownerUsername = profile?.username ? `@${profile.username}` : ownerInitials;
   const storeName = profile?.business_name?.trim() || profile?.shopify_store?.trim() || null;
   const plan = planLabel(lang, isCreator, isScale, isPro, isBasic);
 
@@ -4949,16 +5027,6 @@ function DashboardTopBar({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginLeft: "auto" }}>
-        {lang === "fr" ? (
-          <FrVideosBubble
-            active={frVideosOpen}
-            onClick={() => {
-              setAccountOpen(false);
-              setNotificationsOpen(false);
-              onToggleFrVideos();
-            }}
-          />
-        ) : null}
         <div ref={notificationsRef} style={{ position: "relative" }}>
           <button
             type="button"
@@ -5062,12 +5130,61 @@ function DashboardTopBar({
             maxWidth: 220,
           }}
         >
-          <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#E8EEFC", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", flexShrink: 0 }}>
-            {profile?.avatar_url && !avatarBroken ? (
-              <img key={profile.avatar_url} src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={onAvatarError} />
-            ) : (
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#0047FF" }}>{initials}</span>
+          <div style={{ display: "flex", alignItems: "center", paddingLeft: workspaceDelegated ? 8 : 0, flexShrink: 0 }}>
+            {workspaceDelegated && (
+              <div
+                title={ownerUsername}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: "#F0F0F0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                  border: "2px solid #FFFFFF",
+                  marginLeft: -8,
+                  marginRight: -9,
+                  zIndex: 1,
+                  boxSizing: "border-box",
+                }}
+              >
+                {profile?.avatar_url && !avatarBroken ? (
+                  <img key={profile.avatar_url} src={profile.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={onAvatarError} />
+                ) : (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: "#5A5A5A" }}>{ownerInitials}</span>
+                )}
+              </div>
             )}
+            <div
+              title={username}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "#E8EEFC",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                overflow: "hidden",
+                border: workspaceDelegated ? "2px solid #FFFFFF" : "none",
+                zIndex: 2,
+                boxSizing: "border-box",
+              }}
+            >
+              {displayProfile?.avatar_url && !(workspaceDelegated ? actorAvatarBroken : avatarBroken) ? (
+                <img
+                  key={displayProfile.avatar_url}
+                  src={displayProfile.avatar_url}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  onError={workspaceDelegated ? () => setActorAvatarBroken(true) : onAvatarError}
+                />
+              ) : (
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#0047FF" }}>{initials}</span>
+              )}
+            </div>
           </div>
           <span style={{ fontSize: 13, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {username}
@@ -5080,7 +5197,14 @@ function DashboardTopBar({
           <div style={dropdownStyle}>
             <div style={{ padding: "10px 12px 8px" }}>
               <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 2px", letterSpacing: "-0.02em" }}>{username}</p>
-              <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0, letterSpacing: "-0.01em" }}>{plan}</p>
+              <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0, letterSpacing: "-0.01em" }}>
+                {workspaceDelegated
+                  ? (lang === "fr" ? `Admin de ${ownerUsername}` : `Admin for ${ownerUsername}`)
+                  : plan}
+              </p>
+              {workspaceDelegated && (
+                <p style={{ fontSize: 12, color: "#0047FF", margin: "4px 0 0", letterSpacing: "-0.01em" }}>{plan}</p>
+              )}
               {storeName && !isCreator && (
                 <p style={{ fontSize: 12, color: "#0047FF", margin: "4px 0 0", letterSpacing: "-0.01em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {storeName}

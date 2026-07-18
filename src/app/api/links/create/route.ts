@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   buildAffiliateShortLink,
@@ -31,7 +32,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid body", errorFr: "Corps de requête invalide" }, { status: 400 });
   }
 
-  const brandId = String(body.brandId || "").trim();
+  const access = await requireWorkspaceAccess(req, body.brandId);
+  if ("error" in access) return access.error;
+  const brandId = access.workspaceId;
   const creatorUsernameRaw = String(body.creatorUsername || body.creator_username || "").trim();
   const destinationRaw = String(body.destinationUrl || body.destination_url || "").trim();
   const campaignId = String(body.campaignId || body.campaign_id || "").trim() || null;

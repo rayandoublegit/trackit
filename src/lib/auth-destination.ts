@@ -1,9 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  HAYTAM_WORKSPACE_ADMIN_EMAIL,
+  normalizeWorkspaceEmail,
+} from "@/lib/workspace-presets";
 
 export async function getAuthRedirectPath(
   supabase: SupabaseClient,
   userId: string
 ): Promise<string> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (normalizeWorkspaceEmail(user?.email) === HAYTAM_WORKSPACE_ADMIN_EMAIL) {
+    return "/dashboard";
+  }
+
   const { data } = await supabase
     .from("profiles")
     .select("onboarding_completed, account_type")

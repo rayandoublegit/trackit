@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,9 @@ async function findCreatorRow(userId: string) {
 // GET : etat de la connexion Stripe du createur (connecte ? onboarde ?).
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+  const access = await requireActorAccess(request, searchParams.get("userId"));
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const row = await findCreatorRow(userId);
@@ -72,7 +75,9 @@ export async function POST(request: Request) {
   if (!stripeKey) return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
 
   const body = await request.json().catch(() => null);
-  const userId = body?.userId as string | undefined;
+  const access = await requireActorAccess(request, body?.userId);
+  if ("error" in access) return access.error;
+  const userId = access.actorId;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const row = await findCreatorRow(userId);

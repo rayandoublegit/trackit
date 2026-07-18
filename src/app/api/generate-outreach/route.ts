@@ -6,6 +6,7 @@ import {
   parseOutreachGenerationResponse,
 } from "@/lib/outreach-ai-prompt";
 import { getMonthlyAIMessageLimit, normalizePlan } from "@/lib/plan-limits";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -31,11 +32,12 @@ export async function POST(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("plan")
-    .eq("id", user.id)
+    .eq("id", workspace.ownerId)
     .maybeSingle();
   const plan = normalizePlan(profile?.plan);
   const aiLimit = getMonthlyAIMessageLimit(plan);

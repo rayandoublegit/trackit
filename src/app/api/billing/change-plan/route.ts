@@ -7,6 +7,7 @@ import {
   changeSubscriptionPlanForUser,
   type PaidPlanTier,
 } from "@/lib/stripe-billing";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
@@ -58,15 +59,16 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(stripeKey);
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   try {
     const result = await changeSubscriptionPlanForUser(
       admin,
       stripe,
-      user.id,
+      workspace.ownerId,
       tier as PaidPlanTier,
       annual,
-      user.email
+      workspace.ownerEmail
     );
 
     if (!result.updated) {

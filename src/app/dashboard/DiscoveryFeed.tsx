@@ -1057,7 +1057,7 @@ function writeFreeDiscoveryGateLock(locked: boolean) {
   else window.localStorage.removeItem(FREE_DISCOVERY_GATE_LOCK_KEY);
 }
 
-export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
+export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onReachOut }: { plan: PlanTier; workspaceUserId?: string; isMobile?: boolean; onUpgrade: () => void; onReachOut?: (creator: FeedCreator) => void }) {
   const lang = useLang();
   const { navState, navigate, goBack } = useDashboardNavigation();
   const t = discoveryCopy(lang);
@@ -1172,9 +1172,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     if (shouldSyncQuota) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: 0 };
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { count: 0 };
-      const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+      if (!workspaceUserId) return { count: 0 };
+      const quota = await syncDiscoveryQuota(supabase, workspaceUserId, plan);
       if (!quota) return { count: 0 };
       setDiscoveriesResetAt(quota.resetAt);
       discoveryUsedRef.current = Math.max(discoveryUsedRef.current, quota.used ?? 0);
@@ -1229,10 +1228,9 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     if (countsTowardQuota && !quotaBlocked) {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return { count: deduped.length };
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { count: deduped.length };
+      if (!workspaceUserId) return { count: deduped.length };
       const currentUsed = Math.max(quotaUsedBefore, discoveryUsedRef.current);
-      const next = await incrementDiscoveryQuota(supabase, user.id, plan, currentUsed);
+      const next = await incrementDiscoveryQuota(supabase, workspaceUserId, plan, currentUsed);
       discoveryUsedRef.current = next;
       setDiscoveriesUsed(next);
       const exhausted = next >= discoveryLimit!;
@@ -1246,7 +1244,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     }
 
     return { count: deduped.length, blocked: quotaBlocked };
-  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, batchSize, allNichesBrowse, isGlobalSearch, lockFreeDiscoveryGate]);
+  }, [apiParams, plan, discoveryLimit, hasDiscoveryCap, batchSize, allNichesBrowse, isGlobalSearch, lockFreeDiscoveryGate, workspaceUserId]);
 
   useEffect(() => {
     fetchGenRef.current += 1;
@@ -1281,9 +1279,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     void (async () => {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+      if (!workspaceUserId) return;
+      const quota = await syncDiscoveryQuota(supabase, workspaceUserId, plan);
       if (!quota) return;
       setDiscoveriesResetAt(quota.resetAt);
       discoveryUsedRef.current = quota.used ?? 0;
@@ -1292,7 +1289,7 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       setShowDiscoveryGate(quota.blocked);
       if (quota.blocked) setHasMore(false);
     })();
-  }, [plan, hasDiscoveryCap, filters, lockFreeDiscoveryGate]);
+  }, [plan, hasDiscoveryCap, filters, lockFreeDiscoveryGate, workspaceUserId]);
 
   useEffect(() => {
     if (!hasDiscoveryCap || !showDiscoveryGate) return;
@@ -1301,9 +1298,8 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
       if (ms == null || ms > 0) return;
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const quota = await syncDiscoveryQuota(supabase, user.id, plan);
+      if (!workspaceUserId) return;
+      const quota = await syncDiscoveryQuota(supabase, workspaceUserId, plan);
       if (quota) {
         setDiscoveriesResetAt(quota.resetAt);
         discoveryUsedRef.current = quota.used ?? 0;
@@ -1315,27 +1311,25 @@ export function DiscoveryFeed({ plan, isMobile, onUpgrade, onReachOut }: { plan:
     void tick();
     const id = setInterval(() => { void tick(); }, 60_000);
     return () => clearInterval(id);
-  }, [showDiscoveryGate, discoveriesResetAt, plan, hasDiscoveryCap]);
+  }, [showDiscoveryGate, discoveriesResetAt, plan, hasDiscoveryCap, workspaceUserId]);
 
   useEffect(() => {
     const loadProduct = async () => {
       const { supabase } = await import("@/lib/supabase");
       if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data } = await supabase.from("profiles").select("business_name").eq("id", user.id).maybeSingle();
+      if (!workspaceUserId) return;
+      const { data } = await supabase.from("profiles").select("business_name").eq("id", workspaceUserId).maybeSingle();
       if (data?.business_name) setProduct(data.business_name);
     };
     void loadProduct();
-  }, []);
+  }, [workspaceUserId]);
 
   const persistProduct = async () => {
     const trimmed = product.trim();
     const { supabase } = await import("@/lib/supabase");
     if (!supabase) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("profiles").update({ business_name: trimmed || null }).eq("id", user.id);
+    if (!workspaceUserId) return;
+    await supabase.from("profiles").update({ business_name: trimmed || null }).eq("id", workspaceUserId);
   };
 
   const loadNextBatch = useCallback(async () => {

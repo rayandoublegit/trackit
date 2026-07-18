@@ -5,6 +5,7 @@ import {
   normalizeProfileUsername,
 } from "@/lib/profile-username";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export async function GET(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const workspace = await resolveWorkspaceContextForUser(user);
 
   const username = normalizeProfileUsername(request.nextUrl.searchParams.get("username") ?? "");
   if (!isValidProfileUsername(username)) {
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
     .from("profiles")
     .select("id")
     .eq("username", username)
-    .neq("id", user.id)
+    .neq("id", workspace.ownerId)
     .maybeSingle();
 
   return NextResponse.json({ available: !data });

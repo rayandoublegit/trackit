@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { applyDiscountCodeToCreator, ensureCreatorForHandle } from "@/lib/creator-promo-codes";
 import { normalizeCreatorHandle } from "@/lib/managed-creator-commission";
 import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
@@ -49,7 +50,9 @@ async function syncCrmSnapshot(
 // Ecrit le code promo (+ ref affiliation) sur le createur et le CRM Gérer.
 export async function POST(request: Request) {
   const body = await request.json();
-  const userId = String(body.userId || "");
+  const access = await requireWorkspaceAccess(request, body.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
   let creatorId = String(body.creatorId || "");
   const handle = String(body.handle || body.creator || "").trim();
   const code = String(body.code || "").trim().toUpperCase();

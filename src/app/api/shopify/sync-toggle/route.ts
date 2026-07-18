@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,11 @@ const supabaseAdmin = createClient(
 // Active ou desactive la synchronisation automatique (webhook Shopify orders/create).
 // POST { userId, enabled: boolean }
 export async function POST(request: NextRequest) {
-  const { userId, enabled } = await request.json();
+  const body = await request.json();
+  const access = await requireWorkspaceAccess(request, body.userId);
+  if ("error" in access) return access.error;
+  const userId = access.workspaceId;
+  const enabled = body.enabled;
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
 
   const { data: store } = await supabaseAdmin

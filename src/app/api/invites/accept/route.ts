@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireActorAccess } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   CREATOR_ROW_SYNC_SELECT,
@@ -47,7 +48,9 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 }); }
 
   const token = (body.token || "").trim();
-  const creatorId = (body.creatorId || "").trim();
+  const access = await requireActorAccess(req, body.creatorId);
+  if ("error" in access) return access.error;
+  const creatorId = access.actorId;
   const fullName = (body.fullName || "").trim();
   const socialHandle = normalizeCreatorHandle(body.socialHandle);
   if (!token || !creatorId) return NextResponse.json({ ok: false, error: "Missing token or creatorId" }, { status: 400 });

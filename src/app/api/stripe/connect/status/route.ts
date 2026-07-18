@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,10 @@ export async function POST(request: Request) {
     }
     const stripe = new Stripe(stripeKey);
 
-    const { userId } = (await request.json()) as { userId?: string };
+    const body = (await request.json()) as { userId?: string };
+    const access = await requireWorkspaceAccess(request, body.userId);
+    if ("error" in access) return access.error;
+    const userId = access.workspaceId;
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }

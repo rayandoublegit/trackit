@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { requireWorkspaceAccess } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,9 @@ export async function POST(request: Request) {
   }
   const stripe = new Stripe(stripeKey);
 
-  const { creatorId, email } = await request.json();
+  const body = await request.json().catch(() => ({}));
+  const creatorId = body.creatorId;
+  const email = body.email;
   if (!creatorId) {
     return NextResponse.json({ error: "Missing creatorId" }, { status: 400 });
   }
@@ -24,9 +27,12 @@ export async function POST(request: Request) {
   // Look up creator + any existing connected account
   const { data: creator } = await supabaseAdmin
     .from("creators")
-    .select("id, stripe_account_id")
+    .select("id, stripe_account_id, user_id")
     .eq("id", creatorId)
     .single();
+
+  const access = await requireWorkspaceAccess(request, creator?.user_id ? String(creator.user_id) : null);
+  if ("error" in access) return access.error;
 
   let accountId = creator?.stripe_account_id as string | undefined;
 
