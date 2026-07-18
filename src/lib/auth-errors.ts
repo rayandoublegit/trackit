@@ -13,7 +13,13 @@ const AUTH_ERROR_FR: Record<string, string> = {
 };
 
 export function translateAuthError(message: string, lang: Lang): string {
-  if (lang !== "fr") return message;
   const key = message.trim().toLowerCase();
+  if (
+    key.includes("exceed_storage_size_quota") ||
+    key.includes("service for this project is restricted")
+  ) {
+    return "Trackit est actuellement en maintenance.";
+  }
+  if (lang !== "fr") return message;
   return AUTH_ERROR_FR[key] ?? message;
 }
