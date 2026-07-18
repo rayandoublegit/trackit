@@ -208,13 +208,13 @@ const LABEL_TO_BUSINESS_TYPE: Record<string, string> = {
 export function SettingsView({
   onProfileUpdate,
   isMobile,
-  workspaceUserId,
-  workspaceEmail,
+  actorUserId,
+  actorEmail,
 }: {
   onProfileUpdate?: () => void;
   isMobile?: boolean;
-  workspaceUserId?: string;
-  workspaceEmail?: string | null;
+  actorUserId: string;
+  actorEmail?: string | null;
 }) {
   useDisplayCurrency();
   const lang = useLang();
@@ -232,16 +232,19 @@ export function SettingsView({
 
   const reloadProfile = async () => {
     if (!supabase) return;
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const { data: { session } } = await supabase.auth.getSession();
+    const authUser = session?.user;
     if (!authUser) return;
-    const effectiveUser = workspaceUserId
-      ? ({ ...authUser, id: workspaceUserId, email: workspaceEmail ?? authUser.email } as User)
-      : authUser;
-    setUser(effectiveUser);
+    const actorUser = {
+      ...authUser,
+      id: actorUserId,
+      email: actorEmail ?? authUser.email,
+    } as User;
+    setUser(actorUser);
     const { data } = await supabase
       .from("profiles")
       .select("full_name, username, avatar_url, business_name, business_type, niche, shopify_store_url")
-      .eq("id", effectiveUser.id)
+      .eq("id", actorUserId)
       .maybeSingle();
     if (data) {
       // Keep the DB URL as source of truth — never overwrite with a short-lived signed URL.
@@ -258,7 +261,7 @@ export function SettingsView({
       await reloadProfile();
       setLoading(false);
     })();
-  }, [workspaceUserId, workspaceEmail]);
+  }, [actorUserId, actorEmail]);
 
   useEffect(() => {
     const onProfileUpdated = (event: Event) => {
@@ -275,7 +278,7 @@ export function SettingsView({
     };
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
-  }, [workspaceUserId, workspaceEmail]);
+  }, [actorUserId, actorEmail]);
 
   return (
     <>

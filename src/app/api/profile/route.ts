@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthedUserId } from "@/lib/api-auth";
+import { getAuthedActorId } from "@/lib/api-auth";
 import { saveUserProfile } from "@/lib/profile-persist";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const userId = await getAuthedUserId(request);
+  const userId = await getAuthedActorId(request);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = getSupabaseAdmin();

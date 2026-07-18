@@ -172,6 +172,7 @@ function DashboardPageContent() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null>(null);
   const [actorProfile, setActorProfile] = useState<WorkspaceProfile | null>(null);
+  const [actorEmail, setActorEmail] = useState<string | null>(null);
   const [workspaceDelegated, setWorkspaceDelegated] = useState(false);
   const [workspaceOwnerEmail, setWorkspaceOwnerEmail] = useState<string | null>(null);
   const [workspaceAccessError, setWorkspaceAccessError] = useState<string | null>(null);
@@ -252,6 +253,24 @@ function DashboardPageContent() {
     void resolveAvatarUrl(supabase, userId, profileData.avatar_url).then((avatar_url) => {
       setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
     });
+  }, []);
+
+  const reloadActorProfile = useCallback(async () => {
+    try {
+      const response = await fetch("/api/workspace/context", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+      const context = (await response.json()) as {
+        actorEmail?: string | null;
+        actorProfile?: WorkspaceProfile | null;
+      };
+      setActorEmail(context.actorEmail ?? null);
+      setActorProfile(context.actorProfile ?? null);
+    } catch {
+      // Keep the last actor identity visible if refreshing it fails.
+    }
   }, []);
 
   useEffect(() => {
@@ -346,6 +365,8 @@ function DashboardPageContent() {
           ok?: boolean;
           blocked?: boolean;
           error?: string;
+          actorId?: string;
+          actorEmail?: string | null;
           ownerId?: string;
           ownerEmail?: string | null;
           delegated?: boolean;
@@ -378,6 +399,7 @@ function DashboardPageContent() {
         const workspaceUser = { ...authUser, id: workspaceId } as User;
         setWorkspaceClientIdentity(authUser.id, workspaceId);
         setActorProfile(workspaceContext?.actorProfile ?? null);
+        setActorEmail(workspaceContext?.actorEmail ?? authUser.email ?? null);
         setWorkspaceDelegated(Boolean(workspaceContext?.delegated && workspaceId !== authUser.id));
         setWorkspaceOwnerEmail(workspaceContext?.ownerEmail ?? authUser.email ?? null);
 
@@ -1087,9 +1109,15 @@ function DashboardPageContent() {
           ) : (
             <SettingsView
               isMobile={isMobile}
-              workspaceUserId={user.id}
-              workspaceEmail={workspaceOwnerEmail}
-              onProfileUpdate={() => void reloadProfile(user.id)}
+              actorUserId={actorProfile?.id ?? user.id}
+              actorEmail={actorEmail}
+              onProfileUpdate={() => {
+                if (workspaceDelegated) {
+                  void reloadActorProfile();
+                } else {
+                  void reloadProfile(user.id);
+                }
+              }}
             />
           )
         )}

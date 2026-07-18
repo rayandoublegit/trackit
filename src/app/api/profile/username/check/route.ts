@@ -1,40 +1,16 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { getAuthedActorId } from "@/lib/api-auth";
 import {
   isValidProfileUsername,
   normalizeProfileUsername,
 } from "@/lib/profile-username";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 export async function GET(request: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.json({ error: "Not configured" }, { status: 500 });
-  }
-
-  const response = NextResponse.json({ available: false });
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const actorId = await getAuthedActorId(request);
+  if (!actorId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const workspace = await resolveWorkspaceContextForUser(user);
 
   const username = normalizeProfileUsername(request.nextUrl.searchParams.get("username") ?? "");
   if (!isValidProfileUsername(username)) {
@@ -50,7 +26,7 @@ export async function GET(request: NextRequest) {
     .from("profiles")
     .select("id")
     .eq("username", username)
-    .neq("id", workspace.ownerId)
+    .neq("id", actorId)
     .maybeSingle();
 
   return NextResponse.json({ available: !data });
