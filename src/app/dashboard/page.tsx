@@ -3267,36 +3267,11 @@ function ShopifyConnectPage({
             style={{
               position: "relative",
               borderRadius: 28,
-              background: "linear-gradient(145deg, #95BF47 0%, #5E8E3E 55%, #3D6B2A 100%)",
+              background: "transparent",
               padding: isMobile ? "32px 20px" : "40px 32px",
               minHeight: isMobile ? 360 : 480,
             }}
           >
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: 24,
-                right: 32,
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.14)",
-              }}
-            />
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                bottom: 32,
-                left: 24,
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.1)",
-              }}
-            />
-
             <div
               style={{
                 position: "relative",
@@ -3304,7 +3279,7 @@ function ShopifyConnectPage({
                 borderRadius: 20,
                 boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
                 padding: isMobile ? "24px 20px" : "32px 28px",
-                border: "1px solid rgba(255,255,255,0.8)",
+                border: "1px solid #EFEFEF",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>

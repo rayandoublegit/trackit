@@ -127,7 +127,7 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
       style={{
         position: "relative",
         borderRadius: 28,
-        background: "linear-gradient(145deg, #0047FF 0%, #0038CC 55%, #002D99 100%)",
+        background: "transparent",
         padding: isMobile ? "32px 20px" : "40px 32px",
         minHeight: isMobile ? 360 : 440,
         display: "flex",
@@ -135,31 +135,6 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
         justifyContent: "center",
       }}
     >
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: 24,
-          right: 32,
-          width: 80,
-          height: 80,
-          borderRadius: "50%",
-          background: "rgba(255,255,255,0.12)",
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          bottom: 32,
-          left: 24,
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          background: "rgba(255,255,255,0.08)",
-        }}
-      />
-
       <div
         style={{
           position: "relative",
@@ -169,7 +144,7 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
           borderRadius: 20,
           boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
           padding: "24px 22px 18px",
-          border: "1px solid rgba(255,255,255,0.8)",
+          border: "1px solid #EFEFEF",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
@@ -305,7 +280,7 @@ export function PayItWelcomeLoading({ isMobile }: { isMobile?: boolean }) {
           }}
         >
           <div style={{ height: 420, borderRadius: 16, background: "#F5F5F5" }} />
-          <div style={{ height: 440, borderRadius: 28, background: "#EEF2FF" }} />
+          <div style={{ height: 440, borderRadius: 28, background: "#F5F5F5" }} />
         </div>
       </div>
     </div>

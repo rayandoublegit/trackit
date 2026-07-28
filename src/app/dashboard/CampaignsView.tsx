@@ -1967,7 +1967,7 @@ function CampaignsEmptyState({
             style={{
               position: "relative",
               borderRadius: 28,
-              background: "linear-gradient(145deg, #0047FF 0%, #0038CC 55%, #002D99 100%)",
+              background: "transparent",
               padding: isMobile ? "32px 20px" : "40px 32px",
               minHeight: isMobile ? 320 : 420,
               display: "flex",
@@ -1975,32 +1975,6 @@ function CampaignsEmptyState({
               justifyContent: "center",
             }}
           >
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: 24,
-                right: 32,
-                width: 80,
-                height: 80,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.12)",
-                filter: "blur(2px)",
-              }}
-            />
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                bottom: 32,
-                left: 24,
-                width: 56,
-                height: 56,
-                borderRadius: "50%",
-                background: "rgba(255,255,255,0.08)",
-              }}
-            />
-
             <div
               style={{
                 position: "relative",
@@ -2010,7 +1984,7 @@ function CampaignsEmptyState({
                 borderRadius: 20,
                 boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
                 padding: "28px 24px 20px",
-                border: "1px solid rgba(255,255,255,0.8)",
+                border: "1px solid #EFEFEF",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
