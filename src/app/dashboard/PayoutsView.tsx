@@ -329,29 +329,29 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
   const list = useMemo(() => notifications, [notifications]);
   const groupedSales = useMemo(() => groupSalesBySection(list), [list]);
 
+  // Same table leader as CreatorListTable / CreatorsPayoutTable
   const thStyle: React.CSSProperties = {
-    padding: "16px 22px",
-    fontSize: 13,
+    padding: "16px 20px",
+    fontSize: 14,
     fontWeight: 600,
-    color: "#6B7280",
+    color: "#1A1A1A",
     textAlign: "left",
     borderBottom: "1px solid #EFEFEF",
-    background: "#FFFFFF",
+    background: "#FAFAFA",
     whiteSpace: "nowrap",
-    letterSpacing: "-0.01em",
   };
 
   const tdStyle: React.CSSProperties = {
-    padding: "18px 22px",
+    padding: "16px 20px",
     fontSize: 15,
     color: "#1A1A1A",
     borderBottom: "1px solid #F5F5F5",
     verticalAlign: "middle",
-    letterSpacing: "-0.02em",
+    whiteSpace: "nowrap",
   };
 
   const sectionRowStyle: React.CSSProperties = {
-    padding: "10px 22px",
+    padding: "10px 20px",
     fontSize: 12,
     fontWeight: 600,
     color: "#6B7280",
@@ -413,7 +413,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
           </div>
         </div>
 
-        <div style={{ position: "relative", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto" }}>
+        <div style={{ position: "relative", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto", background: "#FFFFFF", WebkitOverflowScrolling: "touch" }}>
           {paused && (
             <div
               style={{
@@ -822,25 +822,27 @@ function CreatorsPayoutTable({
     dir: "desc",
   });
 
+  // Exact same leader styles as CreatorListTable (Gérer les créateurs)
   const thStyle: React.CSSProperties = {
-    padding: "20px 22px",
-    fontSize: 15,
+    padding: "16px 20px",
+    fontSize: 14,
     fontWeight: 600,
     color: "#1A1A1A",
     textAlign: "left",
     borderBottom: "1px solid #EFEFEF",
-    background: "#FFFFFF",
+    background: "#FAFAFA",
     whiteSpace: "nowrap",
     cursor: "pointer",
     userSelect: "none",
   };
 
   const tdStyle: React.CSSProperties = {
-    padding: "20px 22px",
-    fontSize: 16,
+    padding: "16px 20px",
+    fontSize: 15,
     color: "#1A1A1A",
     borderBottom: "1px solid #F5F5F5",
     verticalAlign: "middle",
+    whiteSpace: "nowrap",
   };
 
   const toggleSort = (key: PayoutTableSortKey) => {
@@ -879,7 +881,16 @@ function CreatorsPayoutTable({
   ];
 
   return (
-    <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto", marginBottom: 36 }}>
+    <div
+      style={{
+        border: "1px solid #EFEFEF",
+        borderRadius: 16,
+        overflow: "auto",
+        marginBottom: 36,
+        background: "#FFFFFF",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
       <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 720 : undefined }}>
         <thead>
           <tr>
@@ -889,13 +900,15 @@ function CreatorsPayoutTable({
                 <PayoutSortArrows active={sort.key === col.key} dir={sort.dir} />
               </th>
             ))}
-            <th style={{ ...thStyle, cursor: "default", width: 56 }}>{lang === "fr" ? "Actions" : "Actions"}</th>
+            <th style={{ ...thStyle, cursor: "default", width: 56 }}>
+              {lang === "fr" ? "Actions" : "Actions"}
+            </th>
           </tr>
         </thead>
         <tbody>
           {sortedCreators.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + 1} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+              <td colSpan={columns.length + 1} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48, whiteSpace: "normal" }}>
                 {lang === "fr" ? "Aucun créateur pour le moment." : "No creators yet."}
               </td>
             </tr>
@@ -920,27 +933,29 @@ function CreatorsPayoutTable({
                 >
                   <td style={{ ...tdStyle, fontWeight: 500 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <CreatorAvatar src={creator.avatar_url} username={creator.handle} displayName={name} size={40} alt={name} />
+                      <CreatorAvatar src={creator.avatar_url} username={creator.handle} displayName={name} size={44} alt={name} />
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 500, letterSpacing: "-0.02em" }}>{name}</div>
+                        <div style={{ fontWeight: 500 }}>{name}</div>
                         {handle && (
-                          <div style={{ fontSize: 14, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 2 }}>
+                          <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 2 }}>
                             @{String(handle).replace(/^@/, "")}
                           </div>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td style={{ ...tdStyle, fontWeight: 600, color: "#1A1A1A" }}>
-                    {formatCurrency(balance, lang)}
-                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>{formatCurrency(balance, lang)}</td>
                   <td style={tdStyle}>
                     <span
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        background: "#F5F5F5",
+                        border: "1px solid #EFEFEF",
+                        borderRadius: 8,
+                        padding: "6px 12px",
                         fontSize: 14,
-                        fontWeight: 600,
                         color: "#1A1A1A",
-                        letterSpacing: "-0.01em",
                       }}
                     >
                       {methodLabel}
@@ -949,24 +964,22 @@ function CreatorsPayoutTable({
                   <td style={tdStyle}>{formatCurrency(Number(creator.total_earned) || 0, lang)}</td>
                   <td style={tdStyle}>{creator.total_sales ?? 0}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
-                    {balance > 0 && (
-                      <button
-                        type="button"
-                        aria-label={lang === "fr" ? `Payer ${name}` : `Pay ${name}`}
-                        onClick={() => onSelectCreator(creator)}
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          cursor: "pointer",
-                          padding: 6,
-                          color: "#1A1A1A",
-                        }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                          <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={lang === "fr" ? `Ouvrir ${name}` : `Open ${name}`}
+                      onClick={() => onSelectCreator(creator)}
+                      style={{
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        padding: 6,
+                        color: "#1A1A1A",
+                      }}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                        <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               );
@@ -1309,20 +1322,6 @@ function computePayoutOverviewStats(
   };
 }
 
-function buildCumulativeValues(buckets: CommissionDayBucket[]) {
-  let sum = 0;
-  return buckets.map((bucket) => {
-    sum = round2(sum + bucket.earned);
-    return sum;
-  });
-}
-
-/** Straight segments only — readable, no exaggerated curves. */
-function buildLinePath(points: { x: number; y: number }[]) {
-  if (points.length === 0) return "";
-  return points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
-}
-
 function chartAxisIndices(count: number): number[] {
   if (count <= 1) return [0];
   if (count <= 4) return Array.from({ length: count }, (_, i) => i);
@@ -1334,8 +1333,35 @@ function chartAxisIndices(count: number): number[] {
   return [...indices].sort((a, b) => a - b);
 }
 
-const PAYOUT_CHART_BLUE = "#0047FF";
+/** Nice rounded axis max for money amounts (banking-style ticks). */
+function niceChartCeiling(rawMax: number): number {
+  if (rawMax <= 0) return 100;
+  const padded = rawMax * 1.12;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(padded)));
+  const steps = [1, 1.25, 1.5, 2, 2.5, 5, 10];
+  for (const step of steps) {
+    const candidate = step * magnitude;
+    if (candidate >= padded) return candidate;
+  }
+  return 10 * magnitude;
+}
 
+function yAxisTicks(ceiling: number): number[] {
+  return [0, ceiling * 0.25, ceiling * 0.5, ceiling * 0.75, ceiling];
+}
+
+function formatAxisMoney(value: number, lang: "en" | "fr"): string {
+  if (value <= 0) return lang === "fr" ? "0 €" : "€0";
+  if (value >= 1000) {
+    const k = value / 1000;
+    const formatted = k % 1 === 0 ? String(k) : k.toFixed(1).replace(".", lang === "fr" ? "," : ".");
+    return lang === "fr" ? `${formatted}k €` : `€${formatted}k`;
+  }
+  if (value % 1 === 0) return formatCurrency(value, lang);
+  return formatCurrency(Math.round(value), lang);
+}
+
+/** Daily commission bars — banking-style with Y-axis value ticks. */
 function PayoutCommissionChart({
   buckets,
   lang,
@@ -1347,97 +1373,219 @@ function PayoutCommissionChart({
   isMobile?: boolean;
   period: PayoutOverviewPeriod;
 }) {
-  const cumulative = useMemo(() => buildCumulativeValues(buckets), [buckets]);
-  const chartW = 640;
-  const chartH = 120;
-  const padX = 12;
-  const padY = 14;
-  const innerW = chartW - padX * 2;
-  const innerH = chartH - padY * 2;
-  const maxY = Math.max(...cumulative, 0.01);
-  const baselineY = padY + innerH;
+  const [hover, setHover] = useState<number | null>(null);
 
-  const points = cumulative.map((value, index) => ({
-    x: padX + (index / Math.max(buckets.length - 1, 1)) * innerW,
-    y: padY + innerH - (value / maxY) * innerH,
-  }));
+  const chartBuckets = useMemo(() => {
+    // 30-day / all-time: denser day series as thin bars; today hourly uses hours as-is.
+    if (period === "all" && buckets.length > 42) {
+      const step = Math.ceil(buckets.length / 28);
+      const grouped: CommissionDayBucket[] = [];
+      for (let i = 0; i < buckets.length; i += step) {
+        const slice = buckets.slice(i, i + step);
+        grouped.push({
+          dateKey: slice[0]?.dateKey ?? "",
+          earned: round2(slice.reduce((s, b) => s + b.earned, 0)),
+          paid: round2(slice.reduce((s, b) => s + b.paid, 0)),
+        });
+      }
+      return grouped;
+    }
+    return buckets;
+  }, [buckets, period]);
 
-  const linePath = buildLinePath(points);
-  const areaPath =
-    points.length > 0
-      ? `${linePath} L ${points[points.length - 1].x.toFixed(2)} ${baselineY} L ${points[0].x.toFixed(2)} ${baselineY} Z`
-      : "";
-  const flatLine = `M ${padX} ${baselineY} L ${padX + innerW} ${baselineY}`;
-  const hasActivity = cumulative.some((value, index) => value > 0 || buckets[index]?.earned > 0);
-  const axisIndices = chartAxisIndices(buckets.length);
+  const maxEarned = Math.max(...chartBuckets.map((b) => b.earned), 0);
+  const ceiling = niceChartCeiling(maxEarned);
+  const ticks = yAxisTicks(ceiling);
+  const hasActivity = maxEarned > 0;
+  const axisIndices = chartAxisIndices(chartBuckets.length);
+  const chartHeight = isMobile ? 140 : 168;
+  const barMaxWidth =
+    chartBuckets.length <= 8 ? 36 : chartBuckets.length <= 16 ? 22 : chartBuckets.length <= 28 ? 14 : 10;
+  const gap = chartBuckets.length <= 8 ? 8 : chartBuckets.length <= 16 ? 4 : 2;
+  const active = hover != null ? chartBuckets[hover] : null;
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-      <svg
-        viewBox={`0 0 ${chartW} ${chartH}`}
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-        aria-label={lang === "fr" ? "Évolution cumulative des commissions" : "Cumulative commission trend"}
-        style={{ width: "100%", height: isMobile ? 100 : 128, display: "block" }}
-      >
-        <defs>
-          <linearGradient id="payoutCommissionFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0.1" />
-            <stop offset="100%" stopColor={PAYOUT_CHART_BLUE} stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {/* Light baseline */}
-        <line
-          x1={padX}
-          y1={baselineY}
-          x2={padX + innerW}
-          y2={baselineY}
-          stroke="#EFEFEF"
-          strokeWidth="1"
-        />
-        {!hasActivity ? (
-          <path d={flatLine} fill="none" stroke="#D1D5DB" strokeWidth="1.5" strokeDasharray="4 4" />
-        ) : (
-          <>
-            <path d={areaPath} fill="url(#payoutCommissionFill)" />
-            <path
-              d={linePath}
-              fill="none"
-              stroke={PAYOUT_CHART_BLUE}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {points.map((p, i) => (
-              <circle
-                key={`pt-${buckets[i]?.dateKey ?? i}`}
-                cx={p.x}
-                cy={p.y}
-                r={buckets.length > 20 ? 2.5 : 3.5}
-                fill="#FFFFFF"
-                stroke={PAYOUT_CHART_BLUE}
-                strokeWidth="1.75"
-              />
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end",
+        marginTop: 4,
+      }}
+    >
+      <div style={{ display: "flex", gap: 10, alignItems: "stretch", minHeight: chartHeight }}>
+        {/* Y-axis */}
+        <div
+          style={{
+            width: isMobile ? 36 : 44,
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            paddingBottom: 22,
+            boxSizing: "border-box",
+          }}
+        >
+          {[...ticks].reverse().map((tick) => (
+            <span
+              key={`yt-${tick}`}
+              style={{
+                fontSize: 10,
+                color: "#9CA3AF",
+                letterSpacing: "-0.01em",
+                lineHeight: 1,
+                textAlign: "right",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatAxisMoney(tick, lang)}
+            </span>
+          ))}
+        </div>
+
+        {/* Bars + grid */}
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <div
+            style={{
+              position: "relative",
+              flex: 1,
+              minHeight: chartHeight - 22,
+              borderBottom: "1px solid #E8E8EA",
+            }}
+          >
+            {/* Horizontal guide lines */}
+            {ticks.map((tick, i) => {
+              if (i === 0) return null;
+              const top = `${((ceiling - tick) / ceiling) * 100}%`;
+              return (
+                <div
+                  key={`grid-${tick}`}
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    right: 0,
+                    top,
+                    borderTop: tick === 0 ? "none" : "1px solid #F1F1F3",
+                    pointerEvents: "none",
+                  }}
+                />
+              );
+            })}
+
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "flex-end",
+                gap,
+                paddingTop: 4,
+              }}
+            >
+              {chartBuckets.map((bucket, i) => {
+                const ratio = hasActivity ? bucket.earned / ceiling : 0;
+                const hPct = hasActivity ? Math.max(bucket.earned > 0 ? 6 : 2, Math.round(ratio * 100)) : 2;
+                const isActive = hover === i;
+                return (
+                  <div
+                    key={`${bucket.dateKey}-${i}`}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "flex-end",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={() => setHover(i)}
+                    onMouseLeave={() => setHover(null)}
+                  >
+                    <div
+                      style={{
+                        width: "100%",
+                        maxWidth: barMaxWidth,
+                        height: `${hPct}%`,
+                        minHeight: hasActivity && bucket.earned > 0 ? 4 : 2,
+                        background: !hasActivity
+                          ? "#EDEDEF"
+                          : isActive
+                            ? "#0047FF"
+                            : bucket.earned > 0
+                              ? "#B8C9FF"
+                              : "#EDEDEF",
+                        borderRadius: "3px 3px 0 0",
+                        transition: "background 0.12s ease, height 0.2s ease",
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {active ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: 6,
+                  transform: "translateX(-50%)",
+                  padding: "8px 11px",
+                  borderRadius: 10,
+                  border: "1px solid #ECECEC",
+                  background: "#FFFFFF",
+                  boxShadow: "0 8px 22px rgba(15, 23, 42, 0.1)",
+                  pointerEvents: "none",
+                  zIndex: 5,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <div style={{ fontSize: 11, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 2 }}>
+                  {formatTimelineAxisLabel(active.dateKey, lang, period)}
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+                  {formatCurrency(active.earned, lang)}
+                </div>
+                {active.paid > 0 ? (
+                  <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, letterSpacing: "-0.01em" }}>
+                    {lang === "fr" ? `Versé ${formatCurrency(active.paid, lang)}` : `Paid ${formatCurrency(active.paid, lang)}`}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {/* X-axis labels */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 6,
+              fontSize: 11,
+              color: "#9CA3AF",
+              letterSpacing: "-0.01em",
+              marginTop: 8,
+              height: 14,
+            }}
+          >
+            {axisIndices.map((idx) => (
+              <span
+                key={`axis-${chartBuckets[idx]?.dateKey ?? idx}`}
+                style={{
+                  flex: 1,
+                  textAlign: idx === 0 ? "left" : idx === chartBuckets.length - 1 ? "right" : "center",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {formatTimelineAxisLabel(chartBuckets[idx]?.dateKey ?? "", lang, period)}
+              </span>
             ))}
-          </>
-        )}
-      </svg>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 8,
-          fontSize: 11,
-          color: "#9A9A9A",
-          letterSpacing: "-0.01em",
-          marginTop: 10,
-        }}
-      >
-        {axisIndices.map((idx) => (
-          <span key={`axis-${buckets[idx]?.dateKey ?? idx}`} style={{ flex: 1, textAlign: idx === 0 ? "left" : idx === buckets.length - 1 ? "right" : "center" }}>
-            {formatTimelineAxisLabel(buckets[idx]?.dateKey ?? "", lang, period)}
-          </span>
-        ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1661,7 +1809,7 @@ function PayoutsOverviewPanel({
             </div>
           </div>
 
-          <div style={{ flex: 1, minHeight: isMobile ? 88 : 112, marginTop: 8 }}>
+          <div style={{ flex: 1, minHeight: isMobile ? 150 : 180, marginTop: 12 }}>
             <PayoutCommissionChart buckets={timeline} lang={lang} isMobile={isMobile} period={period} />
           </div>
         </div>
@@ -1835,6 +1983,8 @@ function CreatorPayoutPage({
   const discountCode = creator.discount_code?.trim() || null;
   const email = creator.email?.trim() || null;
   const canPayManual = balance > 0 && creatorHasPaymentMethod(creator) && payingId !== creator.id;
+  const hasPaymentMethod = creatorHasPaymentMethod(creator);
+  const paymentDetail = creator.paypal_link || creator.revolut_link || creator.iban || "";
 
   // Brand revenue (sales) vs cost (commissions earned = paid + still owed).
   const costToBrand = totalEarned;
@@ -1842,32 +1992,36 @@ function CreatorPayoutPage({
   const hasProfitSignal = revenue > 0 || costToBrand > 0;
   const isProfitable = hasProfitSignal && revenue > costToBrand;
 
-  const sectionTitle: React.CSSProperties = {
-    fontSize: 16,
-    fontWeight: 600,
-    color: "#1A1A1A",
+  const panel: React.CSSProperties = {
+    background: "#FFFFFF",
+    border: "1px solid #E8E8EA",
+    borderRadius: 16,
+    padding: "18px 18px",
     marginBottom: 14,
-    letterSpacing: "-0.02em",
   };
 
-  const statBox: React.CSSProperties = {
-    flex: 1,
-    minWidth: 0,
-    border: "1px solid #EFEFEF",
-    borderRadius: 12,
-    padding: "16px 18px",
-    background: "#FFF",
-  };
-
-  const pillBase: React.CSSProperties = {
-    display: "inline-flex",
+  const row: React.CSSProperties = {
+    display: "flex",
     alignItems: "center",
-    gap: 5,
-    fontSize: 12,
-    fontWeight: 600,
-    padding: "4px 10px",
-    borderRadius: 20,
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "12px 0",
+    borderBottom: "1px solid #F0F0F2",
+  };
+
+  const rowLast: React.CSSProperties = { ...row, borderBottom: "none", paddingBottom: 0 };
+  const rowLabel: React.CSSProperties = {
+    fontSize: 13,
+    color: "#6B7280",
     letterSpacing: "-0.01em",
+  };
+  const rowValue: React.CSSProperties = {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#111827",
+    letterSpacing: "-0.02em",
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
   };
 
   return (
@@ -1876,7 +2030,7 @@ function CreatorPayoutPage({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.4)",
+        background: "rgba(15, 23, 42, 0.42)",
         zIndex: 1100,
         display: "flex",
         justifyContent: "flex-end",
@@ -1885,123 +2039,175 @@ function CreatorPayoutPage({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(560px, 100%)",
+          width: "min(440px, 100%)",
           height: "100%",
-          background: "#FFF",
-          overflowY: "auto",
-          transform: shown ? "translateX(0)" : "translateX(40px)",
+          background: "#FFFFFF",
+          display: "flex",
+          flexDirection: "column",
+          transform: shown ? "translateX(0)" : "translateX(48px)",
           opacity: shown ? 1 : 0,
-          transition: "transform .18s ease, opacity .18s ease",
-          padding: "28px 28px 56px",
-          boxSizing: "border-box",
+          transition: "transform .2s ease, opacity .2s ease",
           fontFamily: payoutDrawerFont,
+          boxShadow: "-12px 0 40px rgba(15, 23, 42, 0.12)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+        {/* App bar */}
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            padding: "14px 16px",
+            background: "#FFFFFF",
+            borderBottom: "1px solid #E8E8EA",
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
             style={{
-              ...payoutDrawerAction,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
               background: "none",
               border: "none",
-              color: "#9A9A9A",
+              color: "#111827",
               fontWeight: 500,
               fontSize: 14,
               cursor: "pointer",
-              padding: 0,
+              padding: "6px 4px",
+              fontFamily: "inherit",
+              letterSpacing: "-0.01em",
             }}
           >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             {lang === "fr" ? "Retour" : "Back"}
           </button>
-          <button
-            type="button"
-            disabled={!canPayManual}
-            onClick={() => void onPayManual()}
-            style={{
-              ...payoutDrawerBtnPrimary,
-              fontSize: 14,
-              padding: "11px 16px",
-              opacity: canPayManual ? 1 : 0.45,
-              cursor: canPayManual ? "pointer" : "default",
-            }}
-          >
-            {payingId === creator.id
-              ? lang === "fr"
-                ? "Paiement…"
-                : "Paying…"
-              : balance > 0
-                ? `${lang === "fr" ? "Payer" : "Pay"} ${formatCurrency(balance, lang)}`
-                : lang === "fr"
-                  ? "Payer"
-                  : "Pay"}
-          </button>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em" }}>
+            {lang === "fr" ? "Paiement créateur" : "Creator payout"}
+          </div>
+          <div style={{ width: 72 }} aria-hidden />
         </div>
 
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 32 }}>
-          <CreatorAvatar
-            src={creator.avatar_url}
-            username={creator.handle}
-            displayName={name}
-            size={64}
-            alt={name}
-            priority
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {name}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 28px", boxSizing: "border-box" }}>
+          {/* Amount hero — like a transfer screen */}
+          <div
+            style={{
+              ...panel,
+              textAlign: "center",
+              padding: "28px 20px 24px",
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 10 }}>
+              {lang === "fr" ? "Montant à verser" : "Amount to pay"}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              {handle && <span style={{ fontSize: 14, color: "#9A9A9A" }}>@{String(handle).replace(/^@/, "")}</span>}
-              <span
-                style={{
-                  ...pillBase,
-                  fontWeight: 500,
-                  color: "#1A1A1A",
-                  background: "#F5F5F5",
-                }}
-              >
-                <SalePlatformLogo platform={platform} />
-                {platformLabel(platform)}
-              </span>
-              {discountCode && (
-                <span
-                  style={{
-                    ...pillBase,
-                    fontWeight: 500,
-                    color: "#1A1A1A",
-                    background: "#F5F5F5",
-                  }}
-                >
-                  {lang === "fr" ? "Code" : "Code"} · {discountCode}
+            <div
+              style={{
+                fontSize: 42,
+                fontWeight: 700,
+                color: balance > 0 ? "#0A0A0A" : "#9CA3AF",
+                letterSpacing: "-0.04em",
+                lineHeight: 1,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatCurrency(balance, lang)}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 13, color: "#9CA3AF", letterSpacing: "-0.01em" }}>
+              {balance > 0
+                ? lang === "fr"
+                  ? "Commission en attente de paiement"
+                  : "Commission waiting to be paid"
+                : lang === "fr"
+                  ? "Rien à payer pour le moment"
+                  : "Nothing to pay right now"}
+            </div>
+          </div>
+
+          {/* Recipient */}
+          <div style={{ ...panel, display: "flex", gap: 14, alignItems: "center" }}>
+            <CreatorAvatar
+              src={creator.avatar_url}
+              username={creator.handle}
+              displayName={name}
+              size={52}
+              alt={name}
+              priority
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", letterSpacing: "0.03em", textTransform: "uppercase", marginBottom: 4 }}>
+                {lang === "fr" ? "Bénéficiaire" : "Recipient"}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {name}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                {handle && (
+                  <span style={{ fontSize: 13, color: "#6B7280" }}>@{String(handle).replace(/^@/, "")}</span>
+                )}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6B7280" }}>
+                  <SalePlatformLogo platform={platform} />
+                  {platformLabel(platform)}
                 </span>
-              )}
-              {hasProfitSignal && (
+              </div>
+            </div>
+          </div>
+
+          {/* Ledger-style summary */}
+          <div style={panel}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 4 }}>
+              {lang === "fr" ? "Récapitulatif" : "Summary"}
+            </div>
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Total gagné" : "Total earned"}</span>
+              <span style={rowValue}>{formatCurrency(totalEarned, lang)}</span>
+            </div>
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Ventes trackées" : "Tracked sales"}</span>
+              <span style={rowValue}>{creator.total_sales || 0}</span>
+            </div>
+            {discountCode && (
+              <div style={row}>
+                <span style={rowLabel}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
+                <span style={rowValue}>{discountCode}</span>
+              </div>
+            )}
+            {followers > 0 && (
+              <div style={row}>
+                <span style={rowLabel}>{lang === "fr" ? "Abonnés" : "Followers"}</span>
+                <span style={rowValue}>{fmtFollowerCount(followers)}</span>
+              </div>
+            )}
+            {engagement > 0 && (
+              <div style={row}>
+                <span style={rowLabel}>ER</span>
+                <span style={rowValue}>{engagement.toFixed(1)}%</span>
+              </div>
+            )}
+            {email && (
+              <div style={row}>
+                <span style={rowLabel}>Email</span>
+                <span style={{ ...rowValue, fontWeight: 500, fontSize: 13, maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</span>
+              </div>
+            )}
+            {hasProfitSignal && (
+              <div style={rowLast}>
+                <span style={rowLabel}>{lang === "fr" ? "Rentabilité" : "Profitability"}</span>
                 <span
                   style={{
-                    ...pillBase,
+                    ...rowValue,
                     color: isProfitable ? "#166534" : "#991B1B",
                     background: isProfitable ? "#DCFCE7" : "#FEE2E2",
+                    borderRadius: 999,
+                    padding: "3px 10px",
+                    fontSize: 12,
                   }}
                 >
-                  <span
-                    aria-hidden
-                    style={{
-                      display: "inline-block",
-                      width: 13,
-                      height: 12,
-                      flexShrink: 0,
-                      backgroundColor: "currentColor",
-                      WebkitMaskImage: "url(/images/trackit-mark.svg)",
-                      WebkitMaskSize: "contain",
-                      WebkitMaskRepeat: "no-repeat",
-                      WebkitMaskPosition: "center",
-                      maskImage: "url(/images/trackit-mark.svg)",
-                      maskSize: "contain",
-                      maskRepeat: "no-repeat",
-                      maskPosition: "center",
-                    }}
-                  />
                   {isProfitable
                     ? lang === "fr"
                       ? "Rentable"
@@ -2010,127 +2216,206 @@ function CreatorPayoutPage({
                       ? "Non rentable"
                       : "Not profitable"}
                 </span>
-              )}
-            </div>
-            {(followers > 0 || engagement > 0) && (
-              <div style={{ display: "flex", gap: 14, marginTop: 10, fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                {followers > 0 && (
-                  <span>
-                    {fmtFollowerCount(followers)} {lang === "fr" ? "abonnés" : "followers"}
-                  </span>
-                )}
-                {engagement > 0 && <span>{engagement.toFixed(1)}% ER</span>}
               </div>
             )}
-            {email && (
-              <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 8, letterSpacing: "-0.01em" }}>{email}</div>
+            {!hasProfitSignal && !email && followers <= 0 && engagement <= 0 && !discountCode && (
+              <div style={{ ...rowLast, justifyContent: "flex-start" }}>
+                <span style={rowLabel}>{lang === "fr" ? "Pas d’infos supplémentaires" : "No extra details"}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Destination / method status */}
+          <div style={panel}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 12 }}>
+              {lang === "fr" ? "Destination du paiement" : "Payment destination"}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                padding: "12px 14px",
+                borderRadius: 12,
+                background: hasPaymentMethod ? "#F0FDF4" : "#FAFAFA",
+                border: `1px solid ${hasPaymentMethod ? "#BBF7D0" : "#E8E8EA"}`,
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "#FFFFFF",
+                  border: "1px solid #E8E8EA",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <rect x="3" y="6" width="18" height="12" rx="2" stroke="#111827" strokeWidth="1.6" />
+                  <path d="M3 10h18" stroke="#111827" strokeWidth="1.6" />
+                </svg>
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                {hasPaymentMethod ? (
+                  <>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#14532D", letterSpacing: "-0.01em" }}>
+                      {paymentMethodLabel(creator, lang)}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#166534", marginTop: 3, wordBreak: "break-all", lineHeight: 1.4 }}>
+                      {paymentDetail}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", letterSpacing: "-0.01em" }}>
+                      {lang === "fr" ? "Aucune destination" : "No destination set"}
+                    </div>
+                    <div style={{ fontSize: 13, color: "#6B7280", marginTop: 3, lineHeight: 1.45 }}>
+                      {lang === "fr"
+                        ? "Ajoutez PayPal, Revolut ou un IBAN pour pouvoir payer."
+                        : "Add PayPal, Revolut, or an IBAN to enable payment."}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Payment credentials form */}
+          <div style={{ ...panel, marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 14 }}>
+              {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
+            </div>
+            <CreatorPayoutMethodFields
+              ref={payoutFieldsRef}
+              creator={creator}
+              lang={lang}
+              size="default"
+              onUpdate={onCreatorChange}
+              onDraftChange={onCreatorChange}
+            />
+          </div>
+
+          {/* Alternate transfer via Stripe */}
+          <div style={{ ...panel, marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              {lang === "fr" ? "Virement bancaire" : "Bank transfer"}
+            </div>
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>
+              {creator.stripe_account_id
+                ? lang === "fr"
+                  ? "Compte Stripe Connect du créateur prêt à recevoir un virement."
+                  : "Creator’s Stripe Connect account is ready for transfer."
+                : lang === "fr"
+                  ? "Connectez le compte bancaire du créateur via Stripe pour un virement direct."
+                  : "Connect the creator’s bank via Stripe for a direct transfer."}
+            </p>
+            {creator.stripe_account_id ? (
+              <button
+                type="button"
+                disabled={balance <= 0 || payingId === creator.id}
+                onClick={() => void onPayStripe()}
+                style={{
+                  width: "100%",
+                  background: "#111827",
+                  color: "#FFFFFF",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "13px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: balance > 0 ? "pointer" : "default",
+                  opacity: balance > 0 ? 1 : 0.45,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {payingId === creator.id
+                  ? lang === "fr"
+                    ? "Virement en cours…"
+                    : "Sending transfer…"
+                  : `${lang === "fr" ? "Envoyer via Stripe" : "Send via Stripe"} · ${formatCurrency(balance, lang)}`}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={registeringId === creator.id}
+                onClick={() => void onConnectStripeBank()}
+                style={{
+                  width: "100%",
+                  background: "#FFFFFF",
+                  color: "#111827",
+                  border: "1px solid #D1D5DB",
+                  borderRadius: 12,
+                  padding: "13px 16px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: registeringId === creator.id ? "default" : "pointer",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {registeringId === creator.id
+                  ? lang === "fr"
+                    ? "Ouverture…"
+                    : "Opening…"
+                  : lang === "fr"
+                    ? "Connecter un compte bancaire"
+                    : "Connect bank account"}
+              </button>
             )}
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-          <div style={statBox}>
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
-              {lang === "fr" ? "Solde à payer" : "Balance owed"}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
-              {formatCurrency(balance, lang)}
-            </div>
-          </div>
-          <div style={statBox}>
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
-              {lang === "fr" ? "Total gagné" : "Total earned"}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
-              {formatCurrency(totalEarned, lang)}
-            </div>
-          </div>
-          <div style={statBox}>
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
-              {lang === "fr" ? "Ventes" : "Sales"}
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
-              {creator.total_sales || 0}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 32 }}>
-          <div style={sectionTitle}>
-            {lang === "fr" ? "Méthode de paiement actuelle" : "Current payment method"}
-          </div>
-          {creatorHasPaymentMethod(creator) ? (
-            <p style={{ margin: 0, fontSize: 15, color: "#1A1A1A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
-              <span style={{ fontWeight: 600 }}>{paymentMethodLabel(creator, lang)}</span>
-              <span style={{ color: "#9A9A9A" }}> · </span>
-              <span style={{ wordBreak: "break-all", color: "#7A7A7A" }}>
-                {creator.paypal_link || creator.revolut_link || creator.iban}
-              </span>
-            </p>
-          ) : (
-            <p style={{ margin: 0, fontSize: 15, color: "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.55 }}>
-              {lang === "fr"
-                ? "Aucun moyen de paiement renseigné. Ajoutez PayPal, Revolut ou IBAN ci-dessous."
-                : "No payment method on file. Add PayPal, Revolut, or IBAN below."}
-            </p>
-          )}
-        </div>
-
-        <div style={{ marginBottom: 36 }}>
-          <div style={sectionTitle}>
-            {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
-          </div>
-          <CreatorPayoutMethodFields
-            ref={payoutFieldsRef}
-            creator={creator}
-            lang={lang}
-            size="default"
-            onUpdate={onCreatorChange}
-            onDraftChange={onCreatorChange}
-          />
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {creator.stripe_account_id ? (
-            <button
-              type="button"
-              disabled={balance <= 0 || payingId === creator.id}
-              onClick={() => void onPayStripe()}
-              style={{
-                ...payoutDrawerBtnPrimary,
-                width: "100%",
-                fontSize: 14,
-                padding: "12px 16px",
-                opacity: balance > 0 ? 1 : 0.45,
-                cursor: balance > 0 ? "pointer" : "default",
-              }}
-            >
-              {payingId === creator.id
-                ? lang === "fr"
-                  ? "Virement en cours…"
-                  : "Sending transfer…"
-                : `${lang === "fr" ? "Payer par virement Stripe" : "Pay via Stripe transfer"} · ${formatCurrency(balance, lang)}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={registeringId === creator.id}
-              onClick={() => void onConnectStripeBank()}
-              style={{
-                ...payoutDrawerBtnSecondary,
-                width: "100%",
-                fontSize: 14,
-                padding: "12px 16px",
-              }}
-            >
-              {registeringId === creator.id
-                ? lang === "fr"
-                  ? "Ouverture…"
-                  : "Opening…"
+        {/* Sticky pay footer — primary action like a payment app */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "14px 16px 20px",
+            background: "#FFFFFF",
+            borderTop: "1px solid #E8E8EA",
+            boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.04)",
+          }}
+        >
+          <button
+            type="button"
+            disabled={!canPayManual}
+            onClick={() => void onPayManual()}
+            style={{
+              width: "100%",
+              background: canPayManual ? "#0047FF" : "#E5E7EB",
+              color: canPayManual ? "#FFFFFF" : "#9CA3AF",
+              border: "none",
+              borderRadius: 14,
+              padding: "16px 18px",
+              fontSize: 15,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              cursor: canPayManual ? "pointer" : "default",
+              letterSpacing: "-0.02em",
+              boxShadow: canPayManual ? "0 8px 20px rgba(0, 71, 255, 0.28)" : "none",
+            }}
+          >
+            {payingId === creator.id
+              ? lang === "fr"
+                ? "Paiement en cours…"
+                : "Processing payment…"
+              : balance > 0
+                ? `${lang === "fr" ? "Payer maintenant" : "Pay now"} · ${formatCurrency(balance, lang)}`
                 : lang === "fr"
-                  ? "Connecter un compte bancaire (Stripe)"
-                  : "Connect bank account (Stripe)"}
-            </button>
+                  ? "Rien à payer"
+                  : "Nothing to pay"}
+          </button>
+          {!hasPaymentMethod && balance > 0 && (
+            <p style={{ margin: "10px 0 0", textAlign: "center", fontSize: 12, color: "#9CA3AF", lineHeight: 1.4 }}>
+              {lang === "fr"
+                ? "Renseignez une destination ci-dessus pour débloquer le paiement."
+                : "Add a payment destination above to unlock payout."}
+            </p>
           )}
         </div>
       </div>

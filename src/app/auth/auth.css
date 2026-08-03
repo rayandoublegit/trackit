@@ -1,0 +1,141 @@
+.auth-shell {
+  height: 100vh;
+  max-height: 100vh;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  background: #ffffff;
+  font-family: "InterDisplay", "Inter Display", sans-serif;
+  overflow: hidden;
+}
+
+.auth-shell--mobile {
+  flex-direction: column;
+  height: auto;
+  max-height: none;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+.auth-page__right {
+  flex: 1 1 50%;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.auth-shell--mobile .auth-page__right {
+  display: none;
+}
+
+.auth-page__testimonials {
+  flex: 1;
+  width: 100%;
+  padding: 20px 36px 36px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  box-sizing: border-box;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.auth-page__hook {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: #1a1a1a;
+  text-align: left;
+  margin: 0 0 20px;
+  line-height: 1.25;
+  max-width: 420px;
+  flex-shrink: 0;
+}
+
+.auth-page__hook-mark {
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.auth-page__hook-doodle {
+  position: absolute;
+  left: -1%;
+  right: -1%;
+  bottom: 0.02em;
+  width: 102%;
+  height: 0.22em;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.auth-page__hook-doodle-path {
+  fill: none;
+  stroke: #0047ff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: auth-hook-doodle-draw 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
+}
+
+@keyframes auth-hook-doodle-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.auth-page__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  justify-content: flex-start;
+  align-self: stretch;
+  flex: 0 0 auto;
+  max-width: 440px;
+  margin: 0;
+}
+
+.auth-page__card {
+  background: #ffffff;
+  border: 1px solid #e8e8ea;
+  border-radius: 16px;
+  padding: 22px 22px 18px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  flex: 0 0 auto;
+}
+
+.auth-page__metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.auth-page__metric-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: #0047ff;
+}
+
+.auth-page__metric-label {
+  font-size: 14px;
+  color: #737373;
+  letter-spacing: -0.02em;
+}
+
+.auth-page__quote {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4a4a4a;
+  letter-spacing: -0.02em;
+  margin: 0;
+}

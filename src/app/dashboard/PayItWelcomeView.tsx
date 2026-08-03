@@ -412,13 +412,41 @@ export function PayItWelcomeView({
                 <>
                   Payez vos
                   <br />
-                  créateurs simplement
+                  créateurs{" "}
+                  <span className="payit-doodle-mark">
+                    simplement
+                    <svg
+                      className="payit-doodle"
+                      viewBox="0 0 100 8"
+                      preserveAspectRatio="none"
+                      aria-hidden
+                    >
+                      <path
+                        className="payit-doodle-path"
+                        d="M1.5 5.2 C 12 3.8, 22 6.4, 33 4.6 C 44 2.8, 54 6.2, 65 4.8 C 76 3.4, 86 5.9, 98.5 3.9"
+                      />
+                    </svg>
+                  </span>
                 </>
               ) : (
                 <>
                   Pay your creators
                   <br />
-                  with ease
+                  with{" "}
+                  <span className="payit-doodle-mark">
+                    ease
+                    <svg
+                      className="payit-doodle"
+                      viewBox="0 0 100 8"
+                      preserveAspectRatio="none"
+                      aria-hidden
+                    >
+                      <path
+                        className="payit-doodle-path"
+                        d="M1.5 5.2 C 12 3.8, 22 6.4, 33 4.6 C 44 2.8, 54 6.2, 65 4.8 C 76 3.4, 86 5.9, 98.5 3.9"
+                      />
+                    </svg>
+                  </span>
                 </>
               )}
             </h1>
