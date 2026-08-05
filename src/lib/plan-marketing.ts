@@ -1,17 +1,12 @@
 import type { Lang } from "@/lib/useLang";
 import {
   BASIC_MAX_CAMPAIGNS,
-  BASIC_MAX_MANAGED_CREATORS,
   BASIC_MAX_SHOPIFY_STORES,
-  BASIC_MONTHLY_AI_MESSAGES,
   BASIC_MONTHLY_DISCOVERIES,
-  BASIC_RESULTS_PER_SEARCH,
   FREE_MAX_CAMPAIGNS,
-  PRO_MAX_CAMPAIGNS,
-  PRO_MAX_MANAGED_CREATORS,
-  PRO_MONTHLY_DISCOVERIES,
-  PRO_RESULTS_PER_SEARCH,
+  FREE_MAX_MANAGED_CREATORS,
   SCALE_MAX_SHOPIFY_STORES,
+  canUseAIOutreach,
   canUseAutoFollowUp,
   canBulkImportTemplatesCsv,
   canCreateTemplates,
@@ -170,10 +165,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   affiliates: {
     requiredTier: "basic",
     check: canUseAffiliates,
-    title: { en: "Affiliates", fr: "Affiliés" },
+    title: { en: "Tracked links", fr: "Liens trackés" },
     description: {
-      en: "Track affiliate links and attribute sales to your creators.",
-      fr: "Suivez les liens d'affiliation et attribuez les ventes à vos créateurs.",
+      en: "Free locks tracked affiliate links. Starter unlocks click, sales, and revenue attribution per creator.",
+      fr: "Free bloque les liens d'affiliation trackés. Starter débloque clics, ventes et CA par créateur.",
     },
   },
   payouts: {
@@ -262,8 +257,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: canUseShopify,
     title: { en: "Shopify", fr: "Shopify" },
     description: {
-      en: `Connect up to ${BASIC_MAX_SHOPIFY_STORES} Shopify store on Starter to track sales and attribute commissions.`,
-      fr: `Connectez ${BASIC_MAX_SHOPIFY_STORES} boutique Shopify sur Starter pour suivre les ventes et attribuer les commissions.`,
+      en: `Shopify is locked on Free. Starter connects up to ${BASIC_MAX_SHOPIFY_STORES} store to sync sales and attribute commissions automatically.`,
+      fr: `Shopify est bloqué sur Free. Starter connecte jusqu'à ${BASIC_MAX_SHOPIFY_STORES} boutique pour synchroniser les ventes et attribuer les commissions.`,
     },
   },
   outreach: {
@@ -278,10 +273,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   templates: {
     requiredTier: "basic",
     check: canPersistTemplates,
-    title: { en: "Templates", fr: "Modèles" },
+    title: { en: "Outreach templates", fr: "Outreach templates" },
     description: {
-      en: "Save, import, and reuse your best-performing outreach templates.",
-      fr: "Sauvegardez, importez et réutilisez vos meilleurs modèles d'outreach.",
+      en: "Outreach templates are locked on Free. Starter lets you save, import, and reuse your best-performing messages.",
+      fr: "Les templates d'outreach sont bloqués sur Free. Starter permet de sauvegarder, importer et réutiliser vos meilleurs messages.",
     },
   },
   discovery: {
@@ -289,17 +284,17 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: (plan) => plan !== "free",
     title: { en: "Discovery", fr: "Découverte" },
     description: {
-      en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries/month and ${BASIC_RESULTS_PER_SEARCH} results per search on Starter.`,
-      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois et ${BASIC_RESULTS_PER_SEARCH} créateurs par recherche sur Starter.`,
+      en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries per month on Starter.`,
+      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois sur Starter.`,
     },
   },
   "ai-outreach": {
-    requiredTier: "basic",
-    check: (plan) => plan !== "free",
+    requiredTier: "pro",
+    check: canUseAIOutreach,
     title: { en: "AI outreach", fr: "Outreach IA" },
     description: {
-      en: `Generate personalized outreach with ${BASIC_MONTHLY_AI_MESSAGES} AI messages per month on Starter, or unlimited on Pro.`,
-      fr: `Générez des messages personnalisés avec ${BASIC_MONTHLY_AI_MESSAGES} messages IA/mois sur Starter, ou illimités sur Pro.`,
+      en: "AI outreach is available on Pro and Business — generate personalized messages with no monthly cap.",
+      fr: "L'outreach IA est disponible sur Pro et Business — générez des messages personnalisés sans limite mensuelle.",
     },
   },
   "bulk-import": {
@@ -324,22 +319,18 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
 
 export function getManagedCreatorLimitLabel(plan: PlanTier, lang: Lang): string {
   const fr = lang === "fr";
-  if (plan === "scale") {
-    return fr ? "créateurs illimités" : "unlimited creators";
+  if (plan === "free") {
+    return fr
+      ? `jusqu'à ${FREE_MAX_MANAGED_CREATORS} créateurs`
+      : `up to ${FREE_MAX_MANAGED_CREATORS} creators`;
   }
-  if (plan === "pro") {
-    return fr ? "jusqu'à 100 créateurs" : "up to 100 creators";
-  }
-  if (plan === "basic") {
-    return fr ? "jusqu'à 25 créateurs" : "up to 25 creators";
-  }
-  return fr ? "jusqu'à 5 créateurs" : "up to 5 creators";
+  return fr ? "créateurs illimités" : "unlimited creators";
 }
 
 export function getNextTierForCreatorLimit(plan: PlanTier): PlanTier {
-  if (plan === "pro") return "scale";
-  if (plan === "basic") return "pro";
-  return "basic";
+  // Free is the only capped plan — any paid tier unlocks unlimited creators.
+  if (plan === "free") return "basic";
+  return "scale";
 }
 
 export function isFeatureAllowed(featureKey: GateFeatureKey, plan: PlanTier): boolean {
@@ -418,8 +409,8 @@ export function getLimitUpgradeModalProps(
     const description =
       currentPlan === "free"
         ? fr
-          ? `Le plan gratuit inclut ${FREE_MAX_CAMPAIGNS} campagne active. Passez à ${planName} pour jusqu'à ${BASIC_MAX_CAMPAIGNS} campagnes.`
-          : `Free includes ${FREE_MAX_CAMPAIGNS} active campaign. Upgrade to ${planName} for up to ${BASIC_MAX_CAMPAIGNS} campaigns.`
+          ? `Le plan gratuit inclut ${FREE_MAX_CAMPAIGNS} campagne réelle (la démo Trackit ne compte pas). Passez à ${planName} pour jusqu'à ${BASIC_MAX_CAMPAIGNS} campagnes.`
+          : `Free includes ${FREE_MAX_CAMPAIGNS} real campaign (Trackit demo doesn't count). Upgrade to ${planName} for up to ${BASIC_MAX_CAMPAIGNS} campaigns.`
         : nextMax == null
           ? fr
             ? `Votre plan inclut ${max} campagnes actives. Passez à ${planName} pour des campagnes illimitées.`
@@ -441,13 +432,13 @@ export function getLimitUpgradeModalProps(
     const max = getMaxManagedCreators(currentPlan);
     const title = fr ? "Limite de créateurs atteinte" : "Creator limit reached";
     const description =
-      nextTier === "scale"
+      currentPlan === "free"
         ? fr
-          ? `Votre plan inclut ${max} créateurs gérés. Passez à ${planName} pour un nombre illimité.`
-          : `Your plan includes ${max} managed creators. Upgrade to ${planName} for unlimited creators.`
+          ? `Le plan Free inclut ${max ?? FREE_MAX_MANAGED_CREATORS} créateurs suivis. Passez à ${planName} pour des créateurs illimités.`
+          : `Free includes ${max ?? FREE_MAX_MANAGED_CREATORS} tracked creators. Upgrade to ${planName} for unlimited creators.`
         : fr
-          ? `Votre plan inclut ${max} créateurs gérés. Passez à ${planName} pour ${getManagedCreatorLimitLabel(nextTier, lang)}.`
-          : `Your plan includes ${max} managed creators. Upgrade to ${planName} to manage ${getManagedCreatorLimitLabel(nextTier, lang)}.`;
+          ? `Passez à ${planName} pour des créateurs illimités.`
+          : `Upgrade to ${planName} for unlimited creators.`;
     return {
       title,
       description,
@@ -472,11 +463,11 @@ export function getLimitUpgradeModalProps(
     const description =
       nextTier === "scale"
         ? fr
-          ? `Passez à ${planName} pour des découvertes et résultats illimités.`
-          : `Upgrade to ${planName} for unlimited discoveries and results.`
+          ? `Passez à ${planName} pour des découvertes illimitées.`
+          : `Upgrade to ${planName} for unlimited discoveries.`
         : fr
-          ? `Passez à ${planName} pour ${nextLimit} découvertes/mois et ${nextTier === "pro" ? PRO_RESULTS_PER_SEARCH : BASIC_RESULTS_PER_SEARCH} résultats par recherche.`
-          : `Upgrade to ${planName} for ${nextLimit} discoveries/month and ${nextTier === "pro" ? PRO_RESULTS_PER_SEARCH : BASIC_RESULTS_PER_SEARCH} results per search.`;
+          ? `Passez à ${planName} pour ${nextLimit} découvertes/mois.`
+          : `Upgrade to ${planName} for ${nextLimit} discoveries/month.`;
     return {
       title,
       description,

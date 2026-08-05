@@ -7,7 +7,7 @@ import { useStripePrices } from "@/lib/use-stripe-prices";
 import { getPlanCardDescription, planDisplayName as marketingPlanDisplayName, PLAN_PRICES, annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal } from "@/lib/plan-marketing";
 import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { PricingFeatureList } from "@/components/PricingFeatureList";
-import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import { planCtaAction, planCtaLabel, freePlanBadgeLabel, freeStayAnywayCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { upgradeToPlanTier } from "@/lib/checkout";
@@ -18,9 +18,6 @@ const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
 const PRO_MONTHLY = PLAN_PRICES.proMonthly;
 const SCALE_MONTHLY = PLAN_PRICES.scaleMonthly;
-const GROWTH_ANNUAL = PLAN_PRICES.growthAnnual;
-const PRO_ANNUAL = PLAN_PRICES.proAnnual;
-const SCALE_ANNUAL = PLAN_PRICES.scaleAnnual;
 
 function priceIdForTier(
   prices: StripePriceMatrix,
@@ -126,8 +123,6 @@ export type PricingPlansProps = {
   subtitle?: string;
   tagline?: string;
   showCurrentPlanBadge?: boolean;
-  freeCtaLabel?: string;
-  freeCtaDisabled?: boolean;
   paidCtaLabel?: string;
   currentPlan?: PlanTier;
   subscriptionInterval?: BillingInterval | null;
@@ -135,7 +130,9 @@ export type PricingPlansProps = {
   cancelUrl?: string;
   userId?: string;
   userEmail?: string;
-  onStayFree: () => void;
+  /** Optional non-card CTA under the grid (e.g. onboarding continue free). */
+  onStayFree?: () => void;
+  stayFreeLabel?: string;
   /** Same checkout as /pricing; onboarding data is saved server-side in create-checkout. */
   getOnboardingPayload?: () => Promise<OnboardingSavePayload | null> | OnboardingSavePayload | null;
   /** @deprecated Prefer getOnboardingPayload — kept for legacy callers. */
@@ -147,8 +144,6 @@ export function PricingPlans({
   subtitle,
   tagline,
   showCurrentPlanBadge = true,
-  freeCtaLabel,
-  freeCtaDisabled = false,
   paidCtaLabel,
   currentPlan = "free",
   subscriptionInterval = null,
@@ -157,6 +152,7 @@ export function PricingPlans({
   userId,
   userEmail,
   onStayFree,
+  stayFreeLabel,
   getOnboardingPayload,
   onBeforeCheckout,
 }: PricingPlansProps) {
@@ -173,7 +169,6 @@ export function PricingPlans({
   const growthFeatures = useMemo(() => getPlanPricingHighlights("basic", lang), [lang]);
   const proFeatures = useMemo(() => getPlanPricingHighlights("pro", lang), [lang]);
   const scaleFeatures = useMemo(() => getPlanPricingHighlights("scale", lang), [lang]);
-  const freeFeatures = useMemo(() => getPlanPricingHighlights("free", lang), [lang]);
 
   const startCheckout = async (tier: PaidTier, annual: boolean) => {
     if (onBeforeCheckout && !getOnboardingPayload) {
@@ -251,11 +246,9 @@ export function PricingPlans({
   const defaultTitle = lang === "fr" ? "Choisis le plan qui te convient" : "Choose the plan that fits";
   const defaultSubtitle =
     lang === "fr"
-      ? "Même pricing que sur le site, avec les vrais checkouts Stripe. Tu peux rester en free ou passer au plan supérieur."
-      : "Same pricing as the website, with the live Stripe checkouts. Stay free or upgrade anytime.";
+      ? "Même pricing que sur le site, avec les vrais checkouts Stripe."
+      : "Same pricing as the website, with the live Stripe checkouts.";
   const defaultTagline = lang === "fr" ? "Tarifs" : "Pricing";
-  const defaultFreeCta =
-    plan === "free" ? freeStayAnywayCtaLabel(lang) : preferFreeCtaLabel(lang);
 
   const starterName = marketingPlanDisplayName("basic", lang);
   const proName = marketingPlanDisplayName("pro", lang);
@@ -271,9 +264,8 @@ export function PricingPlans({
     paidCtaLabel ??
     planCtaLabel(lang, scaleAction, businessName, plan, "scale", subscriptionInterval, scaleAnnual);
 
-  const freeLabel = freeCtaLabel ?? defaultFreeCta;
-
   const planDisplayName = marketingPlanDisplayName(plan, lang);
+  const freeLinkLabel = stayFreeLabel ?? freeStayAnywayCtaLabel(lang);
 
   return (
     <>
@@ -291,8 +283,8 @@ export function PricingPlans({
         {!loadingPrices && !prices.growth.usd.month && (
           <p style={{ marginTop: 12, fontSize: 14, color: "#B45309", letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Les checkouts payants sont temporairement indisponibles. Vous pouvez continuer en free."
-              : "Paid checkout is temporarily unavailable. You can continue on the free plan."}
+              ? "Les checkouts payants sont temporairement indisponibles."
+              : "Paid checkout is temporarily unavailable."}
           </p>
         )}
         {showCurrentPlanBadge && !loadingPlan && (
@@ -361,36 +353,30 @@ export function PricingPlans({
           disabled={!paidCtaLabel && scaleAction === "current"}
           ctaLoading={payingTier === "scale" || loadingPrices}
         />
-
-        <div className="pricing-wrap pricing-wrap-full">
-          <div className="pricing-card">
-            <div className="pricing-card-top">
-              <div className="pricing-logo"><img src={TRACKIT_LOGO_URL} alt="" /></div>
-              <div className="pricing-name">{marketingPlanDisplayName("free", lang)}</div>
-              <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
-              <div className="pricing-price">
-                <span className="pricing-amount">{formatPricingAmount(0, lang)}</span>
-                <span className="pricing-period">{lang === "fr" ? "/mois" : "/month"}</span>
-              </div>
-            </div>
-            <div className="pricing-divider" />
-            <PricingFeatureList features={freeFeatures} />
-            <button
-              type="button"
-              className="pricing-cta"
-              onClick={onStayFree}
-              disabled={freeCtaDisabled}
-              style={
-                freeCtaDisabled
-                  ? { background: "#FFFFFF", color: "#1A1A1A", border: "1px solid transparent", boxShadow: "none", transform: "none", transition: "none", cursor: "default", opacity: 0.6 }
-                  : undefined
-              }
-            >
-              {freeLabel}
-            </button>
-          </div>
-        </div>
       </div>
+
+      {onStayFree ? (
+        <div style={{ textAlign: "center", marginTop: 28 }}>
+          <button
+            type="button"
+            onClick={onStayFree}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: 14,
+              fontFamily: "inherit",
+              color: "#7A7A7A",
+              textDecoration: "underline",
+              textUnderlineOffset: 3,
+              cursor: "pointer",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {freeLinkLabel}
+          </button>
+        </div>
+      ) : null}
     </>
   );
 }

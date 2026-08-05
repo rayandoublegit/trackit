@@ -21,8 +21,6 @@ import {
   resolveCreatorCountryCode,
 } from "@/lib/creator-country";
 import {
-  BASIC_MAX_MANAGED_CREATORS,
-  PRO_MAX_MANAGED_CREATORS,
   getDailyDiscoveryLimit,
   getResultsPerSearchLimit,
   getVisibleDiscoveryResults,

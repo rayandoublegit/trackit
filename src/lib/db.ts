@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase";
+import { isDemoPresetCampaign } from "@/lib/demo-preset-data";
 import { hasReachedCampaignLimit, normalizePlan } from "@/lib/plan-limits";
+
+function isActiveCampaignStatus(status: string | null | undefined): boolean {
+  const s = String(status || "").toLowerCase();
+  return s === "active" || s === "paused";
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -103,13 +109,13 @@ export async function saveCampaign(userId: string, campaign: {
   if (!supabase) return null;
   const [{ data: profile }, { data: existingCampaigns }] = await Promise.all([
     supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
-    supabase.from("campaigns").select("status").eq("user_id", userId),
+    supabase.from("campaigns").select("status, name, description").eq("user_id", userId),
   ]);
   const plan = normalizePlan(profile?.plan);
   const activeCampaignCount = (existingCampaigns ?? []).filter(
-    (row) => row.status === "Active" || row.status === "Paused"
+    (row) => isActiveCampaignStatus(row.status) && !isDemoPresetCampaign(row),
   ).length;
-  const nextCampaignIsActive = campaign.status === "Active" || campaign.status === "Paused";
+  const nextCampaignIsActive = isActiveCampaignStatus(campaign.status);
   if (nextCampaignIsActive && hasReachedCampaignLimit(plan, activeCampaignCount)) return null;
   const { data, error } = await supabase
     .from("campaigns")

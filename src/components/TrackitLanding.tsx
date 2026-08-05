@@ -16,7 +16,7 @@ import { PricingFeatureList } from "@/components/PricingFeatureList";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
 import { SocialFooterLinks } from "@/components/SocialFooterLinks";
-import { planCtaAction, planCtaLabel, freeStayAnywayCtaLabel, preferFreeCtaLabel, type PaidTier } from "@/lib/pricing-cta";
+import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
 
 const instrumentSerif = Instrument_Serif({
@@ -379,7 +379,6 @@ export default function TrackitLanding() {
   pricing_scale_pill: lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand",
   pricing_most_popular: lang === "fr" ? "Le plus populaire" : "Most Popular",
   pricing_cta: lang === "fr" ? "Commencer" : "Get Started",
-  pricing_free_cta: lang === "fr" ? "Démarrer gratuitement →" : "Start free →",
   pricing_month: lang === "fr" ? "/mois" : "/month",
   pricing_year: lang === "fr" ? "par an" : "/year",
   pricing_annually: lang === "fr" ? "Annuel" : "Annually",
@@ -418,7 +417,6 @@ export default function TrackitLanding() {
   trackit_10: lang === "fr" ? "Conçu pour les marques DTC et agences" : "Built for DTC brands and agencies",
 };
 
-  const freePricingFeatures = getPlanPricingHighlights("free", lang);
   const growthPricingFeatures = getPlanPricingHighlights("basic", lang);
   const proPricingFeatures = getPlanPricingHighlights("pro", lang);
   const scalePricingFeatures = getPlanPricingHighlights("scale", lang);
@@ -514,13 +512,6 @@ export default function TrackitLanding() {
     }
     await startCheckout(tier, annual);
   };
-
-  const freeCtaLabel =
-    isLoggedIn && plan === "free"
-      ? freeStayAnywayCtaLabel(lang)
-      : isLoggedIn && plan !== "free"
-        ? preferFreeCtaLabel(lang)
-        : t.pricing_free_cta;
 
   const handleCheckout = async (planKey: LandingPaidTier, annual?: boolean) => {
     await onPaidPlanClick(planKey, Boolean(annual));
@@ -1610,43 +1601,6 @@ export default function TrackitLanding() {
               <div className="pricing-divider"></div>
               <PricingFeatureList features={scalePricingFeatures} />
               {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pricing-cta pricing-cta-dark")}
-            </div>
-          </div>
-
-          <div className="pricing-wrap pricing-wrap-full fade-up fade-up-delay-6">
-            <div className="pricing-card">
-              <div className="pricing-card-top">
-                <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">Free</div>
-                <div className="pricing-desc">{getPlanCardDescription("free", lang)}</div>
-                <div className="pricing-price">
-                  <span className="pricing-amount">{formatPricingAmount(0, lang)}</span>
-                  <span className="pricing-period">{t.pricing_month}</span>
-                </div>
-              </div>
-              <div className="pricing-divider"></div>
-              <PricingFeatureList features={freePricingFeatures} />
-              {isLoggedIn ? (
-                <button
-                  type="button"
-                  className="pricing-cta"
-                  disabled={plan === "free" || planLoading || portalLoading}
-                  onClick={() => {
-                    if (plan !== "free") void openStripeBillingPortal();
-                  }}
-                  style={
-                    plan === "free"
-                      ? { ...disabledPricingCtaStyle, opacity: planLoading ? 0.6 : 1 }
-                      : undefined
-                  }
-                >
-                  {planLoading || portalLoading
-                    ? portalLabel
-                    : freeCtaLabel}
-                </button>
-              ) : (
-                <a href="/auth" className="pricing-cta">{t.pricing_free_cta}</a>
-              )}
             </div>
           </div>
         </div>

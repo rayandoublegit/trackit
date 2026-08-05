@@ -30,9 +30,6 @@ import {
   canGenerateAiOutreach,
   canPersistTemplates,
   canUseAutoFollowUp,
-  canUseUnlimitedAIOutreach,
-  getMonthlyAIMessageLimit,
-  incrementAiOutreachUsage,
   type PlanTier,
 } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
@@ -664,9 +661,6 @@ function OutreachAIGeneratePanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error("Failed");
-      if (!canUseUnlimitedAIOutreach(plan) && getMonthlyAIMessageLimit(plan) != null) {
-        incrementAiOutreachUsage();
-      }
       setMessage(data.message);
       setEmailSubject(typeof data.subject === "string" ? data.subject : "");
       setShowSendFlow(false);

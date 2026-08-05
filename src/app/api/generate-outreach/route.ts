@@ -5,7 +5,7 @@ import {
   buildOutreachGenerationPrompt,
   parseOutreachGenerationResponse,
 } from "@/lib/outreach-ai-prompt";
-import { getMonthlyAIMessageLimit, normalizePlan } from "@/lib/plan-limits";
+import { canUseAIOutreach, normalizePlan } from "@/lib/plan-limits";
 import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 
 const getAnthropic = () => new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -40,10 +40,9 @@ export async function POST(request: NextRequest) {
     .eq("id", workspace.ownerId)
     .maybeSingle();
   const plan = normalizePlan(profile?.plan);
-  const aiLimit = getMonthlyAIMessageLimit(plan);
-  if (aiLimit === 0) {
+  if (!canUseAIOutreach(plan)) {
     return NextResponse.json(
-      { error: "AI outreach requires Starter or higher" },
+      { error: "AI outreach requires Pro or Business" },
       { status: 403 }
     );
   }

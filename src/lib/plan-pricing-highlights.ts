@@ -1,20 +1,13 @@
 import type { Lang } from "@/lib/useLang";
 import {
   BASIC_MAX_CAMPAIGNS,
-  BASIC_MAX_MANAGED_CREATORS,
   BASIC_MAX_SHOPIFY_STORES,
-  BASIC_MONTHLY_AI_MESSAGES,
   BASIC_MONTHLY_DISCOVERIES,
-  BASIC_RESULTS_PER_SEARCH,
   FREE_LIFETIME_DISCOVERIES,
   FREE_MAX_CAMPAIGNS,
   FREE_MAX_MANUAL_SALES,
-  FREE_MAX_MANAGED_CREATORS,
-  FREE_RESULTS_PER_SEARCH,
   PRO_MAX_CAMPAIGNS,
-  PRO_MAX_MANAGED_CREATORS,
   PRO_MONTHLY_DISCOVERIES,
-  PRO_RESULTS_PER_SEARCH,
   SCALE_MAX_SHOPIFY_STORES,
   type PlanTier,
 } from "@/lib/plan-limits";
@@ -39,39 +32,43 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
-        value: fr ? `${FREE_LIFETIME_DISCOVERIES} au total` : `${FREE_LIFETIME_DISCOVERIES} total`,
-      },
-      {
-        id: "search",
-        label: fr ? "Résultats" : "Results",
         value: fr
-          ? `${FREE_RESULTS_PER_SEARCH} créateurs par recherche`
-          : `${FREE_RESULTS_PER_SEARCH} creators per search`,
-      },
-      {
-        id: "creators",
-        label: fr ? "Créateurs suivis" : "Tracked creators",
-        value: String(FREE_MAX_MANAGED_CREATORS),
+          ? `${FREE_LIFETIME_DISCOVERIES} recherches lifetime`
+          : `${FREE_LIFETIME_DISCOVERIES} lifetime searches`,
       },
       {
         id: "campaigns",
         label: fr ? "Campagnes" : "Campaigns",
-        value: String(FREE_MAX_CAMPAIGNS),
+        value: fr
+          ? `${FREE_MAX_CAMPAIGNS} réelle (+ démo Trackit hors quota)`
+          : `${FREE_MAX_CAMPAIGNS} real (+ Trackit demo excluded)`,
       },
       {
         id: "sales",
         label: fr ? "Ventes" : "Sales",
-        value: fr ? `Ajout manuel, ${FREE_MAX_MANUAL_SALES} max` : `Manual entry, ${FREE_MAX_MANUAL_SALES} max`,
+        value: fr
+          ? `Manuel, ${FREE_MAX_MANUAL_SALES} lifetime`
+          : `Manual, ${FREE_MAX_MANUAL_SALES} lifetime`,
       },
       {
         id: "commissions",
-        label: fr ? "Commissions" : "Commissions",
-        value: fr ? "Calcul automatique inclus" : "Automatic calculation included",
+        label: fr ? "Commissions + Listes" : "Commissions + Lists",
+        value: fr ? "Incluses" : "Included",
       },
       {
-        id: "save",
-        label: fr ? "Listes" : "Lists",
-        value: fr ? "Sauvegarde" : "Save creators",
+        id: "blocked-shopify",
+        label: "Shopify",
+        value: fr ? "Bloqué (Starter+)" : "Locked (Starter+)",
+      },
+      {
+        id: "blocked-links",
+        label: fr ? "Liens trackés" : "Tracked links",
+        value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
+      },
+      {
+        id: "blocked-templates",
+        label: fr ? "Outreach templates" : "Outreach templates",
+        value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
       },
     ];
   }
@@ -84,21 +81,9 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         value: fr ? `${BASIC_MONTHLY_DISCOVERIES} / mois` : `${BASIC_MONTHLY_DISCOVERIES} / month`,
       },
       {
-        id: "search",
-        label: fr ? "Résultats" : "Results",
-        value: fr
-          ? `${BASIC_RESULTS_PER_SEARCH} créateurs par recherche`
-          : `${BASIC_RESULTS_PER_SEARCH} creators per search`,
-      },
-      {
         id: "campaigns",
         label: fr ? "Campagnes" : "Campaigns",
         value: fr ? `${BASIC_MAX_CAMPAIGNS} actives` : `${BASIC_MAX_CAMPAIGNS} active`,
-      },
-      {
-        id: "creators",
-        label: fr ? "Créateurs suivis" : "Tracked creators",
-        value: String(BASIC_MAX_MANAGED_CREATORS),
       },
       {
         id: "shopify",
@@ -106,11 +91,6 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         value: fr
           ? `${BASIC_MAX_SHOPIFY_STORES} boutique connectée`
           : `${BASIC_MAX_SHOPIFY_STORES} connected store`,
-      },
-      {
-        id: "ai",
-        label: fr ? "Outreach IA" : "AI outreach",
-        value: fr ? `${BASIC_MONTHLY_AI_MESSAGES} messages / mois` : `${BASIC_MONTHLY_AI_MESSAGES} messages / month`,
       },
       {
         id: "affiliate",
@@ -148,21 +128,9 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         value: fr ? `${PRO_MONTHLY_DISCOVERIES} / mois` : `${PRO_MONTHLY_DISCOVERIES} / month`,
       },
       {
-        id: "search",
-        label: fr ? "Résultats" : "Results",
-        value: fr
-          ? `${PRO_RESULTS_PER_SEARCH} créateurs par recherche`
-          : `${PRO_RESULTS_PER_SEARCH} creators per search`,
-      },
-      {
         id: "campaigns",
         label: fr ? "Campagnes" : "Campaigns",
         value: fr ? `${PRO_MAX_CAMPAIGNS} actives` : `${PRO_MAX_CAMPAIGNS} active`,
-      },
-      {
-        id: "creators",
-        label: fr ? "Créateurs suivis" : "Tracked creators",
-        value: String(PRO_MAX_MANAGED_CREATORS),
       },
       {
         id: "ai",
@@ -206,19 +174,9 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       value: fr ? "Illimitées" : "Unlimited",
     },
     {
-      id: "search",
-      label: fr ? "Résultats" : "Results",
-      value: fr ? "Illimités" : "Unlimited",
-    },
-    {
       id: "campaigns",
       label: fr ? "Campagnes" : "Campaigns",
       value: fr ? "Illimitées" : "Unlimited",
-    },
-    {
-      id: "creators",
-      label: fr ? "Créateurs" : "Creators",
-      value: fr ? "Illimités" : "Unlimited",
     },
     {
       id: "shopify",

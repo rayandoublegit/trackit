@@ -118,6 +118,7 @@ export function AddSalePanel({
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
+  const [manualSalesUsed, setManualSalesUsed] = useState<number | null>(null);
 
   const amountCurrency = useDisplayCurrency();
   const selectedCommission = creatorId ? commissionByCreatorId[creatorId] : undefined;
@@ -141,6 +142,36 @@ export function AddSalePanel({
     setMessage("");
     setMessageTone("error");
   }, [open, campaign?.id]);
+
+  useEffect(() => {
+    if (!open || !supabase) {
+      setManualSalesUsed(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let resolvedUserId = userId;
+      if (!resolvedUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        resolvedUserId = user?.id;
+      }
+      if (!resolvedUserId || cancelled) return;
+      const { data } = await supabase
+        .from("sales")
+        .select("shopify_order_id, shop_domain")
+        .eq("user_id", resolvedUserId)
+        .or("shop_domain.eq.manual,shopify_order_id.like.manual_%");
+      if (cancelled) return;
+      const used = (data ?? []).filter((row) => {
+        const orderId = String(row.shopify_order_id || "");
+        return !orderId.startsWith("manual_demo_") && !orderId.startsWith("demo_");
+      }).length;
+      setManualSalesUsed(used);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, userId]);
 
   useEffect(() => {
     if (!open) return;
@@ -319,13 +350,22 @@ export function AddSalePanel({
 
   if (!open || typeof document === "undefined") return null;
 
+  const salesCounter =
+    manualSalesUsed != null
+      ? lang === "fr"
+        ? `Ventes manuelles : ${manualSalesUsed}/${FREE_MAX_MANUAL_SALES} lifetime`
+        : `Manual sales: ${manualSalesUsed}/${FREE_MAX_MANUAL_SALES} lifetime`
+      : lang === "fr"
+        ? `Plan Free : ${FREE_MAX_MANUAL_SALES} ventes manuelles lifetime`
+        : `Free plan: ${FREE_MAX_MANUAL_SALES} manual sales lifetime`;
+
   const subtitle = campaign
     ? lang === "fr"
-      ? `Campagne « ${campaign.name} » — la commission est calculée automatiquement.`
-      : `Campaign "${campaign.name}" — commission is calculated automatically.`
+      ? `Campagne « ${campaign.name} » — la commission est calculée automatiquement. ${salesCounter}.`
+      : `Campaign "${campaign.name}" — commission is calculated automatically. ${salesCounter}.`
     : lang === "fr"
-      ? `Enregistrez une vente générée par un créateur. La commission est calculée automatiquement. Plan Free : ${FREE_MAX_MANUAL_SALES} ventes manuelles max.`
-      : `Record a sale driven by a creator. Commission is calculated automatically. Free plan: ${FREE_MAX_MANUAL_SALES} manual sales max.`;
+      ? `Enregistrez une vente générée par un créateur. La commission est calculée automatiquement. ${salesCounter}.`
+      : `Record a sale driven by a creator. Commission is calculated automatically. ${salesCounter}.`;
 
   return createPortal(
     <div

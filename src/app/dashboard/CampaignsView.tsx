@@ -14,12 +14,13 @@ import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import {
   canUseManualPayouts,
+  FREE_MAX_CAMPAIGNS,
   getMaxActiveCampaigns,
   getMaxManagedCreators,
   hasReachedCampaignLimit,
-  canUseShopify,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { isDemoPresetCampaign } from "@/lib/demo-preset-data";
 import { listFolders, listSaved, type FolderRow, type FolderItem, type SavedRow } from "@/lib/workspace-client";
 import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import { PAYOUTS_UPDATED_EVENT, SALES_UPDATED_EVENT, CAMPAIGNS_UPDATED_EVENT, dispatchCampaignsUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated } from "@/lib/outreach-history-events";
@@ -1109,7 +1110,6 @@ export function CampaignsView({
   onUpgradeScale,
   isMobile,
   userId,
-  shopifyStore,
 }: {
   plan: PlanTier;
   onUpgrade: () => void;
@@ -1121,7 +1121,6 @@ export function CampaignsView({
 }) {
   const lang = useLang();
   const { navState, navigate, goBack } = useDashboardNavigation();
-  const shopifyConnected = canUseShopify(plan) && Boolean(shopifyStore?.trim());
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
@@ -1139,7 +1138,11 @@ export function CampaignsView({
   const detailId = campaignNav?.type === "detail" ? campaignNav.id : null;
   const detailInitialTab =
     campaignNav?.type === "detail" && isDetailTab(campaignNav.tab) ? campaignNav.tab : "analytics";
-  const activeCampaignCount = campaigns.filter((c) => c.status === "Active" || c.status === "Paused").length;
+  const activeCampaignCount = campaigns.filter(
+    (c) =>
+      (c.status === "Active" || c.status === "Paused") &&
+      !isDemoPresetCampaign({ name: c.name, description: c.description }),
+  ).length;
 
   const tryOpenNewCampaign = () => {
     if (hasReachedCampaignLimit(plan, activeCampaignCount)) {
@@ -1320,6 +1323,15 @@ export function CampaignsView({
       if (!supabase) return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const launchingDemo = isDemoPresetCampaign({
+        name: campaignData.name.trim(),
+        description: campaignData.description,
+      });
+      if (!launchingDemo && hasReachedCampaignLimit(plan, activeCampaignCount)) {
+        setUpgradeModalOpen(true);
+        return;
+      }
 
       const dbPayload = {
         name: campaignData.name.trim() || (lang === "fr" ? "Campagne sans titre" : "Untitled Campaign"),
@@ -1709,6 +1721,7 @@ export function CampaignsView({
             navigate({ view: "campaigns", campaign: { type: "addCreators", id: selected.id } })
           }
           onManualSaleAdded={handleManualSaleAdded}
+          onUpgrade={onUpgrade}
         />
       </>
     );
@@ -1742,7 +1755,7 @@ export function CampaignsView({
         campaigns={campaigns}
         kpiStats={kpiStats}
         plan={plan}
-        shopifyConnected={shopifyConnected}
+        billableActiveCampaigns={activeCampaignCount}
         boardTab={boardTab}
         setBoardTab={setBoardTab}
         sortOrder={sortOrder}
@@ -2113,7 +2126,11 @@ function formatStartedLabel(startRaw: string | undefined, startLabel: string, la
   if (!iso) return lang === "fr" ? "Non démarrée" : "Not started";
   const d = new Date(`${iso}T12:00:00`);
   if (Number.isNaN(d.getTime())) return startLabel || (lang === "fr" ? "Non démarrée" : "Not started");
-  const date = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const date = d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
   return lang === "fr" ? `Démarrée le ${date}` : `Started ${date}`;
 }
 
@@ -2142,7 +2159,7 @@ function CampaignsBoard({
   campaigns,
   kpiStats,
   plan,
-  shopifyConnected,
+  billableActiveCampaigns,
   boardTab,
   setBoardTab,
   sortOrder,
@@ -2158,7 +2175,7 @@ function CampaignsBoard({
   campaigns: Campaign[];
   kpiStats: CampaignKpiStats;
   plan: PlanTier;
-  shopifyConnected: boolean;
+  billableActiveCampaigns: number;
   boardTab: BoardTab;
   setBoardTab: (t: BoardTab) => void;
   sortOrder: CampaignSort;
@@ -2335,7 +2352,11 @@ function CampaignsBoard({
             </button>
           )}
           <div style={{ marginLeft: isMobile ? 0 : "auto", fontSize: 13, color: "#6B7280", width: isMobile ? "100%" : "auto" }}>
-            {lang === "fr"
+            {plan === "free" ? (
+              lang === "fr"
+                ? `Campagnes réelles : ${billableActiveCampaigns}/${FREE_MAX_CAMPAIGNS} (démo Trackit hors quota)`
+                : `Real campaigns: ${billableActiveCampaigns}/${FREE_MAX_CAMPAIGNS} (Trackit demo excluded)`
+            ) : lang === "fr"
               ? `${creatorsInCampaigns} sur ${creatorPool} créateurs (${creatorPct} %) ajoutés aux campagnes`
               : `${creatorsInCampaigns} of ${creatorPool} creators (${creatorPct}%) added to campaigns`}
           </div>
@@ -2355,12 +2376,13 @@ function CampaignsBoard({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {filtered.map((campaign) => {
               const platforms = platformsForCampaign(campaign.platform);
-              const posted = 0;
-              const totalCreators = campaign.creators ?? 0;
-              const views = 0;
-              const engagement = 0;
-              const clicks = 0;
-              const salesLabel = shopifyConnected ? formatCurrency(campaign.sales ?? 0, lang) : "—";
+              const totalCreators = campaign.creators ?? campaign.creatorIds?.length ?? 0;
+              const salesRevenue = Number(campaign.sales ?? 0) || 0;
+              const commissionOwed = Number(campaign.commission ?? 0) || 0;
+              const creatorsLabel =
+                lang === "fr"
+                  ? `${totalCreators} créateur${totalCreators > 1 ? "s" : ""}`
+                  : `${totalCreators} creator${totalCreators === 1 ? "" : "s"}`;
 
               return (
                 <button
@@ -2407,46 +2429,36 @@ function CampaignsBoard({
 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", fontSize: 13, color: "#6B7280" }}>
                     <span>{formatStartedLabel(campaign.startRaw, campaign.start, lang)}</span>
-                    <span>
-                      {lang === "fr"
-                        ? `${posted} sur ${totalCreators} publié${totalCreators > 1 ? "s" : ""}`
-                        : `${posted} out of ${totalCreators} posted`}
-                    </span>
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M2 12C4.5 7 8 4 12 4s7.5 3 10 8c-2.5 5-6 8-10 8S4.5 17 2 12z" stroke="#9CA3AF" strokeWidth="1.8" />
-                          <circle cx="12" cy="12" r="2.5" fill="#9CA3AF" />
+                          <circle cx="12" cy="12" r="9" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <path d="M12 7v10M15 9.5c0-1.1-1.3-2-3-2s-3 .9-3 2 1.3 2 3 2 3 .9 3 2-1.3 2-3 2-3-.9-3-2" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                       }
-                      value={String(views)}
+                      value={formatCurrency(salesRevenue, lang)}
                     />
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M12 20.5s-6.5-4.2-6.5-9.1a4.1 4.1 0 017.4-2.8A4.1 4.1 0 0118.5 11.4c0 4.9-6.5 9.1-6.5 9.1z" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <circle cx="9" cy="8" r="3.2" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <path d="M3.5 19c.8-3.2 2.9-5 5.5-5s4.7 1.8 5.5 5" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
+                          <circle cx="17" cy="9" r="2.4" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <path d="M15.2 19c.4-1.7 1.5-2.9 3.3-3.3" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                       }
-                      value={`${engagement}%`}
+                      value={creatorsLabel}
                     />
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M5 4l6 6-6 6V4zM14 6h6v12h-6" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
+                          <path d="M4 7h16v12H4V7z" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
+                          <path d="M8 7V5.8A2.8 2.8 0 0110.8 3h2.4A2.8 2.8 0 0116 5.8V7" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
+                          <path d="M4 12h16" stroke="#9CA3AF" strokeWidth="1.8" />
                         </svg>
                       }
-                      value={String(clicks)}
+                      value={formatCurrency(commissionOwed, lang)}
                     />
-                    {shopifyConnected && (
-                      <CampaignMetric
-                        icon={
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                            <path d="M7 8h13l-1.2 11H6.2L5 4h4l1 4z" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
-                          </svg>
-                        }
-                        value={salesLabel}
-                      />
-                    )}
                   </div>
                 </button>
               );
@@ -3384,7 +3396,7 @@ function CampaignDetailToolbar({
   );
 }
 
-function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onManualSaleAdded, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onManualSaleAdded?: (saleDate?: string) => void | Promise<void>; isMobile?: boolean }) {
+function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics", onBack, onTabChange, onUpdate: _onUpdate, onStatusChange, onEdit, onDelete: _onDelete, onAddCreators, onManualSaleAdded, onUpgrade, isMobile }: { lang: "en" | "fr"; campaign: Campaign; userId?: string; plan: PlanTier; initialTab?: DetailTab; onBack: () => void; onTabChange?: (tab: DetailTab) => void; onUpdate: (c: Campaign) => void; onStatusChange: (campaignId: string, status: CampaignStatus) => void | Promise<void>; onEdit: (id: string) => void; onDelete: (id: string) => void | Promise<void>; onAddCreators: () => void; onManualSaleAdded?: (saleDate?: string) => void | Promise<void>; onUpgrade?: () => void; isMobile?: boolean }) {
   const [tab, setTab] = useState<DetailTab>(initialTab);
   const [addSaleOpen, setAddSaleOpen] = useState(false);
   const displayCurrency = useDisplayCurrency();
@@ -3643,6 +3655,8 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           campaignId={campaign.id}
           campaignCreatorIds={campaign.creatorIds ?? []}
           isMobile={isMobile}
+          plan={plan}
+          onUpgrade={onUpgrade}
         />
       )}
       {tab === "analytics" && (

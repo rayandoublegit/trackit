@@ -67,17 +67,24 @@ export async function POST(request: NextRequest) {
   const plan = normalizePlan(profilePlan?.plan);
   const manualSalesLimit = getManualSalesLimit(plan);
   if (manualSalesLimit != null) {
-    const { count } = await supabaseAdmin
+    const { data: manualRows } = await supabaseAdmin
       .from("sales")
-      .select("id", { count: "exact", head: true })
+      .select("id, shopify_order_id, shop_domain")
       .eq("user_id", userId)
       .or("shop_domain.eq.manual,shopify_order_id.like.manual_%");
-    if ((count ?? 0) >= manualSalesLimit) {
+    const billableCount = (manualRows ?? []).filter((row) => {
+      const orderId = String(row.shopify_order_id || "");
+      // Demo preset sales (manual_demo_* / demo_*) hors quota Free.
+      return !orderId.startsWith("manual_demo_") && !orderId.startsWith("demo_");
+    }).length;
+    if (billableCount >= manualSalesLimit) {
       return NextResponse.json(
         {
           ok: false,
-          error: `Free plan limit reached: ${manualSalesLimit} manual sales max.`,
-          errorFr: `Limite du plan Free atteinte : ${manualSalesLimit} ventes manuelles max.`,
+          error: `Free plan limit reached: ${manualSalesLimit} manual sales lifetime.`,
+          errorFr: `Limite du plan Free atteinte : ${manualSalesLimit} ventes manuelles lifetime.`,
+          used: billableCount,
+          max: manualSalesLimit,
         },
         { status: 402 }
       );

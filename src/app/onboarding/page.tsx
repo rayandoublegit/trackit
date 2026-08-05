@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { PricingPlans } from "@/components/PricingPlans";
-import { freeStayAnywayCtaLabel } from "@/lib/pricing-cta";
 import {
   isSocialReferralSource,
   normalizeSocialHandle,
@@ -376,11 +375,10 @@ export default function OnboardingPage() {
               title={lang === "fr" ? "Avant d'accéder à votre dashboard" : "Before you access your dashboard"}
               subtitle={
                 lang === "fr"
-                  ? "Choisissez un plan pour débloquer tout Trackit, ou continuez gratuitement — vous pourrez upgrader à tout moment."
-                  : "Pick a plan to unlock all of Trackit, or continue for free — you can upgrade anytime."
+                  ? "Choisissez un plan pour débloquer tout Trackit — vous pourrez upgrader à tout moment."
+                  : "Pick a plan to unlock all of Trackit — you can upgrade anytime."
               }
               showCurrentPlanBadge={false}
-              freeCtaLabel={freeStayAnywayCtaLabel(lang)}
               paidCtaLabel={lang === "fr" ? "Commencer" : "Get Started"}
               userId={user.id}
               userEmail={user.email ?? undefined}
@@ -390,6 +388,7 @@ export default function OnboardingPage() {
                   : undefined
               }
               onStayFree={() => void handleCompleteFree()}
+              stayFreeLabel={lang === "fr" ? "Continuer gratuitement" : "Continue for free"}
               getOnboardingPayload={buildOnboardingPayload}
             />
             {error && <OnboardingError message={error} />}

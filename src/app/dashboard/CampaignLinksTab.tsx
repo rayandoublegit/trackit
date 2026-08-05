@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
 import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
+import { canUseAffiliates, type PlanTier } from "@/lib/plan-limits";
 import { CreatorAvatar } from "./CreatorAvatar";
 
 type LinkMetrics = {
@@ -64,12 +65,16 @@ export function CampaignLinksTab({
   campaignId,
   campaignCreatorIds = [],
   isMobile,
+  plan = "free",
+  onUpgrade,
 }: {
   lang: Lang;
   brandId?: string;
   campaignId: string;
   campaignCreatorIds?: string[];
   isMobile?: boolean;
+  plan?: PlanTier;
+  onUpgrade?: () => void;
 }) {
   const [links, setLinks] = useState<AffiliateLinkRow[]>([]);
   const [totals, setTotals] = useState({ clicks: 0, uniques: 0 });
@@ -162,7 +167,13 @@ export function CampaignLinksTab({
     return topSources(out, 8);
   }, [links]);
 
+  const linksAllowed = canUseAffiliates(plan);
+
   const handleGenerate = async () => {
+    if (!linksAllowed) {
+      onUpgrade?.();
+      return;
+    }
     if (!brandId || !selectedCreator || !destinationUrl.trim()) return;
     setGenerating(true);
     setGenError("");
@@ -295,7 +306,41 @@ export function CampaignLinksTab({
             : "Short links are built from your destination URL (e.g. myboost.com/abc1234), redirect to that store’s base URL, and track clicks."}
         </p>
 
-        {creators.length === 0 ? (
+        {!linksAllowed ? (
+          <div
+            style={{
+              border: "1px dashed #E5E5E5",
+              borderRadius: 12,
+              padding: "20px 16px",
+              background: "#FAFAFA",
+            }}
+          >
+            <p style={{ margin: "0 0 12px", fontSize: 14, color: "#374151", lineHeight: 1.5 }}>
+              {lang === "fr"
+                ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Starter pour générer et mesurer vos liens d'affiliation."
+                : "Tracked links (clicks, sales, revenue) are locked on Free. Upgrade to Starter to generate and measure affiliate links."}
+            </p>
+            {onUpgrade ? (
+              <button
+                type="button"
+                onClick={onUpgrade}
+                style={{
+                  background: "#1A1A1A",
+                  color: "#FFF",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "10px 16px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                }}
+              >
+                {lang === "fr" ? "Débloquer les liens trackés" : "Unlock tracked links"}
+              </button>
+            ) : null}
+          </div>
+        ) : creators.length === 0 ? (
           <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
             {lang === "fr" ? "Ajoutez des créateurs à la campagne pour générer un lien." : "Add creators to this campaign to generate a link."}
           </p>

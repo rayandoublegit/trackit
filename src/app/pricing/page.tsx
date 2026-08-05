@@ -1,13 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { PricingPlans } from "@/components/PricingPlans";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { BillingInterval } from "@/lib/stripe-billing";
 
 function PricingPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [subscriptionInterval, setSubscriptionInterval] = useState<BillingInterval | null>(null);
@@ -35,14 +34,6 @@ function PricingPageContent() {
     return () => { cancelled = true; };
   }, []);
 
-  const handleStayFree = () => {
-    if (window.history.length > 1) {
-      router.back();
-      return;
-    }
-    router.push(returnTo);
-  };
-
   const cancelUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/pricing?returnTo=${encodeURIComponent(returnTo)}`
@@ -56,7 +47,6 @@ function PricingPageContent() {
           subscriptionInterval={subscriptionInterval}
           loadingPlan={loadingPlan}
           cancelUrl={cancelUrl}
-          onStayFree={handleStayFree}
         />
       </div>
     </main>

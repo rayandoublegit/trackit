@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/api-auth";
+import { canUseShopify, normalizePlan } from "@/lib/plan-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,19 @@ export async function POST(request: Request) {
   if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
   if (!shop) return NextResponse.json({ ok: false, error: "Domaine manquant" }, { status: 400 });
   if (!accessToken) return NextResponse.json({ ok: false, error: "Token manquant" }, { status: 400 });
+
+  const { data: profile } = await supabaseAdmin.from("profiles").select("plan").eq("id", userId).maybeSingle();
+  if (!canUseShopify(normalizePlan(profile?.plan))) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Shopify requires Starter or above.",
+        errorFr: "Shopify nécessite le plan Starter ou supérieur.",
+        code: "plan_gate",
+      },
+      { status: 402 },
+    );
+  }
 
   // Normalize the domain: strip protocol, trailing slash, and force .myshopify.com host.
   shop = shop.replace(/^https?:\/\//, "").replace(/\/.*$/, "");

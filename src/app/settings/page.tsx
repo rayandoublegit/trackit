@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { normalizePlan, BASIC_MAX_MANAGED_CREATORS, FREE_MAX_MANAGED_CREATORS, PRO_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
+import { normalizePlan, FREE_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
 import { formatPricingAmount, getPlanMonthlyPrice, planDisplayName } from "@/lib/plan-marketing";
 import {
   fetchProfileUsernameAvailability,
@@ -22,21 +22,17 @@ type SettingsLang = "en" | "fr";
 
 function planSummaryLine(tier: PlanTier, lang: SettingsLang): string {
   if (tier === "free") {
-    return lang === "fr" ? `Plan Free · ${FREE_MAX_MANAGED_CREATORS} créateurs suivis` : `Free plan · ${FREE_MAX_MANAGED_CREATORS} tracked creators`;
+    return lang === "fr"
+      ? `Plan Free · ${FREE_MAX_MANAGED_CREATORS} créateurs suivis`
+      : `Free plan · ${FREE_MAX_MANAGED_CREATORS} tracked creators`;
   }
   const name = planDisplayName(tier, lang);
   const price = getPlanMonthlyPrice(tier);
   const formatted = price != null ? formatPricingAmount(price, lang) : "";
   const period = lang === "fr" ? "/mois" : "/mo";
-  if (tier === "scale") {
-    return lang === "fr"
-      ? `${name} · ${formatted}${period} · créateurs illimités`
-      : `${name} · ${formatted}${period} · unlimited creators`;
-  }
-  const creators = tier === "basic" ? BASIC_MAX_MANAGED_CREATORS : PRO_MAX_MANAGED_CREATORS;
   return lang === "fr"
-    ? `${name} · ${formatted}${period} · ${creators} créateurs suivis`
-    : `${name} · ${formatted}${period} · ${creators} tracked creators`;
+    ? `${name} · ${formatted}${period}`
+    : `${name} · ${formatted}${period}`;
 }
 
 const settingsT: Record<SettingsLang, Record<string, string>> = {

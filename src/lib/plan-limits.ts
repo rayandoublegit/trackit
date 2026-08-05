@@ -1,21 +1,28 @@
 export type PlanTier = "free" | "basic" | "pro" | "scale";
 
-export const FREE_LIFETIME_DISCOVERIES = 10;
+export const FREE_LIFETIME_DISCOVERIES = 2;
 export const BASIC_MONTHLY_DISCOVERIES = 30;
 export const PRO_MONTHLY_DISCOVERIES = 100;
 
-export const FREE_RESULTS_PER_SEARCH = 15;
-export const BASIC_RESULTS_PER_SEARCH = 25;
-export const PRO_RESULTS_PER_SEARCH = 50;
+export const FREE_RESULTS_PER_SEARCH = 10;
+/** Same results-per-search quota for all paid plans (Starter / Pro / Scale). */
+export const PAID_RESULTS_PER_SEARCH = 20;
+/** @deprecated Use PAID_RESULTS_PER_SEARCH — kept for older imports. */
+export const BASIC_RESULTS_PER_SEARCH = PAID_RESULTS_PER_SEARCH;
+/** @deprecated Use PAID_RESULTS_PER_SEARCH — kept for older imports. */
+export const PRO_RESULTS_PER_SEARCH = PAID_RESULTS_PER_SEARCH;
 
+/** Real campaigns only — Trackit demo campaign is hors quota. */
 export const FREE_MAX_CAMPAIGNS = 1;
 export const BASIC_MAX_CAMPAIGNS = 5;
 export const PRO_MAX_CAMPAIGNS = 15;
 
-export const FREE_MAX_MANAGED_CREATORS = 5;
+export const FREE_MAX_MANAGED_CREATORS = 3;
 export const FREE_MAX_MANUAL_SALES = 10;
-export const BASIC_MAX_MANAGED_CREATORS = 25;
-export const PRO_MAX_MANAGED_CREATORS = 100;
+/** @deprecated Paid plans have unlimited tracked creators. */
+export const BASIC_MAX_MANAGED_CREATORS = Number.POSITIVE_INFINITY;
+/** @deprecated Paid plans have unlimited tracked creators. */
+export const PRO_MAX_MANAGED_CREATORS = Number.POSITIVE_INFINITY;
 
 export const BASIC_MAX_SHOPIFY_STORES = 1;
 export const PRO_MAX_SHOPIFY_STORES = 1;
@@ -59,16 +66,14 @@ export function hasUnlimitedDiscoveries(plan: PlanTier): boolean {
   return plan === "scale";
 }
 
-/** Max creators shown per search; `null` = unlimited (Scale). */
-export function getResultsPerSearchLimit(plan: PlanTier): number | null {
+/** Max creators shown per search (Free 10, everyone else 20). */
+export function getResultsPerSearchLimit(plan: PlanTier): number {
   if (plan === "free") return FREE_RESULTS_PER_SEARCH;
-  if (plan === "basic") return BASIC_RESULTS_PER_SEARCH;
-  if (plan === "pro") return PRO_RESULTS_PER_SEARCH;
-  return null;
+  return PAID_RESULTS_PER_SEARCH;
 }
 
-export function hasUnlimitedSearchResults(plan: PlanTier): boolean {
-  return plan === "scale";
+export function hasUnlimitedSearchResults(_plan: PlanTier): boolean {
+  return false;
 }
 
 export function getVisibleDiscoveryResults<T>(plan: PlanTier, creators: T[]): T[] {
@@ -85,12 +90,10 @@ export function getMaxActiveCampaigns(plan: PlanTier): number | null {
   return FREE_MAX_CAMPAIGNS;
 }
 
-/** `null` = unlimited (Scale). */
+/** Free only; `null` = unlimited for all paid plans. */
 export function getMaxManagedCreators(plan: PlanTier): number | null {
-  if (plan === "scale") return null;
-  if (plan === "pro") return PRO_MAX_MANAGED_CREATORS;
-  if (plan === "basic") return BASIC_MAX_MANAGED_CREATORS;
-  return FREE_MAX_MANAGED_CREATORS;
+  if (plan === "free") return FREE_MAX_MANAGED_CREATORS;
+  return null;
 }
 
 export function hasReachedCampaignLimit(plan: PlanTier, campaignCount: number): boolean {
@@ -117,57 +120,45 @@ export function hasReachedManualSalesLimit(plan: PlanTier, manualSalesCount: num
   return manualSalesCount >= max;
 }
 
-export const BASIC_MONTHLY_AI_MESSAGES = 100;
+/** @deprecated No monthly AI quota — Pro / Business only. */
+export const BASIC_MONTHLY_AI_MESSAGES = 0;
 
-/** Pro + Scale: unlimited AI outreach. Basic: 100/month. */
-export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
+/** AI outreach: Pro + Business (scale) only — no message quota. */
+export function canUseAIOutreach(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
-/** Monthly AI message cap; `null` = unlimited (Pro + Scale), 0 = none (free). */
+/** @deprecated Alias of canUseAIOutreach — no monthly cap when allowed. */
+export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
+  return canUseAIOutreach(plan);
+}
+
+/**
+ * @deprecated Prefer canUseAIOutreach.
+ * `null` = allowed (unlimited), `0` = locked (Free / Starter).
+ */
 export function getMonthlyAIMessageLimit(plan: PlanTier): number | null {
-  if (plan === "free") return 0;
-  if (plan === "basic") return BASIC_MONTHLY_AI_MESSAGES;
-  return null;
+  return canUseAIOutreach(plan) ? null : 0;
 }
 
-function aiOutreachMonthKey(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+/** @deprecated Monthly AI usage tracking removed. */
+export function getAiOutreachUsageStorageKey(_userId?: string | null): string {
+  return "trackit_ai_outreach_deprecated";
 }
 
-/** Client-side monthly AI usage key (Starter quota). */
-export function getAiOutreachUsageStorageKey(userId?: string | null): string {
-  const uid = userId?.trim() || "anon";
-  return `trackit_ai_outreach_${uid}_${aiOutreachMonthKey()}`;
+/** @deprecated Monthly AI usage tracking removed. */
+export function readAiOutreachUsage(_userId?: string | null): number {
+  return 0;
 }
 
-export function readAiOutreachUsage(userId?: string | null): number {
-  if (typeof window === "undefined") return 0;
-  try {
-    return Math.max(0, parseInt(localStorage.getItem(getAiOutreachUsageStorageKey(userId)) || "0", 10) || 0);
-  } catch {
-    return 0;
-  }
+/** @deprecated Monthly AI usage tracking removed. */
+export function incrementAiOutreachUsage(_userId?: string | null): number {
+  return 0;
 }
 
-export function incrementAiOutreachUsage(userId?: string | null): number {
-  if (typeof window === "undefined") return 0;
-  const next = readAiOutreachUsage(userId) + 1;
-  try {
-    localStorage.setItem(getAiOutreachUsageStorageKey(userId), String(next));
-  } catch {
-    /* ignore */
-  }
-  return next;
-}
-
-/** Returns true when generation is allowed; false when gated. */
-export function canGenerateAiOutreach(plan: PlanTier, userId?: string | null): boolean {
-  const limit = getMonthlyAIMessageLimit(plan);
-  if (limit == null) return true;
-  if (limit <= 0) return false;
-  return readAiOutreachUsage(userId) < limit;
+/** Returns true when AI generation is allowed (Pro / Business). */
+export function canGenerateAiOutreach(plan: PlanTier, _userId?: string | null): boolean {
+  return canUseAIOutreach(plan);
 }
 
 export function canImportTemplates(plan: PlanTier): boolean {

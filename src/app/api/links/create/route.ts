@@ -7,6 +7,7 @@ import {
   generateAffiliateSlug,
   normalizeCreatorUsername,
 } from "@/lib/affiliate-short-link";
+import { canUseAffiliates, normalizePlan } from "@/lib/plan-limits";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,19 @@ export async function POST(req: Request) {
   const access = await requireWorkspaceAccess(req, body.brandId);
   if ("error" in access) return access.error;
   const brandId = access.workspaceId;
+
+  const { data: profile } = await supabase.from("profiles").select("plan").eq("id", brandId).maybeSingle();
+  if (!canUseAffiliates(normalizePlan(profile?.plan))) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Tracked affiliate links require Starter or above.",
+        errorFr: "Les liens d'affiliation trackés nécessitent le plan Starter ou supérieur.",
+        code: "plan_gate",
+      },
+      { status: 402 },
+    );
+  }
   const creatorUsernameRaw = String(body.creatorUsername || body.creator_username || "").trim();
   const destinationRaw = String(body.destinationUrl || body.destination_url || "").trim();
   const campaignId = String(body.campaignId || body.campaign_id || "").trim() || null;

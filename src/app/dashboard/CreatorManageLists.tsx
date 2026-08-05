@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PlanTier } from "@/lib/plan-limits";
-import { canUseCreatorPortal, canUseScripts } from "@/lib/plan-limits";
+import { canUseCreatorPortal, canUseScripts, getMaxManagedCreators, type PlanTier } from "@/lib/plan-limits";
+import { isDemoPresetSavedCreator } from "@/lib/demo-preset-data";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { pipelineStages } from "@/lib/pipeline";
 import {
@@ -596,6 +596,11 @@ export function CreatorManageLists({
   };
 
   const pad = isMobile ? "56px 16px 16px" : "28px 32px 32px";
+  const managedCap = getMaxManagedCreators(plan);
+  const billableCreatorCount = useMemo(
+    () => rows.filter((r) => !isDemoPresetSavedCreator(r)).length,
+    [rows],
+  );
 
   const listThStyle: React.CSSProperties = {
     padding: "18px 20px",
@@ -922,6 +927,21 @@ export function CreatorManageLists({
         )}
         </div>
       </div>
+
+      {managedCap != null ? (
+        <div
+          style={{
+            marginBottom: 16,
+            fontSize: 13,
+            color: billableCreatorCount >= managedCap ? "#B45309" : "#6B7280",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {lang === "fr"
+            ? `Créateurs suivis : ${billableCreatorCount}/${managedCap}${plan === "free" ? " (démo Trackit hors quota)" : ""}`
+            : `Tracked creators: ${billableCreatorCount}/${managedCap}${plan === "free" ? " (Trackit demo excluded)" : ""}`}
+        </div>
+      ) : null}
 
       <div
         style={{

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getAuthedUserId } from "@/lib/api-auth";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
+import { isDemoPresetSavedCreator } from "@/lib/demo-preset-data";
 import { getMaxManagedCreators, normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
 import { commissionRateFromDiscoverySnapshot } from "@/lib/managed-creator-commission";
@@ -73,13 +74,19 @@ export async function POST(request: NextRequest) {
   const username = String(c?.username ?? "").trim().replace(/^@/, "");
   if (!username) return NextResponse.json({ error: "Missing creator" }, { status: 400 });
 
-  // Free-tier save cap (shared with managed-creators limit).
+  // Free-tier save cap — demo Trackit creators are hors quota.
   const max = getMaxManagedCreators(await planFor(admin, userId));
   if (max != null) {
-    const { count } = await admin.from("discovery_saved").select("id", { count: "exact", head: true }).eq("user_id", userId);
-    const already = (await admin.from("discovery_saved").select("id", { head: true, count: "exact" }).eq("user_id", userId).eq("creator_username", username)).count ?? 0;
-    if (already === 0 && (count ?? 0) >= max) {
-      return NextResponse.json({ error: "limit", max }, { status: 402 });
+    const { data: savedRows } = await admin
+      .from("discovery_saved")
+      .select("creator_username, notes, snapshot")
+      .eq("user_id", userId);
+    const already = (savedRows ?? []).some(
+      (row) => String(row.creator_username || "").toLowerCase() === username.toLowerCase(),
+    );
+    const billableCount = (savedRows ?? []).filter((row) => !isDemoPresetSavedCreator(row)).length;
+    if (!already && billableCount >= max) {
+      return NextResponse.json({ error: "limit", max, used: billableCount }, { status: 402 });
     }
   }
 

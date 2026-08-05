@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators, saveOutreach } from "@/lib/db";
-import { dispatchOutreachHistoryUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
+import { dispatchOutreachHistoryUpdated, dispatchPayoutsUpdated, dispatchSalesUpdated, dispatchCampaignsUpdated, followUpIn3Days } from "@/lib/outreach-history-events";
 import { appendStoredOutreachEntry } from "@/lib/outreach-history-storage";
 import { avatarUrlForCreatorHandle, buildCreatorAvatarMap, normalizeCreatorHandle } from "@/lib/creator-avatar";
 import { buildCreatorEmailMap } from "@/lib/creator-crm";
@@ -334,6 +334,55 @@ function DashboardPageContent() {
       savedCreators: savedCreators ?? 0,
     });
   }, []);
+
+  // One-shot Trackit demo preset: single list + single campaign
+  useEffect(() => {
+    if (!user?.id || loading || isCreator || DEV_BYPASS_PLAN) return;
+    if (typeof window === "undefined") return;
+    const key = `trackit_demo_preset_v3_${user.id}`;
+    const lockKey = `${key}_lock`;
+    // In-flight lock avoids React Strict Mode / multi-effect duplicate POSTs
+    if (sessionStorage.getItem(key) === "1") return;
+    if (sessionStorage.getItem(lockKey) === "1") return;
+    sessionStorage.setItem(lockKey, "1");
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/demo-preset", { method: "POST", credentials: "include" });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          seeded?: boolean;
+          affiliates?: StoredAffiliate[];
+        };
+        if (cancelled) return;
+        if (data.ok) {
+          sessionStorage.setItem(key, "1");
+          if (Array.isArray(data.affiliates) && data.affiliates.length > 0) {
+            const existing = loadAffiliates(user.id);
+            if (existing.length === 0) {
+              saveAffiliates(user.id, data.affiliates as StoredAffiliate[]);
+            }
+          }
+          if (data.seeded) {
+            dispatchCampaignsUpdated();
+            dispatchSalesUpdated();
+            dispatchPayoutsUpdated();
+            window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
+            void loadSidebarCounts(user.id);
+          }
+        } else {
+          sessionStorage.removeItem(lockKey);
+        }
+      } catch {
+        sessionStorage.removeItem(lockKey);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, loading, isCreator, loadSidebarCounts]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -4171,6 +4220,60 @@ function AffiliatesView({
     setTimeout(() => setActionMessage(null), 4000);
   };
 
+  if (!canUseAffiliates(plan)) {
+    return (
+      <>
+        {upgradeModalOpen && (
+          <UpgradeModal
+            lang={lang}
+            featureKey="affiliates"
+            onClose={() => setUpgradeModalOpen(false)}
+            onPrimary={() => {
+              setUpgradeModalOpen(false);
+              onUpgrade?.();
+            }}
+          />
+        )}
+        <PageHeader
+          isMobile={isMobile}
+          title={lang === "fr" ? "Affiliés" : "Affiliates"}
+          subtitle={
+            lang === "fr"
+              ? "Les liens trackés sont bloqués sur Free — Starter débloque clics, ventes et CA."
+              : "Tracked links are locked on Free — Starter unlocks clicks, sales, and revenue."
+          }
+        />
+        <div style={{ padding: isMobile ? 16 : 40 }}>
+          <div
+            style={{
+              border: "1px solid #EFEFEF",
+              borderRadius: 16,
+              padding: isMobile ? "28px 20px" : "40px 32px",
+              background: "#FAFAFA",
+              maxWidth: 560,
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", marginBottom: 10, letterSpacing: "-0.02em" }}>
+              {lang === "fr" ? "Ce que vous ratez sur Free" : "What you're missing on Free"}
+            </div>
+            <ul style={{ margin: "0 0 20px", paddingLeft: 18, color: "#4B5563", fontSize: 14, lineHeight: 1.6 }}>
+              <li>{lang === "fr" ? "Liens d'affiliation trackés (clics, uniques, sources)" : "Tracked affiliate links (clicks, uniques, sources)"}</li>
+              <li>{lang === "fr" ? "Attribution des ventes et du CA par lien" : "Sales & revenue attribution per link"}</li>
+              <li>{lang === "fr" ? "Codes promo liés aux créateurs" : "Promo codes tied to creators"}</li>
+            </ul>
+            <button
+              type="button"
+              className="hero-cta-shopify hero-cta-compact"
+              onClick={() => setUpgradeModalOpen(true)}
+            >
+              {lang === "fr" ? "Débloquer les liens trackés" : "Unlock tracked links"}
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       {upgradeModalOpen && (
@@ -4185,10 +4288,6 @@ function AffiliatesView({
           type="button"
           className="hero-cta-shopify-light hero-cta-compact"
           onClick={() => {
-            if (!canUseAffiliates(plan)) {
-              setUpgradeModalOpen(true);
-              return;
-            }
             setPanelOpen(true);
           }}
         >

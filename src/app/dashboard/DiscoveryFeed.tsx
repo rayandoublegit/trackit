@@ -1040,6 +1040,7 @@ function feedRowGateStyle(index: number, total: number, gateActive: boolean): Re
   };
 }
 
+/** Progressive teaser on Free — shows what's locked beyond the first results. */
 const FREE_VISIBLE = 6;
 const SCALE_PAGE_LIMIT = 48;
 const ALL_NICHES_CHUNK = 1000;
