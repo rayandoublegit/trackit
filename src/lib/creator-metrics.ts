@@ -21,6 +21,8 @@ export interface CreatorMetrics {
 }
 
 export const MAX_POSTS_ANALYZED = 12;
+/** Brand-signal / CPM estimates need at least this many organic posts. */
+export const MIN_POSTS_FOR_RELIABLE_METRICS = 3;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
@@ -30,6 +32,11 @@ export function median(nums: number[]): number {
   const s = [...nums].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);
   return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+/** True when sample size is large enough for CPM / value / frequency to be trustworthy. */
+export function hasReliableCreatorMetrics(postsAnalyzed: number): boolean {
+  return postsAnalyzed >= MIN_POSTS_FOR_RELIABLE_METRICS;
 }
 
 export function computeMetrics(
@@ -52,15 +59,18 @@ export function computeMetrics(
     };
   }
 
-  const views = used.map((v) => v.playCount);
-  const avgViews = Math.round(median(views));
-  const avgLikes = Math.round(median(used.map((v) => v.likeCount)));
-  const avgComments = Math.round(median(used.map((v) => v.commentCount)));
-  const avgShares = Math.round(median(used.map((v) => v.shareCount)));
+  // Drop zero-play stubs from view/like medians (keep them out of ER already).
+  const withPlays = used.filter((v) => v.playCount > 0);
+  const statPool = withPlays.length > 0 ? withPlays : used;
 
-  const perViewEr = used
-    .filter((v) => v.playCount > 0)
-    .map((v) => ((v.likeCount + v.commentCount + v.shareCount) / v.playCount) * 100);
+  const avgViews = Math.round(median(statPool.map((v) => v.playCount)));
+  const avgLikes = Math.round(median(statPool.map((v) => v.likeCount)));
+  const avgComments = Math.round(median(statPool.map((v) => v.commentCount)));
+  const avgShares = Math.round(median(statPool.map((v) => v.shareCount)));
+
+  const perViewEr = withPlays.map(
+    (v) => ((v.likeCount + v.commentCount + v.shareCount) / v.playCount) * 100
+  );
   const engagementRate = perViewEr.length ? round2(median(perViewEr)) : 0;
 
   const meanEngagement =
@@ -72,8 +82,12 @@ export function computeMetrics(
   const lastTime = Math.max(...times);
   const firstTime = Math.min(...times);
   const lastPostAt = new Date(lastTime * 1000).toISOString();
-  const spanDays = Math.max((lastTime - firstTime) / 86400, 1);
-  const postFrequency = round2((used.length / spanDays) * 7);
+  // Need ≥2 posts across a real time span — a single post must not become "7/week".
+  const spanDays = (lastTime - firstTime) / 86400;
+  const postFrequency =
+    used.length >= 2 && spanDays >= 1
+      ? round2((used.length / spanDays) * 7)
+      : 0;
 
   return {
     avgViews, avgLikes, avgComments, avgShares, engagementRate,

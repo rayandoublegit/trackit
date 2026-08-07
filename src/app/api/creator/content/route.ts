@@ -4,6 +4,10 @@ import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
 import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
+import {
+  CREATOR_CONTENT_MAX_FILE_BYTES,
+  CREATOR_CONTENT_MAX_FILE_LABEL,
+} from "@/lib/content-upload-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
@@ -109,6 +113,13 @@ export async function POST(request: Request) {
 
   if (!userId || !title || !fileUrl || !fileName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  if (fileSize != null && fileSize > CREATOR_CONTENT_MAX_FILE_BYTES) {
+    return NextResponse.json(
+      { error: `File too large. Maximum ${CREATOR_CONTENT_MAX_FILE_LABEL}.` },
+      { status: 413 }
+    );
   }
 
   const resolved = await resolveCreatorUploadTarget(admin, userId, brandId);

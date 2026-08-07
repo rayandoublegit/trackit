@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import {
+  CREATOR_CONTENT_MAX_FILE_LABEL,
+  creatorContentFileTooLargeMessage,
+  creatorContentStorageErrorMessage,
+  isCreatorContentFileTooLarge,
+} from "@/lib/content-upload-limits";
 import { CONTENT_UPDATED_EVENT, dispatchContentUpdated } from "@/lib/outreach-history-events";
 import { supabase } from "@/lib/supabase";
 import { ContentPostStatsDisplay } from "./ContentPostStats";
@@ -186,6 +192,11 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
     if (!files.length) return;
+    const tooLarge = files.find((f) => isCreatorContentFileTooLarge(f.size));
+    if (tooLarge) {
+      setError(creatorContentFileTooLargeMessage(lang, tooLarge.name));
+      return;
+    }
     setPendingFiles((prev) => [...prev, ...files]);
     setError(null);
   };
@@ -245,11 +256,18 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
       for (let i = 0; i < pendingFiles.length; i++) {
         const file = pendingFiles[i];
+        if (isCreatorContentFileTooLarge(file.size)) {
+          throw new Error(creatorContentFileTooLargeMessage(lang, file.name));
+        }
         const path = `${userId}/${uploadBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
-          .upload(path, file, { upsert: false, contentType: file.type || undefined });
-        if (upErr) throw new Error(upErr.message);
+          .upload(path, file, {
+            upsert: false,
+            contentType: file.type || undefined,
+            cacheControl: "3600",
+          });
+        if (upErr) throw new Error(creatorContentStorageErrorMessage(lang, upErr.message));
 
         const { data: pub } = supabase.storage.from("creator-content").getPublicUrl(path);
         const itemTitle = pendingFiles.length === 1 && title.trim() ? title.trim() : title.trim() || file.name;
@@ -449,8 +467,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               </p>
               <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 20px", lineHeight: 1.45, maxWidth: 280 }}>
                 {lang === "fr"
-                  ? "Vidéos, images, PDF, archives… tous les formats sont acceptés."
-                  : "Videos, images, PDFs, archives… all file types are accepted."}
+                  ? `Vidéos (1–2 min+), images, PDF… jusqu’à ${CREATOR_CONTENT_MAX_FILE_LABEL} par fichier.`
+                  : `Videos (1–2+ min), images, PDFs… up to ${CREATOR_CONTENT_MAX_FILE_LABEL} per file.`}
               </p>
               <button
                 type="button"

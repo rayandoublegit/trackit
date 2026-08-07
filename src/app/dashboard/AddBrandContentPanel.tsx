@@ -5,6 +5,12 @@ import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
 import { safeContentFileName } from "@/lib/content-shared";
+import {
+  CREATOR_CONTENT_MAX_FILE_LABEL,
+  creatorContentFileTooLargeMessage,
+  creatorContentStorageErrorMessage,
+  isCreatorContentFileTooLarge,
+} from "@/lib/content-upload-limits";
 import { dispatchContentUpdated } from "@/lib/outreach-history-events";
 import {
   selectionCardStyle,
@@ -119,6 +125,12 @@ export function AddBrandContentPanel({
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
     if (!files.length) return;
+    const tooLarge = files.find((f) => isCreatorContentFileTooLarge(f.size));
+    if (tooLarge) {
+      setMessageTone("error");
+      setMessage(creatorContentFileTooLargeMessage(lang, tooLarge.name));
+      return;
+    }
     setPendingFiles((prev) => [...prev, ...files]);
     setMessage("");
   };
@@ -152,11 +164,18 @@ export function AddBrandContentPanel({
       let uploaded = 0;
       for (let i = 0; i < pendingFiles.length; i++) {
         const file = pendingFiles[i];
+        if (isCreatorContentFileTooLarge(file.size)) {
+          throw new Error(creatorContentFileTooLargeMessage(lang, file.name));
+        }
         const path = `brand-upload/${brandId}/${creatorRowId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeContentFileName(file.name)}`;
         const { error: upErr } = await supabase.storage
           .from("creator-content")
-          .upload(path, file, { upsert: false, contentType: file.type || undefined });
-        if (upErr) throw new Error(upErr.message);
+          .upload(path, file, {
+            upsert: false,
+            contentType: file.type || undefined,
+            cacheControl: "3600",
+          });
+        if (upErr) throw new Error(creatorContentStorageErrorMessage(lang, upErr.message));
 
         const { data: pub } = supabase.storage.from("creator-content").getPublicUrl(path);
         const itemTitle =
@@ -414,8 +433,8 @@ export function AddBrandContentPanel({
               >
                 <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
                   {lang === "fr"
-                    ? "Glissez des images ou vidéos ici, ou cliquez pour parcourir"
-                    : "Drag images or videos here, or click to browse"}
+                    ? `Glissez des images ou vidéos ici (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2 min+), ou cliquez pour parcourir`
+                    : `Drag images or videos here (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2+ min), or click to browse`}
                 </p>
                 <input
                   ref={fileRef}

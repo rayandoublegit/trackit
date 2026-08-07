@@ -72,6 +72,12 @@ describe("creatorMatchesNicheFilter", () => {
     expect(creatorMatchesNicheFilter(food, "beauty")).toBe(false);
   });
 
+  it("maps sport/sports tags into fitness", () => {
+    expect(creatorMatchesNicheFilter({ niches: ["sport"] }, "fitness")).toBe(true);
+    expect(creatorMatchesNicheFilter({ primaryNiche: "Sports" }, "fitness")).toBe(true);
+    expect(creatorMatchesNicheFilter({ niches: ["sport"] }, "travel")).toBe(false);
+  });
+
   it("matches only exact e-commerce / saas tags", () => {
     expect(creatorMatchesNicheFilter({ niches: ["dropshipping"] }, "e-commerce")).toBe(true);
     expect(creatorMatchesNicheFilter({ niches: ["e-commerce"] }, "e-commerce")).toBe(true);

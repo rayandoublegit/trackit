@@ -41,4 +41,14 @@ describe("computeMetrics", () => {
     const m = computeMetrics(1000, videos, { nowMs: NOW * 1000 });
     expect(m.engagementRate).toBe(0);
   });
+
+  it("does not invent 7 posts/week from a single video", () => {
+    const videos = [
+      vid({ playCount: 308, likeCount: 5, commentCount: 0, shareCount: 0, createTime: NOW }),
+    ];
+    const m = computeMetrics(9_000, videos, { nowMs: NOW * 1000 });
+    expect(m.postsAnalyzed).toBe(1);
+    expect(m.postFrequency).toBe(0);
+    expect(m.avgViews).toBe(308);
+  });
 });

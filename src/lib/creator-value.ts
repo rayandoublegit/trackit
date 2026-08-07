@@ -24,16 +24,25 @@ export function valueTier(followers: number): ValueTier {
   return "mega";
 }
 
+/** Minimum avg views before CPM / value score are considered meaningful. */
+export const MIN_VIEWS_FOR_VALUE_METRICS = 500;
+
 // USD per 1000 real views. Lower = better value. Rounded to 0.1.
+// Tiny samples (e.g. 308 views) used to explode CPM via the 0.1k floor — guard that.
 export function estimatedCpm(estCostPerPost: number, avgViews: number): number {
-  const cpm = estCostPerPost / Math.max(avgViews / 1000, 0.1);
+  if (!Number.isFinite(avgViews) || avgViews < MIN_VIEWS_FOR_VALUE_METRICS) return 0;
+  const cpm = estCostPerPost / (avgViews / 1000);
   return Math.round(cpm * 10) / 10;
 }
 
 // 0-100. Rewards low CPM (cost efficiency) and high engagement.
 export function valueScore(followers: number, engagementRate: number, avgViews: number): number {
+  if (!Number.isFinite(avgViews) || avgViews < MIN_VIEWS_FOR_VALUE_METRICS) {
+    // Engagement-only fallback when reach sample is too thin for CPM.
+    return Math.round(clamp(engagementRate * 8, 0, 100));
+  }
   const cost = estimatedCostPerPost(followers);
-  const cpm = cost / Math.max(avgViews / 1000, 0.1);
+  const cpm = cost / (avgViews / 1000);
   const cpmComponent = clamp(100 - cpm * 2, 0, 100);
   const engagementComponent = clamp(engagementRate * 8, 0, 100);
   return Math.round(0.6 * cpmComponent + 0.4 * engagementComponent);

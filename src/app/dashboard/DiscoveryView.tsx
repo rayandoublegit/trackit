@@ -2388,12 +2388,13 @@ export function DiscoveryView({
     setHasSearched(true);
 
     try {
+      // Exclusive edges so a creator never lands in two buckets at once.
       const followerBounds: Record<string, { min: number; max?: number }> = {
-        "1-10k": { min: 1000, max: 10000 },
-        "10-20k": { min: 10000, max: 20000 },
-        "20-50k": { min: 20000, max: 50000 },
-        "50-100k": { min: 50000, max: 100000 },
-        "100k+": { min: 100000 },
+        "1-10k": { min: 1_000, max: 10_000 },
+        "10-20k": { min: 10_001, max: 20_000 },
+        "20-50k": { min: 20_001, max: 50_000 },
+        "50-100k": { min: 50_001, max: 100_000 },
+        "100k+": { min: 100_001 },
       };
       const activeFollowers = followersOverride !== undefined ? followersOverride : followers;
       const { min: minFollowers, max: maxFollowers } = followerBounds[activeFollowers] ?? { min: 0 };

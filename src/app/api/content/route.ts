@@ -13,6 +13,10 @@ import {
   syncContentRefToDiscoverySaved,
 } from "@/lib/content-creator-sync";
 import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
+import {
+  CREATOR_CONTENT_MAX_FILE_BYTES,
+  CREATOR_CONTENT_MAX_FILE_LABEL,
+} from "@/lib/content-upload-limits";
 import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -171,6 +175,12 @@ export async function POST(request: Request) {
 
   if (!brandId || !creatorRowId || !title || !fileUrl || !fileName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  }
+  if (fileSize != null && fileSize > CREATOR_CONTENT_MAX_FILE_BYTES) {
+    return NextResponse.json(
+      { error: `File too large. Maximum ${CREATOR_CONTENT_MAX_FILE_LABEL}.` },
+      { status: 413 }
+    );
   }
   if (postUrlRaw && !/tiktok\.com\//i.test(postUrlRaw)) {
     return NextResponse.json({ error: "URL must be a TikTok link (tiktok.com)." }, { status: 400 });

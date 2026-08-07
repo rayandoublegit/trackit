@@ -106,7 +106,10 @@ export async function fetchTikTokProfileRaw(handle: string): Promise<any> {
   return scGet(`/v1/tiktok/profile?handle=${encodeURIComponent(handle)}`);
 }
 export async function fetchTikTokVideosRaw(handle: string): Promise<any> {
-  return scGet(`/v3/tiktok/profile/videos?handle=${encodeURIComponent(handle)}`);
+  // Request a fuller page so medians aren't based on a single video when possible.
+  return scGet(
+    `/v3/tiktok/profile/videos?handle=${encodeURIComponent(handle)}&amount=30`
+  );
 }
 export async function searchTikTokUsersRaw(query: string, cursor?: number): Promise<any> {
   const c = cursor ? `&cursor=${cursor}` : "";

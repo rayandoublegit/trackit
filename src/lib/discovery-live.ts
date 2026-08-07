@@ -26,6 +26,11 @@ export interface DiscoveryCreatorResult {
   engagementRate: number;
   engagementByFollower: number;
   avgViews: number;
+  avgLikes?: number;
+  avgComments?: number;
+  avgShares?: number;
+  viewsPerFollower?: number;
+  postsAnalyzed?: number;
   postFrequency: number;
   lastPostAt: string | null;
   authenticityScore: number;

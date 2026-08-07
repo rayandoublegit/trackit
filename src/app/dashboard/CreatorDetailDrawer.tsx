@@ -19,6 +19,13 @@ import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
 import { discoveryCopy, daysAgoCopy, engagementInsightCopy } from "@/lib/discovery-copy";
 import type { Lang } from "@/lib/useLang";
 import { setCachedAvatarUrl } from "@/lib/avatar-url-cache";
+import {
+  fetchCreatorDetail,
+  getCachedCreatorDetail,
+  setCachedCreatorDetail,
+} from "@/lib/creator-detail-cache";
+import { hasReliableCreatorMetrics } from "@/lib/creator-metrics";
+import { MIN_VIEWS_FOR_VALUE_METRICS } from "@/lib/creator-value";
 import { supabase } from "@/lib/supabase";
 
 export type CreatorDetail = FeedCreator & {
@@ -216,18 +223,27 @@ function valueTierLabel(tier: ValueTier, lang: Lang): string {
 function BrandSignalsGrid({ d, lang }: { d: CreatorDetail; lang: Lang }) {
   const t = discoveryCopy(lang);
   const avgViews = d.avgViews || 0;
+  const postsAnalyzed = d.postsAnalyzed ?? 0;
+  const reliable = hasReliableCreatorMetrics(postsAnalyzed);
+  const cpmReady = reliable && avgViews >= MIN_VIEWS_FOR_VALUE_METRICS && d.estCpm > 0;
+  const frequency = postsAnalyzed >= 2 ? d.postFrequency : 0;
 
   return (
     <>
       <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "24px 0 12px", letterSpacing: "-0.02em" }}>{t.brandSignals}</h3>
+      {!reliable && postsAnalyzed > 0 ? (
+        <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 12px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+          {t.lowSampleNote(postsAnalyzed)}
+        </p>
+      ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
         <Stat label={t.likeRate} value={fmtRate(d.avgLikes ?? 0, avgViews)} />
         <Stat label={t.commentRate} value={fmtRate(d.avgComments ?? 0, avgViews)} />
         <Stat label={t.shareRate} value={fmtRate(d.avgShares ?? 0, avgViews)} />
-        <Stat label={t.estCpm} value={d.estCpm > 0 ? `$${d.estCpm}` : "—"} accent />
+        <Stat label={t.estCpm} value={cpmReady ? `$${d.estCpm}` : "—"} accent />
         <Stat label={t.estCostPerPost} value={d.estCostPerPost > 0 ? `$${d.estCostPerPost.toLocaleString()}` : "—"} />
-        <Stat label={t.valueScore} value={d.valueScore > 0 ? `${d.valueScore}/100` : "—"} accent />
-        <Stat label={t.postFrequency} value={d.postFrequency > 0 ? t.postsPerWeek(d.postFrequency) : "—"} />
+        <Stat label={t.valueScore} value={reliable && d.valueScore > 0 ? `${d.valueScore}/100` : "—"} accent />
+        <Stat label={t.postFrequency} value={frequency > 0 ? t.postsPerWeek(frequency) : "—"} />
         <Stat label={t.creatorTier} value={d.valueTier ? valueTierLabel(d.valueTier, lang) : "—"} />
         <Stat label={t.engagementByFollower} value={d.engagementByFollower > 0 ? `${d.engagementByFollower.toFixed(2)}%` : "—"} />
       </div>
@@ -365,6 +381,8 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
   const [saveBusy, setSaveBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const aiSectionRef = useRef<HTMLDivElement>(null);
+  const [aiVisible, setAiVisible] = useState(false);
 
   useEffect(() => {
     if (!creator) return;
@@ -478,29 +496,36 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
   };
 
   useEffect(() => {
-    setDetail(creator);
-    if (!creator) return;
+    if (!creator) {
+      setDetail(null);
+      return;
+    }
+    // Paint Performance immediately from feed fields + any hover prefetch cache.
+    const cached = getCachedCreatorDetail(creator.username);
+    setDetail(cached ? ({ ...creator, ...(cached as unknown as CreatorDetail) } as CreatorDetail) : creator);
     setShown(false);
     const t = setTimeout(() => setShown(true), 10);
+    setAiVisible(false);
+    setAnalysis(null);
+    setAnalysisLoading(false);
     let cancelled = false;
     const handle = creator.username;
-    fetch(`/api/creator/${encodeURIComponent(handle)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled || !d?.creator) return;
-        const remote = d.creator as CreatorDetail;
-        if (remote.username && remote.username !== handle) return;
-        setDetail((prev) => {
-          if (!prev || prev.username !== handle) return remote;
-          const merged = { ...prev, ...remote } as CreatorDetail;
-          merged.avatarUrl = mergeCreatorAvatarSrc(handle, remote.avatarUrl, prev.avatarUrl);
-          // Keep feed previews only when the API row has none yet (same creator).
-          if (!remote.topVideos?.length && prev.topVideos?.length) merged.topVideos = prev.topVideos;
-          if (!remote.videoThumbnails?.length && prev.videoThumbnails?.length) merged.videoThumbnails = prev.videoThumbnails;
-          return merged;
-        });
-      })
-      .catch(() => {});
+    void fetchCreatorDetail(handle).then((remoteRaw) => {
+      if (cancelled || !remoteRaw) return;
+      const remote = remoteRaw as unknown as CreatorDetail;
+      if (remote.username && remote.username !== handle) return;
+      setCachedCreatorDetail(remoteRaw);
+      setDetail((prev) => {
+        if (!prev || prev.username !== handle) return remote;
+        const merged = { ...prev, ...remote } as CreatorDetail;
+        merged.avatarUrl = mergeCreatorAvatarSrc(handle, remote.avatarUrl, prev.avatarUrl);
+        if (!remote.topVideos?.length && prev.topVideos?.length) merged.topVideos = prev.topVideos;
+        if (!remote.videoThumbnails?.length && prev.videoThumbnails?.length) {
+          merged.videoThumbnails = prev.videoThumbnails;
+        }
+        return merged;
+      });
+    });
     return () => { cancelled = true; clearTimeout(t); };
   }, [creator]);
 
@@ -510,11 +535,24 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // AI content analysis of the creator's video frames (paid; cached server-side).
+  // Lazy AI: only fetch when the section scrolls into view (don't block Performance).
   useEffect(() => {
-    if (!creator || !isPaid) { setAnalysis(null); return; }
+    if (!creator || !isPaid) return;
+    const el = aiSectionRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setAiVisible(true);
+      },
+      { root: null, rootMargin: "120px", threshold: 0.05 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [creator, isPaid]);
+
+  useEffect(() => {
+    if (!creator || !isPaid || !aiVisible) return;
     let cancelled = false;
-    setAnalysis(null);
     setAnalysisLoading(true);
     fetch(`/api/creator/${encodeURIComponent(creator.username)}/analyze`)
       .then((r) => (r.ok ? r.json() : null))
@@ -522,7 +560,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
       .catch(() => {})
       .finally(() => { if (!cancelled) setAnalysisLoading(false); });
     return () => { cancelled = true; };
-  }, [creator, isPaid]);
+  }, [creator, isPaid, aiVisible]);
 
   const videos = useMemo(() => {
     if (!detail) return [];
@@ -745,26 +783,28 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
         </DrawerSection>
 
         {isPaid && (
-          <DrawerSection title={t.aiAnalysis}>
-            {analysisLoading && !analysis ? (
-              <div style={{ fontSize: 13, color: "#9A9A9A", background: "#F7F7F8", borderRadius: 10, padding: 14 }}>{t.analyzingVideos}</div>
-            ) : analysis ? (
-              <div style={{ background: "#F7F7F8", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-                <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55 }}>{analysis.summary}</div>
-                {analysis.themes.length > 0 && (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {analysis.themes.map((th) => <span key={th} style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", padding: "2px 9px", borderRadius: 20 }}>{th}</span>)}
-                  </div>
-                )}
-                {analysis.style && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.style}:</span> {analysis.style}</div>}
-                {analysis.production && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.production}:</span> {analysis.production}</div>}
-                {analysis.brandFit && <div style={{ fontSize: 12.5, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>🎯 <span style={{ fontWeight: 600 }}>{t.brandFit}:</span> {analysis.brandFit}</div>}
-                {!analysis.brandSafe && <div style={{ fontSize: 12, color: "#9A1F1F", background: "#FEF2F2", borderRadius: 8, padding: "6px 10px" }}>⚠ {t.brandSensitive}</div>}
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: "#9A9A9A" }}>{t.analysisUnavailable}</div>
-            )}
-          </DrawerSection>
+          <div ref={aiSectionRef}>
+            <DrawerSection title={t.aiAnalysis}>
+              {!aiVisible || (analysisLoading && !analysis) ? (
+                <div style={{ fontSize: 13, color: "#9A9A9A", background: "#F7F7F8", borderRadius: 10, padding: 14 }}>{t.analyzingVideos}</div>
+              ) : analysis ? (
+                <div style={{ background: "#F7F7F8", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontSize: 13, color: "#1A1A1A", lineHeight: 1.55 }}>{analysis.summary}</div>
+                  {analysis.themes.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {analysis.themes.map((th) => <span key={th} style={{ fontSize: 11, color: "#534AB7", background: "#EEEDFE", padding: "2px 9px", borderRadius: 20 }}>{th}</span>)}
+                    </div>
+                  )}
+                  {analysis.style && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.style}:</span> {analysis.style}</div>}
+                  {analysis.production && <div style={{ fontSize: 12.5, color: "#5A5A5A", lineHeight: 1.5 }}><span style={{ color: "#1A1A1A", fontWeight: 600 }}>{t.production}:</span> {analysis.production}</div>}
+                  {analysis.brandFit && <div style={{ fontSize: 12.5, color: "#0F6E56", background: "#E1F5EE", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}>🎯 <span style={{ fontWeight: 600 }}>{t.brandFit}:</span> {analysis.brandFit}</div>}
+                  {!analysis.brandSafe && <div style={{ fontSize: 12, color: "#9A1F1F", background: "#FEF2F2", borderRadius: 8, padding: "6px 10px" }}>⚠ {t.brandSensitive}</div>}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: "#9A9A9A" }}>{t.analysisUnavailable}</div>
+              )}
+            </DrawerSection>
+          </div>
         )}
 
         {isPaid && (

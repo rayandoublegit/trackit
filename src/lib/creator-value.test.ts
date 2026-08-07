@@ -27,8 +27,9 @@ describe("estimatedCpm", () => {
     expect(estimatedCpm(150, 40_000)).toBe(3.8); // 150 / 40
     expect(estimatedCpm(5000, 108_000)).toBeCloseTo(46.3, 1);
   });
-  it("guards zero views", () => {
-    expect(estimatedCpm(150, 0)).toBe(1500); // 150 / 0.1
+  it("hides CPM when views sample is too thin", () => {
+    expect(estimatedCpm(150, 0)).toBe(0);
+    expect(estimatedCpm(50, 308)).toBe(0); // nano 1-post trap
   });
 });
 

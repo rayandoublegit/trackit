@@ -157,6 +157,10 @@ export function discoveryCopy(lang: Lang) {
     authenticity: fr ? "Authenticité" : "Authenticity",
     reachPerFollower: fr ? "Portée / abonnés" : "Reach / followers",
     postsAnalyzed: fr ? "Posts analysés" : "Posts analyzed",
+    lowSampleNote: (n: number) =>
+      fr
+        ? `Échantillon faible (${n} post${n > 1 ? "s" : ""}) — CPM et fréquence sont masqués jusqu’à 3 posts analysés.`
+        : `Thin sample (${n} post${n === 1 ? "" : "s"}) — CPM and frequency stay hidden until 3 posts are analyzed.`,
     likeRate: fr ? "Taux de likes" : "Like rate",
     commentRate: fr ? "Taux de commentaires" : "Comment rate",
     shareRate: fr ? "Taux de partages" : "Share rate",

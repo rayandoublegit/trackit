@@ -7,8 +7,11 @@ export const maxDuration = 30;
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
   const num = (k: string) => {
-    const v = Number(p.get(k));
-    return Number.isFinite(v) && v > 0 ? v : undefined;
+    const raw = p.get(k);
+    if (raw == null || raw === "") return undefined;
+    const v = Number(raw);
+    // Allow 0 so lower bucket edges are never dropped by truthiness checks.
+    return Number.isFinite(v) && v >= 0 ? v : undefined;
   };
   const filters: FeedFilters = {
     niche: p.get("niche") || undefined,

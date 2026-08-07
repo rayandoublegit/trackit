@@ -1,0 +1,27 @@
+---
+description: Never use Zescale Supabase — Trackit project only
+alwaysApply: true
+---
+
+# Trackit Supabase only — never Zescale
+
+This repo is **Trackit**. Do not use, edit, or call the **Zescale** Supabase project from this folder.
+
+## Canonical project
+
+- **Trackit** (correct): `https://tokpuhzjhysqxwjkxfya.supabase.co`
+- **Zescale** (forbidden here): `https://utqlwiksnimfbuylzwzi.supabase.co`
+
+## Rules
+
+- Before any Storage / DB / Supabase admin script or API call, verify `NEXT_PUBLIC_SUPABASE_URL` in `.env.local` contains `tokpuhzjhysqxwjkxfya`.
+- If the URL is `utqlwiksnimfbuylzwzi` (or any non-Trackit project), **stop** and restore Trackit credentials from `.env.local.backup` (or ask the user). Do not “fix” the wrong project.
+- Never copy Zescale keys into `.env.local` for this repo.
+- Never run migrations, bucket updates, seed scripts, or service-role queries against Zescale while working in `/Trackit`.
+- Prefer `.env.local` + dotenv with `override: true` so a shell that previously loaded Zescale does not win.
+
+## If credentials look wrong
+
+1. Check: `grep NEXT_PUBLIC_SUPABASE_URL .env.local`
+2. Expected: `tokpuhzjhysqxwjkxfya.supabase.co`
+3. Restore: `cp .env.local.backup .env.local` (or equivalent Trackit backup), then retry.

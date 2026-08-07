@@ -15,6 +15,10 @@ import {
 } from "@/lib/discovery-quota";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { creatorMatchesGeoFilter, creatorMatchesNicheFilter, isCuratedFeedCreator } from "@/lib/discovery-feed";
+import {
+  creatorMatchesFollowerRange,
+  followerRangeBounds,
+} from "@/lib/discovery-follower-ranges";
 import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
@@ -24,6 +28,7 @@ import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
 import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
+import { prefetchCreatorDetail } from "@/lib/creator-detail-cache";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 function fmt(n: number): string {
@@ -128,19 +133,6 @@ function languageFromCountry(country: string): string | null {
   return map[country] ?? null;
 }
 
-const FOLLOWER_RANGES: Record<string, { min: number; max?: number }> = {
-  "1-10k": { min: 0, max: 10_000 },
-  "10-100k": { min: 10_001, max: 100_000 },
-  "100-500k": { min: 100_001, max: 500_000 },
-  "500k+": { min: 500_001 },
-};
-
-function followerRangeBounds(range: string): { min?: number; max?: number } {
-  const b = FOLLOWER_RANGES[range];
-  if (!b) return {};
-  return { min: b.min, max: b.max };
-}
-
 const VIEWS_VAL: Record<string, number> = {
   "10k": 10_000,
   "50k": 50_000,
@@ -200,12 +192,9 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
       out = out.filter((c) => (c.platform || "tiktok").toLowerCase().includes(want));
     }
 
-    const followers = followerRangeBounds(f.followersRange);
-    if (followers.min != null) {
-      out = out.filter((c) => c.followersCount >= followers.min!);
-    }
-    if (followers.max != null) {
-      out = out.filter((c) => c.followersCount <= followers.max!);
+    if (f.followersRange) {
+      const followers = followerRangeBounds(f.followersRange);
+      out = out.filter((c) => creatorMatchesFollowerRange(c.followersCount, followers));
     }
 
     if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
@@ -758,6 +747,7 @@ function FeedListRow({
       onMouseEnter={(e) => {
         e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
         e.currentTarget.style.borderColor = "#E0E0E0";
+        prefetchCreatorDetail(c.username);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = "none";

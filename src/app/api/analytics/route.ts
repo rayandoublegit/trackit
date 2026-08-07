@@ -62,18 +62,61 @@ export async function GET(request: NextRequest) {
   const periodRange = range === "custom" || range === "all" ? "30d" : range;
   const { start, end, prevStart, prevEnd } = getPeriodBounds(periodRange, new Date(), tzOffset);
 
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("shopify_store, shopify_access_token")
-    .eq("id", userId)
-    .maybeSingle();
+  // Window covering previous + current periods (charts + period KPIs).
+  const windowStartIso = prevStart.toISOString();
+  const windowEndIso = end.toISOString();
+
+  // Fan out independent reads — was a waterfall of 6–8 sequential awaits.
+  const [
+    { data: profile },
+    { data: salesData },
+    { count: salesTotalCount },
+    { data: payoutsData },
+    { data: outreachData },
+    { data: allCreators },
+    { data: campaignCreatorLinks },
+    { data: campaignsRaw },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("profiles")
+      .select("shopify_store, shopify_access_token")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("sales")
+      .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id, status")
+      .eq("user_id", userId)
+      .gte("created_at", windowStartIso)
+      .lte("created_at", windowEndIso),
+    supabaseAdmin
+      .from("sales")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+    supabaseAdmin
+      .from("payouts")
+      .select("amount, status, paid_at, created_at, creator_id")
+      .eq("user_id", userId),
+    supabaseAdmin
+      .from("outreach_history")
+      .select("status, created_at, creator_username, platform, message, follow_up_date")
+      .eq("user_id", userId)
+      .gte("created_at", windowStartIso)
+      .lte("created_at", windowEndIso),
+    supabaseAdmin
+      .from("creators")
+      .select("id, full_name, handle, platform, avatar_url, total_sales, total_earned, balance, discount_code")
+      .eq("user_id", userId),
+    supabaseAdmin
+      .from("campaign_creators")
+      .select("campaign_id, creator_id, discount_code, historical_sales_attached, created_at")
+      .eq("user_id", userId),
+    supabaseAdmin
+      .from("campaigns")
+      .select("id, name, platform, status, created_at, start_date")
+      .eq("user_id", userId),
+  ]);
 
   const shopifyConnected = !!(profile?.shopify_store && profile?.shopify_access_token);
-
-  const { data: salesData } = await supabaseAdmin
-    .from("sales")
-    .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id, status")
-    .eq("user_id", userId);
 
   const salesRows = (salesData || []) as SaleAttributionRow[];
 
@@ -92,11 +135,6 @@ export async function GET(request: NextRequest) {
   const accruedCommissions = currentSales.commissions;
 
   const periodSales = salesRows.filter((s) => isWithinPeriod(s.created_at, start, end, tzOffset));
-
-  const { data: payoutsData } = await supabaseAdmin
-    .from("payouts")
-    .select("amount, status, paid_at, created_at, creator_id")
-    .eq("user_id", userId);
 
   const sumPaidPayouts = (from: Date, to: Date) => {
     const rows = (payoutsData || []).filter((p) => {
@@ -124,11 +162,6 @@ export async function GET(request: NextRequest) {
       paidByCreatorPeriod.set(creatorId, (paidByCreatorPeriod.get(creatorId) || 0) + amount);
     }
   }
-
-  const { data: outreachData } = await supabaseAdmin
-    .from("outreach_history")
-    .select("status, created_at, creator_username, platform, message, follow_up_date")
-    .eq("user_id", userId);
 
   const outreachRows = (outreachData || []) as OutreachRow[];
 
@@ -224,11 +257,6 @@ export async function GET(request: NextRequest) {
     withoutFollowUp: followUpStats(withoutFollowUpRows),
   };
 
-  const { data: allCreators } = await supabaseAdmin
-    .from("creators")
-    .select("id, full_name, handle, platform, avatar_url, total_sales, total_earned, balance, discount_code")
-    .eq("user_id", userId);
-
   type CreatorInfo = {
     id: string;
     full_name?: string;
@@ -258,13 +286,8 @@ export async function GET(request: NextRequest) {
     if (handle) codeToCreatorId.set(handleToDiscountCode(handle), id);
   }
 
-  const { data: campaignCodeLinks } = await supabaseAdmin
-    .from("campaign_creators")
-    .select("creator_id, campaign_id, discount_code")
-    .eq("user_id", userId);
-
   const creatorsByCampaign = new Map<string, string[]>();
-  for (const link of campaignCodeLinks || []) {
+  for (const link of campaignCreatorLinks || []) {
     const code = String(link.discount_code || "").trim().toUpperCase();
     if (code) codeToCreatorId.set(code, String(link.creator_id));
     const campaignId = String(link.campaign_id || "");
@@ -402,24 +425,15 @@ export async function GET(request: NextRequest) {
     }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  const { data: campaignsRaw } = await supabaseAdmin
-    .from("campaigns")
-    .select("id, name, platform, status, created_at, start_date")
-    .eq("user_id", userId);
-
-  const { data: ccLinks } = await supabaseAdmin
-    .from("campaign_creators")
-    .select("campaign_id, creator_id, historical_sales_attached, created_at")
-    .eq("user_id", userId);
-
+  const ccLinks = campaignCreatorLinks || [];
   const creatorCounts = buildCreatorCountsFromLinks(
-    (ccLinks || []).map((l) => ({
+    ccLinks.map((l) => ({
       campaign_id: String(l.campaign_id),
       creator_id: String(l.creator_id),
     })),
   );
   const linkMeta = buildCampaignCreatorLinkMap(
-    (ccLinks || []).map((l) => ({
+    ccLinks.map((l) => ({
       campaign_id: String(l.campaign_id),
       creator_id: String(l.creator_id),
       historical_sales_attached: l.historical_sales_attached,
@@ -428,7 +442,7 @@ export async function GET(request: NextRequest) {
   );
 
   const creatorCountByCampaign = new Map<string, number>();
-  for (const link of ccLinks || []) {
+  for (const link of ccLinks) {
     const cid = String(link.campaign_id);
     creatorCountByCampaign.set(cid, (creatorCountByCampaign.get(cid) || 0) + 1);
   }
@@ -476,43 +490,51 @@ export async function GET(request: NextRequest) {
     outreachMessagesSent > 0 ||
     creatorsPerformance.length > 0 ||
     (campaignsData && campaignsData.length > 0) ||
+    (salesTotalCount ?? 0) > 0 ||
     salesRows.length > 0 ||
     (payoutsData && payoutsData.some((p) => String(p.status || "").toLowerCase() === "paid"));
 
-  return NextResponse.json({
-    hasData,
-    shopifyConnected,
-    range,
-    totalRevenue,
-    totalCommissions,
-    accruedCommissions,
-    totalSent,
-    outreachMessagesSent,
-    responseRate,
-    converted,
-    creators: creatorsPerformance,
-    creatorsPerformance,
-    campaigns: campaignsData || [],
-    salesCount: currentSales.count,
-    revenueTimeline,
-    platformBreakdown,
-    outreachByPlatform,
-    followUpImpact,
-    trends: {
-      revenue: computeTrend(currentSales.revenue, previousSales.revenue),
-      commissions: computeTrend(currentPaidCommissions, previousPaidCommissions),
-      accruedCommissions: computeTrend(currentSales.commissions, previousSales.commissions),
-      netRevenue: computeTrend(
-        Math.max(0, currentSales.revenue - currentSales.commissions),
-        Math.max(0, previousSales.revenue - previousSales.commissions),
-      ),
-      roi: computeTrend(
-        currentSales.commissions > 0 ? currentSales.revenue / currentSales.commissions : 0,
-        previousSales.commissions > 0 ? previousSales.revenue / previousSales.commissions : 0,
-      ),
-      outreachSent: computeTrend(currentOutreach.contactedCreators, previousOutreach.contactedCreators),
-      responseRate: computeTrend(currentOutreach.responseRate, previousOutreach.responseRate),
-      converted: computeTrend(currentOutreach.converted ?? 0, previousOutreach.converted ?? 0),
+  return NextResponse.json(
+    {
+      hasData,
+      shopifyConnected,
+      range,
+      totalRevenue,
+      totalCommissions,
+      accruedCommissions,
+      totalSent,
+      outreachMessagesSent,
+      responseRate,
+      converted,
+      creators: creatorsPerformance,
+      creatorsPerformance,
+      campaigns: campaignsData || [],
+      salesCount: currentSales.count,
+      revenueTimeline,
+      platformBreakdown,
+      outreachByPlatform,
+      followUpImpact,
+      trends: {
+        revenue: computeTrend(currentSales.revenue, previousSales.revenue),
+        commissions: computeTrend(currentPaidCommissions, previousPaidCommissions),
+        accruedCommissions: computeTrend(currentSales.commissions, previousSales.commissions),
+        netRevenue: computeTrend(
+          Math.max(0, currentSales.revenue - currentSales.commissions),
+          Math.max(0, previousSales.revenue - previousSales.commissions),
+        ),
+        roi: computeTrend(
+          currentSales.commissions > 0 ? currentSales.revenue / currentSales.commissions : 0,
+          previousSales.commissions > 0 ? previousSales.revenue / previousSales.commissions : 0,
+        ),
+        outreachSent: computeTrend(currentOutreach.contactedCreators, previousOutreach.contactedCreators),
+        responseRate: computeTrend(currentOutreach.responseRate, previousOutreach.responseRate),
+        converted: computeTrend(currentOutreach.converted ?? 0, previousOutreach.converted ?? 0),
+      },
     },
-  });
+    {
+      headers: {
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=60",
+      },
+    },
+  );
 }

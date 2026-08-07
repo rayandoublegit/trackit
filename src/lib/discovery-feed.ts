@@ -13,6 +13,7 @@ import {
   valueTier,
   type ValueTier,
 } from "@/lib/creator-value";
+import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 
 export interface FeedVideo {
   id: string;
@@ -28,7 +29,7 @@ export interface FeedCreator extends DiscoveryCreatorResult {
   estCpm: number;
   valueTier: ValueTier;
   topVideos?: FeedVideo[];
-  /** Hand-picked creator — always pinned, never dropped by client filters. */
+  /** Hand-picked creator — pinned first in feed results. */
   isCurated?: boolean;
 }
 
@@ -102,13 +103,23 @@ function readIsCurated(c: Record<string, unknown>): boolean {
 }
 
 function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
+  const postsAnalyzed = Number(c.posts_analyzed ?? 0);
+  // Guard legacy rows where a single post was stored as "7 posts/week".
+  const rawFrequency = Number(c.post_frequency ?? 0);
+  const postFrequency = postsAnalyzed >= 2 ? rawFrequency : 0;
   return {
     username: String(c.username), displayName: String(c.display_name ?? c.username),
     avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
     followersCount: Number(c.followers ?? 0),
     engagementRate: Number(c.engagement_rate ?? 0),
     engagementByFollower: Number(c.engagement_by_follower ?? 0),
-    avgViews: Number(c.avg_views ?? 0), postFrequency: Number(c.post_frequency ?? 0),
+    avgViews: Number(c.avg_views ?? 0),
+    avgLikes: Number(c.avg_likes ?? 0),
+    avgComments: Number(c.avg_comments ?? 0),
+    avgShares: Number(c.avg_shares ?? 0),
+    viewsPerFollower: Number(c.views_per_follower ?? 0),
+    postsAnalyzed,
+    postFrequency,
     lastPostAt: (c.last_post_at as string) ?? null, authenticityScore: Number(c.authenticity_score ?? 0),
     qualityStatus: String(c.quality_status ?? "ok"), platform: String(c.platform ?? "TikTok"),
     bio: String(c.bio ?? ""), email: (c.email as string) ?? null, niche: String(c.primary_niche ?? ""),
@@ -161,7 +172,18 @@ export async function buildFeed(opts: { limitPerNiche?: number } = {}): Promise<
 
 // Exact tags only (niches[] / primary_niche). No partials, no cross-niche terms.
 const NICHE_TOKENS: Record<string, string[]> = {
-  fitness: ["fitness", "gym", "workout", "musculation", "bodybuilding", "calisthenics", "crossfit", "powerlifting"],
+  fitness: [
+    "fitness",
+    "gym",
+    "workout",
+    "musculation",
+    "bodybuilding",
+    "calisthenics",
+    "crossfit",
+    "powerlifting",
+    "sport",
+    "sports",
+  ],
   beauty: ["beauty", "beaute", "makeup", "maquillage", "skincare", "haircare", "grwm"],
   food: ["food", "recipe", "recipes", "recette", "recettes", "cuisine", "baking", "mealprep", "vegan"],
   fashion: ["fashion", "mode", "moda", "outfit", "outfits", "ootd", "streetwear", "menswear", "womenswear"],
@@ -193,6 +215,8 @@ const NICHE_TOKENS: Record<string, string[]> = {
 // Map UI labels (FR/EN) to a niche key.
 const LABEL_TO_NICHE: Record<string, string> = {
   fitness: "fitness",
+  sport: "fitness",
+  sports: "fitness",
   beauté: "beauty", beaute: "beauty", beauty: "beauty",
   food: "food", cuisine: "food",
   mode: "fashion", fashion: "fashion",
@@ -301,6 +325,11 @@ export const CREATOR_LIST_COLUMNS = [
   "engagement_rate",
   "engagement_by_follower",
   "avg_views",
+  "avg_likes",
+  "avg_comments",
+  "avg_shares",
+  "views_per_follower",
+  "posts_analyzed",
   "post_frequency",
   "last_post_at",
   "authenticity_score",
@@ -345,6 +374,24 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
   };
 }
 
+function passesFeedSquareFilters(
+  creator: FeedCreator,
+  filters: FeedFilters
+): boolean {
+  if (filters.niche && !creatorMatchesNicheFilter(creator, filters.niche)) {
+    return false;
+  }
+  if (
+    !creatorMatchesFollowerRange(creator.followersCount, {
+      min: filters.minFollowers,
+      max: filters.maxFollowers,
+    })
+  ) {
+    return false;
+  }
+  return true;
+}
+
 // Filterable + paginated feed straight from the DB. Used by the redesigned feed
 // (server-side filters + infinite scroll). Ordered by followers (or engagement).
 export async function buildFeedPage(
@@ -356,23 +403,27 @@ export async function buildFeedPage(
   if (!hasDb) return { creators: [], hasMore: false };
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
-  const build = () => {
+  const build = (opts: { requireAuthenticity: boolean; nicheInSql: boolean }) => {
     let q = admin
       .from("creators_index")
       .select("*")
       .eq("enrichment_status", "enriched")
-      .neq("quality_status", "dead")
-      .gte("authenticity_score", 30);
+      .neq("quality_status", "dead");
+    // Curated/manual rows often ship with authenticity_score 0/null — don't drop them.
+    if (opts.requireAuthenticity) q = q.gte("authenticity_score", 30);
     if (filters.platform) q = q.eq("platform", filters.platform);
-    if (filters.minFollowers) q = q.gte("followers", filters.minFollowers);
-    if (filters.maxFollowers) q = q.lte("followers", filters.maxFollowers);
-    if (filters.minEngagement) q = q.gte("engagement_rate", filters.minEngagement);
+    // Use != null so minFollowers=0 / exact bucket edges are applied.
+    if (filters.minFollowers != null) q = q.gte("followers", filters.minFollowers);
+    if (filters.maxFollowers != null) q = q.lte("followers", filters.maxFollowers);
+    if (filters.minEngagement != null && filters.minEngagement > 0) {
+      q = q.gte("engagement_rate", filters.minEngagement);
+    }
     // FR strict ejecte les createurs FR dont country_code est NULL (le scraper
     // ne le remplit pas toujours). On accepte le pays demande OU null: la langue
     // (filtree juste apres) garantit deja qu'ils sont du bon marche.
     if (filters.country) q = q.or(`country_code.eq.${filters.country},country_code.is.null`);
     if (filters.language) q = q.eq("language", filters.language);
-    if (filters.niche) {
+    if (opts.nicheInSql && filters.niche) {
       const or = nicheOrClause(filters.niche);
       if (or) q = q.or(or);
     }
@@ -381,42 +432,50 @@ export async function buildFeedPage(
 
   const sortCol = filters.sort === "engagement" ? "engagement_rate" : filters.sort === "followers" ? "followers" : "value_score";
 
-  // Helper: applique le tri avec fallback si value_score absent.
-  const runOrdered = async (q: ReturnType<typeof build>, from: number, to: number) => {
-    let r = await q.order(sortCol, { ascending: false, nullsFirst: false }).range(from, to);
+  const runOrdered = async (
+    makeQ: () => ReturnType<typeof build>,
+    from: number,
+    to: number
+  ) => {
+    let r = await makeQ().order(sortCol, { ascending: false, nullsFirst: false }).range(from, to);
     if (r.error && sortCol === "value_score") {
-      r = await build().order("followers", { ascending: false }).range(from, to);
+      r = await makeQ().order("followers", { ascending: false }).range(from, to);
     }
     return r;
   };
 
-  // 1) CURATED/SCRIPTED d'abord: les createurs ajoutes a la main (tag 'curated'
-  //    OU video_thumbnails non-vide = marqueur indestructible de curation).
-  //    Ils passent devant les scrapes, pour toutes les niches.
-  const curatedQ = build().or("niches.cs.{curated},video_thumbnails.neq.[]");
-  const { data: curatedData } = await runOrdered(curatedQ, offset, offset + limit - 1);
-  const curatedRows = (curatedData || []).map(dbRowToFeedCreator);
+  // 1) CURATED first — niche applied in JS so a second .or() cannot wipe SQL niche.
+  //    Oversample then square-filter so 1–10k / 500k+ buckets stay exclusive.
+  const curatedMake = () =>
+    build({ requireAuthenticity: false, nicheInSql: false }).or(
+      "is_curated.eq.true,niches.cs.{curated},video_thumbnails.neq.[]"
+    );
+  const { data: curatedData } = await runOrdered(curatedMake, 0, Math.max(limit * 4, 48) - 1);
+  const curatedRows = (curatedData || [])
+    .map(dbRowToFeedCreator)
+    .filter((c) => passesFeedSquareFilters(c, filters));
 
   const seen = new Set(curatedRows.map((c) => c.username));
   let creators = [...curatedRows];
 
-  // 2) Completer avec le reste (scrapes) si on n'a pas atteint la limite.
-  //    On ne filtre PAS sur video_thumbnails en SQL (comparaison JSONB fragile):
-  //    on prend simplement les createurs de la niche pas encore vus, et le dedup
-  //    par username via `seen` ecarte ceux deja sortis par la couche curated.
+  // 2) Fill with scrapes (authenticity + niche in SQL), then square-filter again.
   if (creators.length < limit) {
     const need = limit - creators.length;
-    // On sur-echantillonne (need*3) pour absorber les doublons deja vus.
-    const { data: restData } = await runOrdered(build(), 0, Math.max(need * 3, need) - 1);
+    const scrapedMake = () => build({ requireAuthenticity: true, nicheInSql: true });
+    const { data: restData } = await runOrdered(
+      scrapedMake,
+      offset,
+      offset + Math.max(need * 3, need) - 1
+    );
     for (const row of (restData || []).map(dbRowToFeedCreator)) {
       if (creators.length >= limit) break;
       if (seen.has(row.username)) continue;
+      if (!passesFeedSquareFilters(row, filters)) continue;
       seen.add(row.username);
       creators.push(row);
     }
   }
 
-  // hasMore: vrai si on a rempli la page entiere (probablement plus derriere).
   const hasMore = creators.length >= limit;
   return { creators: creators.slice(0, limit), hasMore };
 }

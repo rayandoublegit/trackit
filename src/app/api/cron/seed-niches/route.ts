@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const SC_API_KEY = process.env.SCRAPECREATORS_API_KEY;
-const MIN_FOLLOWERS = 10_000; // FR market: 10k floor
+const MIN_FOLLOWERS = 1_000; // Fill 1–10k discovery bucket across niches
 const MAX_FOLLOWERS = 1_000_000; // 1M ceiling per ICP
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

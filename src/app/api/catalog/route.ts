@@ -8,13 +8,22 @@ import {
   nicheOrClause,
   type FeedCreator,
 } from "@/lib/discovery-feed";
+import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
+function parseNonNegInt(raw: string | null): number | undefined {
+  if (raw == null || raw === "") return undefined;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : undefined;
+}
+
 /**
  * /api/catalog — Find It feed.
  * Paginated at the DB. Optional `search` queries the full creators_index (global).
+ * Follower / engagement bounds must be applied in SQL — client re-filter alone
+ * cannot invent 1–10k rows from a page of 500k+ accounts.
  */
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
@@ -23,6 +32,20 @@ export async function GET(req: NextRequest) {
   const niche = search ? undefined : p.get("niche") || undefined;
   const language = search ? undefined : p.get("language") || undefined;
   const country = search ? undefined : (p.get("country") || "").trim().toUpperCase() || undefined;
+  const minFollowers = search ? undefined : parseNonNegInt(p.get("minFollowers"));
+  const maxFollowers = search ? undefined : parseNonNegInt(p.get("maxFollowers"));
+  const minEngagement = search ? undefined : parseNonNegInt(p.get("minEngagement"));
+  const platformRaw = search ? undefined : (p.get("platform") || "").trim();
+  const platform = platformRaw
+    ? platformRaw.toLowerCase() === "instagram"
+      ? "Instagram"
+      : platformRaw.toLowerCase() === "youtube"
+        ? "YouTube"
+        : platformRaw.toLowerCase() === "tiktok"
+          ? "TikTok"
+          : undefined
+    : undefined;
+
   const offset = Math.max(0, Number(p.get("offset")) || 0);
   const maxLimit = search ? 50 : niche ? 50 : 100;
   const defaultLimit = search ? 30 : niche ? 25 : 48;
@@ -34,6 +57,26 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ creators: [], hasMore: false, count: 0, error: "no db" });
   }
   const admin = createClient(url, key);
+
+  const followerBounds = { min: minFollowers, max: maxFollowers };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applySharedFilters = (q: any) => {
+    let out = q;
+    if (minFollowers != null) out = out.gte("followers", minFollowers);
+    if (maxFollowers != null) out = out.lte("followers", maxFollowers);
+    if (minEngagement != null && minEngagement > 0) {
+      out = out.gte("engagement_rate", minEngagement);
+    }
+    if (platform) out = out.eq("platform", platform);
+    if (language) out = out.eq("language", language);
+    if (country) out = out.or(`country_code.eq.${country},country_code.is.null`);
+    if (niche) {
+      const or = nicheOrClause(niche);
+      if (or) out = out.or(or);
+    }
+    return out;
+  };
 
   try {
     const from = offset;
@@ -70,24 +113,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Fetch limit+1 to know hasMore without counting the whole table.
+    // Oversample a bit when niche JS filter may drop rows after SQL.
+    const fetchTo = niche ? offset + limit * 3 : to;
 
     let q = admin
       .from("creators_index")
       .select(CREATOR_LIST_COLUMNS)
       .order("followers", { ascending: false, nullsFirst: false })
-      .range(from, to);
+      .range(from, fetchTo);
+    q = applySharedFilters(q);
 
-    if (language) q = q.eq("language", language);
-    if (country) q = q.or(`country_code.eq.${country},country_code.is.null`);
-
-    if (niche) {
-      const or = nicheOrClause(niche);
-      if (or) q = q.or(or);
-    }
-
-    // Curated picks: hand-added creators always surface on the first page,
-    // regardless of follower count.
+    // Curated picks on first page — still respect follower/niche/geo square filters.
     let curatedRows: Record<string, unknown>[] = [];
     if (offset === 0) {
       let cq = admin
@@ -96,14 +132,11 @@ export async function GET(req: NextRequest) {
         .eq("is_curated", true)
         .order("followers", { ascending: false, nullsFirst: false })
         .limit(20);
-      if (niche) {
-        const cor = nicheOrClause(niche);
-        if (cor) cq = cq.or(cor);
-      }
-      if (language) cq = cq.eq("language", language);
-      if (country) cq = cq.or(`country_code.eq.${country},country_code.is.null`);
+      cq = applySharedFilters(cq);
       const cr = await cq;
-      curatedRows = (cr.data ?? []) as unknown as Record<string, unknown>[];
+      curatedRows = ((cr.data ?? []) as unknown as Record<string, unknown>[]).filter((row) =>
+        creatorMatchesFollowerRange(Number(row.followers ?? 0), followerBounds)
+      );
     }
 
     const { data, error } = await q;
@@ -121,7 +154,8 @@ export async function GET(req: NextRequest) {
       const seenU = new Set(curatedRows.map((r) => String(r.username || "").toLowerCase()));
       rows = [...curatedRows, ...rows.filter((r) => !seenU.has(String(r.username || "").toLowerCase()))];
     }
-    // Exact-tag safety net: drop any row that leaked through SQL.
+
+    // Square safety nets (niche / geo / followers).
     if (niche) {
       rows = rows.filter((row) =>
         creatorMatchesNicheFilter(
@@ -145,9 +179,14 @@ export async function GET(req: NextRequest) {
         )
       );
     }
+    if (minFollowers != null || maxFollowers != null) {
+      rows = rows.filter((row) =>
+        creatorMatchesFollowerRange(Number(row.followers ?? 0), followerBounds)
+      );
+    }
+
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
-    // Stable order: curated picks first (already prepended), then followers desc from SQL.
     const creators: FeedCreator[] = page.map(catalogRowToFeedCreator);
 
     return NextResponse.json({

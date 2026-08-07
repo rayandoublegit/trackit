@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { normalizeDiscoveryFilters } from "@/lib/creator-discovery-filters";
 import { CREATOR_LIST_COLUMNS, creatorMatchesNicheFilter, nicheOrClause } from "@/lib/discovery-feed";
+import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { displayVideoThumbnails } from "@/lib/tiktok-video-thumbs";
 import { clientImageUrl } from "@/lib/client-image-url";
@@ -85,10 +86,13 @@ export async function POST(request: Request) {
   });
 
   // Curated + enriched in parallel (DB only — no live ScrapeCreators).
+  // Apply the same follower square bounds as scrapes so 1–10k / 500k+ stay exclusive.
   let curatedQ = supabaseAdmin
     .from("creators_index")
     .select(CREATOR_LIST_COLUMNS)
     .eq("is_curated", true)
+    .gte("followers", f.followers.gte)
+    .lte("followers", f.followers.lte)
     .order("followers", { ascending: false })
     .limit(40);
   if (f.language) curatedQ = curatedQ.eq("language", f.language);
@@ -117,12 +121,21 @@ export async function POST(request: Request) {
   const [curatedRes, scrapedRes] = await Promise.all([curatedQ, scrapedQ]);
 
   const nicheLabel = String(body.niche);
+  const followerBounds = { min: f.followers.gte, max: f.followers.lte };
   const curatedRows = ((curatedRes.data ?? []) as unknown as Record<string, unknown>[])
     .map(mapRow)
-    .filter((r) => creatorMatchesNicheFilter(r, nicheLabel));
+    .filter(
+      (r) =>
+        creatorMatchesNicheFilter(r, nicheLabel) &&
+        creatorMatchesFollowerRange(Number(r.followersCount ?? 0), followerBounds)
+    );
   const scrapedRows = ((scrapedRes.data ?? []) as unknown as Record<string, unknown>[])
     .map(mapRow)
-    .filter((r) => creatorMatchesNicheFilter(r, nicheLabel));
+    .filter(
+      (r) =>
+        creatorMatchesNicheFilter(r, nicheLabel) &&
+        creatorMatchesFollowerRange(Number(r.followersCount ?? 0), followerBounds)
+    );
 
   const CAP = 30;
   const HALF = 15;

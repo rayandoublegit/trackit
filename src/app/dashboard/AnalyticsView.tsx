@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { CreatorAnalytics } from "./CreatorAnalytics";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
@@ -51,22 +51,30 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   const [compare, setCompare] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("sales");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const hasPaintedRef = useRef(false);
 
   const tzOffset = new Date().getTimezoneOffset();
+
+  const fetchAnalytics = useCallback(
+    async (activeRange: DateRange) => {
+      const res = await fetch(
+        `/api/analytics?userId=${userId}&range=${activeRange}&tzOffset=${tzOffset}`,
+      );
+      return res.json() as Promise<Record<string, unknown>>;
+    },
+    [userId, tzOffset],
+  );
 
   const refreshAnalytics = useCallback(async () => {
     if (!userId) return;
     try {
-      const res = await fetch(
-        `/api/analytics?userId=${userId}&range=${range}&tzOffset=${tzOffset}`,
-        { cache: "no-store" },
-      );
-      const data = await res.json();
+      const data = await fetchAnalytics(range);
       setAnalyticsData(data);
+      hasPaintedRef.current = true;
     } catch {
       /* keep current data */
     }
-  }, [userId, range, tzOffset]);
+  }, [userId, range, fetchAnalytics]);
 
   useEffect(() => {
     if (!userId) {
@@ -77,38 +85,37 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     let cancelled = false;
 
     const load = async () => {
-      setLoadingData(true);
-      let data: Record<string, unknown> | null = null;
-
-      const fetchAnalytics = async (activeRange: DateRange) => {
-        const res = await fetch(
-          `/api/analytics?userId=${userId}&range=${activeRange}&tzOffset=${tzOffset}`,
-          { cache: "no-store" },
-        );
-        return res.json() as Promise<Record<string, unknown>>;
-      };
+      // Keep previous charts visible while range changes / soft refresh.
+      if (!hasPaintedRef.current) setLoadingData(true);
 
       try {
-        data = await fetchAnalytics(range);
+        const data = await fetchAnalytics(range);
+        if (cancelled) return;
+        setAnalyticsData(data);
+        hasPaintedRef.current = true;
+        setLoadingData(false);
+
+        // Shopify sync in background — never block the first paint.
         const shouldSync = !!(shopifyStore || data?.shopifyConnected);
-        if (shouldSync) {
-          try {
-            await fetch("/api/shopify/sync", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ userId }),
-            });
-            dispatchSalesUpdated();
-            data = await fetchAnalytics(range);
-          } catch {
-            // Keep first analytics payload if sync fails
-          }
+        if (!shouldSync) return;
+        try {
+          await fetch("/api/shopify/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId }),
+          });
+          if (cancelled) return;
+          dispatchSalesUpdated();
+          const refreshed = await fetchAnalytics(range);
+          if (!cancelled) setAnalyticsData(refreshed);
+        } catch {
+          // Keep first analytics payload if sync fails
         }
-        if (!cancelled) setAnalyticsData(data);
       } catch {
-        if (!cancelled) setAnalyticsData(null);
-      } finally {
-        if (!cancelled) setLoadingData(false);
+        if (!cancelled) {
+          if (!hasPaintedRef.current) setAnalyticsData(null);
+          setLoadingData(false);
+        }
       }
     };
 
@@ -116,7 +123,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
     return () => {
       cancelled = true;
     };
-  }, [userId, shopifyStore, range, tzOffset]);
+  }, [userId, shopifyStore, range, tzOffset, fetchAnalytics]);
 
   useAnalyticsAutoRefresh(refreshAnalytics, { enabled: !!userId });
 
