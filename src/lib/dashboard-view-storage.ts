@@ -1,9 +1,12 @@
 export const DASHBOARD_VIEWS = [
   "dashboard",
   "discovery",
+  "findit-inbox",
   "my-creators",
   "creators",
   "campaigns",
+  "brand-content",
+  "links",
   "affiliates",
   "outreach",
   "payouts",
@@ -15,13 +18,112 @@ export const DASHBOARD_VIEWS = [
   "analytics",
   "integrations",
   "notes",
+  "workspace",
   "automation",
   "settings",
   "billing",
   "feedback",
   "notifications",
   "help",
+  "planner",
+  "planner-notes",
+  "whiteboard",
+  "ai",
+  "meetings",
+  "tasks",
 ] as const;
+
+/** Primary icon-rail spaces in the ClickUp-style workspace shell. */
+export const WORKSPACE_SPACES = [
+  "home",
+  "findit",
+  "trackit",
+  "payit",
+  "planner",
+  "notes",
+  "whiteboard",
+  "integrations",
+  "analytics",
+  "ai",
+] as const;
+
+export type WorkspaceSpace = (typeof WORKSPACE_SPACES)[number];
+
+export function spaceForView(view: DashboardView): WorkspaceSpace {
+  switch (view) {
+    case "dashboard":
+    case "notifications":
+    case "outreach":
+    case "tasks":
+    case "ai":
+    case "workspace":
+      return "home";
+    case "discovery":
+    case "findit-inbox":
+    case "creators":
+    case "my-creators":
+      return "findit";
+    case "campaigns":
+    case "brand-content":
+    case "links":
+    case "affiliates":
+    case "invitations":
+    case "automation":
+      return "trackit";
+    case "payouts":
+    case "balance":
+    case "transactions":
+      return "payit";
+    case "planner":
+    case "meetings":
+    case "planner-notes":
+      return "planner";
+    case "notes":
+      return "notes";
+    case "whiteboard":
+      return "whiteboard";
+    case "integrations":
+      return "integrations";
+    case "analytics":
+      return "analytics";
+    case "settings":
+    case "billing":
+    case "help":
+    case "feedback":
+    case "scripts":
+    case "content":
+      return "home";
+    default:
+      return "home";
+  }
+}
+
+export function defaultViewForSpace(space: WorkspaceSpace): DashboardView {
+  switch (space) {
+    case "home":
+      return "notifications";
+    case "findit":
+      return "discovery";
+    case "trackit":
+      return "campaigns";
+    case "payit":
+      return "payouts";
+    case "planner":
+      return "planner";
+    case "notes":
+      return "notes";
+    case "whiteboard":
+      return "whiteboard";
+    case "integrations":
+      return "integrations";
+    case "analytics":
+      return "analytics";
+    case "ai":
+      return "ai";
+    default:
+      return "discovery";
+  }
+}
 
 export type DashboardView = (typeof DASHBOARD_VIEWS)[number];
 

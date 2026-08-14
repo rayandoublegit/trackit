@@ -1,10 +1,23 @@
 import { supabase } from "@/lib/supabase";
+import { clientBrandScope } from "@/lib/brand-workspace";
 import { isDemoPresetCampaign } from "@/lib/demo-preset-data";
 import { hasReachedCampaignLimit, normalizePlan } from "@/lib/plan-limits";
 
 function isActiveCampaignStatus(status: string | null | undefined): boolean {
   const s = String(status || "").toLowerCase();
   return s === "active" || s === "paused";
+}
+
+/** PostgREST / Postgres missing-column errors (migration not applied yet). */
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, column: string): boolean {
+  if (!error) return false;
+  if (error.code === "42703") return (error.message || "").includes(column);
+  return (error.message || "").toLowerCase().includes(`${column} does not exist`);
+}
+
+function formatSupabaseError(error: { code?: string; message?: string; details?: string; hint?: string } | null | undefined): string {
+  if (!error) return "unknown";
+  return [error.code, error.message, error.details, error.hint].filter(Boolean).join(" | ") || "unknown";
 }
 
 const UUID_RE =
@@ -107,33 +120,87 @@ export async function saveCampaign(userId: string, campaign: {
   status: string;
 }) {
   if (!supabase) return null;
-  const [{ data: profile }, { data: existingCampaigns }] = await Promise.all([
-    supabase.from("profiles").select("plan").eq("id", userId).maybeSingle(),
-    supabase.from("campaigns").select("status, name, description").eq("user_id", userId),
+  const { ownerId, spaceId } = clientBrandScope(userId);
+  let existingQ = supabase
+    .from("campaigns")
+    .select("status, name, description")
+    .eq("user_id", ownerId)
+    .eq("workspace_id", spaceId);
+  let [{ data: profile }, existingRes] = await Promise.all([
+    supabase.from("profiles").select("plan").eq("id", ownerId).maybeSingle(),
+    existingQ,
   ]);
+  if (isMissingColumnError(existingRes.error, "workspace_id")) {
+    existingRes = await supabase
+      .from("campaigns")
+      .select("status, name, description")
+      .eq("user_id", ownerId);
+  }
+  const existingCampaigns = existingRes.data;
   const plan = normalizePlan(profile?.plan);
   const activeCampaignCount = (existingCampaigns ?? []).filter(
     (row) => isActiveCampaignStatus(row.status) && !isDemoPresetCampaign(row),
   ).length;
   const nextCampaignIsActive = isActiveCampaignStatus(campaign.status);
   if (nextCampaignIsActive && hasReachedCampaignLimit(plan, activeCampaignCount)) return null;
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("campaigns")
-    .insert({ user_id: userId, ...campaign })
+    .insert({ user_id: ownerId, workspace_id: spaceId, ...campaign })
     .select()
     .single();
+  if (isMissingColumnError(error, "workspace_id")) {
+    ({ data, error } = await supabase
+      .from("campaigns")
+      .insert({ user_id: ownerId, ...campaign })
+      .select()
+      .single());
+  }
   if (error) console.error("saveCampaign error:", error);
+  else invalidateCampaignsCache(ownerId);
   return data;
 }
 
-export async function getCampaigns(userId: string) {
+const campaignsMemCache = new Map<string, { at: number; rows: Awaited<ReturnType<typeof fetchCampaignsUncached>> }>();
+const CAMPAIGNS_TTL_MS = 30_000;
+
+async function fetchCampaignsUncached(userId: string) {
   if (!supabase) return [];
-  const { data } = await supabase
+  const { ownerId, spaceId } = clientBrandScope(userId);
+  let query = supabase
     .from("campaigns")
     .select("*")
-    .eq("user_id", userId)
+    .eq("user_id", ownerId)
     .order("created_at", { ascending: false });
+  let { data, error } = await query.eq("workspace_id", spaceId);
+  if (isMissingColumnError(error, "workspace_id")) {
+    ({ data, error } = await supabase
+      .from("campaigns")
+      .select("*")
+      .eq("user_id", ownerId)
+      .order("created_at", { ascending: false }));
+  }
+  if (error) {
+    console.error("getCampaigns error:", formatSupabaseError(error));
+    return [];
+  }
   return data || [];
+}
+
+export async function getCampaigns(userId: string) {
+  const key = userId;
+  const hit = campaignsMemCache.get(key);
+  if (hit && Date.now() - hit.at < CAMPAIGNS_TTL_MS) return hit.rows;
+  const rows = await fetchCampaignsUncached(userId);
+  campaignsMemCache.set(key, { at: Date.now(), rows });
+  return rows;
+}
+
+export function invalidateCampaignsCache(userId?: string) {
+  if (!userId) {
+    campaignsMemCache.clear();
+    return;
+  }
+  campaignsMemCache.delete(userId);
 }
 
 export async function updateCampaignStatus(campaignId: string, status: string): Promise<boolean> {
@@ -203,12 +270,22 @@ export type CampaignCreatorLinkRow = {
 
 export async function getCampaignCreatorLinks(userId: string): Promise<CampaignCreatorLinkRow[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  const { ownerId, spaceId } = clientBrandScope(userId);
+  const selectCols = "campaign_id, creator_id, historical_sales_attached, created_at";
+  let { data, error } = await supabase
     .from("campaign_creators")
-    .select("campaign_id, creator_id, historical_sales_attached, created_at")
-    .eq("user_id", userId);
+    .select(selectCols)
+    .eq("user_id", ownerId)
+    .eq("workspace_id", spaceId);
+  // Brand-workspaces migration may not be applied yet on Trackit.
+  if (isMissingColumnError(error, "workspace_id")) {
+    ({ data, error } = await supabase
+      .from("campaign_creators")
+      .select(selectCols)
+      .eq("user_id", ownerId));
+  }
   if (error) {
-    console.error("getCampaignCreatorLinks error:", error);
+    console.error("getCampaignCreatorLinks error:", formatSupabaseError(error));
     return [];
   }
   return (data || []).map((row) => ({

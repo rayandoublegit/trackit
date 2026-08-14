@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { accountEmailForLinkedUser } from "@/lib/linked-creator-emails";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 
 export type BrandCreatorSyncRow = {
   id: string;
@@ -13,6 +14,7 @@ export type BrandCreatorSyncRow = {
   followers?: number | null;
   engagement_rate?: number | null;
   linked_user_id: string | null;
+  workspace_id?: string | null;
 };
 
 /** Upsert a linked brand creator into discovery_saved (Gérer les créateurs). */
@@ -20,17 +22,24 @@ export async function syncCreatorToDiscoverySaved(
   admin: SupabaseClient,
   brandId: string,
   creator: BrandCreatorSyncRow,
-  options?: { pipelineStatus?: string },
+  options?: { pipelineStatus?: string; workspaceId?: string | null },
 ): Promise<Error | null> {
   const username = creator.handle.trim().replace(/^@+/, "").toLowerCase();
   if (!username) return new Error("Creator handle missing");
 
-  const { data: existing } = await admin
+  const workspaceId =
+    options?.workspaceId ??
+    creator.workspace_id ??
+    (await resolveOwnerActiveWorkspaceId(admin, brandId));
+
+  let existingQuery = admin
     .from("discovery_saved")
-    .select("snapshot, pipeline_status, notes")
+    .select("id, snapshot, pipeline_status, notes")
     .eq("user_id", brandId)
-    .eq("creator_username", username)
-    .maybeSingle();
+    .eq("creator_username", username);
+  if (workspaceId) existingQuery = existingQuery.eq("workspace_id", workspaceId);
+  const { data: existingRows } = await existingQuery.limit(1);
+  const existing = existingRows?.[0] ?? null;
 
   const prevSnap =
     existing?.snapshot && typeof existing.snapshot === "object"
@@ -72,23 +81,25 @@ export async function syncCreatorToDiscoverySaved(
     },
   };
 
-  const { error } = await admin.from("discovery_saved").upsert(
-    {
-      user_id: brandId,
-      creator_username: username,
-      platform,
-      display_name: displayName,
-      avatar_url: avatarUrl,
-      followers,
-      engagement_rate: engagementRate,
-      primary_niche: niche,
-      snapshot,
-      pipeline_status: existing?.pipeline_status ?? options?.pipelineStatus ?? "signed",
-      notes: existing?.notes ?? "",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id,creator_username" },
-  );
+  const row: Record<string, unknown> = {
+    user_id: brandId,
+    creator_username: username,
+    platform,
+    display_name: displayName,
+    avatar_url: avatarUrl,
+    followers,
+    engagement_rate: engagementRate,
+    primary_niche: niche,
+    snapshot,
+    pipeline_status: existing?.pipeline_status ?? options?.pipelineStatus ?? "signed",
+    notes: existing?.notes ?? "",
+    updated_at: new Date().toISOString(),
+  };
+  if (workspaceId) row.workspace_id = workspaceId;
+
+  const { error } = existing?.id
+    ? await admin.from("discovery_saved").update(row).eq("id", existing.id)
+    : await admin.from("discovery_saved").insert(row);
 
   return error ? new Error(error.message) : null;
 }

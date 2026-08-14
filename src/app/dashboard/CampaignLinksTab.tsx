@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Lang } from "@/lib/useLang";
 import { supabase } from "@/lib/supabase";
 import { buildTrackitShortLink, createAffiliateShortLink } from "@/lib/affiliate-short-link";
@@ -39,15 +39,16 @@ const fieldInput: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "12px 14px",
   borderRadius: 10,
-  border: "1px solid #E5E5E5",
+  border: "1px solid var(--ws-border)",
   fontSize: 14,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFF",
+  background: "var(--ws-input)",
 };
 
 const externFont = "'InterDisplay', 'Inter Display', sans-serif";
+const EMPTY_CREATOR_IDS: string[] = [];
 
 function sortedDayEntries(byDay: Record<string, number>) {
   return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b));
@@ -63,14 +64,15 @@ export function CampaignLinksTab({
   lang,
   brandId,
   campaignId,
-  campaignCreatorIds = [],
+  campaignCreatorIds = EMPTY_CREATOR_IDS,
   isMobile,
   plan = "free",
   onUpgrade,
 }: {
   lang: Lang;
   brandId?: string;
-  campaignId: string;
+  /** When omitted, loads brand-wide affiliate links (dedicated Links page). */
+  campaignId?: string;
   campaignCreatorIds?: string[];
   isMobile?: boolean;
   plan?: PlanTier;
@@ -88,42 +90,71 @@ export function CampaignLinksTab({
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadMetrics = useCallback(async () => {
+  const creatorIdsKey = campaignCreatorIds.filter(Boolean).join("|");
+
+  const refreshMetrics = async () => {
     if (!brandId) return;
-    const res = await fetch(
-      `/api/links/metrics?brand_id=${encodeURIComponent(brandId)}&campaign_id=${encodeURIComponent(campaignId)}&days=${days}`,
-      { cache: "no-store" },
-    );
-    const data = (await res.json()) as {
+    const params = new URLSearchParams({
+      brand_id: brandId,
+      days: String(days),
+    });
+    if (campaignId) params.set("campaign_id", campaignId);
+    const res = await fetch(`/api/links/metrics?${params}`, { cache: "no-store" });
+    const data = (await res.json().catch(() => ({}))) as {
       links?: AffiliateLinkRow[];
       totals?: { clicks: number; uniques: number };
     };
     setLinks(Array.isArray(data.links) ? data.links : []);
     setTotals(data.totals ?? { clicks: 0, uniques: 0 });
-  }, [brandId, campaignId, days]);
+  };
 
   useEffect(() => {
     if (!brandId) {
       setLoading(false);
+      setLinks([]);
+      setTotals({ clicks: 0, uniques: 0 });
+      setCreators([]);
       return;
     }
+
     let cancelled = false;
     void (async () => {
       setLoading(true);
       try {
-        await loadMetrics();
+        const params = new URLSearchParams({
+          brand_id: brandId,
+          days: String(days),
+        });
+        if (campaignId) params.set("campaign_id", campaignId);
+        const res = await fetch(`/api/links/metrics?${params}`, { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as {
+          links?: AffiliateLinkRow[];
+          totals?: { clicks: number; uniques: number };
+        };
+        if (cancelled) return;
+        setLinks(Array.isArray(data.links) ? data.links : []);
+        setTotals(data.totals ?? { clicks: 0, uniques: 0 });
+
         if (supabase) {
-          const ids = campaignCreatorIds.filter(Boolean);
+          const ids = creatorIdsKey ? creatorIdsKey.split("|") : [];
           if (ids.length > 0) {
-            const { data } = await supabase
+            const { data: creatorRows } = await supabase
               .from("creators")
               .select("id, handle, full_name, avatar_url")
               .eq("user_id", brandId)
               .in("id", ids);
-            if (!cancelled) setCreators((data || []) as CampaignCreator[]);
+            if (!cancelled) setCreators((creatorRows || []) as CampaignCreator[]);
+          } else if (!campaignId) {
+            const { data: creatorRows } = await supabase
+              .from("creators")
+              .select("id, handle, full_name, avatar_url")
+              .eq("user_id", brandId)
+              .limit(200);
+            if (!cancelled) setCreators((creatorRows || []) as CampaignCreator[]);
           } else if (!cancelled) {
             setCreators([]);
           }
+
           const { data: profile } = await supabase
             .from("profiles")
             .select("shopify_store_url")
@@ -133,19 +164,21 @@ export function CampaignLinksTab({
             setDestinationUrl(String(profile.shopify_store_url));
           }
         }
+      } catch (err) {
+        console.error("CampaignLinksTab load failed:", err);
+        if (!cancelled) {
+          setLinks([]);
+          setTotals({ clicks: 0, uniques: 0 });
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [brandId, campaignCreatorIds, loadMetrics]);
-
-  useEffect(() => {
-    if (!brandId || loading) return;
-    void loadMetrics();
-  }, [brandId, days, loadMetrics, loading]);
+  }, [brandId, campaignId, creatorIdsKey, days]);
 
   const aggregateByDay = useMemo(() => {
     const out: Record<string, number> = {};
@@ -187,7 +220,7 @@ export function CampaignLinksTab({
         brandId,
         creatorUsername: creator.handle,
         destinationUrl: destinationUrl.trim(),
-        campaignId,
+        campaignId: campaignId || undefined,
       });
       if (!created.ok || !created.slug) {
         setGenError(
@@ -208,7 +241,7 @@ export function CampaignLinksTab({
         }),
       }).catch(() => null);
       setSelectedCreator("");
-      await loadMetrics();
+      await refreshMetrics();
     } finally {
       setGenerating(false);
     }
@@ -250,7 +283,7 @@ export function CampaignLinksTab({
         );
         return;
       }
-      await loadMetrics();
+      await refreshMetrics();
     } finally {
       setDeletingId(null);
     }
@@ -258,7 +291,7 @@ export function CampaignLinksTab({
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+      <div style={{ padding: 40, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14 }}>
         {lang === "fr" ? "Chargement des liens…" : "Loading links…"}
       </div>
     );
@@ -271,36 +304,36 @@ export function CampaignLinksTab({
           display: "flex",
           alignItems: "stretch",
           paddingBottom: 16,
-          borderBottom: "1px solid #EFEFEF",
+          borderBottom: "1px solid var(--ws-border)",
         }}
       >
         <div style={{ flex: 1, minWidth: 0, paddingRight: isMobile ? 12 : 20 }}>
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
             {lang === "fr" ? "Clics" : "Clicks"}
           </div>
-          <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{totals.clicks}</div>
+          <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>{totals.clicks}</div>
         </div>
-        <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+        <div style={{ width: 1, background: "var(--ws-border)", flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "0 12px" : "0 20px" }}>
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
             {lang === "fr" ? "Visiteurs uniques" : "Unique visitors"}
           </div>
-          <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{totals.uniques}</div>
+          <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>{totals.uniques}</div>
         </div>
-        <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+        <div style={{ width: 1, background: "var(--ws-border)", flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0, paddingLeft: isMobile ? 12 : 20 }}>
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
             {lang === "fr" ? "Liens actifs" : "Active links"}
           </div>
-          <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>{links.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>{links.length}</div>
         </div>
       </div>
 
-      <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? "20px 16px" : "24px 22px", background: "#FFFFFF" }}>
-        <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+      <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? "20px 16px" : "24px 22px", background: "var(--ws-surface)" }}>
+        <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
           {lang === "fr" ? "Générer un lien d'affiliation" : "Generate affiliate link"}
         </h3>
-        <p style={{ margin: "0 0 18px", fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Le lien court est généré à partir de votre URL de destination (ex. myboost.com/abc1234), redirige vers la base de cette boutique et enregistre les clics."
             : "Short links are built from your destination URL (e.g. myboost.com/abc1234), redirect to that store’s base URL, and track clicks."}
@@ -309,13 +342,13 @@ export function CampaignLinksTab({
         {!linksAllowed ? (
           <div
             style={{
-              border: "1px dashed #E5E5E5",
+              border: "1px dashed var(--ws-border)",
               borderRadius: 12,
               padding: "20px 16px",
-              background: "#FAFAFA",
+              background: "var(--ws-surface-2)",
             }}
           >
-            <p style={{ margin: "0 0 12px", fontSize: 14, color: "#374151", lineHeight: 1.5 }}>
+            <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Starter pour générer et mesurer vos liens d'affiliation."
                 : "Tracked links (clicks, sales, revenue) are locked on Free. Upgrade to Starter to generate and measure affiliate links."}
@@ -325,8 +358,8 @@ export function CampaignLinksTab({
                 type="button"
                 onClick={onUpgrade}
                 style={{
-                  background: "#1A1A1A",
-                  color: "#FFF",
+                  background: "var(--ws-btn)",
+                  color: "var(--ws-btn-text)",
                   border: "none",
                   borderRadius: 10,
                   padding: "10px 16px",
@@ -341,13 +374,19 @@ export function CampaignLinksTab({
             ) : null}
           </div>
         ) : creators.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
-            {lang === "fr" ? "Ajoutez des créateurs à la campagne pour générer un lien." : "Add creators to this campaign to generate a link."}
+          <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: 0 }}>
+            {lang === "fr"
+              ? campaignId
+                ? "Ajoutez des créateurs à la campagne pour générer un lien."
+                : "Ajoutez des créateurs pour générer un lien."
+              : campaignId
+                ? "Add creators to this campaign to generate a link."
+                : "Add creators to generate a link."}
           </p>
         ) : (
           <>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 8 }}>
                 {lang === "fr" ? "Créateur" : "Creator"}
               </label>
               <select
@@ -364,7 +403,7 @@ export function CampaignLinksTab({
               </select>
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ws-text-dim)", marginBottom: 8 }}>
                 {lang === "fr" ? "URL de destination" : "Destination URL"}
               </label>
               <input
@@ -375,15 +414,15 @@ export function CampaignLinksTab({
                 style={fieldInput}
               />
             </div>
-            {genError ? <p style={{ color: "#dc2626", fontSize: 13, margin: "0 0 12px" }}>{genError}</p> : null}
+            {genError ? <p style={{ color: "var(--ws-danger)", fontSize: 13, margin: "0 0 12px" }}>{genError}</p> : null}
             <button
               type="button"
               disabled={generating || !selectedCreator || !destinationUrl.trim()}
               onClick={() => void handleGenerate()}
               style={{
                 border: "none",
-                background: "#1A1A1A",
-                color: "#FFF",
+                background: "var(--ws-btn)",
+                color: "var(--ws-btn-text)",
                 borderRadius: 10,
                 padding: "11px 18px",
                 fontSize: 14,
@@ -413,9 +452,9 @@ export function CampaignLinksTab({
             gap: 14,
           }}
         >
-          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 18px", background: "#FFFFFF" }}>
+          <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: "20px 18px", background: "var(--ws-surface)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
                 {lang === "fr" ? "Clics par jour" : "Clicks by day"}
               </h4>
               <select
@@ -432,41 +471,41 @@ export function CampaignLinksTab({
               </select>
             </div>
             {aggregateByDay.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Aucun clic." : "No clicks yet."}</p>
+              <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: 0 }}>{lang === "fr" ? "Aucun clic." : "No clicks yet."}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {aggregateByDay.slice(-14).map(([day, count]) => (
                   <div key={day} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ width: 72, fontSize: 12, color: "#9A9A9A", flexShrink: 0 }}>{day.slice(5)}</span>
-                    <div style={{ flex: 1, height: 8, background: "#F3F4F6", borderRadius: 999, overflow: "hidden" }}>
+                    <span style={{ width: 72, fontSize: 12, color: "var(--ws-text-dim)", flexShrink: 0 }}>{day.slice(5)}</span>
+                    <div style={{ flex: 1, height: 8, background: "var(--ws-pill)", borderRadius: 999, overflow: "hidden" }}>
                       <div
                         style={{
                           height: "100%",
                           width: `${Math.max(4, Math.round((count / Math.max(...aggregateByDay.map(([, c]) => c), 1)) * 100))}%`,
-                          background: "#1A1A1A",
+                          background: "var(--ws-text)",
                           borderRadius: 999,
                         }}
                       />
                     </div>
-                    <span style={{ width: 28, textAlign: "right", fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{count}</span>
+                    <span style={{ width: 28, textAlign: "right", fontSize: 12, fontWeight: 600, color: "var(--ws-text)" }}>{count}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "20px 18px", background: "#FFFFFF" }}>
-            <h4 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+          <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: "20px 18px", background: "var(--ws-surface)" }}>
+            <h4 style={{ margin: "0 0 14px", fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
               {lang === "fr" ? "Sources de trafic" : "Sources"}
             </h4>
             {aggregateSources.length === 0 ? (
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Aucune source." : "No sources yet."}</p>
+              <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: 0 }}>{lang === "fr" ? "Aucune source." : "No sources yet."}</p>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {aggregateSources.map(([src, count]) => (
                   <div key={src} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 13 }}>
-                    <span style={{ color: "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{src}</span>
-                    <span style={{ fontWeight: 600, color: "#1A1A1A", flexShrink: 0 }}>{count}</span>
+                    <span style={{ color: "var(--ws-text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{src}</span>
+                    <span style={{ fontWeight: 600, color: "var(--ws-text)", flexShrink: 0 }}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -475,15 +514,27 @@ export function CampaignLinksTab({
         </div>
       )}
 
-      <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden", background: "#FFFFFF" }}>
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid #EFEFEF" }}>
-          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
-            {lang === "fr" ? "Liens de la campagne" : "Campaign links"}
+      <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "hidden", background: "var(--ws-surface)" }}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--ws-border)" }}>
+          <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
+            {lang === "fr"
+              ? campaignId
+                ? "Liens de la campagne"
+                : "Tous les liens"
+              : campaignId
+                ? "Campaign links"
+                : "All links"}
           </h4>
         </div>
         {links.length === 0 ? (
-          <div style={{ padding: 32, textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
-            {lang === "fr" ? "Aucun lien généré pour cette campagne." : "No links generated for this campaign yet."}
+          <div style={{ padding: 32, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
+            {lang === "fr"
+              ? campaignId
+                ? "Aucun lien généré pour cette campagne."
+                : "Aucun lien généré pour le moment."
+              : campaignId
+                ? "No links generated for this campaign yet."
+                : "No links generated yet."}
           </div>
         ) : (
           links.map((link, index) => {
@@ -496,7 +547,7 @@ export function CampaignLinksTab({
                 key={link.id}
                 style={{
                   padding: "18px 20px",
-                  borderBottom: index < links.length - 1 ? "1px solid #F5F5F5" : "none",
+                  borderBottom: index < links.length - 1 ? "1px solid var(--ws-border)" : "none",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
@@ -504,13 +555,13 @@ export function CampaignLinksTab({
                     <CreatorAvatar src={creator.avatar_url} username={creator.handle} displayName={creator.full_name || creator.handle} size={36} alt={creator.handle} />
                   ) : null}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
                       @{link.creator_username.replace(/^@/, "")}
                     </div>
                     <div
                       style={{
                         fontSize: 13,
-                        color: "#0047FF",
+                        color: "var(--ws-text)",
                         fontFamily: externFont,
                         letterSpacing: "-0.02em",
                         overflow: "hidden",
@@ -525,8 +576,8 @@ export function CampaignLinksTab({
                     type="button"
                     onClick={() => void copyLink(link.slug, link.destination_url)}
                     style={{
-                      border: "1px solid #E5E5E5",
-                      background: "#FFF",
+                      border: "1px solid var(--ws-border)",
+                      background: "var(--ws-surface)",
                       borderRadius: 8,
                       padding: "8px 12px",
                       fontSize: 12,
@@ -548,15 +599,15 @@ export function CampaignLinksTab({
                     disabled={deletingId === link.id}
                     onClick={() => void handleDelete(link.id, link.slug, link.destination_url)}
                     style={{
-                      border: "1px solid #FECACA",
-                      background: "#FFF",
+                      border: "1px solid var(--ws-border)",
+                      background: "var(--ws-surface)",
                       borderRadius: 8,
                       padding: "8px 12px",
                       fontSize: 12,
                       fontWeight: 500,
                       cursor: deletingId === link.id ? "default" : "pointer",
                       fontFamily: "inherit",
-                      color: "#DC2626",
+                      color: "var(--ws-danger)",
                       opacity: deletingId === link.id ? 0.5 : 1,
                     }}
                   >
@@ -569,12 +620,12 @@ export function CampaignLinksTab({
                         : "Delete"}
                   </button>
                 </div>
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "#6B7280" }}>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--ws-text-muted)" }}>
                   <span>
-                    <strong style={{ color: "#1A1A1A" }}>{link.metrics.clicks}</strong> {lang === "fr" ? "clics" : "clicks"}
+                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.clicks}</strong> {lang === "fr" ? "clics" : "clicks"}
                   </span>
                   <span>
-                    <strong style={{ color: "#1A1A1A" }}>{link.metrics.uniques}</strong> {lang === "fr" ? "uniques" : "uniques"}
+                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.uniques}</strong> {lang === "fr" ? "uniques" : "uniques"}
                   </span>
                 </div>
               </div>

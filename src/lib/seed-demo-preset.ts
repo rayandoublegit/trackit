@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateAffiliateSlug } from "@/lib/affiliate-short-link";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 import {
   DEMO_CAMPAIGN_DESCRIPTION,
   DEMO_CAMPAIGN_NAME,
   DEMO_CREATOR_NOTES,
+  DEMO_LIST_MAX_CREATORS,
   DEMO_LIST_NAME,
   buildDemoSalePlans,
   daysAgoToIso,
@@ -508,65 +510,93 @@ export async function seedDemoPresetForUser(
   let campaignId = (await resolveSingletonDemoCampaign(admin, userId)) || "";
   let folderId = (await resolveSingletonDemoFolder(admin, userId)) || "";
 
-  const demoCreators = pickDemoCreators(userId, 8);
+  const demoCreators = pickDemoCreators(userId, DEMO_LIST_MAX_CREATORS);
   const rand = mulberry32(
     demoCreators.reduce((acc, c) => acc + c.handle.length * 17, userId.length * 31),
   );
 
   // ── Creators table + discovery_saved ──────────────────────────────
   const creatorIdsByHandle = new Map<string, string>();
+  const workspaceId = await resolveOwnerActiveWorkspaceId(admin, userId);
 
   for (const c of demoCreators) {
     const avatar = demoAvatarUrl(c.avatarSeed);
     const snapshot = buildDiscoverySnapshot(c, avatar);
 
-    const { data: creatorRow, error: creatorErr } = await admin
+    const creatorPayload: Record<string, unknown> = {
+      user_id: userId,
+      handle: c.handle,
+      full_name: c.displayName,
+      avatar_url: avatar,
+      platform: c.platform,
+      followers: c.followers,
+      engagement_rate: c.engagement,
+      niche: c.niche,
+      commission_rate: c.commissionRate,
+      discount_code: c.promoCode,
+      balance: 0,
+      total_earned: 0,
+      total_sales: 0,
+    };
+    if (workspaceId) creatorPayload.workspace_id = workspaceId;
+
+    const { data: existingCreators } = await admin
       .from("creators")
-      .upsert(
-        {
-          user_id: userId,
-          handle: c.handle,
-          full_name: c.displayName,
-          avatar_url: avatar,
-          platform: c.platform,
-          followers: c.followers,
-          engagement_rate: c.engagement,
-          niche: c.niche,
-          commission_rate: c.commissionRate,
-          discount_code: c.promoCode,
-          balance: 0,
-          total_earned: 0,
-          total_sales: 0,
-        },
-        { onConflict: "user_id,handle" },
-      )
-      .select("id, handle")
-      .single();
+      .select("id")
+      .eq("user_id", userId)
+      .eq("handle", c.handle)
+      .limit(1);
+    const existingCreatorId = existingCreators?.[0]?.id ? String(existingCreators[0].id) : null;
 
-    if (creatorErr || !creatorRow) {
-      return { ok: false, seeded: false, error: creatorErr?.message || `Failed to upsert @${c.handle}` };
+    let creatorRowId = existingCreatorId;
+    let creatorErrMsg: string | null = null;
+    if (existingCreatorId) {
+      const { error } = await admin.from("creators").update(creatorPayload).eq("id", existingCreatorId);
+      if (error) creatorErrMsg = error.message;
+    } else {
+      const { data: inserted, error } = await admin
+        .from("creators")
+        .insert(creatorPayload)
+        .select("id")
+        .single();
+      if (error || !inserted) creatorErrMsg = error?.message || null;
+      else creatorRowId = String(inserted.id);
     }
-    creatorIdsByHandle.set(c.handle.toLowerCase(), String(creatorRow.id));
 
-    await admin.from("discovery_saved").upsert(
-      {
-        user_id: userId,
-        creator_username: c.handle,
-        platform: c.platform.toLowerCase(),
-        display_name: c.displayName,
-        avatar_url: avatar,
-        followers: c.followers,
-        engagement_rate: c.engagement,
-        primary_niche: c.niche,
-        country_code: c.country,
-        value_score: Math.round(50 + rand() * 40),
-        pipeline_status: c.stage,
-        notes: DEMO_CREATOR_NOTES,
-        snapshot,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,creator_username" },
-    );
+    if (creatorErrMsg || !creatorRowId) {
+      return { ok: false, seeded: false, error: creatorErrMsg || `Failed to upsert @${c.handle}` };
+    }
+    creatorIdsByHandle.set(c.handle.toLowerCase(), creatorRowId);
+
+    const savedPayload: Record<string, unknown> = {
+      user_id: userId,
+      creator_username: c.handle,
+      platform: c.platform.toLowerCase(),
+      display_name: c.displayName,
+      avatar_url: avatar,
+      followers: c.followers,
+      engagement_rate: c.engagement,
+      primary_niche: c.niche,
+      country_code: c.country,
+      value_score: Math.round(50 + rand() * 40),
+      pipeline_status: c.stage,
+      notes: DEMO_CREATOR_NOTES,
+      snapshot,
+      updated_at: new Date().toISOString(),
+    };
+    if (workspaceId) savedPayload.workspace_id = workspaceId;
+
+    const { data: existingSaved } = await admin
+      .from("discovery_saved")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("creator_username", c.handle)
+      .limit(1);
+    if (existingSaved?.[0]?.id) {
+      await admin.from("discovery_saved").update(savedPayload).eq("id", existingSaved[0].id);
+    } else {
+      await admin.from("discovery_saved").insert(savedPayload);
+    }
   }
 
   // ── Folder "Trackit" (single instance) ────────────────────────────
@@ -601,10 +631,29 @@ export async function seedDemoPresetForUser(
     folderId = (await resolveSingletonDemoFolder(admin, userId)) || folderId;
   }
 
+  const keepHandles = demoCreators.map((c) => c.handle);
+  const keepHandlesLower = new Set(keepHandles.map((h) => h.toLowerCase()));
+
   await admin.from("discovery_folder_items").upsert(
-    demoCreators.map((c) => ({ folder_id: folderId, creator_username: c.handle })),
+    keepHandles.map((handle) => ({ folder_id: folderId, creator_username: handle })),
     { onConflict: "folder_id,creator_username", ignoreDuplicates: true },
   );
+
+  // Cap the demo list: remove leftover items from older seeds (> 8).
+  const { data: folderItems } = await admin
+    .from("discovery_folder_items")
+    .select("creator_username")
+    .eq("folder_id", folderId);
+  const extraHandles = (folderItems ?? [])
+    .map((row) => String(row.creator_username || ""))
+    .filter((handle) => handle && !keepHandlesLower.has(handle.toLowerCase()));
+  if (extraHandles.length) {
+    await admin
+      .from("discovery_folder_items")
+      .delete()
+      .eq("folder_id", folderId)
+      .in("creator_username", extraHandles);
+  }
 
   // ── Campaign "Trackit" (single instance) ──────────────────────────
   if (!campaignId) {
@@ -664,6 +713,25 @@ export async function seedDemoPresetForUser(
       onConflict: "campaign_id,creator_id",
       ignoreDuplicates: true,
     });
+  }
+
+  // Keep demo campaign inventory aligned with the 8-creator list.
+  const keepCreatorIds = [...creatorIdsByHandle.values()];
+  const { data: linkedCreators } = await admin
+    .from("campaign_creators")
+    .select("creator_id")
+    .eq("user_id", userId)
+    .eq("campaign_id", campaignId);
+  const extraCreatorIds = (linkedCreators ?? [])
+    .map((row) => String(row.creator_id || ""))
+    .filter((id) => id && !keepCreatorIds.includes(id));
+  if (extraCreatorIds.length) {
+    await admin
+      .from("campaign_creators")
+      .delete()
+      .eq("user_id", userId)
+      .eq("campaign_id", campaignId)
+      .in("creator_id", extraCreatorIds);
   }
 
   // ── Affiliate links + clicks first (needed for sales attribution) ─

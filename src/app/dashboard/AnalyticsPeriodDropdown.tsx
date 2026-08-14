@@ -51,13 +51,13 @@ export function AnalyticsPeriodDropdown({
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
-          background: subtle ? "#FFFFFF" : "#F5F5F5",
-          border: subtle ? "1px solid #E5E7EB" : "none",
+          background: subtle ? "var(--ws-surface)" : "var(--ws-pill)",
+          border: subtle ? "1px solid var(--ws-border)" : "none",
           borderRadius: subtle ? 8 : 10,
           padding: subtle ? "5px 10px" : "8px 12px",
           fontSize: subtle ? 12 : 13,
           fontWeight: 500,
-          color: subtle ? "#6B7280" : "#1A1A1A",
+          color: subtle ? "var(--ws-text-muted)" : "var(--ws-text)",
           letterSpacing: "-0.01em",
           cursor: "pointer",
           fontFamily: "inherit",
@@ -73,7 +73,7 @@ export function AnalyticsPeriodDropdown({
           aria-hidden="true"
           style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
         >
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="#6B7280" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--ws-text-muted)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -86,10 +86,10 @@ export function AnalyticsPeriodDropdown({
             left: align === "left" ? 0 : undefined,
             right: align === "right" ? 0 : undefined,
             minWidth: 196,
-            background: "#FFFFFF",
-            border: "1px solid #EFEFEF",
+            background: "var(--ws-surface)",
+            border: "1px solid var(--ws-border)",
             borderRadius: 12,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
+            boxShadow: "var(--ws-shadow)",
             padding: 6,
             zIndex: 50,
           }}
@@ -110,12 +110,12 @@ export function AnalyticsPeriodDropdown({
                   display: "block",
                   width: "100%",
                   textAlign: "left",
-                  background: active ? "#F5F5F5" : "transparent",
+                  background: active ? "var(--ws-hover)" : "transparent",
                   border: "none",
                   borderRadius: 8,
                   padding: "9px 10px",
                   fontSize: 13,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   cursor: "pointer",
                   fontFamily: "inherit",
                   letterSpacing: "-0.01em",

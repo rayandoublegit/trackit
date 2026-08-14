@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { commissionRateFromDiscountCode } from "@/lib/creator-crm";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 import {
   commissionRateFromDiscoverySnapshot,
   normalizeCreatorHandle,
@@ -50,31 +51,42 @@ export async function ensureCreatorForHandle(
   const normalized = normalizeCreatorHandle(handle);
   if (!normalized) return null;
 
-  const { data: existing } = await admin
+  const select =
+    "id, user_id, handle, discount_code, commission_rate, balance, total_earned, total_sales";
+
+  const { data: existingRows } = await admin
     .from("creators")
-    .select("id, user_id, handle, discount_code, commission_rate, balance, total_earned, total_sales")
+    .select(select)
     .eq("user_id", userId)
     .ilike("handle", normalized)
-    .maybeSingle();
+    .limit(1);
+  if (existingRows?.[0]?.id) return existingRows[0] as ShopifyCreatorRow;
 
-  if (existing?.id) return existing as ShopifyCreatorRow;
+  const workspaceId = await resolveOwnerActiveWorkspaceId(admin, userId);
+  const row: Record<string, unknown> = {
+    user_id: userId,
+    handle: normalized,
+    full_name: extras?.full_name || normalized,
+    platform: extras?.platform || "TikTok",
+  };
+  if (workspaceId) row.workspace_id = workspaceId;
 
   const { data: created, error } = await admin
     .from("creators")
-    .upsert(
-      {
-        user_id: userId,
-        handle: normalized,
-        full_name: extras?.full_name || normalized,
-        platform: extras?.platform || "TikTok",
-      },
-      { onConflict: "user_id,handle" }
-    )
-    .select("id, user_id, handle, discount_code, commission_rate, balance, total_earned, total_sales")
+    .insert(row)
+    .select(select)
     .single();
 
-  if (error || !created) return null;
-  return created as ShopifyCreatorRow;
+  if (!error && created) return created as ShopifyCreatorRow;
+
+  // Insert may lose a race against a concurrent create: re-read.
+  const { data: retryRows } = await admin
+    .from("creators")
+    .select(select)
+    .eq("user_id", userId)
+    .ilike("handle", normalized)
+    .limit(1);
+  return (retryRows?.[0] as ShopifyCreatorRow) ?? null;
 }
 
 export async function applyDiscountCodeToCreator(

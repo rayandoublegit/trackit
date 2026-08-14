@@ -30,21 +30,21 @@ function MetricCard({
   return (
     <div
       style={{
-        background: accent ? BLUE : "#FFFFFF",
-        border: accent ? "none" : "1px solid #EFEFEF",
+        background: accent ? BLUE : "var(--ws-surface)",
+        border: accent ? "none" : "1px solid var(--ws-border)",
         borderRadius: 16,
         padding: "22px 24px",
         boxShadow: accent ? "0 8px 24px rgba(0,71,255,0.15)" : "0 1px 2px rgba(0,0,0,0.03)",
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "#9A9A9A", marginBottom: 10, letterSpacing: "-0.01em" }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "var(--ws-text-dim)", marginBottom: 10, letterSpacing: "-0.01em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
+      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1 }}>
         {value}
       </div>
       {hint && (
-        <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "#B0B0B0", marginTop: 8, letterSpacing: "-0.01em" }}>
+        <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "var(--ws-text-dim)", marginTop: 8, letterSpacing: "-0.01em" }}>
           {hint}
         </div>
       )}
@@ -101,29 +101,29 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
 
   if (loading) {
     return (
-      <div style={{ padding: pad, color: "#9A9A9A", fontSize: 14, background: "#FFFFFF", minHeight: "100%" }}>
+      <div style={{ padding: pad, color: "var(--ws-text-dim)", fontSize: 14, background: "var(--ws-surface)", minHeight: "100%" }}>
         {lang === "fr" ? "Chargement de vos analytiques…" : "Loading your analytics…"}
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div
         style={{
           paddingTop: isMobile ? 56 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,
-          borderBottom: "1px solid #EFEFEF",
+          borderBottom: "1px solid var(--ws-border)",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
+            <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
               {lang === "fr" ? "Analytiques" : "Analytics"}
             </h1>
-            <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
               {stats?.brandName
                 ? lang === "fr"
                   ? `Ventes et commissions générées pour ${stats.brandName}.`
@@ -139,12 +139,12 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 1080 }}>
         {error && (
-          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", fontSize: 13, color: "#DC2626" }}>
+          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", fontSize: 13, color: "var(--ws-danger)" }}>
             {error}
           </div>
         )}
         {!stats?.linked && !error && (
-          <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 12, background: "#F5F8FF", border: "1px solid #D6E4FF", fontSize: 13, color: "#5A5A5A", lineHeight: 1.5 }}>
+          <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 12, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", fontSize: 13, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Reliez votre compte à la marque (invitation ou pseudo identique) pour voir vos ventes."
               : "Link your account to the brand (invite or matching handle) to see your sales."}
@@ -163,9 +163,9 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
               border: "1px solid rgba(0,71,255,0.12)",
             }}
           >
-            <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Votre code promo" : "Your promo code"}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: BLUE }}>{stats.discountCode}</span>
-            {stats.commissionRate != null && <span style={{ fontSize: 13, color: "#9A9A9A" }}>· {stats.commissionRate}%</span>}
+            <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>{lang === "fr" ? "Votre code promo" : "Your promo code"}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-accent)" }}>{stats.discountCode}</span>
+            {stats.commissionRate != null && <span style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>· {stats.commissionRate}%</span>}
           </div>
         )}
 
@@ -192,11 +192,11 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
           />
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "hidden" }}>
           <div
             style={{
               padding: "16px 20px",
-              borderBottom: "1px solid #EFEFEF",
+              borderBottom: "1px solid var(--ws-border)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -204,21 +204,21 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
               flexWrap: "wrap",
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
               {lang === "fr" ? `Historique de mes ventes — ${periodLabel}` : `My sales history — ${periodLabel}`}
             </div>
             {filteredSales.length > 0 && (
-              <span style={{ fontSize: 12, color: "#9A9A9A" }}>
+              <span style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>
                 {filteredSales.length} {lang === "fr" ? "vente(s)" : "sale(s)"}
               </span>
             )}
           </div>
           {filteredSales.length === 0 ? (
             <div style={{ padding: "48px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", marginBottom: 6 }}>
                 {lang === "fr" ? "Aucune vente sur cette période" : "No sales in this period"}
               </div>
-              <p style={{ fontSize: 14, color: "#7A7A7A", lineHeight: 1.5, margin: "0 auto", maxWidth: 400 }}>
+              <p style={{ fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5, margin: "0 auto", maxWidth: 400 }}>
                 {lang === "fr"
                   ? "Essayez une autre période ou attendez qu'une commande passe avec votre code promo."
                   : "Try another period or wait for an order with your promo code."}
@@ -228,33 +228,33 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: isMobile ? 520 : undefined }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid #EFEFEF" }}>
-                    <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
+                  <tr style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                    <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
                     {!isMobile && (
-                      <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Marque" : "Brand"}</th>
+                      <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Marque" : "Brand"}</th>
                     )}
-                    <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Code" : "Code"}</th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Vente" : "Sale"}</th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Commission" : "Commission"}</th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Statut" : "Status"}</th>
+                    <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Code" : "Code"}</th>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Vente" : "Sale"}</th>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Commission" : "Commission"}</th>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Statut" : "Status"}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSales.map((sale) => {
                     const statusStyle = saleStatusStyle(sale.status);
                     return (
-                      <tr key={sale.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                        <td style={{ padding: "14px 20px", color: "#1A1A1A", whiteSpace: "nowrap" }}>{fmtDate(sale.date)}</td>
+                      <tr key={sale.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                        <td style={{ padding: "14px 20px", color: "var(--ws-text)", whiteSpace: "nowrap" }}>{fmtDate(sale.date)}</td>
                         {!isMobile && (
-                          <td style={{ padding: "14px 20px", color: "#7A7A7A" }}>{sale.brandName || "—"}</td>
+                          <td style={{ padding: "14px 20px", color: "var(--ws-text-muted)" }}>{sale.brandName || "—"}</td>
                         )}
-                        <td style={{ padding: "14px 20px", color: "#7A7A7A", fontFamily: "monospace", fontSize: 13 }}>
+                        <td style={{ padding: "14px 20px", color: "var(--ws-text-muted)", fontFamily: "monospace", fontSize: 13 }}>
                           {sale.discountCode || stats?.discountCode || "—"}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", color: "#1A1A1A" }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", color: "var(--ws-text)" }}>
                           {formatCurrency(sale.orderAmount, lang)}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", color: BLUE, fontWeight: 600 }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", color: "var(--ws-accent)", fontWeight: 600 }}>
                           {formatCurrency(sale.commissionAmount, lang)}
                         </td>
                         <td style={{ padding: "14px 20px", textAlign: "right" }}>

@@ -297,9 +297,9 @@ export function SaveCreatorDropdown({
           fontSize: 12,
           fontWeight: 600,
           letterSpacing: "-0.02em",
-          color: savedLocal ? "#FFFFFF" : "#1A1A1A",
-          background: savedLocal ? "#0047FF" : "#FFFFFF",
-          border: `1px solid ${savedLocal ? "#0047FF" : "#E5E5E5"}`,
+          color: savedLocal ? "#FFFFFF" : "var(--ws-text)",
+          background: savedLocal ? "var(--ws-accent)" : "var(--ws-surface)",
+          border: `1px solid ${savedLocal ? "var(--ws-accent)" : "var(--ws-border)"}`,
           borderRadius: 10,
           padding: "8px 12px",
           cursor: "pointer",
@@ -326,17 +326,17 @@ export function SaveCreatorDropdown({
             zIndex: 200,
             width: 248,
             maxWidth: 248,
-            background: "#FFFFFF",
-            border: "1px solid #E5E5E5",
+            background: "var(--ws-surface)",
+            border: "1px solid var(--ws-border)",
             borderRadius: 12,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.12)",
+            boxShadow: "var(--ws-shadow)",
             padding: "10px 0",
             fontFamily: actionFont,
             boxSizing: "border-box",
             overflow: "hidden",
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.04em", padding: "4px 14px 8px" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.04em", padding: "4px 14px 8px" }}>
             {t.saveToList}
           </div>
 
@@ -351,9 +351,9 @@ export function SaveCreatorDropdown({
               cursor: "pointer",
               fontSize: 13,
               fontWeight: 500,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               letterSpacing: "-0.01em",
-              background: savedLocal ? "#E8EEFC" : "transparent",
+              background: savedLocal ? "var(--ws-accent-soft)" : "transparent",
               minWidth: 0,
             }}
           >
@@ -369,13 +369,13 @@ export function SaveCreatorDropdown({
           {isPaid ? (
             <>
               {folders.length > 0 && (
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 10px 6px" }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.04em", padding: "8px 10px 6px" }}>
                   {t.folders}
                 </div>
               )}
 
               {folders.length === 0 ? (
-                <div style={{ fontSize: 12, color: "#9A9A9A", padding: "4px 10px 10px", lineHeight: 1.45 }}>
+                <div style={{ fontSize: 12, color: "var(--ws-text-dim)", padding: "4px 10px 10px", lineHeight: 1.45 }}>
                   {t.noListsYet}
                 </div>
               ) : (
@@ -393,11 +393,11 @@ export function SaveCreatorDropdown({
                           borderRadius: 8,
                           cursor: "pointer",
                           fontSize: 13,
-                          color: "#1A1A1A",
+                          color: "var(--ws-text)",
                           letterSpacing: "-0.01em",
                           minWidth: 0,
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "#F7F7F8"; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = "var(--ws-hover)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
                       >
                         <input
@@ -436,7 +436,7 @@ export function SaveCreatorDropdown({
                       maxWidth: "100%",
                       fontSize: 12,
                       padding: "7px 8px",
-                      border: "1px solid #E5E5E5",
+                      border: "1px solid var(--ws-border)",
                       borderRadius: 8,
                       fontFamily: actionFont,
                       letterSpacing: "-0.01em",

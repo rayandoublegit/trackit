@@ -223,6 +223,8 @@ export function pushNotification(
   input: Omit<NotificationItem, "id" | "read" | "time"> & {
     time?: string;
     prefKey?: NotificationPrefKey;
+    /** Create the notification without playing the chime (e.g. on app entry). */
+    silent?: boolean;
   },
   userId?: string | null
 ): NotificationItem | null {
@@ -240,7 +242,7 @@ export function pushNotification(
     return duplicate;
   }
 
-  playNotificationSound();
+  if (!input.silent) playNotificationSound();
 
   const item: NotificationItem = {
     kind: input.kind,
@@ -412,10 +414,9 @@ export function notifyFeedbackIfNeeded(userId: string, lang: "en" | "fr"): boole
   }
 
   // Drop previous feedback notifications so a fresh unread one can appear.
+  // No chime: this fires on app entry and should stay silent.
   const withoutFeedback = existing.filter((n) => !isFeedbackNotification(n));
   saveNotifications(withoutFeedback);
-
-  playNotificationSound();
 
   const item: NotificationItem = {
     id: newNotificationId(),
@@ -461,6 +462,8 @@ export function notifyWelcomeIfNeeded(userId: string, lang: "en" | "fr"): boolea
       title: lang === "fr" ? "Bienvenue sur Trackit" : "Welcome to Trackit",
       body: welcomeNotificationBody(lang),
       time: formatNotificationTime(lang),
+      // Shown on app entry — no chime.
+      silent: true,
     },
     userId
   );
@@ -470,15 +473,6 @@ export function notifyWelcomeIfNeeded(userId: string, lang: "en" | "fr"): boolea
     return true;
   }
   return false;
-}
-
-/** Replays welcome chime after a user gesture if welcome is still unread. */
-export function playWelcomeSoundIfUnread(userId: string) {
-  setNotificationsUserId(userId);
-  const welcome = loadNotifications().find(isWelcomeNotification);
-  if (welcome && !welcome.read) {
-    playNotificationSound();
-  }
 }
 
 /** Dev helper — fires a sample notification of the given type. */

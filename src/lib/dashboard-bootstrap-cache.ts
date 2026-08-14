@@ -19,17 +19,23 @@ export type DashboardBootstrapCache = {
 
 const STORAGE_KEY = "trackit_dashboard_bootstrap_v1";
 
-export function readDashboardBootstrap(userId: string): DashboardBootstrapCache | null {
+export function readLastDashboardBootstrap(): DashboardBootstrapCache | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as DashboardBootstrapCache;
-    if (!parsed || parsed.userId !== userId) return null;
+    if (!parsed?.userId) return null;
     return parsed;
   } catch {
     return null;
   }
+}
+
+export function readDashboardBootstrap(userId: string): DashboardBootstrapCache | null {
+  const parsed = readLastDashboardBootstrap();
+  if (!parsed || parsed.userId !== userId) return null;
+  return parsed;
 }
 
 export function writeDashboardBootstrap(cache: DashboardBootstrapCache): void {

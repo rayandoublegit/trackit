@@ -9,6 +9,8 @@ export const DEMO_LIST_NAME = "Trackit";
 export const DEMO_CAMPAIGN_NAME = "Trackit";
 export const DEMO_CAMPAIGN_MARKER = "[trackit-demo-preset]";
 export const DEMO_CREATOR_NOTES = "Créateur démo Trackit";
+/** Hard cap for creators shown in the Trackit demo list / campaign. */
+export const DEMO_LIST_MAX_CREATORS = 8;
 export const DEMO_CAMPAIGN_DESCRIPTION =
   `Campagne démo Trackit — Explorez inventaire, ventes, ROI et affiliation avec des données d’exemple. ${DEMO_CAMPAIGN_MARKER}`;
 
@@ -196,6 +198,48 @@ export const DEMO_CREATOR_POOL: DemoCreatorSeed[] = [
     email: "ines.demo@trackit.example",
     avatarSeed: "ines",
   },
+  {
+    handle: "hugo.techlab",
+    displayName: "Hugo Renard",
+    platform: "TikTok",
+    niche: "Tech",
+    country: "FR",
+    stage: "signed",
+    followers: 274_600,
+    engagement: 5.4,
+    commissionRate: 14,
+    promoCode: "HUGO14",
+    email: "hugo.demo@trackit.example",
+    avatarSeed: "hugo",
+  },
+  {
+    handle: "maya.gadgets",
+    displayName: "Maya Chen",
+    platform: "Instagram",
+    niche: "Tech",
+    country: "FR",
+    stage: "in_progress",
+    followers: 156_800,
+    engagement: 4.2,
+    commissionRate: 13,
+    promoCode: "MAYA13",
+    email: "maya.demo@trackit.example",
+    avatarSeed: "maya",
+  },
+  {
+    handle: "noah.setup",
+    displayName: "Noah Keller",
+    platform: "YouTube",
+    niche: "Tech",
+    country: "DE",
+    stage: "contacted",
+    followers: 489_200,
+    engagement: 3.1,
+    commissionRate: 10,
+    promoCode: "NOAH10",
+    email: "noah.demo@trackit.example",
+    avatarSeed: "noah",
+  },
 ];
 
 function hashSeed(input: string): number {
@@ -218,14 +262,24 @@ export function mulberry32(seed: number) {
   };
 }
 
-export function pickDemoCreators(userId: string, count = 8): DemoCreatorSeed[] {
-  const rand = mulberry32(hashSeed(`${userId}:demo-creators`));
+export function pickDemoCreators(
+  userId: string,
+  count = DEMO_LIST_MAX_CREATORS,
+): DemoCreatorSeed[] {
+  const capped = Math.min(Math.max(1, count), DEMO_LIST_MAX_CREATORS);
+  const rand = mulberry32(hashSeed(`${userId}:demo-creators-v4`));
   const pool = [...DEMO_CREATOR_POOL];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
-  return pool.slice(0, Math.min(count, pool.length)).map((c) => {
+  // Always include at least one Tech creator in the Trackit demo set.
+  const tech = pool.find((c) => c.niche.toLowerCase() === "tech");
+  const picked = pool.slice(0, Math.min(capped, pool.length));
+  if (tech && !picked.some((c) => c.handle === tech.handle)) {
+    picked[picked.length - 1] = tech;
+  }
+  return picked.map((c) => {
     // Slight per-user jitter so numbers feel unique without absurd values
     const fJitter = 0.9 + rand() * 0.2;
     const eJitter = 0.9 + rand() * 0.2;

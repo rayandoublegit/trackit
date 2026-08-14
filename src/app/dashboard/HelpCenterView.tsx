@@ -7,10 +7,9 @@ import type { PlanTier } from "@/lib/plan-limits";
 const SUPPORT_EMAIL = "hello@thentrack.it";
 const CALENDLY_BOOKING_URL =
   process.env.NEXT_PUBLIC_CALENDLY_BOOKING_URL ?? "https://calendly.com/hello-thentrack/30min";
-const BLUE = "#0047FF";
 
 const btnPrimary: CSSProperties = {
-  background: BLUE,
+  background: "var(--ws-accent)",
   color: "#FFFFFF",
   border: "none",
   borderRadius: 10,
@@ -31,8 +30,8 @@ function IconBubble({ children }: { children: ReactNode }) {
         width: 44,
         height: 44,
         borderRadius: 12,
-        background: "#EEF4FF",
-        color: BLUE,
+        background: "var(--ws-accent-soft)",
+        color: "var(--ws-accent)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -101,13 +100,13 @@ function HelpCenterRow({
         alignItems: "flex-start",
         gap: 16,
         padding: "24px 0",
-        borderBottom: "1px solid #EFEFEF",
+        borderBottom: "1px solid var(--ws-border)",
       }}
     >
       <IconBubble>{icon}</IconBubble>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>{title}</h2>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 16px", lineHeight: 1.55, letterSpacing: "-0.02em" }}>{text}</p>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 6px", letterSpacing: "-0.02em" }}>{title}</h2>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 16px", lineHeight: 1.55, letterSpacing: "-0.02em" }}>{text}</p>
         {cta}
       </div>
     </div>
@@ -118,21 +117,21 @@ export function HelpCenterView({ isMobile, plan: _plan = "free" }: { isMobile?: 
   const lang = useLang();
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)" }}>
       <div
         style={{
           paddingTop: isMobile ? 56 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,
-          background: "#FFFFFF",
+          background: "var(--ws-bg)",
         }}
       >
         <h1
           style={{
             fontSize: isMobile ? 26 : 34,
             fontWeight: 600,
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
             letterSpacing: "-0.04em",
             margin: 0,
             marginBottom: 6,
@@ -140,7 +139,7 @@ export function HelpCenterView({ isMobile, plan: _plan = "free" }: { isMobile?: 
         >
           {lang === "fr" ? "Centre d'aide" : "Help Center"}
         </h1>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Une question ? Écrivez-nous ou réservez un appel avec l'équipe Trackit."
             : "Have a question? Email us or book a call with the Trackit team."}

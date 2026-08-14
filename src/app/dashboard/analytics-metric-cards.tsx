@@ -55,9 +55,9 @@ export function toCumulativeSeries(points: ChartPoint[]): ChartPoint[] {
 }
 
 export function trendColors(direction: PeriodTrend["direction"]) {
-  if (direction === "up") return { fg: "#166534", bg: "#DCFCE7" };
-  if (direction === "down") return { fg: "#991B1B", bg: "#FEE2E2" };
-  return { fg: "#6B7280", bg: "#F3F4F6" };
+  if (direction === "up") return { fg: "#22C55E", bg: "var(--ws-bg)", border: "var(--ws-border)" };
+  if (direction === "down") return { fg: "var(--ws-danger)", bg: "var(--ws-bg)", border: "var(--ws-border)" };
+  return { fg: "var(--ws-text-muted)", bg: "var(--ws-bg)", border: "var(--ws-border)" };
 }
 
 export function trendToSeries(trend?: PeriodTrend): ChartPoint[] {
@@ -141,10 +141,10 @@ export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
               transform: pos.top > (btnRef.current?.getBoundingClientRect().bottom ?? 0) ? "none" : "translateY(-100%)",
               padding: "10px 12px",
               borderRadius: 10,
-              border: "1px solid #E5E5E5",
-              background: "#FFFFFF",
+              border: "1px solid var(--ws-border)",
+              background: "var(--ws-surface)",
               boxShadow: "0 10px 28px rgba(0,0,0,0.12)",
-              color: "#5A5A5A",
+              color: "var(--ws-text-muted)",
               fontSize: 12,
               fontWeight: 400,
               lineHeight: 1.45,
@@ -153,7 +153,7 @@ export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
               pointerEvents: "none",
             }}
           >
-            <div style={{ fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
+            <div style={{ fontWeight: 600, color: "var(--ws-text)", marginBottom: 4 }}>
               {lang === "fr" ? "En savoir plus" : "Learn more"}
             </div>
             {text}
@@ -180,9 +180,9 @@ export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
           width: 18,
           height: 18,
           borderRadius: "50%",
-          border: "1.5px solid #C4C4C4",
-          background: "#FFFFFF",
-          color: "#6B7280",
+          border: "1.5px solid var(--ws-border-strong)",
+          background: "var(--ws-surface)",
+          color: "var(--ws-text-muted)",
           fontSize: 11,
           fontWeight: 700,
           fontFamily: "Georgia, serif",
@@ -203,7 +203,7 @@ export function InfoTip({ text, lang }: { text: string; lang: "en" | "fr" }) {
 }
 
 export function TrendPill({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" }) {
-  const { fg, bg } = trendColors(trend.direction);
+  const { fg, bg, border } = trendColors(trend.direction);
   const sign = trend.direction === "up" ? "+" : trend.direction === "down" ? "−" : "";
   return (
     <span
@@ -215,6 +215,7 @@ export function TrendPill({ trend, lang }: { trend: PeriodTrend; lang: "en" | "f
         fontWeight: 600,
         color: fg,
         background: bg,
+        border: `1px solid ${border}`,
         padding: "4px 9px",
         borderRadius: 999,
         letterSpacing: "-0.02em",
@@ -238,7 +239,7 @@ function TrendInline({ trend, lang }: { trend: PeriodTrend; lang: "en" | "fr" })
         {sign}
         {formatTrendLabel(trend.changePct, lang)}
       </span>
-      <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+      <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "vs période préc." : "vs prev. period"}
       </span>
     </span>
@@ -251,7 +252,7 @@ export function SummaryMetricCard({
   info,
   value,
   trend,
-  sparklineSeries,
+  sparklineSeries: _sparklineSeries,
   lang,
   profitability,
 }: {
@@ -263,15 +264,11 @@ export function SummaryMetricCard({
   lang: "en" | "fr";
   profitability?: boolean;
 }) {
-  const sparkPoints = ensureChartSeries(sparklineSeries, trend, trend?.current ?? 0);
-  const sparkColor =
-    trend?.direction === "down" ? "#DC2626" : trend?.direction === "up" ? "#16A34A" : "#9CA3AF";
-
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 14,
         padding: "16px 16px 14px",
         minHeight: 118,
@@ -284,56 +281,17 @@ export function SummaryMetricCard({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.01em" }}>{title}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{title}</span>
         <InfoTip text={info} lang={lang} />
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-        <div style={{ fontSize: 26, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
-          {value}
-        </div>
-        <div style={{ width: 88, flexShrink: 0, marginBottom: 2 }}>
-          <MiniSparkline points={sparkPoints} color={sparkColor} />
-        </div>
+      <div style={{ fontSize: 26, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
+        {value}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: "auto", minWidth: 0 }}>
         {trend ? <TrendInline trend={trend} lang={lang} /> : null}
         {profitability != null ? <ProfitabilityPill profitable={profitability} lang={lang} /> : null}
       </div>
     </div>
-  );
-}
-
-function MiniSparkline({ points, color }: { points: ChartPoint[]; color: string }) {
-  const width = 88;
-  const height = 44;
-  const padX = 2;
-  const padY = 4;
-  const chartW = width - padX * 2;
-  const chartH = height - padY * 2;
-  const values = points.map((p) => p.value);
-  const minV = Math.min(...values, 0);
-  const maxV = Math.max(...values, 1);
-  const span = Math.max(maxV - minV, 1e-9);
-
-  const coords = points.map((p, i) => {
-    const x = padX + (points.length === 1 ? chartW / 2 : (i / (points.length - 1)) * chartW);
-    const y = padY + chartH - ((p.value - minV) / span) * chartH;
-    return { x, y };
-  });
-
-  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`).join(" ");
-  const areaPath =
-    coords.length > 0
-      ? `${linePath} L ${coords[coords.length - 1].x.toFixed(1)} ${(padY + chartH).toFixed(1)} L ${coords[0].x.toFixed(1)} ${(padY + chartH).toFixed(1)} Z`
-      : "";
-
-  return (
-    <svg width={width} height={height} aria-hidden style={{ display: "block" }}>
-      {areaPath ? <path d={areaPath} fill={color} fillOpacity={0.12} /> : null}
-      {linePath ? (
-        <path d={linePath} fill="none" stroke={color} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
-      ) : null}
-    </svg>
   );
 }
 
@@ -568,13 +526,13 @@ export function HeroMetricChart({
 
   const trendLine = trend ? formatHeroTrendLine(trend, formatPoint, periodLabel, lang) : null;
   const trendColor =
-    trend?.direction === "down" ? "#DC2626" : trend?.direction === "up" ? accent : "#6B7280";
+    trend?.direction === "down" ? "#DC2626" : trend?.direction === "up" ? accent : "var(--ws-text-muted)";
 
   return (
     <div style={{ width: "100%", marginBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.01em" }}>{title}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{title}</span>
           <InfoTip text={info} lang={lang} />
         </div>
         <AnalyticsPeriodDropdown
@@ -587,7 +545,7 @@ export function HeroMetricChart({
         />
       </div>
 
-      <div style={{ fontSize: 40, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.05em", lineHeight: 1.05, marginBottom: 6 }}>
+      <div style={{ fontSize: 40, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.05em", lineHeight: 1.05, marginBottom: 6 }}>
         {value}
       </div>
       {trendLine ? (
@@ -629,7 +587,7 @@ export function HeroMetricChart({
                   y1={y}
                   x2={padL + chartW}
                   y2={y}
-                  stroke="#E5E7EB"
+                  stroke="var(--ws-border)"
                   strokeWidth={1}
                   strokeDasharray="3 5"
                 />
@@ -637,7 +595,7 @@ export function HeroMetricChart({
                   x={padL - 10}
                   y={y + 4}
                   textAnchor="end"
-                  fill="#9CA3AF"
+                  fill="var(--ws-text-dim)"
                   fontSize={11}
                   fontFamily="inherit"
                 >
@@ -671,7 +629,7 @@ export function HeroMetricChart({
                 strokeOpacity={0.4}
               />
               <circle cx={active.x} cy={active.y} r={8} fill={accent} fillOpacity={0.12} />
-              <circle cx={active.x} cy={active.y} r={4} fill="#FFFFFF" stroke={accent} strokeWidth={2.5} />
+              <circle cx={active.x} cy={active.y} r={4} fill="var(--ws-surface)" stroke={accent} strokeWidth={2.5} />
             </>
           ) : null}
 
@@ -684,7 +642,7 @@ export function HeroMetricChart({
                 x={c.x}
                 y={height - 8}
                 textAnchor="middle"
-                fill="#9CA3AF"
+                fill="var(--ws-text-dim)"
                 fontSize={11}
                 fontFamily="inherit"
               >
@@ -781,8 +739,8 @@ export function MetricPanelCard({
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 16,
         padding: "20px 22px 16px",
         boxSizing: "border-box",
@@ -790,7 +748,7 @@ export function MetricPanelCard({
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{title}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{title}</span>
           <InfoTip text={info} lang={lang} />
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -798,7 +756,7 @@ export function MetricPanelCard({
           {trend ? <TrendPill trend={trend} lang={lang} /> : null}
         </div>
       </div>
-      <div style={{ fontSize: 34, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.045em", lineHeight: 1.1, marginBottom: 14 }}>
+      <div style={{ fontSize: 34, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.045em", lineHeight: 1.1, marginBottom: 14 }}>
         {value}
       </div>
       {chartVariant === "bars" ? (
@@ -921,18 +879,18 @@ export function InteractiveLineChart({
       <svg width={width} height={height} style={{ display: "block", overflow: "visible" }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#1A1A1A" stopOpacity="0.1" />
-            <stop offset="100%" stopColor="#1A1A1A" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--ws-text)" stopOpacity="0.1" />
+            <stop offset="100%" stopColor="var(--ws-text)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {areaPath ? <path d={areaPath} fill={`url(#${gradId})`} /> : null}
         {linePath ? (
-          <path d={linePath} fill="none" stroke="#1A1A1A" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <path d={linePath} fill="none" stroke="var(--ws-text)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         ) : null}
         {active ? (
           <>
-            <line x1={active.x} y1={padTop} x2={active.x} y2={padTop + chartH} stroke="#E5E5E5" strokeWidth={1} />
-            <circle cx={active.x} cy={active.y} r={4.5} fill="#FFF" stroke="#1A1A1A" strokeWidth={2} />
+            <line x1={active.x} y1={padTop} x2={active.x} y2={padTop + chartH} stroke="var(--ws-border)" strokeWidth={1} />
+            <circle cx={active.x} cy={active.y} r={4.5} fill="var(--ws-surface)" stroke="var(--ws-text)" strokeWidth={2} />
           </>
         ) : null}
       </svg>
@@ -945,7 +903,7 @@ export function InteractiveLineChart({
           display: "flex",
           justifyContent: "space-between",
           fontSize: 11,
-          color: "#9A9A9A",
+          color: "var(--ws-text-dim)",
           letterSpacing: "-0.01em",
           pointerEvents: "none",
         }}
@@ -962,17 +920,17 @@ export function InteractiveLineChart({
             minWidth: 132,
             padding: "8px 10px",
             borderRadius: 10,
-            border: "1px solid #E5E5E5",
-            background: "#FFF",
+            border: "1px solid var(--ws-border)",
+            background: "var(--ws-surface)",
             boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             pointerEvents: "none",
             zIndex: 5,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 2 }}>
             {formatChartDate(active.date, lang, false)}
           </div>
-          <div style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{formatValue(active.value)}</div>
+          <div style={{ fontSize: 12, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{formatValue(active.value)}</div>
         </div>
       ) : null}
     </div>
@@ -1020,8 +978,8 @@ export function HeroBarChartCard({
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 16,
         padding: "20px 22px 18px",
         boxSizing: "border-box",
@@ -1029,7 +987,7 @@ export function HeroBarChartCard({
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: "#6B7280", letterSpacing: "-0.02em" }}>{title}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text-muted)", letterSpacing: "-0.02em" }}>{title}</span>
           <InfoTip text={info} lang={lang} />
         </div>
         <AnalyticsPeriodDropdown
@@ -1042,7 +1000,7 @@ export function HeroBarChartCard({
         />
       </div>
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12, marginBottom: 16 }}>
-        <div style={{ fontSize: 36, fontWeight: 600, color: "#0A0A0A", letterSpacing: "-0.045em", lineHeight: 1.05 }}>
+        <div style={{ fontSize: 36, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.045em", lineHeight: 1.05 }}>
           {value}
         </div>
         {trend ? <TrendPill trend={trend} lang={lang} /> : null}
@@ -1100,7 +1058,7 @@ export function AnalyticsBarChart({
                   maxWidth: barMaxWidth,
                   height: `${h}%`,
                   minHeight: 4,
-                  background: isActive ? "#1A1A1A" : "#D4D4D4",
+                  background: isActive ? "var(--ws-text)" : "var(--ws-border-strong)",
                   borderRadius: "4px 4px 0 0",
                   transition: "background 0.15s",
                   cursor: "pointer",
@@ -1116,7 +1074,7 @@ export function AnalyticsBarChart({
           justifyContent: showAllLabels ? "space-between" : "space-between",
           gap: 4,
           fontSize: 10,
-          color: "#9A9A9A",
+          color: "var(--ws-text-dim)",
           marginTop: 6,
           letterSpacing: "-0.01em",
         }}
@@ -1143,16 +1101,16 @@ export function AnalyticsBarChart({
             transform: "translateX(-50%)",
             padding: "8px 10px",
             borderRadius: 10,
-            border: "1px solid #E5E5E5",
-            background: "#FFF",
+            border: "1px solid var(--ws-border)",
+            background: "var(--ws-surface)",
             boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
             pointerEvents: "none",
             zIndex: 5,
             whiteSpace: "nowrap",
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A" }}>{formatBarPointLabel(active, lang, weekly)}</div>
-          <div style={{ fontSize: 12, color: "#7A7A7A" }}>{formatValue(active.value)}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text)" }}>{formatBarPointLabel(active, lang, weekly)}</div>
+          <div style={{ fontSize: 12, color: "var(--ws-text-muted)" }}>{formatValue(active.value)}</div>
         </div>
       ) : null}
     </div>
@@ -1183,7 +1141,7 @@ export function AnalyticsSectionHeader({
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 14 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.03em" }}>{title}</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.03em" }}>{title}</h2>
       {info ? <InfoTip text={info} lang={lang} /> : null}
     </div>
   );
@@ -1205,9 +1163,9 @@ export function AnalyticsChartCard({
   const langHook = useLang();
   const lang = langProp ?? langHook;
   return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, ...style }}>
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 24, ...style }}>
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 16 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>{title}</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.02em" }}>{title}</h3>
         {info ? <InfoTip text={info} lang={lang} /> : null}
       </div>
       {children}

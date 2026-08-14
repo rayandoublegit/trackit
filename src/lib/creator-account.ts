@@ -4,6 +4,7 @@ import {
   CREATOR_LINK_STATUS,
   type CreatorLinkStatus,
 } from "@/lib/creator-dashboard-access";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 
 export type CreatorManagedRow = {
   id: string;
@@ -65,7 +66,7 @@ async function selectCreatorRows(
 }
 
 export const CREATOR_ROW_SYNC_SELECT =
-  "id, handle, full_name, avatar_url, platform, commission_rate, discount_code, niche, followers, engagement_rate, linked_user_id";
+  "id, handle, full_name, avatar_url, platform, commission_rate, discount_code, niche, followers, engagement_rate, linked_user_id, workspace_id";
 
 export async function ensureCreatorRowForBrandLink(
   supabase: SupabaseClient,
@@ -94,17 +95,21 @@ export async function ensureCreatorRowForBrandLink(
     handle ||
     `u_${userId.replace(/-/g, "").slice(0, 12)}`;
 
+  const insertRow: Record<string, unknown> = {
+    user_id: brandId,
+    handle: fallbackHandle,
+    full_name: profile.full_name || fallbackHandle,
+    linked_user_id: userId,
+    platform: "tiktok",
+    commission_rate: 10,
+    needs_review: true,
+  };
+  const workspaceId = await resolveOwnerActiveWorkspaceId(supabase, brandId);
+  if (workspaceId) insertRow.workspace_id = workspaceId;
+
   const { data: inserted, error } = await supabase
     .from("creators")
-    .insert({
-      user_id: brandId,
-      handle: fallbackHandle,
-      full_name: profile.full_name || fallbackHandle,
-      linked_user_id: userId,
-      platform: "tiktok",
-      commission_rate: 10,
-      needs_review: true,
-    })
+    .insert(insertRow)
     .select(CREATOR_ROW_SELECT)
     .single();
 
@@ -186,7 +191,7 @@ export async function syncCreatorRowsByProfileHandle(
     if (takenByOther) continue;
 
     if (hasBrandAccessLink(links, brandId) || alreadyLinked.some((r) => r.user_id === brandId)) {
-      await supabase.from("creators").insert({
+      const insertRow: Record<string, unknown> = {
         user_id: brandId,
         handle,
         full_name: profileRow?.full_name || handle,
@@ -194,7 +199,10 @@ export async function syncCreatorRowsByProfileHandle(
         platform: "tiktok",
         commission_rate: 10,
         needs_review: true,
-      });
+      };
+      const brandWorkspaceId = await resolveOwnerActiveWorkspaceId(supabase, brandId);
+      if (brandWorkspaceId) insertRow.workspace_id = brandWorkspaceId;
+      await supabase.from("creators").insert(insertRow);
       if (!links.some((l) => l.brand_id === brandId)) {
         await ensureCreatorLinkRecord(supabase, userId, brandId, CREATOR_LINK_STATUS.pendingReview);
       }

@@ -1,3 +1,5 @@
+import { getClientBrandWorkspaceId } from "@/lib/workspaces";
+
 const STORAGE_PREFIX = "trackit_workspace_notes_";
 const LEGACY_PREFIX = "trackit_workspace_notes_";
 
@@ -23,7 +25,8 @@ export const NOTE_COLORS: Record<
 };
 
 function storageKey(userId: string) {
-  return `${STORAGE_PREFIX}v2_${userId}`;
+  const spaceId = getClientBrandWorkspaceId() || userId;
+  return `${STORAGE_PREFIX}v2_${spaceId}`;
 }
 
 function newNoteId() {

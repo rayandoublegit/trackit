@@ -23,6 +23,8 @@
   --chaotic-float-scale: 1.15;
   --chaotic-app-size: 60px;
   --chaotic-logo-max: 34px;
+  --chaotic-fall-y: 0px;
+  --chaotic-fall-opacity: 1;
 }
 
 .chaotic-work::before {
@@ -68,8 +70,10 @@
 .chaotic-work__icons-layer {
   position: absolute;
   inset: 0;
-  transform: translateY(var(--chaotic-float-y)) scale(var(--chaotic-float-scale));
+  transform: translateY(calc(var(--chaotic-float-y) + var(--chaotic-fall-y))) scale(var(--chaotic-float-scale));
   transform-origin: 50% 22%;
+  opacity: var(--chaotic-fall-opacity);
+  will-change: transform, opacity;
 }
 
 .chaotic-work__icons-layer {
@@ -182,6 +186,75 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Bubbly doodle pop — transform lives on inner so icon rotates stay intact */
+.chaotic-work__icon-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  transform: scale(0.28) translateY(18px);
+  transform-origin: 50% 70%;
+  will-change: transform, opacity;
+}
+
+.chaotic-work.is-popped .chaotic-work__icon-inner {
+  animation: chaotic-bubble-in 0.78s cubic-bezier(0.22, 1.35, 0.36, 1) both;
+  animation-delay: var(--chaotic-pop-delay, 0ms);
+}
+
+.chaotic-work.is-static .chaotic-work__icon-inner {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
+.chaotic-work__line {
+  opacity: 0;
+  transition: opacity 0.55s ease;
+}
+
+.chaotic-work.is-popped .chaotic-work__line {
+  opacity: 1;
+  transition-delay: 0.28s;
+}
+
+.chaotic-work.is-static .chaotic-work__line {
+  opacity: 1;
+  transition: none;
+}
+
+@keyframes chaotic-bubble-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.22) translateY(22px) rotate(-6deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.12) translateY(-4px) rotate(2deg);
+  }
+  78% {
+    transform: scale(0.96) translateY(2px) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chaotic-work__icon-inner {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .chaotic-work__line {
+    opacity: 1;
+    transition: none;
+  }
 }
 
 .chaotic-work__app {

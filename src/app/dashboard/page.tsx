@@ -28,17 +28,21 @@ import {
 import { CreatorAvatar } from "./CreatorAvatar";
 import { notifyOutreachSent } from "@/lib/notifications-storage";
 import { setWorkspaceClientIdentity, supabase } from "@/lib/supabase";
+import { installWorkspaceFetchHeader, rememberClientBrandSpace } from "@/lib/brand-workspace";
+import { readActiveWorkspaceId } from "@/lib/workspaces";
 import type { User } from "@supabase/supabase-js";
 import { SettingsView } from "./SettingsView";
 import { CreatorSettings } from "./CreatorSettings";
 import { CreatorAffiliateReadPanel } from "./CreatorAffiliateReadPanel";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
+import { BrandContentView } from "./BrandContentView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CreatorScripts } from "./CreatorScripts";
 import { CreatorContent } from "./CreatorContent";
 import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
+import { AffiliateLinksView } from "./AffiliateLinksView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
 import { MyCreatorsView } from "./MyCreatorsView";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
@@ -83,7 +87,6 @@ import {
   notifyFeedbackIfNeeded,
   notifyShopifyConnected,
   notifyWelcomeIfNeeded,
-  playWelcomeSoundIfUnread,
   setNotificationsUserId,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
@@ -94,8 +97,10 @@ import {
   buildBootstrapFromProfile,
   patchDashboardBootstrap,
   readDashboardBootstrap,
+  readLastDashboardBootstrap,
   writeDashboardBootstrap,
 } from "@/lib/dashboard-bootstrap-cache";
+import { KeepAlivePane } from "./KeepAlivePane";
 import { useLang } from "@/lib/useLang";
 import type { WorkspaceProfile } from "@/lib/workspace-access";
 import { useDisplayCurrency } from "@/lib/useCurrency";
@@ -107,14 +112,40 @@ import {
   readViewFromUrl,
   type DashboardView,
 } from "@/lib/dashboard-view-storage";
+import { clearUserSessionStorage } from "@/lib/locale-preferences";
 import {
   DashboardNavigationProvider,
   useDashboardNavigationController,
 } from "./DashboardNavigationProvider";
+import { getDashboardTheme } from "@/lib/dashboard-theme";
+import { DashboardThemeProvider, useDashboardTheme } from "./DashboardThemeProvider";
+import { WorkspaceShell } from "./workspace/WorkspaceShell";
+import { WhiteboardView } from "./WhiteboardView";
+import { AiChatView } from "./AiChatView";
+import { InboxView } from "./InboxView";
+import { FinditInboxView } from "./FinditInboxView";
+import { MeetingsView } from "./MeetingsView";
+import { PlannerNotesView } from "./PlannerNotesView";
+import { TasksView } from "./TasksView";
+import { WorkspaceInfoView } from "./WorkspaceInfoView";
+import { OutreachAnalyticsCards } from "./OutreachAnalyticsCards";
 
 type View = DashboardView;
 
-const CREATOR_ALLOWED_VIEWS: View[] = ["dashboard", "analytics", "scripts", "content", "notes", "payouts", "settings", "feedback"];
+const CREATOR_ALLOWED_VIEWS: View[] = [
+  "dashboard",
+  "analytics",
+  "scripts",
+  "content",
+  "whiteboard",
+  "ai",
+  "payouts",
+  "balance",
+  "settings",
+  "feedback",
+  "help",
+  "planner",
+];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -173,6 +204,7 @@ function DashboardPageContent() {
   const [profile, setProfile] = useState<{ full_name: string | null; username: string | null; avatar_url: string | null; business_name: string | null; shopify_store: string | null; plan: string } | null>(null);
   const [actorProfile, setActorProfile] = useState<WorkspaceProfile | null>(null);
   const [actorEmail, setActorEmail] = useState<string | null>(null);
+  const [actorId, setActorId] = useState<string | null>(null);
   const [workspaceDelegated, setWorkspaceDelegated] = useState(false);
   const [workspaceOwnerEmail, setWorkspaceOwnerEmail] = useState<string | null>(null);
   const [workspaceAccessError, setWorkspaceAccessError] = useState<string | null>(null);
@@ -189,16 +221,26 @@ function DashboardPageContent() {
   const view = navigation.navState.view;
   const setView = navigation.setView;
   const navigate = navigation.navigate;
+  const [mountedViews, setMountedViews] = useState(() => new Set<DashboardView>([navigation.navState.view]));
+  useEffect(() => {
+    setMountedViews((prev) => {
+      if (prev.has(view)) return prev;
+      const next = new Set(prev);
+      next.add(view);
+      // Planner/meetings share one pane
+      if (view === "planner" || view === "meetings") {
+        next.add("planner");
+        next.add("meetings");
+      }
+      return next;
+    });
+  }, [view]);
+  const keep = (v: DashboardView) => mountedViews.has(v) || view === v;
+
   const [isCreator, setIsCreator] = useState(false);
   const { stats: creatorStats, loading: creatorStatsLoading } = useCreatorStats(isCreator ? user?.id : undefined);
   const creatorAccessRevoked =
     isCreator && !creatorStatsLoading && creatorStats?.accessRevoked === true;
-
-  useEffect(() => {
-    if (view === "notifications") {
-      navigate({ view: "discovery" }, { replace: true });
-    }
-  }, [view, navigate]);
 
   // Créateur : accueil, outils essentiels et paramètres uniquement.
   useEffect(() => {
@@ -300,18 +342,8 @@ function DashboardPageContent() {
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
     const removeSoundUnlock = installNotificationSoundUnlock();
 
-    const retryWelcome = () => {
-      primeNotificationSound();
-      const created = notifyWelcomeIfNeeded(user.id, lang);
-      if (!created) {
-        playWelcomeSoundIfUnread(user.id);
-      }
-    };
-    window.addEventListener("pointerdown", retryWelcome, { capture: true, passive: true, once: true });
-
     return () => {
       window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, refreshUnread);
-      window.removeEventListener("pointerdown", retryWelcome, { capture: true });
       removeSoundUnlock();
     };
   }, [user?.id, lang, isCreator, loading]);
@@ -335,59 +367,69 @@ function DashboardPageContent() {
     });
   }, []);
 
-  // One-shot Trackit demo preset: single list + single campaign
+    // One-shot Trackit demo preset — deferred so first paint/nav stays instant
   useEffect(() => {
     if (!user?.id || loading || isCreator || DEV_BYPASS_PLAN) return;
     if (typeof window === "undefined") return;
-    const key = `trackit_demo_preset_v3_${user.id}`;
+    const key = `trackit_demo_preset_v6_${user.id}`;
     const lockKey = `${key}_lock`;
-    // In-flight lock avoids React Strict Mode / multi-effect duplicate POSTs
     if (sessionStorage.getItem(key) === "1") return;
     if (sessionStorage.getItem(lockKey) === "1") return;
-    sessionStorage.setItem(lockKey, "1");
 
     let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/demo-preset", { method: "POST", credentials: "include" });
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          seeded?: boolean;
-          affiliates?: StoredAffiliate[];
-        };
-        if (cancelled) return;
-        if (data.ok) {
-          sessionStorage.setItem(key, "1");
-          if (Array.isArray(data.affiliates) && data.affiliates.length > 0) {
-            const existing = loadAffiliates(user.id);
-            if (existing.length === 0) {
-              saveAffiliates(user.id, data.affiliates as StoredAffiliate[]);
+    const run = () => {
+      if (cancelled) return;
+      if (sessionStorage.getItem(key) === "1" || sessionStorage.getItem(lockKey) === "1") return;
+      sessionStorage.setItem(lockKey, "1");
+      void (async () => {
+        try {
+          const res = await fetch("/api/demo-preset", { method: "POST", credentials: "include" });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            seeded?: boolean;
+            affiliates?: StoredAffiliate[];
+          };
+          if (cancelled) return;
+          if (data.ok) {
+            sessionStorage.setItem(key, "1");
+            if (Array.isArray(data.affiliates) && data.affiliates.length > 0) {
+              const existing = loadAffiliates(user.id);
+              if (existing.length === 0) {
+                saveAffiliates(user.id, data.affiliates as StoredAffiliate[]);
+              }
             }
+            if (data.seeded) {
+              dispatchCampaignsUpdated();
+              dispatchSalesUpdated();
+              dispatchPayoutsUpdated();
+              window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
+              void loadSidebarCounts(user.id);
+            }
+          } else {
+            sessionStorage.removeItem(lockKey);
           }
-          if (data.seeded) {
-            dispatchCampaignsUpdated();
-            dispatchSalesUpdated();
-            dispatchPayoutsUpdated();
-            window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
-            void loadSidebarCounts(user.id);
-          }
-        } else {
+        } catch {
           sessionStorage.removeItem(lockKey);
         }
-      } catch {
-        sessionStorage.removeItem(lockKey);
-      }
-    })();
+      })();
+    };
+
+    const hasIdle = typeof window.requestIdleCallback === "function";
+    const idleId = hasIdle
+      ? window.requestIdleCallback(run, { timeout: 2500 })
+      : setTimeout(run, 1200);
 
     return () => {
       cancelled = true;
+      if (hasIdle) window.cancelIdleCallback(idleId as number);
+      else clearTimeout(idleId as ReturnType<typeof setTimeout>);
     };
   }, [user?.id, loading, isCreator, loadSidebarCounts]);
 
   useEffect(() => {
     if (!user?.id) return;
     void loadSidebarCounts(user.id);
-  }, [user?.id, view, loadSidebarCounts]);
+  }, [user?.id, loadSidebarCounts]);
 
   useEffect(() => {
     if (DEV_BYPASS_PLAN) {
@@ -402,14 +444,6 @@ function DashboardPageContent() {
 
     void (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const authUser = session?.user;
-        if (!authUser) {
-          router.replace("/auth");
-          setLoading(false);
-          return;
-        }
-
         type WorkspaceContextResponse = {
           ok?: boolean;
           blocked?: boolean;
@@ -423,52 +457,95 @@ function DashboardPageContent() {
           ownerProfile?: WorkspaceProfile | null;
         };
 
-        let workspaceContext: WorkspaceContextResponse | null = null;
-        try {
-          const workspaceRes = await fetch("/api/workspace/context", {
-            credentials: "include",
-            cache: "no-store",
+        // Session is local/fast — paint from bootstrap cache immediately, then refresh in parallel.
+        const { data: { session } } = await supabase.auth.getSession();
+        const authUser = session?.user;
+        if (!authUser) {
+          router.replace("/auth");
+          setLoading(false);
+          return;
+        }
+
+        const earlyCached =
+          readDashboardBootstrap(authUser.id) ??
+          (() => {
+            const last = readLastDashboardBootstrap();
+            return last?.userId === authUser.id ? last : null;
+          })();
+        if (earlyCached?.onboarding_completed) {
+          if (earlyCached.isCreator) setIsCreator(true);
+          setShopifyStore(earlyCached.shopify_store);
+          setUser({ ...authUser, id: earlyCached.userId } as User);
+          setActorId(authUser.id);
+          setActorEmail(authUser.email ?? null);
+          avatarRetryRef.current = false;
+          setAvatarBroken(false);
+          setProfile({
+            full_name: earlyCached.full_name,
+            username: earlyCached.username,
+            avatar_url: earlyCached.avatar_url,
+            business_name: earlyCached.business_name,
+            shopify_store: earlyCached.shopify_store,
+            plan: normalizePlan(earlyCached.plan),
           });
-          workspaceContext = (await workspaceRes.json()) as WorkspaceContextResponse;
-          if (!workspaceRes.ok && workspaceContext.blocked) {
-            setWorkspaceAccessError(
-              workspaceContext.error ||
-                (lang === "fr"
-                  ? "Le compte principal n'est pas encore disponible."
-                  : "The principal account is not available yet."),
-            );
-            setLoading(false);
-            return;
-          }
-        } catch {
-          // Normal accounts can safely fall back to their own workspace.
+          setLoading(false);
+        }
+
+        const contextPromise = fetch("/api/workspace/context", {
+          credentials: "include",
+          cache: "no-store",
+        })
+          .then(async (workspaceRes) => {
+            const workspaceContext = (await workspaceRes.json()) as WorkspaceContextResponse;
+            return { workspaceRes, workspaceContext };
+          })
+          .catch(() => null);
+        const spacesPromise = fetch("/api/workspaces", {
+          credentials: "include",
+          cache: "no-store",
+        })
+          .then(async (spacesRes) => {
+            const spacesData = (await spacesRes.json()) as {
+              ok?: boolean;
+              activeWorkspaceId?: string;
+              workspaces?: Array<{ id: string; name: string; avatar_url?: string | null }>;
+            };
+            return { spacesRes, spacesData };
+          })
+          .catch(() => null);
+
+        const [contextResult, spacesResult] = await Promise.all([contextPromise, spacesPromise]);
+
+        let workspaceContext: WorkspaceContextResponse | null = contextResult?.workspaceContext ?? null;
+        if (contextResult && !contextResult.workspaceRes.ok && workspaceContext?.blocked) {
+          setWorkspaceAccessError(
+            workspaceContext.error ||
+              (lang === "fr"
+                ? "Le compte principal n'est pas encore disponible."
+                : "The principal account is not available yet."),
+          );
+          setLoading(false);
+          return;
         }
 
         const workspaceId = workspaceContext?.ownerId || authUser.id;
         const workspaceUser = { ...authUser, id: workspaceId } as User;
-        setWorkspaceClientIdentity(authUser.id, workspaceId);
+        installWorkspaceFetchHeader();
+        setActorId(authUser.id);
         setActorProfile(workspaceContext?.actorProfile ?? null);
         setActorEmail(workspaceContext?.actorEmail ?? authUser.email ?? null);
         setWorkspaceDelegated(Boolean(workspaceContext?.delegated && workspaceId !== authUser.id));
         setWorkspaceOwnerEmail(workspaceContext?.ownerEmail ?? authUser.email ?? null);
 
-        const cached = readDashboardBootstrap(workspaceId);
-        if (cached?.onboarding_completed) {
-          if (cached.isCreator) setIsCreator(true);
-          setShopifyStore(cached.shopify_store);
-          setUser(workspaceUser);
-          avatarRetryRef.current = false;
-          setAvatarBroken(false);
-          setProfile({
-            full_name: cached.full_name,
-            username: cached.username,
-            avatar_url: cached.avatar_url,
-            business_name: cached.business_name,
-            shopify_store: cached.shopify_store,
-            plan: normalizePlan(cached.plan),
-          });
-          setLoading(false);
+        let activeSpaceId = readActiveWorkspaceId() || workspaceId;
+        let activeSpaceMeta: { name: string; avatar_url?: string | null } | null = null;
+        if (spacesResult?.spacesRes.ok && spacesResult.spacesData.ok) {
+          activeSpaceId = spacesResult.spacesData.activeWorkspaceId || workspaceId;
+          rememberClientBrandSpace(activeSpaceId);
+          const found = (spacesResult.spacesData.workspaces || []).find((w) => w.id === activeSpaceId);
+          if (found) activeSpaceMeta = { name: found.name, avatar_url: found.avatar_url };
         }
+        setWorkspaceClientIdentity(authUser.id, workspaceId, activeSpaceId);
 
         let profileData = workspaceContext?.ownerProfile ?? null;
         if (!profileData) {
@@ -483,7 +560,7 @@ function DashboardPageContent() {
         if (cancelled) return;
 
         if (!profileData) {
-          if (!cached) router.replace("/auth");
+          if (!earlyCached) router.replace("/auth");
           setLoading(false);
           return;
         }
@@ -500,18 +577,29 @@ function DashboardPageContent() {
         setUser(workspaceUser);
         avatarRetryRef.current = false;
         setAvatarBroken(false);
+        const displayBusinessName = activeSpaceMeta?.name || profileData.business_name;
+        const displayAvatar =
+          activeSpaceId !== workspaceId
+            ? activeSpaceMeta?.avatar_url ?? profileData.avatar_url
+            : profileData.avatar_url;
         setProfile({
           full_name: profileData.full_name,
           username: profileData.username,
-          avatar_url: profileData.avatar_url,
-          business_name: profileData.business_name,
+          avatar_url: displayAvatar,
+          business_name: displayBusinessName,
           shopify_store: profileData.shopify_store ?? null,
           plan: normalizePlan(profileData.plan),
         });
-        writeDashboardBootstrap(buildBootstrapFromProfile(workspaceUser, profileData));
+        writeDashboardBootstrap(
+          buildBootstrapFromProfile(workspaceUser, {
+            ...profileData,
+            business_name: displayBusinessName,
+            avatar_url: displayAvatar,
+          }),
+        );
         setLoading(false);
 
-        void resolveAvatarUrl(supabase, workspaceId, profileData.avatar_url).then((avatar_url) => {
+        void resolveAvatarUrl(supabase, workspaceId, displayAvatar).then((avatar_url) => {
           if (cancelled) return;
           setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
         });
@@ -698,10 +786,16 @@ function DashboardPageContent() {
   const filteredSidebarNav = sidebarNavEntries;
 
   useEffect(() => {
-    if (view === "discovery" || view === "creators") {
+    if (view === "discovery" || view === "creators" || view === "findit-inbox") {
       setSidebarGroupExpanded((prev) => ({ ...prev, discovery: true }));
     }
-    if (view === "campaigns" || view === "integrations" || view === "invitations") {
+    if (
+      view === "campaigns" ||
+      view === "integrations" ||
+      view === "invitations" ||
+      view === "brand-content" ||
+      view === "links"
+    ) {
       setSidebarGroupExpanded((prev) => ({ ...prev, campaigns: true }));
     }
     if (view === "payouts" || view === "balance" || view === "transactions") {
@@ -732,7 +826,8 @@ function DashboardPageContent() {
   };
 
   if (loading) {
-    return <div style={{ minHeight: "100vh", background: "#FAFAFA" }} />;
+    const bootBg = getDashboardTheme() === "dark" ? "#000000" : "#FAFAFA";
+    return <div style={{ minHeight: "100vh", background: bootBg }} />;
   }
 
   if (workspaceAccessError) {
@@ -760,190 +855,35 @@ function DashboardPageContent() {
     );
   }
 
-  const sidebarWidth = sidebarCollapsed ? 48 : 128;
-
-  const asideStyle: React.CSSProperties = isMobile
-    ? {
-        width: 280,
-        minWidth: 280,
-        background: "#FFFFFF",
-        borderRight: "1px solid #EFEFEF",
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        position: "fixed",
-        left: 0,
-        top: 0,
-        zIndex: 300,
-        transform: mobileSidebarOpen ? "translateX(0)" : "translateX(-100%)",
-        transition: "transform 0.25s ease",
-        overflow: "hidden",
-      }
-    : {
-        width: sidebarWidth,
-        minWidth: sidebarWidth,
-        background: "#FFFFFF",
-        borderRight: "1px solid #EFEFEF",
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        position: "sticky",
-        top: 0,
-        transition: "width 0.2s ease",
-        overflow: "hidden",
-      };
-
-  const renderSidebarNavItems = (items: SidebarNavEntry[], showSectionGap?: boolean) => (
-    <>
-      {showSectionGap && sidebarCollapsed && items.length > 0 && <div style={{ height: 16 }} />}
-      {items.map((item) => {
-        if (item.children?.length) {
-  return (
-            <SidebarNavGroup
-              key={item.id}
-              collapsed={sidebarCollapsed}
-              expanded={sidebarGroupExpanded[item.id] ?? false}
-              active={view === item.view || item.children.some((c) => c.view === view)}
-              icon={renderSidebarNavIcon(item.iconKey)}
-              label={item.label}
-              badge={item.badge}
-              subItems={item.children}
-              parentView={item.view}
-              activeView={view}
-              onParentClick={() => {
-                goToSidebarItem(item.view);
-                setSidebarGroupExpanded((prev) => ({ ...prev, [item.id]: true }));
-              }}
-              onToggleExpand={() => setSidebarGroupExpanded((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
-              onChildClick={(childView) => goToSidebarItem(childView)}
-            />
-          );
-        }
-        return (
-          <SidebarItem
-            key={item.id}
-            collapsed={sidebarCollapsed}
-            icon={renderSidebarNavIcon(item.iconKey)}
-            label={item.label}
-            active={view === item.view}
-            badge={item.badge}
-            onClick={() => goToSidebarItem(item.view)}
-          />
-        );
-      })}
-    </>
-  );
-
-  const renderNavSection = (section: Exclude<SidebarNavSection, "footer">, extraTopPadding?: boolean) => {
-    const items = filteredSidebarNav.filter((item) => item.section === section);
-    if (items.length === 0) return null;
-    return <>{renderSidebarNavItems(items, extraTopPadding)}</>;
+  const handleWorkspaceSignOut = async () => {
+    try {
+      await supabase?.auth.signOut({ scope: "global" });
+    } catch {
+      /* ignore */
+    }
+    clearUserSessionStorage();
+    router.replace("/auth");
   };
 
   return (
     <DashboardNavigationProvider value={navigation}>
-    <div style={{ height: "100vh", minHeight: "100vh", background: "#FAFAFA", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", overflow: "hidden" }}>
-      {isMobile && mobileSidebarOpen && (
-        <div
-          onClick={() => setMobileSidebarOpen(false)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 299 }}
-        />
-      )}
-      {isMobile && (
-        <button
-          type="button"
-          onClick={() => setMobileSidebarOpen(true)}
-          style={{ position: "fixed", top: 14, left: 14, zIndex: 200, background: "#fff", border: "1px solid #EFEFEF", borderRadius: 10, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
-      )}
-      <aside style={asideStyle}>
-        <div
-          style={{
-            padding: sidebarCollapsed ? "8px 4px" : "8px 8px",
-            borderBottom: "1px solid #F5F5F5",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: sidebarCollapsed ? "center" : "space-between",
-            flexDirection: sidebarCollapsed ? "column" : "row",
-            gap: sidebarCollapsed ? 6 : 0,
-          }}
-        >
-          <img
-            src={TRACKIT_LOGO_URL}
-            alt="Trackit"
-            style={{
-              height: sidebarCollapsed ? 48 : 58,
-              width: "auto",
-              maxWidth: sidebarCollapsed ? 48 : 100,
-              display: "block",
-              objectFit: "contain",
-              flexShrink: 0,
-            }}
-          />
-          <button type="button" onClick={() => setSidebarCollapsed((c) => !c)} aria-label="Toggle sidebar" style={{ background: "none", border: "none", cursor: "pointer", color: "#9A9A9A", display: "flex", padding: 4, flexShrink: 0 }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d={sidebarCollapsed ? "M9 6l6 6-6 6" : "M15 6l-6 6 6 6"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
-        </div>
-
-        <nav style={{ flex: 1, padding: "6px 6px", overflowY: "auto" }}>
-          {renderNavSection("main")}
-          {renderNavSection("tools", true)}
-          {renderNavSection("workspace", true)}
-        </nav>
-
-        <div
-          style={{
-            flexShrink: 0,
-            padding: sidebarCollapsed ? "8px 4px" : isMobile ? "14px 16px 18px" : "12px 8px 14px",
-            borderTop: "1px solid #F5F5F5",
-          }}
-        >
-          <TrackitTagline sidebar collapsed={sidebarCollapsed} />
-        </div>
-      </aside>
-
-      <main
-        className="dashboard-main"
-        style={{
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          alignSelf: "stretch",
-          overflow: "hidden",
-          background: "#FFFFFF",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <DashboardTopBar
-          lang={lang}
-          profile={profile}
-          actorProfile={actorProfile}
-          workspaceDelegated={workspaceDelegated}
-          avatarBroken={avatarBroken}
-          onAvatarError={handleSidebarAvatarError}
-          shopifyConnected={Boolean(shopifyStore ?? profile?.shopify_store)}
-          isCreator={isCreator}
-          isScale={isScale}
-          isPro={isPro}
-          isBasic={isBasic}
-          userId={user?.id}
-          notificationUnread={notificationUnread}
-          onNotificationUnreadChange={setNotificationUnread}
-          onNavigate={goToSidebarItem}
-          onConnectShopify={() => goToSidebarItem("integrations")}
-        />
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflow: view === "discovery" ? "hidden" : "auto",
-            display: view === "discovery" ? "flex" : "block",
-            flexDirection: "column",
-          }}
-        >
+    <DashboardThemeProvider>
+    <WorkspaceShell
+      lang={lang}
+      view={view}
+      isCreator={isCreator}
+      isMobile={isMobile}
+      userId={user?.id}
+      actorId={actorId || undefined}
+      profile={profile}
+      actorProfile={actorProfile}
+      workspaceDelegated={workspaceDelegated}
+      notificationUnread={notificationUnread}
+      avatarBroken={avatarBroken}
+      onAvatarError={handleSidebarAvatarError}
+      onNavigate={goToSidebarItem}
+      onSignOut={() => void handleWorkspaceSignOut()}
+    >
         {creatorAccessRevoked ? (
           <div
             style={{
@@ -952,7 +892,7 @@ function DashboardPageContent() {
               alignItems: "center",
               justifyContent: "center",
               padding: isMobile ? "56px 24px 40px" : "48px 40px",
-              background: "#FFFFFF",
+              background: "var(--ws-surface)",
             }}
           >
             <div style={{ maxWidth: 440, textAlign: "center" }}>
@@ -961,13 +901,13 @@ function DashboardPageContent() {
                   margin: "0 0 12px",
                   fontSize: isMobile ? 22 : 26,
                   fontWeight: 600,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   letterSpacing: "-0.03em",
                 }}
               >
                 {lang === "fr" ? "Accès désactivé" : "Access deactivated"}
               </h1>
-              <p style={{ margin: 0, fontSize: 15, color: "#6B7280", lineHeight: 1.6 }}>
+              <p style={{ margin: 0, fontSize: 15, color: "var(--ws-text-muted)", lineHeight: 1.6 }}>
                 {formatCreatorDeactivatedMessage(
                   creatorStats?.revokedBrandName ?? creatorStats?.brandName ?? (lang === "fr" ? "La marque" : "The brand"),
                   lang,
@@ -977,7 +917,26 @@ function DashboardPageContent() {
               </div>
         ) : (
           <>
-        {view === "dashboard" && (
+        {keep("notifications") && (
+          <KeepAlivePane active={view === "notifications"}>
+          <InboxView
+            userId={user?.id}
+            isMobile={isMobile}
+            onNavigate={goToSidebarItem}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("tasks") && (
+          <KeepAlivePane active={view === "tasks"}>
+          <TasksView
+            userId={user?.id}
+            isMobile={isMobile}
+            displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("dashboard") && (
+          <KeepAlivePane active={view === "dashboard"}>
           <HomeOverviewView
             isMobile={isMobile}
             isCreator={isCreator}
@@ -989,8 +948,10 @@ function DashboardPageContent() {
             activeCampaigns={sidebarCounts.activeCampaigns}
             onNavigate={goToSidebarItem}
           />
+          </KeepAlivePane>
         )}
-        {view === "discovery" && (
+        {keep("discovery") && (
+          <KeepAlivePane active={view === "discovery"}>
           <DiscoveryFeed
             isMobile={isMobile}
             plan={plan}
@@ -998,8 +959,15 @@ function DashboardPageContent() {
             onUpgrade={openWebsitePricing}
             onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
+          </KeepAlivePane>
         )}
-        {view === "my-creators" && (
+        {keep("findit-inbox") && (
+          <KeepAlivePane active={view === "findit-inbox"}>
+          <FinditInboxView userId={user?.id} isMobile={isMobile} />
+          </KeepAlivePane>
+        )}
+        {keep("my-creators") && (
+          <KeepAlivePane active={view === "my-creators"}>
           <MyCreatorsView
             isMobile={isMobile}
             plan={plan}
@@ -1010,8 +978,10 @@ function DashboardPageContent() {
             }}
             onReachOut={(creator) => navigateToOutreachSend(creator)}
           />
+          </KeepAlivePane>
         )}
-        {view === "creators" && (
+        {keep("creators") && (
+          <KeepAlivePane active={view === "creators"}>
           <CreatorsView
             isMobile={isMobile}
             plan={plan}
@@ -1021,8 +991,10 @@ function DashboardPageContent() {
             onUpgradeScale={handleUpgradeScale}
             userId={user?.id}
           />
+          </KeepAlivePane>
         )}
-        {view === "campaigns" && user && (
+        {keep("campaigns") && user && (
+          <KeepAlivePane active={view === "campaigns"}>
             <CampaignsView
               isMobile={isMobile}
               plan={plan}
@@ -1032,17 +1004,32 @@ function DashboardPageContent() {
               userId={user.id}
               shopifyStore={shopifyStore ?? profile?.shopify_store}
             />
+          </KeepAlivePane>
         )}
-        {view === "affiliates" && user && (
+        {keep("links") && user && !isCreator && (
+          <KeepAlivePane active={view === "links"}>
+          <AffiliateLinksView
+            userId={user.id}
+            isMobile={isMobile}
+            plan={plan}
+            onUpgrade={handleUpgradeBasic}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("affiliates") && user && (
+          <KeepAlivePane active={view === "affiliates"}>
             <AffiliatesView
               userId={user.id}
               isMobile={isMobile}
               plan={plan}
               onUpgrade={handleUpgradeBasic}
             />
+          </KeepAlivePane>
         )}
-        {view === "outreach" && (
+        {keep("outreach") && (
+          <KeepAlivePane active={view === "outreach"}>
           <OutreachView
+            userId={user?.id}
             isMobile={isMobile}
             plan={plan}
             onUpgrade={handleUpgradeBasic}
@@ -1056,8 +1043,10 @@ function DashboardPageContent() {
               else setView("settings");
             }}
           />
+          </KeepAlivePane>
         )}
-        {view === "payouts" && user && (
+        {keep("payouts") && user && (
+          <KeepAlivePane active={view === "payouts"}>
             <PayoutsView
               userId={user.id}
               isMobile={isMobile}
@@ -1069,8 +1058,10 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+          </KeepAlivePane>
         )}
-        {view === "balance" && user && (
+        {keep("balance") && user && (
+          <KeepAlivePane active={view === "balance"}>
             <BalanceView
               userId={user.id}
               isMobile={isMobile}
@@ -1080,8 +1071,10 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+          </KeepAlivePane>
         )}
-        {view === "transactions" && user && (
+        {keep("transactions") && user && (
+          <KeepAlivePane active={view === "transactions"}>
             <TransactionsView
               userId={user.id}
               isMobile={isMobile}
@@ -1091,17 +1084,21 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+          </KeepAlivePane>
         )}
-        {view === "invitations" && user && (
+        {keep("invitations") && user && (
+          <KeepAlivePane active={view === "invitations"}>
             <InvitationsView
               userId={user.id}
               isMobile={isMobile}
               plan={plan}
               onUpgrade={handleUpgradePro}
             />
+          </KeepAlivePane>
         )}
-        {view === "scripts" && user && (
-          isCreator ? (
+        {keep("scripts") && user && (
+          <KeepAlivePane active={view === "scripts"}>
+          {isCreator ? (
             <CreatorScripts userId={user.id} isMobile={isMobile} />
           ) : (
             <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
@@ -1113,12 +1110,21 @@ function DashboardPageContent() {
                 onUpgrade={handleUpgradePro}
               />
         </div>
-          )
+          )}
+          </KeepAlivePane>
         )}
-        {view === "content" && user && isCreator && (
+        {keep("brand-content") && user && !isCreator && (
+          <KeepAlivePane active={view === "brand-content"}>
+          <BrandContentView userId={user.id} isMobile={isMobile} />
+          </KeepAlivePane>
+        )}
+        {keep("content") && user && isCreator && (
+          <KeepAlivePane active={view === "content"}>
           <CreatorContent userId={user.id} isMobile={isMobile} />
+          </KeepAlivePane>
         )}
-        {view === "analytics" && user && (
+        {keep("analytics") && user && (
+          <KeepAlivePane active={view === "analytics"}>
             <AnalyticsView
               userId={user.id}
               isMobile={isMobile}
@@ -1128,8 +1134,10 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onConnectShopify={() => setView("integrations")}
             />
+          </KeepAlivePane>
         )}
-        {view === "integrations" && user && (
+        {keep("integrations") && user && (
+          <KeepAlivePane active={view === "integrations"}>
             <IntegrationsView
               isMobile={isMobile}
               user={user}
@@ -1139,11 +1147,44 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+          </KeepAlivePane>
         )}
-        {view === "notes" && user && (
+        {keep("notes") && user && (
+          <KeepAlivePane active={view === "notes"}>
           <NotesView isMobile={isMobile} userId={user.id} />
+          </KeepAlivePane>
         )}
-        {view === "automation" && (
+        {(keep("planner") || keep("meetings")) && (
+          <KeepAlivePane active={view === "planner" || view === "meetings"}>
+          <MeetingsView
+            userId={user?.id}
+            isMobile={isMobile}
+            displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("planner-notes") && (
+          <KeepAlivePane active={view === "planner-notes"}>
+          <PlannerNotesView userId={user?.id} isMobile={isMobile} />
+          </KeepAlivePane>
+        )}
+        {keep("whiteboard") && (
+          <KeepAlivePane active={view === "whiteboard"}>
+          <WhiteboardView isMobile={isMobile} userId={user?.id} />
+          </KeepAlivePane>
+        )}
+        {keep("ai") && (
+          <KeepAlivePane active={view === "ai"}>
+          <AiChatView
+            isMobile={isMobile}
+            onNavigate={goToSidebarItem}
+            userId={user?.id}
+            displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("automation") && (
+          <KeepAlivePane active={view === "automation"}>
             <AutomationView
               isMobile={isMobile}
               plan={plan}
@@ -1151,9 +1192,24 @@ function DashboardPageContent() {
               onUpgradePro={handleUpgradePro}
               onUpgradeScale={handleUpgradeScale}
             />
+          </KeepAlivePane>
         )}
-        {view === "settings" && user && (
-          isCreator ? (
+        {keep("workspace") && user && (
+          <KeepAlivePane active={view === "workspace"}>
+          <WorkspaceInfoView
+            userId={user.id}
+            actorId={actorId || user.id}
+            isMobile={isMobile}
+            fallbackName={
+              profile?.business_name || profile?.full_name || profile?.username || "Workspace"
+            }
+            onSaved={() => void reloadProfile(user.id)}
+          />
+          </KeepAlivePane>
+        )}
+        {keep("settings") && user && (
+          <KeepAlivePane active={view === "settings"}>
+          {isCreator ? (
             <CreatorSettings userId={user.id} isMobile={isMobile} onSaved={() => void reloadProfile(user.id)} />
           ) : (
             <SettingsView
@@ -1168,38 +1224,55 @@ function DashboardPageContent() {
                 }
               }}
             />
-          )
+          )}
+          </KeepAlivePane>
         )}
-        {view === "billing" && user && (
+        {keep("billing") && user && (
+          <KeepAlivePane active={view === "billing"}>
           <BillingView isMobile={isMobile} plan={plan} />
+          </KeepAlivePane>
         )}
-        {view === "feedback" && <FeedbackView isMobile={isMobile} />}
-        {view === "help" && <HelpCenterView isMobile={isMobile} plan={plan} />}
+        {keep("feedback") && (
+          <KeepAlivePane active={view === "feedback"}>
+          <FeedbackView isMobile={isMobile} />
+          </KeepAlivePane>
+        )}
+        {keep("help") && (
+          <KeepAlivePane active={view === "help"}>
+          <HelpCenterView isMobile={isMobile} plan={plan} />
+          </KeepAlivePane>
+        )}
           </>
         )}
-        </div>
-      </main>
       {user && !isCreator && <NewCreatorModal brandId={user.id} />}
-    </div>
+    </WorkspaceShell>
+    </DashboardThemeProvider>
     </DashboardNavigationProvider>
   );
 }
 
+function DashboardBootFallback() {
+  const bootBg = typeof window !== "undefined" && getDashboardTheme() === "dark" ? "#000000" : "#FAFAFA";
+  return <div style={{ minHeight: "100vh", background: bootBg }} />;
+}
+
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div style={{ minHeight: "100vh", background: "#FAFAFA" }} />}>
+    <Suspense fallback={<DashboardBootFallback />}>
       <DashboardPageContent />
     </Suspense>
   );
 }
 
 function PageHeader({ title, subtitle, right, isMobile, dense }: { title: string; subtitle?: string; right?: React.ReactNode; isMobile?: boolean; dense?: boolean }) {
+  const { theme } = useDashboardTheme();
+  const dark = theme === "dark";
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: dark ? "transparent" : "#FFFFFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
-          {subtitle && <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+          <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: dark ? "#F3F3F4" : "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+          {subtitle && <p style={{ fontSize: 14, color: dark ? "#9A9AA0" : "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
         </div>
         {right && <div style={{ marginTop: 8, flexShrink: 0 }}>{right}</div>}
       </div>
@@ -1855,6 +1928,7 @@ function OutreachHeaderActions({
 
 
 function OutreachView({
+  userId,
   plan,
   onNavigateToBilling,
   onUpgrade,
@@ -1864,6 +1938,7 @@ function OutreachView({
   openSendRequest,
   onOpenSendHandled,
 }: {
+  userId?: string;
   plan: PlanTier;
   onNavigateToBilling: () => void;
   onUpgrade?: () => void;
@@ -1927,8 +2002,16 @@ function OutreachView({
   };
 
   return (
-    <>
-      <PageHeader isMobile={isMobile} dense title="Outreach" subtitle={lang === "fr" ? "Rédigez des outreach personnalisés et gérez les relances automatiquement" : "Send personalized outreach and manage follow-ups automatically"} right={
+    <div className="ou-page">
+      <div className={`ou-page__head${isMobile ? " is-mobile" : ""}`}>
+        <div>
+          <h1 className="ou-page__title">Outreach</h1>
+          <p className="ou-page__sub">
+            {lang === "fr"
+              ? "Messages envoyés, réponses et relances — tout au même endroit."
+              : "Sent messages, replies, and follow-ups — all in one place."}
+          </p>
+        </div>
         <OutreachHeaderActions
           lang={lang}
           onSend={() => { setSendTemplateId(null); setPanel("send"); }}
@@ -1961,13 +2044,13 @@ function OutreachView({
             setPanel("create");
           }}
         />
-      } />
-      <div style={{ padding: isMobile ? "0 16px 16px" : "0 40px 40px" }}>
+      </div>
+      <div className={`ou-page__body${isMobile ? " is-mobile" : ""}`}>
         {toast && (
-          <div style={{ background: "rgba(0,71,255,0.08)", border: "1px solid rgba(0,71,255,0.2)", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#0047FF", letterSpacing: "-0.02em" }}>
-            {toast}
-        </div>
+          <div className="ou-toast">{toast}</div>
         )}
+
+        <OutreachAnalyticsCards userId={userId} refreshKey={historyRefreshKey} />
 
         <OutreachHistorySection
           isMobile={isMobile}
@@ -1978,7 +2061,7 @@ function OutreachView({
           onUpgradeScale={onUpgradeScale}
           refreshKey={historyRefreshKey}
         />
-          </div>
+      </div>
 
       {panel === "import" && (
         <ImportTemplatePanel
@@ -2047,7 +2130,7 @@ function OutreachView({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -3408,6 +3491,8 @@ function IntegrationsView({
   onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
+  const { theme } = useDashboardTheme();
+  const dark = theme === "dark";
   const [shopDomain, setShopDomain] = useState("");
   const [shopToken, setShopToken] = useState("");
   const [shopError, setShopError] = useState("");
@@ -3421,6 +3506,18 @@ function IntegrationsView({
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
   const [connectPageOpen, setConnectPageOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+
+  const cardBg = dark ? "transparent" : "#FFFFFF";
+  const cardBorder = dark ? "rgba(255,255,255,0.1)" : "#EFEFEF";
+  const titleColor = dark ? "#F3F3F4" : "#1A1A1A";
+  const mutedColor = dark ? "#9A9AA0" : "#7A7A7A";
+  const logoBoxBg = dark ? "transparent" : "#FFFFFF";
+  const secondaryBtn: React.CSSProperties = {
+    ...btnSecondary,
+    background: dark ? "transparent" : "#FFFFFF",
+    color: dark ? "#E8E8EA" : "#1A1A1A",
+    border: dark ? "1px solid rgba(255,255,255,0.12)" : "1px solid #E5E5E5",
+  };
 
   const activeShop = connectedShop || shopifyStore || null;
   const isShopifyConnected = !!activeShop && !changingStore;
@@ -3573,6 +3670,7 @@ function IntegrationsView({
 
   const apps = [
     { name: "Shopify", desc: "Connect your store to track sales", logo: "/shopify-logo.svg", logoH: 39 },
+    { name: "Stripe", desc: "Track analytics and everything automatically", logo: "/stripe-logo.svg", logoH: 28 },
     { name: "Zapier", desc: "Automate workflows with 5000+ apps", logo: "/zapier-logo.svg", logoH: 34 },
     { name: "Notion", desc: "Sync your workspace and docs", logo: "/notion-logo.svg", logoH: 34 },
     { name: "Make", desc: "Advanced visual automation", logo: "/make-logo.svg", logoH: 34 },
@@ -3613,20 +3711,20 @@ function IntegrationsView({
       )}
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
       {connectedShop && (
-        <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, color: "#15803d", fontSize: 14, fontWeight: 500 }}>
+        <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: dark ? "rgba(34,197,94,0.12)" : "#f0fdf4", border: dark ? "1px solid rgba(34,197,94,0.28)" : "1px solid #bbf7d0", borderRadius: 10, color: dark ? "#86efac" : "#15803d", fontSize: 14, fontWeight: 500 }}>
           ✓ {connectedShop} connected successfully
         </div>
       )}
       <div style={{ padding: isMobile ? "12px 16px 16px" : "24px 40px 40px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
           {apps.map((app) => (
-            <div key={app.name} style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, display: "flex", alignItems: app.name === "Shopify" && !isShopifyConnected ? "center" : "flex-start", gap: 16, width: "100%", boxSizing: "border-box" }}>
-              <div style={{ width: 52, height: 52, borderRadius: 12, background: "#FFFFFF", border: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div key={app.name} style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 16, padding: 24, display: "flex", alignItems: app.name === "Shopify" && !isShopifyConnected ? "center" : "flex-start", gap: 16, width: "100%", boxSizing: "border-box" }}>
+              <div style={{ width: 52, height: 52, borderRadius: 12, background: logoBoxBg, border: `1px solid ${cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <img src={app.logo} alt={app.name} width={34} height={app.logoH} style={{ display: "block", objectFit: "contain" }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{app.name}</div>
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: titleColor, letterSpacing: "-0.02em", marginBottom: 2 }}>{app.name}</div>
+                <div style={{ fontSize: 13, color: mutedColor, letterSpacing: "-0.01em" }}>
                   {app.name === "Shopify"
                     ? isShopifyConnected
                       ? lang === "fr"
@@ -3635,17 +3733,21 @@ function IntegrationsView({
                       : lang === "fr"
                         ? "Connectez votre boutique pour suivre les ventes"
                         : "Connect your store to track sales"
-                    : app.name === "Zapier"
+                    : app.name === "Stripe"
                       ? lang === "fr"
-                        ? "Automatisez vos workflows avec 5000+ applications"
-                        : "Automate workflows with 5000+ apps"
-                      : app.name === "Notion"
+                        ? "Suivez les analytics et tout le reste automatiquement"
+                        : "Track analytics and everything automatically"
+                      : app.name === "Zapier"
                         ? lang === "fr"
-                          ? "Synchronisez votre espace de travail et vos documents"
-                          : "Sync your workspace and docs"
-                        : lang === "fr"
-                          ? "Automatisation visuelle avancée"
-                          : "Advanced visual automation"}
+                          ? "Automatisez vos workflows avec 5000+ applications"
+                          : "Automate workflows with 5000+ apps"
+                        : app.name === "Notion"
+                          ? lang === "fr"
+                            ? "Synchronisez votre espace de travail et vos documents"
+                            : "Sync your workspace and docs"
+                          : lang === "fr"
+                            ? "Automatisation visuelle avancée"
+                            : "Advanced visual automation"}
               </div>
                 {app.name === "Shopify" && (
                   <div style={{ marginTop: 10 }}>
@@ -3654,13 +3756,13 @@ function IntegrationsView({
                         <div style={{ fontSize: 13, fontWeight: 600, color: "#22C55E", marginBottom: 4, letterSpacing: "-0.01em" }}>
                           {lang === "fr" ? "Boutique connectée ✓" : "Store connected ✓"}
                         </div>
-                        <div style={{ fontSize: 13, color: "#1A1A1A", fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", border: "1px solid #EFEFEF", borderRadius: 12, marginBottom: 10, background: "#FFFFFF" }}>
+                        <div style={{ fontSize: 13, color: titleColor, fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em" }}>{activeShop}</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "12px 14px", border: `1px solid ${cardBorder}`, borderRadius: 12, marginBottom: 10, background: dark ? "#2A2B30" : "#FFFFFF" }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: titleColor, letterSpacing: "-0.01em" }}>
                               {lang === "fr" ? "Synchronisation automatique" : "Automatic sync"}
                             </div>
-                            <div style={{ fontSize: 12, color: "#7A7A7A", marginTop: 2, letterSpacing: "-0.01em" }}>
+                            <div style={{ fontSize: 12, color: mutedColor, marginTop: 2, letterSpacing: "-0.01em" }}>
                               {lang === "fr" ? "Chaque nouvelle vente Shopify remonte automatiquement dans Trackit." : "Every new Shopify sale flows into Trackit automatically."}
                             </div>
                           </div>
@@ -3793,13 +3895,13 @@ function IntegrationsView({
                         </div>
                         {isMultiStore && connectedStores.length > 0 && (
                           <div style={{ marginBottom: 10 }}>
-                            <div style={{ fontSize: 12, color: "#7A7A7A", marginBottom: 6 }}>
+                            <div style={{ fontSize: 12, color: mutedColor, marginBottom: 6 }}>
                               {lang === "fr"
                                 ? `${connectedStores.length}/${storeLimit} boutiques connectées`
                                 : `${connectedStores.length}/${storeLimit} stores connected`}
                             </div>
                             {connectedStores.map((domain) => (
-                              <div key={domain} style={{ fontSize: 13, color: "#1A1A1A", marginBottom: 4 }}>
+                              <div key={domain} style={{ fontSize: 13, color: titleColor, marginBottom: 4 }}>
                                 {domain}
             </div>
           ))}
@@ -3812,7 +3914,7 @@ function IntegrationsView({
                           <button
                             type="button"
                             onClick={() => openConnectPage("", true)}
-                            style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
+                            style={{ ...secondaryBtn, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
                           >
                             {isMultiStore
                               ? lang === "fr"
@@ -3828,24 +3930,24 @@ function IntegrationsView({
                               <button
                                 type="button"
                                 onClick={() => openConnectPage(activeShop?.replace(/\.myshopify\.com$/, "") || "", true)}
-                                style={{ ...btnSecondary, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
+                                style={{ ...secondaryBtn, padding: "8px 14px", fontSize: 12, marginRight: 8 }}
                               >
                                 {lang === "fr" ? "Changer de boutique" : "Change my store"}
                               </button>
                             )}
                             {plan === "free" ? (
-                              <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                              <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
                                 {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Starter. " : "Free includes manual sales. Shopify requires the Starter plan. "}
-                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                                   {lang === "fr" ? "Passer à Starter →" : "Upgrade to Starter →"}
                                 </button>
                               </p>
                             ) : (plan === "basic" || plan === "pro") ? (
-                              <p style={{ fontSize: 12, color: "#7A7A7A", margin: 0 }}>
+                              <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
                                 {lang === "fr"
                                   ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Business. `
                                   : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Business. `}
-                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                                <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                                   {lang === "fr" ? "Passer à Business →" : "Upgrade to Business →"}
                                 </button>
                               </p>
@@ -3854,7 +3956,7 @@ function IntegrationsView({
                         )}
                       </>
                     ) : (
-                      shopError ? <div style={{ color: "#dc2626", fontSize: 12, marginTop: 8 }}>{shopError}</div> : null
+                      shopError ? <div style={{ color: "#f87171", fontSize: 12, marginTop: 8 }}>{shopError}</div> : null
                     )}
                   </div>
                 )}
@@ -3871,7 +3973,7 @@ function IntegrationsView({
                   </button>
                 ) : null
               ) : (
-                <button type="button" style={{ ...btnSecondary, alignSelf: "center" }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
+                <button type="button" style={{ ...secondaryBtn, alignSelf: "center" }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
               )}
             </div>
           ))}
@@ -4794,7 +4896,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange?: () => void }) {
   return track;
 }
 
-const iconBtn: React.CSSProperties = { background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+const iconBtn: React.CSSProperties = { background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 8, padding: "6px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
 
 function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
   return [
@@ -4839,12 +4941,20 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
       keywords: ["payments", "pay", "payouts", "commissions", "iban", "paiements"],
     },
     {
-      id: "notes",
-      label: lang === "fr" ? "Notes" : "Notes",
-      view: "notes",
+      id: "whiteboard",
+      label: "Board",
+      view: "whiteboard",
       section: "main",
       iconKey: "notes",
-      keywords: ["notes", "notepad", "memo"],
+      keywords: ["whiteboard", "board", "notes", "notepad", "memo", "ideas"],
+    },
+    {
+      id: "ai",
+      label: "Ask AI",
+      view: "ai",
+      section: "main",
+      iconKey: "ai",
+      keywords: ["ai", "mino", "ask", "build", "create", "assistant", "chat"],
     },
     {
       id: "settings",

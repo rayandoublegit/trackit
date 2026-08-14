@@ -16,7 +16,8 @@ import {
   type SaleAttributionRow,
 } from "@/lib/campaign-sales-attribution";
 import { dedupeCampaignRows, normalizeCampaignStatus } from "@/lib/campaign-status";
-import { getAuthedUserId } from "@/lib/api-auth";
+import { requireBrandSpace } from "@/lib/brand-workspace-server";
+import { brandTablesHaveWorkspaceId } from "@/lib/workspace-db";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,11 @@ export async function GET(request: NextRequest) {
   const userId = searchParams.get("userId");
   const range = parseRange(searchParams.get("range"));
   if (!userId) return NextResponse.json({ error: "No userId" }, { status: 400 });
-  const authorizedWorkspaceId = await getAuthedUserId(request);
-  if (!authorizedWorkspaceId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (authorizedWorkspaceId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const access = await requireBrandSpace(request);
+  if ("error" in access) return access.error;
+  if (access.ownerId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { spaceId } = access;
+  const useWs = await brandTablesHaveWorkspaceId(supabaseAdmin);
 
   const tzOffset = parseTzOffsetMinutes(searchParams.get("tzOffset"));
   const periodRange = range === "custom" || range === "all" ? "30d" : range;
@@ -65,6 +68,11 @@ export async function GET(request: NextRequest) {
   // Window covering previous + current periods (charts + period KPIs).
   const windowStartIso = prevStart.toISOString();
   const windowEndIso = end.toISOString();
+
+  // Loosely typed on purpose: constraining T to the Supabase builder type
+  // makes tsc blow up ("type instantiation is excessively deep").
+  const scopeWs = <T,>(q: T): T =>
+    useWs ? ((q as { eq: (c: string, v: string) => unknown }).eq("workspace_id", spaceId) as T) : q;
 
   // Fan out independent reads — was a waterfall of 6–8 sequential awaits.
   const [
@@ -82,38 +90,49 @@ export async function GET(request: NextRequest) {
       .select("shopify_store, shopify_access_token")
       .eq("id", userId)
       .maybeSingle(),
-    supabaseAdmin
-      .from("sales")
-      .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id, status")
-      .eq("user_id", userId)
+    scopeWs(
+      supabaseAdmin
+        .from("sales")
+        .select("order_amount, commission_amount, discount_code_used, created_at, campaign_id, creator_id, status")
+        .eq("user_id", userId),
+    )
       .gte("created_at", windowStartIso)
       .lte("created_at", windowEndIso),
-    supabaseAdmin
-      .from("sales")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
-    supabaseAdmin
-      .from("payouts")
-      .select("amount, status, paid_at, created_at, creator_id")
-      .eq("user_id", userId),
-    supabaseAdmin
-      .from("outreach_history")
-      .select("status, created_at, creator_username, platform, message, follow_up_date")
-      .eq("user_id", userId)
+    scopeWs(
+      supabaseAdmin.from("sales").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    ),
+    scopeWs(
+      supabaseAdmin
+        .from("payouts")
+        .select("amount, status, paid_at, created_at, creator_id")
+        .eq("user_id", userId),
+    ),
+    scopeWs(
+      supabaseAdmin
+        .from("outreach_history")
+        .select("status, created_at, creator_username, platform, message, follow_up_date")
+        .eq("user_id", userId),
+    )
       .gte("created_at", windowStartIso)
       .lte("created_at", windowEndIso),
-    supabaseAdmin
-      .from("creators")
-      .select("id, full_name, handle, platform, avatar_url, total_sales, total_earned, balance, discount_code")
-      .eq("user_id", userId),
-    supabaseAdmin
-      .from("campaign_creators")
-      .select("campaign_id, creator_id, discount_code, historical_sales_attached, created_at")
-      .eq("user_id", userId),
-    supabaseAdmin
-      .from("campaigns")
-      .select("id, name, platform, status, created_at, start_date")
-      .eq("user_id", userId),
+    scopeWs(
+      supabaseAdmin
+        .from("creators")
+        .select("id, full_name, handle, platform, avatar_url, total_sales, total_earned, balance, discount_code")
+        .eq("user_id", userId),
+    ),
+    scopeWs(
+      supabaseAdmin
+        .from("campaign_creators")
+        .select("campaign_id, creator_id, discount_code, historical_sales_attached, created_at")
+        .eq("user_id", userId),
+    ),
+    scopeWs(
+      supabaseAdmin
+        .from("campaigns")
+        .select("id, name, platform, status, created_at, start_date")
+        .eq("user_id", userId),
+    ),
   ]);
 
   const shopifyConnected = !!(profile?.shopify_store && profile?.shopify_access_token);

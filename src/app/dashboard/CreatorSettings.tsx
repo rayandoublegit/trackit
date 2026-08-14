@@ -19,16 +19,17 @@ import {
   type ProfileUsernameStatus,
 } from "@/lib/profile-username";
 
-const BLUE = "#0047FF";
+const BLUE = "var(--ws-accent)";
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "12px 14px", borderRadius: 12,
-  border: "1px solid rgba(0,0,0,0.1)", fontSize: 15, fontFamily: "inherit",
+  border: "1px solid var(--ws-border)", fontSize: 15, fontFamily: "inherit",
   outline: "none", boxSizing: "border-box",
+  background: "var(--ws-input)", color: "var(--ws-text)",
 };
 const labelStyle: React.CSSProperties = {
   display: "block", fontSize: 13, fontWeight: 500,
-  color: "rgba(0,0,0,0.55)", marginBottom: 6, letterSpacing: "-0.01em",
+  color: "var(--ws-text-muted)", marginBottom: 6, letterSpacing: "-0.01em",
 };
 
 export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string; isMobile?: boolean; onSaved?: () => void }) {
@@ -366,7 +367,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
   if (loading) {
     return (
-      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "#9A9A9A", fontSize: 14, background: "#FFFFFF", minHeight: "100vh" }}>
+      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "var(--ws-text-dim)", fontSize: 14, background: "var(--ws-surface)", minHeight: "100vh" }}>
         {lang === "fr" ? "Chargement..." : "Loading..."}
       </div>
     );
@@ -375,23 +376,23 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const displayAvatar = avatarPreview || avatarUrl;
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "#FFFFFF", minHeight: "100vh", flex: 1 }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "var(--ws-surface)", minHeight: "100vh", flex: 1 }}>
       <div style={{ maxWidth: 640 }}>
 
         <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 650, color: "#1A1A1A", letterSpacing: "-0.035em", margin: "0 0 8px" }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
-          <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.5 }}>{lang === "fr" ? "Gérez votre profil et vos préférences." : "Manage your profile and preferences."}</p>
+          <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.035em", margin: "0 0 8px" }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
+          <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.5 }}>{lang === "fr" ? "Gérez votre profil et vos préférences." : "Manage your profile and preferences."}</p>
         </div>
 
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 20 }}>{lang === "fr" ? "Profil" : "Profile"}</div>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 20 }}>{lang === "fr" ? "Profil" : "Profile"}</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 28 }}>
-            <div style={{ width: 96, height: 96, borderRadius: "50%", overflow: "hidden", background: "#F2F2F2", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid #EFEFEF" }}>
+            <div style={{ width: 96, height: 96, borderRadius: "50%", overflow: "hidden", background: "var(--ws-surface-2)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--ws-border)" }}>
               {displayAvatar ? (
                 <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <span style={{ fontSize: 34, color: "#B5B5B5", fontWeight: 600 }}>{(fullName || "?").charAt(0).toUpperCase()}</span>
+                <span style={{ fontSize: 34, color: "var(--ws-text-dim)", fontWeight: 600 }}>{(fullName || "?").charAt(0).toUpperCase()}</span>
               )}
             </div>
             <div>
@@ -399,7 +400,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
                 {lang === "fr" ? "Changer la photo" : "Change photo"}
                 <input type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: "none" }} />
               </label>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 10 }}>{lang === "fr" ? "JPG ou PNG, 2 Mo max." : "JPG or PNG, 2MB max."}</div>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 10 }}>{lang === "fr" ? "JPG ou PNG, 2 Mo max." : "JPG or PNG, 2MB max."}</div>
             </div>
           </div>
 
@@ -408,7 +409,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
           <label style={labelStyle}>{lang === "fr" ? "Pseudo (réseaux sociaux)" : "Handle (social media)"}</label>
           <div style={{ position: "relative", marginBottom: 6 }}>
-            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#9A9A9A", fontSize: 15 }}>@</span>
+            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--ws-text-dim)", fontSize: 15 }}>@</span>
             <input type="text" value={username} onChange={(e) => { setUsername(e.target.value); setSaved(false); setError(""); }} placeholder="votrepseudo" style={{ ...inputStyle, paddingLeft: 30 }} />
           </div>
           {usernameStatus !== "idle" && (
@@ -416,21 +417,21 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
               {profileUsernameStatusMessage(usernameStatus, lang)}
             </div>
           )}
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4 }}>{lang === "fr" ? "Doit correspondre au pseudo connu par la marque qui vous a invité." : "Should match the handle known by the brand that invited you."}</div>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4 }}>{lang === "fr" ? "Doit correspondre au pseudo connu par la marque qui vous a invité." : "Should match the handle known by the brand that invited you."}</div>
         </div>
 
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>
             {lang === "fr" ? "Marque partenaire" : "Partner brand"}
           </div>
-          <p style={{ fontSize: 13, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: "0 0 16px", lineHeight: 1.5 }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 16px", lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Indique si votre compte est bien relié à la marque qui vous a invité. Vos uploads de contenu sont envoyés à cette marque."
               : "Shows whether your account is linked to the brand that invited you. Your content uploads are sent to this brand."}
           </p>
 
           {brandsLoading ? (
-            <div style={{ fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
+            <div style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
           ) : brandMemberships.length === 0 ? (
             <div
               style={{
@@ -469,12 +470,12 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
                       <div style={{ fontSize: 14, fontWeight: 600, color: "#1A7F37", letterSpacing: "-0.02em" }}>
                         {lang === "fr" ? "A rejoint" : "Joined"}
                       </div>
-                      <div style={{ fontSize: 14, color: "#1A1A1A", marginTop: 4, letterSpacing: "-0.02em" }}>
+                      <div style={{ fontSize: 14, color: "var(--ws-text)", marginTop: 4, letterSpacing: "-0.02em" }}>
                         {lang === "fr" ? "Appartient à " : "Belongs to "}
                         <strong>{brand.brandName}</strong>
                       </div>
                       {brand.creatorHandle && (
-                        <div style={{ fontSize: 12, color: "#6B7280", marginTop: 6 }}>
+                        <div style={{ fontSize: 12, color: "var(--ws-text-muted)", marginTop: 6 }}>
                           {lang === "fr" ? "Pseudo côté marque : " : "Brand-side handle: "}
                           @{brand.creatorHandle.replace(/^@+/, "")}
                           {brand.handleMatched
@@ -501,8 +502,8 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           )}
         </div>
 
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>{lang === "fr" ? "Préférences" : "Preferences"}</div>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 16 }}>{lang === "fr" ? "Préférences" : "Preferences"}</div>
           <label style={labelStyle}>{lang === "fr" ? "Langue" : "Language"}</label>
           <div style={{ display: "flex", gap: 8 }}>
             {([["fr", "Français"], ["en", "English"]] as const).map(([code, label]) => {
@@ -514,7 +515,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
                 onClick={() => { if (code !== lang) { applyAppLocale(code); window.location.reload(); } }}
                 style={{
                   flex: 1, padding: "11px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em",
-                  ...selectionCardStyle(active, { unselectedBackground: "#FFFFFF", unselectedBorder: "1px solid rgba(0,0,0,0.12)" }),
+                  ...selectionCardStyle(active, { unselectedBackground: "var(--ws-surface)", unselectedBorder: "1px solid var(--ws-border)" }),
                   color: selectionTextPrimary(active),
                 }}
               >
@@ -524,16 +525,16 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           </div>
         </div>
 
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Versements" : "Payouts"}</div>
-          <p style={{ fontSize: 13, color: "rgba(0,0,0,0.5)", letterSpacing: "-0.01em", margin: "0 0 18px", lineHeight: 1.5 }}>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Versements" : "Payouts"}</div>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 18px", lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Connectez votre compte Stripe pour recevoir vos paiements automatiquement, en toute securite."
               : "Connect your Stripe account to receive your payments automatically and securely."}
           </p>
 
           {stripeLoading ? (
-            <div style={{ fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
+            <div style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
           ) : stripeOnboarded ? (
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 10, background: "rgba(26,127,55,0.08)" }}>
               <span style={{ fontSize: 15, color: "#1A7F37", fontWeight: 700 }}>&#10003;</span>
@@ -563,7 +564,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         </div>
 
         {error && (
-          <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>
+          <div style={{ fontSize: 14, color: "var(--ws-danger)", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>
         )}
         {saved && !saving && (
           <div style={{ fontSize: 14, color: "#1A7F37", padding: "10px 12px", borderRadius: 10, background: "rgba(26,127,55,0.08)", marginBottom: 14 }}>
@@ -571,7 +572,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           </div>
         )}
         {saving && (
-          <div style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", padding: "10px 12px", borderRadius: 10, background: "rgba(0,0,0,0.04)", marginBottom: 14 }}>
+          <div style={{ fontSize: 14, color: "var(--ws-text-muted)", padding: "10px 12px", borderRadius: 10, background: "var(--ws-hover)", marginBottom: 14 }}>
             {lang === "fr" ? "Enregistrement..." : "Saving..."}
           </div>
         )}
@@ -580,9 +581,9 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer" : "Save")}
         </button>
 
-        <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid #EFEFEF" }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
-          <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--ws-border)" }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
             {lang === "fr" ? "Déconnectez-vous et dissociez cet appareil de votre compte Trackit." : "Sign out and disconnect this device from your Trackit account."}
           </p>
           <button
@@ -591,7 +592,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
             disabled={signingOut}
             style={{
               padding: "11px 18px", borderRadius: 10, border: "1px solid rgba(220, 38, 38, 0.35)",
-              background: "#FFFFFF", color: "#DC2626", fontSize: 14, fontWeight: 600,
+              background: "var(--ws-surface)", color: "var(--ws-danger)", fontSize: 14, fontWeight: 600,
               fontFamily: "inherit", cursor: signingOut ? "default" : "pointer", letterSpacing: "-0.01em",
               opacity: signingOut ? 0.6 : 1,
             }}
@@ -600,8 +601,8 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           </button>
         </div>
 
-        <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid #EFEFEF", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: "rgba(0,0,0,0.4)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Propulsé par" : "Powered by"}</span>
+        <div style={{ marginTop: 40, paddingTop: 24, borderTop: "1px solid var(--ws-border)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Propulsé par" : "Powered by"}</span>
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 26, width: "auto", opacity: 0.85 }} />
         </div>
 

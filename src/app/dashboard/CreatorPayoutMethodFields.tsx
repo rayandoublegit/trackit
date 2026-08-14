@@ -2,7 +2,7 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
+import { selectionCardStyle } from "@/lib/selection-card-styles";
 
 export type PayoutMethodType = "paypal" | "revolut" | "iban";
 
@@ -20,14 +20,14 @@ export type CreatorPayoutMethodFieldsHandle = {
 const payoutPanelInputStyle: React.CSSProperties = {
   padding: "12px 14px",
   borderRadius: 10,
-  border: "1px solid #EFEFEF",
-  background: "#FFFFFF",
+  border: "1px solid var(--ws-border)",
+  background: "var(--ws-input)",
   fontSize: 14,
   fontFamily: "inherit",
   width: "100%",
   boxSizing: "border-box",
   letterSpacing: "-0.02em",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   outline: "none",
 };
 
@@ -35,7 +35,7 @@ const payoutPanelFieldLabelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 12,
   fontWeight: 600,
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   marginBottom: 6,
   letterSpacing: "-0.01em",
 };
@@ -219,17 +219,17 @@ export const CreatorPayoutMethodFields = forwardRef<
             gap: 12,
             padding: controlPad,
             borderRadius: controlRadius,
-            border: "1px solid #EFEFEF",
-            background: "#FFFFFF",
+            border: "1px solid var(--ws-border)",
+            background: "var(--ws-input)",
             cursor: "pointer",
             fontFamily: "inherit",
             textAlign: "left",
           }}
         >
           <PaymentMethodLogo method={current.id} />
-          <span style={{ flex: 1, fontSize: controlFont, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{current.label}</span>
+          <span style={{ flex: 1, fontSize: controlFont, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{current.label}</span>
           <svg width={large ? 16 : 14} height={large ? 16 : 14} viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
-            <path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M6 9l6 6 6-6" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
         {open && (
@@ -239,10 +239,10 @@ export const CreatorPayoutMethodFields = forwardRef<
               top: "calc(100% + 6px)",
               left: 0,
               right: 0,
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 12,
-              boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
+              boxShadow: "var(--ws-shadow)",
               zIndex: 20,
               overflow: "hidden",
             }}
@@ -264,15 +264,28 @@ export const CreatorPayoutMethodFields = forwardRef<
                     gap: 12,
                     padding: controlPad,
                     border: "none",
-                    borderBottom: i < PAYOUT_METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none",
-                    ...selectionCardStyle(selected, { unselectedBackground: "#FFFFFF", unselectedBorder: "none" }),
+                    borderBottom: i < PAYOUT_METHOD_OPTIONS.length - 1 ? "1px solid var(--ws-border)" : "none",
+                    ...selectionCardStyle(selected, {
+                      unselectedBackground: "var(--ws-surface)",
+                      unselectedBorder: "none",
+                    }),
                     cursor: "pointer",
                     fontFamily: "inherit",
                     textAlign: "left",
                   }}
                 >
                   <PaymentMethodLogo method={option.id} />
-                  <span style={{ flex: 1, fontSize: controlFont, fontWeight: selected ? 600 : 500, color: selectionTextPrimary(selected), letterSpacing: "-0.02em" }}>{option.label}</span>
+                  <span
+                    style={{
+                      flex: 1,
+                      fontSize: controlFont,
+                      fontWeight: selected ? 600 : 500,
+                      color: selected ? "#FFFFFF" : "var(--ws-text)",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    {option.label}
+                  </span>
                   {selected && (
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                       <path d="M5 13l4 4L19 7" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -291,9 +304,9 @@ export const CreatorPayoutMethodFields = forwardRef<
             style={{
               display: "flex",
               alignItems: "stretch",
-              border: "1px solid #EFEFEF",
+              border: "1px solid var(--ws-border)",
               borderRadius: controlRadius,
-              background: "#FFFFFF",
+              background: "var(--ws-input)",
               overflow: "hidden",
             }}
           >
@@ -303,7 +316,7 @@ export const CreatorPayoutMethodFields = forwardRef<
                 alignItems: "center",
                 padding: large ? "16px 0 16px 18px" : "12px 0 12px 14px",
                 fontSize: controlFont,
-                color: "#7A7A7A",
+                color: "var(--ws-text-muted)",
                 letterSpacing: "-0.02em",
                 whiteSpace: "nowrap",
                 flexShrink: 0,
@@ -339,7 +352,7 @@ export const CreatorPayoutMethodFields = forwardRef<
           />
         )}
       </label>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "Sauvegarde automatique en quittant le champ" : "Auto-saves when you leave the field"}
       </p>
     </div>

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { getAuthedUserId } from "@/lib/api-auth";
+import { requireBrandSpace } from "@/lib/brand-workspace-server";
+import { brandTablesHaveWorkspaceId } from "@/lib/workspace-db";
 
 export const dynamic = "force-dynamic";
 
@@ -8,21 +9,19 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function GET(request: NextRequest) {
-  const userId = await getAuthedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await requireBrandSpace(request);
+  if ("error" in access) return access.error;
+  const { ownerId, spaceId } = access;
 
   const admin = getSupabaseAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  const { data, error } = await admin
-    .from("creators")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+  const useWs = await brandTablesHaveWorkspaceId(admin);
+  let q = admin.from("creators").select("*").eq("user_id", ownerId);
+  if (useWs) q = q.eq("workspace_id", spaceId);
+  const { data, error } = await q.order("created_at", { ascending: false });
 
   if (error) {
     console.error("GET /api/creators error:", error.message);
@@ -33,10 +32,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const userId = await getAuthedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await requireBrandSpace(request);
+  if ("error" in access) return access.error;
+  const { ownerId, spaceId } = access;
 
   let body: Record<string, unknown>;
   try {
@@ -55,21 +53,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
+  const useWs = await brandTablesHaveWorkspaceId(admin);
+  const row: Record<string, unknown> = {
+    user_id: ownerId,
+    handle: username,
+    full_name: String(body.display_name ?? username),
+    avatar_url: String(body.avatar_url ?? ""),
+    platform: String(body.platform ?? "TikTok"),
+    followers: Number(body.followers_count ?? 0) || 0,
+    engagement_rate: Number(body.engagement_rate ?? 0) || 0,
+    niche: String(body.niche ?? ""),
+  };
+  if (useWs) row.workspace_id = spaceId;
+
   const { data, error } = await admin
     .from("creators")
-    .upsert(
-      {
-        user_id: userId,
-        handle: username,
-        full_name: String(body.display_name ?? username),
-        avatar_url: String(body.avatar_url ?? ""),
-        platform: String(body.platform ?? "TikTok"),
-        followers: Number(body.followers_count ?? 0) || 0,
-        engagement_rate: Number(body.engagement_rate ?? 0) || 0,
-        niche: String(body.niche ?? ""),
-      },
-      { onConflict: "user_id,handle" }
-    )
+    .upsert(row, { onConflict: useWs ? "workspace_id,handle" : "user_id,handle" })
     .select()
     .single();
 
@@ -82,10 +81,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const userId = await getAuthedUserId(request);
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await requireBrandSpace(request);
+  if ("error" in access) return access.error;
+  const { ownerId, spaceId } = access;
 
   const { searchParams } = new URL(request.url);
   const rawId = searchParams.get("creatorId")?.trim();
@@ -100,7 +98,9 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  let query = admin.from("creators").delete().eq("user_id", userId);
+  const useWs = await brandTablesHaveWorkspaceId(admin);
+  let query = admin.from("creators").delete().eq("user_id", ownerId);
+  if (useWs) query = query.eq("workspace_id", spaceId);
   if (creatorId) query = query.eq("id", creatorId);
   else if (handle) query = query.eq("handle", handle);
 

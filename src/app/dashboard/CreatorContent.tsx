@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { ContentPostStatsDisplay } from "./ContentPostStats";
 import { InfoTip } from "./analytics-metric-cards";
 
-const BLUE = "#0047FF";
+const BLUE = "var(--ws-accent)";
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
 type BrandOption = { id: string; name: string; creatorRowId: string | null };
@@ -60,11 +60,11 @@ function ContentTrackedLink({ lang, linkUrl }: { lang: "en" | "fr"; linkUrl: str
         marginTop: 12,
         padding: "12px 14px",
         borderRadius: 12,
-        border: "1px solid #E5E5E5",
-        background: "#FAFAFA",
+        border: "1px solid var(--ws-border)",
+        background: "var(--ws-surface-2)",
       }}
     >
-      <p style={{ fontSize: 12, color: "#6B7280", margin: "0 0 8px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 12, color: "var(--ws-text-muted)", margin: "0 0 8px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
         {lang === "fr"
           ? "Ton lien pour ce contenu — mets-le en bio/description"
           : "Your link for this content — add it to your bio or description"}
@@ -91,15 +91,15 @@ function ContentTrackedLink({ lang, linkUrl }: { lang: "en" | "fr"; linkUrl: str
           onClick={() => void copy()}
           style={{
             flexShrink: 0,
-            border: "1px solid #E5E5E5",
-            background: "#FFF",
+            border: "1px solid var(--ws-border)",
+            background: "var(--ws-surface)",
             borderRadius: 8,
             padding: "6px 12px",
             fontSize: 12,
             fontWeight: 500,
             cursor: "pointer",
             fontFamily: "inherit",
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
           }}
         >
           {copied ? (lang === "fr" ? "Copié" : "Copied") : lang === "fr" ? "Copier" : "Copy"}
@@ -341,13 +341,13 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     width: "100%",
     padding: "12px 14px",
     borderRadius: 12,
-    border: "1px solid #E5E5E5",
+    border: "1px solid var(--ws-border)",
     fontSize: 15,
     fontFamily: "inherit",
     outline: "none",
     boxSizing: "border-box",
-    color: "#1A1A1A",
-    background: "#FFFFFF",
+    color: "var(--ws-text)",
+    background: "var(--ws-input)",
   };
 
   const fmtDate = (iso: string) => {
@@ -363,21 +363,21 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   };
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div
         style={{
           paddingTop: isMobile ? 56 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,
-          borderBottom: "1px solid #EFEFEF",
+          borderBottom: "1px solid var(--ws-border)",
         }}
       >
         <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: 36, width: "auto", marginBottom: 20, opacity: 0.9 }} />
-        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
+        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
           Content
         </h1>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Importez vos vidéos, fichiers et livrables — la marque les retrouve dans Gérer les créateurs, à côté des scripts."
             : "Upload your videos, files, and deliverables — the brand sees them in Manage creators, next to scripts."}
@@ -386,7 +386,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 960 }}>
         {!loading && brands.length > 0 && (
-          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#1A1A1A", lineHeight: 1.5 }}>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ws-text)", lineHeight: 1.5 }}>
             <span style={{ fontWeight: 600, color: "#1A7F37" }}>
               {lang === "fr" ? "A rejoint · " : "Joined · "}
             </span>
@@ -399,7 +399,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
             style={{
               margin: "0 0 20px",
               fontSize: 13,
-              color: "#DC2626",
+              color: "var(--ws-danger)",
               lineHeight: 1.5,
             }}
           >
@@ -428,8 +428,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                 pickFiles(e.dataTransfer.files);
               }}
               style={{
-                background: dragOver ? "#F0F4FF" : "#F7F7F7",
-                border: dragOver ? "2px dashed #0047FF" : "2px solid transparent",
+                background: dragOver ? "var(--ws-hover)" : "var(--ws-surface-2)",
+                border: dragOver ? "2px dashed var(--ws-accent)" : "2px solid transparent",
                 borderRadius: 16,
                 minHeight: isMobile ? 300 : 420,
                 display: "flex",
@@ -448,24 +448,24 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                   width: 52,
                   height: 52,
                   borderRadius: 14,
-                  background: "#FFFFFF",
-                  border: "1px solid #EFEFEF",
+                  background: "var(--ws-surface)",
+                  border: "1px solid var(--ws-border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 20,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                  boxShadow: "var(--ws-shadow)",
                 }}
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M4 20h16" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+                  <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M4 20h16" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </div>
-              <p style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Glisser-déposer pour importer" : "Drag and drop to upload"}
               </p>
-              <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 20px", lineHeight: 1.45, maxWidth: 280 }}>
+              <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 20px", lineHeight: 1.45, maxWidth: 280 }}>
                 {lang === "fr"
                   ? `Vidéos (1–2 min+), images, PDF… jusqu’à ${CREATOR_CONTENT_MAX_FILE_LABEL} par fichier.`
                   : `Videos (1–2+ min), images, PDFs… up to ${CREATOR_CONTENT_MAX_FILE_LABEL} per file.`}
@@ -500,14 +500,14 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               />
               {pendingFiles.length > 0 && (
                 <div style={{ marginTop: 20, width: "100%", textAlign: "left" }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                     {lang === "fr" ? "Fichiers sélectionnés" : "Selected files"}
                   </p>
                   <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
                     {pendingFiles.map((f, i) => (
-                      <li key={`${f.name}-${i}`} style={{ fontSize: 13, color: "#1A1A1A", padding: "6px 0", borderBottom: "1px solid #ECECEC" }}>
+                      <li key={`${f.name}-${i}`} style={{ fontSize: 13, color: "var(--ws-text)", padding: "6px 0", borderBottom: "1px solid var(--ws-border)" }}>
                         {f.name}
-                        <span style={{ color: "#9A9A9A", marginLeft: 8 }}>{formatBytes(f.size)}</span>
+                        <span style={{ color: "var(--ws-text-dim)", marginLeft: 8 }}>{formatBytes(f.size)}</span>
                       </li>
                     ))}
                   </ul>
@@ -522,38 +522,19 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                     marginBottom: 16,
                     padding: "10px 14px",
                     borderRadius: 10,
-                    background: "#F7F7F7",
-                    border: "1px solid #EFEFEF",
+                    background: "var(--ws-surface-2)",
+                    border: "1px solid var(--ws-border)",
                     fontSize: 13,
-                    color: "#5A5A5A",
+                    color: "var(--ws-text-muted)",
                   }}
                 >
-                  <span style={{ fontWeight: 600, color: "#1A1A1A" }}>
+                  <span style={{ fontWeight: 600, color: "var(--ws-text)" }}>
                     {lang === "fr" ? "Destination : " : "Destination: "}
                   </span>
                   {brands.find((b) => b.id === brandId)?.name || brands[0]?.name}
                 </div>
               )}
-              {brands.length > 1 && (
-                <>
-                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
-                    {lang === "fr" ? "Marque" : "Brand"}
-                  </label>
-                  <select
-                    value={brandId}
-                    onChange={(e) => setBrandId(e.target.value)}
-                    style={{ ...inputStyle, marginBottom: 16 }}
-                  >
-                    {brands.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                 {lang === "fr" ? "Titre" : "Title"}
               </label>
               <input
@@ -564,7 +545,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                 style={{ ...inputStyle, marginBottom: 16 }}
               />
 
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 8 }}>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                 {lang === "fr" ? "Notes" : "Notes"}
               </label>
               <textarea
@@ -576,7 +557,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               />
 
               <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: 0 }}>
                   {lang === "fr" ? "Ajouter un URL" : "Add a URL"}
                 </label>
                 <InfoTip
@@ -596,8 +577,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                 style={{ ...inputStyle, marginBottom: 20 }}
               />
 
-              {error && <p style={{ fontSize: 13, color: "#C62828", margin: "0 0 12px" }}>{error}</p>}
-              {success && <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 12px" }}>{success}</p>}
+              {error && <p style={{ fontSize: 13, color: "var(--ws-danger)", margin: "0 0 12px" }}>{error}</p>}
+              {success && <p style={{ fontSize: 13, color: "var(--ws-text)", margin: "0 0 12px" }}>{success}</p>}
               {lastUploadedLink && <ContentTrackedLink lang={lang} linkUrl={lastUploadedLink} />}
 
               <button
@@ -619,29 +600,29 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           </div>
 
         <div style={{ marginTop: 40 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 16px" }}>
             {lang === "fr" ? "Contenu envoyé" : "Uploaded content"}
           </h2>
           {loading ? (
-            <div style={{ color: "#9A9A9A", fontSize: 14 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
+            <div style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
           ) : items.length === 0 ? (
-            <div style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "32px 20px", textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>
+            <div style={{ border: "1px solid var(--ws-border)", borderRadius: 14, padding: "32px 20px", textAlign: "center", color: "var(--ws-text-muted)", fontSize: 14 }}>
               {lang === "fr" ? "Aucun fichier envoyé pour le moment." : "No files uploaded yet."}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {items.map((item) => (
-                <div key={item.id} style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "16px 18px" }}>
+                <div key={item.id} style={{ border: "1px solid var(--ws-border)", borderRadius: 14, padding: "16px 18px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{item.title}</div>
-                      <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 4 }}>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{item.title}</div>
+                      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 4 }}>
                         {fmtDate(item.created_at)}
                         {item.brandName ? ` · ${item.brandName}` : ""}
                         {item.file_size ? ` · ${formatBytes(item.file_size)}` : ""}
                       </div>
                       {item.notes && (
-                        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "8px 0 0", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{item.notes}</p>
+                        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "8px 0 0", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{item.notes}</p>
                       )}
                       <ContentPostStatsDisplay item={item} lang={lang} />
                       {isVideoFile(item) && (
@@ -655,7 +636,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                         <img
                           src={item.file_url}
                           alt=""
-                          style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, border: "1px solid #EFEFEF" }}
+                          style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, border: "1px solid var(--ws-border)" }}
                         />
                       )}
                       <a
@@ -673,8 +654,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                       onClick={() => void removeItem(item.id)}
                       style={{
                         border: "1px solid #FECACA",
-                        background: "#FFF",
-                        color: "#DC2626",
+                        background: "var(--ws-surface)",
+                        color: "var(--ws-danger)",
                         borderRadius: 8,
                         padding: "6px 12px",
                         fontSize: 13,

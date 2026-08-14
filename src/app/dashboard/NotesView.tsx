@@ -19,15 +19,15 @@ function NotesPageHeader({
         paddingRight: isMobile ? 16 : 40,
         paddingBottom: isMobile ? 16 : 24,
         paddingLeft: isMobile ? 16 : 40,
-        borderBottom: "1px solid #EFEFEF",
-        background: "#FFFFFF",
+        borderBottom: "1px solid var(--ws-border)",
+        background: "var(--ws-surface)",
       }}
     >
-      <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>
+      <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>
         {title}
       </h1>
       {subtitle && (
-        <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
           {subtitle}
         </p>
       )}

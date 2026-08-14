@@ -217,7 +217,7 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
         </div>
       )}
 
-      <CreatorDetailDrawer creator={selected} plan={plan} lang={lang} onClose={goBack} onUpgrade={onUpgrade} onWorkspaceChange={load} onReachOut={onReachOut} />
+      <CreatorDetailDrawer creator={selected} plan={plan} lang={lang} onClose={goBack} onUpgrade={onUpgrade} onWorkspaceChange={load} />
     </div>
   );
 }

@@ -76,14 +76,34 @@ export function usePayItActivity(userId?: string) {
       setLoading(false);
       return;
     }
-    setLoading(true);
     try {
+      const { cachedJsonFetch, peekDashboardCache } = await import("@/lib/dashboard-fetch-cache");
+      const cachedPayouts = peekDashboardCache<{ payouts?: CompletedPayout[] }>("GET:/api/payouts/history");
+      const cachedCreators = peekDashboardCache<CreatorRow[]>(`GET:/api/creators-list?userId=${userId}`);
+      if (cachedPayouts || cachedCreators) {
+        const payouts = cachedPayouts?.payouts ?? [];
+        const creators = Array.isArray(cachedCreators) ? cachedCreators : [];
+        const walletBalance = loadWalletBalance(userId);
+        if (hasPayItActivity({ sales: [], payouts, creators, walletBalance })) {
+          setHasActivity(true);
+          setLoading(false);
+        }
+      }
+
       const [sales, payoutRes, creatorsRes] = await Promise.all([
         fetchTrackedSales(userId),
-        fetch("/api/payouts/history", { cache: "no-store" }).then((r) => r.json()),
-        fetch(`/api/creators-list?userId=${userId}`).then((r) => r.json()),
+        cachedJsonFetch<{ payouts?: CompletedPayout[] }>(
+          "/api/payouts/history",
+          { credentials: "include" },
+          { preferCache: true, ttlMs: 20_000 },
+        ),
+        cachedJsonFetch<CreatorRow[]>(
+          `/api/creators-list?userId=${userId}`,
+          { credentials: "include" },
+          { preferCache: true, ttlMs: 30_000 },
+        ),
       ]);
-      const payouts = (payoutRes as { payouts?: CompletedPayout[] }).payouts ?? [];
+      const payouts = payoutRes.payouts ?? [];
       const creators = Array.isArray(creatorsRes) ? creatorsRes : [];
       const walletBalance = loadWalletBalance(userId);
       setHasActivity(hasPayItActivity({ sales, payouts, creators, walletBalance }));
@@ -270,7 +290,7 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
 export function PayItWelcomeLoading({ isMobile }: { isMobile?: boolean }) {
   const pad = isMobile ? "56px 16px 48px" : "48px 48px 64px";
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pad }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-bg)", padding: pad }}>
       <div style={{ maxWidth: 1120, margin: "0 auto", opacity: 0.5 }}>
         <div
           style={{
@@ -279,8 +299,8 @@ export function PayItWelcomeLoading({ isMobile }: { isMobile?: boolean }) {
             gap: 56,
           }}
         >
-          <div style={{ height: 420, borderRadius: 16, background: "#F5F5F5" }} />
-          <div style={{ height: 440, borderRadius: 28, background: "#F5F5F5" }} />
+          <div style={{ height: 420, borderRadius: 16, background: "var(--ws-surface)" }} />
+          <div style={{ height: 440, borderRadius: 28, background: "var(--ws-surface)" }} />
         </div>
       </div>
     </div>

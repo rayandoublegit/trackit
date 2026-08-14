@@ -168,18 +168,18 @@ export function CampaignAffiliateLinksPanel({
     padding: "12px 14px",
     fontSize: 12,
     fontWeight: 500,
-    color: "#9A9A9A",
+    color: "var(--ws-text-dim)",
     letterSpacing: "-0.01em",
     textAlign: "left",
-    borderBottom: "1px solid #EFEFEF",
+    borderBottom: "1px solid var(--ws-border)",
     whiteSpace: "nowrap",
   };
 
   const tdStyle: React.CSSProperties = {
     padding: "14px",
     fontSize: 13,
-    color: "#1A1A1A",
-    borderBottom: "1px solid #F5F5F5",
+    color: "var(--ws-text)",
+    borderBottom: "1px solid var(--ws-border)",
     verticalAlign: "middle",
   };
 
@@ -197,8 +197,8 @@ export function CampaignAffiliateLinksPanel({
 
       <div
         style={{
-          background: "#FFFFFF",
-          border: "1px solid #EFEFEF",
+          background: "var(--ws-surface)",
+          border: "1px solid var(--ws-border)",
           borderRadius: 16,
           padding: isMobile ? "18px 16px" : "22px 22px 20px",
           boxSizing: "border-box",
@@ -213,7 +213,7 @@ export function CampaignAffiliateLinksPanel({
             gap: 14,
             marginBottom: 18,
             paddingBottom: 16,
-            borderBottom: "1px solid #EFEFEF",
+            borderBottom: "1px solid var(--ws-border)",
           }}
         >
           <div
@@ -225,43 +225,43 @@ export function CampaignAffiliateLinksPanel({
             }}
           >
             <div style={{ flex: 1, minWidth: 0, paddingRight: isMobile ? 12 : 20 }}>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "Clics" : "Clicks"}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>
                 {loading ? "…" : totals.clicks}
               </div>
             </div>
-            <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+            <div style={{ width: 1, background: "var(--ws-border)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "0 12px" : "0 20px" }}>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "Ventes" : "Sales"}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>
                 {loading ? "…" : totals.sales}
               </div>
             </div>
-            <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+            <div style={{ width: 1, background: "var(--ws-border)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0, padding: isMobile ? "0 12px" : "0 20px" }}>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "CA total" : "Total revenue"}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>
                 {loading ? "…" : formatCurrency(totals.revenue, lang)}
               </div>
             </div>
-            <div style={{ width: 1, background: "#EFEFEF", flexShrink: 0 }} />
+            <div style={{ width: 1, background: "var(--ws-border)", flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0, paddingLeft: isMobile ? 12 : 20 }}>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.025em" }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.025em" }}>
                 {lang === "fr" ? "Visiteurs uniques" : "Unique visitors"}
               </div>
-              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em" }}>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em" }}>
                 {loading ? "…" : totals.uniques}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "inline-flex", gap: 4, background: "#F5F5F5", borderRadius: 10, padding: 4, alignSelf: isMobile ? "flex-start" : "center" }}>
+          <div style={{ display: "inline-flex", gap: 4, background: "var(--ws-pill)", borderRadius: 10, padding: 4, alignSelf: isMobile ? "flex-start" : "center" }}>
             {PERIOD_OPTIONS.map((option) => {
               const active = days === option;
               return (
@@ -277,8 +277,8 @@ export function CampaignAffiliateLinksPanel({
                     fontWeight: active ? 600 : 500,
                     fontFamily: "inherit",
                     cursor: "pointer",
-                    background: active ? "#FFFFFF" : "transparent",
-                    color: active ? "#1A1A1A" : "#7A7A7A",
+                    background: active ? "var(--ws-surface)" : "transparent",
+                    color: active ? "var(--ws-text)" : "var(--ws-text-muted)",
                     boxShadow: active ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
                     letterSpacing: "-0.02em",
                   }}
@@ -291,12 +291,12 @@ export function CampaignAffiliateLinksPanel({
         </div>
 
         {loading ? (
-          <div style={{ padding: "32px 0", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+          <div style={{ padding: "32px 0", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
             {lang === "fr" ? "Chargement…" : "Loading…"}
           </div>
         ) : links.length === 0 ? (
           <div style={{ padding: "40px 16px", textAlign: "center" }}>
-            <p style={{ margin: "0 0 12px", fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
+            <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "Générez votre premier lien d'affiliation depuis votre campagne."
                 : "Generate your first affiliate link from your campaign."}
@@ -308,7 +308,7 @@ export function CampaignAffiliateLinksPanel({
                 style={{
                   border: "none",
                   background: "transparent",
-                  color: "#0047FF",
+                  color: "var(--ws-text)",
                   fontSize: 13,
                   fontWeight: 500,
                   cursor: "pointer",
@@ -323,11 +323,11 @@ export function CampaignAffiliateLinksPanel({
         ) : (
           <>
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 12, letterSpacing: "-0.02em" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 12, letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Évolution des clics" : "Click trend"}
               </div>
               {chartPoints.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#9A9A9A", margin: 0 }}>
+                <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: 0 }}>
                   {lang === "fr" ? "Aucun clic sur cette période." : "No clicks in this period."}
                 </p>
               ) : (
@@ -374,7 +374,7 @@ export function CampaignAffiliateLinksPanel({
                               style={{
                                 fontFamily: externFont,
                                 fontSize: 13,
-                                color: "#0047FF",
+                                color: "var(--ws-text)",
                                 letterSpacing: "-0.02em",
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
@@ -388,15 +388,15 @@ export function CampaignAffiliateLinksPanel({
                               onClick={() => void copyLink(link.slug, link.destination_url)}
                               style={{
                                 flexShrink: 0,
-                                border: "1px solid #E5E5E5",
-                                background: "#FFF",
+                                border: "1px solid var(--ws-border)",
+                                background: "var(--ws-surface)",
                                 borderRadius: 8,
                                 padding: "4px 8px",
                                 fontSize: 11,
                                 fontWeight: 500,
                                 cursor: "pointer",
                                 fontFamily: "inherit",
-                                color: "#1A1A1A",
+                                color: "var(--ws-text)",
                               }}
                             >
                               {copiedSlug === link.slug
@@ -410,7 +410,7 @@ export function CampaignAffiliateLinksPanel({
                           </div>
                         </td>
                         <td style={tdStyle}>@{link.creator_username.replace(/^@/, "")}</td>
-                        <td style={{ ...tdStyle, color: "#6B7280" }}>{campaignName}</td>
+                        <td style={{ ...tdStyle, color: "var(--ws-text-muted)" }}>{campaignName}</td>
                         <td style={{ ...tdStyle, fontWeight: 600 }}>{link.metrics?.clicks ?? 0}</td>
                         <td style={tdStyle}>{link.metrics?.uniques ?? 0}</td>
                         <td style={tdStyle}>{link.metrics?.sales ?? 0}</td>

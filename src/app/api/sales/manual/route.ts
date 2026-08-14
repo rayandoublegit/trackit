@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
-import { getAuthedUserId } from "@/lib/api-auth";
+import { requireBrandSpace } from "@/lib/brand-workspace-server";
+import { brandTablesHaveWorkspaceId } from "@/lib/workspace-db";
 import { getManualSalesLimit, normalizePlan } from "@/lib/plan-limits";
 import {
   COMMISSION_NOT_CONFIGURED_CODE,
@@ -38,10 +39,9 @@ const supabaseAdmin = createClient(
 // Manual sale entry — for brands without Shopify or teams logging sales by hand.
 // Mirrors /api/shopify/sync: inserts into `sales` and credits the creator.
 export async function POST(request: NextRequest) {
-  const authedUserId = await getAuthedUserId(request);
-  if (!authedUserId) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const access = await requireBrandSpace(request);
+  if ("error" in access) return access.error;
+  const { ownerId: authedUserId, spaceId } = access;
 
   const body = await request.json();
   const bodyUserId = String(body.userId || "");
@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
   const creatorId = String(body.creatorId || "");
   const campaignId = String(body.campaignId || "");
   const orderAmount = parseOrderAmount(String(body.amount || "0"));
+  const useWs = await brandTablesHaveWorkspaceId(supabaseAdmin);
 
   if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
   if (!creatorId) return NextResponse.json({ ok: false, error: "No creatorId" }, { status: 400 });
@@ -67,11 +68,14 @@ export async function POST(request: NextRequest) {
   const plan = normalizePlan(profilePlan?.plan);
   const manualSalesLimit = getManualSalesLimit(plan);
   if (manualSalesLimit != null) {
-    const { data: manualRows } = await supabaseAdmin
+    let manualQ = supabaseAdmin
       .from("sales")
       .select("id, shopify_order_id, shop_domain")
-      .eq("user_id", userId)
-      .or("shop_domain.eq.manual,shopify_order_id.like.manual_%");
+      .eq("user_id", userId);
+    if (useWs) manualQ = manualQ.eq("workspace_id", spaceId);
+    const { data: manualRows } = await manualQ.or(
+      "shop_domain.eq.manual,shopify_order_id.like.manual_%",
+    );
     const billableCount = (manualRows ?? []).filter((row) => {
       const orderId = String(row.shopify_order_id || "");
       // Demo preset sales (manual_demo_* / demo_*) hors quota Free.
@@ -92,12 +96,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Creator must belong to this user (same ownership rule as the sync).
-  const { data: creator } = await supabaseAdmin
+  let creatorQ = supabaseAdmin
     .from("creators")
     .select("id, user_id, handle, balance, total_earned, total_sales, commission_rate, discount_code")
     .eq("id", creatorId)
-    .eq("user_id", userId)
-    .maybeSingle();
+    .eq("user_id", userId);
+  if (useWs) creatorQ = creatorQ.eq("workspace_id", spaceId);
+  const { data: creator } = await creatorQ.maybeSingle();
 
   if (!creator) return NextResponse.json({ ok: false, error: "Creator not found" }, { status: 404 });
 
@@ -190,7 +195,7 @@ export async function POST(request: NextRequest) {
     creator.discount_code ||
     (recordAsShopify ? "shopify" : "manual");
 
-  const { error } = await supabaseAdmin.from("sales").insert({
+  const saleRow: Record<string, unknown> = {
     creator_id: creator.id,
     user_id: userId,
     shopify_order_id: presetMeta?.shopify_order_id ?? `manual_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -201,7 +206,10 @@ export async function POST(request: NextRequest) {
     shop_domain: presetMeta?.shop_domain ?? "manual",
     status: "paid",
     created_at: resolveManualSaleCreatedAt(body.date ? String(body.date) : undefined, tzOffset),
-  });
+  };
+  if (useWs) saleRow.workspace_id = spaceId;
+
+  const { error } = await supabaseAdmin.from("sales").insert(saleRow);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 

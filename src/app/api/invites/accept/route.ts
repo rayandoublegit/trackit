@@ -9,6 +9,7 @@ import {
 } from "@/lib/creator-account";
 import { syncCreatorToDiscoverySaved, type BrandCreatorSyncRow } from "@/lib/creator-discovery-sync";
 import { CREATOR_LINK_STATUS } from "@/lib/creator-dashboard-access";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 
 export const dynamic = "force-dynamic";
 
@@ -91,12 +92,15 @@ export async function POST(req: Request) {
 
   const handle = socialHandle;
   let creatorRowId: string | null = null;
+  const brandWorkspaceId = await resolveOwnerActiveWorkspaceId(supabase, invite.brand_id);
 
   if (handle) {
-    const { data: existingRows } = await supabase
+    let existingQuery = supabase
       .from("creators")
       .select("id, handle")
       .eq("user_id", invite.brand_id);
+    if (brandWorkspaceId) existingQuery = existingQuery.eq("workspace_id", brandWorkspaceId);
+    const { data: existingRows } = await existingQuery;
     const existing =
       (existingRows ?? []).find((row) => normalizeCreatorHandle(row.handle) === handle) ?? null;
 
@@ -107,17 +111,19 @@ export async function POST(req: Request) {
         .eq("id", existing.id);
       creatorRowId = existing.id;
     } else {
+      const insertRow: Record<string, unknown> = {
+        user_id: invite.brand_id,
+        handle,
+        full_name: fullName || handle,
+        linked_user_id: creatorId,
+        platform: "tiktok",
+        commission_rate: 10,
+        needs_review: true,
+      };
+      if (brandWorkspaceId) insertRow.workspace_id = brandWorkspaceId;
       const { data: inserted, error: insertErr } = await supabase
         .from("creators")
-        .insert({
-          user_id: invite.brand_id,
-          handle,
-          full_name: fullName || handle,
-          linked_user_id: creatorId,
-          platform: "tiktok",
-          commission_rate: 10,
-          needs_review: true,
-        })
+        .insert(insertRow)
         .select("id")
         .single();
       if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 });
@@ -145,7 +151,7 @@ export async function POST(req: Request) {
         supabase,
         invite.brand_id,
         creatorForSync as BrandCreatorSyncRow,
-        { pipelineStatus: "signed" },
+        { pipelineStatus: "signed", workspaceId: brandWorkspaceId },
       );
       if (syncErr) return NextResponse.json({ ok: false, error: syncErr.message }, { status: 500 });
     }

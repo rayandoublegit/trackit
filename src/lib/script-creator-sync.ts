@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 
 export type ScriptRef = { id: string; title: string };
 
@@ -10,7 +11,7 @@ export async function syncScriptRefToDiscoverySaved(
 ): Promise<Error | null> {
   const { data: creator, error: creatorErr } = await admin
     .from("creators")
-    .select("handle, full_name, avatar_url, platform, followers, engagement_rate, niche")
+    .select("handle, full_name, avatar_url, platform, followers, engagement_rate, niche, workspace_id")
     .eq("id", creatorId)
     .eq("user_id", brandId)
     .maybeSingle();
@@ -20,12 +21,18 @@ export async function syncScriptRefToDiscoverySaved(
   const username = creator.handle.trim().replace(/^@+/, "").toLowerCase();
   if (!username) return null;
 
-  const { data: existing } = await admin
+  const workspaceId =
+    (creator.workspace_id as string | null) ??
+    (await resolveOwnerActiveWorkspaceId(admin, brandId));
+
+  let existingQuery = admin
     .from("discovery_saved")
-    .select("snapshot, pipeline_status, notes")
+    .select("id, snapshot, pipeline_status, notes")
     .eq("user_id", brandId)
-    .eq("creator_username", username)
-    .maybeSingle();
+    .eq("creator_username", username);
+  if (workspaceId) existingQuery = existingQuery.eq("workspace_id", workspaceId);
+  const { data: existingRows } = await existingQuery.limit(1);
+  const existing = existingRows?.[0] ?? null;
 
   const prevSnap =
     existing?.snapshot && typeof existing.snapshot === "object"
@@ -49,7 +56,7 @@ export async function syncScriptRefToDiscoverySaved(
     crm: { ...prevCrm, scripts },
   };
 
-  const row = {
+  const row: Record<string, unknown> = {
     user_id: brandId,
     creator_username: username,
     display_name: creator.full_name?.trim() || username,
@@ -63,9 +70,10 @@ export async function syncScriptRefToDiscoverySaved(
     notes: existing?.notes ?? "",
     updated_at: new Date().toISOString(),
   };
+  if (workspaceId) row.workspace_id = workspaceId;
 
-  const { error } = await admin
-    .from("discovery_saved")
-    .upsert(row, { onConflict: "user_id,creator_username" });
+  const { error } = existing?.id
+    ? await admin.from("discovery_saved").update(row).eq("id", existing.id)
+    : await admin.from("discovery_saved").insert(row);
   return error ? new Error(error.message) : null;
 }

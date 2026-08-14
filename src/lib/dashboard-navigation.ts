@@ -31,8 +31,8 @@ export type DashboardNavState = {
   settingsTab?: string;
 };
 
-export function isDetailTab(value: string | undefined): value is "creators" | "analytics" | "content" | "links" {
-  return value === "creators" || value === "analytics" || value === "content" || value === "links";
+export function isDetailTab(value: string | undefined): value is "creators" | "analytics" {
+  return value === "creators" || value === "analytics";
 }
 
 export function normalizeNavState(state: DashboardNavState): DashboardNavState {

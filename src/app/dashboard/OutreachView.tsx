@@ -791,48 +791,29 @@ function OutreachAIGeneratePanel({
   const platforms: GeneratePlatform[] = ["TikTok DM", "Instagram DM", "Email"];
 
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div
-        style={{
-          background: "#FFFFFF",
-          border: "1px solid #EFEFEF",
-          borderRadius: 16,
-          padding: expanded ? 0 : 20,
-          overflow: "hidden",
-        }}
-      >
+    <div style={{ marginBottom: 28 }}>
+      <div className={`ou-ai${expanded ? " is-expanded" : ""}`}>
         {!expanded ? (
-          isMobile ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0, alignSelf: "flex-start" }} />
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>
-                  {lang === "fr" ? "Générer un outreach avec Trackit IA" : "Generate outreach with Trackit AI"}
-                </div>
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
-                  {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un outreach personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized outreach, you edit and send"}
-                </div>
-              </div>
-              <button type="button" className="hero-cta-shopify hero-cta-compact" style={{ alignSelf: "flex-start" }} onClick={() => setExpanded(true)}>
-                {lang === "fr" ? "Essayer maintenant" : "Try now"}
-              </button>
+          <div className={`ou-ai__collapsed${isMobile ? " is-mobile" : ""}`}>
+            <div className="ou-ai__icon" aria-hidden>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+              </svg>
             </div>
-          ) : (
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" style={{ height: 72, width: "auto", display: "block", flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>
-                  {lang === "fr" ? "Générer un outreach avec Trackit IA" : "Generate outreach with Trackit AI"}
-                </div>
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
-                  {lang === "fr" ? "Sélectionnez un créateur, l'IA rédige un outreach personnalisé, vous modifiez et envoyez" : "Select a creator, AI writes a personalized outreach, you edit and send"}
-                </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="ou-ai__title">
+                {lang === "fr" ? "Générer un outreach avec l’IA" : "Generate outreach with AI"}
               </div>
-              <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={() => setExpanded(true)}>
-                {lang === "fr" ? "Essayer maintenant" : "Try now"}
-              </button>
+              <div className="ou-ai__sub">
+                {lang === "fr"
+                  ? "Choisis un créateur — l’IA rédige, tu modifies, tu envoies."
+                  : "Pick a creator — AI drafts, you edit, you send."}
+              </div>
             </div>
-          )
+            <button type="button" className="ou-ai__cta" onClick={() => setExpanded(true)}>
+              {lang === "fr" ? "Essayer" : "Try it"}
+            </button>
+          </div>
         ) : (
           <>
             <div
@@ -1575,14 +1556,6 @@ export function OutreachHistorySection({
     return list;
   }, [entries, filter, search]);
 
-  const historyStats = useMemo(() => {
-    const totalSent = entries.length;
-    const replied = entries.filter((e) => e.status === "replied" || e.status === "converted").length;
-    const converted = entries.filter((e) => e.status === "converted").length;
-    const replyRate = totalSent > 0 ? Math.round((replied / totalSent) * 100) : 0;
-    return { totalSent, replied, converted, replyRate };
-  }, [entries]);
-
   const updateStatus = (id: string, status: OutreachHistoryStatus, source?: OutreachHistoryEntry) => {
     const prev = entries.find((e) => e.id === id);
     setEntries((list) =>
@@ -1625,53 +1598,26 @@ export function OutreachHistorySection({
     { id: "converted", label: lang === "fr" ? "Converti" : "Converted" },
   ];
 
-  const handleAiMarkSent = async (entry: OutreachHistoryEntry) => {
-    await handleMarkSent(
-      {
-        username: entry.handle,
-        handle: entry.handle,
-        displayName: entry.creator,
-        creator: entry.creator,
-        avatarUrl: entry.avatar,
-        avatar: entry.avatar,
-        platform: entry.platform,
-      },
-      entry.message,
-      entry.followUpDate
-    );
-  };
-
   return (
     <>
-      <OutreachAIGeneratePanel
-        lang={lang}
-        plan={plan}
-        onUpgrade={onUpgrade}
-        onUpgradePro={onUpgradePro}
-        onUpgradeScale={onUpgradeScale}
-        onMarkSent={handleAiMarkSent}
-        onToast={setToast}
-        isMobile={isMobile}
-      />
-
-      <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>{lang === "fr" ? "Historique d'outreach" : "Outreach history"}</h3>
+      <div className="ou-history">
+        <div className="ou-history__toolbar">
+          <h3 className="ou-history__title">{lang === "fr" ? "Historique" : "History"}</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {entries.length > 0 && (
             <button
               type="button"
               onClick={() => void handleClearHistory()}
-              className="hero-cta-shopify-light hero-cta-compact-sm"
+              className="ou-ghost-btn"
             >
-              {lang === "fr" ? "Vider l'historique" : "Clear history"}
+              {lang === "fr" ? "Vider" : "Clear"}
             </button>
           )}
           <div style={{ position: "relative", minWidth: 220 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
+            <div className="ou-search">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
-                <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
               <input
                 type="text"
@@ -1682,8 +1628,7 @@ export function OutreachHistorySection({
                 }}
                 onFocus={() => setHistoryCreatorSearchOpen(true)}
                 onBlur={() => window.setTimeout(() => setHistoryCreatorSearchOpen(false), 150)}
-                placeholder={lang === "fr" ? "Rechercher un créateur..." : "Search creators..."}
-                style={{ border: "none", outline: "none", flex: 1, fontSize: 13, fontFamily: "inherit", background: "transparent", minWidth: 140 }}
+                placeholder={lang === "fr" ? "Rechercher…" : "Search…"}
               />
             </div>
             {historyCreatorSearchOpen && search.trim() && (
@@ -1745,63 +1690,35 @@ export function OutreachHistorySection({
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 4, flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : undefined, paddingBottom: isMobile ? 4 : undefined, marginBottom: 20, borderBottom: "1px solid #EFEFEF" }}>
+        <div className={`ou-tabs${isMobile ? " is-mobile" : ""}`}>
           {filterTabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setFilter(t.id)}
-              style={{
-                background: "transparent",
-                border: "none",
-                borderBottom: filter === t.id ? "2px solid #0047FF" : "2px solid transparent",
-                padding: "8px 10px 12px",
-                fontSize: 13,
-                fontWeight: filter === t.id ? 600 : 400,
-                color: filter === t.id ? "#1A1A1A" : "#7A7A7A",
-                fontFamily: "inherit",
-                cursor: "pointer",
-                marginRight: 4,
-              }}
+              className={`ou-tab${filter === t.id ? " is-active" : ""}`}
             >
               {t.label}
             </button>
           ))}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-          {[
-            { label: lang === "fr" ? "Total envoyé" : "Total sent", value: String(historyStats.totalSent) },
-            { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: `${historyStats.replyRate}%` },
-            {
-              label: lang === "fr" ? "Réponses" : "Replies",
-              value: String(historyStats.replied),
-            },
-            { label: lang === "fr" ? "Converti" : "Converted", value: String(historyStats.converted) },
-          ].map((kpi) => (
-            <div key={kpi.label} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 12, padding: 14 }}>
-              <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 6 }}>{kpi.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A" }}>{kpi.value}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, overflow: "hidden" }}>
+        <div className="ou-list">
           {filtered.length === 0 ? (
-            <div style={{ padding: 48, textAlign: "center", color: "#7A7A7A", fontSize: 14 }}>
+            <div className="ou-empty">
               {entries.length === 0
                 ? lang === "fr"
-                  ? "Aucun outreach envoyé pour le moment. Contactez un créateur via Instagram, TikTok, etc."
-                  : "No outreach sent yet. Contact a creator via Instagram, TikTok, etc."
+                  ? "Il semblerait que vous n’ayez encore envoyé aucun outreach — la première conversation commence ici."
+                  : "Looks like you haven’t sent any outreach yet — your first conversation starts here."
                 : lang === "fr"
-                  ? "Aucun résultat pour ce filtre."
-                  : "No results for this filter."}
+                  ? "Rien ne correspond à ce filtre — essayez un autre angle."
+                  : "Nothing matches this filter — try a different angle."}
             </div>
           ) : isMobile ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 12 }}>
               {filtered.map((item) => {
                 return (
-                  <div key={item.id} style={{ background: "#fff", border: "1px solid #EFEFEF", borderRadius: 14, padding: 16 }}>
+                  <div key={item.id} className="ou-row-card">
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <CreatorAvatar src={item.avatar} username={item.handle} displayName={item.creator} size={40} alt={item.creator} />
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1841,15 +1758,17 @@ export function OutreachHistorySection({
           ) : (
             <>
               <div
+                className="ou-table-head"
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1.6fr 0.8fr 1.4fr 0.9fr 0.9fr 0.9fr 1.1fr",
                   gap: 10,
-                  padding: "12px 16px",
-                  background: "#FAFAFA",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "#9A9A9A",
+                  padding: "10px 4px 12px",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: "var(--ws-text-muted, #9A9A9A)",
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
                 }}
               >
                 {[

@@ -84,7 +84,7 @@ export function CreatorAffiliateReadPanel({
         style={{
           width: "min(440px, 100%)",
           height: "100%",
-          background: "#FFF",
+          background: "var(--ws-surface)",
           overflowY: "auto",
           padding: "24px 26px 40px",
           boxSizing: "border-box",
@@ -98,7 +98,7 @@ export function CreatorAffiliateReadPanel({
             style={{
               background: "none",
               border: "none",
-              color: "#9A9A9A",
+              color: "var(--ws-text-dim)",
               fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
@@ -114,31 +114,31 @@ export function CreatorAffiliateReadPanel({
           style={{
             fontSize: 20,
             fontWeight: 600,
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
             margin: "0 0 8px",
             letterSpacing: "-0.03em",
           }}
         >
           {lang === "fr" ? "Lien d'affiliation" : "Affiliate link"}
         </h2>
-        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 24px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 24px", lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Votre lien de parrainage attribué par la marque."
             : "Your referral link assigned by the brand."}
         </p>
 
         {loading ? (
-          <p style={{ fontSize: 14, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
         ) : !link && !code ? (
           <div
             style={{
-              border: "1px solid #EFEFEF",
+              border: "1px solid var(--ws-border)",
               borderRadius: 12,
               padding: "20px 18px",
-              background: "#FAFAFA",
+              background: "var(--ws-surface-2)",
             }}
           >
-            <p style={{ margin: 0, fontSize: 14, color: "#7A7A7A", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.55, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "Aucun lien d'affiliation n'a été encore attribué à votre compte."
                 : "No affiliate link has been assigned to your account yet."}
@@ -148,7 +148,7 @@ export function CreatorAffiliateReadPanel({
           <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
             {link && (
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   {lang === "fr" ? "Lien" : "Link"}
                 </div>
                 <div
@@ -158,8 +158,8 @@ export function CreatorAffiliateReadPanel({
                     gap: 10,
                     padding: "12px 14px",
                     borderRadius: 12,
-                    border: "1px solid #E5E5E5",
-                    background: "#FAFAFA",
+                    border: "1px solid var(--ws-border)",
+                    background: "var(--ws-surface-2)",
                   }}
                 >
                   <div
@@ -167,7 +167,7 @@ export function CreatorAffiliateReadPanel({
                       flex: 1,
                       minWidth: 0,
                       fontSize: 13,
-                      color: "#1A1A1A",
+                      color: "var(--ws-text)",
                       fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -182,8 +182,8 @@ export function CreatorAffiliateReadPanel({
                     style={{
                       flexShrink: 0,
                       border: "none",
-                      background: "#1A1A1A",
-                      color: "#FFF",
+                      background: "var(--ws-btn)",
+                      color: "var(--ws-btn-text)",
                       borderRadius: 8,
                       padding: "8px 12px",
                       fontSize: 12,
@@ -206,7 +206,7 @@ export function CreatorAffiliateReadPanel({
 
             {code && (
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                   {lang === "fr" ? "Code promo" : "Promo code"}
                 </div>
                 <div
@@ -216,8 +216,8 @@ export function CreatorAffiliateReadPanel({
                     gap: 10,
                     padding: "12px 14px",
                     borderRadius: 12,
-                    border: "1px solid #E5E5E5",
-                    background: "#FAFAFA",
+                    border: "1px solid var(--ws-border)",
+                    background: "var(--ws-surface-2)",
                   }}
                 >
                   <div
@@ -225,7 +225,7 @@ export function CreatorAffiliateReadPanel({
                       flex: 1,
                       fontSize: 15,
                       fontWeight: 700,
-                      color: "#1A1A1A",
+                      color: "var(--ws-text)",
                       fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                       letterSpacing: "0.04em",
                     }}
@@ -237,9 +237,9 @@ export function CreatorAffiliateReadPanel({
                     onClick={() => void copyText(code, "code")}
                     style={{
                       flexShrink: 0,
-                      border: "1px solid #E5E5E5",
-                      background: "#FFF",
-                      color: "#1A1A1A",
+                      border: "1px solid var(--ws-border)",
+                      background: "var(--ws-surface)",
+                      color: "var(--ws-text)",
                       borderRadius: 8,
                       padding: "8px 12px",
                       fontSize: 12,

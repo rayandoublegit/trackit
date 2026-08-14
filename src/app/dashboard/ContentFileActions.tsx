@@ -5,11 +5,9 @@ import type { Lang } from "@/lib/useLang";
 import { deleteBrandContent } from "@/lib/content-shared";
 import { dispatchContentUpdated } from "@/lib/outreach-history-events";
 
-const BLUE = "#0047FF";
-
 const deleteBtnStyle: React.CSSProperties = {
   border: "1px solid #FECACA",
-  background: "#FFF",
+  background: "var(--ws-surface)",
   color: "#DC2626",
   borderRadius: 8,
   padding: "4px 10px",
@@ -66,15 +64,7 @@ export function ContentFileActions({
         target="_blank"
         rel="noopener noreferrer"
         download={fileName}
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          fontSize: 13,
-          fontWeight: 500,
-          color: BLUE,
-          textDecoration: "none",
-          letterSpacing: "-0.01em",
-        }}
+        className="bc-card__download"
       >
         {openLabel} →
       </a>

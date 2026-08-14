@@ -66,6 +66,7 @@ export const CHAOTIC_WORK_COMPONENT_CLASSES = [
   "chaotic-work__title-emphasis",
   "chaotic-work__stats",
   "chaotic-work__icon",
+  "chaotic-work__icon-inner",
   "chaotic-work__app",
   "chaotic-work__badge",
 ] as const;

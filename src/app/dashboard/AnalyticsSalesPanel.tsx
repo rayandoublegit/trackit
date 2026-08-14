@@ -73,7 +73,7 @@ function SaleTimelineIcon({ shopify }: { shopify: boolean }) {
           width: 32,
           height: 32,
           borderRadius: 10,
-          background: "#ECFDF3",
+          background: "transparent",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -90,12 +90,12 @@ function SaleTimelineIcon({ shopify }: { shopify: boolean }) {
         width: 32,
         height: 32,
         borderRadius: 10,
-        background: "#EFF6FF",
+        background: "transparent",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        color: "#2563EB",
+        color: "var(--ws-text)",
       }}
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -106,9 +106,9 @@ function SaleTimelineIcon({ shopify }: { shopify: boolean }) {
 }
 
 const deleteBtnStyle: React.CSSProperties = {
-  border: "1px solid #FECACA",
-  background: "#FFF",
-  color: "#DC2626",
+  border: "1px solid var(--ws-border)",
+  background: "var(--ws-bg)",
+  color: "var(--ws-danger)",
   borderRadius: 8,
   padding: "4px 8px",
   fontSize: 11,
@@ -246,11 +246,11 @@ export function AnalyticsSalesPanel({
     >
       <div
         style={{
-          background: "#FFFFFF",
-          border: "1px solid #EFEFEF",
+          background: "var(--ws-surface)",
+          border: "1px solid var(--ws-border)",
           borderRadius: 16,
           padding: "16px 14px 14px",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+          boxShadow: "var(--ws-shadow)",
           display: "flex",
           flexDirection: "column",
           flex: isMobile ? undefined : 1,
@@ -262,7 +262,7 @@ export function AnalyticsSalesPanel({
         }}
       >
         <div style={{ marginBottom: 14 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.03em" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.03em" }}>
             {lang === "fr" ? "Dernières ventes" : "Latest sales"}
           </h2>
         </div>
@@ -274,7 +274,7 @@ export function AnalyticsSalesPanel({
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden
-            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A9A9A" }}
+            style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ws-text-dim)" }}
           >
             <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
             <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -289,11 +289,11 @@ export function AnalyticsSalesPanel({
               boxSizing: "border-box",
               padding: "9px 12px 9px 34px",
               borderRadius: 999,
-              border: "1px solid #E5E5E5",
-              background: "#FAFAFA",
+              border: "1px solid var(--ws-border)",
+              background: "var(--ws-input)",
               fontSize: 12,
               fontFamily: "inherit",
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               letterSpacing: "-0.02em",
               outline: "none",
             }}
@@ -312,11 +312,11 @@ export function AnalyticsSalesPanel({
           }}
         >
           {loading ? (
-            <div style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 12 }}>
+            <div style={{ padding: "32px 8px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 12 }}>
               {lang === "fr" ? "Chargement…" : "Loading…"}
             </div>
           ) : filteredSales.length === 0 ? (
-            <div style={{ padding: "32px 8px", textAlign: "center", color: "#9A9A9A", fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ padding: "32px 8px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 12, lineHeight: 1.5 }}>
               {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
             </div>
           ) : (
@@ -329,7 +329,7 @@ export function AnalyticsSalesPanel({
                   top: 16,
                   bottom: 16,
                   width: 1,
-                  borderLeft: "1px dashed #E5E5E5",
+                  borderLeft: "1px dashed var(--ws-border)",
                 }}
               />
               {filteredSales.map((sale) => {
@@ -373,7 +373,7 @@ export function AnalyticsSalesPanel({
                           style={{
                             fontSize: 13,
                             fontWeight: 600,
-                            color: "#1A1A1A",
+                            color: "var(--ws-text)",
                             letterSpacing: "-0.02em",
                             lineHeight: 1.3,
                           }}
@@ -393,7 +393,7 @@ export function AnalyticsSalesPanel({
                           {lang === "fr" ? "Supprimer" : "Delete"}
                         </button>
                       </div>
-                      <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, letterSpacing: "-0.02em" }}>
+                      <div style={{ fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.45, letterSpacing: "-0.02em" }}>
                         @{handle} · {amount}
                         {codePart}
                         <br />

@@ -57,10 +57,12 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
 
   const fetchAnalytics = useCallback(
     async (activeRange: DateRange) => {
-      const res = await fetch(
+      const { cachedJsonFetch } = await import("@/lib/dashboard-fetch-cache");
+      return cachedJsonFetch<Record<string, unknown>>(
         `/api/analytics?userId=${userId}&range=${activeRange}&tzOffset=${tzOffset}`,
+        { credentials: "include" },
+        { preferCache: true, ttlMs: 20_000 },
       );
-      return res.json() as Promise<Record<string, unknown>>;
     },
     [userId, tzOffset],
   );

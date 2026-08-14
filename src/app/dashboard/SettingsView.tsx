@@ -143,7 +143,7 @@ function invoiceStatusLabel(status: "Paid" | "Failed" | "Pending", lang: Lang): 
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: "#0047FF",
+  background: "var(--ws-accent)",
   color: "#FFFFFF",
   border: "none",
   borderRadius: 10,
@@ -156,9 +156,9 @@ const btnPrimary: React.CSSProperties = {
 };
 
 const btnSecondary: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "10px 16px",
   fontSize: 13,
@@ -173,12 +173,12 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "10px 12px",
   borderRadius: 10,
-  border: "1px solid #E5E5E5",
+  border: "1px solid var(--ws-border)",
   fontSize: 14,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFFFFF",
+  background: "var(--ws-input)",
 };
 
 type ProfileRow = {
@@ -282,8 +282,8 @@ export function SettingsView({
 
   return (
     <>
-      <div style={{ padding: isMobile ? "16px" : "32px 40px 0 40px", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 20 }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
+      <div style={{ padding: isMobile ? "16px" : "32px 40px 0 40px", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-bg)" }}>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 20 }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
         <div style={{ display: "flex", gap: 28, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
           {tabs.map((t) => (
             <button
@@ -296,11 +296,11 @@ export function SettingsView({
                 padding: "12px 0",
                 fontSize: 14,
                 fontFamily: "inherit",
-                color: tab === t.id ? "#1A1A1A" : "#7A7A7A",
+                color: tab === t.id ? "var(--ws-text)" : "var(--ws-text-muted)",
                 fontWeight: tab === t.id ? 500 : 400,
                 letterSpacing: "-0.02em",
                 cursor: "pointer",
-                borderBottom: tab === t.id ? "2px solid #1A1A1A" : "2px solid transparent",
+                borderBottom: tab === t.id ? "2px solid var(--ws-btn)" : "2px solid transparent",
                 marginBottom: -1,
                 whiteSpace: "nowrap",
               }}
@@ -311,9 +311,9 @@ export function SettingsView({
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "var(--ws-bg)", minHeight: "100%", color: "var(--ws-text)" }}>
         {loading ? (
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>Loading settings...</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>Loading settings...</p>
         ) : (
           <>
             {tab === "general" && user && profile && (
@@ -368,8 +368,8 @@ export function SettingsView({
 
 function Card({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-      {title && <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 18px 0" }}>{title}</h3>}
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
+      {title && <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 18px 0" }}>{title}</h3>}
       {children}
     </div>
   );
@@ -378,7 +378,7 @@ function Card({ title, children }: { title?: string; children: React.ReactNode }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{label}</label>
       {children}
     </div>
   );
@@ -386,7 +386,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function SegmentedToggle({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div style={{ display: "inline-flex", background: "#F5F5F5", borderRadius: 10, padding: 3, gap: 2 }}>
+    <div style={{ display: "inline-flex", background: "var(--ws-bg)", borderRadius: 10, padding: 3, gap: 2 }}>
       {options.map((opt) => (
         <button
           key={opt}
@@ -400,8 +400,8 @@ function SegmentedToggle({ options, value, onChange }: { options: string[]; valu
             fontFamily: "inherit",
             fontWeight: value === opt ? 500 : 400,
             cursor: "pointer",
-            background: value === opt ? "#FFFFFF" : "transparent",
-            color: value === opt ? "#1A1A1A" : "#7A7A7A",
+            background: value === opt ? "var(--ws-surface)" : "transparent",
+            color: value === opt ? "var(--ws-text)" : "var(--ws-text-muted)",
             boxShadow: value === opt ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
             letterSpacing: "-0.02em",
           }}
@@ -423,7 +423,7 @@ function SettingsToggle({ on, onToggle }: { on: boolean; onToggle: () => void })
         position: "relative",
         width: 40,
         height: 22,
-        background: on ? "#0047FF" : "#E5E5E5",
+        background: on ? "var(--ws-accent)" : "var(--ws-border)",
         borderRadius: 999,
         border: "none",
         cursor: "pointer",
@@ -450,7 +450,7 @@ function SettingsToggle({ on, onToggle }: { on: boolean; onToggle: () => void })
 
 function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
   return (
-    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
       {invoiceStatusLabel(status, lang)}
     </span>
   );
@@ -517,6 +517,21 @@ function GeneralSettings({
       setMessage({ text: error.message, type: "error" });
       return;
     }
+    // Keep the active brand-workspace name in sync with Settings.
+    try {
+      const spacesRes = await fetch("/api/workspaces", { credentials: "include", cache: "no-store" });
+      const spacesData = (await spacesRes.json()) as { ok?: boolean; activeWorkspaceId?: string };
+      if (spacesRes.ok && spacesData.ok && spacesData.activeWorkspaceId) {
+        await fetch(`/api/workspaces/${spacesData.activeWorkspaceId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: storeName.trim() }),
+        });
+      }
+    } catch {
+      /* non-blocking */
+    }
     setAppTimezone(timezone);
     onSaved({
       business_name: storeName.trim(),
@@ -536,8 +551,8 @@ function GeneralSettings({
     if (storeChanged) {
       const ok = window.confirm(
         lang === "fr"
-          ? "Êtes-vous sûr de vouloir changer le nom de cette boutique ?"
-          : "Are you sure you want to change this store name?"
+          ? "Êtes-vous sûr de vouloir renommer ce workspace ?"
+          : "Are you sure you want to rename this workspace?"
       );
       if (!ok) return;
     }
@@ -546,9 +561,20 @@ function GeneralSettings({
 
   return (
     <Card>
-      <Field label={lang === "fr" ? "Nom de la boutique" : "Store name"}>
-        <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} placeholder="Acme Co." style={inputStyle} />
+      <Field label={lang === "fr" ? "Nom du workspace" : "Workspace name"}>
+        <input
+          type="text"
+          value={storeName}
+          onChange={(e) => setStoreName(e.target.value)}
+          placeholder={lang === "fr" ? "Mon workspace" : "My workspace"}
+          style={inputStyle}
+        />
       </Field>
+      <p style={{ margin: "-4px 0 14px", fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.45 }}>
+        {lang === "fr"
+          ? "Ce nom apparaît en haut du dashboard (comme un espace ClickUp)."
+          : "This name appears at the top of the dashboard (like a ClickUp space)."}
+      </p>
       <Field label={lang === "fr" ? "Langue par défaut" : "Default language"}>
         <SegmentedToggle
           options={["EN", "FR"]}
@@ -580,9 +606,9 @@ function GeneralSettings({
         {saving ? (lang === "fr" ? "Enregistrement…" : "Saving...") : lang === "fr" ? "Sauvegarder" : "Save changes"}
       </button>
 
-      <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid #EFEFEF" }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
-        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
+      <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--ws-border)" }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 14px 0", lineHeight: 1.45 }}>
           {lang === "fr" ? "Déconnectez-vous et dissociez cet appareil de votre compte Trackit." : "Sign out and disconnect this device from your Trackit account."}
         </p>
         <button
@@ -832,11 +858,11 @@ function ProfileSettings({
     <Card>
       <Field label={lang === "fr" ? "Photo de profil" : "Profile photo"}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#E8EEFC", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--ws-accent-soft)", flexShrink: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
             {displayAvatar ? (
               <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: 24, fontWeight: 600, color: "#0047FF" }}>{initial}</span>
+              <span style={{ fontSize: 24, fontWeight: 600, color: "var(--ws-accent)" }}>{initial}</span>
             )}
           </div>
           <label style={{ cursor: "pointer" }}>
@@ -853,7 +879,7 @@ function ProfileSettings({
       </Field>
       <Field label={lang === "fr" ? "Nom d'utilisateur" : "Username"}>
         <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#9A9A9A", fontSize: 14 }}>@</span>
+          <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--ws-text-dim)", fontSize: 14 }}>@</span>
           <input
             type="text"
             value={username}
@@ -1038,26 +1064,26 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       <Card title={lang === "fr" ? "Plan actuel" : "Current plan"}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "#0047FF", background: "#F0F6FF", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>
+            <span style={{ display: "inline-block", fontSize: 11, fontWeight: 600, color: "var(--ws-accent)", background: "var(--ws-accent-soft)", padding: "4px 10px", borderRadius: 6, marginBottom: 10, letterSpacing: "-0.01em" }}>
               {planLoading
                 ? "…"
                 : planDisplayName(currentPlan, lang)}
             </span>
-            <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 4 }}>
+            <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", marginBottom: 4 }}>
               {planLoading ? (
-                <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
+                <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ws-text-muted)" }}>
                   {lang === "fr" ? "Chargement..." : "Loading..."}
                 </span>
               ) : (
                 <>
                   {formatPricingAmount(planMonthlyPrice(currentPlan), lang)}
-                  <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>{lang === "fr" ? "/mois" : "/month"}</span>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ws-text-muted)" }}>{lang === "fr" ? "/mois" : "/month"}</span>
                 </>
               )}
             </div>
             {!planLoading && isPaidPlan && (
               <>
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+                <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
                   {lang === "fr" ? "Prochaine date de facturation :" : "Next billing date:"}{" "}
                   {invoicesLoading
                     ? lang === "fr"
@@ -1076,7 +1102,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
           {!planLoading && currentPlan !== "scale" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: isMobile ? "stretch" : "flex-end" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: isMobile ? "center" : "flex-end" }}>
-                <span style={{ fontSize: 13, color: annual ? "#9A9A9A" : "#1A1A1A", fontWeight: annual ? 400 : 600 }}>
+                <span style={{ fontSize: 13, color: annual ? "var(--ws-text-dim)" : "var(--ws-text)", fontWeight: annual ? 400 : 600 }}>
                   {lang === "fr" ? "Mensuel" : "Monthly"}
                 </span>
                 <button
@@ -1089,7 +1115,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                     height: 24,
                     borderRadius: 999,
                     border: "none",
-                    background: annual ? "#0047FF" : "#E5E5E5",
+                    background: annual ? "var(--ws-accent)" : "var(--ws-border)",
                     position: "relative",
                     cursor: "pointer",
                     padding: 0,
@@ -1104,17 +1130,17 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                       width: 20,
                       height: 20,
                       borderRadius: "50%",
-                      background: "#FFFFFF",
+                      background: "var(--ws-surface)",
                       transition: "left 0.2s ease",
                       boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
                     }}
                   />
                 </button>
-                <span style={{ fontSize: 13, color: annual ? "#1A1A1A" : "#9A9A9A", fontWeight: annual ? 600 : 400 }}>
+                <span style={{ fontSize: 13, color: annual ? "var(--ws-text)" : "var(--ws-text-dim)", fontWeight: annual ? 600 : 400 }}>
                   {lang === "fr" ? "Annuel" : "Annual"}
                 </span>
                 {annual && (
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#0047FF", letterSpacing: "-0.01em" }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-accent)", letterSpacing: "-0.01em" }}>
                     {annualFreeMonthsBadge(lang)}
                   </span>
                 )}
@@ -1136,7 +1162,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                     type="button"
                     onClick={() => void startCheckout("pro")}
                     disabled={loading !== null}
-                    style={{ ...btnPrimary, background: "#1A1A1A" }}
+                    style={{ ...btnPrimary, background: "var(--ws-btn)", color: "var(--ws-btn-text)" }}
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
@@ -1150,7 +1176,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
                     type="button"
                     onClick={() => void startCheckout("pro")}
                     disabled={loading !== null}
-                    style={{ ...btnPrimary, background: "#1A1A1A" }}
+                    style={{ ...btnPrimary, background: "var(--ws-btn)", color: "var(--ws-btn-text)" }}
                   >
                     {loading === "pro"
                       ? lang === "fr" ? "Chargement..." : "Loading..."
@@ -1195,7 +1221,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               padding: 0,
               marginTop: 14,
               fontSize: 12,
-              color: "#9A9A9A",
+              color: "var(--ws-text-dim)",
               cursor: portalLoading ? "wait" : "pointer",
               fontFamily: "inherit",
               letterSpacing: "-0.01em",
@@ -1219,7 +1245,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
 
       <Card title={lang === "fr" ? "Historique des factures" : "Invoice history"}>
         {invoicesLoading ? (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
             {lang === "fr" ? "Chargement des factures..." : "Loading invoices..."}
           </p>
         ) : invoicesError ? (
@@ -1227,7 +1253,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
             {invoicesError}
           </p>
         ) : invoices.length === 0 ? (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? "Aucune facture pour le moment. Elles apparaîtront ici après votre premier paiement."
               : "No invoices yet. They will appear here after your first payment."}
@@ -1236,18 +1262,18 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
           <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 500 : undefined }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Date" : "Date"}</th>
-                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
-                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Statut" : "Status"}</th>
-                  <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, letterSpacing: "-0.01em" }}></th>
+                <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
+                  <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Date" : "Date"}</th>
+                  <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Montant" : "Amount"}</th>
+                  <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, letterSpacing: "-0.01em" }}>{lang === "fr" ? "Statut" : "Status"}</th>
+                  <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, letterSpacing: "-0.01em" }}></th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((inv) => (
-                  <tr key={inv.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                    <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>{formatInvoiceDate(inv.created)}</td>
-                    <td style={{ padding: "12px 8px", color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+                  <tr key={inv.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                    <td style={{ padding: "12px 8px", color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{formatInvoiceDate(inv.created)}</td>
+                    <td style={{ padding: "12px 8px", color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
                       {new Intl.NumberFormat(lang === "fr" ? "fr-FR" : "en-US", {
                         style: "currency",
                         currency: inv.currency,
@@ -1340,10 +1366,10 @@ function NotificationsSettings({ userId }: { userId: string }) {
 
 function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #F5F5F5" }}>
-      <span style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", paddingRight: 16 }}>{label}</span>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--ws-border)" }}>
+      <span style={{ fontSize: 14, color: "var(--ws-text)", letterSpacing: "-0.02em", paddingRight: 16 }}>{label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{on ? "On" : "Off"}</span>
+        <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>{on ? "On" : "Off"}</span>
         <SettingsToggle on={on} onToggle={onToggle} />
       </div>
     </div>
@@ -1421,7 +1447,7 @@ function TeamSettings({
   return (
     <>
       <Card title={lang === "fr" ? "Inviter un membre" : "Invite team member"}>
-        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>
           {lang === "fr" ? "Ajoutez des collègues à votre espace de travail. Ils recevront une invitation par email." : "Add colleagues to your workspace. They will receive an email invite to join."}
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
@@ -1461,7 +1487,7 @@ function TeamSettings({
           </button>
         </div>
         {!teamInvitesEnabled && (
-          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "8px 0 0", letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? "Les invitations d'équipe seront disponibles prochainement."
               : "Team invites will be available soon."}
@@ -1477,14 +1503,14 @@ function TeamSettings({
         }
       >
         {membersLoading ? (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
             {lang === "fr" ? "Chargement de l'équipe..." : "Loading team..."}
           </p>
         ) : (
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 600 : undefined }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
                 {[
                   lang === "fr" ? "Membre" : "Member",
                   lang === "fr" ? "Rôle" : "Role",
@@ -1492,13 +1518,13 @@ function TeamSettings({
                   lang === "fr" ? "Dernière activité" : "Last active",
                   "",
                 ].map((h) => (
-                  <th key={h || "actions"} style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500, fontSize: 12 }}>{h}</th>
+                  <th key={h || "actions"} style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500, fontSize: 12 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {members.map((m) => (
-                <tr key={m.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                <tr key={m.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
                   <td style={{ padding: "14px 8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div
@@ -1506,8 +1532,8 @@ function TeamSettings({
                           width: 36,
                           height: 36,
                           borderRadius: "50%",
-                          background: m.avatarUrl ? "#EFEFEF" : m.isYou ? "#0047FF" : "#EFEFEF",
-                          color: m.isYou && !m.avatarUrl ? "#FFF" : "#7A7A7A",
+                          background: m.avatarUrl ? "var(--ws-border)" : m.isYou ? "var(--ws-accent)" : "var(--ws-border)",
+                          color: m.isYou && !m.avatarUrl ? "#FFFFFF" : "var(--ws-text-muted)",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
@@ -1526,13 +1552,13 @@ function TeamSettings({
                         )}
                       </div>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A" }}>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)" }}>
                           {m.isYou ? "You" : m.name}
                           {m.isYou && (
-                            <span style={{ marginLeft: 6, fontSize: 11, color: "#9A9A9A", fontWeight: 400 }}>({lang === "fr" ? "propriétaire du compte" : "account owner"})</span>
+                            <span style={{ marginLeft: 6, fontSize: 11, color: "var(--ws-text-dim)", fontWeight: 400 }}>({lang === "fr" ? "propriétaire du compte" : "account owner"})</span>
                           )}
                         </div>
-                        <div style={{ fontSize: 12, color: "#9A9A9A" }}>{m.email}</div>
+                        <div style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>{m.email}</div>
                       </div>
                     </div>
                   </td>
@@ -1552,11 +1578,11 @@ function TeamSettings({
                     )}
                   </td>
                   <td style={{ padding: "14px 8px" }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
                       {m.status === "active" ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Invitation en attente" : "Pending invite"}
                     </span>
                   </td>
-                  <td style={{ padding: "14px 8px", color: "#7A7A7A", fontSize: 12 }}>{formatLastActive(m.lastActive, lang)}</td>
+                  <td style={{ padding: "14px 8px", color: "var(--ws-text-muted)", fontSize: 12 }}>{formatLastActive(m.lastActive, lang)}</td>
                   <td style={{ padding: "14px 8px", textAlign: "right" }}>
                     {!m.isYou && m.role !== "owner" && (
                       <button
@@ -1581,7 +1607,7 @@ function TeamSettings({
           {(["owner", "admin", "editor", "viewer", "billing"] as TeamRole[]).map((role) => (
             <div key={role} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <RoleBadge lang={lang} role={role} />
-              <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45, paddingTop: 2 }}>
+              <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", lineHeight: 1.45, paddingTop: 2 }}>
                 {roleDescription(role, lang)}
               </div>
             </div>
@@ -1594,11 +1620,11 @@ function TeamSettings({
 
 function RoleBadge({ lang, role }: { lang: Lang; role: TeamRole }) {
   const styles: Record<TeamRole, { bg: string; color: string }> = {
-    owner: { bg: "#1A1A1A", color: "#FFFFFF" },
-    admin: { bg: "#F0F6FF", color: "#0047FF" },
-    editor: { bg: "#E8F5E9", color: "#2E7D32" },
-    viewer: { bg: "#F5F5F5", color: "#7A7A7A" },
-    billing: { bg: "#FFF8E1", color: "#F57F17" },
+    owner: { bg: "var(--ws-btn)", color: "var(--ws-btn-text)" },
+    admin: { bg: "var(--ws-accent-soft)", color: "var(--ws-accent)" },
+    editor: { bg: "rgba(46, 125, 50, 0.15)", color: "#4ADE80" },
+    viewer: { bg: "var(--ws-hover)", color: "var(--ws-text-muted)" },
+    billing: { bg: "rgba(245, 127, 23, 0.15)", color: "#FBBF24" },
   };
   const s = styles[role];
   return (
@@ -1633,8 +1659,8 @@ function SecuritySettings({ onDeleteAccount }: { onDeleteAccount: () => void }) 
       </Card>
 
       <Card title={lang === "fr" ? "Zone dangereuse" : "Danger zone"}>
-        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>{lang === "fr" ? "Supprimez définitivement votre compte et toutes les données associées. Cette action est irréversible." : "Permanently delete your account and all associated data. This cannot be undone."}</p>
-        <button type="button" onClick={onDeleteAccount} style={{ background: "#FFFFFF", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Supprimer le compte" : "Delete account"}</button>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 16px 0" }}>{lang === "fr" ? "Supprimez définitivement votre compte et toutes les données associées. Cette action est irréversible." : "Permanently delete your account and all associated data. This cannot be undone."}</p>
+        <button type="button" onClick={onDeleteAccount} style={{ background: "var(--ws-surface)", color: "#DC2626", border: "1px solid #FECACA", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.02em" }}>{lang === "fr" ? "Supprimer le compte" : "Delete account"}</button>
       </Card>
     </>
   );
@@ -1643,9 +1669,9 @@ function SecuritySettings({ onDeleteAccount }: { onDeleteAccount: () => void }) 
 function DeleteAccountModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
-      <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}>
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Delete account?</h3>
-        <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: "0 0 24px 0", lineHeight: 1.5 }}>This will permanently delete your account, stores, creators, and billing history. Type DELETE to confirm.</p>
+      <div style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}>
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Delete account?</h3>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: "0 0 24px 0", lineHeight: 1.5 }}>This will permanently delete your account, stores, creators, and billing history. Type DELETE to confirm.</p>
         <input type="text" placeholder="DELETE" style={{ ...inputStyle, marginBottom: 20 }} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button type="button" onClick={onCancel} style={btnSecondary}>Cancel</button>

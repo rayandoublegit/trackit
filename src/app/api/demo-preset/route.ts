@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Idempotent: completes missing creators / sales / affiliates for the Trackit demo.
     const result = await seedDemoPresetForUser(admin, workspaceId);
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch (e) {

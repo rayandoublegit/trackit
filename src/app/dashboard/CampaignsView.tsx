@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorAttribution, syncCampaignCreators, attachCreatorSalesToCampaign, fetchCreatorBrandSalesSummary } from "@/lib/db";
+import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
-import { CampaignContentTab } from "./CampaignContentTab";
-import { CampaignLinksTab } from "./CampaignLinksTab";
-import { CampaignAffiliateLinksPanel } from "./CampaignAffiliateLinksPanel";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
@@ -28,13 +26,13 @@ import { computeTrend, dayKeyFromIso, fillTimelineDays, formatTrendLabel, isWith
 import {
   AnalyticsSectionHeader,
   HeroBarChartCard,
-  ProfitabilityPill,
   SummaryMetricCard,
 } from "./analytics-metric-cards";
 import { AnalyticsSalesPanel } from "./AnalyticsSalesPanel";
 import { AddSalePanel } from "./AddSalePanel";
 import { formatCurrency, formatCurrencyWithCode, useDisplayCurrency, type DisplayCurrency } from "@/lib/useCurrency";
 import { getDisplayCurrency } from "@/lib/locale-preferences";
+import { rememberLastCampaignId } from "@/lib/last-campaign-storage";
 import {
   compactNumberToInput,
   formatCompactCurrency,
@@ -77,7 +75,7 @@ type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
 type BoardTab = "active" | "drafts" | "finished";
 type CampaignSort = "recent" | "name";
-type DetailTab = "creators" | "analytics" | "content" | "links";
+type DetailTab = "creators" | "analytics";
 type CampaignDateRange = { start: string; end: string };
 
 type CampaignAnalyticsExport = {
@@ -268,19 +266,50 @@ function campaignRowFingerprint(row: Record<string, unknown>): string {
   return `${name}|${platform}|${minute}`;
 }
 
+async function fetchScopedRows<T>(
+  withWorkspace: () => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
+  withoutWorkspace: () => PromiseLike<{ data: T[] | null; error: { code?: string; message?: string } | null }>,
+): Promise<{ data: T[] | null; error: { code?: string; message?: string } | null }> {
+  const first = await withWorkspace();
+  const msg = (first.error?.message || "").toLowerCase();
+  const missingWs =
+    first.error?.code === "42703" ||
+    (msg.includes("workspace_id") && msg.includes("does not exist"));
+  if (missingWs) return withoutWorkspace();
+  return first;
+}
+
 async function fetchCampaignBoardData(resolvedUserId: string): Promise<{
   campaigns: Campaign[];
   sales: SaleRow[];
   creators: CreatorBalanceRow[];
 }> {
+  const { ownerId, spaceId } = clientBrandScope(resolvedUserId);
   const [campaignData, salesResult, creatorsResult, attribution] = await Promise.all([
-    getCampaigns(resolvedUserId),
-    supabase!
-      .from("sales")
-      .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
-      .eq("user_id", resolvedUserId),
-    supabase!.from("creators").select("balance").eq("user_id", resolvedUserId),
-    getCampaignCreatorAttribution(resolvedUserId),
+    getCampaigns(ownerId),
+    fetchScopedRows(
+      () =>
+        supabase!
+          .from("sales")
+          .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+          .eq("user_id", ownerId)
+          .eq("workspace_id", spaceId),
+      () =>
+        supabase!
+          .from("sales")
+          .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+          .eq("user_id", ownerId),
+    ),
+    fetchScopedRows(
+      () =>
+        supabase!
+          .from("creators")
+          .select("balance")
+          .eq("user_id", ownerId)
+          .eq("workspace_id", spaceId),
+      () => supabase!.from("creators").select("balance").eq("user_id", ownerId),
+    ),
+    getCampaignCreatorAttribution(ownerId),
   ]);
 
   const { creatorCounts, linkMeta } = attribution;
@@ -532,13 +561,12 @@ function formatCampaignRoi(roi: number | null | undefined): string {
   return `${roi.toFixed(1)}×`;
 }
 
-function CampaignRoiCell({ roi, lang }: { roi: number | null | undefined; lang: "en" | "fr" }) {
+function CampaignRoiCell({ roi }: { roi: number | null | undefined; lang?: "en" | "fr" }) {
   if (roi == null || roi <= 0) return <span>—</span>;
   const profitable = roi >= 1;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontWeight: 500, color: profitable ? "#166534" : "#991B1B" }}>
+    <span style={{ fontWeight: 500, color: profitable ? "#166534" : "#991B1B" }}>
       {formatCampaignRoi(roi)}
-      <ProfitabilityPill profitable={profitable} lang={lang} />
     </span>
   );
 }
@@ -576,33 +604,76 @@ type CampaignAnalyticsSnapshot = {
   roi: number | null;
 };
 
+type CampaignAnalyticsCacheKey = string;
+
+const campaignAnalyticsCache = new Map<
+  CampaignAnalyticsCacheKey,
+  { at: number; snapshot: CampaignAnalyticsSnapshot }
+>();
+const CAMPAIGN_ANALYTICS_TTL_MS = 45_000;
+
+function campaignAnalyticsCacheKey(
+  userId: string,
+  campaignId: string,
+  dateBounds?: { start: Date; end: Date },
+): CampaignAnalyticsCacheKey {
+  const range = dateBounds
+    ? `${dateBounds.start.toISOString()}_${dateBounds.end.toISOString()}`
+    : "all";
+  return `${userId}:${campaignId}:${range}`;
+}
+
+function peekCampaignAnalyticsSnapshot(
+  userId: string,
+  campaignId: string,
+  dateBounds?: { start: Date; end: Date },
+): CampaignAnalyticsSnapshot | null {
+  const hit = campaignAnalyticsCache.get(campaignAnalyticsCacheKey(userId, campaignId, dateBounds));
+  if (!hit) return null;
+  if (Date.now() - hit.at > CAMPAIGN_ANALYTICS_TTL_MS * 4) return null;
+  return hit.snapshot;
+}
+
+function seedCampaignAnalyticsSnapshot(
+  userId: string,
+  campaignId: string,
+  dateBounds: { start: Date; end: Date } | undefined,
+  snapshot: CampaignAnalyticsSnapshot,
+) {
+  campaignAnalyticsCache.set(campaignAnalyticsCacheKey(userId, campaignId, dateBounds), {
+    at: Date.now(),
+    snapshot,
+  });
+}
+
 async function fetchCampaignAnalyticsSnapshot(
   campaign: Campaign,
   resolvedUserId: string,
   dateBounds?: { start: Date; end: Date },
 ): Promise<CampaignAnalyticsSnapshot> {
+  const { ownerId, spaceId } = clientBrandScope(resolvedUserId);
+  const creatorIdsHint = (campaign.creatorIds || []).filter(Boolean);
+
   const [attribution, campaignData, salesResult] = await Promise.all([
-    getCampaignCreatorAttribution(resolvedUserId),
-    getCampaigns(resolvedUserId),
-    supabase!
-      .from("sales")
-      .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
-      .eq("user_id", resolvedUserId),
+    getCampaignCreatorAttribution(ownerId),
+    getCampaigns(ownerId),
+    fetchScopedRows(
+      () =>
+        supabase!
+          .from("sales")
+          .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+          .eq("user_id", ownerId)
+          .eq("workspace_id", spaceId),
+      () =>
+        supabase!
+          .from("sales")
+          .select("order_amount, commission_amount, created_at, campaign_id, creator_id")
+          .eq("user_id", ownerId),
+    ),
   ]);
 
   const { creatorCounts, linkMeta } = attribution;
-
   const resolvedCreatorIds = resolveCampaignCreatorIds(campaign, creatorCounts);
-
-  let payoutsData: Array<{ creator_id?: string | null; amount?: number | null; status?: string | null }> = [];
-  if (resolvedCreatorIds.length > 0) {
-    const { data: payoutRows } = await supabase!
-      .from("payouts")
-      .select("creator_id, amount, status")
-      .eq("user_id", resolvedUserId)
-      .in("creator_id", resolvedCreatorIds);
-    payoutsData = payoutRows || [];
-  }
 
   const campaignMeta: Record<string, CampaignSalesMeta> = {};
   for (const row of campaignData) {
@@ -613,8 +684,6 @@ async function fetchCampaignAnalyticsSnapshot(
   }
 
   const salesRows = (salesResult.data || []) as SaleRow[];
-  const paidByCreator = sumPaidByCreator(payoutsData);
-  const totalCommissionByCreator = sumCommissionByCreator(salesRows);
 
   const stats = computeCreatorStatsForCampaign(
     salesRows,
@@ -627,29 +696,74 @@ async function fetchCampaignAnalyticsSnapshot(
   );
 
   const displayCreatorIds = [
-    ...new Set([...resolvedCreatorIds, ...Object.keys(stats)]),
+    ...new Set([
+      ...resolvedCreatorIds,
+      ...creatorIdsHint,
+      ...Object.keys(stats),
+    ]),
   ];
 
-  let creatorProfiles: { id: string; handle: string; full_name?: string; avatar_url?: string; platform?: string }[] = [];
-  if (displayCreatorIds.length > 0) {
-    const { data: creatorResult } = await supabase!
-      .from("creators")
-      .select("id, handle, full_name, avatar_url, platform")
-      .eq("user_id", resolvedUserId)
-      .in("id", displayCreatorIds);
-    creatorProfiles = await enrichCreatorsWithSavedAvatarsClient(
-      supabase!,
-      resolvedUserId,
-      (creatorResult || []) as typeof creatorProfiles,
-    );
-  }
+  type CreatorProfileRow = {
+    id: string;
+    handle: string;
+    full_name?: string;
+    avatar_url?: string;
+    platform?: string;
+    balance?: number | null;
+  };
+
+  const [payoutsData, creatorProfilesRaw, brandSalesSummary] = await Promise.all([
+    displayCreatorIds.length > 0
+      ? fetchScopedRows(
+          () =>
+            supabase!
+              .from("payouts")
+              .select("creator_id, amount, status")
+              .eq("user_id", ownerId)
+              .eq("workspace_id", spaceId)
+              .in("creator_id", displayCreatorIds),
+          () =>
+            supabase!
+              .from("payouts")
+              .select("creator_id, amount, status")
+              .eq("user_id", ownerId)
+              .in("creator_id", displayCreatorIds),
+        ).then((r) => (r.data || []) as Array<{ creator_id?: string | null; amount?: number | null; status?: string | null }>)
+      : Promise.resolve(
+          [] as Array<{ creator_id?: string | null; amount?: number | null; status?: string | null }>,
+        ),
+    displayCreatorIds.length > 0
+      ? fetchScopedRows(
+          () =>
+            supabase!
+              .from("creators")
+              .select("id, handle, full_name, avatar_url, platform, balance")
+              .eq("user_id", ownerId)
+              .eq("workspace_id", spaceId)
+              .in("id", displayCreatorIds),
+          () =>
+            supabase!
+              .from("creators")
+              .select("id, handle, full_name, avatar_url, platform, balance")
+              .eq("user_id", ownerId)
+              .in("id", displayCreatorIds),
+        ).then((r) => (r.data || []) as CreatorProfileRow[])
+      : Promise.resolve([] as CreatorProfileRow[]),
+    displayCreatorIds.length > 0
+      ? fetchCreatorBrandSalesSummary(resolvedUserId, displayCreatorIds).catch(
+          () => ({} as Record<string, { count: number; revenue: number }>),
+        )
+      : Promise.resolve({} as Record<string, { count: number; revenue: number }>),
+  ]);
+
+  // Avatar enrich is cosmetic — do not await on the critical path.
+  const creatorProfiles = creatorProfilesRaw;
+  void enrichCreatorsWithSavedAvatarsClient(supabase!, ownerId, creatorProfilesRaw);
+
+  const paidByCreator = sumPaidByCreator(payoutsData);
+  const totalCommissionByCreator = sumCommissionByCreator(salesRows);
 
   const creatorMap = new Map(creatorProfiles.map((c) => [String(c.id), c]));
-
-  const brandSalesSummary =
-    resolvedCreatorIds.length > 0
-      ? await fetchCreatorBrandSalesSummary(resolvedUserId, resolvedCreatorIds)
-      : {};
 
   const buildCreatorRow = (id: string, s: CreatorCampaignStats): CampaignCreatorRow => {
     const c = creatorMap.get(id);
@@ -719,17 +833,13 @@ async function fetchCampaignAnalyticsSnapshot(
     linkMeta,
   );
 
-  let pendingPayouts = 0;
-  let pendingCreatorCount = 0;
-  if (resolvedCreatorIds.length > 0) {
-    const { data: creatorRows } = await supabase!
-      .from("creators")
-      .select("balance")
-      .eq("user_id", resolvedUserId)
-      .in("id", resolvedCreatorIds);
-    pendingPayouts = (creatorRows || []).reduce((sum, row) => sum + (Number(row.balance) || 0), 0);
-    pendingCreatorCount = (creatorRows || []).filter((row) => (Number(row.balance) || 0) > 0).length;
-  }
+  const pendingPayouts = creatorProfilesRaw.reduce(
+    (sum, row) => sum + (Number(row.balance) || 0),
+    0,
+  );
+  const pendingCreatorCount = creatorProfilesRaw.filter(
+    (row) => (Number(row.balance) || 0) > 0,
+  ).length;
 
   const salesTrend = computeCampaignScopedSalesTrend(
     salesRows,
@@ -792,7 +902,7 @@ async function fetchCampaignAnalyticsSnapshot(
   const prevRoi = computeCreatorCampaignRoi(prevTotals.sales, prevBrandCost);
   const roiTrend = computeTrend(roi ?? 0, prevRoi ?? 0);
 
-  return {
+  const snapshot: CampaignAnalyticsSnapshot = {
     rows,
     monthRows,
     totals,
@@ -807,6 +917,8 @@ async function fetchCampaignAnalyticsSnapshot(
     activeCreators,
     roi,
   };
+  seedCampaignAnalyticsSnapshot(resolvedUserId, campaign.id, dateBounds, snapshot);
+  return snapshot;
 }
 
 type PayableCreator = {
@@ -897,11 +1009,11 @@ function formatCreatorsSub(campaignCount: number, lang: "en" | "fr"): string {
 
 function formatSalesTrendSub(trend: PeriodTrend, lang: "en" | "fr"): { text: string; color: string } {
   if (trend.current === 0 && trend.previous === 0) {
-    return { text: lang === "fr" ? "Aucune vente sur la période" : "No sales in period", color: "#7A7A7A" };
+    return { text: lang === "fr" ? "Aucune vente sur la période" : "No sales in period", color: "var(--ws-text-muted)" };
   }
   const label = formatTrendLabel(trend.changePct, lang);
   const arrow = trend.direction === "up" ? "↑" : trend.direction === "down" ? "↓" : "→";
-  const color = trend.direction === "up" ? "#2E7D32" : trend.direction === "down" ? "#E53935" : "#7A7A7A";
+  const color = trend.direction === "up" ? "#2E7D32" : trend.direction === "down" ? "#E53935" : "var(--ws-text-muted)";
   return {
     text: lang === "fr" ? `vs période précédente ${label} ${arrow}` : `vs previous period ${label} ${arrow}`,
     color,
@@ -917,7 +1029,7 @@ function formatPendingPayoutsSub(count: number, lang: "en" | "fr"): string {
 function EmptyTableRow({ lang, colSpan }: { lang: "en" | "fr"; colSpan: number }) {
   return (
     <tr>
-      <td colSpan={colSpan} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+      <td colSpan={colSpan} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
         {lang === "fr" ? "Aucune donnée pour le moment." : "No data yet."}
       </td>
     </tr>
@@ -925,19 +1037,19 @@ function EmptyTableRow({ lang, colSpan }: { lang: "en" | "fr"; colSpan: number }
 }
 
 const btnPrimary: React.CSSProperties = {
-  background: "#0047FF", color: "#FFF", border: "none", borderRadius: 10,
+  background: "var(--ws-accent)", color: "#FFFFFF", border: "none", borderRadius: 10,
   padding: "10px 18px", fontSize: 13, fontWeight: 500, fontFamily: "inherit",
   cursor: "pointer", letterSpacing: "-0.02em",
 };
 const btnSecondary: React.CSSProperties = {
-  background: "#FFF", color: "#1A1A1A", border: "1px solid #E5E5E5", borderRadius: 10,
+  background: "var(--ws-surface)", color: "var(--ws-text)", border: "1px solid var(--ws-border)", borderRadius: 10,
   padding: "10px 16px", fontSize: 13, fontWeight: 500, fontFamily: "inherit",
   cursor: "pointer", letterSpacing: "-0.02em",
 };
 const inputStyle: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 10,
-  border: "1px solid #E5E5E5", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A",
-  letterSpacing: "-0.02em", background: "#FFF",
+  border: "1px solid var(--ws-border)", fontSize: 14, fontFamily: "inherit", color: "var(--ws-text)",
+  letterSpacing: "-0.02em", background: "var(--ws-input)",
 };
 const dateInputStyle: React.CSSProperties = {
   ...inputStyle,
@@ -1582,6 +1694,7 @@ export function CampaignsView({
       openEditCampaign(id);
       return;
     }
+    rememberLastCampaignId(userId, id);
     navigate({ view: "campaigns", campaign: { type: "detail", id, tab } });
   };
 
@@ -1736,17 +1849,6 @@ export function CampaignsView({
     );
   }
 
-  if (campaigns.length === 0) {
-    return (
-      <>
-        <CampaignsEmptyState lang={lang} isMobile={isMobile} onNew={tryOpenNewCampaign} />
-        {upgradeModalOpen && (
-          <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
-        )}
-      </>
-    );
-  }
-
   return (
     <>
       <CampaignsBoard
@@ -1762,7 +1864,6 @@ export function CampaignsView({
         setSortOrder={setSortOrder}
         search={search}
         setSearch={setSearch}
-        onNew={tryOpenNewCampaign}
         onOpenCampaign={openCampaign}
         onDeleteAll={() => void handleDeleteAllCampaigns()}
       />
@@ -1809,280 +1910,6 @@ function CampaignUpgradeModal({
   );
 }
 
-const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
-
-function CampaignsEmptyState({
-  lang,
-  isMobile,
-  onNew,
-}: {
-  lang: "en" | "fr";
-  isMobile?: boolean;
-  onNew: () => void;
-}) {
-  const pad = isMobile ? "56px 16px 48px" : "48px 48px 64px";
-
-  const shopifyIcon = (
-    <img src="/shopify-logo.svg" alt="" width={22} height={22} style={{ display: "block", objectFit: "contain" }} />
-  );
-
-  const features: { icon: React.ReactNode; title: string; description: string }[] =
-    lang === "fr"
-      ? [
-          {
-            icon: (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 7h16M4 12h10M4 17h14" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
-                <circle cx="19" cy="12" r="2.5" stroke="#1A1A1A" strokeWidth="1.8" />
-              </svg>
-            ),
-            title: "Trackers par créateur",
-            description:
-              "Codes promo, hashtags, mentions et liens UTM — chaque créateur a ses trackers dédiés pour mesurer l'impact réel de son contenu.",
-          },
-          {
-            icon: shopifyIcon,
-            title: "Ventes & commissions",
-            description:
-              "Synchronisez Shopify ou ajoutez des ventes manuellement. Les commissions se calculent automatiquement, prêtes à être versées.",
-          },
-          {
-            icon: (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M3 3v18h18" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M7 14l4-4 3 3 5-6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-            title: "Analytics en temps réel",
-            description:
-              "Revenus générés, ROI et performance par créateur — filtrez par période et exportez vos données en un clic.",
-          },
-        ]
-      : [
-          {
-            icon: (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M4 7h16M4 12h10M4 17h14" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
-                <circle cx="19" cy="12" r="2.5" stroke="#1A1A1A" strokeWidth="1.8" />
-              </svg>
-            ),
-            title: "Per-creator trackers",
-            description:
-              "Promo codes, hashtags, mentions and UTM links — each creator gets dedicated trackers to measure real content impact.",
-          },
-          {
-            icon: shopifyIcon,
-            title: "Sales & commissions",
-            description:
-              "Sync Shopify or add sales manually. Commissions are calculated automatically and ready to pay out.",
-          },
-          {
-            icon: (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M3 3v18h18" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M7 14l4-4 3 3 5-6" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ),
-            title: "Real-time analytics",
-            description:
-              "Revenue, ROI and per-creator performance — filter by date range and export your data in one click.",
-          },
-        ];
-
-  const mockCreators =
-    lang === "fr"
-      ? [
-          { name: "@sarah.creates", detail: "Code SUMMER20", amount: "€ 4 230", pill: "Actif", pillBg: "#E8F5E9", pillColor: "#2E7D32" },
-          { name: "@mike.style", detail: "Hashtag #Trackit", amount: "€ 3 890", pill: "Top perf.", pillBg: "#E3F2FD", pillColor: "#1565C0" },
-          { name: "@luna.beauty", detail: "Lien UTM", amount: "€ 2 150", pill: "En cours", pillBg: "#F3F4F6", pillColor: "#6B7280" },
-        ]
-      : [
-          { name: "@sarah.creates", detail: "Code SUMMER20", amount: "€ 4,230", pill: "Active", pillBg: "#E8F5E9", pillColor: "#2E7D32" },
-          { name: "@mike.style", detail: "Hashtag #Trackit", amount: "€ 3,890", pill: "Top perf.", pillBg: "#E3F2FD", pillColor: "#1565C0" },
-          { name: "@luna.beauty", detail: "UTM link", amount: "€ 2,150", pill: "In progress", pillBg: "#F3F4F6", pillColor: "#6B7280" },
-        ];
-
-  const avatarColors = ["#F9A8D4", "#93C5FD", "#C4B5FD"];
-
-  return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
-      <div style={{ padding: pad, maxWidth: 1120, margin: "0 auto" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-            gap: isMobile ? 40 : 56,
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontSize: isMobile ? 32 : 38,
-                fontWeight: 700,
-                color: "#1A1A1A",
-                margin: "0 0 32px",
-                letterSpacing: "-0.04em",
-                lineHeight: 1.1,
-              }}
-            >
-              {lang === "fr" ? (
-                <>
-                  Lancez votre
-                  <br />
-                  première campagne
-                </>
-              ) : (
-                <>
-                  Launch your
-                  <br />
-                  first campaign
-                </>
-              )}
-            </h1>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 28, marginBottom: 40 }}>
-              {features.map((f) => (
-                <div key={f.title} style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-                  <div
-                    style={{
-                      flexShrink: 0,
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      background: "#F9FAFB",
-                      border: "1px solid #F0F0F0",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    {f.icon}
-                  </div>
-                  <div>
-                    <p style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px", letterSpacing: "-0.02em" }}>
-                      {f.title}
-                    </p>
-                    <p style={{ fontSize: 14, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
-                      {f.description}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button type="button" className="hero-cta-shopify" onClick={onNew} style={{ fontSize: 15, padding: "12px 24px" }}>
-              {lang === "fr" ? "Créez une nouvelle campagne" : "Create a new campaign"}
-            </button>
-          </div>
-
-          <div
-            style={{
-              position: "relative",
-              borderRadius: 28,
-              background: "transparent",
-              padding: isMobile ? "32px 20px" : "40px 32px",
-              minHeight: isMobile ? 320 : 420,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                maxWidth: 340,
-                background: "#FFFFFF",
-                borderRadius: 20,
-                boxShadow: "0 24px 48px rgba(0,0,0,0.12), 0 4px 12px rgba(0,0,0,0.06)",
-                padding: "28px 24px 20px",
-                border: "1px solid #EFEFEF",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
-                <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: isMobile ? 48 : 64, objectFit: "contain" }} />
-              </div>
-
-              <p style={{ fontSize: 12, color: "#9CA3AF", margin: "0 0 4px", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Revenus générés" : "Revenue generated"}
-              </p>
-              <p
-                style={{
-                  fontSize: 32,
-                  fontWeight: 700,
-                  color: "#1A1A1A",
-                  margin: "0 0 24px",
-                  letterSpacing: "-0.04em",
-                }}
-              >
-                € 24 580
-              </p>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {mockCreators.map((c, i) => (
-                  <div
-                    key={c.name}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      padding: "10px 0",
-                      borderTop: i === 0 ? "1px solid #F3F4F6" : undefined,
-                      borderBottom: i < mockCreators.length - 1 ? "1px solid #F3F4F6" : undefined,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: "50%",
-                        background: avatarColors[i],
-                        flexShrink: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "#FFF",
-                      }}
-                    >
-                      {c.name.charAt(1).toUpperCase()}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
-                        {c.name}
-                      </p>
-                      <p style={{ fontSize: 12, color: "#9CA3AF", margin: 0 }}>{c.detail}</p>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", margin: "0 0 4px" }}>{c.amount}</p>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: "3px 8px",
-                          borderRadius: 999,
-                          background: c.pillBg,
-                          color: c.pillColor,
-                          letterSpacing: "-0.01em",
-                        }}
-                      >
-                        {c.pill}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function CampaignsLoadingState({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
   return (
     <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
@@ -2091,27 +1918,27 @@ function CampaignsLoadingState({ lang, isMobile }: { lang: "en" | "fr"; isMobile
           <div
             key={index}
             style={{
-              background: "#FFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 16,
               padding: 20,
               minHeight: 108,
             }}
           >
-            <div style={{ width: "55%", height: 10, borderRadius: 999, background: "#F0F0F0", marginBottom: 14 }} />
-            <div style={{ width: "40%", height: 24, borderRadius: 8, background: "#ECECEC", marginBottom: 10 }} />
-            <div style={{ width: "70%", height: 10, borderRadius: 999, background: "#F5F5F5" }} />
+            <div style={{ width: "55%", height: 10, borderRadius: 999, background: "var(--ws-hover)", marginBottom: 14 }} />
+            <div style={{ width: "40%", height: 24, borderRadius: 8, background: "var(--ws-active)", marginBottom: 10 }} />
+            <div style={{ width: "70%", height: 10, borderRadius: 999, background: "var(--ws-bg)" }} />
           </div>
         ))}
       </div>
       <div
         style={{
-          background: "#FFF",
-          border: "1px solid #EFEFEF",
+          background: "var(--ws-surface)",
+          border: "1px solid var(--ws-border)",
           borderRadius: 16,
           padding: "48px 24px",
           textAlign: "center",
-          color: "#9A9A9A",
+          color: "var(--ws-text-dim)",
           fontSize: 14,
         }}
       >
@@ -2146,9 +1973,9 @@ function platformsForCampaign(platform: string): string[] {
 
 function CampaignMetric({ icon, value }: { icon: React.ReactNode; value: string }) {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "#6B7280" }}>
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ws-text-muted)" }}>
       {icon}
-      <span style={{ color: "#374151", fontWeight: 500 }}>{value}</span>
+      <span style={{ color: "var(--ws-text)", fontWeight: 500 }}>{value}</span>
     </div>
   );
 }
@@ -2166,7 +1993,6 @@ function CampaignsBoard({
   setSortOrder,
   search,
   setSearch,
-  onNew,
   onOpenCampaign,
   onDeleteAll,
 }: {
@@ -2182,7 +2008,6 @@ function CampaignsBoard({
   setSortOrder: (s: CampaignSort) => void;
   search: string;
   setSearch: (s: string) => void;
-  onNew: () => void;
   onOpenCampaign: (id: string) => void;
   onDeleteAll: () => void;
 }) {
@@ -2229,13 +2054,13 @@ function CampaignsBoard({
   ];
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div style={{ padding: pad }}>
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", margin: 0, marginBottom: 6, letterSpacing: "-0.03em", maxWidth: 520 }}>
+          <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", margin: 0, marginBottom: 6, letterSpacing: "-0.03em", maxWidth: 520 }}>
             {lang === "fr" ? "Campagnes" : "Campaigns"}
           </h1>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 520, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 520, lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Gérez vos campagnes et suivez les performances et commissions de vos créateurs."
               : "Manage your campaigns and track creator performance and commissions."}
@@ -2248,7 +2073,7 @@ function CampaignsBoard({
             alignItems: "flex-end",
             justifyContent: "space-between",
             gap: 16,
-            borderBottom: "1px solid #E5E7EB",
+            borderBottom: "1px solid var(--ws-border)",
             marginBottom: 24,
             flexWrap: "wrap",
           }}
@@ -2267,25 +2092,15 @@ function CampaignsBoard({
                   fontSize: 14,
                   fontFamily: "inherit",
                   fontWeight: boardTab === tab.id ? 600 : 400,
-                  color: boardTab === tab.id ? "#1A1A1A" : "#9CA3AF",
+                  color: boardTab === tab.id ? "var(--ws-text)" : "var(--ws-text-dim)",
                   cursor: "pointer",
-                  borderBottom: boardTab === tab.id ? "2px solid #1A1A1A" : "2px solid transparent",
+                  borderBottom: boardTab === tab.id ? "2px solid var(--ws-btn)" : "2px solid transparent",
                   whiteSpace: "nowrap",
                 }}
               >
                 {tab.label} ({tab.count})
               </button>
             ))}
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, marginBottom: 8 }}>
-            <button
-              type="button"
-              className="hero-cta-shopify"
-              onClick={onNew}
-              style={{ padding: "12px 22px", fontSize: 15 }}
-            >
-              {lang === "fr" ? "+ Créer une campagne" : "+ Create campaign"}
-            </button>
           </div>
         </div>
 
@@ -2296,22 +2111,22 @@ function CampaignsBoard({
               display: "flex",
               alignItems: "center",
               gap: 10,
-              border: "1px solid #E5E7EB",
+              border: "1px solid var(--ws-border)",
               borderRadius: 10,
               padding: "10px 14px",
-              background: "#FFF",
+              background: "var(--ws-surface)",
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="11" cy="11" r="7" stroke="#9CA3AF" strokeWidth="2" />
-              <path d="M21 21l-4.35-4.35" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="11" cy="11" r="7" stroke="var(--ws-text-dim)" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round" />
             </svg>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={lang === "fr" ? "Rechercher une campagne par titre" : "Search campaigns by title"}
-              style={{ border: "none", outline: "none", flex: 1, fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", background: "transparent" }}
+              style={{ border: "none", outline: "none", flex: 1, fontSize: 14, fontFamily: "inherit", color: "var(--ws-text)", background: "transparent" }}
             />
           </div>
           <select
@@ -2320,11 +2135,11 @@ function CampaignsBoard({
             style={{
               padding: "10px 14px",
               borderRadius: 10,
-              border: "1px solid #E5E7EB",
+              border: "1px solid var(--ws-border)",
               fontSize: 14,
               fontFamily: "inherit",
-              color: "#1A1A1A",
-              background: "#FFF",
+              color: "var(--ws-text)",
+              background: "var(--ws-surface)",
               cursor: "pointer",
             }}
           >
@@ -2343,7 +2158,7 @@ function CampaignsBoard({
                 fontFamily: "inherit",
                 fontWeight: 500,
                 color: "#DC2626",
-                background: "#FFF",
+                background: "var(--ws-surface)",
                 cursor: "pointer",
                 whiteSpace: "nowrap",
               }}
@@ -2351,7 +2166,7 @@ function CampaignsBoard({
               {lang === "fr" ? "Supprimer toutes les campagnes" : "Delete all campaigns"}
             </button>
           )}
-          <div style={{ marginLeft: isMobile ? 0 : "auto", fontSize: 13, color: "#6B7280", width: isMobile ? "100%" : "auto" }}>
+          <div style={{ marginLeft: isMobile ? 0 : "auto", fontSize: 13, color: "var(--ws-text-muted)", width: isMobile ? "100%" : "auto" }}>
             {plan === "free" ? (
               lang === "fr"
                 ? `Campagnes réelles : ${billableActiveCampaigns}/${FREE_MAX_CAMPAIGNS} (démo Trackit hors quota)`
@@ -2363,7 +2178,7 @@ function CampaignsBoard({
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ padding: "48px 24px", textAlign: "center", color: "#9CA3AF", fontSize: 14, border: "1px solid #E5E7EB", borderRadius: 12 }}>
+          <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14, border: "1px solid var(--ws-border)", borderRadius: 12 }}>
             {boardTab === "drafts"
               ? lang === "fr"
                 ? "Aucun brouillon. Commencez une campagne et quittez pour la retrouver ici."
@@ -2393,27 +2208,27 @@ function CampaignsBoard({
                     display: "block",
                     width: "100%",
                     textAlign: "left",
-                    border: "1px solid #E5E7EB",
+                    border: "1px solid var(--ws-border)",
                     borderRadius: 12,
-                    background: "#FFFFFF",
+                    background: "var(--ws-surface)",
                     padding: "18px 20px",
                     cursor: "pointer",
                     fontFamily: "inherit",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#D1D5DB";
+                    e.currentTarget.style.borderColor = "var(--ws-border-strong)";
                     e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "#E5E7EB";
+                    e.currentTarget.style.borderColor = "var(--ws-border)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{campaign.name}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{campaign.name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       {campaign.status === "Draft" && (
-                        <span title={lang === "fr" ? "Brouillon" : "Draft"} style={{ color: "#9CA3AF", display: "flex" }}>
+                        <span title={lang === "fr" ? "Brouillon" : "Draft"} style={{ color: "var(--ws-text-dim)", display: "flex" }}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
                             <path d="M3 12s3.5-7 9-7 9 7 9 7-3.5 7-9 7-9-7-9-7z" stroke="currentColor" strokeWidth="1.8" />
                             <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.8" />
@@ -2427,13 +2242,13 @@ function CampaignsBoard({
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", fontSize: 13, color: "#6B7280" }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center", fontSize: 13, color: "var(--ws-text-muted)" }}>
                     <span>{formatStartedLabel(campaign.startRaw, campaign.start, lang)}</span>
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <circle cx="12" cy="12" r="9" stroke="#9CA3AF" strokeWidth="1.8" />
-                          <path d="M12 7v10M15 9.5c0-1.1-1.3-2-3-2s-3 .9-3 2 1.3 2 3 2 3 .9 3 2-1.3 2-3 2-3-.9-3-2" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
+                          <circle cx="12" cy="12" r="9" stroke="var(--ws-text-dim)" strokeWidth="1.8" />
+                          <path d="M12 7v10M15 9.5c0-1.1-1.3-2-3-2s-3 .9-3 2 1.3 2 3 2 3 .9 3 2-1.3 2-3 2-3-.9-3-2" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                       }
                       value={formatCurrency(salesRevenue, lang)}
@@ -2441,10 +2256,10 @@ function CampaignsBoard({
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <circle cx="9" cy="8" r="3.2" stroke="#9CA3AF" strokeWidth="1.8" />
-                          <path d="M3.5 19c.8-3.2 2.9-5 5.5-5s4.7 1.8 5.5 5" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
-                          <circle cx="17" cy="9" r="2.4" stroke="#9CA3AF" strokeWidth="1.8" />
-                          <path d="M15.2 19c.4-1.7 1.5-2.9 3.3-3.3" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
+                          <circle cx="9" cy="8" r="3.2" stroke="var(--ws-text-dim)" strokeWidth="1.8" />
+                          <path d="M3.5 19c.8-3.2 2.9-5 5.5-5s4.7 1.8 5.5 5" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinecap="round" />
+                          <circle cx="17" cy="9" r="2.4" stroke="var(--ws-text-dim)" strokeWidth="1.8" />
+                          <path d="M15.2 19c.4-1.7 1.5-2.9 3.3-3.3" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinecap="round" />
                         </svg>
                       }
                       value={creatorsLabel}
@@ -2452,9 +2267,9 @@ function CampaignsBoard({
                     <CampaignMetric
                       icon={
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                          <path d="M4 7h16v12H4V7z" stroke="#9CA3AF" strokeWidth="1.8" strokeLinejoin="round" />
-                          <path d="M8 7V5.8A2.8 2.8 0 0110.8 3h2.4A2.8 2.8 0 0116 5.8V7" stroke="#9CA3AF" strokeWidth="1.8" strokeLinecap="round" />
-                          <path d="M4 12h16" stroke="#9CA3AF" strokeWidth="1.8" />
+                          <path d="M4 7h16v12H4V7z" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinejoin="round" />
+                          <path d="M8 7V5.8A2.8 2.8 0 0110.8 3h2.4A2.8 2.8 0 0116 5.8V7" stroke="var(--ws-text-dim)" strokeWidth="1.8" strokeLinecap="round" />
+                          <path d="M4 12h16" stroke="var(--ws-text-dim)" strokeWidth="1.8" />
                         </svg>
                       }
                       value={formatCurrency(commissionOwed, lang)}
@@ -2472,9 +2287,9 @@ function CampaignsBoard({
 
 function CampaignsHeader({ lang, onNew, showFilters, showNewButton = true, isMobile }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean; showNewButton?: boolean; isMobile?: boolean }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-        <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
         {showNewButton && (
           <button type="button" className="hero-cta-shopify hero-cta-compact" onClick={onNew}>{lang === "fr" ? "+ Nouvelle campagne" : "+ New Campaign"}</button>
         )}
@@ -2713,9 +2528,9 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
     <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
         <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
-        <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 10, padding: "8px 12px" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round"/></svg>
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search campaigns..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", flex: 1, color: "#1A1A1A" }} />
+        <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "8px 12px" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="var(--ws-text-dim)" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round"/></svg>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search campaigns..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", flex: 1, color: "var(--ws-text)" }} />
         </div>
       </div>
 
@@ -2726,11 +2541,11 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
         <Kpi title={lang === "fr" ? "Commissions dues" : "Total Commissions Owed"} value={formatCurrency(kpiStats.totalCommissionOwed, lang)} sub={formatPendingPayoutsSub(kpiStats.pendingPayouts, lang)} />
       </div>
 
-      <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16 }}>
+      <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16 }}>
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 700 : undefined }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left", background: "#FAFAFA" }}>
+              <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left", background: "var(--ws-surface-2)" }}>
                 {[
                   lang === "fr" ? "Nom de la campagne" : "Campaign Name",
                   lang === "fr" ? "Créateurs" : "Creators",
@@ -2742,7 +2557,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
                   lang === "fr" ? "Date de fin" : "End Date",
                   lang === "fr" ? "Action" : "Action",
                 ].map((h) => (
-                  <th key={h} style={{ padding: "12px 14px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ padding: "12px 14px", color: "var(--ws-text-dim)", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -2753,18 +2568,18 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
                 <tr
                   key={c.id}
                   style={{
-                    borderBottom: "1px solid #F5F5F5",
-                    background: isPaused ? "#F7F7F7" : "#FFFFFF",
+                    borderBottom: "1px solid var(--ws-border)",
+                    background: isPaused ? "var(--ws-hover)" : "var(--ws-surface)",
                   }}
                 >
-                  <td style={{ padding: "14px", fontWeight: 500, color: isPaused ? "#9A9A9A" : "#1A1A1A" }}>{c.name}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "#9A9A9A" : "#1A1A1A" }}>{(c.creators ?? 0)} {lang === "fr" ? "créateurs" : "creators"}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "#B0B0B0" : "#7A7A7A" }}>{c.platform}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "#9A9A9A" : "#1A1A1A" }}>{formatCurrency(c.sales ?? 0, lang)}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "#9A9A9A" : "#1A1A1A" }}>{formatCurrency(c.commission ?? 0, lang)}</td>
+                  <td style={{ padding: "14px", fontWeight: 500, color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{c.name}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{(c.creators ?? 0)} {lang === "fr" ? "créateurs" : "creators"}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{c.platform}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{formatCurrency(c.sales ?? 0, lang)}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{formatCurrency(c.commission ?? 0, lang)}</td>
                   <td style={{ padding: "14px" }}><CampaignBadge lang={lang} status={c.status} /></td>
-                  <td style={{ padding: "14px", color: isPaused ? "#B0B0B0" : "#7A7A7A" }}>{c.start}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "#B0B0B0" : "#7A7A7A" }}>{c.end}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{c.start}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{c.end}</td>
                   <td style={{ padding: "14px" }}>
                     <CampaignRowActions
                       lang={lang}
@@ -2781,7 +2596,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
             </tbody>
           </table>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid #EFEFEF", fontSize: 13, color: "#7A7A7A" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: "1px solid var(--ws-border)", fontSize: 13, color: "var(--ws-text-muted)" }}>
           <span>{lang === "fr" ? "Affichage" : "Showing"} {filtered.length} {lang === "fr" ? "sur" : "of"} {campaigns.length} {lang === "fr" ? "campagnes" : "campaigns"}</span>
         </div>
       </div>
@@ -2807,9 +2622,9 @@ function FilterPills({ lang, filter, setFilter }: { lang: "en" | "fr"; filter: C
           style={{
             padding: "8px 14px",
             borderRadius: 999,
-            border: filter === p.id ? "1px solid #1A1A1A" : "1px solid #E5E5E5",
-            background: filter === p.id ? "#1A1A1A" : "#FFF",
-            color: filter === p.id ? "#FFF" : "#7A7A7A",
+            border: filter === p.id ? "1px solid var(--ws-btn)" : "1px solid var(--ws-border)",
+            background: filter === p.id ? "var(--ws-btn)" : "var(--ws-surface)",
+            color: filter === p.id ? "var(--ws-btn-text)" : "var(--ws-text-muted)",
             fontSize: 13,
             fontFamily: "inherit",
             fontWeight: filter === p.id ? 500 : 400,
@@ -2826,10 +2641,10 @@ function FilterPills({ lang, filter, setFilter }: { lang: "en" | "fr"; filter: C
 
 function Kpi({ title, value, sub, subColor }: { title: string; value: string; sub: string; subColor?: string }) {
   return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
-      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", marginBottom: 6 }}>{value}</div>
-      <div style={{ fontSize: 12, color: subColor ?? "#7A7A7A", letterSpacing: "-0.01em" }}>{sub}</div>
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 20 }}>
+      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", marginBottom: 6 }}>{value}</div>
+      <div style={{ fontSize: 12, color: subColor ?? "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{sub}</div>
     </div>
   );
 }
@@ -2895,8 +2710,8 @@ function CompactKpi({
   const displayValue = showAsCurrency ? formatCompactCurrency(value, getDisplayCurrency(lang)) : formatCompactNumber(value);
 
   return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20 }}>
-      <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 20 }}>
+      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: 8, letterSpacing: "-0.01em" }}>{title}</div>
       {focused ? (
         <input
           ref={inputRef}
@@ -2921,7 +2736,7 @@ function CompactKpi({
             boxSizing: "border-box",
             fontSize: 28,
             fontWeight: 600,
-            color: error ? "#DC2626" : "#1A1A1A",
+            color: error ? "#DC2626" : "var(--ws-text)",
             letterSpacing: "-0.04em",
             marginBottom: error ? 4 : 6,
             border: "none",
@@ -2946,7 +2761,7 @@ function CompactKpi({
             textAlign: "left",
             fontSize: 28,
             fontWeight: 600,
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
             letterSpacing: "-0.04em",
             marginBottom: 6,
             border: "none",
@@ -2965,7 +2780,7 @@ function CompactKpi({
           {error}
         </div>
       )}
-      <div style={{ fontSize: 12, color: subColor ?? "#7A7A7A", letterSpacing: "-0.01em" }}>{sub}</div>
+      <div style={{ fontSize: 12, color: subColor ?? "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{sub}</div>
     </div>
   );
 }
@@ -2993,7 +2808,7 @@ function getCampaignStatusTheme(status: CampaignStatus): { color: string; backgr
     case "Draft":
     default:
       return {
-        color: "#52525B",
+        color: "var(--ws-text-muted)",
         background: "rgba(82, 82, 91, 0.1)",
         boxShadow: "0 6px 18px rgba(82, 82, 91, 0.12), inset 0 -3px 0 rgba(82, 82, 91, 0.1)",
       };
@@ -3078,8 +2893,8 @@ function CampaignBadge({ lang, status }: { lang: "en" | "fr"; status: CampaignSt
 
 function Card({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#FFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24, marginBottom: 20 }}>
-      {title && <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 18px 0" }}>{title}</h3>}
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 24, marginBottom: 20 }}>
+      {title && <h3 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 18px 0" }}>{title}</h3>}
       {children}
     </div>
   );
@@ -3088,7 +2903,7 @@ function Card({ title, children }: { title?: string; children: React.ReactNode }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>{label}</label>
       {children}
     </div>
   );
@@ -3099,9 +2914,9 @@ function Table({ headers, children }: { headers: string[]; children: React.React
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <thead>
-          <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left", background: "#FAFAFA" }}>
+          <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left", background: "var(--ws-surface-2)" }}>
             {headers.map((h) => (
-              <th key={h} style={{ padding: "12px 14px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
+              <th key={h} style={{ padding: "12px 14px", color: "var(--ws-text-dim)", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -3135,11 +2950,11 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
         type="button"
         onClick={() => onChange(!on)}
         aria-pressed={on}
-        style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
+        style={{ position: "relative", width: 40, height: 22, background: on ? "var(--ws-accent)" : "var(--ws-border)", borderRadius: 999, border: "none", cursor: "pointer", padding: 0, flexShrink: 0 }}
       >
-        <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFF", borderRadius: "50%", transition: "left 0.2s" }} />
+        <span style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "var(--ws-surface)", borderRadius: "50%", transition: "left 0.2s" }} />
       </button>
-      {label && <span style={{ fontSize: 13, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{label}</span>}
+      {label && <span style={{ fontSize: 13, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{label}</span>}
     </div>
   );
 }
@@ -3179,8 +2994,8 @@ function CampaignDetailToolbar({
     top: "calc(100% + 6px)",
     right: 0,
     minWidth: 180,
-    background: "#FFF",
-    border: "1px solid #E5E7EB",
+    background: "var(--ws-surface)",
+    border: "1px solid var(--ws-border)",
     borderRadius: 10,
     boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
     zIndex: 30,
@@ -3197,7 +3012,7 @@ function CampaignDetailToolbar({
     borderRadius: 8,
     fontSize: 14,
     fontFamily: "inherit",
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     cursor: "pointer",
   };
 
@@ -3210,7 +3025,7 @@ function CampaignDetailToolbar({
     padding: "6px 4px",
     fontSize: 14,
     fontFamily: "inherit",
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     cursor: "pointer",
     whiteSpace: "nowrap",
   };
@@ -3239,7 +3054,7 @@ function CampaignDetailToolbar({
           style={{
             fontSize: 13,
             fontWeight: 500,
-            color: "#7A7A7A",
+            color: "var(--ws-text-muted)",
             cursor: "pointer",
             letterSpacing: "-0.02em",
           }}
@@ -3252,7 +3067,7 @@ function CampaignDetailToolbar({
           style={{
             fontSize: isMobile ? 24 : 28,
             fontWeight: 600,
-            color: isPaused ? "#9CA3AF" : "#1A1A1A",
+            color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)",
             margin: 0,
             letterSpacing: "-0.03em",
           }}
@@ -3304,7 +3119,7 @@ function CampaignDetailToolbar({
           )}
         </div>
 
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#9CA3AF", fontSize: 13 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "var(--ws-text-dim)", fontSize: 13 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
             <path d="M8 12.5l2.5 2.5L16 9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -3352,7 +3167,7 @@ function CampaignDetailToolbar({
               >
                 {lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
               </button>
-              <div style={{ height: 1, background: "#EFEFEF", margin: "4px 0" }} />
+              <div style={{ height: 1, background: "var(--ws-border)", margin: "4px 0" }} />
               <button
                 type="button"
                 style={menuItemStyle}
@@ -3375,7 +3190,7 @@ function CampaignDetailToolbar({
               </button>
               {campaign.status !== "Completed" && (
                 <>
-                  <div style={{ height: 1, background: "#EFEFEF", margin: "4px 0" }} />
+                  <div style={{ height: 1, background: "var(--ws-border)", margin: "4px 0" }} />
                   <button
                     type="button"
                     style={menuItemStyle}
@@ -3490,7 +3305,16 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     let cancelled = false;
 
     const load = async () => {
-      setAnalyticsLoading(true);
+      const cached =
+        userId
+          ? peekCampaignAnalyticsSnapshot(userId, campaign.id, analyticsDateBounds)
+          : null;
+      if (cached) {
+        setAnalytics(cached);
+        setAnalyticsLoading(false);
+      } else {
+        setAnalyticsLoading(true);
+      }
       await refreshCampaignAnalytics();
       if (!cancelled) setAnalyticsLoading(false);
     };
@@ -3499,15 +3323,13 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     return () => {
       cancelled = true;
     };
-  }, [refreshCampaignAnalytics]);
+  }, [refreshCampaignAnalytics, userId, campaign.id, analyticsDateBounds]);
 
   useAnalyticsAutoRefresh(refreshCampaignAnalytics);
 
   const detailTabs: { id: DetailTab; label: string }[] = [
     { id: "creators", label: lang === "fr" ? "Créateurs" : "Creators" },
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
-    { id: "content", label: lang === "fr" ? "Contenu" : "Content" },
-    { id: "links", label: lang === "fr" ? "Liens" : "Links" },
   ];
 
   const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
@@ -3544,7 +3366,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   const roiSparklineSeries = timeline
     .filter((p) => !currentStartKey || p.date >= currentStartKey)
     .map((p) => ({ date: p.date, value: p.commission > 0 ? p.revenue / p.commission : 0 }));
-  const isProfitable = (roi ?? 0) >= 1 || (totals.commission === 0 && totals.sales > 0);
   const money = (v: number) => formatCurrencyWithCode(v, displayCurrency);
 
   const handleExport = async (format: "csv" | "xlsx") => {
@@ -3584,7 +3405,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
 
   return (
   <>
-    <div style={{ padding: headerPad, borderBottom: "1px solid #E5E7EB", background: "#FFFFFF" }}>
+    <div style={{ padding: headerPad, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-bg)" }}>
       <CampaignDetailToolbar
         lang={lang}
         campaign={campaign}
@@ -3612,9 +3433,9 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               fontSize: 14,
               fontFamily: "inherit",
               fontWeight: tab === t.id ? 600 : 400,
-              color: tab === t.id ? "#1A1A1A" : "#9CA3AF",
+              color: tab === t.id ? "var(--ws-text)" : "var(--ws-text-dim)",
               cursor: "pointer",
-              borderBottom: tab === t.id ? "2px solid #1A1A1A" : "2px solid transparent",
+              borderBottom: tab === t.id ? "2px solid var(--ws-btn)" : "2px solid transparent",
               whiteSpace: "nowrap",
             }}
           >
@@ -3623,7 +3444,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         ))}
       </div>
     </div>
-    <div style={{ padding: isMobile ? 16 : "32px 40px 40px", background: "#FFFFFF" }}>
+    <div style={{ padding: isMobile ? 16 : "32px 40px 40px", background: "var(--ws-bg)" }}>
       {tab === "creators" && (
         <CreatorsTab
           lang={lang}
@@ -3633,30 +3454,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
           currency={displayCurrency}
           userId={userId}
           onAddCreator={onAddCreators}
-        />
-      )}
-      {tab === "content" && (
-        <CampaignContentTab
-          lang={lang}
-          brandId={userId}
-          campaignId={campaign.id}
-          campaignCreatorIds={
-            analytics?.rows?.map((row) => row.id) ??
-            campaign.creatorIds ??
-            []
-          }
-          isMobile={isMobile}
-        />
-      )}
-      {tab === "links" && (
-        <CampaignLinksTab
-          lang={lang}
-          brandId={userId}
-          campaignId={campaign.id}
-          campaignCreatorIds={campaign.creatorIds ?? []}
-          isMobile={isMobile}
-          plan={plan}
-          onUpgrade={onUpgrade}
         />
       )}
       {tab === "analytics" && (
@@ -3692,7 +3489,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               trend={netRevenueTrend}
               sparklineSeries={netSeries}
               lang={lang}
-              profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
             />
             <SummaryMetricCard
               title={lang === "fr" ? "Rentabilité (ROI)" : "Profitability (ROI)"}
@@ -3705,7 +3501,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               trend={roiTrend}
               sparklineSeries={roiSparklineSeries}
               lang={lang}
-              profitability={totals.sales > 0 || totals.commission > 0 ? isProfitable : undefined}
             />
           </div>
 
@@ -3767,18 +3562,6 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
               onSalesChange={refreshCampaignAnalytics}
             />
           </div>
-
-          <CampaignAffiliateLinksPanel
-            lang={lang}
-            brandId={userId}
-            campaignId={campaign.id}
-            campaignName={campaign.name}
-            isMobile={isMobile}
-            onGoToLinksTab={() => {
-              setTab("links");
-              onTabChange?.("links");
-            }}
-          />
 
           <AnalyticsSectionHeader
             title={lang === "fr" ? "Performances créateurs" : "Creator performance"}
@@ -3875,7 +3658,7 @@ function CreatorsTab({
       <Table headers={headers}>
         {loading ? (
           <tr>
-            <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+            <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
               {lang === "fr" ? "Chargement…" : "Loading…"}
             </td>
           </tr>
@@ -3883,7 +3666,7 @@ function CreatorsTab({
           <EmptyTableRow lang={lang} colSpan={headers.length} />
         ) : (
           rows.map((row) => (
-            <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+            <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
             <td style={{ padding: "14px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                   <CreatorAvatar
@@ -3894,15 +3677,15 @@ function CreatorsTab({
                     alt={row.full_name || row.handle}
                   />
                   <div style={{ minWidth: 0 }}>
-                    <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                    <span style={{ fontWeight: 500, color: "var(--ws-text)" }}>{row.full_name || row.handle || "—"}</span>
                     {!row.historicalSalesAttached && (row.brandSalesCount ?? 0) > 0 ? (
                       <div
                         style={{
                           marginTop: 8,
                           padding: "10px 12px",
                           borderRadius: 8,
-                          background: "#FFF7ED",
-                          border: "1px solid #FED7AA",
+                          background: "rgba(217, 119, 6, 0.12)",
+                          border: "1px solid rgba(217, 119, 6, 0.35)",
                           maxWidth: 360,
                         }}
                       >
@@ -3917,8 +3700,8 @@ function CreatorsTab({
                           onClick={() => void handleAttachSales(row)}
                           style={{
                             border: "none",
-                            background: "#1A1A1A",
-                            color: "#FFFFFF",
+                            background: "var(--ws-text)",
+                            color: "var(--ws-surface)",
                             borderRadius: 8,
                             padding: "6px 12px",
                             fontSize: 12,
@@ -3937,11 +3720,11 @@ function CreatorsTab({
                   </div>
                 </div>
             </td>
-              <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
-              <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
-              <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
-              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
-              <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+              <td style={{ padding: "14px", color: "var(--ws-text-muted)" }}>{row.handle ? `@${row.handle.replace(/^@/, "")}` : "—"}</td>
+              <td style={{ padding: "14px", color: "var(--ws-text-muted)" }}>{row.platform || "—"}</td>
+              <td style={{ padding: "14px", color: "var(--ws-text)", fontWeight: 500 }}>{row.salesCount}</td>
+              <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
+              <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
           </tr>
           ))
         )}
@@ -3955,13 +3738,13 @@ function CreatorsTab({
 
 function CampaignCreatorRankBadge({ rank }: { rank: number }) {
   const colors: Record<number, string> = { 1: "#D4AF37", 2: "#9E9E9E", 3: "#CD7F32" };
-  return <span style={{ fontWeight: 600, color: colors[rank] ?? "#9A9A9A" }}>#{rank}</span>;
+  return <span style={{ fontWeight: 600, color: colors[rank] ?? "var(--ws-text-dim)" }}>#{rank}</span>;
 }
 
 function CampaignCreatorStatusBadge({ lang, active }: { lang: "en" | "fr"; active: boolean }) {
   const label = active ? (lang === "fr" ? "Actif" : "Active") : lang === "fr" ? "Inactif" : "Inactive";
-  const bg = active ? "#E8F5E9" : "#F5F5F5";
-  const color = active ? "#2E7D32" : "#9A9A9A";
+  const bg = active ? "rgba(34, 197, 94, 0.12)" : "var(--ws-bg)";
+  const color = active ? "#2E7D32" : "var(--ws-text-dim)";
   return (
     <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 500, background: bg, color }}>
       {label}
@@ -4030,9 +3813,9 @@ function AnalyticsTab({
         <div style={{ overflowX: isMobile ? "auto" : undefined, WebkitOverflowScrolling: isMobile ? "touch" : undefined }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 640 : undefined }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
                 {monthHeaders.map((header) => (
-                  <th key={header} style={{ padding: "12px 14px", color: "#9A9A9A", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>
+                  <th key={header} style={{ padding: "12px 14px", color: "var(--ws-text-dim)", fontWeight: 500, fontSize: 12, whiteSpace: "nowrap" }}>
                     {header}
                   </th>
                 ))}
@@ -4041,13 +3824,13 @@ function AnalyticsTab({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                     {lang === "fr" ? "Chargement…" : "Loading…"}
                   </td>
                 </tr>
               ) : monthRows.length === 0 ? (
                 <tr>
-                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                     {monthEmptyMessage}
                   </td>
                 </tr>
@@ -4056,7 +3839,7 @@ function AnalyticsTab({
                   const displayName = row.full_name || row.handle || "—";
                   const handle = row.handle ? row.handle.replace(/^@/, "") : "";
                   return (
-          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+          <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
             <td style={{ padding: "14px" }}>
                         <CampaignCreatorRankBadge rank={index + 1} />
             </td>
@@ -4070,28 +3853,28 @@ function AnalyticsTab({
                             alt={displayName}
                           />
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 500, color: "#1A1A1A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <div style={{ fontWeight: 500, color: "var(--ws-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {displayName}
                             </div>
                             {handle && handle !== row.full_name ? (
-                              <div style={{ fontSize: 12, color: "#0047FF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <div style={{ fontSize: 12, color: "var(--ws-accent)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 @{handle}
                               </div>
                             ) : null}
                           </div>
                         </div>
                       </td>
-                      <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.platform || "—"}</td>
+                      <td style={{ padding: "14px", color: "var(--ws-text-muted)" }}>{row.platform || "—"}</td>
                       <td style={{ padding: "14px" }}>
-                        <div style={{ fontWeight: 500, color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</div>
+                        <div style={{ fontWeight: 500, color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</div>
                         {row.salesCount > 0 ? (
-                          <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 2 }}>
+                          <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginTop: 2 }}>
                             {row.salesCount}{" "}
                             {lang === "fr" ? (row.salesCount > 1 ? "ventes" : "vente") : row.salesCount > 1 ? "sales" : "sale"}
                           </div>
                         ) : null}
                       </td>
-                      <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+                      <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
                       <td style={{ padding: "14px" }}><CampaignRoiCell roi={row.roi} lang={lang} /></td>
                       <td style={{ padding: "14px" }}>
                         <CampaignCreatorStatusBadge lang={lang} active={row.salesAmount > 0} />
@@ -4110,19 +3893,19 @@ function AnalyticsTab({
         <Table headers={headers}>
           {loading ? (
             <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                 {lang === "fr" ? "Chargement…" : "Loading…"}
               </td>
             </tr>
           ) : rows.length === 0 ? (
             <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             rows.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+                <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
                   <td style={{ padding: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <CreatorAvatar
@@ -4133,16 +3916,16 @@ function AnalyticsTab({
                     alt={row.full_name || row.handle}
                   />
                       <div>
-                        <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.full_name || row.handle || "—"}</span>
+                        <span style={{ fontWeight: 500, color: "var(--ws-text)" }}>{row.full_name || row.handle || "—"}</span>
                         {row.handle && row.handle !== row.full_name ? (
-                          <div style={{ fontSize: 12, color: "#9A9A9A" }}>@{row.handle.replace(/^@/, "")}</div>
+                          <div style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>@{row.handle.replace(/^@/, "")}</div>
                         ) : null}
                       </div>
                     </div>
                   </td>
-                  <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{row.salesCount}</td>
-                  <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
-                  <td style={{ padding: "14px", color: "#1A1A1A" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+                  <td style={{ padding: "14px", color: "var(--ws-text)", fontWeight: 500 }}>{row.salesCount}</td>
+                  <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
+                  <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
                   <td style={{ padding: "14px" }}><CampaignRoiCell roi={row.roi} lang={lang} /></td>
                 </tr>
             ))
@@ -4496,32 +4279,32 @@ function PayoutsTab({
       <Card title={lang === "fr" ? "Paiements créateurs" : "Creator payouts"}>
         {!loading && creatorCount > 0 && (
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
-            <div style={{ fontSize: 13, color: "#7A7A7A" }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>
               {lang === "fr" ? "En attente" : "Pending"}:{" "}
-              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(pendingTotal, lang)}</strong>
+              <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(pendingTotal, lang)}</strong>
             </div>
-            <div style={{ fontSize: 13, color: "#7A7A7A" }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>
               {lang === "fr" ? "Commission campagne" : "Campaign commission"}:{" "}
-              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(campaign.commission ?? 0, lang)}</strong>
+              <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(campaign.commission ?? 0, lang)}</strong>
             </div>
           </div>
         )}
         <Table headers={headers}>
           {loading ? (
             <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                 {lang === "fr" ? "Chargement…" : "Loading…"}
               </td>
             </tr>
           ) : rows.length === 0 ? (
             <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "#9A9A9A", fontSize: 13 }}>
+              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             rows.map((row) => (
-          <tr key={row.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
+          <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
             <td style={{ padding: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <CreatorAvatar
@@ -4532,26 +4315,26 @@ function PayoutsTab({
                       alt={row.creatorName}
                     />
                     <div>
-                      <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{row.creatorName}</span>
+                      <span style={{ fontWeight: 500, color: "var(--ws-text)" }}>{row.creatorName}</span>
                       {row.creatorHandle && row.creatorHandle !== row.creatorName ? (
-                        <div style={{ fontSize: 12, color: "#9A9A9A" }}>{row.creatorHandle}</div>
+                        <div style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>{row.creatorHandle}</div>
                       ) : null}
                     </div>
                   </div>
             </td>
-                <td style={{ padding: "14px", color: "#1A1A1A", fontWeight: 500 }}>{formatCurrency(row.amount, lang)}</td>
+                <td style={{ padding: "14px", color: "var(--ws-text)", fontWeight: 500 }}>{formatCurrency(row.amount, lang)}</td>
             <td style={{ padding: "14px" }}>
                   <span
                     style={{
                       fontSize: 12,
                       fontWeight: 500,
-                      color: row.kind === "pending" ? "#D97706" : row.status.toLowerCase() === "paid" ? "#1FB567" : "#7A7A7A",
+                      color: row.kind === "pending" ? "#D97706" : row.status.toLowerCase() === "paid" ? "#1FB567" : "var(--ws-text-muted)",
                     }}
                   >
                     {formatPayoutStatusLabel(row.status, lang)}
                   </span>
                 </td>
-                <td style={{ padding: "14px", color: "#7A7A7A" }}>{row.dueDate}</td>
+                <td style={{ padding: "14px", color: "var(--ws-text-muted)" }}>{row.dueDate}</td>
                 <td style={{ padding: "14px" }}>
                   {row.kind === "pending" && row.payableCreator ? (
                     <BtnSm onClick={() => handlePayCreator(row.payableCreator!)}>
@@ -4560,7 +4343,7 @@ function PayoutsTab({
                         : lang === "fr" ? "Payer" : "Pay"}
                     </BtnSm>
                   ) : (
-                    <span style={{ color: "#9A9A9A", fontSize: 12 }}>—</span>
+                    <span style={{ color: "var(--ws-text-dim)", fontSize: 12 }}>—</span>
                   )}
             </td>
           </tr>
@@ -4575,20 +4358,20 @@ function PayoutsTab({
           onClick={() => setConfirmPay(null)}
         >
           <div
-            style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            style={{ background: "var(--ws-surface)", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px" }}>
               {lang === "fr" ? "Confirmer le paiement ?" : "Confirm payment?"}
             </h3>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 8px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 8px", lineHeight: 1.5 }}>
               {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
-              <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
+              <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
               {lang === "fr" ? "à" : "to"}{" "}
-              <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+              <strong style={{ color: "var(--ws-text)" }}>{confirmPay.name}</strong>
             </p>
-            <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 24px", lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "En confirmant, le paiement est enregistré et le solde du créateur est remis à zéro."
                 : "By confirming, the payment is recorded and the creator's balance is reset."}
@@ -4652,7 +4435,7 @@ function SettingsTab({
         </div>
       </Card>
       <Card title="Danger zone">
-        <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px" }}>Mark this campaign as completed or delete it permanently.</p>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 16px" }}>Mark this campaign as completed or delete it permanently.</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <BtnSm onClick={() => onUpdate({ ...campaign, status: "Completed" })}>Mark completed</BtnSm>
           <BtnSm variant="danger" onClick={onDelete}>{lang === "fr" ? "Supprimer la campagne" : "Delete campaign"}</BtnSm>
@@ -4686,7 +4469,7 @@ function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | 
 
 function InfoHint({ title }: { title: string }) {
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid #D1D5DB", color: "#9A9A9A", fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0 }}>
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, borderRadius: "50%", border: "1px solid var(--ws-border)", color: "var(--ws-text-dim)", fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0 }}>
       i
     </span>
   );
@@ -4844,12 +4627,12 @@ const onboardingFieldInput: React.CSSProperties = {
   boxSizing: "border-box",
   padding: "14px 16px",
   borderRadius: 10,
-  border: "1px solid #D1D5DB",
+  border: "1px solid var(--ws-border)",
   fontSize: 15,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.02em",
-  background: "#FFF",
+  background: "var(--ws-input)",
   outline: "none",
 };
 
@@ -4966,6 +4749,10 @@ function NewCampaignOnboarding({
   const [draftId, setDraftId] = useState<string | undefined>(
     isDraftMode ? existingCampaign?.id : undefined,
   );
+  const draftIdRef = useRef<string | undefined>(draftId);
+  useEffect(() => {
+    draftIdRef.current = draftId;
+  }, [draftId]);
   const [name, setName] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [flagMissingTags, setFlagMissingTags] = useState(false);
@@ -5422,12 +5209,15 @@ function NewCampaignOnboarding({
   };
 
   const persistDraft = async () => {
-    if (isAddCreatorsMode || !onSaveDraft || !hasDraftContent()) return draftId ?? null;
+    if (isAddCreatorsMode || !onSaveDraft || !hasDraftContent()) return draftIdRef.current ?? null;
     setSavingDraft(true);
     try {
       const payload = await buildCampaignPayload();
-      const savedId = await onSaveDraft(payload, draftId ?? existingCampaign?.id);
-      if (savedId) setDraftId(savedId);
+      const savedId = await onSaveDraft(payload, draftIdRef.current ?? existingCampaign?.id);
+      if (savedId) {
+        draftIdRef.current = savedId;
+        setDraftId(savedId);
+      }
       return savedId;
     } finally {
       setSavingDraft(false);
@@ -5457,8 +5247,12 @@ function NewCampaignOnboarding({
         return;
       }
 
-      if (isDraftMode && onLaunchDraft && existingCampaign?.id) {
-        await onLaunchDraft(existingCampaign.id, payload);
+      // Prefer updating an existing draft (auto-saved on step change / close)
+      // instead of inserting a second campaign with the same name.
+      const existingDraftId =
+        draftIdRef.current ?? draftId ?? (isDraftMode ? existingCampaign?.id : undefined);
+      if (existingDraftId && onLaunchDraft) {
+        await onLaunchDraft(existingDraftId, payload);
         return;
       }
 
@@ -5503,11 +5297,11 @@ function NewCampaignOnboarding({
           .join(", ");
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", padding: pagePad }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)", padding: pagePad }}>
       <div style={{ maxWidth: contentMax, margin: "0 auto" }}>
         {step === 0 ? (
           <>
-            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 36px", letterSpacing: "-0.03em" }}>
+            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 36px", letterSpacing: "-0.03em" }}>
               {isDraftMode
                 ? lang === "fr"
                   ? "Reprendre le brouillon"
@@ -5524,10 +5318,11 @@ function NewCampaignOnboarding({
             <div style={{ marginBottom: 28 }}>
               <div
                 style={{
-                  border: "1px solid #0047FF",
+                  border: "1px solid var(--ws-accent)",
                   borderRadius: 10,
                   padding: "4px 14px",
-                  boxShadow: "0 0 0 1px rgba(0,71,255,0.08)",
+                  background: "var(--ws-input)",
+                  boxShadow: "0 0 0 1px var(--ws-accent-soft)",
                 }}
               >
                 <input
@@ -5535,7 +5330,17 @@ function NewCampaignOnboarding({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={lang === "fr" ? "Nommez votre campagne" : "Name your campaign"}
-                  style={{ width: "100%", border: "none", outline: "none", fontSize: 15, fontFamily: "inherit", padding: "12px 0", background: "transparent", boxSizing: "border-box" }}
+                  style={{
+                    width: "100%",
+                    border: "none",
+                    outline: "none",
+                    fontSize: 15,
+                    fontFamily: "inherit",
+                    padding: "12px 0",
+                    background: "transparent",
+                    color: "var(--ws-text)",
+                    boxSizing: "border-box",
+                  }}
                   autoFocus
                 />
                 </div>
@@ -5543,7 +5348,7 @@ function NewCampaignOnboarding({
 
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
                   {lang === "fr"
                     ? "Définir des hashtags, mentions ou mots-clés pour suivre le contenu"
                     : "Set hashtags, mentions, or keywords to track content"}
@@ -5621,9 +5426,9 @@ function NewCampaignOnboarding({
                     type="checkbox"
                     checked={row.checked}
                     onChange={(e) => row.onChange(e.target.checked)}
-                    style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0047FF" }}
+                    style={{ marginTop: 3, width: 16, height: 16, accentColor: "var(--ws-accent)" }}
                   />
-                  <span style={{ flex: 1, fontSize: 14, color: "#1A1A1A", lineHeight: 1.45 }}>
+                  <span style={{ flex: 1, fontSize: 14, color: "var(--ws-text)", lineHeight: 1.45 }}>
                     {row.label}{" "}
                     <InfoHint title={row.hint} />
                   </span>
@@ -5633,7 +5438,7 @@ function NewCampaignOnboarding({
 
             <div style={{ marginBottom: 40 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>
                   {lang === "fr" ? "Commencer à collecter le contenu le" : "Start collecting content on"}
                 </span>
                 <InfoHint
@@ -5644,16 +5449,34 @@ function NewCampaignOnboarding({
                   }
                 />
               </div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 10, border: "1px solid #D1D5DB", borderRadius: 10, padding: "10px 14px" }}>
+              <div
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 10,
+                  border: "1px solid var(--ws-border)",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  background: "var(--ws-input)",
+                }}
+              >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="3" y="5" width="18" height="16" rx="2" stroke="#6B7280" strokeWidth="1.8" />
-                  <path d="M8 3v4M16 3v4M3 10h18" stroke="#6B7280" strokeWidth="1.8" strokeLinecap="round" />
+                  <rect x="3" y="5" width="18" height="16" rx="2" stroke="var(--ws-text-muted)" strokeWidth="1.8" />
+                  <path d="M8 3v4M16 3v4M3 10h18" stroke="var(--ws-text-muted)" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
                 <input
                   type="date"
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
-                  style={{ border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", color: "#1A1A1A", background: "transparent" }}
+                  style={{
+                    border: "none",
+                    outline: "none",
+                    fontSize: 14,
+                    fontFamily: "inherit",
+                    color: "var(--ws-text)",
+                    background: "transparent",
+                    colorScheme: "inherit",
+                  }}
                 />
               </div>
             </div>
@@ -5679,7 +5502,7 @@ function NewCampaignOnboarding({
           </>
         ) : (
           <>
-            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+            <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
               {isAddCreatorsMode
                 ? lang === "fr"
                   ? "Ajouter des créateurs"
@@ -5693,7 +5516,7 @@ function NewCampaignOnboarding({
                     : "Select creators"}
             </h1>
             {isAddCreatorsMode && existingCampaign ? (
-              <p style={{ fontSize: 15, color: "#1A1A1A", margin: "0 0 28px", lineHeight: 1.5 }}>
+              <p style={{ fontSize: 15, color: "var(--ws-text)", margin: "0 0 28px", lineHeight: 1.5 }}>
                 {(existingCampaign.creatorIds?.length ?? 0) > 0
                   ? lang === "fr"
                     ? `${existingCampaign.creatorIds?.length} créateur${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} déjà dans « ${existingCampaign.name} ». Ajoutez-en d'autres ou mettez la liste à jour.`
@@ -5703,7 +5526,7 @@ function NewCampaignOnboarding({
                     : `Add creators to "${existingCampaign.name}".`}
               </p>
             ) : (
-              <p style={{ fontSize: 15, color: "#1A1A1A", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
+              <p style={{ fontSize: 15, color: "var(--ws-text)", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
             )}
 
             <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
@@ -5719,12 +5542,12 @@ function NewCampaignOnboarding({
                     gap: 8,
                     cursor: "pointer",
                     textAlign: "left",
-                    color: selectedListIds.length ? "#1A1A1A" : "#9CA3AF",
+                    color: selectedListIds.length ? "var(--ws-text)" : "var(--ws-text-dim)",
                   }}
                 >
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{listsLabel}</span>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0 }}>
-                    <path d="M8 10l4 4 4-4" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M8 10l4 4 4-4" stroke="var(--ws-text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </button>
                 {listsOpen && (
@@ -5734,8 +5557,8 @@ function NewCampaignOnboarding({
                       top: "calc(100% + 6px)",
                       left: 0,
                       right: 0,
-                      background: "#FFF",
-                      border: "1px solid #E5E7EB",
+                      background: "var(--ws-surface)",
+                      border: "1px solid var(--ws-border)",
                       borderRadius: 10,
                       boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
                       zIndex: 20,
@@ -5745,9 +5568,9 @@ function NewCampaignOnboarding({
                     }}
                   >
                     {loadingCreators ? (
-                      <div style={{ padding: 12, fontSize: 13, color: "#9A9A9A" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
+                      <div style={{ padding: 12, fontSize: 13, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
                     ) : listOptions.length === 0 ? (
-                      <div style={{ padding: 12, fontSize: 13, color: "#9A9A9A" }}>
+                      <div style={{ padding: 12, fontSize: 13, color: "var(--ws-text-dim)" }}>
                         {lang === "fr" ? "Aucune liste. Ajoutez des créateurs dans Gérer." : "No lists yet. Add creators in Manage."}
               </div>
                     ) : (
@@ -5760,10 +5583,10 @@ function NewCampaignOnboarding({
                             type="checkbox"
                             checked={selectedListIds.includes(list.id)}
                             onChange={() => toggleList(list.id)}
-                            style={{ width: 16, height: 16, accentColor: "#0047FF" }}
+                            style={{ width: 16, height: 16, accentColor: "var(--ws-accent)" }}
                           />
-                          <span style={{ flex: 1, fontSize: 14, color: "#1A1A1A" }}>{list.label}</span>
-                          <span style={{ fontSize: 12, color: "#9A9A9A" }}>{list.usernames.length}</span>
+                          <span style={{ flex: 1, fontSize: 14, color: "var(--ws-text)" }}>{list.label}</span>
+                          <span style={{ fontSize: 12, color: "var(--ws-text-dim)" }}>{list.usernames.length}</span>
                         </label>
                       ))
                     )}
@@ -5777,7 +5600,7 @@ function NewCampaignOnboarding({
         </div>
 
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 10 }}>
                 {lang === "fr" ? "Saisir ou coller des @pseudos" : "Write or copy-paste @usernames"}
               </div>
               <textarea
@@ -5797,13 +5620,13 @@ function NewCampaignOnboarding({
                 style={{ ...onboardingTextarea, minHeight: 140 }}
               />
               {manualSearchNotFound && (
-                <p style={{ fontSize: 14, color: "#1A1A1A", margin: "10px 0 0" }}>
+                <p style={{ fontSize: 14, color: "var(--ws-text)", margin: "10px 0 0" }}>
                   {lang === "fr"
                     ? "Nous n'avons pas trouvé de créateurs correspondant à cette recherche"
                     : "We couldn't find any creators matching this search"}
                 </p>
               )}
-              <p style={{ fontSize: 13, color: "#1A1A1A", margin: "8px 0 0" }}>
+              <p style={{ fontSize: 13, color: "var(--ws-text)", margin: "8px 0 0" }}>
                 {lang === "fr"
                   ? "Seuls les créateurs sauvegardés dans Find it peuvent être ajoutés."
                   : "Only creators saved in Find it can be added."}
@@ -5812,7 +5635,7 @@ function NewCampaignOnboarding({
 
             {addedCreators.length > 0 && (
               <div style={{ marginBottom: 32 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 12 }}>
                   {isAddCreatorsMode
                     ? lang === "fr"
                       ? `${addedCreators.length} créateur${addedCreators.length > 1 ? "s" : ""} dans la sélection`
@@ -5834,9 +5657,9 @@ function NewCampaignOnboarding({
                         alignItems: "center",
                         gap: 12,
                         padding: "12px 14px",
-                        border: "1px solid #E5E7EB",
+                        border: "1px solid var(--ws-border)",
                         borderRadius: 10,
-                        background: "#FAFAFA",
+                        background: "var(--ws-surface-2)",
                       }}
                     >
                       <CreatorAvatar
@@ -5848,14 +5671,14 @@ function NewCampaignOnboarding({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{entry.displayName || entry.handle}</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)" }}>{entry.displayName || entry.handle}</div>
                           {isAddCreatorsMode && isExistingInCampaign ? (
                             <span
                               style={{
                                 fontSize: 11,
                                 fontWeight: 600,
                                 color: "#FFFFFF",
-                                background: "#0047FF",
+                                background: "var(--ws-accent)",
                                 padding: "4px 10px",
                                 borderRadius: 999,
                                 letterSpacing: "-0.01em",
@@ -5867,7 +5690,7 @@ function NewCampaignOnboarding({
                             </span>
                           ) : null}
                         </div>
-                        <div style={{ fontSize: 13, color: "#1A1A1A" }}>@{entry.handle.replace(/^@/, "")}</div>
+                        <div style={{ fontSize: 13, color: "var(--ws-text)" }}>@{entry.handle.replace(/^@/, "")}</div>
                         {isAddCreatorsMode &&
                         !isExistingInCampaign &&
                         !entry.historicalSalesAttached &&
@@ -5877,11 +5700,11 @@ function NewCampaignOnboarding({
                               marginTop: 8,
                               padding: "10px 12px",
                               borderRadius: 8,
-                              background: "#FFF7ED",
-                              border: "1px solid #FED7AA",
+                              background: "rgba(217, 119, 6, 0.12)",
+                              border: "1px solid rgba(217, 119, 6, 0.35)",
                             }}
                           >
-                            <p style={{ margin: "0 0 8px", fontSize: 12, color: "#9A3412", lineHeight: 1.45 }}>
+                            <p style={{ margin: "0 0 8px", fontSize: 12, color: "#EAB308", lineHeight: 1.45 }}>
                               {lang === "fr"
                                 ? "Les ventes de ce créateur ne sont pas rattachées à cette campagne."
                                 : "This creator's sales are not attached to this campaign."}
@@ -5891,8 +5714,8 @@ function NewCampaignOnboarding({
                               onClick={() => markCreatorSalesAttached(entry.key)}
                               style={{
                                 border: "none",
-                                background: "#1A1A1A",
-                                color: "#FFFFFF",
+                                background: "var(--ws-btn)",
+                                color: "var(--ws-btn-text)",
                                 borderRadius: 8,
                                 padding: "6px 12px",
                                 fontSize: 12,
@@ -5908,7 +5731,7 @@ function NewCampaignOnboarding({
                           </div>
                         ) : null}
                         {entry.historicalSalesAttached && (entry.brandSalesCount ?? 0) > 0 ? (
-                          <div style={{ marginTop: 6, fontSize: 12, color: "#166534", fontWeight: 500 }}>
+                          <div style={{ marginTop: 6, fontSize: 12, color: "#4ADE80", fontWeight: 500 }}>
                             {lang === "fr"
                               ? `${entry.brandSalesCount} vente(s) rattachée(s)`
                               : `${entry.brandSalesCount} sale(s) attached`}
@@ -5918,7 +5741,7 @@ function NewCampaignOnboarding({
                       <button
                         type="button"
                         onClick={() => removeCreator(entry.key)}
-                        style={{ border: "none", background: "transparent", color: "#9CA3AF", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
+                        style={{ border: "none", background: "transparent", color: "var(--ws-text-dim)", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}
                       >
                         {lang === "fr" ? "Retirer" : "Remove"}
           </button>

@@ -27,7 +27,13 @@ import {
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CreatorPayoutMethodFields, creatorHasPayoutDetails, type CreatorPayoutMethodFieldsHandle } from "./CreatorPayoutMethodFields";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
-import { PayItWelcomeLoading, PayItWelcomeView, usePayItActivity } from "./PayItWelcomeView";
+import { useDashboardTheme } from "./DashboardThemeProvider";
+import {
+  cachedJsonFetch,
+  invalidateDashboardCache,
+  peekDashboardCache,
+} from "@/lib/dashboard-fetch-cache";
+import { PayItWelcomeLoading } from "./PayItWelcomeView";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGateModalProps, runTierUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
@@ -79,9 +85,9 @@ type SaleNotification = {
 type SaleFeedSection = "today" | "yesterday" | "earlier";
 
 const btnOutline: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "10px 16px",
   fontSize: 14,
@@ -232,22 +238,52 @@ function commissionRateFromSale(sale: TrackedSale) {
   return order > 0 ? commission / order : 0;
 }
 
+const trackedSalesCache = new Map<string, { at: number; rows: TrackedSale[]; inflight?: Promise<TrackedSale[]> }>();
+const TRACKED_SALES_TTL_MS = 25_000;
+
 async function fetchTrackedSales(userId: string): Promise<TrackedSale[]> {
-  const { supabase } = await import("@/lib/supabase");
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("sales")
-    .select(
-      "id, creator_id, order_amount, commission_amount, discount_code_used, shopify_order_id, shop_domain, status, created_at, campaign_id, creators ( handle, full_name, avatar_url, platform )",
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(150);
-  if (error) {
-    console.error(error);
-    return [];
+  const hit = trackedSalesCache.get(userId);
+  if (hit && Date.now() - hit.at < TRACKED_SALES_TTL_MS) return hit.rows;
+  if (hit?.inflight) return hit.inflight;
+
+  const inflight = (async () => {
+    const { supabase } = await import("@/lib/supabase");
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("sales")
+      .select(
+        "id, creator_id, order_amount, commission_amount, discount_code_used, shopify_order_id, shop_domain, status, created_at, campaign_id, creators ( handle, full_name, avatar_url, platform )",
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(150);
+    if (error) {
+      console.error(error);
+      return hit?.rows ?? [];
+    }
+    const rows = (data || []) as TrackedSale[];
+    trackedSalesCache.set(userId, { at: Date.now(), rows });
+    return rows;
+  })();
+
+  trackedSalesCache.set(userId, {
+    at: hit?.at ?? 0,
+    rows: hit?.rows ?? [],
+    inflight,
+  });
+  try {
+    return await inflight;
+  } finally {
+    const cur = trackedSalesCache.get(userId);
+    if (cur) delete cur.inflight;
   }
-  return (data || []) as TrackedSale[];
+}
+
+function peekTrackedSales(userId: string): TrackedSale[] | null {
+  const hit = trackedSalesCache.get(userId);
+  if (!hit?.rows?.length && hit?.at === 0) return null;
+  if (!hit) return null;
+  return hit.rows;
 }
 
 function mapSaleToNotification(row: TrackedSale, isNew: boolean): SaleNotification {
@@ -334,18 +370,18 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
     padding: "16px 20px",
     fontSize: 14,
     fontWeight: 600,
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     textAlign: "left",
-    borderBottom: "1px solid #EFEFEF",
-    background: "#FAFAFA",
+    borderBottom: "1px solid var(--ws-border)",
+    background: "var(--ws-surface-2)",
     whiteSpace: "nowrap",
   };
 
   const tdStyle: React.CSSProperties = {
     padding: "16px 20px",
     fontSize: 15,
-    color: "#1A1A1A",
-    borderBottom: "1px solid #F5F5F5",
+    color: "var(--ws-text)",
+    borderBottom: "1px solid var(--ws-border)",
     verticalAlign: "middle",
     whiteSpace: "nowrap",
   };
@@ -354,9 +390,9 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
     padding: "10px 20px",
     fontSize: 12,
     fontWeight: 600,
-    color: "#6B7280",
-    background: "#FAFAFA",
-    borderBottom: "1px solid #EFEFEF",
+    color: "var(--ws-text-muted)",
+    background: "var(--ws-surface-2)",
+    borderBottom: "1px solid var(--ws-border)",
     letterSpacing: "-0.01em",
   };
 
@@ -365,7 +401,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
     border: "none",
     padding: 0,
     fontSize: 13,
-    color: "#6B7280",
+    color: "var(--ws-text-muted)",
     cursor: "pointer",
     fontFamily: "inherit",
     letterSpacing: "-0.01em",
@@ -376,7 +412,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
       <style>{`
         @keyframes saleRowIn {
           from { opacity: 0; background: #F5F8FF; }
-          to { opacity: 1; background: #FFFFFF; }
+          to { opacity: 1; background: var(--ws-surface); }
         }
       `}</style>
 
@@ -391,7 +427,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
             flexWrap: "wrap",
           }}
         >
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0 }}>
             {lang === "fr" ? "Ventes en direct" : "Live sales"}
           </h2>
           <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
@@ -413,7 +449,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
           </div>
         </div>
 
-        <div style={{ position: "relative", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto", background: "#FFFFFF", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ position: "relative", border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "auto", background: "var(--ws-surface)", WebkitOverflowScrolling: "touch" }}>
           {paused && (
             <div
               style={{
@@ -427,7 +463,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
                 pointerEvents: "none",
               }}
             >
-              <span style={{ fontSize: 13, fontWeight: 500, color: "#9A9A9A", letterSpacing: "-0.02em" }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: "var(--ws-text-dim)", letterSpacing: "-0.02em" }}>
                 {lang === "fr" ? "Flux en pause" : "Feed paused"}
               </span>
             </div>
@@ -447,7 +483,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
             <tbody>
               {list.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                  <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--ws-text-dim)", padding: 48 }}>
                     {lang === "fr" ? "Aucune vente pour le moment." : "No sales yet."}
                   </td>
                 </tr>
@@ -465,14 +501,14 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
                         <tr
                           key={sale.id}
                           style={{
-                            background: "#FFFFFF",
+                            background: "var(--ws-surface)",
                             animation: sale.isNew ? "saleRowIn 0.6s ease-out" : undefined,
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#FAFAFA";
+                            e.currentTarget.style.background = "var(--ws-hover)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#FFFFFF";
+                            e.currentTarget.style.background = "var(--ws-surface)";
                           }}
                         >
                           <td style={{ ...tdStyle, fontWeight: 500 }}>@{sale.creatorHandle}</td>
@@ -485,7 +521,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
                           <td style={{ ...tdStyle, textAlign: "right" }}>
                             {formatCurrency(creatorShare, lang)}
                           </td>
-                          <td style={{ ...tdStyle, textAlign: "right", color: "#6B7280", fontSize: 14 }}>
+                          <td style={{ ...tdStyle, textAlign: "right", color: "var(--ws-text-muted)", fontSize: 14 }}>
                             {formatSaleFeedTime(sale.createdAt, lang)}
                           </td>
                           <td style={{ ...tdStyle, textAlign: "right", paddingLeft: 8, paddingRight: 16 }}>
@@ -496,7 +532,7 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
                               style={{
                                 background: "none",
                                 border: "none",
-                                color: "#9CA3AF",
+                                color: "var(--ws-text-dim)",
                                 fontSize: 18,
                                 lineHeight: 1,
                                 cursor: "pointer",
@@ -524,9 +560,9 @@ export function LiveSalesFeed({ isMobile, userId }: { isMobile?: boolean; userId
 // --- Shared payment methods (Settings + Payouts) ---
 
 const pmBtnSecondary: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "8px 14px",
   fontSize: 13,
@@ -544,8 +580,8 @@ function CardBrandIcon({ brand }: { brand: string }) {
         width: 44,
         height: 28,
         borderRadius: 6,
-        background: isMastercard ? "#1A1A1A" : "#1A1F71",
-        color: "#FFFFFF",
+        background: isMastercard ? "var(--ws-text)" : "#1A1F71",
+        color: "var(--ws-surface)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -565,8 +601,8 @@ function PaymentMethodCardItem({ method }: { method: PaymentMethod }) {
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 12,
         padding: 16,
         display: "flex",
@@ -577,15 +613,15 @@ function PaymentMethodCardItem({ method }: { method: PaymentMethod }) {
     >
       <CardBrandIcon brand={method.brand} />
       <div style={{ flex: 1, minWidth: 160 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 4 }}>
           {formatPaymentLabel(method)}
         </div>
-        <div style={{ fontSize: 12, color: "#7A7A7A" }}>
+        <div style={{ fontSize: 12, color: "var(--ws-text-muted)" }}>
           {lang === "fr" ? "Expire" : "Expires"} {method.expiry}
         </div>
       </div>
       {method.isDefault && (
-        <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1A1A", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text)", textTransform: "capitalize", letterSpacing: "-0.01em" }}>
           {lang === "fr" ? "Par défaut" : "Default"}
         </span>
       )}
@@ -599,7 +635,7 @@ export function BillingPaymentMethodSummary({ compact }: { compact?: boolean }) 
 
   if (loading) {
     return (
-      <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "Chargement de la carte…" : "Loading card…"}
       </p>
     );
@@ -615,14 +651,14 @@ export function BillingPaymentMethodSummary({ compact }: { compact?: boolean }) 
 
   if (!hasPaymentMethod || !defaultMethod) {
     return (
-      <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
         {lang === "fr"
           ? "Aucune carte enregistrée pour votre abonnement."
           : "No card on file for your subscription."}{" "}
         <button
           type="button"
           onClick={openManage}
-          style={{ background: "none", border: "none", padding: 0, color: "#0047FF", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
+          style={{ background: "none", border: "none", padding: 0, color: "var(--ws-accent)", fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}
         >
           {lang === "fr" ? "Ajouter une carte" : "Add a card"}
         </button>
@@ -631,9 +667,9 @@ export function BillingPaymentMethodSummary({ compact }: { compact?: boolean }) 
   }
 
   return (
-    <p style={{ fontSize: 13, color: "#7A7A7A", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
+    <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: compact ? "8px 0 0" : "0", letterSpacing: "-0.01em" }}>
       {lang === "fr" ? "Facturé sur" : "Billed to"}{" "}
-      <span style={{ color: "#1A1A1A", fontWeight: 500 }}>
+      <span style={{ color: "var(--ws-text)", fontWeight: 500 }}>
         {formatPaymentLabelShort(defaultMethod, lang)}
       </span>
       {!compact && (
@@ -652,7 +688,7 @@ export function PaymentMethodsBillingSection() {
 
   if (loading) {
     return (
-      <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "Chargement..." : "Loading..."}
       </p>
     );
@@ -668,7 +704,7 @@ export function PaymentMethodsBillingSection() {
 
   return (
     <>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 12px", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+      <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "0 0 12px", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
         {lang === "fr"
           ? "Carte utilisée lors du choix de votre offre et pour les renouvellements Stripe."
           : "Card used when you chose your plan and for Stripe renewals."}
@@ -678,7 +714,7 @@ export function PaymentMethodsBillingSection() {
           <PaymentMethodCardItem key={m.id} method={m} />
         ))}
         {!hasPaymentMethod && (
-          <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
             {lang === "fr"
               ? "Aucune carte enregistrée. Ajoutez-en une via le portail de facturation Stripe."
               : "No card on file. Add one in the Stripe billing portal."}
@@ -694,7 +730,7 @@ export function PaymentMethodsBillingSection() {
             ? "Ajouter une carte"
             : "Add a card"}
       </button>
-      <div style={{ padding: "12px 14px", background: "#FAFAFA", borderRadius: 10, fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+      <div style={{ padding: "12px 14px", background: "var(--ws-surface-2)", borderRadius: 10, fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
         {lang === "fr" ? "Passez à la facturation annuelle — 2 mois offerts" : "Switch to annual billing — 2 months free"}
       </div>
     </>
@@ -827,10 +863,10 @@ function CreatorsPayoutTable({
     padding: "16px 20px",
     fontSize: 14,
     fontWeight: 600,
-    color: "#1A1A1A",
+    color: "var(--ws-text)",
     textAlign: "left",
-    borderBottom: "1px solid #EFEFEF",
-    background: "#FAFAFA",
+    borderBottom: "1px solid var(--ws-border)",
+    background: "var(--ws-surface-2)",
     whiteSpace: "nowrap",
     cursor: "pointer",
     userSelect: "none",
@@ -839,8 +875,8 @@ function CreatorsPayoutTable({
   const tdStyle: React.CSSProperties = {
     padding: "16px 20px",
     fontSize: 15,
-    color: "#1A1A1A",
-    borderBottom: "1px solid #F5F5F5",
+    color: "var(--ws-text)",
+    borderBottom: "1px solid var(--ws-border)",
     verticalAlign: "middle",
     whiteSpace: "nowrap",
   };
@@ -883,11 +919,11 @@ function CreatorsPayoutTable({
   return (
     <div
       style={{
-        border: "1px solid #EFEFEF",
+        border: "1px solid var(--ws-border)",
         borderRadius: 16,
         overflow: "auto",
         marginBottom: 36,
-        background: "#FFFFFF",
+        background: "var(--ws-surface)",
         WebkitOverflowScrolling: "touch",
       }}
     >
@@ -908,7 +944,7 @@ function CreatorsPayoutTable({
         <tbody>
           {sortedCreators.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + 1} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48, whiteSpace: "normal" }}>
+              <td colSpan={columns.length + 1} style={{ ...tdStyle, textAlign: "center", color: "var(--ws-text-dim)", padding: 48, whiteSpace: "normal" }}>
                 {lang === "fr" ? "Aucun créateur pour le moment." : "No creators yet."}
               </td>
             </tr>
@@ -925,10 +961,10 @@ function CreatorsPayoutTable({
                   onClick={() => onSelectCreator(creator)}
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#FAFAFA";
+                    e.currentTarget.style.background = "var(--ws-hover)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#FFFFFF";
+                    e.currentTarget.style.background = "var(--ws-surface)";
                   }}
                 >
                   <td style={{ ...tdStyle, fontWeight: 500 }}>
@@ -937,7 +973,7 @@ function CreatorsPayoutTable({
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontWeight: 500 }}>{name}</div>
                         {handle && (
-                          <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 2 }}>
+                          <div style={{ fontSize: 13, color: "var(--ws-text-dim)", marginTop: 2 }}>
                             @{String(handle).replace(/^@/, "")}
                           </div>
                         )}
@@ -950,12 +986,12 @@ function CreatorsPayoutTable({
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
-                        background: "#F5F5F5",
-                        border: "1px solid #EFEFEF",
+                        background: "var(--ws-bg)",
+                        border: "1px solid var(--ws-border)",
                         borderRadius: 8,
                         padding: "6px 12px",
                         fontSize: 14,
-                        color: "#1A1A1A",
+                        color: "var(--ws-text)",
                       }}
                     >
                       {methodLabel}
@@ -973,7 +1009,7 @@ function CreatorsPayoutTable({
                         background: "transparent",
                         cursor: "pointer",
                         padding: 6,
-                        color: "#1A1A1A",
+                        color: "var(--ws-text)",
                       }}
                     >
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -1218,7 +1254,7 @@ function PayoutOverviewPeriodSelect({
           border: "none",
           padding: 0,
           fontSize: 13,
-          color: "#6B7280",
+          color: "var(--ws-text-muted)",
           letterSpacing: "-0.01em",
           cursor: "pointer",
           fontFamily: "inherit",
@@ -1226,7 +1262,7 @@ function PayoutOverviewPeriodSelect({
       >
         {payoutOverviewPeriodLabel(value, lang)}
         <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true" style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}>
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="#6B7280" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--ws-text-muted)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -1238,10 +1274,10 @@ function PayoutOverviewPeriodSelect({
             top: "calc(100% + 8px)",
             right: 0,
             minWidth: 180,
-            background: "#FFFFFF",
-            border: "1px solid #EFEFEF",
+            background: "var(--ws-surface)",
+            border: "1px solid var(--ws-border)",
             borderRadius: 12,
-            boxShadow: "0 12px 32px rgba(0,0,0,0.08)",
+            boxShadow: "var(--ws-shadow)",
             padding: 6,
             zIndex: 40,
           }}
@@ -1262,12 +1298,12 @@ function PayoutOverviewPeriodSelect({
                   display: "block",
                   width: "100%",
                   textAlign: "left",
-                  background: active ? "#F5F5F5" : "transparent",
+                  background: active ? "var(--ws-hover)" : "transparent",
                   border: "none",
                   borderRadius: 8,
                   padding: "9px 10px",
                   fontSize: 13,
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   cursor: "pointer",
                   fontFamily: "inherit",
                   letterSpacing: "-0.01em",
@@ -1433,7 +1469,7 @@ function PayoutCommissionChart({
               key={`yt-${tick}`}
               style={{
                 fontSize: 10,
-                color: "#9CA3AF",
+                color: "var(--ws-text-dim)",
                 letterSpacing: "-0.01em",
                 lineHeight: 1,
                 textAlign: "right",
@@ -1452,7 +1488,7 @@ function PayoutCommissionChart({
               position: "relative",
               flex: 1,
               minHeight: chartHeight - 22,
-              borderBottom: "1px solid #E8E8EA",
+              borderBottom: "1px solid var(--ws-border)",
             }}
           >
             {/* Horizontal guide lines */}
@@ -1467,7 +1503,7 @@ function PayoutCommissionChart({
                     left: 0,
                     right: 0,
                     top,
-                    borderTop: tick === 0 ? "none" : "1px solid #F1F1F3",
+                    borderTop: tick === 0 ? "none" : "1px solid var(--ws-border)",
                     pointerEvents: "none",
                   }}
                 />
@@ -1510,14 +1546,15 @@ function PayoutCommissionChart({
                         height: `${hPct}%`,
                         minHeight: hasActivity && bucket.earned > 0 ? 4 : 2,
                         background: !hasActivity
-                          ? "#EDEDEF"
+                          ? "var(--ws-border)"
                           : isActive
-                            ? "#0047FF"
+                            ? "var(--ws-accent)"
                             : bucket.earned > 0
-                              ? "#B8C9FF"
-                              : "#EDEDEF",
+                              ? "var(--ws-accent-soft)"
+                              : "var(--ws-border)",
                         borderRadius: "3px 3px 0 0",
                         transition: "background 0.12s ease, height 0.2s ease",
+                        boxShadow: bucket.earned > 0 && !isActive ? "inset 0 0 0 1px color-mix(in srgb, var(--ws-accent) 55%, transparent)" : "none",
                       }}
                     />
                   </div>
@@ -1534,22 +1571,22 @@ function PayoutCommissionChart({
                   transform: "translateX(-50%)",
                   padding: "8px 11px",
                   borderRadius: 10,
-                  border: "1px solid #ECECEC",
-                  background: "#FFFFFF",
-                  boxShadow: "0 8px 22px rgba(15, 23, 42, 0.1)",
+                  border: "1px solid var(--ws-border)",
+                  background: "var(--ws-surface-2)",
+                  boxShadow: "var(--ws-shadow)",
                   pointerEvents: "none",
                   zIndex: 5,
                   whiteSpace: "nowrap",
                 }}
               >
-                <div style={{ fontSize: 11, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 2 }}>
+                <div style={{ fontSize: 11, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 2 }}>
                   {formatTimelineAxisLabel(active.dateKey, lang, period)}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
                   {formatCurrency(active.earned, lang)}
                 </div>
                 {active.paid > 0 ? (
-                  <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 2, letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginTop: 2, letterSpacing: "-0.01em" }}>
                     {lang === "fr" ? `Versé ${formatCurrency(active.paid, lang)}` : `Paid ${formatCurrency(active.paid, lang)}`}
                   </div>
                 ) : null}
@@ -1564,7 +1601,7 @@ function PayoutCommissionChart({
               justifyContent: "space-between",
               gap: 6,
               fontSize: 11,
-              color: "#9CA3AF",
+              color: "var(--ws-text-dim)",
               letterSpacing: "-0.01em",
               marginTop: 8,
               height: 14,
@@ -1605,13 +1642,13 @@ function StripeOverviewSideMetric({
   showDivider?: boolean;
 }) {
   return (
-    <div style={{ paddingBottom: showDivider ? 24 : 0, marginBottom: showDivider ? 24 : 0, borderBottom: showDivider ? "1px solid #EFEFEF" : "none" }}>
-      <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
+    <div style={{ paddingBottom: showDivider ? 24 : 0, marginBottom: showDivider ? 24 : 0, borderBottom: showDivider ? "1px solid var(--ws-border)" : "none" }}>
+      <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 10 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1.05 }}>
         {value}
       </div>
       {hint && (
-        <div style={{ fontSize: 12, color: hintColor ?? "#1A1A1A", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: hintColor ?? "var(--ws-text)", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 8 }}>
           {hint}
         </div>
       )}
@@ -1634,12 +1671,12 @@ function PayoutOverviewMetric({
 }) {
   return (
     <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 12 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 12 }}>{label}</div>
       <div
         style={{
           fontSize: large ? 36 : 30,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           letterSpacing: "-0.04em",
           lineHeight: 1.05,
           marginBottom: hint ? 10 : 0,
@@ -1648,7 +1685,7 @@ function PayoutOverviewMetric({
         {value}
       </div>
       {hint && (
-        <div style={{ fontSize: 12, color: hintColor ?? "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>{hint}</div>
+        <div style={{ fontSize: 12, color: hintColor ?? "var(--ws-text-dim)", letterSpacing: "-0.01em", lineHeight: 1.45 }}>{hint}</div>
       )}
     </div>
   );
@@ -1764,7 +1801,7 @@ function PayoutsOverviewPanel({
       style={{
         marginBottom: isMobile ? 56 : 72,
         paddingBottom: isMobile ? 32 : 40,
-        borderBottom: "1px solid #EFEFEF",
+        borderBottom: "1px solid var(--ws-border)",
       }}
     >
       <div
@@ -1786,7 +1823,7 @@ function PayoutsOverviewPanel({
               marginBottom: 8,
             }}
           >
-            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
               {commissionsLabel}
             </div>
             <PayoutOverviewPeriodSelect value={period} onChange={setPeriod} lang={lang} />
@@ -1797,14 +1834,14 @@ function PayoutsOverviewPanel({
               style={{
                 fontSize: isMobile ? 32 : 36,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 letterSpacing: "-0.04em",
                 lineHeight: 1.05,
               }}
             >
               {formatCurrency(periodCommission, lang)}
             </div>
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginTop: 8 }}>
+            <div style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginTop: 8 }}>
               {commissionsSub}
             </div>
           </div>
@@ -1816,8 +1853,8 @@ function PayoutsOverviewPanel({
 
         <div
           style={{
-            borderTop: isMobile ? "1px solid #EFEFEF" : "none",
-            borderLeft: isMobile ? "none" : "1px solid #EFEFEF",
+            borderTop: isMobile ? "1px solid var(--ws-border)" : "none",
+            borderLeft: isMobile ? "none" : "1px solid var(--ws-border)",
             paddingTop: isMobile ? 28 : 0,
             paddingLeft: isMobile ? 0 : 32,
             minWidth: 0,
@@ -1834,7 +1871,7 @@ function PayoutsOverviewPanel({
             hint={paidSub}
             showDivider={false}
           />
-          <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", lineHeight: 1.45, marginTop: 4 }}>
             {readySub}
           </div>
         </div>
@@ -1855,7 +1892,7 @@ function PayoutsPageHeader({
   trailing?: ReactNode;
 }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 16, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 12 : 16, paddingLeft: isMobile ? 16 : 40, background: "var(--ws-bg)", color: "var(--ws-text)" }}>
       <div
         style={{
           display: "flex",
@@ -1866,8 +1903,8 @@ function PayoutsPageHeader({
         }}
       >
         <div style={{ minWidth: 0 }}>
-          <h1 style={{ fontSize: isMobile ? 26 : 34, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
-          {subtitle && <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
+          <h1 style={{ fontSize: isMobile ? 26 : 34, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
+          {subtitle && <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0 }}>{subtitle}</p>}
         </div>
         {trailing}
       </div>
@@ -1877,15 +1914,15 @@ function PayoutsPageHeader({
 
 function PayoutsToggle({ on }: { on: boolean }) {
   return (
-    <div style={{ position: "relative", width: 40, height: 22, background: on ? "#0047FF" : "#E5E5E5", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
+    <div style={{ position: "relative", width: 40, height: 22, background: on ? "var(--ws-accent)" : "var(--ws-border)", borderRadius: 999, cursor: "pointer", transition: "background 0.2s" }}>
       <div style={{ position: "absolute", top: 2, left: on ? 20 : 2, width: 18, height: 18, background: "#FFFFFF", borderRadius: "50%", transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
     </div>
   );
 }
 
 const payoutPagePrimaryBtn: React.CSSProperties = {
-  background: "#0047FF",
-  color: "#FFFFFF",
+  background: "var(--ws-accent)",
+  color: "var(--ws-surface)",
   border: "none",
   borderRadius: 10,
   padding: "12px 20px",
@@ -1897,9 +1934,9 @@ const payoutPagePrimaryBtn: React.CSSProperties = {
 };
 
 const payoutPageSecondaryBtn: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "12px 20px",
   fontSize: 15,
@@ -1921,8 +1958,8 @@ const payoutDrawerAction: React.CSSProperties = {
 const payoutDrawerBtnPrimary: React.CSSProperties = {
   ...payoutDrawerAction,
   fontWeight: 600,
-  color: "#FFF",
-  background: "#1A1A1A",
+  color: "var(--ws-surface)",
+  background: "var(--ws-text)",
   border: "none",
   padding: "10px 14px",
   cursor: "pointer",
@@ -1931,9 +1968,9 @@ const payoutDrawerBtnPrimary: React.CSSProperties = {
 const payoutDrawerBtnSecondary: React.CSSProperties = {
   ...payoutDrawerAction,
   fontWeight: 500,
-  color: "#1A1A1A",
-  background: "#FFF",
-  border: "1px solid #E5E5E5",
+  color: "var(--ws-text)",
+  background: "var(--ws-surface)",
+  border: "1px solid var(--ws-border)",
   padding: "10px 14px",
   cursor: "pointer",
 };
@@ -1967,34 +2004,37 @@ function CreatorPayoutPage({
   onPayStripe: () => void | Promise<void>;
   onConnectStripeBank: () => void | Promise<void>;
 }) {
+  const { theme } = useDashboardTheme();
+  const isDark = theme === "dark";
   const [shown, setShown] = useState(false);
+  const [showPayMethods, setShowPayMethods] = useState(false);
   useEffect(() => {
     const id = requestAnimationFrame(() => setShown(true));
     return () => cancelAnimationFrame(id);
   }, []);
 
+  useEffect(() => {
+    setShowPayMethods(false);
+  }, [creator.id]);
+
   const name = creator.full_name || creator.handle || creator.username || "Creator";
   const handle = creator.handle || creator.username || "";
   const balance = Number(creator.balance) || 0;
   const totalEarned = Number(creator.total_earned) || 0;
-  const platform = salePlatformFromCreator(creator.platform);
-  const followers = Number(creator.followers) || 0;
-  const engagement = Number(creator.engagement_rate) || 0;
+  const trackedSales = Number(creator.total_sales) || 0;
   const discountCode = creator.discount_code?.trim() || null;
   const email = creator.email?.trim() || null;
-  const canPayManual = balance > 0 && creatorHasPaymentMethod(creator) && payingId !== creator.id;
   const hasPaymentMethod = creatorHasPaymentMethod(creator);
-  const paymentDetail = creator.paypal_link || creator.revolut_link || creator.iban || "";
-
-  // Brand revenue (sales) vs cost (commissions earned = paid + still owed).
-  const costToBrand = totalEarned;
+  const isPaying = payingId === creator.id;
   const revenue = Number(salesRevenue) || 0;
-  const hasProfitSignal = revenue > 0 || costToBrand > 0;
-  const isProfitable = hasProfitSignal && revenue > costToBrand;
+  const commissionRatePct =
+    revenue > 0 && totalEarned > 0 ? Math.min(100, (totalEarned / revenue) * 100) : null;
+  const alreadyPaid = Math.max(0, totalEarned - balance);
+  const canStartPay = balance > 0 && !isPaying;
 
   const panel: React.CSSProperties = {
-    background: "#FFFFFF",
-    border: "1px solid #E8E8EA",
+    background: "var(--ws-surface)",
+    border: "1px solid var(--ws-border)",
     borderRadius: 16,
     padding: "18px 18px",
     marginBottom: 14,
@@ -2005,23 +2045,67 @@ function CreatorPayoutPage({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    padding: "12px 0",
-    borderBottom: "1px solid #F0F0F2",
+    padding: "11px 0",
+    borderBottom: "1px solid var(--ws-border)",
   };
 
   const rowLast: React.CSSProperties = { ...row, borderBottom: "none", paddingBottom: 0 };
   const rowLabel: React.CSSProperties = {
     fontSize: 13,
-    color: "#6B7280",
+    color: "var(--ws-text-muted)",
     letterSpacing: "-0.01em",
   };
   const rowValue: React.CSSProperties = {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: 600,
-    color: "#111827",
+    color: "var(--ws-text)",
     letterSpacing: "-0.02em",
     textAlign: "right",
     fontVariantNumeric: "tabular-nums",
+  };
+
+  const methodBtn: React.CSSProperties = {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    padding: "14px 16px",
+    borderRadius: 12,
+    border: "1px solid var(--ws-border-strong)",
+    background: "var(--ws-surface-2)",
+    color: "var(--ws-text)",
+    font: "inherit",
+    fontSize: 14,
+    fontWeight: 650,
+    letterSpacing: "-0.02em",
+    cursor: "pointer",
+    textAlign: "left",
+  };
+
+  const invoiceRef = `PAY-${String(creator.id || "").slice(0, 8).toUpperCase() || "CREATOR"}`;
+  const createdLabel = new Date().toLocaleString(lang === "fr" ? "fr-FR" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const runPayPal = () => {
+    if (!hasPaymentMethod && !paypalUsername(String(creator.paypal_link || ""))) {
+      // still try flush + manual — form may have draft values
+    }
+    void onPayManual();
+  };
+
+  const runIban = () => {
+    void onPayManual();
+  };
+
+  const runStripe = () => {
+    if (creator.stripe_account_id) void onPayStripe();
+    else void onConnectStripeBank();
   };
 
   return (
@@ -2030,7 +2114,7 @@ function CreatorPayoutPage({
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(15, 23, 42, 0.42)",
+        background: isDark ? "rgba(0, 0, 0, 0.55)" : "rgba(15, 15, 15, 0.35)",
         zIndex: 1100,
         display: "flex",
         justifyContent: "flex-end",
@@ -2041,17 +2125,17 @@ function CreatorPayoutPage({
         style={{
           width: "min(440px, 100%)",
           height: "100%",
-          background: "#FFFFFF",
+          background: "var(--ws-bg)",
+          color: "var(--ws-text)",
           display: "flex",
           flexDirection: "column",
           transform: shown ? "translateX(0)" : "translateX(48px)",
           opacity: shown ? 1 : 0,
           transition: "transform .2s ease, opacity .2s ease",
           fontFamily: payoutDrawerFont,
-          boxShadow: "-12px 0 40px rgba(15, 23, 42, 0.12)",
+          boxShadow: "var(--ws-shadow)",
         }}
       >
-        {/* App bar */}
         <div
           style={{
             flexShrink: 0,
@@ -2060,8 +2144,8 @@ function CreatorPayoutPage({
             justifyContent: "space-between",
             gap: 12,
             padding: "14px 16px",
-            background: "#FFFFFF",
-            borderBottom: "1px solid #E8E8EA",
+            background: "var(--ws-surface)",
+            borderBottom: "1px solid var(--ws-border)",
           }}
         >
           <button
@@ -2073,7 +2157,7 @@ function CreatorPayoutPage({
               gap: 6,
               background: "none",
               border: "none",
-              color: "#111827",
+              color: "var(--ws-text)",
               fontWeight: 500,
               fontSize: 14,
               cursor: "pointer",
@@ -2087,207 +2171,236 @@ function CreatorPayoutPage({
             </svg>
             {lang === "fr" ? "Retour" : "Back"}
           </button>
-          <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em" }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
             {lang === "fr" ? "Paiement créateur" : "Creator payout"}
           </div>
-          <div style={{ width: 72 }} aria-hidden />
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              border: "1px solid var(--ws-border)",
+              background: "var(--ws-surface-2)",
+              color: "var(--ws-text-muted)",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 16px 28px", boxSizing: "border-box" }}>
-          {/* Amount hero — like a transfer screen */}
-          <div
-            style={{
-              ...panel,
-              textAlign: "center",
-              padding: "28px 20px 24px",
-              marginBottom: 14,
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 10 }}>
-              {lang === "fr" ? "Montant à verser" : "Amount to pay"}
-            </div>
-            <div
-              style={{
-                fontSize: 42,
-                fontWeight: 700,
-                color: balance > 0 ? "#0A0A0A" : "#9CA3AF",
-                letterSpacing: "-0.04em",
-                lineHeight: 1,
-                fontVariantNumeric: "tabular-nums",
-              }}
-            >
-              {formatCurrency(balance, lang)}
-            </div>
-            <div style={{ marginTop: 10, fontSize: 13, color: "#9CA3AF", letterSpacing: "-0.01em" }}>
-              {balance > 0
-                ? lang === "fr"
-                  ? "Commission en attente de paiement"
-                  : "Commission waiting to be paid"
-                : lang === "fr"
-                  ? "Rien à payer pour le moment"
-                  : "Nothing to pay right now"}
-            </div>
-          </div>
-
-          {/* Recipient */}
-          <div style={{ ...panel, display: "flex", gap: 14, alignItems: "center" }}>
+          {/* Recipient strip */}
+          <div style={{ ...panel, display: "flex", gap: 12, alignItems: "center" }}>
             <CreatorAvatar
               src={creator.avatar_url}
               username={creator.handle}
               displayName={name}
-              size={52}
+              size={44}
               alt={name}
               priority
             />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: "#6B7280", letterSpacing: "0.03em", textTransform: "uppercase", marginBottom: 4 }}>
-                {lang === "fr" ? "Bénéficiaire" : "Recipient"}
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {name}
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                {handle && (
-                  <span style={{ fontSize: 13, color: "#6B7280" }}>@{String(handle).replace(/^@/, "")}</span>
-                )}
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "#6B7280" }}>
-                  <SalePlatformLogo platform={platform} />
-                  {platformLabel(platform)}
-                </span>
-              </div>
+              {handle ? (
+                <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", marginTop: 2 }}>@{String(handle).replace(/^@/, "")}</div>
+              ) : null}
             </div>
           </div>
 
-          {/* Ledger-style summary */}
+          {/* Invoice line items */}
           <div style={panel}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 4 }}>
-              {lang === "fr" ? "Récapitulatif" : "Summary"}
+            <div style={{ fontSize: 14, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>
+              {lang === "fr" ? "Détails de la facture" : "Invoice details"}
             </div>
+
             <div style={row}>
-              <span style={rowLabel}>{lang === "fr" ? "Total gagné" : "Total earned"}</span>
-              <span style={rowValue}>{formatCurrency(totalEarned, lang)}</span>
+              <span style={rowLabel}>{lang === "fr" ? "Statut" : "Status"}</span>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 650,
+                  color: balance > 0 ? "#fff" : "var(--ws-text)",
+                  background: balance > 0 ? "#16a34a" : "var(--ws-pill)",
+                  border: balance > 0 ? "none" : "1px solid var(--ws-border)",
+                  borderRadius: 999,
+                  padding: "3px 10px",
+                }}
+              >
+                {balance > 0
+                  ? lang === "fr"
+                    ? "À payer"
+                    : "Due"
+                  : lang === "fr"
+                    ? "Soldé"
+                    : "Paid"}
+              </span>
             </div>
+
             <div style={row}>
-              <span style={rowLabel}>{lang === "fr" ? "Ventes trackées" : "Tracked sales"}</span>
-              <span style={rowValue}>{creator.total_sales || 0}</span>
+              <span style={rowLabel}>{lang === "fr" ? "Référence" : "Reference"}</span>
+              <span style={rowValue}>{invoiceRef}</span>
             </div>
-            {discountCode && (
-              <div style={row}>
-                <span style={rowLabel}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
-                <span style={rowValue}>{discountCode}</span>
-              </div>
-            )}
-            {followers > 0 && (
-              <div style={row}>
-                <span style={rowLabel}>{lang === "fr" ? "Abonnés" : "Followers"}</span>
-                <span style={rowValue}>{fmtFollowerCount(followers)}</span>
-              </div>
-            )}
-            {engagement > 0 && (
-              <div style={row}>
-                <span style={rowLabel}>ER</span>
-                <span style={rowValue}>{engagement.toFixed(1)}%</span>
-              </div>
-            )}
-            {email && (
+
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Créée le" : "Created on"}</span>
+              <span style={{ ...rowValue, fontWeight: 500 }}>{createdLabel}</span>
+            </div>
+
+            {email ? (
               <div style={row}>
                 <span style={rowLabel}>Email</span>
-                <span style={{ ...rowValue, fontWeight: 500, fontSize: 13, maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</span>
+                <span style={{ ...rowValue, fontWeight: 500, fontSize: 12.5, maxWidth: "58%", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</span>
               </div>
-            )}
-            {hasProfitSignal && (
-              <div style={rowLast}>
-                <span style={rowLabel}>{lang === "fr" ? "Rentabilité" : "Profitability"}</span>
+            ) : null}
+
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Ventes trackées" : "Tracked sales"}</span>
+              <span style={rowValue}>{trackedSales}</span>
+            </div>
+
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "CA ventes trackées" : "Tracked sales revenue"}</span>
+              <span style={rowValue}>{formatCurrency(revenue, lang)}</span>
+            </div>
+
+            {discountCode ? (
+              <div style={row}>
+                <span style={rowLabel}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
                 <span
                   style={{
                     ...rowValue,
-                    color: isProfitable ? "#166534" : "#991B1B",
-                    background: isProfitable ? "#DCFCE7" : "#FEE2E2",
-                    borderRadius: 999,
-                    padding: "3px 10px",
-                    fontSize: 12,
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    background: "var(--ws-pill)",
+                    padding: "3px 8px",
+                    borderRadius: 8,
+                    fontSize: 12.5,
                   }}
                 >
-                  {isProfitable
-                    ? lang === "fr"
-                      ? "Rentable"
-                      : "Profitable"
-                    : lang === "fr"
-                      ? "Non rentable"
-                      : "Not profitable"}
+                  {discountCode}
                 </span>
               </div>
-            )}
-            {!hasProfitSignal && !email && followers <= 0 && engagement <= 0 && !discountCode && (
-              <div style={{ ...rowLast, justifyContent: "flex-start" }}>
-                <span style={rowLabel}>{lang === "fr" ? "Pas d’infos supplémentaires" : "No extra details"}</span>
+            ) : (
+              <div style={row}>
+                <span style={rowLabel}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
+                <span style={{ ...rowValue, fontWeight: 500, color: "var(--ws-text-dim)" }}>—</span>
               </div>
             )}
+
+            {commissionRatePct != null ? (
+              <div style={row}>
+                <span style={rowLabel}>{lang === "fr" ? "Taux de commission" : "Commission rate"}</span>
+                <span style={rowValue}>{commissionRatePct.toFixed(1)}%</span>
+              </div>
+            ) : null}
+
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Commissions totales" : "Total commissions"}</span>
+              <span style={rowValue}>{formatCurrency(totalEarned, lang)}</span>
+            </div>
+
+            <div style={row}>
+              <span style={rowLabel}>{lang === "fr" ? "Déjà versé" : "Already paid"}</span>
+              <span style={rowValue}>{formatCurrency(alreadyPaid, lang)}</span>
+            </div>
+
+            <div style={{ ...rowLast, paddingTop: 14, marginTop: 4, borderTop: "1px solid var(--ws-border)" }}>
+              <span style={{ ...rowLabel, fontWeight: 700, color: "var(--ws-text)", fontSize: 14 }}>
+                {lang === "fr" ? "Total à payer" : "Amount due"}
+              </span>
+              <span style={{ ...rowValue, fontSize: 18, fontWeight: 750, letterSpacing: "-0.03em" }}>
+                {formatCurrency(balance, lang)}
+              </span>
+            </div>
           </div>
 
-          {/* Destination / method status */}
+          {/* Timeline */}
           <div style={panel}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 12 }}>
-              {lang === "fr" ? "Destination du paiement" : "Payment destination"}
+            <div style={{ fontSize: 14, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 14 }}>
+              Timeline
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                padding: "12px 14px",
-                borderRadius: 12,
-                background: hasPaymentMethod ? "#F0FDF4" : "#FAFAFA",
-                border: `1px solid ${hasPaymentMethod ? "#BBF7D0" : "#E8E8EA"}`,
-              }}
-            >
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "#FFFFFF",
-                  border: "1px solid #E8E8EA",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <rect x="3" y="6" width="18" height="12" rx="2" stroke="#111827" strokeWidth="1.6" />
-                  <path d="M3 10h18" stroke="#111827" strokeWidth="1.6" />
-                </svg>
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                {hasPaymentMethod ? (
-                  <>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#14532D", letterSpacing: "-0.01em" }}>
-                      {paymentMethodLabel(creator, lang)}
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 4 }}>
+              {[
+                {
+                  title: lang === "fr" ? "Facture créée" : "Invoice created",
+                  sub: lang === "fr" ? "Basée sur les ventes trackées du créateur." : "Based on the creator’s tracked sales.",
+                  done: true,
+                },
+                {
+                  title: lang === "fr" ? "En attente de paiement" : "Awaiting payment",
+                  sub: lang === "fr" ? "Choisissez PayPal, Stripe ou IBAN pour régler." : "Choose PayPal, Stripe, or IBAN to settle.",
+                  done: balance <= 0,
+                  current: balance > 0,
+                },
+                {
+                  title: lang === "fr" ? "Paiement effectué" : "Payment complete",
+                  sub:
+                    balance <= 0
+                      ? lang === "fr"
+                        ? "Rien à payer pour le moment."
+                        : "Nothing left to pay."
+                      : lang === "fr"
+                        ? `Vous paierez ${formatCurrency(balance, lang)} au créateur.`
+                        : `You will pay ${formatCurrency(balance, lang)} to the creator.`,
+                  done: balance <= 0,
+                },
+              ].map((step, i, arr) => (
+                <div key={step.title} style={{ display: "flex", gap: 12, paddingBottom: i === arr.length - 1 ? 0 : 16, position: "relative" }}>
+                  {i < arr.length - 1 ? (
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 9,
+                        top: 22,
+                        bottom: 0,
+                        width: 2,
+                        background: "var(--ws-border)",
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      marginTop: 1,
+                      background: step.done || step.current ? "var(--ws-accent)" : "var(--ws-pill)",
+                      border: step.done || step.current ? "none" : "1px solid var(--ws-border)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 1,
+                    }}
+                  >
+                    {step.done ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path d="M5 12.5l5 5L19 7" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: step.current ? 700 : 600, color: "var(--ws-text)", letterSpacing: "-0.01em" }}>
+                      {step.title}
                     </div>
-                    <div style={{ fontSize: 13, color: "#166534", marginTop: 3, wordBreak: "break-all", lineHeight: 1.4 }}>
-                      {paymentDetail}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: "#111827", letterSpacing: "-0.01em" }}>
-                      {lang === "fr" ? "Aucune destination" : "No destination set"}
-                    </div>
-                    <div style={{ fontSize: 13, color: "#6B7280", marginTop: 3, lineHeight: 1.45 }}>
-                      {lang === "fr"
-                        ? "Ajoutez PayPal, Revolut ou un IBAN pour pouvoir payer."
-                        : "Add PayPal, Revolut, or an IBAN to enable payment."}
-                    </div>
-                  </>
-                )}
-              </div>
+                    <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", marginTop: 3, lineHeight: 1.4 }}>{step.sub}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Payment credentials form */}
-          <div style={{ ...panel, marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 14 }}>
+          {/* Credentials for manual methods */}
+          <div style={{ ...panel, marginBottom: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 12 }}>
               {lang === "fr" ? "Coordonnées de paiement" : "Payment details"}
             </div>
             <CreatorPayoutMethodFields
@@ -2299,123 +2412,144 @@ function CreatorPayoutPage({
               onDraftChange={onCreatorChange}
             />
           </div>
-
-          {/* Alternate transfer via Stripe */}
-          <div style={{ ...panel, marginBottom: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", letterSpacing: "-0.02em", marginBottom: 6 }}>
-              {lang === "fr" ? "Virement bancaire" : "Bank transfer"}
-            </div>
-            <p style={{ margin: "0 0 14px", fontSize: 13, color: "#6B7280", lineHeight: 1.5 }}>
-              {creator.stripe_account_id
-                ? lang === "fr"
-                  ? "Compte Stripe Connect du créateur prêt à recevoir un virement."
-                  : "Creator’s Stripe Connect account is ready for transfer."
-                : lang === "fr"
-                  ? "Connectez le compte bancaire du créateur via Stripe pour un virement direct."
-                  : "Connect the creator’s bank via Stripe for a direct transfer."}
-            </p>
-            {creator.stripe_account_id ? (
-              <button
-                type="button"
-                disabled={balance <= 0 || payingId === creator.id}
-                onClick={() => void onPayStripe()}
-                style={{
-                  width: "100%",
-                  background: "#111827",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "13px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: "inherit",
-                  cursor: balance > 0 ? "pointer" : "default",
-                  opacity: balance > 0 ? 1 : 0.45,
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {payingId === creator.id
-                  ? lang === "fr"
-                    ? "Virement en cours…"
-                    : "Sending transfer…"
-                  : `${lang === "fr" ? "Envoyer via Stripe" : "Send via Stripe"} · ${formatCurrency(balance, lang)}`}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={registeringId === creator.id}
-                onClick={() => void onConnectStripeBank()}
-                style={{
-                  width: "100%",
-                  background: "#FFFFFF",
-                  color: "#111827",
-                  border: "1px solid #D1D5DB",
-                  borderRadius: 12,
-                  padding: "13px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: "inherit",
-                  cursor: registeringId === creator.id ? "default" : "pointer",
-                  letterSpacing: "-0.02em",
-                }}
-              >
-                {registeringId === creator.id
-                  ? lang === "fr"
-                    ? "Ouverture…"
-                    : "Opening…"
-                  : lang === "fr"
-                    ? "Connecter un compte bancaire"
-                    : "Connect bank account"}
-              </button>
-            )}
-          </div>
         </div>
 
-        {/* Sticky pay footer — primary action like a payment app */}
+        {/* Sticky invoice footer */}
         <div
           style={{
             flexShrink: 0,
             padding: "14px 16px 20px",
-            background: "#FFFFFF",
-            borderTop: "1px solid #E8E8EA",
-            boxShadow: "0 -8px 24px rgba(15, 23, 42, 0.04)",
+            background: "var(--ws-surface)",
+            borderTop: "1px solid var(--ws-border)",
+            boxShadow: isDark ? "0 -8px 24px rgba(0,0,0,0.45)" : "0 -8px 24px rgba(0,0,0,0.06)",
           }}
         >
-          <button
-            type="button"
-            disabled={!canPayManual}
-            onClick={() => void onPayManual()}
-            style={{
-              width: "100%",
-              background: canPayManual ? "#0047FF" : "#E5E7EB",
-              color: canPayManual ? "#FFFFFF" : "#9CA3AF",
-              border: "none",
-              borderRadius: 14,
-              padding: "16px 18px",
-              fontSize: 15,
-              fontWeight: 600,
-              fontFamily: "inherit",
-              cursor: canPayManual ? "pointer" : "default",
-              letterSpacing: "-0.02em",
-              boxShadow: canPayManual ? "0 8px 20px rgba(0, 71, 255, 0.28)" : "none",
-            }}
-          >
-            {payingId === creator.id
-              ? lang === "fr"
-                ? "Paiement en cours…"
-                : "Processing payment…"
-              : balance > 0
-                ? `${lang === "fr" ? "Payer maintenant" : "Pay now"} · ${formatCurrency(balance, lang)}`
-                : lang === "fr"
-                  ? "Rien à payer"
-                  : "Nothing to pay"}
-          </button>
-          {!hasPaymentMethod && balance > 0 && (
-            <p style={{ margin: "10px 0 0", textAlign: "center", fontSize: 12, color: "#9CA3AF", lineHeight: 1.4 }}>
-              {lang === "fr"
-                ? "Renseignez une destination ci-dessus pour débloquer le paiement."
-                : "Add a payment destination above to unlock payout."}
-            </p>
+          {!showPayMethods ? (
+            <>
+              <button
+                type="button"
+                disabled={!canStartPay}
+                onClick={() => setShowPayMethods(true)}
+                style={{
+                  width: "100%",
+                  background: canStartPay ? "var(--ws-btn)" : "var(--ws-pill)",
+                  color: canStartPay ? "var(--ws-btn-text)" : "var(--ws-text-dim)",
+                  border: canStartPay ? "none" : "1px solid var(--ws-border)",
+                  borderRadius: 14,
+                  padding: "16px 18px",
+                  fontSize: 15,
+                  fontWeight: 650,
+                  fontFamily: "inherit",
+                  cursor: canStartPay ? "pointer" : "default",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {isPaying
+                  ? lang === "fr"
+                    ? "Paiement en cours…"
+                    : "Processing…"
+                  : balance > 0
+                    ? `${lang === "fr" ? "Payer" : "Pay"} · ${formatCurrency(balance, lang)}`
+                    : lang === "fr"
+                      ? "Rien à payer"
+                      : "Nothing to pay"}
+              </button>
+              {balance > 0 && !hasPaymentMethod ? (
+                <p style={{ margin: "10px 0 0", textAlign: "center", fontSize: 12, color: "var(--ws-text-dim)", lineHeight: 1.4 }}>
+                  {lang === "fr"
+                    ? "Ajoutez PayPal ou IBAN ci-dessus, ou payez via Stripe."
+                    : "Add PayPal or IBAN above, or pay via Stripe."}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 650, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 2 }}>
+                {lang === "fr" ? "Choisir un mode de paiement" : "Choose a payment method"}
+              </div>
+
+              <button
+                type="button"
+                disabled={isPaying}
+                onClick={runPayPal}
+                style={methodBtn}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/payment-logos/paypal.svg" alt="" height={14} style={{ height: 14, width: "auto" }} />
+                  PayPal
+                </span>
+                <span style={{ fontSize: 12, color: "var(--ws-text-dim)", fontWeight: 500 }}>{formatCurrency(balance, lang)}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isPaying || registeringId === creator.id}
+                onClick={runStripe}
+                style={methodBtn}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                  <span
+                    style={{
+                      width: 22,
+                      height: 14,
+                      borderRadius: 3,
+                      background: "#635BFF",
+                      color: "#fff",
+                      fontSize: 9,
+                      fontWeight: 800,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      letterSpacing: "-0.04em",
+                    }}
+                  >
+                    S
+                  </span>
+                  Stripe
+                </span>
+                <span style={{ fontSize: 12, color: "var(--ws-text-dim)", fontWeight: 500 }}>
+                  {creator.stripe_account_id
+                    ? formatCurrency(balance, lang)
+                    : lang === "fr"
+                      ? "Connecter"
+                      : "Connect"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isPaying}
+                onClick={runIban}
+                style={methodBtn}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/payment-logos/iban.svg" alt="" height={14} style={{ height: 14, width: "auto" }} />
+                  IBAN
+                </span>
+                <span style={{ fontSize: 12, color: "var(--ws-text-dim)", fontWeight: 500 }}>{formatCurrency(balance, lang)}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowPayMethods(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--ws-text-muted)",
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  padding: "8px 4px",
+                  fontFamily: "inherit",
+                  textDecoration: "underline",
+                  textUnderlineOffset: 3,
+                }}
+              >
+                {lang === "fr" ? "Annuler" : "Cancel"}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -2424,8 +2558,8 @@ function CreatorPayoutPage({
 }
 
 const payoutsBtnPrimary: React.CSSProperties = {
-  background: "#0047FF",
-  color: "#FFFFFF",
+  background: "var(--ws-accent)",
+  color: "var(--ws-surface)",
   border: "none",
   borderRadius: 10,
   padding: "10px 18px",
@@ -2437,9 +2571,9 @@ const payoutsBtnPrimary: React.CSSProperties = {
 };
 
 const payoutsBtnSecondary: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "10px 16px",
   fontSize: 13,
@@ -2473,8 +2607,6 @@ export function PayoutsView({
   const lang = useLang();
   useDisplayCurrency();
   const { navState, navigate } = useDashboardNavigation();
-  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
-  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const payoutCreatorId =
     navState.view === "payouts" && navState.payout?.type === "creator" ? navState.payout.id : null;
@@ -2491,7 +2623,6 @@ export function PayoutsView({
   const [completedPayouts, setCompletedPayouts] = useState<CompletedPayout[]>([]);
   const [trackedSales, setTrackedSales] = useState<TrackedSale[]>([]);
   const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active">("none");
-  const [connectLoading, setConnectLoading] = useState(false);
 
   // Check Stripe Connect status on mount + after returning from onboarding
   useEffect(() => {
@@ -2506,29 +2637,6 @@ export function PayoutsView({
       .catch(() => {});
   }, [userId]);
 
-  const handleConnectStripe = async () => {
-    if (!userId || connectLoading) return;
-    setConnectLoading(true);
-    try {
-      let email: string | undefined;
-      const { supabase } = await import("@/lib/supabase");
-      if (supabase) {
-        const { data: { user } } = await supabase.auth.getUser();
-        email = user?.email ?? undefined;
-      }
-      const res = await fetch("/api/stripe/connect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, email }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-      else { alert(data.error || "Could not start Stripe onboarding"); setConnectLoading(false); }
-    } catch {
-      setConnectLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (!userId) return;
     import("@/lib/supabase").then(({ supabase }) => {
@@ -2542,19 +2650,28 @@ export function PayoutsView({
 
   useEffect(() => {
     if (!userId) return;
-    fetch(`/api/creators-list?userId=${userId}`)
-      .then(r => r.json())
-      .then(data => { if (Array.isArray(data)) setCreators(data); })
+    let cancelled = false;
+    const keyPath = `/api/creators-list?userId=${userId}`;
+    const cached = peekDashboardCache<unknown[]>(`GET:${keyPath}`);
+    if (Array.isArray(cached) && cached.length) setCreators(cached as any[]);
+
+    void cachedJsonFetch<unknown[]>(keyPath, { credentials: "include" }, { preferCache: true, ttlMs: 30_000 })
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setCreators(data as any[]);
+      })
       .catch(console.error);
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
     const reloadCreators = () => {
-      fetch(`/api/creators-list?userId=${userId}`)
-        .then((r) => r.json())
+      invalidateDashboardCache("/api/creators-list");
+      void cachedJsonFetch<unknown[]>(`/api/creators-list?userId=${userId}`, { credentials: "include" }, { ttlMs: 30_000 })
         .then((data) => {
-          if (Array.isArray(data)) setCreators(data);
+          if (Array.isArray(data)) setCreators(data as any[]);
         })
         .catch(console.error);
     };
@@ -2588,9 +2705,11 @@ export function PayoutsView({
 
   const loadCompletedPayouts = async () => {
     try {
-      const res = await fetch("/api/payouts/history", { cache: "no-store" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { payouts?: CompletedPayout[] };
+      const data = await cachedJsonFetch<{ payouts?: CompletedPayout[] }>(
+        "/api/payouts/history",
+        { credentials: "include" },
+        { preferCache: true, ttlMs: 20_000 },
+      );
       setCompletedPayouts(Array.isArray(data.payouts) ? data.payouts : []);
     } catch (e) {
       console.error(e);
@@ -2599,6 +2718,8 @@ export function PayoutsView({
 
   useEffect(() => {
     if (!userId) return;
+    const cached = peekDashboardCache<{ payouts?: CompletedPayout[] }>("GET:/api/payouts/history");
+    if (cached?.payouts) setCompletedPayouts(cached.payouts);
     void loadCompletedPayouts();
   }, [userId]);
 
@@ -2606,13 +2727,19 @@ export function PayoutsView({
     if (!userId) return;
     let cancelled = false;
 
+    const cachedSales = peekTrackedSales(userId);
+    if (cachedSales) setTrackedSales(cachedSales);
+
     const loadSales = async () => {
       const rows = await fetchTrackedSales(userId);
       if (!cancelled) setTrackedSales(rows);
     };
 
     void loadSales();
-    const onUpdate = () => void loadSales();
+    const onUpdate = () => {
+      trackedSalesCache.delete(userId);
+      void loadSales();
+    };
     window.addEventListener(SALES_UPDATED_EVENT, onUpdate);
     return () => {
       cancelled = true;
@@ -2743,31 +2870,31 @@ export function PayoutsView({
 
   const confirmPayModal = confirmPay ? (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ background: "#FFFFFF", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
+      <div style={{ background: "var(--ws-surface)", borderRadius: 20, padding: "32px 28px", maxWidth: 420, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }} onClick={(e) => e.stopPropagation()}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
           alt="Trackit"
           style={{ height: 96, width: "auto", display: "block", margin: "0 auto 20px", objectFit: "contain" }}
         />
-        <h3 style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+        <h3 style={{ fontSize: 19, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Le virement a été effectué ?" : "Did you complete the transfer?"}
         </h3>
-        <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 6px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 6px", lineHeight: 1.5 }}>
           {lang === "fr" ? "Virement de" : "Transfer of"}{" "}
-          <strong style={{ color: "#1A1A1A" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
+          <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(confirmPay.amount, lang)}</strong>{" "}
           {lang === "fr" ? "à" : "to"}{" "}
-          <strong style={{ color: "#1A1A1A" }}>{confirmPay.name}</strong>
+          <strong style={{ color: "var(--ws-text)" }}>{confirmPay.name}</strong>
         </p>
-        <p style={{ fontSize: 13, color: "#9A9A9A", margin: "0 0 24px", lineHeight: 1.5 }}>
+        <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 24px", lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Si vous confirmez, le paiement est enregistré et le solde du créateur est remis à zéro."
             : "If you confirm, the payment is recorded and the creator's balance is reset."}
         </p>
-        <button type="button" onClick={() => { primeNotificationSound(); void confirmManualPayout(); }} style={{ width: "100%", padding: "13px 0", background: "#1A1A1A", color: "#FFFFFF", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
+        <button type="button" onClick={() => { primeNotificationSound(); void confirmManualPayout(); }} style={{ width: "100%", padding: "13px 0", background: "var(--ws-btn)", color: "var(--ws-btn-text)", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
           {lang === "fr" ? "Oui, virement effectué ✓" : "Yes, transfer completed ✓"}
         </button>
-        <button type="button" onClick={() => { setConfirmPay(null); pendingConfirmRef.current = null; paymentLeftTabRef.current = false; }} style={{ width: "100%", padding: "13px 0", background: "#F5F5F5", color: "#1A1A1A", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
+        <button type="button" onClick={() => { setConfirmPay(null); pendingConfirmRef.current = null; paymentLeftTabRef.current = false; }} style={{ width: "100%", padding: "13px 0", background: "var(--ws-bg)", color: "var(--ws-text)", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
           {lang === "fr" ? "Non, pas encore" : "No, not yet"}
         </button>
       </div>
@@ -2779,38 +2906,6 @@ export function PayoutsView({
       <>
         <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Vos commissions et vos coordonnées de virement" : "Your commissions and payout details"} />
         <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
-      </>
-    );
-  }
-
-  if (payItWelcomeLoading) {
-    return <PayItWelcomeLoading isMobile={isMobile} />;
-  }
-
-  if (showPayItWelcome && !payoutCreatorId && !payItWelcomeBypass) {
-    return (
-      <>
-        {upgradeFeature && (
-          <PaywallModal
-            featureKey={upgradeFeature}
-            lang={lang}
-            onClose={() => setUpgradeFeature(null)}
-            onUpgrade={onUpgrade}
-            onUpgradePro={onUpgradePro}
-            onUpgradeScale={onUpgradeScale}
-          />
-        )}
-        <PayItWelcomeView
-          isMobile={isMobile}
-          variant="overview"
-          onPrimary={() => {
-            if (!canUseManualPayouts(plan)) {
-              setUpgradeFeature("payouts");
-              return;
-            }
-            setPayItWelcomeBypass(true);
-          }}
-        />
       </>
     );
   }
@@ -2897,8 +2992,9 @@ export function PayoutsView({
           onUpgradeScale={onUpgradeScale}
         />
       )}
+      <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)" }}>
       <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Aperçu" : "Overview"} />
-      <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 40px 40px", position: "relative" }}>
+      <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 40px 40px", position: "relative", background: "var(--ws-bg)" }}>
         <PayoutsOverviewPanel
           stats={payoutOverviewStats}
           sales={trackedSales}
@@ -2917,12 +3013,12 @@ export function PayoutsView({
         <LiveSalesFeed isMobile={isMobile} userId={userId} />
 
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, marginBottom: 36, overflow: "hidden", position: "relative" }}>
+        <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, marginBottom: 36, overflow: "hidden", position: "relative" }}>
           {!canUseAutoPayouts(plan as PlanTier) && (
-            <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.9)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, textAlign: "center" }}>
+            <div style={{ position: "absolute", inset: 0, background: "color-mix(in srgb, var(--ws-surface) 92%, transparent)", borderRadius: 16, zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+              <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, textAlign: "center" }}>
                 {lang === "fr" ? "Paiements auto — Plan Pro. " : "Auto payouts — Pro plan. "}
-                <button type="button" onClick={() => void (onUpgradePro ?? onUpgrade)()} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
+                <button type="button" onClick={() => void (onUpgradePro ?? onUpgrade)()} style={{ background: "none", border: "none", color: "var(--ws-accent)", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
                   {lang === "fr" ? "Passer à Pro →" : "Upgrade to Pro →"}
                 </button>
               </p>
@@ -2930,10 +3026,10 @@ export function PayoutsView({
           )}
           <div style={{ padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ flex: 1, opacity: canUseAutoPayouts(plan as PlanTier) ? 1 : 0.45 }}>
-              <div style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+              <div style={{ fontSize: 17, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>
                 {lang === "fr" ? "Paiement automatique" : "Automatic payout"}
               </div>
-              <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.01em" }}>
+              <div style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
                 {lang === "fr"
                   ? "Le 1er de chaque mois, tous les créateurs avec un solde positif sont payés automatiquement."
                   : "On the 1st of every month, all creators with a positive balance are paid automatically."}
@@ -2959,24 +3055,24 @@ export function PayoutsView({
           </div>
 
           {autoPayoutMonthly && canUseAutoPayouts(plan as PlanTier) && (
-            <div style={{ borderTop: "1px solid #EFEFEF", padding: "16px 20px 20px", background: "#FAFAFA" }}>
+            <div style={{ borderTop: "1px solid var(--ws-border)", padding: "16px 20px 20px", background: "var(--ws-surface-2)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
                 <div style={{ flex: 1, minWidth: 200, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>
                     {lang === "fr" ? "Stripe Connect" : "Stripe Connect"}
                   </div>
-                  <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
+                  <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", lineHeight: 1.45 }}>
                     {lang === "fr"
                       ? "Versez automatiquement vos créateurs via Stripe Connect dès qu'une commission est due."
                       : "Pay creators automatically via Stripe Connect as soon as commission is owed."}
                   </div>
                   {!canUseStripeConnectPayouts(plan) && (
-                    <p style={{ fontSize: 13, color: "#7A7A7A", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
+                    <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "10px 0 0", letterSpacing: "-0.01em" }}>
                       {lang === "fr" ? "Disponible sur le plan Business. " : "Available on the Business plan. "}
                       <button
                         type="button"
                         onClick={() => void (onUpgradeScale ?? onUpgradePro ?? onUpgrade)()}
-                        style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+                        style={{ background: "none", border: "none", color: "var(--ws-accent)", fontSize: 13, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
                       >
                         {lang === "fr" ? "Passer à Business →" : "Upgrade to Business →"}
                       </button>
@@ -2985,21 +3081,19 @@ export function PayoutsView({
                 </div>
                 <div style={{ flexShrink: 0, opacity: canUseStripeConnectPayouts(plan) ? 1 : 0.45 }}>
                   {connectStatus === "active" ? (
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.01em" }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.01em" }}>
                       {lang === "fr" ? "✓ Connecté" : "✓ Connected"}
                     </span>
                   ) : (
                     <button
                       type="button"
                       className="hero-cta-shopify hero-cta-compact"
-                      disabled={!canUseStripeConnectPayouts(plan) || connectLoading}
-                      onClick={handleConnectStripe}
+                      disabled={!canUseStripeConnectPayouts(plan)}
+                      onClick={() => navigate({ view: "integrations" })}
                     >
-                      {connectLoading
-                        ? (lang === "fr" ? "Chargement…" : "Loading…")
-                        : connectStatus === "pending"
-                          ? (lang === "fr" ? "Terminer la configuration" : "Finish setup")
-                          : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
+                      {connectStatus === "pending"
+                        ? (lang === "fr" ? "Terminer la configuration" : "Finish setup")
+                        : (lang === "fr" ? "Connecter Stripe" : "Connect Stripe")}
                     </button>
                   )}
                 </div>
@@ -3007,10 +3101,10 @@ export function PayoutsView({
             </div>
           )}
         </div>
+      </div>
 
       {payoutDrawer}
       {confirmPayModal}
-
       </div>
     </>
   );
@@ -3210,8 +3304,6 @@ export function TransactionsView({
   const lang = useLang();
   useDisplayCurrency();
   const { navigate } = useDashboardNavigation();
-  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome } = usePayItActivity(userId);
-  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [sales, setSales] = useState<TrackedSale[]>([]);
   const [payouts, setPayouts] = useState<CompletedPayout[]>([]);
@@ -3219,6 +3311,9 @@ export function TransactionsView({
   const [filter, setFilter] = useState<TransactionFilter>("all");
   const [period, setPeriod] = useState<PayoutOverviewPeriod>("30d");
   const [search, setSearch] = useState("");
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const { theme } = useDashboardTheme();
+  const primaryCta = theme === "dark" ? "hero-cta-raised-light" : "hero-cta-raised-dark";
   const tzOffset = useMemo(() => new Date().getTimezoneOffset(), []);
 
   useEffect(() => {
@@ -3283,10 +3378,10 @@ export function TransactionsView({
     padding: "16px 22px",
     fontSize: 13,
     fontWeight: 600,
-    color: "#6B7280",
+    color: "var(--ws-text-muted)",
     textAlign: "left",
-    borderBottom: "1px solid #EFEFEF",
-    background: "#FFFFFF",
+    borderBottom: "1px solid var(--ws-border)",
+    background: "var(--ws-surface)",
     whiteSpace: "nowrap",
     letterSpacing: "-0.01em",
   };
@@ -3294,8 +3389,8 @@ export function TransactionsView({
   const tdStyle: React.CSSProperties = {
     padding: "18px 22px",
     fontSize: 15,
-    color: "#1A1A1A",
-    borderBottom: "1px solid #F5F5F5",
+    color: "var(--ws-text)",
+    borderBottom: "1px solid var(--ws-border)",
     verticalAlign: "middle",
     letterSpacing: "-0.02em",
   };
@@ -3304,9 +3399,9 @@ export function TransactionsView({
     padding: "10px 22px",
     fontSize: 12,
     fontWeight: 600,
-    color: "#6B7280",
-    background: "#FAFAFA",
-    borderBottom: "1px solid #EFEFEF",
+    color: "var(--ws-text-muted)",
+    background: "var(--ws-surface-2)",
+    borderBottom: "1px solid var(--ws-border)",
     letterSpacing: "-0.01em",
   };
 
@@ -3320,11 +3415,11 @@ export function TransactionsView({
         padding: "0 0 8px",
         fontSize: 14,
         fontWeight: filter === id ? 600 : 400,
-        color: filter === id ? "#1A1A1A" : "#7A7A7A",
+        color: filter === id ? "var(--ws-text)" : "var(--ws-text-muted)",
         cursor: "pointer",
         fontFamily: "inherit",
         letterSpacing: "-0.02em",
-        borderBottom: filter === id ? "2px solid #1A1A1A" : "2px solid transparent",
+        borderBottom: filter === id ? "2px solid var(--ws-btn)" : "2px solid transparent",
       }}
     >
       {label}
@@ -3348,42 +3443,11 @@ export function TransactionsView({
     );
   }
 
-  if (payItWelcomeLoading) {
-    return <PayItWelcomeLoading isMobile={isMobile} />;
-  }
-
-  if (showPayItWelcome && !payItWelcomeBypass) {
-    return (
-      <>
-        {upgradeFeature && (
-          <PaywallModal
-            featureKey={upgradeFeature}
-            lang={lang}
-            onClose={() => setUpgradeFeature(null)}
-            onUpgrade={onUpgrade}
-            onUpgradePro={onUpgradePro}
-            onUpgradeScale={onUpgradeScale}
-          />
-        )}
-        <PayItWelcomeView
-          isMobile={isMobile}
-          variant="transactions"
-          onPrimary={() => {
-            if (!canUseManualPayouts(plan)) {
-              setUpgradeFeature("transactions");
-              return;
-            }
-            setPayItWelcomeBypass(true);
-          }}
-        />
-      </>
-    );
-  }
-
   const resetFilters = () => {
     setFilter("all");
     setPeriod("30d");
     setSearch("");
+    setResetConfirmOpen(false);
   };
 
   return (
@@ -3394,15 +3458,80 @@ export function TransactionsView({
         trailing={
           <button
             type="button"
-            onClick={resetFilters}
-            className="hero-cta-raised-light"
+            onClick={() => setResetConfirmOpen(true)}
+            className={primaryCta}
             style={{ padding: "15px 24px", fontSize: 17 }}
           >
             {lang === "fr" ? "Réinitialiser" : "Reset"}
           </button>
         }
       />
-      <div style={{ padding: isMobile ? "12px 16px 32px" : "16px 40px 48px", background: "#FFFFFF" }}>
+
+      {resetConfirmOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: theme === "dark" ? "rgba(0,0,0,0.65)" : "rgba(15,15,15,0.4)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+          onClick={() => setResetConfirmOpen(false)}
+        >
+          <div
+            style={{
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
+              borderRadius: 20,
+              padding: "28px 24px",
+              maxWidth: 400,
+              width: "100%",
+              boxShadow: "var(--ws-shadow)",
+              color: "var(--ws-text)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+              {lang === "fr" ? "Réinitialiser les filtres ?" : "Reset filters?"}
+            </h3>
+            <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 22px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+              {lang === "fr"
+                ? "Cela remettra la période sur 30 jours, affichera toutes les transactions et effacera la recherche."
+                : "This will set the period back to 30 days, show all transactions, and clear the search."}
+            </p>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className={primaryCta}
+              style={{
+                width: "100%",
+                padding: "13px 0",
+                fontSize: 14,
+                marginBottom: 10,
+              }}
+            >
+              {lang === "fr" ? "Oui, réinitialiser" : "Yes, reset"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setResetConfirmOpen(false)}
+              style={{
+                ...payoutPageSecondaryBtn,
+                width: "100%",
+                padding: "13px 0",
+                fontSize: 14,
+              }}
+            >
+              {lang === "fr" ? "Annuler" : "Cancel"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: isMobile ? "12px 16px 32px" : "16px 40px 48px", background: "var(--ws-surface)" }}>
         <div
           style={{
             display: "flex",
@@ -3425,8 +3554,8 @@ export function TransactionsView({
             display: "flex",
             alignItems: "center",
             gap: 10,
-            background: "#FAFAFA",
-            border: "1px solid #EFEFEF",
+            background: "var(--ws-surface-2)",
+            border: "1px solid var(--ws-border)",
             borderRadius: 12,
             padding: "10px 14px",
             minWidth: isMobile ? "100%" : 280,
@@ -3434,19 +3563,19 @@ export function TransactionsView({
           }}
         >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="11" cy="11" r="7" stroke="#9A9A9A" strokeWidth="2" />
-              <path d="M21 21l-4.35-4.35" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="11" cy="11" r="7" stroke="var(--ws-text-dim)" strokeWidth="2" />
+              <path d="M21 21l-4.35-4.35" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round" />
             </svg>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={lang === "fr" ? "Rechercher un créateur..." : "Search a creator..."}
-              style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "#1A1A1A", letterSpacing: "-0.02em" }}
+              style={{ background: "transparent", border: "none", outline: "none", fontSize: 14, fontFamily: "inherit", flex: 1, color: "var(--ws-text)", letterSpacing: "-0.02em" }}
             />
           </div>
 
-        <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, overflow: "auto" }}>
+        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: isMobile ? 720 : undefined }}>
             <thead>
               <tr>
@@ -3459,13 +3588,13 @@ export function TransactionsView({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "var(--ws-text-dim)", padding: 48 }}>
                     {lang === "fr" ? "Chargement…" : "Loading…"}
                   </td>
                 </tr>
               ) : filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "#9A9A9A", padding: 48 }}>
+                  <td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: "var(--ws-text-dim)", padding: 48 }}>
                     {rows.length === 0
                       ? lang === "fr"
                         ? "Vos transactions apparaîtront ici."
@@ -3489,13 +3618,13 @@ export function TransactionsView({
                         <tr
                           key={row.id}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#FAFAFA";
+                            e.currentTarget.style.background = "var(--ws-hover)";
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "#FFFFFF";
+                            e.currentTarget.style.background = "var(--ws-surface)";
                           }}
                         >
-                          <td style={{ ...tdStyle, color: "#6B7280", fontSize: 14, whiteSpace: "nowrap" }}>
+                          <td style={{ ...tdStyle, color: "var(--ws-text-muted)", fontSize: 14, whiteSpace: "nowrap" }}>
                             {formatTransactionDate(row.date, lang)}
                           </td>
                           <td style={tdStyle}>
@@ -3504,12 +3633,12 @@ export function TransactionsView({
                               <div style={{ minWidth: 0 }}>
                                 <div style={{ fontWeight: 500, letterSpacing: "-0.02em" }}>{name}</div>
                                 {row.creatorHandle && (
-                                  <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 2 }}>@{row.creatorHandle}</div>
+                                  <div style={{ fontSize: 13, color: "var(--ws-text-dim)", marginTop: 2 }}>@{row.creatorHandle}</div>
                                 )}
                               </div>
                             </div>
                           </td>
-                          <td style={{ ...tdStyle, color: "#6B7280", fontSize: 14 }}>
+                          <td style={{ ...tdStyle, color: "var(--ws-text-muted)", fontSize: 14 }}>
                             {transactionKindLabel(row.kind, lang)}
                             {row.kind === "payout" && row.method ? ` · ${row.method}` : ""}
                             {row.kind === "commission" && row.saleAmount
@@ -3533,7 +3662,7 @@ export function TransactionsView({
   );
 }
 
-const TRACKIT_BLUE = "#0047FF";
+const TRACKIT_BLUE = "var(--ws-accent)";
 
 function TrackitWalletCard({
   lang,
@@ -3552,6 +3681,10 @@ function TrackitWalletCard({
   hasPaymentMethod: boolean;
   onManage: () => void;
 }) {
+  const { theme } = useDashboardTheme();
+  const isDark = theme === "dark";
+  const primaryCta = isDark ? "hero-cta-raised-light" : "hero-cta-raised-dark";
+
   return (
     <div
       style={{
@@ -3559,9 +3692,12 @@ function TrackitWalletCard({
         borderRadius: 20,
         padding: isMobile ? 22 : 28,
         minHeight: isMobile ? 190 : 220,
-        background: "linear-gradient(145deg, #0047FF 0%, #002FA8 100%)",
-        boxShadow: "0 16px 48px rgba(0,71,255,0.22)",
-        color: "#FFFFFF",
+        background: isDark
+          ? "linear-gradient(145deg, #1a1a1f 0%, #0a0a0a 55%, #111827 100%)"
+          : "linear-gradient(145deg, #ffffff 0%, #f7f7f8 55%, #eef2ff 100%)",
+        border: `1px solid ${isDark ? "#2a2a2a" : "var(--ws-border)"}`,
+        boxShadow: isDark ? "0 16px 48px rgba(0,0,0,0.45)" : "var(--ws-shadow)",
+        color: isDark ? "#fafafa" : "var(--ws-text)",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
@@ -3577,7 +3713,7 @@ function TrackitWalletCard({
           width: 180,
           height: 180,
           borderRadius: "50%",
-          background: "rgba(255,255,255,0.07)",
+          background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,71,255,0.08)",
         }}
       />
       <div
@@ -3589,7 +3725,7 @@ function TrackitWalletCard({
           width: 120,
           height: 120,
           borderRadius: "50%",
-          background: "rgba(255,255,255,0.05)",
+          background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
         }}
       />
 
@@ -3630,7 +3766,7 @@ function TrackitWalletCard({
                 width: 44,
                 height: 32,
                 borderRadius: 6,
-                background: "rgba(255,255,255,0.18)",
+                background: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.08)",
                 marginBottom: 16,
               }}
             />
@@ -3647,7 +3783,9 @@ function TrackitWalletCard({
                 width: 44,
                 height: 32,
                 borderRadius: 6,
-                background: "linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 100%)",
+                background: isDark
+                  ? "linear-gradient(135deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 100%)"
+                  : "linear-gradient(135deg, rgba(0,71,255,0.2) 0%, rgba(0,0,0,0.06) 100%)",
                 marginBottom: 20,
               }}
             />
@@ -3676,7 +3814,7 @@ function TrackitWalletCard({
         <button
           type="button"
           onClick={onManage}
-          className="hero-cta-raised-light"
+          className={primaryCta}
           style={{ padding: "12px 20px", fontSize: 14, width: isMobile ? "100%" : "auto" }}
         >
           {!hasPaymentMethod
@@ -3715,15 +3853,17 @@ export function BalanceView({
   onUpgradeScale?: () => void;
 }) {
   const lang = useLang();
+  const { theme } = useDashboardTheme();
+  const primaryCta = theme === "dark" ? "hero-cta-raised-light" : "hero-cta-raised-dark";
   const { navigate } = useDashboardNavigation();
-  const { loading: payItWelcomeLoading, showWelcome: showPayItWelcome, refresh: refreshPayItActivity } = usePayItActivity(userId);
-  const [payItWelcomeBypass, setPayItWelcomeBypass] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<GateFeatureKey | null>(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [creators, setCreators] = useState<PayoutTableCreator[]>([]);
   const [addFundsOpen, setAddFundsOpen] = useState(false);
   const [fundAmount, setFundAmount] = useState("");
   const [payMessage, setPayMessage] = useState<string | null>(null);
+  const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active" | null>(null);
+  const [connectLoading, setConnectLoading] = useState(false);
   const {
     defaultMethod: defaultPaymentMethod,
     hasPaymentMethod: hasBillingPaymentMethod,
@@ -3731,6 +3871,60 @@ export function BalanceView({
     error: billingError,
     openManage: openBillingPaymentManage,
   } = usePaymentMethods();
+
+  useEffect(() => {
+    if (!userId || isCreator) return;
+    let cancelled = false;
+    setConnectStatus(null);
+    fetch("/api/stripe/connect/status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setConnectStatus(d?.status === "active" || d?.status === "pending" ? d.status : "none");
+      })
+      .catch(() => {
+        if (!cancelled) setConnectStatus("none");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, isCreator]);
+
+  const handleConnectStripe = async () => {
+    if (!userId || connectLoading) return;
+    if (!canUseStripeConnectPayouts(plan)) {
+      setUpgradeFeature("payouts");
+      return;
+    }
+    setConnectLoading(true);
+    try {
+      let email: string | undefined;
+      const { supabase } = await import("@/lib/supabase");
+      if (supabase) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        email = user?.email ?? undefined;
+      }
+      const res = await fetch("/api/stripe/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, email }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else {
+        alert(data.error || (lang === "fr" ? "Impossible de démarrer Stripe" : "Could not start Stripe onboarding"));
+        setConnectLoading(false);
+      }
+    } catch {
+      setConnectLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -3772,7 +3966,6 @@ export function BalanceView({
         : `${formatCurrency(amount, lang)} added to your balance.`,
     );
     notifyFundsAdded(lang, amount, userId);
-    void refreshPayItActivity();
   };
 
   const openAddFunds = (presetAmount?: number) => {
@@ -3793,15 +3986,6 @@ export function BalanceView({
         ? "Prêt pour les prochains paiements"
         : "Ready for upcoming payouts";
 
-  const owedHint =
-    owedTotal > 0
-      ? lang === "fr"
-        ? "Montants dus aux créateurs"
-        : "Amounts due to creators"
-      : lang === "fr"
-        ? "Aucune commission en attente"
-        : "No commissions pending";
-
   if (isCreator) {
     return (
       <>
@@ -3819,13 +4003,13 @@ export function BalanceView({
     );
   }
 
-  if (payItWelcomeLoading) {
+  if (connectStatus === null) {
     return <PayItWelcomeLoading isMobile={isMobile} />;
   }
 
-  if (showPayItWelcome && !payItWelcomeBypass) {
+  if (connectStatus !== "active") {
     return (
-      <>
+      <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)" }}>
         {upgradeFeature && (
           <PaywallModal
             featureKey={upgradeFeature}
@@ -3836,24 +4020,79 @@ export function BalanceView({
             onUpgradeScale={onUpgradeScale}
           />
         )}
-        <PayItWelcomeView
+        <PayoutsPageHeader
           isMobile={isMobile}
-          variant="balance"
-          onPrimary={() => {
-            if (!canUseBalance(plan)) {
-              setUpgradeFeature("balance");
-              return;
-            }
-            setPayItWelcomeBypass(true);
-            openAddFunds();
-          }}
+          title={lang === "fr" ? "Solde" : "Balance"}
+          subtitle={
+            lang === "fr"
+              ? "Disponible après connexion Stripe"
+              : "Available after connecting Stripe"
+          }
         />
-      </>
+        <div
+          style={{
+            padding: isMobile ? "24px 16px 48px" : "32px 40px 64px",
+            maxWidth: 520,
+          }}
+        >
+          <div
+            style={{
+              border: "1px solid var(--ws-border)",
+              borderRadius: 16,
+              padding: isMobile ? 22 : 28,
+              background: "var(--ws-surface)",
+            }}
+          >
+            <div style={{ fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 8 }}>
+              {lang === "fr" ? "Connectez Stripe pour accéder au solde" : "Connect Stripe to access Balance"}
+            </div>
+            <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", lineHeight: 1.5, margin: "0 0 20px" }}>
+              {lang === "fr"
+                ? "Le solde Trackit est réservé aux marques qui ont connecté Stripe Connect pour payer leurs créateurs."
+                : "Trackit Balance is only available to brands that have connected Stripe Connect to pay creators."}
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <button
+                type="button"
+                className={primaryCta}
+                disabled={connectLoading}
+                onClick={() => void handleConnectStripe()}
+                style={{ padding: "14px 20px", fontSize: 15 }}
+              >
+                {connectLoading
+                  ? lang === "fr"
+                    ? "Chargement…"
+                    : "Loading…"
+                  : connectStatus === "pending"
+                    ? lang === "fr"
+                      ? "Terminer la configuration Stripe"
+                      : "Finish Stripe setup"
+                    : lang === "fr"
+                      ? "Connecter Stripe"
+                      : "Connect Stripe"}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate({ view: "payouts" })}
+                style={{ ...payoutPageSecondaryBtn, padding: "14px 20px", fontSize: 15 }}
+              >
+                {lang === "fr" ? "Retour à Pay it" : "Back to Pay it"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <>
+    <div
+      style={{
+        minHeight: "100%",
+        background: "var(--ws-bg)",
+        color: "var(--ws-text)",
+      }}
+    >
       {upgradeFeature && (
         <PaywallModal
           featureKey={upgradeFeature}
@@ -3876,7 +4115,7 @@ export function BalanceView({
       <div
         style={{
           padding: isMobile ? "12px 16px 32px" : "16px 40px 48px",
-          background: "#FFFFFF",
+          background: "var(--ws-bg)",
           minHeight: "calc(100vh - 120px)",
         }}
       >
@@ -3892,22 +4131,22 @@ export function BalanceView({
         >
           <div
             style={{
-              border: "1px solid #EFEFEF",
+              border: "1px solid var(--ws-border)",
               borderRadius: 16,
               padding: isMobile ? 22 : 28,
-              background: "#FFFFFF",
+              background: "var(--ws-surface)",
               display: "flex",
               flexDirection: "column",
             }}
           >
-            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 10 }}>
+            <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 10 }}>
               {lang === "fr" ? "Solde disponible" : "Available balance"}
             </div>
             <div
               style={{
                 fontSize: isMobile ? 36 : 44,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 letterSpacing: "-0.04em",
                 lineHeight: 1.05,
                 marginBottom: 10,
@@ -3918,7 +4157,7 @@ export function BalanceView({
             <div
               style={{
                 fontSize: 13,
-                color: owedTotal > walletBalance ? TRACKIT_BLUE : "#9A9A9A",
+                color: owedTotal > walletBalance ? TRACKIT_BLUE : "var(--ws-text-dim)",
                 letterSpacing: "-0.01em",
                 lineHeight: 1.45,
               }}
@@ -3933,13 +4172,13 @@ export function BalanceView({
                 gap: 12,
                 marginTop: 28,
                 paddingTop: 28,
-                borderTop: "1px solid #EFEFEF",
+                borderTop: "1px solid var(--ws-border)",
               }}
             >
               <button
                 type="button"
                 onClick={() => openAddFunds()}
-                className="hero-cta-raised-light"
+                className={primaryCta}
                 style={{ padding: "15px 24px", fontSize: 17 }}
               >
                 {lang === "fr" ? "Ajouter des fonds" : "Add funds"}
@@ -3957,7 +4196,7 @@ export function BalanceView({
 
             {hasBillingPaymentMethod && (
               <div style={{ marginTop: 24 }}>
-                <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 10 }}>
                   {lang === "fr" ? "Montants rapides" : "Quick amounts"}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -3991,48 +4230,6 @@ export function BalanceView({
             onManage={openBillingPaymentManage}
           />
         </div>
-
-        <div
-          style={{
-            border: "1px solid #EFEFEF",
-            borderRadius: 16,
-            padding: isMobile ? 20 : 24,
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            alignItems: isMobile ? "stretch" : "center",
-            justifyContent: "space-between",
-            gap: isMobile ? 16 : 24,
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 13, color: "#6B7280", letterSpacing: "-0.01em", marginBottom: 8 }}>
-              {lang === "fr" ? "Commissions à verser" : "Commissions owed"}
-            </div>
-            <div
-              style={{
-                fontSize: isMobile ? 28 : 32,
-                fontWeight: 600,
-                color: "#1A1A1A",
-                letterSpacing: "-0.04em",
-                lineHeight: 1.05,
-                marginBottom: 6,
-              }}
-            >
-              {formatCurrency(owedTotal, lang)}
-            </div>
-            <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>{owedHint}</div>
-          </div>
-          {owedTotal > 0 && (
-            <button
-              type="button"
-              onClick={() => navigate({ view: "payouts" })}
-              className="hero-cta-raised-light"
-              style={{ padding: "12px 20px", fontSize: 14, flexShrink: 0, alignSelf: isMobile ? "stretch" : "center" }}
-            >
-              {lang === "fr" ? "Payer les créateurs" : "Pay creators"}
-            </button>
-          )}
-        </div>
       </div>
 
       {addFundsOpen && (
@@ -4040,7 +4237,7 @@ export function BalanceView({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.4)",
+            background: theme === "dark" ? "rgba(0,0,0,0.65)" : "rgba(15,15,15,0.4)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -4051,42 +4248,44 @@ export function BalanceView({
         >
           <div
             style={{
-              background: "#FFFFFF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 16,
               padding: 28,
               maxWidth: 440,
               width: "100%",
-              boxShadow: "0 24px 48px rgba(0,0,0,0.12)",
+              boxShadow: "var(--ws-shadow)",
+              color: "var(--ws-text)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>
               {lang === "fr" ? "Ajouter des fonds" : "Add money to balance"}
             </h3>
-            <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "0 0 20px 0", lineHeight: 1.5 }}>
               {lang === "fr" ? "Solde actuel :" : "Current balance:"} {formatCurrency(walletBalance, lang)}
             </p>
             {!hasBillingPaymentMethod ? (
               <>
-                <p style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 16px 0", lineHeight: 1.5 }}>
+                <p style={{ fontSize: 14, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 16px 0", lineHeight: 1.5 }}>
                   {lang === "fr"
                     ? "Ajoutez d'abord votre carte Trackit bleue pour débiter votre solde."
                     : "Add your Trackit payment card first to fund your balance."}
                 </p>
-                <button type="button" onClick={openBillingPaymentManage} className="hero-cta-raised-light" style={{ padding: "14px 20px", fontSize: 15, width: "100%" }}>
+                <button type="button" onClick={openBillingPaymentManage} className={primaryCta} style={{ padding: "14px 20px", fontSize: 15, width: "100%" }}>
                   {lang === "fr" ? "Ajouter une carte" : "Add card"}
                 </button>
               </>
             ) : (
               <>
-                <p style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>
+                <p style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>
                   {lang === "fr" ? "Carte enregistrée" : "Saved card"}: {chargingLabel}
                 </p>
-                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>
                   {lang === "fr" ? "Montant à ajouter" : "Amount to add"}
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-                  <span style={{ fontSize: 18, fontWeight: 500, color: "#1A1A1A" }}>{lang === "fr" ? "€" : "$"}</span>
+                  <span style={{ fontSize: 18, fontWeight: 500, color: "var(--ws-text)" }}>{lang === "fr" ? "€" : "$"}</span>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -4098,10 +4297,11 @@ export function BalanceView({
                       boxSizing: "border-box",
                       padding: "12px 14px",
                       borderRadius: 10,
-                      border: "1px solid #E5E5E5",
+                      border: "1px solid var(--ws-border)",
+                      background: "var(--ws-input)",
                       fontSize: 18,
                       fontFamily: "inherit",
-                      color: "#1A1A1A",
+                      color: "var(--ws-text)",
                       letterSpacing: "-0.02em",
                     }}
                   />
@@ -4122,7 +4322,7 @@ export function BalanceView({
                   type="button"
                   onClick={handleAddFunds}
                   disabled={!canAddFunds}
-                  className="hero-cta-raised-light"
+                  className={primaryCta}
                   style={{ padding: "14px 20px", fontSize: 15, width: "100%", opacity: canAddFunds ? 1 : 0.5 }}
                 >
                   {lang === "fr" ? "Ajouter des fonds" : "Add funds"}
@@ -4139,7 +4339,7 @@ export function BalanceView({
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -4153,24 +4353,24 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
   };
 
   return (
-    <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 24 }}>
-      <div style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em", marginBottom: 8 }}>
+    <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 24 }}>
+      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 8 }}>
         {lang === "fr" ? "Carte de facturation" : "Billing card"}
       </div>
-      <p style={{ fontSize: 11, color: "#9A9A9A", margin: "0 0 12px", lineHeight: 1.4 }}>
+      <p style={{ fontSize: 11, color: "var(--ws-text-dim)", margin: "0 0 12px", lineHeight: 1.4 }}>
         {lang === "fr"
           ? "Même carte que pour votre abonnement Trackit."
           : "Same card as your Trackit subscription."}
       </p>
       {loading ? (
-        <div style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em" }}>
+        <div style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em" }}>
           {lang === "fr" ? "Chargement..." : "Loading..."}
         </div>
       ) : error ? (
         <div style={{ fontSize: 13, color: "#C62828", letterSpacing: "-0.02em" }}>{error}</div>
       ) : !hasPaymentMethod || !defaultMethod ? (
         <>
-          <div style={{ fontSize: 14, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 16 }}>
             {lang === "fr" ? "Aucune carte enregistrée" : "No card on file"}
           </div>
           <button type="button" onClick={openAdd} style={{ ...pmBtnSecondary, width: "100%" }}>
@@ -4182,10 +4382,10 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
             <CardBrandIcon brand={defaultMethod.brand} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+              <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
                 {formatPaymentLabel(defaultMethod)}
               </div>
-              <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 2 }}>
                 {lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}
               </div>
             </div>

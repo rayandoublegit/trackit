@@ -17,6 +17,8 @@ const WORKSPACE_IDENTITY_KEY = "trackit_workspace_identity_v1";
 type StoredWorkspaceIdentity = {
   actorId: string;
   ownerId: string;
+  /** Brand-space id (workspaces.id). Defaults to ownerId for the primary space. */
+  workspaceId?: string;
 };
 
 function readWorkspaceIdentity(): StoredWorkspaceIdentity | null {
@@ -34,10 +36,26 @@ function readWorkspaceIdentity(): StoredWorkspaceIdentity | null {
  * Makes existing client features workspace-aware without changing the auth
  * session: getUser() keeps the actor's email/metadata but exposes the owner id
  * as the data scope. The mapping is only honored for the actor who stored it.
+ * `workspaceId` is the active brand-space (workspaces row), not the auth user.
  */
-export function setWorkspaceClientIdentity(actorId: string, ownerId: string): void {
+export function setWorkspaceClientIdentity(
+  actorId: string,
+  ownerId: string,
+  workspaceId?: string,
+): void {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(WORKSPACE_IDENTITY_KEY, JSON.stringify({ actorId, ownerId }));
+  sessionStorage.setItem(
+    WORKSPACE_IDENTITY_KEY,
+    JSON.stringify({
+      actorId,
+      ownerId,
+      workspaceId: workspaceId || ownerId,
+    }),
+  );
+}
+
+export function getWorkspaceClientIdentity(): StoredWorkspaceIdentity | null {
+  return readWorkspaceIdentity();
 }
 
 if (supabase && typeof window !== "undefined") {

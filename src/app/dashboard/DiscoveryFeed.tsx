@@ -29,6 +29,10 @@ import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
 import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
 import { prefetchCreatorDetail } from "@/lib/creator-detail-cache";
+import {
+  HIDDEN_CREATORS_EVENT,
+  loadHiddenCreators,
+} from "@/lib/hidden-creators-storage";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 
 function fmt(n: number): string {
@@ -49,13 +53,13 @@ function Lock({ size = 14 }: { size?: number }) {
 const filterSelectStyle: React.CSSProperties = {
   display: "block",
   width: "100%",
-  background: "#FFFFFF",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-input)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "9px 12px",
   fontSize: 13,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   cursor: "pointer",
   letterSpacing: "-0.01em",
   boxSizing: "border-box",
@@ -64,13 +68,13 @@ const filterSelectStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   display: "block",
   width: "100%",
-  background: "#FFFFFF",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-input)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "9px 12px",
   fontSize: 13,
   fontFamily: "inherit",
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   letterSpacing: "-0.01em",
   boxSizing: "border-box",
 };
@@ -88,6 +92,7 @@ type FilterState = {
   search: string;
   hasEmail: boolean;
   hideSaved: boolean;
+  showHidden: boolean;
 };
 
 const EMPTY_FILTERS: FilterState = {
@@ -103,6 +108,7 @@ const EMPTY_FILTERS: FilterState = {
   search: "",
   hasEmail: false,
   hideSaved: false,
+  showHidden: false,
 };
 
 /** Catalogue sans niche choisie : pas de cap plan ni quota decouverte. */
@@ -114,7 +120,7 @@ function isAllNichesBrowse(f: FilterState): boolean {
 function hasActiveSearchFilters(f: FilterState): boolean {
   if (f.followersRange || f.engagement || f.viewsFrom || f.viewsTo || f.age) return true;
   if (f.search.trim()) return true;
-  if (f.hasEmail || f.hideSaved) return true;
+  if (f.hasEmail || f.hideSaved || f.showHidden) return true;
   return false;
 }
 
@@ -166,7 +172,12 @@ function toParams(f: FilterState, debouncedSearch = ""): Record<string, string> 
   return p;
 }
 
-function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<string>): FeedCreator[] {
+function applyClientFilters(
+  list: FeedCreator[],
+  f: FilterState,
+  saved: Set<string>,
+  hidden: Set<string>,
+): FeedCreator[] {
   const curated = list.filter((c) => isCuratedFeedCreator(c));
   const regular = list.filter((c) => !isCuratedFeedCreator(c));
   const isGlobalSearch = f.search.trim().replace(/^@/, "").length >= 2;
@@ -215,6 +226,11 @@ function applyClientFilters(list: FeedCreator[], f: FilterState, saved: Set<stri
     }
     if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
     if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
+    if (f.showHidden) {
+      out = out.filter((c) => hidden.has(c.username.toLowerCase()));
+    } else {
+      out = out.filter((c) => !hidden.has(c.username.toLowerCase()));
+    }
     if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => c.avgViews >= VIEWS_VAL[f.viewsFrom]);
     if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => c.avgViews <= VIEWS_VAL[f.viewsTo]);
     return out;
@@ -254,7 +270,7 @@ function FilterSelect({
   const guard = disabled ? (e: React.SyntheticEvent) => { e.preventDefault(); onLocked?.(); } : undefined;
   return (
     <div>
-      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
+      <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
       <select
         value={value}
         onChange={(e) => {
@@ -292,7 +308,7 @@ function FilterToggle({
 }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
+      <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
       <label
         style={{
           display: "flex",
@@ -306,7 +322,7 @@ function FilterToggle({
           if (disabled) { e.preventDefault(); onLocked?.(); }
         }}
       >
-        <span style={{ fontSize: 13, color: "#1A1A1A", flex: 1, marginRight: 8 }}>{checked ? onLabel : offLabel}</span>
+        <span style={{ fontSize: 13, color: "var(--ws-text)", flex: 1, marginRight: 8 }}>{checked ? onLabel : offLabel}</span>
         <input
           type="checkbox"
           checked={checked}
@@ -324,7 +340,7 @@ function FilterToggle({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 4 }}>
+    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ws-text-dim)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, marginTop: 4 }}>
       {children}
     </div>
   );
@@ -360,11 +376,11 @@ function NicheRequestSection({ lang, product }: { lang: "en" | "fr"; product: st
       style={{
         marginBottom: 16,
         paddingTop: 16,
-        borderTop: "1px solid #EFEFEF",
+        borderTop: "1px solid var(--ws-border)",
       }}
     >
       <SectionTitle>{t.requestSection}</SectionTitle>
-      <p style={{ fontSize: 12, color: "#7A7A7A", margin: "0 0 10px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+      <p style={{ fontSize: 12, color: "var(--ws-text-muted)", margin: "0 0 10px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
         {t.requestSectionHint}
       </p>
       <input
@@ -460,9 +476,9 @@ function FilterSidebar({
         width: isMobile ? "100%" : 300,
         flexShrink: 0,
         alignSelf: "stretch",
-        background: "#FFFFFF",
-        borderRight: isMobile ? "none" : "1px solid #EFEFEF",
-        borderBottom: isMobile ? "1px solid #EFEFEF" : "none",
+        background: "var(--ws-surface)",
+        borderRight: isMobile ? "none" : "1px solid var(--ws-border)",
+        borderBottom: isMobile ? "1px solid var(--ws-border)" : "none",
         height: isMobile ? "auto" : "100%",
         maxHeight: isMobile ? undefined : "100%",
         minHeight: isMobile ? undefined : 0,
@@ -473,13 +489,13 @@ function FilterSidebar({
         WebkitOverflowScrolling: "touch",
       }}
     >
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: "0 0 4px" }}>{t.findItTitle}</h1>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: "0 0 20px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
+      <h1 style={{ fontSize: 22, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: "0 0 4px" }}>{t.findItTitle}</h1>
+      <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "0 0 20px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
         {t.findItSubtitle}
       </p>
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.yourProduct}</div>
+        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.yourProduct}</div>
         <input
           type="text"
           value={product}
@@ -514,9 +530,9 @@ function FilterSidebar({
               style={{
                 padding: "7px 14px",
                 borderRadius: 999,
-                border: active ? "1px solid #1A1A1A" : "1px solid #E5E5E5",
-                background: active ? "#1A1A1A" : "#FFFFFF",
-                color: active ? "#FFFFFF" : freeBlocked ? "#9A9A9A" : "#1A1A1A",
+                border: active ? "1px solid var(--ws-btn)" : "1px solid var(--ws-border)",
+                background: active ? "var(--ws-btn)" : "var(--ws-surface)",
+                color: active ? "var(--ws-btn-text)" : freeBlocked ? "var(--ws-text-dim)" : "var(--ws-text)",
                 fontSize: 12,
                 fontWeight: 500,
                 fontFamily: "inherit",
@@ -541,7 +557,7 @@ function FilterSidebar({
             marginBottom: 16,
             padding: "4px 0",
             fontSize: 12,
-            color: platformNoticeBlocked ? "#7A5C00" : "#0047FF",
+            color: platformNoticeBlocked ? "#EAB308" : "var(--ws-accent)",
             letterSpacing: "-0.01em",
             lineHeight: 1.45,
           }}
@@ -551,11 +567,11 @@ function FilterSidebar({
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.search}</div>
+        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.search}</div>
         <div style={{ position: "relative" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.45 }}>
-            <circle cx="11" cy="11" r="7" stroke="#1A1A1A" strokeWidth="1.8" />
-            <path d="M21 21l-4.35-4.35" stroke="#1A1A1A" strokeWidth="1.8" strokeLinecap="round" />
+            <circle cx="11" cy="11" r="7" stroke="var(--ws-text)" strokeWidth="1.8" />
+            <path d="M21 21l-4.35-4.35" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
           </svg>
           <input
             type="text"
@@ -586,6 +602,13 @@ function FilterSidebar({
           label={t.hideSaved}
           checked={filters.hideSaved}
           onChange={(v) => onChange({ hideSaved: v })}
+          onLabel={t.enabled}
+          offLabel={t.disabled}
+        />
+        <FilterToggle
+          label={t.hiddenCreators}
+          checked={filters.showHidden}
+          onChange={(v) => onChange({ showHidden: v })}
           onLabel={t.enabled}
           offLabel={t.disabled}
         />
@@ -713,6 +736,7 @@ function FeedListRow({
   onUpgrade,
   compact,
   avatarPriority,
+  dimmed,
 }: {
   lang: "en" | "fr";
   creator: FeedCreator;
@@ -727,6 +751,7 @@ function FeedListRow({
   onUpgrade?: () => void;
   compact?: boolean;
   avatarPriority?: boolean;
+  dimmed?: boolean;
 }) {
   const c = creator;
   const t = discoveryCopy(lang);
@@ -739,19 +764,21 @@ function FeedListRow({
         alignItems: "center",
         gap: compact ? 10 : 16,
         padding: compact ? "12px 14px" : "14px 20px",
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 12,
         transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+        opacity: dimmed ? 0.48 : 1,
+        filter: dimmed ? "grayscale(0.85)" : "none",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.06)";
-        e.currentTarget.style.borderColor = "#E0E0E0";
+        e.currentTarget.style.boxShadow = "var(--ws-shadow)";
+        e.currentTarget.style.borderColor = "var(--ws-border-strong)";
         prefetchCreatorDetail(c.username);
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.borderColor = "#EFEFEF";
+        e.currentTarget.style.borderColor = "var(--ws-border)";
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 200px", minWidth: 0 }}>
@@ -765,17 +792,17 @@ function FeedListRow({
         />
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {c.displayName}
             </span>
             {c.authenticityScore >= 60 && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-label={t.verified} style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" fill="#0047FF" />
+                <circle cx="12" cy="12" r="10" fill="var(--ws-accent)" />
                 <path d="M8 12.5l2.5 2.5L16 9" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
           </div>
-          <div style={{ fontSize: 12, color: "#9A9A9A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             @{c.username}
           </div>
         </div>
@@ -784,16 +811,16 @@ function FeedListRow({
       {!compact && (
         <>
           <div style={{ flex: "0 0 90px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</div>
-            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{t.followers}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</div>
+            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>{t.followers}</div>
           </div>
           <div style={{ flex: "0 0 70px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{c.engagementRate}%</div>
-            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>ER</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{c.engagementRate}%</div>
+            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>ER</div>
           </div>
           <div style={{ flex: "0 0 80px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{fmt(engagement)}</div>
-            <div style={{ fontSize: 10, color: "#9A9A9A", marginTop: 2 }}>{t.engagementShort}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{fmt(engagement)}</div>
+            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>{t.engagementShort}</div>
           </div>
         </>
       )}
@@ -817,9 +844,9 @@ function FeedListRow({
           style={{
             fontSize: 12,
             fontWeight: 500,
-            color: "#1A1A1A",
-            background: "#FFFFFF",
-            border: "1px solid #E5E5E5",
+            color: "var(--ws-text)",
+            background: "var(--ws-surface)",
+            border: "1px solid var(--ws-border)",
             borderRadius: 10,
             padding: "8px 14px",
             cursor: "pointer",
@@ -856,8 +883,8 @@ function FreeDiscoveryBanner({
         marginBottom: 16,
         padding: "14px 16px",
         borderRadius: 14,
-        border: "1px solid #E8E4FF",
-        background: "linear-gradient(135deg, #F8F7FF 0%, #FFFFFF 55%)",
+        border: "1px solid var(--ws-border)",
+        background: "var(--ws-surface-2)",
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "space-between",
@@ -873,8 +900,8 @@ function FreeDiscoveryBanner({
               fontWeight: 600,
               letterSpacing: "0.04em",
               textTransform: "uppercase",
-              color: "#534AB7",
-              background: "#EEEDFE",
+              color: "var(--ws-accent)",
+              background: "var(--ws-accent-soft)",
               padding: "3px 8px",
               borderRadius: 999,
             }}
@@ -882,15 +909,15 @@ function FreeDiscoveryBanner({
             {t.discoveriesRemainingLifetime(used, limit)}
           </span>
           {remaining > 0 ? (
-            <span style={{ fontSize: 11, color: "#6B7280", letterSpacing: "-0.01em" }}>
+            <span style={{ fontSize: 11, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
               {lang === "fr" ? `${remaining} restante${remaining > 1 ? "s" : ""}` : `${remaining} left`}
             </span>
           ) : null}
         </div>
-        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", lineHeight: 1.35 }}>
+        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", lineHeight: 1.35 }}>
           {t.freeDiscoveryBannerTitle}
         </p>
-        <p style={{ margin: 0, fontSize: 12.5, color: "#6B7280", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
           {allNichesBrowse ? t.freeDiscoveryBannerBrowse : t.freeDiscoveryBannerBody}
         </p>
       </div>
@@ -899,9 +926,9 @@ function FreeDiscoveryBanner({
         onClick={onUpgrade}
         style={{
           flexShrink: 0,
-          border: "1px solid #D4D0F7",
-          background: "#FFFFFF",
-          color: "#534AB7",
+          border: "1px solid var(--ws-border)",
+          background: "var(--ws-surface)",
+          color: "var(--ws-accent)",
           borderRadius: 10,
           padding: "8px 12px",
           fontSize: 12,
@@ -955,16 +982,16 @@ function PaywallModal({ lang, title, body, onUpgrade, onClose }: { lang: "en" | 
   const t = discoveryCopy(lang);
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "#FFF", borderRadius: 18, padding: "30px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 24px 48px rgba(0,0,0,0.18)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "var(--ws-surface)", borderRadius: 18, padding: "30px 34px", textAlign: "center", maxWidth: 380, boxShadow: "0 24px 48px rgba(0,0,0,0.18)" }}>
         <img
           src={TRACKIT_LOGO_URL}
           alt="Trackit"
           style={{ height: 64, width: "auto", display: "block", objectFit: "contain", margin: "0 auto 14px" }}
         />
-        <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 7 }}>{title}</div>
-        <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.5 }}>{body}</div>
+        <div style={{ fontSize: 19, fontWeight: 600, color: "var(--ws-text)", marginBottom: 7 }}>{title}</div>
+        <div style={{ fontSize: 13, color: "var(--ws-text-muted)", marginBottom: 18, lineHeight: 1.5 }}>{body}</div>
         <UpgradeCtaButton lang={lang} onClick={onUpgrade} fullWidth />
-        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "#9A9A9A", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: "inherit" }}>{t.later}</button>
+        <button type="button" onClick={onClose} style={{ background: "none", border: "none", color: "var(--ws-text-dim)", fontSize: 13, marginTop: 12, cursor: "pointer", fontFamily: "inherit" }}>{t.later}</button>
       </div>
     </div>
   );
@@ -980,7 +1007,7 @@ function FeedGateOverlay({ lang, onUpgrade }: { lang: "en" | "fr"; onUpgrade: ()
         right: 0,
         top: "26%",
         bottom: 0,
-        background: "linear-gradient(rgba(245,245,245,0) 0%, #F5F5F5 48%)",
+        background: "linear-gradient(transparent 0%, var(--ws-bg) 48%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -991,8 +1018,8 @@ function FeedGateOverlay({ lang, onUpgrade }: { lang: "en" | "fr"; onUpgrade: ()
     >
       <div
         style={{
-          background: "#FFF",
-          border: "1px solid #EFEFEF",
+          background: "var(--ws-surface)",
+          border: "1px solid var(--ws-border)",
           borderRadius: 16,
           padding: "28px 28px 24px",
           textAlign: "center",
@@ -1007,8 +1034,8 @@ function FeedGateOverlay({ lang, onUpgrade }: { lang: "en" | "fr"; onUpgrade: ()
           alt="Trackit"
           style={{ height: 64, width: "auto", display: "block", objectFit: "contain", margin: "0 auto 16px" }}
         />
-        <div style={{ fontSize: 19, fontWeight: 600, color: "#1A1A1A", marginBottom: 6, letterSpacing: "-0.03em" }}>{t.paywallTitle}</div>
-        <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 18, lineHeight: 1.55 }}>{t.paywallBody}</div>
+        <div style={{ fontSize: 19, fontWeight: 600, color: "var(--ws-text)", marginBottom: 6, letterSpacing: "-0.03em" }}>{t.paywallTitle}</div>
+        <div style={{ fontSize: 13, color: "var(--ws-text-muted)", marginBottom: 18, lineHeight: 1.55 }}>{t.paywallBody}</div>
         <UpgradeCtaButton lang={lang} onClick={onUpgrade} fullWidth />
       </div>
     </div>
@@ -1060,6 +1087,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [product, setProduct] = useState("");
   const [savedUsernames, setSavedUsernames] = useState<Set<string>>(new Set());
+  const [hiddenUsernames, setHiddenUsernames] = useState<Set<string>>(() => loadHiddenCreators());
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItem[]>([]);
   const [hasMore, setHasMore] = useState(() => !(plan === "free" && readFreeDiscoveryGateLock()));
@@ -1076,6 +1104,13 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     setSelected(creator);
     navigate({ view: "discovery", creator: creator.username });
   };
+
+  useEffect(() => {
+    const refreshHidden = () => setHiddenUsernames(loadHiddenCreators());
+    refreshHidden();
+    window.addEventListener(HIDDEN_CREATORS_EVENT, refreshHidden);
+    return () => window.removeEventListener(HIDDEN_CREATORS_EVENT, refreshHidden);
+  }, []);
 
   useEffect(() => {
     if (navState.view !== "discovery") return;
@@ -1396,7 +1431,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   }, [loading, loadingMore, hasMore, showDiscoveryGate, loadNextBatch, isMobile, creators.length]);
 
   const filtered = useMemo(() => {
-    const clientFiltered = applyClientFilters(creators, filters, savedUsernames);
+    const clientFiltered = applyClientFilters(creators, filters, savedUsernames, hiddenUsernames);
     const base =
       showDiscoveryGate && clientFiltered.length === 0
         ? (creators.length > 0 ? creators : gatedTeaserRef.current)
@@ -1419,7 +1454,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       out.push(c);
     }
     return out;
-  }, [creators, filters, savedUsernames, sort, isPaid, isGlobalSearch, showDiscoveryGate]);
+  }, [creators, filters, savedUsernames, hiddenUsernames, sort, isPaid, isGlobalSearch, showDiscoveryGate]);
   const visibleCreators = filtered;
   const discoveryGateActive = showDiscoveryGate;
   const hasProgressiveFreeTeaser = !isPaid && (shouldShowAllNichesTeaser || discoveryGateActive);
@@ -1496,7 +1531,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         minHeight: 0,
         overflow: isMobile ? "auto" : "hidden",
         WebkitOverflowScrolling: "touch",
-        background: "#F5F5F5",
+        background: "var(--ws-bg)",
         alignItems: "stretch",
       }}
     >
@@ -1525,18 +1560,6 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         }}
       >
         <div style={{ padding: isMobile ? "8px 16px 32px 52px" : "20px 24px 40px" }}>
-          {!isMobile && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ fontSize: 13, color: "#9A9A9A", letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>Powered by</span>
-                <img
-                  src={TRACKIT_LOGO_URL}
-                  alt="Trackit"
-                  style={{ height: 56, width: "auto", display: "block", objectFit: "contain" }}
-                />
-              </div>
-            </div>
-          )}
           <div
             style={{
               display: "flex",
@@ -1549,39 +1572,10 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           >
             <div style={{ minWidth: 0 }}>
               {loading && !discoveryGateActive ? (
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, letterSpacing: "-0.01em" }}>
+                <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
                   {t.loading}
                 </p>
               ) : null}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              {!isMobile && (
-                <div style={{ display: "flex", alignItems: "center", gap: 20, fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
-                  {(["followers", "engagement"] as const).map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        if (!isPaid) { setFilterPaywall(true); return; }
-                        setSort(key);
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        fontFamily: "inherit",
-                        cursor: "pointer",
-                        color: sort === key ? "#1A1A1A" : "#9A9A9A",
-                        fontWeight: sort === key ? 600 : 400,
-                        fontSize: 11,
-                        padding: 0,
-                      }}
-                    >
-                      {key === "followers" ? t.followers : "ER%"}
-                      {sort === key ? " ↓" : ""}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
@@ -1599,8 +1593,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           {!loading && !error && isCreatorSearchMiss && (
             <div
               style={{
-                background: "#FFF",
-                border: "1px solid #EFEFEF",
+                background: "var(--ws-surface)",
+                border: "1px solid var(--ws-border)",
                 borderRadius: 16,
                 padding: "40px 32px",
                 textAlign: "center",
@@ -1613,8 +1607,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
                   width: 48,
                   height: 48,
                   borderRadius: "50%",
-                  background: "#F5F5F5",
-                  color: "#7A7A7A",
+                  background: "var(--ws-bg)",
+                  color: "var(--ws-text-muted)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -1625,19 +1619,19 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               >
                 @
               </div>
-              <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.02em", lineHeight: 1.4 }}>
+              <p style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.02em", lineHeight: 1.4 }}>
                 {t.creatorNotInDatabaseTitle}
               </p>
-              <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px", lineHeight: 1.55 }}>
+              <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 12px", lineHeight: 1.55 }}>
                 {t.creatorNotInDatabaseBody}
               </p>
-              <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0, letterSpacing: "-0.01em" }}>
+              <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: 0, letterSpacing: "-0.01em" }}>
                 {t.creatorNotInDatabaseQuery(searchQuery)}
               </p>
             </div>
           )}
           {!loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && (
-            <div style={{ background: "#FFF", border: "1px dashed #E5E5E5", borderRadius: 12, padding: 48, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+            <div style={{ background: "var(--ws-surface)", border: "1px dashed var(--ws-border)", borderRadius: 12, padding: 48, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14 }}>
               {t.noCreators}
             </div>
           )}
@@ -1663,6 +1657,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
                       isPaid={isPaid}
                       compact={isMobile}
                       avatarPriority={i < 10}
+                      dimmed={filters.showHidden || hiddenUsernames.has(c.username.toLowerCase())}
                       onOpen={() => openCreator(c)}
                       onWorkspaceChange={() => void refreshWorkspace()}
                       onSavedOptimistic={onSavedOptimistic}
@@ -1687,7 +1682,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           </div>
 
           {loadingMore && (
-            <div style={{ textAlign: "center", padding: "16px 0", fontSize: 13, color: "#9A9A9A" }}>
+            <div style={{ textAlign: "center", padding: "16px 0", fontSize: 13, color: "var(--ws-text-dim)" }}>
               {t.loading}
             </div>
           )}
@@ -1704,7 +1699,16 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         />
       )}
 
-      <CreatorDetailDrawer creator={selected} plan={plan} lang={lang} onClose={goBack} onUpgrade={onUpgrade} onWorkspaceChange={() => void refreshWorkspace()} onReachOut={onReachOut} />
+      <CreatorDetailDrawer
+        creator={selected}
+        plan={plan}
+        lang={lang}
+        userId={workspaceUserId}
+        onClose={goBack}
+        onUpgrade={onUpgrade}
+        onWorkspaceChange={() => void refreshWorkspace()}
+        onHiddenChange={() => setHiddenUsernames(loadHiddenCreators())}
+      />
     </div>
   );
 }

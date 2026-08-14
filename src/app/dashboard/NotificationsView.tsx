@@ -370,10 +370,12 @@ export function NotificationsPanel({
   userId,
   onUnreadChange,
   onOpenAction,
+  fullHeight,
 }: {
   userId?: string;
   onUnreadChange?: (count: number) => void;
   onOpenAction?: (action: NonNullable<NotificationItem["action"]>) => void;
+  fullHeight?: boolean;
 }) {
   const lang = useLang();
   const {
@@ -390,20 +392,40 @@ export function NotificationsPanel({
   } = useNotifications(userId, onUnreadChange);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", maxHeight: 480 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        maxHeight: fullHeight ? "none" : 480,
+        height: fullHeight ? "100%" : undefined,
+        minHeight: fullHeight ? 420 : undefined,
+      }}
+    >
       <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid #F0F0F0", flexShrink: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
           <div>
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
-              {lang === "fr" ? "Notifications" : "Notifications"}
-            </h2>
-            <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "2px 0 0" }}>
-              {unreadCount > 0
-                ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
-                : lang === "fr"
-                  ? "Vous êtes à jour"
-                  : "You're all caught up"}
-            </p>
+            {!fullHeight ? (
+              <>
+                <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+                  {lang === "fr" ? "Notifications" : "Notifications"}
+                </h2>
+                <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "2px 0 0" }}>
+                  {unreadCount > 0
+                    ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
+                    : lang === "fr"
+                      ? "Vous êtes à jour"
+                      : "You're all caught up"}
+                </p>
+              </>
+            ) : (
+              <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>
+                {unreadCount > 0
+                  ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
+                  : lang === "fr"
+                    ? "Vous êtes à jour"
+                    : "You're all caught up"}
+              </p>
+            )}
           </div>
           <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
             {unreadCount > 0 && (

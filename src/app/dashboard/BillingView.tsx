@@ -112,18 +112,18 @@ function planFeatures(lang: Lang, tier: PaidTier): string[] {
 function StatusBadge({ lang, status }: { lang: Lang; status: "Paid" | "Failed" | "Pending" }) {
   const styles: Record<typeof status, { bg: string; color: string; label: string }> = {
     Paid: {
-      bg: "#E8F5E9",
-      color: "#2E7D32",
+      bg: "rgba(46, 125, 50, 0.18)",
+      color: "#4ADE80",
       label: lang === "fr" ? "Payée" : "Paid",
     },
     Failed: {
-      bg: "#FFEBEE",
-      color: "#C62828",
+      bg: "rgba(198, 40, 40, 0.18)",
+      color: "#F87171",
       label: lang === "fr" ? "Échouée" : "Failed",
     },
     Pending: {
-      bg: "#FFF8E1",
-      color: "#F57F17",
+      bg: "rgba(245, 127, 23, 0.18)",
+      color: "#FBBF24",
       label: lang === "fr" ? "En attente" : "Pending",
     },
   };
@@ -158,8 +158,8 @@ function BillingCard({
   return (
     <div
       style={{
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 16,
         padding: isMobile ? 20 : 24,
         marginBottom: 20,
@@ -169,7 +169,7 @@ function BillingCard({
         style={{
           fontSize: 15,
           fontWeight: 600,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           letterSpacing: "-0.02em",
           margin: "0 0 16px",
         }}
@@ -442,21 +442,21 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
   const activePrice = currentPlanPrice(currentPlan, subscriptionInterval);
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)" }}>
       <div
         style={{
           paddingTop: isMobile ? 56 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 12 : 16,
           paddingLeft: isMobile ? 16 : 40,
-          borderBottom: "1px solid #EFEFEF",
+          borderBottom: "1px solid var(--ws-border)",
         }}
       >
         <h1
           style={{
             fontSize: isMobile ? 26 : 34,
             fontWeight: 600,
-            color: "#1A1A1A",
+            color: "var(--ws-text)",
             letterSpacing: "-0.04em",
             margin: 0,
             marginBottom: 6,
@@ -464,7 +464,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
         >
           {lang === "fr" ? "Facturation" : "Billing"}
         </h1>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
+        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0 }}>
           {lang === "fr"
             ? "Gérez votre abonnement, votre carte et vos factures Stripe"
             : "Manage your subscription, payment method, and Stripe invoices"}
@@ -480,8 +480,8 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                   display: "inline-block",
                   fontSize: 11,
                   fontWeight: 600,
-                  color: "#0047FF",
-                  background: "#F0F6FF",
+                  color: "var(--ws-accent)",
+                  background: "var(--ws-accent-soft)",
                   padding: "4px 10px",
                   borderRadius: 6,
                   marginBottom: 10,
@@ -490,9 +490,9 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
               >
                 {planLoading ? "…" : planDisplayName(currentPlan, lang)}
               </span>
-              <div style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
+              <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1.1 }}>
                 {planLoading ? (
-                  <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
+                  <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ws-text-muted)" }}>
                     {lang === "fr" ? "Chargement…" : "Loading…"}
                   </span>
                 ) : currentPlan === "free" ? (
@@ -500,11 +500,11 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                 ) : activePrice ? (
                   <>
                     {formatPricingAmount(activePrice.amount, lang)}
-                    <span style={{ fontSize: 14, fontWeight: 400, color: "#7A7A7A" }}>
+                    <span style={{ fontSize: 14, fontWeight: 400, color: "var(--ws-text-muted)" }}>
                       {lang === "fr" ? "/mois" : "/month"}
                     </span>
                     {activePrice.billedAnnually ? (
-                      <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em", fontWeight: 400 }}>
+                      <div style={{ fontSize: 13, color: "var(--ws-text-muted)", marginTop: 6, letterSpacing: "-0.02em", fontWeight: 400 }}>
                         {annualBilledSubtitle(activePrice.billedAnnually, lang)}
                       </div>
                     ) : null}
@@ -512,7 +512,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                 ) : null}
               </div>
               {!planLoading && isPaidPlan && (
-                <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", marginTop: 8 }}>
                   {lang === "fr" ? "Prochaine facturation :" : "Next billing:"}{" "}
                   {invoicesLoading
                     ? "…"
@@ -557,11 +557,11 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
             marginBottom: 20,
           }}
         >
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0 }}>
             {lang === "fr" ? "Choisir un plan" : "Choose a plan"}
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 13, color: annual ? "#9A9A9A" : "#1A1A1A", fontWeight: annual ? 400 : 600 }}>
+            <span style={{ fontSize: 13, color: annual ? "var(--ws-text-dim)" : "var(--ws-text)", fontWeight: annual ? 400 : 600 }}>
               {lang === "fr" ? "Mensuel" : "Monthly"}
             </span>
             <button
@@ -574,7 +574,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                 height: 24,
                 borderRadius: 999,
                 border: "none",
-                background: annual ? "#0047FF" : "#E5E5E5",
+                background: annual ? "var(--ws-accent)" : "var(--ws-border)",
                 position: "relative",
                 cursor: "pointer",
                 padding: 0,
@@ -589,13 +589,13 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                   width: 20,
                   height: 20,
                   borderRadius: "50%",
-                  background: "#FFFFFF",
+                  background: "var(--ws-surface)",
                   transition: "left 0.2s ease",
                   boxShadow: "0 1px 2px rgba(0,0,0,0.12)",
                 }}
               />
             </button>
-            <span style={{ fontSize: 13, color: annual ? "#1A1A1A" : "#9A9A9A", fontWeight: annual ? 600 : 400 }}>
+            <span style={{ fontSize: 13, color: annual ? "var(--ws-text)" : "var(--ws-text-dim)", fontWeight: annual ? 600 : 400 }}>
               {lang === "fr" ? "Annuel" : "Annual"}
             </span>
             {annual && (
@@ -603,8 +603,8 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                 style={{
                   fontSize: 11,
                   fontWeight: 600,
-                  color: "#0047FF",
-                  background: "#F0F6FF",
+                  color: "var(--ws-accent)",
+                  background: "var(--ws-accent-soft)",
                   padding: "4px 8px",
                   borderRadius: 6,
                 }}
@@ -645,10 +645,10 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
               <div
                 key={card.tier}
                 style={{
-                  border: isCurrent ? `1px solid ${TRACKIT_SELECTION_BLUE}` : "1px solid #EFEFEF",
+                  border: isCurrent ? `1px solid ${TRACKIT_SELECTION_BLUE}` : "1px solid var(--ws-border)",
                   borderRadius: 16,
                   padding: isMobile ? 22 : 24,
-                  background: isCurrent ? TRACKIT_SELECTION_BLUE : "#FFFFFF",
+                  background: isCurrent ? TRACKIT_SELECTION_BLUE : "var(--ws-surface)",
                   display: "flex",
                   flexDirection: "column",
                   position: "relative",
@@ -663,8 +663,8 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                       right: 16,
                       fontSize: 10,
                       fontWeight: 600,
-                      color: "#0047FF",
-                      background: "#F0F6FF",
+                      color: "var(--ws-accent)",
+                      background: "var(--ws-accent-soft)",
                       padding: "4px 8px",
                       borderRadius: 999,
                       letterSpacing: "-0.01em",
@@ -681,8 +681,8 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                       right: 16,
                       fontSize: 10,
                       fontWeight: 600,
-                      color: "#6B7280",
-                      background: "#F3F4F6",
+                      color: "var(--ws-text-muted)",
+                      background: "var(--ws-hover)",
                       padding: "4px 8px",
                       borderRadius: 999,
                       letterSpacing: "-0.01em",
@@ -700,7 +700,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                       fontSize: 10,
                       fontWeight: 600,
                       color: TRACKIT_SELECTION_BLUE,
-                      background: "#FFFFFF",
+                      background: "var(--ws-surface)",
                       padding: "4px 8px",
                       borderRadius: 999,
                     }}
@@ -709,18 +709,18 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                   </span>
                 )}
 
-                <div style={{ fontSize: 13, fontWeight: 600, color: isCurrent ? "rgba(255,255,255,0.85)" : "#6B7280", letterSpacing: "-0.01em", marginBottom: 6 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: isCurrent ? "rgba(255,255,255,0.85)" : "var(--ws-text-muted)", letterSpacing: "-0.01em", marginBottom: 6 }}>
                   {card.name}
                 </div>
-                <p style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A", margin: "0 0 16px", lineHeight: 1.45, letterSpacing: "-0.01em", minHeight: 40 }}>
+                <p style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "var(--ws-text-dim)", margin: "0 0 16px", lineHeight: 1.45, letterSpacing: "-0.01em", minHeight: 40 }}>
                   {card.description}
                 </p>
-                <div style={{ fontSize: 32, fontWeight: 600, color: isCurrent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.04em", marginBottom: annual ? 6 : 20 }}>
+                <div style={{ fontSize: 32, fontWeight: 600, color: isCurrent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", marginBottom: annual ? 6 : 20 }}>
                   {formatPricingAmount(price, lang)}
-                  <span style={{ fontSize: 13, fontWeight: 400, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A" }}>{period}</span>
+                  <span style={{ fontSize: 13, fontWeight: 400, color: isCurrent ? "rgba(255,255,255,0.75)" : "var(--ws-text-dim)" }}>{period}</span>
                 </div>
                 {annual ? (
-                  <div style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "#9A9A9A", marginBottom: 20, letterSpacing: "-0.02em" }}>
+                  <div style={{ fontSize: 13, color: isCurrent ? "rgba(255,255,255,0.75)" : "var(--ws-text-dim)", marginBottom: 20, letterSpacing: "-0.02em" }}>
                     {annualBilledSubtitle(card.annualTotal, lang)}
                   </div>
                 ) : null}
@@ -734,14 +734,14 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                         alignItems: "flex-start",
                         gap: 8,
                         fontSize: 13,
-                        color: isCurrent ? "rgba(255,255,255,0.9)" : "#4B5563",
+                        color: isCurrent ? "rgba(255,255,255,0.9)" : "var(--ws-text-muted)",
                         letterSpacing: "-0.01em",
                         lineHeight: 1.45,
                         marginBottom: 8,
                       }}
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, marginTop: 2 }}>
-                        <path d="M5 13l4 4L19 7" stroke={isCurrent ? "#FFFFFF" : "#0047FF"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M5 13l4 4L19 7" stroke={isCurrent ? "#FFFFFF" : "var(--ws-accent)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       {feature}
                     </li>
@@ -758,7 +758,7 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
                       borderRadius: 12,
                       border: "1px solid rgba(255,255,255,0.35)",
                       background: "rgba(255,255,255,0.2)",
-                      color: "#FFFFFF",
+                      color: "var(--ws-surface)",
                       fontSize: 14,
                       fontWeight: 600,
                       fontFamily: "inherit",
@@ -808,11 +808,11 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
 
         <BillingCard title={lang === "fr" ? "Historique des factures" : "Invoice history"} isMobile={isMobile}>
           {invoicesLoading ? (
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
           ) : invoicesError ? (
             <p style={{ fontSize: 13, color: "#C62828", margin: 0 }}>{invoicesError}</p>
           ) : invoices.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#7A7A7A", margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "Aucune facture pour le moment."
                 : "No invoices yet."}
@@ -821,18 +821,18 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
             <div style={{ overflowX: isMobile ? "auto" : undefined }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: isMobile ? 480 : undefined }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid #EFEFEF", textAlign: "left" }}>
-                    <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
-                    <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Montant" : "Amount"}</th>
-                    <th style={{ padding: "10px 8px", color: "#9A9A9A", fontWeight: 500 }}>{lang === "fr" ? "Statut" : "Status"}</th>
+                  <tr style={{ borderBottom: "1px solid var(--ws-border)", textAlign: "left" }}>
+                    <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Date" : "Date"}</th>
+                    <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Montant" : "Amount"}</th>
+                    <th style={{ padding: "10px 8px", color: "var(--ws-text-dim)", fontWeight: 500 }}>{lang === "fr" ? "Statut" : "Status"}</th>
                     <th style={{ padding: "10px 8px" }} />
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map((inv) => (
-                    <tr key={inv.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                      <td style={{ padding: "12px 8px", color: "#1A1A1A" }}>{formatInvoiceDate(inv.created)}</td>
-                      <td style={{ padding: "12px 8px", color: "#1A1A1A" }}>
+                    <tr key={inv.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                      <td style={{ padding: "12px 8px", color: "var(--ws-text)" }}>{formatInvoiceDate(inv.created)}</td>
+                      <td style={{ padding: "12px 8px", color: "var(--ws-text)" }}>
                         {new Intl.NumberFormat(lang === "fr" ? "fr-FR" : "en-US", {
                           style: "currency",
                           currency: inv.currency,

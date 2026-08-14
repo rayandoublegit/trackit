@@ -27,18 +27,18 @@ function platformLabel(platform: string): string {
 }
 
 function TextPill({ value }: { value: string }) {
-  if (!value) return <span style={{ color: "#B0B0B0", fontSize: 14 }}>—</span>;
+  if (!value) return <span style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>—</span>;
   return (
     <span
       style={{
         display: "inline-flex",
         alignItems: "center",
-        background: "#F5F5F5",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-bg)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 8,
         padding: "6px 12px",
         fontSize: 14,
-        color: "#1A1A1A",
+        color: "var(--ws-text)",
         maxWidth: 180,
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -134,19 +134,19 @@ function EditablePercentCell({
           style={{
             width,
             maxWidth: "100%",
-            border: error ? "1px solid #DC2626" : focused ? "1px solid #0047FF" : "1px solid transparent",
+            border: error ? "1px solid #DC2626" : focused ? "1px solid var(--ws-accent)" : "1px solid transparent",
             borderRadius: 8,
             padding: "7px 10px",
             fontSize: 14,
             fontFamily: "inherit",
-            color: displayValue || focused ? "#1A1A1A" : "#B0B0B0",
-            background: focused || error ? "#FFFFFF" : "transparent",
+            color: displayValue || focused ? "var(--ws-text)" : "var(--ws-text-dim)",
+            background: focused || error ? "var(--ws-surface)" : "transparent",
             outline: "none",
             boxSizing: "border-box",
           }}
         />
         {(focused || displayValue) && (
-          <span style={{ fontSize: 14, color: displayValue || focused ? "#1A1A1A" : "#B0B0B0" }}>%</span>
+          <span style={{ fontSize: 14, color: displayValue || focused ? "var(--ws-text)" : "var(--ws-text-dim)" }}>%</span>
         )}
       </div>
       {error && (
@@ -223,13 +223,13 @@ function EditableTextCell({
         style={{
           width,
           maxWidth: "100%",
-          border: error ? "1px solid #DC2626" : focused ? "1px solid #0047FF" : "1px solid transparent",
+          border: error ? "1px solid #DC2626" : focused ? "1px solid var(--ws-accent)" : "1px solid transparent",
           borderRadius: 8,
           padding: "7px 10px",
           fontSize: 14,
           fontFamily: "inherit",
-          color: value || focused ? "#1A1A1A" : "#B0B0B0",
-          background: focused || error ? "#FFFFFF" : "transparent",
+          color: value || focused ? "var(--ws-text)" : "var(--ws-text-dim)",
+          background: focused || error ? "var(--ws-surface)" : "transparent",
           outline: "none",
           boxSizing: "border-box",
         }}
@@ -258,21 +258,21 @@ function ContentCell({
         type="button"
         onClick={onOpen}
         style={{
-          border: "1px solid #E5E5E5",
-          background: "#FFF",
+          border: "1px solid var(--ws-border)",
+          background: "var(--ws-surface)",
           borderRadius: 8,
           padding: "6px 12px",
           fontSize: 13,
           fontWeight: 500,
           cursor: "pointer",
           fontFamily: "inherit",
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
         }}
       >
         {viewLabel}
       </button>
       {content.length > 0 && (
-        <span style={{ fontSize: 13, color: "#7A7A7A" }} title={content.map((s) => s.title).join(", ")}>
+        <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }} title={content.map((s) => s.title).join(", ")}>
           {content.length}
         </span>
       )}
@@ -295,21 +295,21 @@ function ScriptCell({
         type="button"
         onClick={onOpen}
         style={{
-          border: "1px solid #E5E5E5",
-          background: "#FFF",
+          border: "1px solid var(--ws-border)",
+          background: "var(--ws-surface)",
           borderRadius: 8,
           padding: "6px 12px",
           fontSize: 13,
           fontWeight: 500,
           cursor: "pointer",
           fontFamily: "inherit",
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
         }}
       >
         + {addLabel}
       </button>
       {scripts.length > 0 && (
-        <span style={{ fontSize: 13, color: "#7A7A7A" }} title={scripts.map((s) => s.title).join(", ")}>
+        <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }} title={scripts.map((s) => s.title).join(", ")}>
           {scripts.length}
         </span>
       )}
@@ -382,8 +382,8 @@ function StatusPillSelect({
       role="listbox"
       style={{
         ...menuStyle,
-        background: "#FFFFFF",
-        border: "1px solid #EFEFEF",
+        background: "var(--ws-surface)",
+        border: "1px solid var(--ws-border)",
         borderRadius: 12,
         boxShadow: "0 8px 24px rgba(0,0,0,0.1)",
         zIndex: 10000,
@@ -410,11 +410,11 @@ function StatusPillSelect({
               padding: "10px 14px",
               border: "none",
               borderRadius: 8,
-              background: s.key === value ? "#FAFAFA" : "transparent",
+              background: s.key === value ? "var(--ws-hover)" : "transparent",
               cursor: "pointer",
               fontSize: 14,
               fontWeight: 500,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               fontFamily: "inherit",
               textAlign: "left",
             }}
@@ -441,11 +441,11 @@ function StatusPillSelect({
           gap: 10,
           padding: "8px 16px",
           borderRadius: 999,
-          border: "1px solid #E5E5E5",
-          background: "#FFFFFF",
+          border: "1px solid var(--ws-border)",
+          background: "var(--ws-surface)",
           fontSize: 14,
           fontWeight: 500,
-          color: "#1A1A1A",
+          color: "var(--ws-text)",
           fontFamily: "inherit",
           cursor: "pointer",
           whiteSpace: "nowrap",
@@ -455,7 +455,7 @@ function StatusPillSelect({
       >
         <span aria-hidden style={{ width: 9, height: 9, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
         <span>{current?.label ?? value}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "#B0B0B0", flexShrink: 0 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ color: "var(--ws-text-dim)", flexShrink: 0 }}>
           <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
@@ -468,10 +468,10 @@ const thStyle: React.CSSProperties = {
   padding: "16px 20px",
   fontSize: 14,
   fontWeight: 600,
-  color: "#1A1A1A",
+  color: "var(--ws-text)",
   textAlign: "left",
-  borderBottom: "1px solid #EFEFEF",
-  background: "#FAFAFA",
+  borderBottom: "1px solid var(--ws-border)",
+  background: "var(--ws-surface-2)",
   whiteSpace: "nowrap",
   position: "sticky",
   top: 0,
@@ -481,8 +481,8 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
   padding: "16px 20px",
   fontSize: 15,
-  color: "#1A1A1A",
-  borderBottom: "1px solid #F5F5F5",
+  color: "var(--ws-text)",
+  borderBottom: "1px solid var(--ws-border)",
   verticalAlign: "middle",
   whiteSpace: "nowrap",
 };
@@ -573,10 +573,10 @@ export function CreatorListTable({
                 onClick={() => onRowClick(r)}
                 style={{ cursor: "pointer" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#FAFAFA";
+                  e.currentTarget.style.background = "var(--ws-hover)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#FFFFFF";
+                  e.currentTarget.style.background = "var(--ws-surface)";
                 }}
               >
                 <td style={{ ...tdStyle, minWidth: 230 }}>
@@ -623,12 +623,12 @@ export function CreatorListTable({
                   {convoEmail ? (
                     <a
                       href={`mailto:${convoEmail}`}
-                      style={{ fontSize: 14, color: "#1A1A1A", textDecoration: "none", fontWeight: 500 }}
+                      style={{ fontSize: 14, color: "var(--ws-text)", textDecoration: "none", fontWeight: 500 }}
                     >
                       {t.sendEmail}
                     </a>
                   ) : (
-                    <span style={{ color: "#B0B0B0", fontSize: 14 }}>—</span>
+                    <span style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>—</span>
                   )}
                 </td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
@@ -712,7 +712,7 @@ export function CreatorListTable({
                     onClick={() => onDelete(r.creator_username)}
                     style={{
                       border: "1px solid #FECACA",
-                      background: "#FFFFFF",
+                      background: "var(--ws-surface)",
                       color: "#DC2626",
                       borderRadius: 8,
                       padding: "6px 12px",

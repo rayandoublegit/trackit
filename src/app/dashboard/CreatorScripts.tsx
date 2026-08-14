@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useLang } from "@/lib/useLang";
 
-const BLUE = "#0047FF";
+const BLUE = "var(--ws-accent)";
 
 type Script = {
   id: string;
@@ -88,20 +88,20 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
   };
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF" }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div
         style={{
           paddingTop: isMobile ? 56 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,
-          borderBottom: "1px solid #EFEFEF",
+          borderBottom: "1px solid var(--ws-border)",
         }}
       >
-        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
+        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
           Scripts
         </h1>
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
           {lang === "fr"
             ? "Briefs et scripts envoyés par la marque depuis votre fiche créateur."
             : "Briefs and scripts sent by the brand from your creator profile."}
@@ -110,13 +110,13 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
 
       <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 820 }}>
         {loading ? (
-          <div style={{ color: "#9A9A9A", fontSize: 14 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
+          <div style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
         ) : scripts.length === 0 ? (
-          <div style={{ border: "1px solid #EFEFEF", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 6 }}>
+          <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: "48px 24px", textAlign: "center" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", marginBottom: 6 }}>
               {lang === "fr" ? "Aucun script pour le moment" : "No scripts yet"}
             </div>
-            <p style={{ fontSize: 14, color: "#7A7A7A", margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "Quand la marque vous envoie un script depuis « Gérer les créateurs », il apparaît ici."
                 : "When the brand sends you a script from Manage creators, it appears here."}
@@ -125,16 +125,16 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {scripts.map((s) => (
-              <div key={s.id} style={{ border: "1px solid #EFEFEF", borderRadius: 14, padding: "18px 20px", background: "#FFFFFF" }}>
+              <div key={s.id} style={{ border: "1px solid var(--ws-border)", borderRadius: 14, padding: "18px 20px", background: "var(--ws-surface)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
-                    <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: s.content || s.file_url ? 10 : 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>{s.title}</div>
+                    <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginBottom: s.content || s.file_url ? 10 : 0 }}>
                       {fmtDate(s.created_at)}
                       {s.brandName ? ` · ${s.brandName}` : ""}
                     </div>
                     {s.content && (
-                      <p style={{ fontSize: 14, color: "rgba(0,0,0,0.7)", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>
+                      <p style={{ fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>
                         {s.content}
                       </p>
                     )}
@@ -142,7 +142,7 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
                       <img
                         src={s.file_url}
                         alt=""
-                        style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, border: "1px solid #EFEFEF" }}
+                        style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, border: "1px solid var(--ws-border)" }}
                       />
                     )}
                     {s.file_url && (

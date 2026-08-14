@@ -34,15 +34,15 @@ function OverviewHeader({
         paddingRight: isMobile ? 16 : 40,
         paddingBottom: isMobile ? 16 : subtitle ? 28 : 16,
         paddingLeft: isMobile ? 16 : 40,
-        borderBottom: "1px solid #EFEFEF",
-        background: "#FFFFFF",
+        borderBottom: "1px solid var(--ws-border)",
+        background: "var(--ws-surface)",
       }}
     >
-      <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 8 : 0 }}>
+      <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 8 : 0 }}>
         {title}
       </h1>
       {subtitle ? (
-        <p style={{ fontSize: 15, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 560, lineHeight: 1.5 }}>
           {subtitle}
         </p>
       ) : null}
@@ -64,21 +64,21 @@ function MetricCard({
   return (
     <div
       style={{
-        background: accent ? BLUE : "#FFFFFF",
-        border: accent ? "none" : "1px solid #EFEFEF",
+        background: accent ? BLUE : "var(--ws-surface)",
+        border: accent ? "none" : "1px solid var(--ws-border)",
         borderRadius: 16,
         padding: "22px 24px",
         boxShadow: accent ? "0 8px 24px rgba(0,71,255,0.15)" : "0 1px 2px rgba(0,0,0,0.03)",
       }}
     >
-      <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "#9A9A9A", marginBottom: 10, letterSpacing: "-0.01em" }}>
+      <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "var(--ws-text-dim)", marginBottom: 10, letterSpacing: "-0.01em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "#1A1A1A", letterSpacing: "-0.04em", lineHeight: 1 }}>
+      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1 }}>
         {value}
       </div>
       {hint && (
-        <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "#B0B0B0", marginTop: 8, letterSpacing: "-0.01em" }}>
+        <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "var(--ws-text-dim)", marginTop: 8, letterSpacing: "-0.01em" }}>
           {hint}
         </div>
       )}
@@ -107,8 +107,8 @@ function QuickAction({
         textAlign: "left",
         padding: "16px 18px",
         borderRadius: 14,
-        border: "1px solid #EFEFEF",
-        background: "#FFFFFF",
+        border: "1px solid var(--ws-border)",
+        background: "var(--ws-surface)",
         cursor: "pointer",
         fontFamily: "inherit",
         transition: "border-color 0.15s ease, box-shadow 0.15s ease",
@@ -118,12 +118,12 @@ function QuickAction({
         e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,71,255,0.08)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = "#EFEFEF";
+        e.currentTarget.style.borderColor = "var(--ws-border)";
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{label}</span>
-      <span style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", lineHeight: 1.45 }}>{description}</span>
+      <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", lineHeight: 1.45 }}>{description}</span>
     </button>
   );
 }
@@ -179,7 +179,7 @@ function BrandHomeOverview({
         </div>
 
         <div style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
             {lang === "fr" ? "Actions rapides" : "Quick actions"}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12 }}>
@@ -202,16 +202,16 @@ function BrandHomeOverview({
         </div>
 
         {setupDone < setupTotal && (
-          <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: isMobile ? 20 : 24 }}>
+          <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 20 : 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-              <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: 0 }}>
+              <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: 0 }}>
                 {lang === "fr" ? "Mise en route" : "Getting started"}
               </h2>
-              <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+              <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>
                 {setupDone}/{setupTotal}
               </span>
             </div>
-            <div style={{ height: 4, borderRadius: 999, background: "#F0F0F0", marginBottom: 18, overflow: "hidden" }}>
+            <div style={{ height: 4, borderRadius: 999, background: "var(--ws-border)", marginBottom: 18, overflow: "hidden" }}>
               <div style={{ width: `${(setupDone / setupTotal) * 100}%`, height: "100%", background: BLUE, borderRadius: 999, transition: "width 0.3s ease" }} />
             </div>
             {[
@@ -230,7 +230,7 @@ function BrandHomeOverview({
                   width: "100%",
                   padding: "12px 0",
                   border: "none",
-                  borderBottom: "1px solid #F5F5F5",
+                  borderBottom: "1px solid var(--ws-border)",
                   background: "transparent",
                   cursor: step.done ? "default" : "pointer",
                   fontFamily: "inherit",
@@ -243,7 +243,7 @@ function BrandHomeOverview({
                     height: 22,
                     borderRadius: "50%",
                     background: step.done ? BLUE : "transparent",
-                    border: step.done ? "none" : "2px solid #DCDCDC",
+                    border: step.done ? "none" : "2px solid var(--ws-border-strong)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -256,7 +256,7 @@ function BrandHomeOverview({
                     </svg>
                   )}
                 </div>
-                <span style={{ fontSize: 14, color: step.done ? "#9A9A9A" : "#1A1A1A", textDecoration: step.done ? "line-through" : "none", opacity: step.done ? 0.65 : 1 }}>
+                <span style={{ fontSize: 14, color: step.done ? "var(--ws-text-dim)" : "var(--ws-text)", textDecoration: step.done ? "line-through" : "none", opacity: step.done ? 0.65 : 1 }}>
                   {step.label}
                 </span>
               </button>
@@ -313,7 +313,7 @@ function CreatorHomeOverview({
     return (
       <>
         <OverviewHeader isMobile={isMobile} title={lang === "fr" ? "Accueil" : "Home"} subtitle={lang === "fr" ? "Chargement…" : "Loading…"} />
-        <div style={{ padding: isMobile ? 16 : 40, color: "#9A9A9A", fontSize: 14 }}>{lang === "fr" ? "Chargement de votre overview…" : "Loading your overview…"}</div>
+        <div style={{ padding: isMobile ? 16 : 40, color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement de votre overview…" : "Loading your overview…"}</div>
       </>
     );
   }
@@ -326,12 +326,12 @@ function CreatorHomeOverview({
       />
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 16 : 24 }}>
         {error && (
-          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", fontSize: 13, color: "#DC2626" }}>
+          <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.15)", fontSize: 13, color: "var(--ws-danger)" }}>
             {error}
           </div>
         )}
         {!stats?.linked && !error && (
-          <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 12, background: "#F5F8FF", border: "1px solid #D6E4FF", fontSize: 13, color: "#5A5A5A", lineHeight: 1.5 }}>
+          <div style={{ marginBottom: 20, padding: "12px 14px", borderRadius: 12, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", fontSize: 13, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
             {lang === "fr"
               ? "Votre compte n'est pas encore relié à une fiche créateur. Acceptez l'invitation de la marque ou vérifiez que votre pseudo correspond."
               : "Your account isn't linked to a creator profile yet. Accept the brand invite or make sure your handle matches."}
@@ -350,9 +350,9 @@ function CreatorHomeOverview({
               border: "1px solid rgba(0,71,255,0.12)",
             }}
           >
-            <span style={{ fontSize: 13, color: "#7A7A7A" }}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: BLUE }}>{stats.discountCode}</span>
-            {stats.commissionRate != null && <span style={{ fontSize: 13, color: "#9A9A9A" }}>· {stats.commissionRate}%</span>}
+            <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-accent)" }}>{stats.discountCode}</span>
+            {stats.commissionRate != null && <span style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>· {stats.commissionRate}%</span>}
           </div>
         )}
 
@@ -376,7 +376,7 @@ function CreatorHomeOverview({
         </div>
 
         <div style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
+          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
             {lang === "fr" ? "Actions rapides" : "Quick actions"}
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12 }}>
@@ -398,11 +398,11 @@ function CreatorHomeOverview({
           </div>
         </div>
 
-        <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, overflow: "hidden" }}>
+        <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, overflow: "hidden" }}>
           <div
             style={{
               padding: "16px 20px",
-              borderBottom: "1px solid #EFEFEF",
+              borderBottom: "1px solid var(--ws-border)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
@@ -410,17 +410,17 @@ function CreatorHomeOverview({
               flexWrap: "wrap",
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
               {lang === "fr" ? "Mes ventes" : "My sales"}
             </div>
             {allSales.length > 0 && (
-              <span style={{ fontSize: 12, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+              <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>
                 {allSales.length} {lang === "fr" ? "vente(s)" : "sale(s)"}
               </span>
             )}
           </div>
           {allSales.length === 0 ? (
-            <div style={{ padding: "40px 20px", textAlign: "center", fontSize: 14, color: "#7A7A7A", lineHeight: 1.5 }}>
+            <div style={{ padding: "40px 20px", textAlign: "center", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
                 ? "Vos ventes apparaîtront ici dès qu'une commande passe avec votre code promo."
                 : "Your sales will show here once an order comes in with your promo code."}
@@ -429,25 +429,25 @@ function CreatorHomeOverview({
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14, minWidth: isMobile ? 520 : undefined }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid #EFEFEF" }}>
-                    <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                  <tr style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                    <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                       {lang === "fr" ? "Date" : "Date"}
                     </th>
                     {!isMobile && (
-                      <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                      <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                         {lang === "fr" ? "Marque" : "Brand"}
                       </th>
                     )}
-                    <th style={{ textAlign: "left", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                    <th style={{ textAlign: "left", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                       {lang === "fr" ? "Code" : "Code"}
                     </th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                       {lang === "fr" ? "Vente" : "Sale"}
                     </th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                       {lang === "fr" ? "Commission" : "Commission"}
                     </th>
-                    <th style={{ textAlign: "right", padding: "12px 20px", color: "#9A9A9A", fontWeight: 500 }}>
+                    <th style={{ textAlign: "right", padding: "12px 20px", color: "var(--ws-text-dim)", fontWeight: 500 }}>
                       {lang === "fr" ? "Statut" : "Status"}
                     </th>
                   </tr>
@@ -456,18 +456,18 @@ function CreatorHomeOverview({
                   {allSales.map((sale) => {
                     const statusStyle = saleStatusStyle(sale.status);
                     return (
-                      <tr key={sale.id} style={{ borderBottom: "1px solid #F5F5F5" }}>
-                        <td style={{ padding: "14px 20px", color: "#1A1A1A", whiteSpace: "nowrap" }}>{fmtDate(sale.date)}</td>
+                      <tr key={sale.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
+                        <td style={{ padding: "14px 20px", color: "var(--ws-text)", whiteSpace: "nowrap" }}>{fmtDate(sale.date)}</td>
                         {!isMobile && (
-                          <td style={{ padding: "14px 20px", color: "#7A7A7A" }}>{sale.brandName || "—"}</td>
+                          <td style={{ padding: "14px 20px", color: "var(--ws-text-muted)" }}>{sale.brandName || "—"}</td>
                         )}
-                        <td style={{ padding: "14px 20px", color: "#7A7A7A", fontFamily: "monospace", fontSize: 13 }}>
+                        <td style={{ padding: "14px 20px", color: "var(--ws-text-muted)", fontFamily: "monospace", fontSize: 13 }}>
                           {sale.discountCode || "—"}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", color: "#1A1A1A" }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", color: "var(--ws-text)" }}>
                           {formatCurrency(sale.orderAmount, lang)}
                         </td>
-                        <td style={{ padding: "14px 20px", textAlign: "right", color: BLUE, fontWeight: 600 }}>
+                        <td style={{ padding: "14px 20px", textAlign: "right", color: "var(--ws-accent)", fontWeight: 600 }}>
                           {formatCurrency(sale.commissionAmount, lang)}
                         </td>
                         <td style={{ padding: "14px 20px", textAlign: "right" }}>

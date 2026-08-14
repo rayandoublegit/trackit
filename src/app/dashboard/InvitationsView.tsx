@@ -6,13 +6,13 @@ import { canInviteCreators, type PlanTier } from "@/lib/plan-limits";
 import { ActiveDashboardCreatorsPanel } from "./ActiveDashboardCreatorsPanel";
 import { UpgradeModal } from "./UpgradeModal";
 
-const BLUE = "#0047FF";
+const BLUE = "var(--ws-accent)";
 const externFont = "'InterDisplay', 'Inter Display', sans-serif";
 
 const inviteSecondaryBtn: React.CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid #E5E5E5",
+  background: "var(--ws-surface)",
+  color: "var(--ws-text)",
+  border: "1px solid var(--ws-border)",
   borderRadius: 10,
   padding: "12px 20px",
   fontSize: 15,
@@ -90,7 +90,7 @@ export function InvitationsView({
   }, [link]);
 
   return (
-    <div style={{ minHeight: "100%", background: "#FFFFFF", padding: pagePad }}>
+    <div style={{ minHeight: "100%", background: "var(--ws-surface)", padding: pagePad }}>
       {upgradeModalOpen && (
         <UpgradeModal
           lang={lang}
@@ -106,26 +106,26 @@ export function InvitationsView({
             style={{
               fontSize: isMobile ? 28 : 32,
               fontWeight: 600,
-              color: "#1A1A1A",
+              color: "var(--ws-text)",
               margin: "0 0 8px",
               letterSpacing: "-0.03em",
             }}
           >
             {lang === "fr" ? "Inviter un créateur" : "Invite a creator"}
           </h1>
-          <p style={{ fontSize: 15, color: "#6B7280", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
+          <p style={{ fontSize: 15, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.55, letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Invitez un créateur à rejoindre votre programme."
-              : "Invite a creator to join your program."}
+              ? "Un lien, un message, et le prochain créateur star de votre programme est déjà en route."
+              : "One link, one message, and the next star creator for your program is already on the way."}
           </p>
         </header>
 
         <section
           ref={linkCardRef}
           style={{
-            border: "1px solid #EFEFEF",
+            border: "1px solid var(--ws-border)",
             borderRadius: 16,
-            background: "#FAFAFA",
+            background: "transparent",
             padding: isMobile ? "24px 20px" : "32px 28px",
             marginBottom: isMobile ? 28 : 32,
           }}
@@ -135,14 +135,14 @@ export function InvitationsView({
               style={{
                 fontSize: isMobile ? 17 : 18,
                 fontWeight: 600,
-                color: "#1A1A1A",
+                color: "var(--ws-text)",
                 margin: "0 0 8px",
                 letterSpacing: "-0.02em",
               }}
             >
               {lang === "fr" ? "Lien d'invitation" : "Invite link"}
             </h2>
-            <p style={{ fontSize: 14, color: "#6B7280", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
+            <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
               {lang === "fr"
                 ? "Partagez ce lien par message, email ou DM. Le créateur pourra créer son compte et rejoindre votre espace."
                 : "Share this link via message, email, or DM. The creator can create their account and join your workspace."}
@@ -180,14 +180,14 @@ export function InvitationsView({
                       minWidth: 0,
                       padding: "12px 14px",
                       borderRadius: 10,
-                      border: "1px solid #E5E5E5",
+                      border: "1px solid var(--ws-border)",
                       fontSize: 14,
                       fontFamily: externFont,
                       letterSpacing: "-0.02em",
                       outline: "none",
                       boxSizing: "border-box",
-                      color: "#1A1A1A",
-                      background: "#FFFFFF",
+                      color: "var(--ws-text)",
+                      background: "var(--ws-surface)",
                     }}
                   />
                   <button
@@ -198,8 +198,8 @@ export function InvitationsView({
                       padding: "12px 18px",
                       borderRadius: 10,
                       border: "none",
-                      background: copied ? "#1A7F37" : "#1A1A1A",
-                      color: "#FFFFFF",
+                      background: copied ? "#1A7F37" : "var(--ws-btn)",
+                      color: copied ? "#FFFFFF" : "var(--ws-btn-text)",
                       fontSize: 14,
                       fontWeight: 500,
                       fontFamily: "inherit",
