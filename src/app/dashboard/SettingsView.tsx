@@ -282,7 +282,7 @@ export function SettingsView({
 
   return (
     <>
-      <div style={{ padding: isMobile ? "16px" : "32px 40px 0 40px", paddingTop: isMobile ? 56 : undefined, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-bg)" }}>
+      <div style={{ padding: isMobile ? "16px" : "32px 40px 0 40px", paddingTop: isMobile ? 16 : undefined, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-bg)" }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 20 }}>{lang === "fr" ? "Paramètres" : "Settings"}</h1>
         <div style={{ display: "flex", gap: 28, overflowX: isMobile ? "auto" : undefined, flexWrap: isMobile ? "nowrap" : undefined }}>
           {tabs.map((t) => (
@@ -311,7 +311,7 @@ export function SettingsView({
         </div>
       </div>
 
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "var(--ws-bg)", minHeight: "100%", color: "var(--ws-text)" }}>
+      <div style={{ padding: isMobile ? "16px 16px 16px" : "40px", background: "var(--ws-bg)", minHeight: "100%", color: "var(--ws-text)" }}>
         {loading ? (
           <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>Loading settings...</p>
         ) : (

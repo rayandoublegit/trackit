@@ -20,8 +20,8 @@ export function getInitialUnreadCount() {
   return getStoredUnreadCount();
 }
 
-const ICON_COLOR = "#1A1A1A";
-const READ_BG = "#FFFFFF";
+const ICON_COLOR = "var(--ws-text)";
+const READ_BG = "var(--ws-surface)";
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
 function NotificationKindIcon({
@@ -247,7 +247,7 @@ function NotificationList({
 }) {
   if (!hydrated) {
     return (
-      <div style={{ padding: 32, textAlign: "center", color: "#9A9A9A", fontSize: 14 }}>
+      <div style={{ padding: 32, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14 }}>
         {lang === "fr" ? "Chargement…" : "Loading…"}
       </div>
     );
@@ -257,10 +257,10 @@ function NotificationList({
     return (
       <div style={{ padding: "40px 24px", textAlign: "center" }}>
         <div style={{ fontSize: 32, marginBottom: 10 }}>🔔</div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 4 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 4 }}>
           {lang === "fr" ? "Aucune notification" : "No notifications"}
         </div>
-        <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, lineHeight: 1.45 }}>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, lineHeight: 1.45 }}>
           {filter === "unread"
             ? lang === "fr"
               ? "Vous avez tout lu."
@@ -301,7 +301,7 @@ function NotificationList({
               width: "100%",
               padding: "14px 16px",
               border: "none",
-              borderBottom: i < visible.length - 1 ? "1px solid #F0F0F0" : "none",
+              borderBottom: i < visible.length - 1 ? "1px solid var(--ws-border)" : "none",
               background: READ_BG,
               cursor: "pointer",
               textAlign: "left",
@@ -317,7 +317,7 @@ function NotificationList({
                   style={{
                     fontSize: 13,
                     fontWeight: unread ? 600 : 500,
-                    color: "#1A1A1A",
+                    color: "var(--ws-text)",
                     letterSpacing: "-0.02em",
                   }}
                 >
@@ -327,7 +327,7 @@ function NotificationList({
               <p
                 style={{
                   fontSize: 12,
-                  color: "#7A7A7A",
+                  color: "var(--ws-text-muted)",
                   letterSpacing: "-0.01em",
                   margin: "0 0 4px 0",
                   lineHeight: 1.45,
@@ -335,7 +335,7 @@ function NotificationList({
               >
                 {n.body}
               </p>
-              <span style={{ fontSize: 11, color: "#9A9A9A", letterSpacing: "-0.01em" }}>
+              <span style={{ fontSize: 11, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>
                 {n.time}
               </span>
             </div>
@@ -349,7 +349,7 @@ function NotificationList({
               style={{
                 background: "none",
                 border: "none",
-                color: "#9A9A9A",
+                color: "var(--ws-text-dim)",
                 fontSize: 18,
                 lineHeight: 1,
                 cursor: "pointer",
@@ -401,15 +401,15 @@ export function NotificationsPanel({
         minHeight: fullHeight ? 420 : undefined,
       }}
     >
-      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid #F0F0F0", flexShrink: 0 }}>
+      <div style={{ padding: "14px 16px 12px", borderBottom: "1px solid var(--ws-border)", flexShrink: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
           <div>
             {!fullHeight ? (
               <>
-                <h2 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: 0 }}>
                   {lang === "fr" ? "Notifications" : "Notifications"}
                 </h2>
-                <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: "2px 0 0" }}>
+                <p style={{ fontSize: 12, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: "2px 0 0" }}>
                   {unreadCount > 0
                     ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
                     : lang === "fr"
@@ -418,7 +418,7 @@ export function NotificationsPanel({
                 </p>
               </>
             ) : (
-              <p style={{ fontSize: 12, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0 }}>
+              <p style={{ fontSize: 12, color: "var(--ws-text-muted)", letterSpacing: "-0.01em", margin: 0 }}>
                 {unreadCount > 0
                   ? `${unreadCount} ${lang === "fr" ? "non lues" : "unread"}`
                   : lang === "fr"
@@ -435,13 +435,13 @@ export function NotificationsPanel({
                 style={{
                   padding: "5px 10px",
                   borderRadius: 7,
-                  border: "1px solid #E5E5E5",
-                  background: "#FFFFFF",
+                  border: "1px solid var(--ws-border)",
+                  background: "var(--ws-surface)",
                   fontSize: 11,
                   fontWeight: 500,
                   fontFamily: "inherit",
                   cursor: "pointer",
-                  color: "#1A1A1A",
+                  color: "var(--ws-text)",
                   letterSpacing: "-0.01em",
                 }}
               >
@@ -455,13 +455,13 @@ export function NotificationsPanel({
                 style={{
                   padding: "5px 10px",
                   borderRadius: 7,
-                  border: "1px solid #FECACA",
-                  background: "#FEF2F2",
+                  border: "1px solid rgba(239,68,68,0.35)",
+                  background: "rgba(239,68,68,0.08)",
                   fontSize: 11,
                   fontWeight: 500,
                   fontFamily: "inherit",
                   cursor: "pointer",
-                  color: "#DC2626",
+                  color: "var(--ws-danger)",
                   letterSpacing: "-0.01em",
                 }}
               >
@@ -484,8 +484,8 @@ export function NotificationsPanel({
                 fontFamily: "inherit",
                 fontWeight: filter === tab ? 500 : 400,
                 cursor: "pointer",
-                background: filter === tab ? "#1A1A1A" : "#F5F5F5",
-                color: filter === tab ? "#FFFFFF" : "#7A7A7A",
+                background: filter === tab ? "var(--ws-btn)" : "var(--ws-pill)",
+                color: filter === tab ? "var(--ws-btn-text)" : "var(--ws-text-muted)",
                 letterSpacing: "-0.02em",
               }}
             >

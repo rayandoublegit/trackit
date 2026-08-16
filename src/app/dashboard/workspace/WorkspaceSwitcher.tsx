@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { setWorkspaceClientIdentity, supabase } from "@/lib/supabase";
+import { setWorkspaceClientIdentity } from "@/lib/supabase";
+import { uploadWorkspaceMark } from "@/lib/workspace-avatar";
 import {
   rememberClientBrandSpace,
 } from "@/lib/brand-workspace";
@@ -10,7 +11,7 @@ import {
   consumeWorkspaceSwitchFlag,
   dismissWorkspaceSwitchVeil,
 } from "@/lib/workspace-switch";
-import type { BrandWorkspace } from "@/lib/workspaces";
+import { applyDashboardTabTitle, type BrandWorkspace } from "@/lib/workspaces";
 import { WsIcon } from "./WorkspaceIcons";
 
 type WorkspaceSwitcherProps = {
@@ -107,10 +108,16 @@ export function WorkspaceSwitcher({
       id: ownerId,
       owner_id: ownerId,
       name: fallbackName,
-      avatar_url: fallbackAvatarUrl || null,
+      avatar_url: null,
     } satisfies BrandWorkspace);
 
   const mark = String(active.name || fallbackName || "W").slice(0, 1).toUpperCase();
+
+  useEffect(() => {
+    const found = workspaces.find((w) => w.id === activeId);
+    if (found?.name?.trim()) applyDashboardTabTitle(found.name);
+    else if (!loading && workspaces.length === 0) applyDashboardTabTitle("Dashboard");
+  }, [activeId, loading, workspaces]);
 
   const requestSwitch = (ws: BrandWorkspace) => {
     if (ws.id === activeId) {
@@ -136,19 +143,6 @@ export function WorkspaceSwitcher({
     });
   };
 
-  const uploadAvatar = async (workspaceId: string, file: File): Promise<string | null> => {
-    if (!supabase) return null;
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-    // Storage RLS requires first path segment = auth.uid()
-    const path = `${ownerId}/workspaces/${workspaceId}/avatar.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
-    if (uploadError) return null;
-    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-    return pub?.publicUrl ? `${pub.publicUrl}?t=${Date.now()}` : null;
-  };
-
   const createWorkspace = async () => {
     const trimmed = name.trim();
     if (!trimmed || saving) return;
@@ -172,17 +166,10 @@ export function WorkspaceSwitcher({
         return;
       }
 
-      let avatarUrl: string | null = null;
+      let avatarUrl: string | null = data.workspace.avatar_url;
       if (avatarFile) {
-        avatarUrl = await uploadAvatar(data.workspace.id, avatarFile);
-        if (avatarUrl) {
-          await fetch(`/api/workspaces/${data.workspace.id}`, {
-            method: "PATCH",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ avatarUrl }),
-          });
-        }
+        const uploaded = await uploadWorkspaceMark(data.workspace.id, avatarFile);
+        if (uploaded.ok) avatarUrl = uploaded.workspace.avatar_url;
       }
 
       setCreateOpen(false);

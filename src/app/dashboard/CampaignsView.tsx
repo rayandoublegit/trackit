@@ -1912,7 +1912,7 @@ function CampaignUpgradeModal({
 
 function CampaignsLoadingState({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
   return (
-    <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
+    <div style={{ padding: isMobile ? "16px 16px 16px" : "24px 40px 40px" }}>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
         {Array.from({ length: 4 }).map((_, index) => (
           <div
@@ -2011,7 +2011,7 @@ function CampaignsBoard({
   onOpenCampaign: (id: string) => void;
   onDeleteAll: () => void;
 }) {
-  const pad = isMobile ? "56px 16px 24px" : "40px 40px 48px";
+  const pad = isMobile ? "16px 16px 24px" : "40px 40px 48px";
 
   const tabCounts = useMemo(
     () => ({
@@ -2287,7 +2287,7 @@ function CampaignsBoard({
 
 function CampaignsHeader({ lang, onNew, showFilters, showNewButton = true, isMobile }: { lang: "en" | "fr"; onNew: () => void; showFilters?: boolean; showNewButton?: boolean; isMobile?: boolean }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
+    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Campagnes" : "Campaigns"}</h1>
         {showNewButton && (
@@ -2525,7 +2525,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
   const salesTrendSub = formatSalesTrendSub(kpiStats.salesTrend, lang);
 
   return (
-    <div style={{ padding: isMobile ? "56px 16px 16px" : "24px 40px 40px" }}>
+    <div style={{ padding: isMobile ? "16px 16px 16px" : "24px 40px 40px" }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 20 }}>
         <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
         <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "8px 12px" }}>
@@ -3332,7 +3332,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
     { id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics" },
   ];
 
-  const headerPad = isMobile ? "56px 16px 0" : "40px 40px 0";
+  const headerPad = isMobile ? "16px 16px 0" : "40px 40px 0";
   const creatorCount = analytics?.creatorCount ?? campaign.creators ?? campaign.creatorIds?.length ?? 0;
   const totals = analytics?.totals ?? { sales: campaign.sales ?? 0, commission: campaign.commission ?? 0 };
   const avgPerCreator = creatorCount > 0 ? totals.sales / creatorCount : 0;
@@ -5283,7 +5283,7 @@ function NewCampaignOnboarding({
         ? "Annuler"
         : "Cancel";
 
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const pagePad = isMobile ? "16px 16px 40px" : "48px 64px 64px";
   const contentMax = 720;
 
   const listsLabel =

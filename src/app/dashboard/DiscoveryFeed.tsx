@@ -6,7 +6,6 @@ import {
   getDailyDiscoveryLimit,
   getResultsPerSearchLimit,
   hasDiscoveryDailyCap,
-  FREE_LIFETIME_DISCOVERIES,
 } from "@/lib/plan-limits";
 import {
   discoveryResetRemainingMs,
@@ -34,6 +33,7 @@ import {
   loadHiddenCreators,
 } from "@/lib/hidden-creators-storage";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import { UpgradeModal } from "./UpgradeModal";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -862,89 +862,6 @@ function FeedListRow({
   );
 }
 
-function FreeDiscoveryBanner({
-  lang,
-  used,
-  limit,
-  allNichesBrowse,
-  onUpgrade,
-}: {
-  lang: "en" | "fr";
-  used: number;
-  limit: number;
-  allNichesBrowse: boolean;
-  onUpgrade: () => void;
-}) {
-  const t = discoveryCopy(lang);
-  const remaining = Math.max(0, limit - used);
-  return (
-    <div
-      style={{
-        marginBottom: 16,
-        padding: "14px 16px",
-        borderRadius: 14,
-        border: "1px solid var(--ws-border)",
-        background: "var(--ws-surface-2)",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 14,
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: "var(--ws-accent)",
-              background: "var(--ws-accent-soft)",
-              padding: "3px 8px",
-              borderRadius: 999,
-            }}
-          >
-            {t.discoveriesRemainingLifetime(used, limit)}
-          </span>
-          {remaining > 0 ? (
-            <span style={{ fontSize: 11, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>
-              {lang === "fr" ? `${remaining} restante${remaining > 1 ? "s" : ""}` : `${remaining} left`}
-            </span>
-          ) : null}
-        </div>
-        <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", lineHeight: 1.35 }}>
-          {t.freeDiscoveryBannerTitle}
-        </p>
-        <p style={{ margin: 0, fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
-          {allNichesBrowse ? t.freeDiscoveryBannerBrowse : t.freeDiscoveryBannerBody}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onUpgrade}
-        style={{
-          flexShrink: 0,
-          border: "1px solid var(--ws-border)",
-          background: "var(--ws-surface)",
-          color: "var(--ws-accent)",
-          borderRadius: 10,
-          padding: "8px 12px",
-          fontSize: 12,
-          fontWeight: 600,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          letterSpacing: "-0.01em",
-          whiteSpace: "nowrap",
-        }}
-      >
-        {lang === "fr" ? "Voir les plans →" : "See plans →"}
-      </button>
-    </div>
-  );
-}
-
 function UpgradeCtaButton({ lang, onClick, fullWidth }: { lang: "en" | "fr"; onClick: () => void; fullWidth?: boolean }) {
   const t = discoveryCopy(lang);
   return (
@@ -1095,6 +1012,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterPaywall, setFilterPaywall] = useState(false);
+  const [gatePaywall, setGatePaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
   const [discoveriesResetAt, setDiscoveriesResetAt] = useState<Date | null>(null);
   const [discoveriesUsed, setDiscoveriesUsed] = useState(0);
@@ -1579,16 +1497,6 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             </div>
           </div>
 
-          {!isPaid && !discoveryGateActive && (
-            <FreeDiscoveryBanner
-              lang={lang}
-              used={discoveriesUsed}
-              limit={discoveryLimit ?? FREE_LIFETIME_DISCOVERIES}
-              allNichesBrowse={allNichesBrowse}
-              onUpgrade={onUpgrade}
-            />
-          )}
-
           {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
           {!loading && !error && isCreatorSearchMiss && (
             <div
@@ -1677,7 +1585,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             </div>
 
             {feedGateActive && (
-              <FeedGateOverlay lang={lang} onUpgrade={onUpgrade} />
+              <FeedGateOverlay lang={lang} onUpgrade={() => setGatePaywall(true)} />
             )}
           </div>
 
@@ -1690,12 +1598,21 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       </div>
 
       {filterPaywall && (
-        <PaywallModal
+        <UpgradeModal
           lang={lang}
+          currentPlan={plan}
           title={t.filterPaywallTitle}
-          body={t.filterPaywallBody}
-          onUpgrade={onUpgrade}
+          description={t.filterPaywallBody}
           onClose={() => setFilterPaywall(false)}
+        />
+      )}
+      {gatePaywall && (
+        <UpgradeModal
+          lang={lang}
+          currentPlan={plan}
+          title={t.paywallTitle}
+          description={t.paywallBody}
+          onClose={() => setGatePaywall(false)}
         />
       )}
 

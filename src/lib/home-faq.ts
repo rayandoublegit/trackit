@@ -4,7 +4,7 @@ export const HOME_FAQ_EN: FaqItem[] = [
   {
     question: "What is Trackit?",
     answer:
-      "Trackit is a creator marketing platform for e-commerce brands. It helps you discover TikTok creators, send outreach, track affiliate sales on Shopify, manage campaigns, and pay commissions — all from one dashboard at thentrack.it.",
+      "Trackit is the Workspace for creator affiliation. Discover creators, send outreach, share content, track Trackit affiliate links on Shopify, and pay commissions — all in one place.",
   },
   {
     question: "Who is Trackit built for?",
@@ -37,7 +37,7 @@ export const HOME_FAQ_FR: FaqItem[] = [
   {
     question: "Qu'est-ce que Trackit ?",
     answer:
-      "Trackit est une plateforme de marketing créateurs pour les marques e-commerce. Elle permet de découvrir des créateurs TikTok, faire de l'outreach, suivre les ventes affiliées sur Shopify, gérer les campagnes et payer les commissions — le tout depuis un seul tableau de bord sur thentrack.it.",
+      "Trackit est le Workspace de l'affiliation créateurs. Découvrez des créateurs, envoyez de l'outreach, partagez vos contenus, suivez les liens d'affiliation Trackit sur Shopify et payez les commissions — le tout au même endroit.",
   },
   {
     question: "À qui s'adresse Trackit ?",

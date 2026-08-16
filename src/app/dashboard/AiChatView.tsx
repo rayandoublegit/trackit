@@ -17,6 +17,7 @@ import {
   type MinoChat,
   type MinoChatMessage,
 } from "@/lib/mino-chats-storage";
+import { MinoCompanion } from "@/components/MinoCompanion";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
 type AiCommand =
@@ -524,16 +525,24 @@ export function AiChatView({
             </div>
           ) : null}
           {chatMode ? (
-            <p className="ai-chat-head__sub">{fr ? "Chat avec Mino" : "Chat with Mino"}</p>
+            <p className="ai-chat-head__sub">
+              <MinoCompanion size={16} motion="soft" />
+              {fr ? "Chat avec Mino" : "Chat with Mino"}
+            </p>
           ) : null}
         </div>
 
         {!chatMode ? (
-          <h1 className="ai-hero__title">
-            {fr
-              ? `Que veux-tu demander à l’IA aujourd’hui, ${firstName} ?`
-              : `What do you want to ask AI today, ${firstName}?`}
-          </h1>
+          <>
+            <div className="ai-hero__mino">
+              <MinoCompanion size={52} />
+            </div>
+            <h1 className="ai-hero__title">
+              {fr
+                ? `Que veux-tu demander à Mino aujourd’hui, ${firstName} ?`
+                : `What do you want to ask Mino today, ${firstName}?`}
+            </h1>
+          </>
         ) : null}
 
         {chatMode && messages.length > 0 ? (

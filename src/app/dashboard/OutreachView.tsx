@@ -1239,6 +1239,7 @@ export function OutreachHistorySection({
   onUpgradeScale,
   isMobile,
   refreshKey = 0,
+  userId,
 }: {
   plan: PlanTier;
   onNavigateToBilling: () => void;
@@ -1247,6 +1248,7 @@ export function OutreachHistorySection({
   onUpgradeScale?: () => void;
   isMobile?: boolean;
   refreshKey?: number;
+  userId?: string;
 }) {
   const lang = useLang();
   const [entries, setEntries] = useState<OutreachHistoryEntry[]>([]);
@@ -1276,6 +1278,12 @@ export function OutreachHistorySection({
   }, [toast]);
 
   const loadHistory = useCallback(async () => {
+    if (userId) {
+      const local = loadStoredOutreachHistory(userId);
+      setEntries(local.map((o) => mapOutreachRow(o as Record<string, unknown>)));
+      setSavedCreators([]);
+      return;
+    }
     if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -1388,7 +1396,7 @@ export function OutreachHistorySection({
         };
       })
     );
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     void loadHistory();

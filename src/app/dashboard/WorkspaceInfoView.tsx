@@ -7,7 +7,6 @@ import {
   setAppTimezone,
   type AppTimezone,
 } from "@/lib/locale-preferences";
-import { supabase } from "@/lib/supabase";
 import { beginWorkspaceSwitch } from "@/lib/workspace-switch";
 import {
   getWorkspaceEditId,
@@ -15,6 +14,7 @@ import {
   WORKSPACE_EDIT_EVENT,
 } from "@/lib/workspace-edit";
 import type { BrandWorkspace } from "@/lib/workspaces";
+import { uploadWorkspaceMark, workspaceAvatarOrNull } from "@/lib/workspace-avatar";
 import { useDashboardTheme } from "./DashboardThemeProvider";
 
 const TIMEZONES: AppTimezone[] = [
@@ -70,7 +70,7 @@ export function WorkspaceInfoView({
   const [workspace, setWorkspace] = useState<BrandWorkspace | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [name, setName] = useState(fallbackName);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(fallbackAvatarUrl || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<AppTimezone>(() => getAppTimezone());
@@ -80,7 +80,7 @@ export function WorkspaceInfoView({
   const applyWorkspace = (found: BrandWorkspace) => {
     setWorkspace(found);
     setName((found.name || "").trim() || fallbackName);
-    setAvatarUrl(found.avatar_url);
+    setAvatarUrl(workspaceAvatarOrNull(userId, found.id, found.avatar_url));
     setAvatarFile(null);
     setAvatarPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -98,7 +98,7 @@ export function WorkspaceInfoView({
       id: userId,
       owner_id: userId,
       name: fallbackName,
-      avatar_url: fallbackAvatarUrl || null,
+      avatar_url: null,
     };
     try {
       const res = await fetch("/api/workspaces", { credentials: "include", cache: "no-store" });
@@ -145,29 +145,13 @@ export function WorkspaceInfoView({
     window.addEventListener(WORKSPACE_EDIT_EVENT, onEdit);
     return () => window.removeEventListener(WORKSPACE_EDIT_EVENT, onEdit);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, fallbackName, fallbackAvatarUrl]);
+  }, [userId]);
 
   useEffect(() => {
     return () => {
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     };
   }, [avatarPreview]);
-
-  const uploadAvatar = async (workspaceId: string, file: File): Promise<string | null> => {
-    if (!supabase) return null;
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-    // Storage RLS requires first path segment = auth.uid()
-    const path = `${userId}/workspaces/${workspaceId}/avatar.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
-    if (uploadError) {
-      console.error("[workspace avatar]", uploadError.message);
-      return null;
-    }
-    const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
-    return pub?.publicUrl ? `${pub.publicUrl}?t=${Date.now()}` : null;
-  };
 
   const save = async () => {
     if (!workspace || saving) return;
@@ -179,25 +163,44 @@ export function WorkspaceInfoView({
     setSaving(true);
     setMessage(null);
     try {
-      let nextAvatar = avatarUrl;
+      let saved = workspace;
       if (avatarFile) {
-        const uploaded = await uploadAvatar(workspace.id, avatarFile);
-        if (!uploaded) {
+        const uploaded = await uploadWorkspaceMark(workspace.id, avatarFile);
+        if (!uploaded.ok) {
           setMessage({
-            text: fr ? "Impossible d’uploader la photo." : "Couldn’t upload the picture.",
+            text: uploaded.error || (fr ? "Impossible d’uploader la photo." : "Couldn’t upload the picture."),
             type: "error",
           });
           setSaving(false);
           return;
         }
-        nextAvatar = uploaded;
+        saved = { ...saved, ...uploaded.workspace };
+      } else if (avatarUrl === null && workspace.avatar_url) {
+        const cleared = await fetch(`/api/workspaces/${workspace.id}/avatar`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        const clearedData = (await cleared.json().catch(() => ({}))) as {
+          ok?: boolean;
+          error?: string;
+          workspace?: BrandWorkspace;
+        };
+        if (!cleared.ok || !clearedData.ok || !clearedData.workspace) {
+          setMessage({
+            text: clearedData.error || (fr ? "Enregistrement impossible." : "Couldn’t save."),
+            type: "error",
+          });
+          setSaving(false);
+          return;
+        }
+        saved = clearedData.workspace;
       }
 
       const res = await fetch(`/api/workspaces/${workspace.id}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed, avatarUrl: nextAvatar }),
+        body: JSON.stringify({ name: trimmed }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
@@ -213,7 +216,10 @@ export function WorkspaceInfoView({
         return;
       }
 
-      applyWorkspace(data.workspace);
+      applyWorkspace({
+        ...data.workspace,
+        avatar_url: avatarFile || avatarUrl === null ? saved.avatar_url : data.workspace.avatar_url,
+      });
       setAppTimezone(timezone);
       try {
         localStorage.setItem(
@@ -268,7 +274,7 @@ export function WorkspaceInfoView({
   }
 
   return (
-    <div className="ws-page" style={{ padding: isMobile ? "56px 16px 40px" : "40px 40px 56px", maxWidth: 720 }}>
+    <div className="ws-page" style={{ padding: isMobile ? "16px 16px 40px" : "40px 40px 56px", maxWidth: 720 }}>
       <h1 style={{ margin: 0, fontSize: 28, fontWeight: 650, letterSpacing: "-0.03em", color: text }}>
         {fr ? "Infos du workspace" : "Workspace info"}
       </h1>

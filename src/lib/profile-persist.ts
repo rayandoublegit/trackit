@@ -6,6 +6,7 @@ import {
   normalizeProfileUsername,
 } from "@/lib/profile-username";
 import { toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
+import { isWorkspaceMarkPath, avatarStoragePath } from "@/lib/workspace-avatar";
 
 export type ProfileSaveInput = {
   full_name?: string;
@@ -64,10 +65,14 @@ export async function saveUserProfile(
   if (input.avatar_url === null) {
     update.avatar_url = null;
   } else if (typeof input.avatar_url === "string") {
-    update.avatar_url =
-      toPersistableAvatarUrl(admin, userId, input.avatar_url) ??
-      input.avatar_url.split("?")[0] ??
-      input.avatar_url;
+    if (isWorkspaceMarkPath(avatarStoragePath(input.avatar_url))) {
+      // Workspace marks are stored separately — never write them onto the account.
+    } else {
+      update.avatar_url =
+        toPersistableAvatarUrl(admin, userId, input.avatar_url) ??
+        input.avatar_url.split("?")[0] ??
+        input.avatar_url;
+    }
   }
 
   if (input.username !== undefined) {

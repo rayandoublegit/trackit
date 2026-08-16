@@ -1,187 +1,22 @@
 "use client";
 
-import { Instrument_Serif } from "next/font/google";
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useLang } from "@/lib/useLang";
-import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
-import { HeroBadgeLaurel } from "@/components/HeroBadgeLaurel";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
-import { applyAppLocale } from "@/lib/locale-preferences";
-import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, getPlanCardDescription, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
+import { MinoCompanion } from "@/components/MinoCompanion";
+import { HeroPreviewShell } from "@/app/hero-preview/HeroPreviewShell";
+import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade, upgradeToPlanTier } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
-import { getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
-import { PricingFeatureList } from "@/components/PricingFeatureList";
+import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
 import { SocialFooterLinks } from "@/components/SocialFooterLinks";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
 import type { BillingInterval } from "@/lib/stripe-billing";
 
-const instrumentSerif = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: "italic",
-});
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
-
-function useInViewOnce<T extends HTMLElement>(threshold = 0.35) {
-  const ref = useRef<T>(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold, rootMargin: "0px 0px -20px 0px" },
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold]);
-
-  return { ref, inView };
-}
-
-function ProcessTypewriter({ text, style }: { text: string; style?: CSSProperties }) {
-  const reduced = usePrefersReducedMotion();
-  const { ref, inView } = useInViewOnce<HTMLSpanElement>();
-  const [displayed, setDisplayed] = useState(reduced ? text : "");
-  const [done, setDone] = useState(reduced);
-
-  useEffect(() => {
-    if (!inView) return;
-    if (reduced) {
-      setDisplayed(text);
-      setDone(true);
-      return;
-    }
-
-    let index = 0;
-    setDisplayed("");
-    setDone(false);
-
-    const interval = window.setInterval(() => {
-      index += 1;
-      setDisplayed(text.slice(0, index));
-      if (index >= text.length) {
-        window.clearInterval(interval);
-        setDone(true);
-      }
-    }, 58);
-
-    return () => window.clearInterval(interval);
-  }, [inView, reduced, text]);
-
-  return (
-    <span ref={ref} style={style} aria-label={text}>
-      {displayed}
-      {!done && !reduced ? <span className="process-typewriter-cursor" aria-hidden>|</span> : null}
-    </span>
-  );
-}
-
-function ProcessCountUp({ target, className }: { target: number; className?: string }) {
-  const reduced = usePrefersReducedMotion();
-  const { ref, inView } = useInViewOnce<HTMLDivElement>();
-  const [value, setValue] = useState(reduced ? target : 0);
-
-  useEffect(() => {
-    if (!inView) return;
-    if (reduced) {
-      setValue(target);
-      return;
-    }
-
-    const duration = 720;
-    const start = performance.now();
-    let raf = 0;
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - start) / duration);
-      const eased = 1 - (1 - progress) ** 3;
-      setValue(Math.round(eased * target));
-      if (progress < 1) raf = requestAnimationFrame(tick);
-      else setValue(target);
-    };
-
-    setValue(0);
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, reduced, target]);
-
-  return (
-    <div ref={ref} className={className} aria-label={String(target)}>
-      {value}
-    </div>
-  );
-}
-
-function HeroTrustedTicker({ lang }: { lang: "en" | "fr" }) {
-  const [lineIndex, setLineIndex] = useState(0);
-
-  useEffect(() => {
-    const holdMs = 3600;
-    const animMs = 700;
-    const id = window.setInterval(() => {
-      setLineIndex((i) => (i + 1) % 2);
-    }, holdMs + animMs);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const prefix = lang === "fr" ? "Fait confiance par plus de " : "Trusted by ";
-  const lines =
-    lang === "fr"
-      ? ["1k+ boutiques Shopify", "500+ fondateurs SaaS"]
-      : ["1k+ Shopify stores", "500+ SaaS owners"];
-  return (
-    <p className="hero-trusted fade-up fade-up-delay-5">
-      <span className="hero-trusted-inner">
-        <span className="hero-trusted-prefix">{prefix}</span>
-        <span className="hero-trusted-slot" data-active={lineIndex} aria-live="polite">
-          <span className="hero-trusted-line hero-trusted-line--shopify">{lines[0]}</span>
-          <span className="hero-trusted-line hero-trusted-line--saas">{lines[1]}</span>
-          <span className="hero-trusted-sizer" aria-hidden>
-            {lines.map((line) => (
-              <span key={line}>{line}</span>
-            ))}
-          </span>
-        </span>
-      </span>
-      <span className="hero-trusted-logo-wrap" data-stripe={lineIndex === 1 ? "true" : undefined} aria-hidden>
-        <img
-          src="/shopify-logo.svg"
-          alt=""
-          className={`hero-trusted-logo hero-trusted-logo--shopify${lineIndex === 0 ? " is-visible" : ""}`}
-        />
-        <img
-          src="/stripe-logo.svg"
-          alt=""
-          className={`hero-trusted-logo hero-trusted-logo--stripe${lineIndex === 1 ? " is-visible" : ""}`}
-        />
-      </span>
-    </p>
-  );
-}
+export { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
 
 function highlightFeatureTerm(text: string, term: string) {
   const parts = text.split(term);
@@ -194,66 +29,6 @@ function highlightFeatureTerm(text: string, term: string) {
   ));
 }
 
-type CommissionPayout = {
-  dayLabel: string;
-  dateLabel: string;
-  creator: string;
-  amount: number;
-  badge: string;
-  theme: "coral" | "pink" | "blue" | "green";
-  tilt?: boolean;
-};
-
-function ProcessCommissionStack({ lang }: { lang: "en" | "fr" }) {
-  const paidToCreator =
-    lang === "fr" ? "Vous avez payé" : "You paid";
-  const toThisCreator =
-    lang === "fr" ? "à ce créateur" : "to this creator";
-
-  const payouts: CommissionPayout[] =
-    lang === "fr"
-      ? [
-          { dayLabel: "PAYÉ, LUN", dateLabel: "18 OCT", creator: "@emma_style", amount: 248, badge: "Payé", theme: "coral" },
-          { dayLabel: "PAYÉ, MAR", dateLabel: "15 OCT", creator: "@marc.fit", amount: 124, badge: "Payé", theme: "pink", tilt: true },
-          { dayLabel: "PAYÉ, MER", dateLabel: "12 OCT", creator: "@lea.beauty", amount: 318, badge: "Payé", theme: "blue" },
-        ]
-      : [
-          { dayLabel: "PAID, MON", dateLabel: "18 OCT", creator: "@emma_style", amount: 248, badge: "Paid", theme: "coral" },
-          { dayLabel: "PAID, TUE", dateLabel: "15 OCT", creator: "@marc.fit", amount: 124, badge: "Paid", theme: "pink", tilt: true },
-          { dayLabel: "PAID, WED", dateLabel: "12 OCT", creator: "@lea.beauty", amount: 318, badge: "Paid", theme: "blue" },
-        ];
-
-  return (
-    <div className="commission-stack" aria-hidden>
-      {payouts.map((payout, index) => (
-        <article
-          key={payout.creator}
-          className={`commission-sheet commission-sheet--${payout.theme}${payout.tilt ? " commission-sheet--tilt" : ""}`}
-          style={{ zIndex: index + 1 }}
-        >
-          <div className="commission-sheet__header">
-            <span className="commission-sheet__day">{payout.dayLabel}</span>
-            <span className="commission-sheet__date">{payout.dateLabel}</span>
-          </div>
-          <div className="commission-sheet__divider" aria-hidden />
-          <div className="commission-sheet__event">
-            <span className="commission-sheet__accent" aria-hidden />
-            <div className="commission-sheet__copy">
-              <p className="commission-sheet__creator">{payout.creator}</p>
-              <p className="commission-sheet__payment">
-                {paidToCreator}{" "}
-                <strong>{formatPricingAmount(payout.amount, lang)}</strong>{" "}
-                {toThisCreator}
-              </p>
-            </div>
-            <span className="commission-sheet__badge">{payout.badge}</span>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
 type LandingPaidTier = "growth" | "pro" | "scale";
 
 const LANDING_TO_PAID: Record<LandingPaidTier, PaidTier> = {
@@ -263,43 +38,94 @@ const LANDING_TO_PAID: Record<LandingPaidTier, PaidTier> = {
 };
 
 const disabledPricingCtaStyle: CSSProperties = {
-  background: "#FFFFFF",
-  color: "#1A1A1A",
-  border: "1px solid transparent",
+  background: "#E8E8E8",
+  color: "#8A8A8A",
+  border: "none",
   boxShadow: "none",
   cursor: "default",
   transform: "none",
   transition: "none",
 };
 
-function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
-  const prefix = lang === "fr" ? "Des tarifs simples. Sans" : "Simple pricing. No";
+function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): string {
+  const fr = lang === "fr";
+  const leadingNumber = item.value.match(/^(\d+)/)?.[1];
 
+  switch (item.id) {
+    case "discoveries":
+      if (/illimit/i.test(item.value)) return fr ? "Découvertes illimitées" : "Unlimited discoveries";
+      if (leadingNumber) return fr ? `${leadingNumber} Découvertes / mois` : `${leadingNumber} Discoveries / month`;
+      return item.label;
+    case "campaigns":
+      if (/illimit/i.test(item.value)) return fr ? "Campagnes illimitées" : "Unlimited campaigns";
+      if (leadingNumber) return fr ? `${leadingNumber} campagnes actives` : `${leadingNumber} active campaigns`;
+      return item.label;
+    case "shopify":
+      if (leadingNumber === "1") return fr ? "1 boutique Shopify connectée" : "1 connected Shopify store";
+      if (leadingNumber) return fr ? `${leadingNumber} boutiques Shopify` : `${leadingNumber} Shopify stores`;
+      return item.label;
+    case "affiliate":
+      return fr ? "Liens d'affiliation trackés (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
+    case "commissions":
+      return fr ? "Calcul automatique des commissions" : "Automatic commission calculation";
+    case "templates":
+      return fr ? "Modèles et historique d'outreach" : "Outreach templates and history";
+    case "payout":
+      if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
+      return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
+    case "includes-starter":
+      return fr ? "Tout Starter, plus" : "Everything in Starter, plus";
+    case "includes-pro":
+      return fr ? "Tout Pro, plus" : "Everything in Pro, plus";
+    case "ai":
+      return fr ? "Outreach IA illimité" : "Unlimited AI outreach";
+    case "creator-dashboard":
+      return fr ? "Dashboard dédié à vos créateurs" : "Dedicated dashboard for your creators";
+    case "creator-content":
+      return fr ? "Upload de contenus et stats de performance" : "Content upload and performance stats";
+    case "automation":
+      return fr ? "Scripts et briefs inclus" : "Scripts and briefs included";
+    case "support":
+      return fr ? "Support dédié, réponse prioritaire" : "Dedicated support, priority response";
+    default:
+      if (!item.value.trim()) return item.label;
+      if (leadingNumber) return `${leadingNumber} ${item.label}`;
+      return item.value;
+  }
+}
+
+function BentoFeatures({ features, lang }: { features: PricingHighlight[]; lang: "en" | "fr" }) {
+  return (
+    <ul className="pb-features">
+      {features.map((item) => (
+        <li key={item.id}>{formatBentoFeatureLine(item, lang)}</li>
+      ))}
+    </ul>
+  );
+}
+
+function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
   return (
     <>
-      {prefix}{" "}
-      <span className="pricing-title-end">
-        {lang === "fr" ? "surprises." : "surprises"}
-        <span className="pricing-title-sparkle" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </span>
+      <span className="section-title-line">
+        {lang === "fr" ? "Le prix d'un outil," : "The price of a tool,"}
       </span>
-      {lang === "en" ? "." : null}
+      <span className="section-title-line">
+        {lang === "fr" ? (
+          <>
+            le résultat d'une <span className="pricing-ai-word">agence</span>.
+          </>
+        ) : (
+          <>
+            the output of an <span className="pricing-ai-word">agency</span>.
+          </>
+        )}
+      </span>
     </>
   );
 }
 
 export default function TrackitLanding() {
-  const heroDoodleRef = useRef<HTMLImageElement>(null);
-  const heroCursorRef = useRef<HTMLImageElement>(null);
-  const heroMoneyRef = useRef<HTMLImageElement>(null);
   const [basicAnnual, setBasicAnnual] = useState(false);
   const [trackitAnnual, setTrackitAnnual] = useState(false);
   const [proAnnual, setProAnnual] = useState(false);
@@ -309,8 +135,6 @@ export default function TrackitLanding() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [payingTier, setPayingTier] = useState<LandingPaidTier | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [langOpen, setLangOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
   const lang = useLang();
 
@@ -337,16 +161,17 @@ export default function TrackitLanding() {
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
   hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatPricingAmount(0, lang)} Manual Bank`,
   hero_bank_line2: lang === "fr" ? "Bancaires Manuels" : "Transfers",
-  section_does_everything: lang === "fr" ? "Trackit fait tout" : "Trackit does everything",
+  section_title_line1: lang === "fr" ? "Gérer tout votre" : "Manage all your",
+  section_title_line2: lang === "fr" ? "affiliation à un seul endroit" : "affiliation in one place",
   section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
-  feat_1_title: lang === "fr" ? "Recherche Intelligente de Créateurs" : "Smart Creator Discovery",
-  feat_1_desc: lang === "fr" ? "Recherchez parmi 250M+ créateurs sur TikTok, Instagram et YouTube. Filtrez par niche, taux d'engagement, abonnés et localisation." : "Search 250M+ creators across TikTok, Instagram, and YouTube. Filter by niche, engagement rate, follower count, and location. Find creators whose audience is exactly your customer.",
-  feat_2_title: lang === "fr" ? "Génération de Messages IA" : "AI Outreach Generation",
-  feat_2_desc: lang === "fr" ? "Arrêtez d'envoyer des DMs copiés-collés. Trackit génère un message personnalisé pour chaque créateur." : "Stop sending generic copy-paste DMs. Trackit generates a personalized outreach message for every creator based on their content style and your product. Higher response rates. Less work.",
-  feat_3_title: lang === "fr" ? "Suivi Automatique des Ventes" : "Automatic Sale Tracking",
-  feat_3_desc: lang === "fr" ? "Chaque créateur reçoit un lien ou un code promo unique. Chaque vente lui est attribuée automatiquement, en temps réel. Plus de tableurs. Plus d'approximations." : "Every creator gets a unique tracking link or discount code. Every sale they drive is attributed automatically in real time. No spreadsheets. No guesswork.",
-  feat_4_title: lang === "fr" ? "Paiement des Commissions en Un Clic" : "One Click Commission Payouts",
-  feat_4_desc: lang === "fr" ? "Voyez exactement ce que chaque créateur a gagné. Cliquez. L'argent va directement sur leur compte." : "See exactly what every creator earned. Hit send. Money goes directly to their account. No bank transfers. No PayPal drama. No spreadsheet math.",
+  feat_1_title: lang === "fr" ? "Découverte de Créateurs" : "Creator Discovery",
+  feat_1_desc: lang === "fr" ? "Trouvez les bons créateurs, invitez-les, et gardez-les dans Trackit. Profils, listes et invitations restent dans le Workspace : plus de recherche éparpillée entre TikTok, Instagram et des tableurs. Un créateur trouvé est un affilié Trackit, pas un onglet de plus." : "Find the right creators, invite them, and keep them in Trackit. Profiles, lists, and invitations stay in the Workspace: no more searching across TikTok, Instagram, and spreadsheets. A creator you find becomes a Trackit affiliate, not another tab.",
+  feat_2_title: lang === "fr" ? "Ask Mino" : "Ask Mino",
+  feat_2_desc: lang === "fr" ? "Ask Mino est l'IA du Workspace Trackit. Posez une question en langage naturel : Mino retrouve un créateur, une campagne, un contenu, un script, un lien d'affiliation ou une conversation. Plus besoin de fouiller cinq outils pour savoir où en est une collab." : "Ask Mino is the AI inside the Trackit Workspace. Ask in plain language: Mino finds a creator, a campaign, a piece of content, a script, an affiliate link, or a conversation. No more digging through five tools to see where a collab stands.",
+  feat_3_title: lang === "fr" ? "Affiliés et Campagnes" : "Affiliates & Campaigns",
+  feat_3_desc: lang === "fr" ? "Campagnes, outreach, inbox, contenus et scripts : tout vit dans Trackit. Envoyez le brief, partagez les contenus de marque, suivez les conversations, et gardez chaque affilié au même endroit. Plus de Drive, plus de tableurs, plus de fils perdus." : "Campaigns, outreach, inbox, content, and scripts all live in Trackit. Send the brief, share brand content, follow conversations, and keep every affiliate in one place. No Drive. No spreadsheets. No lost threads.",
+  feat_4_title: lang === "fr" ? "Suivi et Paiements" : "Track and Pay",
+  feat_4_desc: lang === "fr" ? "Chaque affilié reçoit un lien d'affiliation Trackit. Chaque vente est attribuée automatiquement, en temps réel. Voyez ce qui est dû, payez les commissions, et gardez le suivi dans le Workspace — sans tableur, sans virement manuel." : "Every affiliate gets a Trackit affiliate link. Every sale is attributed automatically, in real time. See what's owed, pay commissions, and keep tracking in the Workspace — no spreadsheet, no manual bank transfer.",
   process_title: lang === "fr" ? "Processus" : "Process",
   process_sub_line1: lang === "fr" ? "De zéro à votre première" : "From zero to first creator",
   process_sub_line2: lang === "fr" ? "Campagne créateur" : "campaign in",
@@ -383,17 +208,33 @@ export default function TrackitLanding() {
   pricing_year: lang === "fr" ? "par an" : "/year",
   pricing_annually: lang === "fr" ? "Annuel" : "Annually",
   pricing_everything_in_pro: lang === "fr" ? "Tout le plan Pro" : "Everything in Pro",
-  footer_tagline: lang === "fr" ? "Une plateforme créée par des fondateurs e-com pour des fondateurs e-com" : "A Platform made by e-com founders to e-com founders",
-  footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
-  footer_terms: lang === "fr" ? "Conditions générales" : "Terms & Conditions",
-  footer_privacy: lang === "fr" ? "Politique de confidentialité" : "Privacy Policy",
+  footer_social: lang === "fr" ? "Réseaux" : "Social Media",
+  footer_reach: lang === "fr" ? "Contactez-nous" : "Reach out to us",
+  footer_contact_title: lang === "fr" ? "Écrivez-nous par e-mail" : "Contact us by email",
+  footer_contact_sub: lang === "fr" ? "On vous répond sous 24h." : "Our team replies within 24h.",
+  footer_col_features: lang === "fr" ? "Produit" : "Product",
+  footer_col_explore: lang === "fr" ? "Explorer" : "Explore",
+  footer_col_help: lang === "fr" ? "Aide" : "Help",
+  footer_discovery: lang === "fr" ? "Découverte de créateurs" : "Creator Discovery",
+  footer_mino: "Ask Mino",
+  footer_campaigns: lang === "fr" ? "Affiliés et campagnes" : "Affiliates & Campaigns",
+  footer_trackpay: lang === "fr" ? "Suivi et paiements" : "Track and Pay",
+  footer_shopify: lang === "fr" ? "Suivi Shopify" : "Shopify tracking",
+  footer_pricing: lang === "fr" ? "Tarifs" : "Pricing",
+  footer_faq: "FAQ",
+  footer_contact: "Contact",
   footer_blog: lang === "fr" ? "Blog" : "Blog",
   footer_solutions: lang === "fr" ? "Solutions" : "Solutions",
   footer_about: lang === "fr" ? "À propos" : "About",
+  footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
+  footer_terms: lang === "fr" ? "Conditions générales" : "Terms of Service",
+  footer_privacy: lang === "fr" ? "Politique de confidentialité" : "Privacy Policy",
   faq_title: lang === "fr" ? "Questions fréquentes sur Trackit" : "Frequently asked questions about Trackit",
+  faq_title_line1: lang === "fr" ? "Encore une question ?" : "Still have a question?",
+  faq_title_line2: lang === "fr" ? "Voici les réponses." : "Here are the answers.",
   faq_subtitle: lang === "fr"
-    ? "Tout ce que vous devez savoir sur la plateforme Trackit."
-    : "Everything you need to know about the Trackit platform.",
+    ? "Workspace, liens Trackit, Shopify, Ask Mino. Tout ce qu'il faut savoir avant de commencer."
+    : "Workspace, Trackit links, Shopify, Ask Mino. Everything you need before you start.",
   traditional_title: lang === "fr" ? "Plateformes Traditionnelles" : "Traditional Platforms",
   trad_1: lang === "fr" ? "Découverte de créateurs" : "Creator discovery",
   trad_2: lang === "fr" ? "Génération de messages IA" : "AI outreach generation",
@@ -545,17 +386,9 @@ export default function TrackitLanding() {
         style={isCurrent ? disabledPricingCtaStyle : undefined}
       >
         {text}
+        {!isCurrent && !isLoading && !planLoading ? <span aria-hidden> →</span> : null}
       </button>
     );
-  };
-
-  const switchLandingLang = (next: "en" | "fr") => {
-    if (next === lang) {
-      setLangOpen(false);
-      return;
-    }
-    applyAppLocale(next);
-    setLangOpen(false);
   };
 
   useEffect(() => {
@@ -576,333 +409,34 @@ export default function TrackitLanding() {
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    const revealHero = () => {
-      document.querySelectorAll(".hero .fade-up").forEach((el) => {
-        setTimeout(() => el.classList.add("visible"), 100);
-      });
-    };
-    if (document.readyState === "complete") revealHero();
-    else window.addEventListener("load", revealHero);
-    return () => window.removeEventListener("load", revealHero);
-  }, []);
-
-  useEffect(() => {
-    const heroDoodle = heroDoodleRef.current;
-    const heroCursor = heroCursorRef.current;
-    const heroMoney = heroMoneyRef.current;
-
-    const onScroll = () => {
-      const scrollY = window.scrollY;
-      if (heroDoodle) {
-        heroDoodle.style.transform = `rotate(-5deg) translateY(${-scrollY * 0.35}px)`;
-      }
-      if (heroCursor) {
-        heroCursor.style.transform = `translateY(${-scrollY * 0.5}px)`;
-      }
-      if (heroMoney) {
-        heroMoney.style.transform = `rotate(-10deg) translateY(${-scrollY * 0.45}px)`;
-      }
-    };
-
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const icons = Array.from(
-      document.querySelectorAll<HTMLElement>("#features .feature-icon-wrapper"),
-    );
-    if (icons.length === 0) return;
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) {
-      icons.forEach((icon) => {
-        icon.style.transform = "";
-      });
-      return;
-    }
-
-    const updateFeatureIconParallax = () => {
-      const viewportHeight = window.innerHeight;
-
-      icons.forEach((icon, index) => {
-        const rect = icon.getBoundingClientRect();
-        const enterStart = viewportHeight * 0.94;
-        const enterEnd = viewportHeight * 0.5 - index * 12;
-        const range = enterStart - enterEnd;
-        const rawProgress = range <= 0 ? 1 : (enterStart - rect.top) / range;
-        const progress = Math.min(1, Math.max(0, rawProgress));
-        const eased = 1 - (1 - progress) ** 2.4;
-        const offset = (1 - eased) * 36;
-
-        icon.style.transform = `translateY(${offset}px)`;
-      });
-    };
-
-    updateFeatureIconParallax();
-    window.addEventListener("scroll", updateFeatureIconParallax, { passive: true });
-    window.addEventListener("resize", updateFeatureIconParallax, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", updateFeatureIconParallax);
-      window.removeEventListener("resize", updateFeatureIconParallax);
-      icons.forEach((icon) => {
-        icon.style.transform = "";
-      });
-    };
-  }, []);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.lang-dropdown-container')) {
-        setLangOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   return (
-    <main className="relative min-h-screen w-full">
-      {/* NAVBAR */}
-      <nav className="navbar">
-        <Link
-          href="/"
-          className="nav-logo"
-          aria-label="Trackit home"
-          onClick={(e) => {
-            if (window.location.pathname === "/") {
-              e.preventDefault();
-              window.scrollTo({ top: 0, behavior: "smooth" });
-            }
-          }}
-        >
-          <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
-        </Link>
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen((v) => !v)}
-          style={{
-            display: "none",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: 6,
-            marginLeft: "auto",
-          }}
-          className="mobile-menu-btn"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2" strokeLinecap="round">
-            {mobileMenuOpen ? (
-              <>
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </>
-            ) : (
-              <>
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </>
-            )}
-          </svg>
-        </button>
-        <div className="nav-links">
-          <a href="/affiliation">{t.nav_affiliation}</a>
-          <a href="#pricing">{t.nav_pricing}</a>
-          <a href="#process">{t.nav_process}</a>
-          <a href="#features-trackit">Trackit</a>
-        </div>
-        <div className="nav-actions">
-          <div className="lang-dropdown-container">
-            <button
-              type="button"
-              onClick={() => setLangOpen(v => !v)}
-              className="nav-lang-btn"
-              aria-label={lang === "fr" ? "Changer la langue" : "Change language"}
-              aria-expanded={langOpen}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-              </svg>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-            </button>
-
-            {langOpen && (
-              <div className="lang-dropdown-menu">
-                <button
-                  type="button"
-                  onClick={() => switchLandingLang("en")}
-                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, ...selectionCardStyle(lang === "en", { unselectedBackground: "transparent", unselectedBorder: "none" }), border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "en" ? 600 : 400, color: selectionTextPrimary(lang === "en"), fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 8h20M8 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
-                  English
-                  {lang === "en" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => switchLandingLang("fr")}
-                  style={{ width: "100%", padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, ...selectionCardStyle(lang === "fr", { unselectedBackground: "transparent", unselectedBorder: "none" }), border: "none", cursor: "pointer", fontSize: 13, fontWeight: lang === "fr" ? 600 : 400, color: selectionTextPrimary(lang === "fr"), fontFamily: "'InstrumentSans', sans-serif", textAlign: "left" }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 4v16M14 4v16" stroke="currentColor" strokeWidth="1.5"/></svg>
-                  Français
-                  {lang === "fr" && <svg style={{ marginLeft: "auto" }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5"><path d="M20 6L9 17l-5-5"/></svg>}
-                </button>
-              </div>
-            )}
-          </div>
-          <a href="/auth" className="nav-cta">
-            {t.nav_cta}
-          </a>
-        </div>
-      </nav>
-
-      {mobileMenuOpen && (
-        <div
-          className="mobile-nav-menu"
-          style={{
-            position: "fixed",
-            top: 70,
-            left: 12,
-            right: 12,
-            background: "#fff",
-            borderRadius: 16,
-            boxShadow: "0 8px 40px rgba(0, 0, 0, 0.12)",
-            border: "1px solid #EFEFEF",
-            padding: 16,
-            zIndex: 99,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
-          <a href="#features-trackit" onClick={() => setMobileMenuOpen(false)}>
-            Trackit
-          </a>
-          <a href="/affiliation" onClick={() => setMobileMenuOpen(false)}>
-            {t.nav_affiliation}
-          </a>
-          <a href="#pricing" onClick={() => setMobileMenuOpen(false)}>
-            {t.nav_pricing}
-          </a>
-          <a href="#process" onClick={() => setMobileMenuOpen(false)}>
-            {t.nav_process}
-          </a>
-          <div className="mobile-nav-lang-row">
-            <button
-              type="button"
-              className={`mobile-nav-lang${lang === "en" ? " is-active" : ""}`}
-              onClick={() => switchLandingLang("en")}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              className={`mobile-nav-lang${lang === "fr" ? " is-active" : ""}`}
-              onClick={() => switchLandingLang("fr")}
-            >
-              FR
-            </button>
-          </div>
-          <a href="/auth" className="hero-cta mobile-nav-cta" onClick={() => setMobileMenuOpen(false)}>
-            {t.nav_cta}
-          </a>
-        </div>
-      )}
-
-      {/* HERO */}
-      <section className="hero" id="hero">
-        <img
-          ref={heroDoodleRef}
-          src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-          className={lang === "fr" ? "hero-doodle hero-doodle--fr" : "hero-doodle"}
-          alt=""
-        />
-        <img
-          ref={heroMoneyRef}
-          src="https://i.ibb.co/ZznDLJMC/moneytransparent.png"
-          className={lang === "fr" ? "hero-money hero-money--fr" : "hero-money"}
-          alt=""
-        />
-        <img
-          ref={heroCursorRef}
-          src="https://i.ibb.co/G4SvBCXp/cursortransparent.png"
-          className={lang === "fr" ? "hero-cursor hero-cursor--fr" : "hero-cursor"}
-          alt=""
-        />
-        <div className="hero-content">
-          <h1 className="hero-headline">
-          <span className="hero-line-wrap fade-up">{t.hero_title_1}</span>
-          <span className="hero-line-wrap fade-up fade-up-delay-1">{t.hero_title_2}</span>
-          <span className={`hero-line-wrap fade-up fade-up-delay-2${lang === "fr" ? " hero-line-wrap--fr" : ""}`}>{t.hero_title_3}</span>
-          <span
-            className={`hero-italic fade-up fade-up-delay-3 ${instrumentSerif.className}`}
-          >
-            {t.hero_italic}
-          </span>
-        </h1>
-
-        <p className="hero-sub fade-up fade-up-delay-4">
-          {t.hero_sub}
-        </p>
-
-        <a href="/auth" className="hero-cta fade-up fade-up-delay-5">
-          <span className="hero-cta-label hero-cta-label--default">{t.hero_cta}</span>
-          <span className="hero-cta-label hero-cta-label--hover">{t.hero_cta_hover}</span>
-        </a>
-
-        <div className={`hero-badges${lang === "fr" ? " hero-badges--fr" : ""}`}>
-          <div className="badge">
-            <HeroBadgeLaurel side="left" />
-            <span className="badge-text">
-              {t.hero_commission}
-              <br />
-              {t.hero_automated}
-            </span>
-            <HeroBadgeLaurel side="right" />
-          </div>
-          <div className="badge">
-            <HeroBadgeLaurel side="left" />
-            <span className="badge-text">
-              {t.hero_bank_line1}
-              <br />
-              {t.hero_bank_line2}
-            </span>
-            <HeroBadgeLaurel side="right" />
-          </div>
-        </div>
-        <HeroTrustedTicker lang={lang} />
-        </div>
-      </section>
-
+    <main className="relative min-h-screen w-full overflow-x-hidden">
+      <HeroPreviewShell />
       {/* TRACKIT SECTION */}
       <section className="section" id="features">
         <ChaoticWorkSection lang={lang} />
 
-        <div className="tagline fade-up" id="features-trackit">
-          Trackit
-        </div>
         <h2 className="section-title fade-up fade-up-delay-1">
-          <span className="section-title-line">{t.section_does_everything}</span>
-          <span className="section-title-line section-title-line--tight">
+          <span className="section-title-line">{t.section_title_line1}</span>
+          <span className="section-title-line">
             {lang === "fr" ? (
               <>
-                Au même{" "}
-                <span className="section-title-word-tag">
+                affiliation à un seul{" "}
+                <span className="features-title-end">
                   endroit
-                  <span className="section-title-popover">vraiment!!</span>
+                  <span className="features-icon-dock" aria-hidden>
+                    <span className="features-icon-dock__card" />
+                  </span>
                 </span>
-                .
               </>
             ) : (
               <>
-                In one{" "}
-                <span className="section-title-word-tag">
+                affiliation in one{" "}
+                <span className="features-title-end">
                   place
-                  <span className="section-title-popover">really!!</span>
+                  <span className="features-icon-dock" aria-hidden>
+                    <span className="features-icon-dock__card" />
+                  </span>
                 </span>
               </>
             )}
@@ -924,7 +458,7 @@ export default function TrackitLanding() {
         </div>
 
         <div className="features-grid">
-          <div className="feature fade-up">
+          <div className="feature">
             <div className="feature-title">
               <span className="feature-icon-wrapper">
                 <svg
@@ -943,37 +477,21 @@ export default function TrackitLanding() {
               {t.feat_1_title}
             </div>
             <div className="feature-desc">
-              {highlightFeatureTerm(t.feat_1_desc, "250M+")}
+              {highlightFeatureTerm(t.feat_1_desc, "Trackit")}
             </div>
           </div>
-          <div className="feature fade-up fade-up-delay-1">
+          <div className="feature">
             <div className="feature-title">
-              <span className="feature-icon-wrapper">
-                <svg
-                  className="feature-icon"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
+              <span className="feature-icon-wrapper feature-icon-wrapper--mino">
+                <MinoCompanion />
               </span>
               {t.feat_2_title}
             </div>
             <div className="feature-desc">
-              {highlightFeatureTerm(t.feat_2_desc, "Trackit")}
+              {highlightFeatureTerm(t.feat_2_desc, "Mino")}
             </div>
           </div>
-          <div className="feature fade-up fade-up-delay-2">
+          <div className="feature">
             <div className="feature-title">
               <span className="feature-icon-wrapper">
                 <svg
@@ -1021,10 +539,10 @@ export default function TrackitLanding() {
               {t.feat_3_title}
             </div>
             <div className="feature-desc">
-              {highlightFeatureTerm(t.feat_3_desc, lang === "fr" ? "automatiquement" : "automatically")}
+              {highlightFeatureTerm(t.feat_3_desc, lang === "fr" ? "contenus" : "content")}
             </div>
           </div>
-          <div className="feature fade-up fade-up-delay-3">
+          <div className="feature">
             <div className="feature-title">
               <span className="feature-icon-wrapper">
                 <svg
@@ -1054,423 +572,14 @@ export default function TrackitLanding() {
               {t.feat_4_title}
             </div>
             <div className="feature-desc">
-              {highlightFeatureTerm(t.feat_4_desc, lang === "fr" ? "compte" : "account")}
+              {highlightFeatureTerm(t.feat_4_desc, lang === "fr" ? "lien d'affiliation Trackit" : "Trackit affiliate link")}
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PROCESS */}
-      <section className="section" id="process">
-        <div className="tagline fade-up">
-          {t.process_title}
-        </div>
-        <h2 className={`section-title fade-up fade-up-delay-1${lang === "en" ? " process-title--en" : " process-title--fr"}`}>
-          {lang === "fr" ? (
-            <>
-              <span className="process-title-line">{t.process_sub_line1}</span>
-              <span className="process-title-line process-title-line--second">{t.process_sub_line2}</span>
-              <span className="process-title-line process-title-line--third">
-                {t.process_sub_line3}{" "}
-                <span className="process-title-pill">10 minutes.</span>
-              </span>
-            </>
-          ) : (
-            <>
-              <span className="process-title-line">{t.process_sub_line1}</span>
-              <span className="process-title-line process-title-line--tight">
-                {t.process_sub_line2}{" "}
-                <span className="process-title-pill">10 minutes</span>
-              </span>
-            </>
-          )}
-        </h2>
-        <p className="section-sub fade-up fade-up-delay-2">
-          {t.process_sub2}
-        </p>
-
-        <div className="process-grid">
-          <div className="process-card fade-up">
-            <div className="process-mockup">
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '14px',
-                  marginBottom: '12px',
-                  background: 'transparent'
-                }}>
-                  <div style={{
-                    background: '#FFFFFF',
-                    borderRadius: '999px',
-                    padding: '6px 18px',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#000000',
-                    fontFamily: "'InterDisplay', sans-serif",
-                    letterSpacing: '-0.3px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-                  }}>Desktop</div>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#9A9A9A',
-                    fontFamily: "'InterDisplay', sans-serif",
-                    letterSpacing: '-0.3px',
-                    padding: '6px 4px'
-                  }}>Tablet</div>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: 500,
-                    color: '#9A9A9A',
-                    fontFamily: "'InterDisplay', sans-serif",
-                    letterSpacing: '-0.3px',
-                    padding: '6px 4px'
-                  }}>Mobile</div>
-                </div>
-                <div style={{
-                  background: '#FFFFFF',
-                  borderRadius: '14px',
-                  border: '1px solid #E8E8E8',
-                  overflow: 'hidden',
-                  width: '100%',
-                  margin: '0 auto',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-                  maskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
-                  WebkitMaskImage: 'linear-gradient(to bottom, black 35%, transparent 100%)',
-                  transform: 'scale(0.95)',
-                  transformOrigin: 'top center',
-                  marginTop: '40px'
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px 12px',
-                    borderBottom: '1px solid #F0F0F0',
-                    background: '#FAFAFA'
-                  }}>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E0E0E0' }} />
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E0E0E0' }} />
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#E0E0E0' }} />
-                    </div>
-                    <div style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: '#F5F5F5',
-                      border: '1px solid #EEEEEE',
-                      borderRadius: '8px',
-                      padding: '3px 10px'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <svg width="12" height="12" viewBox="0 0 50 57" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M28.3 5.9c0 0-0.7 0.2-1.8 0.5c-0.1-0.4-0.3-0.9-0.6-1.4c-0.9-1.7-2.2-2.6-3.8-2.6c-0.1 0-0.2 0-0.4 0C21.5 2.1 21.2 1.8 20.8 1.6C19.4 0.6 17.7 1 16.3 2.1C12 5.5 10 13 9.4 17.1C7 17.8 5.3 18.4 5.2 18.4C3.8 18.8 3.8 18.9 3.6 20.2C3.5 21.1 0 47.5 0 47.5L33.9 53l7.3-1.8L28.3 5.9z" fill="#95BF47"/>
-                          <path d="M35.1 10.7c-0.7 0-1.5 0.2-1.5 0.2s-0.8-2.5-2.3-3.5c-0.7-0.5-1.5-0.6-2.3-0.4l6.1 44.8l7.3-1.8c0 0-5.9-37.4-6-38.2C36.3 11.1 35.8 10.7 35.1 10.7z" fill="#5E8E3E"/>
-                          <path d="M25.2 19.6l-1.5 5.7c0 0-1.7-0.8-3.7-0.7c-3 0.2-3 2.1-3 2.5c0.2 2.8 7.5 3.4 7.9 10c0.3 5.2-2.7 8.7-7.1 9c-5.3 0.3-7.9-2.8-7.9-2.8l1.1-4.6c0 0 2.7 2 4.8 1.9c1.4-0.1 1.9-1.2 1.9-2c-0.2-3.7-6.2-3.4-6.5-9.5C10.8 23.6 14.7 18 22 17.5C24.9 17.3 25.2 19.6 25.2 19.6z" fill="white"/>
-                        </svg>
-                        <ProcessTypewriter
-                          text="Shopify.com"
-                          style={{
-                            color: "#888",
-                            fontWeight: 400,
-                            fontSize: "11px",
-                            lineHeight: "11px",
-                            letterSpacing: "-0.4px",
-                            fontFamily: "'InterDisplay', sans-serif",
-                          }}
-                        />
-                      </div>
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="9" stroke="#BBB" strokeWidth="1.6"/>
-                        <ellipse cx="12" cy="12" rx="4" ry="9" stroke="#BBB" strokeWidth="1.6"/>
-                        <line x1="3" y1="12" x2="21" y2="12" stroke="#BBB" strokeWidth="1.6"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div style={{ padding: '14px', background: '#FFFFFF' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '1px', marginLeft: '36px' }}>
-                        <svg width="18" height="18" viewBox="0 0 50 57" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '-2px' }}>
-                          <path d="M28.3 5.9c0 0-0.7 0.2-1.8 0.5c-0.1-0.4-0.3-0.9-0.6-1.4c-0.9-1.7-2.2-2.6-3.8-2.6c-0.1 0-0.2 0-0.4 0C21.5 2.1 21.2 1.8 20.8 1.6C19.4 0.6 17.7 1 16.3 2.1C12 5.5 10 13 9.4 17.1C7 17.8 5.3 18.4 5.2 18.4C3.8 18.8 3.8 18.9 3.6 20.2C3.5 21.1 0 47.5 0 47.5L33.9 53l7.3-1.8L28.3 5.9z" fill="#95BF47"/>
-                          <path d="M35.1 10.7c-0.7 0-1.5 0.2-1.5 0.2s-0.8-2.5-2.3-3.5c-0.7-0.5-1.5-0.6-2.3-0.4l6.1 44.8l7.3-1.8c0 0-5.9-37.4-6-38.2C36.3 11.1 35.8 10.7 35.1 10.7z" fill="#5E8E3E"/>
-                          <path d="M25.2 19.6l-1.5 5.7c0 0-1.7-0.8-3.7-0.7c-3 0.2-3 2.1-3 2.5c0.2 2.8 7.5 3.4 7.9 10c0.3 5.2-2.7 8.7-7.1 9c-5.3 0.3-7.9-2.8-7.9-2.8l1.1-4.6c0 0 2.7 2 4.8 1.9c1.4-0.1 1.9-1.2 1.9-2c-0.2-3.7-6.2-3.4-6.5-9.5C10.8 23.6 14.7 18 22 17.5C24.9 17.3 25.2 19.6 25.2 19.6z" fill="white"/>
-                        </svg>
-                        <span style={{
-                          fontWeight: 600,
-                          fontSize: '10px',
-                          lineHeight: '10px',
-                          letterSpacing: '-0.04em',
-                          color: '#1A1A1A',
-                          fontFamily: "'InterDisplay', sans-serif"
-                        }}>Shopify</span>
-                      </div>
-                      <div style={{ width: '40px', height: '14px', background: '#EEE', borderRadius: '20px', marginRight: '12px' }} />
-                    </div>
-                    <div style={{ textAlign: 'center', padding: '12px 0 20px' }}>
-                      <div style={{
-                        fontWeight: 600,
-                        fontSize: '13px',
-                        color: '#000',
-                        lineHeight: '11px',
-                        letterSpacing: '-0.04em',
-                        fontFamily: "'InterDisplay', sans-serif",
-                        marginBottom: '14px'
-                      }}>
-                        {t.process_mock_shopify_line1}<br />{t.process_mock_shopify_line2}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '180px', height: '8px', background: '#EEE', borderRadius: '4px' }} />
-                        <div style={{ width: '140px', height: '8px', background: '#EEE', borderRadius: '4px' }} />
-                        <div style={{ width: '60px', height: '8px', background: '#EEE', borderRadius: '4px', marginTop: '4px' }} />
-                      </div>
-                    </div>
-                    <div style={{ height: '80px', background: '#EEEEEE', borderRadius: '8px' }} />
-                  </div>
-                </div>
-              </div>
-
-            </div>
-            <div className="process-card-footer">
-              <div className="process-card-title">
-                <span className="process-icon" aria-hidden="true">
-                  ⊕
-                </span>
-                {t.process_1}
-              </div>
-              <div className="process-card-desc">{t.process_1_sub}</div>
-            </div>
-          </div>
-
-          <div className="process-card fade-up fade-up-delay-1">
-            <div className="process-mockup">
-              <div className="inf-card">
-                <div className="inf-header">
-                  <div className="inf-title">{t.process_mock_inf_title}</div>
-                  <div className="inf-filters">
-                    <div className="f">1d</div>
-                    <div className="f">7d</div>
-                    <div className="f">1m</div>
-                    <div className="f">6m</div>
-                    <div className="f active">All</div>
-                    <div className="f">📅</div>
-                  </div>
-                </div>
-                <div className="inf-count">
-                  <ProcessCountUp target={24} className="inf-num" />
-                  <img
-                    className="inf-brand"
-                    src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-                    alt="Trackit"
-                  />
-                </div>
-                <div className="inf-btn">{t.process_mock_reach_out}</div>
-                <br />
-                <div className="inf-btn">{t.process_mock_see_profiles}</div>
-              </div>
-            </div>
-            <div className="process-card-footer">
-              <div className="process-card-title">{t.process_2}</div>
-              <div className="process-card-desc">{t.process_2_sub}</div>
-            </div>
-          </div>
-
-          <div className="process-card fade-up fade-up-delay-2">
-            <div className="process-mockup">
-              <div className="outreach-wrap">
-                <div className="outreach-stack">
-                  <div className="outreach-msg outreach-msg-3">
-                    <div className="outreach-logo">
-                      <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
-                    </div>
-                    <div className="outreach-text">{t.process_mock_outreach_3}</div>
-                  </div>
-                  <div className="outreach-msg outreach-msg-2">
-                    <div className="outreach-logo">
-                      <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
-                    </div>
-                    <div className="outreach-text">{t.process_mock_outreach_2}</div>
-                  </div>
-                  <div className="outreach-msg outreach-msg-1">
-                    <div className="outreach-logo">
-                      <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
-                    </div>
-                    <div className="outreach-text">{t.process_mock_outreach_1}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="process-card-footer">
-              <div className="process-card-title">
-                <svg
-                  className="process-icon"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 28 28"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <circle cx="14" cy="14" r="14" fill="black" />
-                  <path
-                    d="M14 6C9.582 6 6 9.328 6 13.444c0 2.16.9 4.1 2.364 5.49V22l2.854-1.41C12.014 20.85 12.99 21 14 21c4.418 0 8-3.328 8-7.556C22 9.328 18.418 6 14 6z"
-                    fill="black"
-                  />
-                  <path
-                    d="M14 6C9.582 6 6 9.328 6 13.444c0 2.16.9 4.1 2.364 5.49V22l2.854-1.41C12.014 20.85 12.99 21 14 21c4.418 0 8-3.328 8-7.556C22 9.328 18.418 6 14 6z"
-                    fill="white"
-                    fillOpacity="0"
-                  />
-                  <path
-                    d="M10 15.5l2.5-2.7 2.3 2.2 3.2-2.5"
-                    stroke="white"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                {t.process_3}
-              </div>
-              <div className="process-card-desc">{t.process_3_sub}</div>
-            </div>
-          </div>
-
-          <div className="process-card fade-up fade-up-delay-3">
-            <div className="process-mockup">
-              <ProcessCommissionStack lang={lang} />
-            </div>
-            <div className="process-card-footer">
-              <div className="process-card-title">
-                <svg
-                  className="process-icon"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <rect x="2" y="2" width="20" height="20" rx="2" fill="black" />
-                  <polyline
-                    points="5,15 9,10 13,13 18,7"
-                    stroke="white"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    fill="none"
-                  />
-                  <polyline
-                    points="5,18 19,18"
-                    stroke="white"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                {t.process_4}
-              </div>
-              <div className="process-card-desc">{t.process_4_sub}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* WHY TRACKIT */}
-      <section className="section" id="why">
-        <div className="why-intro">
-          <div className="tagline fade-up">
-            {t.why_title}
-          </div>
-          <h2 className={`section-title fade-up fade-up-delay-1${lang === "fr" ? " why-section-title--fr" : " why-section-title--en"}`}>
-            {lang === "fr" ? (
-              <>
-                <span className="why-title-line">{t.why_sub_line1}</span>
-                <span className="why-title-line why-title-line--second">{t.why_sub_line2}</span>
-                <span className="why-title-line why-title-line--third">
-                  {t.why_sub2}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="why-title-line">{t.why_sub}</span>
-                <span className="why-title-line why-title-line--second">
-                  {t.why_sub2}
-                </span>
-              </>
-            )}
-          </h2>
-          <p className="section-sub fade-up fade-up-delay-2">
-            {t.why_desc}
-          </p>
-        </div>
-
-        <div className="why-grid">
-          <div className="why-col fade-up fade-up-delay-3">
-            <h3>{t.traditional_title}</h3>
-            <ul className="why-list">
-              {[
-                t.trad_1,
-                t.trad_2,
-                t.trad_3,
-                t.trad_4,
-                t.trad_5,
-                t.trad_6,
-                t.trad_7,
-                t.trad_8,
-                t.trad_9,
-                t.trad_10,
-              ].map((item, i) => (
-                <li key={String(item)}>
-                  <span className={i === 0 ? "wcheck wcheck-blue" : "wcheck"}>
-                    <svg viewBox="0 0 10 10">
-                      <path d="M2 5 L4 7 L8 3" />
-                    </svg>
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="why-col right fade-up fade-up-delay-4">
-            <h3 className="why-col-logo-wrap">
-              <img
-                src="https://i.ibb.co/20jgns98/navbarlogotransparent.png"
-                alt="Trackit"
-                className="why-col-logo"
-              />
-            </h3>
-            <ul className="why-list">
-              {[
-                t.trackit_1,
-                t.trackit_2,
-                t.trackit_3,
-                t.trackit_4,
-                t.trackit_5,
-                t.trackit_6,
-                t.trackit_7,
-                t.trackit_8,
-                t.trackit_9,
-                t.trackit_10,
-              ].map((item) => (
-                <li key={String(item)}>
-                  <span className="wcheck wcheck-blue">
-                    <svg viewBox="0 0 10 10">
-                      <path d="M2 5 L4 7 L8 3" />
-                    </svg>
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
       </section>
 
       {/* PRICING */}
       <section className="section" id="pricing">
-        <div className="tagline fade-up">
-          {t.nav_pricing}
-        </div>
         <h2 className="section-title fade-up fade-up-delay-1">
           <PricingTitleSparkle lang={lang} />
         </h2>
@@ -1478,140 +587,135 @@ export default function TrackitLanding() {
           {t.pricing_sub}
         </p>
 
-        <div className="pricing-grid">
-          <div className="pricing-wrap fade-up fade-up-delay-3">
-            <div className="pricing-toggle">
-              <div className="pricing-toggle-left">
-                <button
-                  type="button"
-                  className={`toggle-switch${basicAnnual ? " is-on" : ""}`}
-                  aria-label="Toggle billing"
-                  aria-pressed={basicAnnual}
-                  onClick={() => setBasicAnnual((on) => !on)}
-                >
-                  <span className="toggle-thumb"></span>
-                </button>
-                <span className="toggle-label">{t.pricing_annually}</span>
+        <div className="pricing-grid pricing-bento">
+          <article className="pb-card fade-up fade-up-delay-3">
+            <div className="pb-card__head">
+              <div className="pb-card__title-row">
+                <h3 className="pb-card__name">{starterName}</h3>
+                <span className={`pb-badge pb-badge--soft${basicAnnual ? " is-on" : ""}`}>
+                  {basicAnnual ? t.pricing_save : t.pricing_annually}
+                </span>
               </div>
-              {basicAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
+              <button
+                type="button"
+                className={`pb-switch${basicAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={basicAnnual}
+                onClick={() => setBasicAnnual((on) => !on)}
+              >
+                <span />
+              </button>
             </div>
-            <div className="pricing-card">
-              <div className="pricing-card-top">
-                <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">{starterName}</div>
-                <div className="pricing-desc">{getPlanCardDescription("basic", lang)}</div>
-                <div>
-                  <div className="pricing-price">
-                    <span className="pricing-amount">
-                      {formatPricingAmount(basicAnnual ? getPlanAnnualMonthlyEquivalent("basic") : PLAN_PRICES.growthMonthly, lang)}
-                    </span>
-                    <span className="pricing-period">{t.pricing_month}</span>
-                  </div>
-                  {basicAnnual ? (
-                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
-                      {annualBilledSubtitle(getPlanAnnualTotal("basic"), lang)}
-                    </div>
-                  ) : null}
-                </div>
+            <p className="pb-card__headline">
+              <span className="is-strong">{lang === "fr" ? "Vos premières ventes." : "Your first sales."}</span>
+              <span className="is-mute">{lang === "fr" ? "Lancez vos affiliés Trackit." : "Launch your Trackit affiliates."}</span>
+            </p>
+            <div className="pb-card__buy">
+              <div className="pb-price">
+                <span className="pb-price__amount">
+                  {formatPricingAmount(basicAnnual ? getPlanAnnualMonthlyEquivalent("basic") : PLAN_PRICES.growthMonthly, lang)}
+                </span>
+                <span className="pb-price__period">{t.pricing_month}</span>
               </div>
-              <div className="pricing-divider"></div>
-              <PricingFeatureList features={growthPricingFeatures} />
-              {renderPaidCta("growth", basicAnnual, growthAction, growthCtaLabel, "pricing-cta")}
+              {basicAnnual ? (
+                <div className="pb-price__sub">{annualBilledSubtitle(getPlanAnnualTotal("basic"), lang)}</div>
+              ) : null}
+              {renderPaidCta("growth", basicAnnual, growthAction, growthCtaLabel, "pb-cta")}
             </div>
-          </div>
+            <BentoFeatures features={growthPricingFeatures} lang={lang} />
+          </article>
 
-          <div className="pricing-wrap pricing-wrap-hero fade-up fade-up-delay-4">
-            <div className="pricing-toggle">
-              <div className="pricing-toggle-left">
-                <button
-                  type="button"
-                  className={`toggle-switch${trackitAnnual ? " is-on" : ""}`}
-                  aria-label="Toggle billing"
-                  aria-pressed={trackitAnnual}
-                  onClick={() => setTrackitAnnual((on) => !on)}
-                >
-                  <span className="toggle-thumb"></span>
-                </button>
-                <span className="toggle-label">{t.pricing_annually}</span>
+          <article className="pb-card pb-card--dark fade-up fade-up-delay-4">
+            <div className="pb-card__head">
+              <div className="pb-card__title-row">
+                <h3 className="pb-card__name">{proName}</h3>
+                <span className="pb-badge pb-badge--dark">{t.pricing_most_popular}</span>
               </div>
-              {trackitAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
+              <button
+                type="button"
+                className={`pb-switch${trackitAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={trackitAnnual}
+                onClick={() => setTrackitAnnual((on) => !on)}
+              >
+                <span />
+              </button>
             </div>
-            <div className="pricing-card pricing-card-hero">
-              <span className="pricing-badge-most-popular">{t.pricing_most_popular}</span>
-              <div className="pricing-card-top">
-                <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">{proName}</div>
-                <div className="pricing-desc">{getPlanCardDescription("pro", lang)}</div>
-                <div>
-                  <div className="pricing-price">
-                    <span className="pricing-amount">
-                      {formatPricingAmount(trackitAnnual ? getPlanAnnualMonthlyEquivalent("pro") : PLAN_PRICES.proMonthly, lang)}
-                    </span>
-                    <span className="pricing-period">{t.pricing_month}</span>
-                  </div>
-                  {trackitAnnual ? (
-                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
-                      {annualBilledSubtitle(getPlanAnnualTotal("pro"), lang)}
-                    </div>
-                  ) : null}
-                </div>
+            <p className="pb-card__headline">
+              <span className="is-strong">{lang === "fr" ? "Pour les marques qui" : "For brands ready to"}</span>
+              <span className="is-mute">{lang === "fr" ? "opèrent de bout en bout." : "run campaigns end to end."}</span>
+            </p>
+            <div className="pb-card__buy">
+              <div className="pb-price">
+                <span className="pb-price__amount">
+                  {formatPricingAmount(trackitAnnual ? getPlanAnnualMonthlyEquivalent("pro") : PLAN_PRICES.proMonthly, lang)}
+                </span>
+                <span className="pb-price__period">{t.pricing_month}</span>
               </div>
-              <div className="pricing-divider"></div>
-              <PricingFeatureList features={proPricingFeatures} />
-              {renderPaidCta("pro", trackitAnnual, proAction, proCtaLabel, "pricing-cta pricing-cta-hero")}
+              {trackitAnnual ? (
+                <div className="pb-price__sub">{annualBilledSubtitle(getPlanAnnualTotal("pro"), lang)}</div>
+              ) : null}
+              {renderPaidCta("pro", trackitAnnual, proAction, proCtaLabel, "pb-cta pb-cta--light")}
             </div>
-          </div>
+            <div className="pb-card__foot">
+              <BentoFeatures features={proPricingFeatures} lang={lang} />
+            </div>
+          </article>
 
-          <div className="pricing-wrap fade-up fade-up-delay-5">
-            <div className="pricing-toggle">
-              <div className="pricing-toggle-left">
-                <button
-                  type="button"
-                  className={`toggle-switch${proAnnual ? " is-on" : ""}`}
-                  aria-label="Toggle billing"
-                  aria-pressed={proAnnual}
-                  onClick={() => setProAnnual((on) => !on)}
-                >
-                  <span className="toggle-thumb"></span>
-                </button>
-                <span className="toggle-label">{t.pricing_annually}</span>
+          <article className="pb-card pb-card--wide fade-up fade-up-delay-5">
+            <div className="pb-card__head">
+              <div className="pb-card__title-row">
+                <h3 className="pb-card__name">{businessName}</h3>
+                <span className="pb-badge pb-badge--green">{t.pricing_scale_pill}</span>
               </div>
-              <div className="pricing-toggle-pill">{t.pricing_scale_pill}</div>
-              {proAnnual ? <div className="pricing-toggle-pill">{t.pricing_save}</div> : null}
+              <button
+                type="button"
+                className={`pb-switch${proAnnual ? " is-on" : ""}`}
+                aria-label="Toggle billing"
+                aria-pressed={proAnnual}
+                onClick={() => setProAnnual((on) => !on)}
+              >
+                <span />
+              </button>
             </div>
-            <div className="pricing-card">
-              <div className="pricing-card-top">
-                <div className="pricing-logo"><img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" /></div>
-                <div className="pricing-name">{businessName}</div>
-                <div className="pricing-desc">{getPlanCardDescription("scale", lang)}</div>
-                <div>
-                  <div className="pricing-price">
-                    <span className="pricing-amount">
-                      {formatPricingAmount(proAnnual ? getPlanAnnualMonthlyEquivalent("scale") : PLAN_PRICES.scaleMonthly, lang)}
-                    </span>
-                    <span className="pricing-period">{t.pricing_month}</span>
-                  </div>
-                  {proAnnual ? (
-                    <div style={{ fontSize: 13, color: "#7A7A7A", marginTop: 6, letterSpacing: "-0.02em" }}>
-                      {annualBilledSubtitle(getPlanAnnualTotal("scale"), lang)}
-                    </div>
-                  ) : null}
+            <div className="pb-card__wide-body">
+              <p className="pb-card__headline">
+                <span className="is-mute">{lang === "fr" ? "Pour les équipes qui" : "Great for those who"}</span>
+                <span className="is-strong">{lang === "fr" ? "gèrent plusieurs marques." : "want quality + scale."}</span>
+              </p>
+              <div className="pb-card__buy">
+                <div className="pb-price">
+                  <span className="pb-price__amount">
+                    {formatPricingAmount(proAnnual ? getPlanAnnualMonthlyEquivalent("scale") : PLAN_PRICES.scaleMonthly, lang)}
+                  </span>
+                  <span className="pb-price__period">{t.pricing_month}</span>
                 </div>
+                {proAnnual ? (
+                  <div className="pb-price__sub">{annualBilledSubtitle(getPlanAnnualTotal("scale"), lang)}</div>
+                ) : null}
+                {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pb-cta")}
               </div>
-              <div className="pricing-divider"></div>
-              <PricingFeatureList features={scalePricingFeatures} />
-              {renderPaidCta("scale", proAnnual, scaleAction, scaleCtaLabel, "pricing-cta pricing-cta-dark")}
             </div>
-          </div>
+            <BentoFeatures features={scalePricingFeatures} lang={lang} />
+          </article>
         </div>
 
       </section>
 
       {/* FAQ — visible for users and search engines */}
-      <section className="seo-faq" aria-labelledby="trackit-faq-title">
+      <section className="seo-faq" id="faq" aria-labelledby="trackit-faq-title">
         <div className="seo-faq-inner">
-          <h2 id="trackit-faq-title" className="seo-faq-title">{t.faq_title}</h2>
-          <p className="seo-faq-subtitle">{t.faq_subtitle}</p>
+          <header className="seo-faq-intro">
+            <h2 id="trackit-faq-title" className="seo-faq-title">
+              <span className="seo-faq-title-line">{t.faq_title_line1}</span>
+              <span className="seo-faq-title-line">{t.faq_title_line2}</span>
+            </h2>
+            <p className="seo-faq-subtitle">{t.faq_subtitle}</p>
+            <div className="seo-faq-links">
+              <Link href="/blog">{t.footer_blog}</Link>
+              <Link href="/solutions/creator-affiliate-platform">{t.footer_solutions}</Link>
+            </div>
+          </header>
           <div className="seo-faq-list">
             {faqItems.map((item, i) => {
               const open = faqOpen === i;
@@ -1623,45 +727,103 @@ export default function TrackitLanding() {
                     aria-expanded={open}
                     onClick={() => setFaqOpen(open ? null : i)}
                   >
-                    <span>{item.question}</span>
-                    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="seo-faq-chevron">
-                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                    </svg>
+                    <span className="seo-faq-index">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="seo-faq-q">{item.question}</span>
+                    <span className="seo-faq-toggle" aria-hidden />
                   </button>
                   {open ? <div className="seo-faq-answer">{item.answer}</div> : null}
                 </div>
               );
             })}
           </div>
-          <div className="seo-faq-links">
-            <Link href="/blog">{t.footer_blog}</Link>
-            <Link href="/solutions/creator-affiliate-platform">{t.footer_solutions}</Link>
+        </div>
+      </section>
+
+      <section className="prefooter" aria-label={lang === "fr" ? "Lancer Trackit" : "Start Trackit"}>
+        <div className="prefooter__card">
+          <div className="prefooter__glow" aria-hidden />
+          <div className="prefooter__copy">
+            <h2 className="prefooter__title">
+              <span>{lang === "fr" ? "Sortez du chaos." : "Leave the chaos."}</span>
+              <span>{lang === "fr" ? "Lancez votre Workspace." : "Open your Workspace."}</span>
+            </h2>
+            <p className="prefooter__sub">
+              {lang === "fr"
+                ? "Découverte, outreach, contenus, liens Trackit et paiements. Enfin au même endroit."
+                : "Discovery, outreach, content, Trackit links, and payouts. Finally in one place."}
+            </p>
+            <Link href="/auth" className="prefooter__cta">
+              {lang === "fr" ? "Commencer" : "Get started"}
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* FOOTER */}
       <footer className="footer">
-        <div className="footer-top">
-          <div>
-            <div className="footer-brand">
-              <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="" />
-              <span className="footer-name">Trackit.</span>
+        <div className="footer__inner">
+          <div className="footer-top">
+            <span className="footer-name">
+              Trackit<span>.</span>
+            </span>
+            <div className="footer-socials">
+              <span className="footer-socials__label">{t.footer_social}</span>
+              <SocialFooterLinks />
             </div>
-            <div className="footer-tag">{t.footer_tagline}</div>
           </div>
-          <div className="footer-socials">
-            <SocialFooterLinks />
+
+          <div className="footer-body">
+            <div className="footer-reach">
+              <h2 className="footer-reach__title">{t.footer_reach}</h2>
+              <a className="footer-contact" href="mailto:hello@thentrack.it">
+                <span className="footer-contact__icon" aria-hidden>
+                  <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path
+                      fill="currentColor"
+                      d="M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25V6.75zm2.4.75 5.1 3.83L17.1 7.5H6.9zm11.1 1.72-5.28 3.96a1.5 1.5 0 0 1-1.74 0L5.7 9.97v7.28h12.3V9.97z"
+                    />
+                  </svg>
+                </span>
+                <span className="footer-contact__copy">
+                  <strong>{t.footer_contact_title}</strong>
+                  <span>{t.footer_contact_sub}</span>
+                </span>
+              </a>
+            </div>
+
+            <div className="footer-grid">
+              <nav className="footer-col" aria-label={t.footer_col_features}>
+                <p className="footer-col__title">{t.footer_col_features}</p>
+                <Link href="/#features">{t.footer_discovery}</Link>
+                <Link href="/#features">{t.footer_mino}</Link>
+                <Link href="/#features">{t.footer_campaigns}</Link>
+                <Link href="/#features">{t.footer_trackpay}</Link>
+              </nav>
+              <nav className="footer-col" aria-label={t.footer_col_explore}>
+                <p className="footer-col__title">{t.footer_col_explore}</p>
+                <Link href="/solutions">{t.footer_solutions}</Link>
+                <Link href="/solutions/shopify-creator-tracking">{t.footer_shopify}</Link>
+                <Link href="/blog">{t.footer_blog}</Link>
+                <Link href="/#pricing">{t.footer_pricing}</Link>
+              </nav>
+              <nav className="footer-col" aria-label={t.footer_col_help}>
+                <p className="footer-col__title">{t.footer_col_help}</p>
+                <Link href="/#faq">{t.footer_faq}</Link>
+                <Link href="/contact">{t.footer_contact}</Link>
+                <Link href="/about">{t.footer_about}</Link>
+              </nav>
+            </div>
           </div>
-        </div>
-        <div className="footer-bottom">
-          <div>Copyright © Trackit.Inc {t.footer_rights}</div>
-          <div className="footer-links">
-            <Link href="/about">{t.footer_about}</Link>
-            <Link href="/blog">{t.footer_blog}</Link>
-            <Link href="/solutions">{t.footer_solutions}</Link>
-            <Link href="/terms">{t.footer_terms}</Link>
-            <Link href="/privacy">{t.footer_privacy}</Link>
+
+          <div className="footer__mark" aria-hidden>
+            Trackit.
+          </div>
+
+          <div className="footer-bottom">
+            <div>©2026 Trackit. {t.footer_rights}</div>
+            <div className="footer-legal">
+              <Link href="/terms">{t.footer_terms}</Link>
+              <Link href="/privacy">{t.footer_privacy}</Link>
+            </div>
           </div>
         </div>
       </footer>

@@ -622,7 +622,7 @@ export function CreatorManageLists({
     if (selected?.username === username) setSelected(null);
   };
 
-  const pad = isMobile ? "56px 16px 16px" : "28px 32px 32px";
+  const pad = isMobile ? "16px 16px 16px" : "28px 32px 32px";
   const managedCap = getMaxManagedCreators(plan);
   const billableCreatorCount = useMemo(
     () => rows.filter((r) => !isDemoPresetSavedCreator(r)).length,

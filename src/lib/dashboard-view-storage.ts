@@ -45,6 +45,8 @@ export const WORKSPACE_SPACES = [
   "integrations",
   "analytics",
   "ai",
+  "scripts",
+  "content",
 ] as const;
 
 export type WorkspaceSpace = (typeof WORKSPACE_SPACES)[number];
@@ -86,12 +88,14 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
       return "integrations";
     case "analytics":
       return "analytics";
+    case "scripts":
+      return "scripts";
+    case "content":
+      return "content";
     case "settings":
     case "billing":
     case "help":
     case "feedback":
-    case "scripts":
-    case "content":
       return "home";
     default:
       return "home";
@@ -120,6 +124,10 @@ export function defaultViewForSpace(space: WorkspaceSpace): DashboardView {
       return "analytics";
     case "ai":
       return "ai";
+    case "scripts":
+      return "scripts";
+    case "content":
+      return "content";
     default:
       return "discovery";
   }

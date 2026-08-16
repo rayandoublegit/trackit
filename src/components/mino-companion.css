@@ -1,0 +1,138 @@
+.mino-companion {
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+  filter: drop-shadow(0 4px 4px rgba(0, 71, 255, 0.22));
+}
+
+.mino-companion--sm {
+  filter: drop-shadow(0 1px 1.5px rgba(0, 71, 255, 0.24));
+}
+
+.mino-companion__wander,
+.mino-companion__spin,
+.mino-companion__face,
+.mino-companion__look {
+  transform-box: view-box;
+  transform-origin: 32px 32px;
+}
+
+.mino-companion__wander {
+  animation: mino-wander 5.2s ease-in-out infinite;
+}
+
+.mino-companion--sm .mino-companion__wander {
+  animation-name: mino-wander-sm;
+}
+
+.mino-companion--soft .mino-companion__wander {
+  animation: none;
+}
+
+.mino-companion__spin {
+  animation: mino-spin 14s linear infinite;
+}
+
+.mino-companion--soft .mino-companion__spin,
+.mino-companion--soft .mino-companion__face {
+  animation-duration: 22s;
+}
+
+.mino-companion__face {
+  animation: mino-spin 14s linear infinite reverse;
+}
+
+.mino-companion__look {
+  animation: mino-look 7.2s ease-in-out infinite;
+}
+
+.mino-companion--soft .mino-companion__look {
+  animation: none;
+}
+
+.mino-companion__eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mino-blink 3.8s ease-in-out infinite;
+}
+
+@keyframes mino-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mino-wander {
+  0%,
+  100% {
+    transform: translate(0, 1.5px);
+  }
+  20% {
+    transform: translate(2.6px, -3.4px);
+  }
+  40% {
+    transform: translate(-1.4px, -5px);
+  }
+  60% {
+    transform: translate(-3.2px, -0.8px);
+  }
+  80% {
+    transform: translate(1.6px, 2px);
+  }
+}
+
+@keyframes mino-wander-sm {
+  0%,
+  100% {
+    transform: translate(0, 0.4px);
+  }
+  50% {
+    transform: translate(0.5px, -1.1px);
+  }
+}
+
+@keyframes mino-look {
+  0%,
+  16%,
+  100% {
+    transform: translate(0, 0);
+  }
+  26% {
+    transform: translate(-1.7px, 0.35px);
+  }
+  44% {
+    transform: translate(0, 0);
+  }
+  58% {
+    transform: translate(1.9px, -0.25px);
+  }
+  74% {
+    transform: translate(0.2px, 0.7px);
+  }
+}
+
+@keyframes mino-blink {
+  0%,
+  38%,
+  46%,
+  84%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  42%,
+  88% {
+    transform: scaleY(0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mino-companion__wander,
+  .mino-companion__spin,
+  .mino-companion__face,
+  .mino-companion__look,
+  .mino-companion__eye {
+    animation: none;
+    transform: none;
+  }
+}

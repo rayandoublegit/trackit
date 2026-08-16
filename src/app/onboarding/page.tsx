@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  selectionCardStyle,
-  selectionTextMuted,
-  selectionTextPrimary,
-} from "@/lib/selection-card-styles";
-
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -49,32 +43,57 @@ type BusinessType = "ecommerce" | "infopreneur" | "agency" | "other";
 type Revenue = "starting" | "1k-10k" | "10k-50k" | "50k+";
 type Source = ReferralSource;
 
+const STEPS = [
+  { id: 1 as const, labelFr: "Infos perso", labelEn: "Personal Info" },
+  { id: 2 as const, labelFr: "Type de compte", labelEn: "Account Type" },
+  { id: 3 as const, labelFr: "Origine", labelEn: "How you found us" },
+  { id: 4 as const, labelFr: "Choisir une offre", labelEn: "Choose a Plan" },
+];
+
 const STEP_COPY = {
   1: {
-    taglineFr: "Étape 1 · Profil",
-    taglineEn: "Step 1 · Profile",
     titleFr: "Configurez votre profil",
     titleEn: "Set up your profile",
-    subtitleFr: "Dites-nous qui vous êtes. C'est ce que les créateurs verront quand vous les contactez.",
-    subtitleEn: "Tell us who you are. This is what creators will see when you reach out.",
+    subFr: "Infos personnelles",
+    subEn: "Personal info",
   },
   2: {
-    taglineFr: "Étape 2 · Activité",
-    taglineEn: "Step 2 · Business",
-    titleFr: "Parlez-nous de votre activité",
+    titleFr: "Vous inscrivez-vous en tant que marque ?",
     titleEn: "Tell us about your business",
-    subtitleFr: "Cela nous aide à personnaliser les suggestions de créateurs et les messages.",
-    subtitleEn: "Helps us personalize creator suggestions and outreach.",
+    subFr: "Choisissez le type de compte",
+    subEn: "Choose account type",
   },
   3: {
-    taglineFr: "Étape 3 · Origine",
-    taglineEn: "Step 3 · Source",
     titleFr: "Comment nous avez-vous connus ?",
     titleEn: "Where did you hear about us?",
-    subtitleFr: "Un simple tap. Ça nous aide à savoir ce qui fonctionne.",
-    subtitleEn: "One quick tap. Helps us know what's working.",
+    subFr: "Choisissez une option",
+    subEn: "Choose one",
   },
 } as const;
+
+const BUSINESS_TYPES = [
+  { key: "ecommerce" as const, label: "Ecommerce store", labelFr: "Boutique e-commerce", desc: "Shopify, WooCommerce", descFr: "Shopify, WooCommerce" },
+  { key: "infopreneur" as const, label: "Infopreneur", labelFr: "Infopreneur", desc: "Courses, coaching", descFr: "Formations, coaching" },
+  { key: "agency" as const, label: "Agency", labelFr: "Agence", desc: "Client services", descFr: "Services clients" },
+  { key: "other" as const, label: "Other", labelFr: "Autre", desc: "Something else", descFr: "Autre chose" },
+];
+
+const REVENUES = [
+  { key: "starting" as const, label: "Just starting", labelFr: "Je débute" },
+  { key: "1k-10k" as const, label: "$1K – $10K", labelFr: "1K€ – 10K€" },
+  { key: "10k-50k" as const, label: "$10K – $50K", labelFr: "10K€ – 50K€" },
+  { key: "50k+" as const, label: "$50K+", labelFr: "50K€+" },
+];
+
+const SOURCES = [
+  { key: "tiktok" as const, label: "TikTok", labelFr: "TikTok" },
+  { key: "instagram" as const, label: "Instagram", labelFr: "Instagram" },
+  { key: "twitter" as const, label: "X (Twitter)", labelFr: "X (Twitter)" },
+  { key: "reddit" as const, label: "Reddit", labelFr: "Reddit" },
+  { key: "friend" as const, label: "A friend", labelFr: "Un ami" },
+  { key: "google" as const, label: "Google", labelFr: "Google" },
+  { key: "other" as const, label: "Other", labelFr: "Autre" },
+];
 
 export default function OnboardingPage() {
   const lang = useLang();
@@ -161,7 +180,7 @@ export default function OnboardingPage() {
     const s = supabase;
     if (!s) return;
     void s.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) { router.replace("/auth"); return; }
+      if (!user) { router.replace("/auth?mode=signup"); return; }
 
       try {
         let profile: { onboarding_completed?: boolean } | null = null;
@@ -345,31 +364,63 @@ export default function OnboardingPage() {
     router.replace("/dashboard");
   };
 
-  if (!user || !hydrated) return <div style={{ minHeight: "100vh", background: "#FFFFFF" }} />;
+  if (!user || !hydrated) return <div className="ob-page" />;
 
   const stepCopy = STEP_COPY[step as 1 | 2 | 3];
-  const containerMaxWidth = step === 4 ? 1180 : 720;
+  const initial = (fullName.trim()[0] || user.email?.[0] || "T").toUpperCase();
 
   return (
-    <div style={{ minHeight: "100vh", background: "#FFFFFF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 20px 64px" }}>
-      <div style={{ width: "100%", maxWidth: containerMaxWidth }}>
-        <div style={{ display: "flex", gap: 8, marginBottom: 32, maxWidth: step === 4 ? 520 : 560, marginLeft: "auto", marginRight: "auto" }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              style={{
-                flex: 1,
-                height: 5,
-                borderRadius: 999,
-                background: step >= i ? "#0047FF" : "rgba(0, 71, 255, 0.12)",
-                transition: "background 0.3s ease",
-              }}
-            />
-          ))}
-        </div>
+    <div className="ob-page">
+      <header className="ob-header">
+        <a href="/" className="ob-logo">
+          <img src={TRACKIT_LOGO_URL} alt="Trackit" />
+        </a>
+        <button type="button" className="ob-avatar" onClick={() => setStep(1)} aria-label="Profile">
+          {avatarPreview ? <img src={avatarPreview} alt="" /> : <span>{initial}</span>}
+        </button>
+      </header>
 
+      <aside className="ob-sidebar">
+        <p className="ob-sidebar__kicker">{lang === "fr" ? "Configuration" : "Account Setup"}</p>
+        <ol className="ob-steps">
+          {STEPS.map((item) => {
+            const state = step > item.id ? "done" : step === item.id ? "current" : "todo";
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  className={`ob-step${state === "done" ? " is-done" : ""}${state === "current" ? " is-current" : ""}`}
+                  onClick={() => {
+                    if (state === "done") setStep(item.id);
+                  }}
+                >
+                  <span className="ob-step__icon">
+                    {state === "done" ? (
+                      <span className="ob-step__check">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                          <path d="M5 12l5 5L20 7" />
+                        </svg>
+                      </span>
+                    ) : state === "current" ? (
+                      <svg className="ob-step__spin" width="22" height="22" viewBox="0 0 22 22" fill="none">
+                        <circle cx="11" cy="11" r="8" stroke="#dbe4ff" strokeWidth="2.4" />
+                        <path d="M11 3a8 8 0 018 8" stroke="#0047ff" strokeWidth="2.4" strokeLinecap="round" />
+                      </svg>
+                    ) : (
+                      <span className="ob-step__num">{item.id}</span>
+                    )}
+                  </span>
+                  <span className="ob-step__label">{lang === "fr" ? item.labelFr : item.labelEn}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </aside>
+
+      <main className={`ob-main${step === 4 ? " is-wide" : ""}`}>
         {step === 4 ? (
-          <div style={{ paddingTop: 4 }}>
+          <>
             <PricingPlans
               tagline={lang === "fr" ? "Étape 4 · Tarifs" : "Step 4 · Pricing"}
               title={lang === "fr" ? "Avant d'accéder à votre dashboard" : "Before you access your dashboard"}
@@ -379,6 +430,7 @@ export default function OnboardingPage() {
                   : "Pick a plan to unlock all of Trackit — you can upgrade anytime."
               }
               showCurrentPlanBadge={false}
+              showLogo={false}
               paidCtaLabel={lang === "fr" ? "Commencer" : "Get Started"}
               userId={user.id}
               userEmail={user.email ?? undefined}
@@ -388,208 +440,191 @@ export default function OnboardingPage() {
                   : undefined
               }
               onStayFree={() => void handleCompleteFree()}
-              stayFreeLabel={lang === "fr" ? "Continuer gratuitement" : "Continue for free"}
+              stayFreeLabel={lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free"}
               getOnboardingPayload={buildOnboardingPayload}
             />
-            {error && <OnboardingError message={error} />}
-            {loading && (
-              <p style={{ textAlign: "center", fontSize: 14, color: "#7A7A7A", marginTop: 16, letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Enregistrement…" : "Saving…"}
-              </p>
-            )}
-          </div>
+            {error ? <p className="ob-error">{error}</p> : null}
+            {loading ? <p className="ob-saving">{lang === "fr" ? "Enregistrement…" : "Saving…"}</p> : null}
+          </>
         ) : (
           <>
-            <OnboardingStepHeader
-              tagline={lang === "fr" ? stepCopy.taglineFr : stepCopy.taglineEn}
-              title={lang === "fr" ? stepCopy.titleFr : stepCopy.titleEn}
-              subtitle={lang === "fr" ? stepCopy.subtitleFr : stepCopy.subtitleEn}
-            />
+            <h1 className="ob-title">{lang === "fr" ? stepCopy.titleFr : stepCopy.titleEn}</h1>
+            <p className="ob-sub">{lang === "fr" ? stepCopy.subFr : stepCopy.subEn}</p>
 
-            <div style={formPanelStyle}>
-              {step === 1 && (
-                <>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 32 }}>
-                    <input id="avatar-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} style={{ display: "none" }} />
-                    <label htmlFor="avatar-input" style={avatarRingStyle}>
-                      {avatarPreview ? (
-                        <img src={avatarPreview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                          <circle cx="12" cy="9" r="3.5" stroke="rgba(0,0,0,0.28)" strokeWidth="1.7" />
-                          <path d="M5 20c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="rgba(0,0,0,0.28)" strokeWidth="1.7" strokeLinecap="round" />
-                        </svg>
-                      )}
-                    </label>
-                    <label htmlFor="avatar-input" style={avatarLabelStyle}>
-                      {lang === "fr" ? "Ajouter une photo" : "Upload a photo"}
-                    </label>
-                  </div>
-                  <Input label="Full name" labelFr="Nom complet" value={fullName} onChange={setFullName} placeholder="Jane Smith" placeholderFr="Jean Dupont" />
-                  <UsernameInput value={username} onChange={setUsername} status={usernameStatus} />
-                </>
-              )}
+            {step === 1 && (
+              <>
+                <div className="ob-photo">
+                  <input id="avatar-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarChange} hidden />
+                  <label htmlFor="avatar-input" className="ob-photo__ring">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="" />
+                    ) : (
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="9" r="3.5" stroke="#a1a1aa" strokeWidth="1.7" />
+                        <path d="M5 20c0-3.5 3.5-6 7-6s7 2.5 7 6" stroke="#a1a1aa" strokeWidth="1.7" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  </label>
+                  <label htmlFor="avatar-input" className="ob-photo__add">
+                    {lang === "fr" ? "Ajouter une photo" : "Upload a photo"}
+                  </label>
+                </div>
+                <Field
+                  label={lang === "fr" ? "Nom complet" : "Full name"}
+                  value={fullName}
+                  onChange={setFullName}
+                  placeholder={lang === "fr" ? "Jean Dupont" : "Jane Smith"}
+                />
+                <UsernameField value={username} onChange={setUsername} status={usernameStatus} />
+              </>
+            )}
 
-              {step === 2 && (
-                <>
-                  <Input label="Business name" labelFr="Nom de votre entreprise" value={businessName} onChange={setBusinessName} placeholder="Acme Co." placeholderFr="Ma Boutique" />
-                  <div style={{ marginBottom: 28 }}>
-                    <FieldLabel>{lang === "fr" ? "Type d'activité" : "Business type"}</FieldLabel>
-                    <div style={optionGridStyle}>
-                      {[
-                        { key: "ecommerce" as const, label: "Ecommerce store", labelFr: "Boutique e-commerce", desc: "Shopify, WooCommerce", descFr: "Shopify, WooCommerce" },
-                        { key: "infopreneur" as const, label: "Infopreneur", labelFr: "Infopreneur", desc: "Courses, coaching", descFr: "Formations, coaching" },
-                        { key: "agency" as const, label: "Agency", labelFr: "Agence", desc: "Client services", descFr: "Services clients" },
-                        { key: "other" as const, label: "Other", labelFr: "Autre", desc: "Something else", descFr: "Autre chose" },
-                      ].map((opt) => {
-                        const active = businessType === opt.key;
-                        return (
-                          <button key={opt.key} type="button" onClick={() => setBusinessType(opt.key)} style={optionCardStyle(active)}>
-                            <div style={{ fontSize: 16, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.025em", lineHeight: 1.3 }}>
-                              {lang === "fr" ? opt.labelFr : opt.label}
-                            </div>
-                            <div style={{ fontSize: 13, color: selectionTextMuted(active), marginTop: 6, letterSpacing: "-0.02em", lineHeight: 1.4 }}>
-                              {lang === "fr" ? opt.descFr : opt.desc}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <Input label="Your niche" labelFr="Votre niche" value={niche} onChange={setNiche} placeholder="Fashion, fitness, beauty, tech..." placeholderFr="Mode, fitness, beauté, tech..." />
-                  <div style={{ marginBottom: 4 }}>
-                    <FieldLabel>{lang === "fr" ? "Revenu mensuel" : "Monthly revenue"}</FieldLabel>
-                    <div style={optionGridStyle}>
-                      {[
-                        { key: "starting" as const, label: "Just starting", labelFr: "Je débute" },
-                        { key: "1k-10k" as const, label: "$1K – $10K", labelFr: "1K€ – 10K€" },
-                        { key: "10k-50k" as const, label: "$10K – $50K", labelFr: "10K€ – 50K€" },
-                        { key: "50k+" as const, label: "$50K+", labelFr: "50K€+" },
-                      ].map((opt) => {
-                        const active = revenue === opt.key;
-                        return (
-                          <button key={opt.key} type="button" onClick={() => setRevenue(opt.key)} style={optionCardStyle(active, { compact: true })}>
-                            <div style={{ fontSize: 16, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.025em" }}>
-                              {lang === "fr" ? opt.labelFr : opt.label}
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
+            {step === 2 && (
+              <>
+                <Field
+                  label={lang === "fr" ? "Nom de votre entreprise" : "Business name"}
+                  value={businessName}
+                  onChange={setBusinessName}
+                  placeholder={lang === "fr" ? "Ma Boutique" : "Acme Co."}
+                />
+                <ChoiceList
+                  items={BUSINESS_TYPES.map((opt) => ({
+                    key: opt.key,
+                    title: lang === "fr" ? opt.labelFr : opt.label,
+                    desc: lang === "fr" ? opt.descFr : opt.desc,
+                  }))}
+                  value={businessType}
+                  onChange={setBusinessType}
+                />
+                <Field
+                  label={lang === "fr" ? "Votre niche" : "Your niche"}
+                  value={niche}
+                  onChange={setNiche}
+                  placeholder={lang === "fr" ? "Mode, fitness, beauté, tech..." : "Fashion, fitness, beauty, tech..."}
+                />
+                <p className="ob-label">{lang === "fr" ? "Revenu mensuel" : "Monthly revenue"}</p>
+                <ChoiceList
+                  items={REVENUES.map((opt) => ({
+                    key: opt.key,
+                    title: lang === "fr" ? opt.labelFr : opt.label,
+                  }))}
+                  value={revenue}
+                  onChange={setRevenue}
+                />
+              </>
+            )}
 
-              {step === 3 && (
-                <>
-                  <div style={{ ...optionGridStyle, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-                    {[
-                      { key: "tiktok" as const, label: "TikTok", labelFr: "TikTok" },
-                      { key: "instagram" as const, label: "Instagram", labelFr: "Instagram" },
-                      { key: "twitter" as const, label: "X (Twitter)", labelFr: "X (Twitter)" },
-                      { key: "reddit" as const, label: "Reddit", labelFr: "Reddit" },
-                      { key: "friend" as const, label: "A friend", labelFr: "Un ami" },
-                      { key: "google" as const, label: "Google", labelFr: "Google" },
-                      { key: "other" as const, label: "Other", labelFr: "Autre" },
-                    ].map((opt) => {
-                      const active = source === opt.key;
-                      return (
-                        <button key={opt.key} type="button" onClick={() => setSource(opt.key)} style={optionCardStyle(active, { tall: true })}>
-                          <div style={{ fontSize: 17, fontWeight: 500, color: selectionTextPrimary(active), letterSpacing: "-0.025em" }}>
-                            {lang === "fr" ? opt.labelFr : opt.label}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+            {step === 3 && (
+              <>
+                <ChoiceList
+                  items={SOURCES.map((opt) => ({
+                    key: opt.key,
+                    title: lang === "fr" ? opt.labelFr : opt.label,
+                  }))}
+                  value={source}
+                  onChange={setSource}
+                />
+                {source && isSocialReferralSource(source) ? (
+                  <ReferralHandleField source={source} value={sourceHandle} onChange={setSourceHandle} />
+                ) : null}
+                {source && !isSocialReferralSource(source) ? (
+                  <ReferralDetailsField source={source} value={sourceDetails} onChange={setSourceDetails} />
+                ) : null}
+              </>
+            )}
 
-                  {source && isSocialReferralSource(source) && (
-                    <div style={{ marginTop: 28 }}>
-                      <ReferralHandleInput
-                        source={source}
-                        value={sourceHandle}
-                        onChange={setSourceHandle}
-                      />
-                    </div>
-                  )}
+            {error ? <p className="ob-error">{error}</p> : null}
 
-                  {source && !isSocialReferralSource(source) && (
-                    <div style={{ marginTop: 28 }}>
-                      <ReferralDetailsInput
-                        source={source}
-                        value={sourceDetails}
-                        onChange={setSourceDetails}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-
-              {error && <OnboardingError message={error} />}
-            </div>
-
-            <div style={{ maxWidth: 480, margin: "28px auto 0" }}>
-              <button type="button" onClick={goNext} disabled={loading} style={primaryBtn}>
-                {lang === "fr" ? "Continuer →" : "Continue →"}
-              </button>
-            </div>
+            <button type="button" className="ob-continue" onClick={() => void goNext()} disabled={loading}>
+              {lang === "fr" ? "Continuer" : "Continue"}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </button>
           </>
         )}
-      </div>
+      </main>
     </div>
   );
 }
 
-function OnboardingStepHeader({ tagline, title, subtitle }: { tagline: string; title: string; subtitle: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
   return (
-    <div style={{ textAlign: "center", marginBottom: 32 }}>
-      <img src={TRACKIT_LOGO_URL} alt="Trackit" style={{ height: 72, width: "auto", margin: "0 auto 18px", display: "block" }} />
-      <div className="tagline" style={{ justifyContent: "center", marginBottom: 8 }}>
-        {tagline}
-      </div>
-      <h1 className="section-title" style={{ marginBottom: 10, letterSpacing: "-0.025em", fontSize: 34, lineHeight: 1.1 }}>
-        {title}
-      </h1>
-      <p className="section-sub" style={{ maxWidth: 560, margin: "0 auto" }}>
-        {subtitle}
-      </p>
+    <div className="ob-field">
+      <label>{label}</label>
+      <input className="ob-input" type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }
 
-function OnboardingError({ message }: { message: string }) {
+function ChoiceList<T extends string>({
+  items,
+  value,
+  onChange,
+}: {
+  items: { key: T; title: string; desc?: string }[];
+  value: T | null;
+  onChange: (v: T) => void;
+}) {
   return (
-    <div style={{ fontSize: 14, color: "#ff6b6b", padding: "12px 16px", borderRadius: 14, background: "rgba(255,107,107,0.08)", marginTop: 20, textAlign: "center", letterSpacing: "-0.01em" }}>
-      {message}
+    <div className="ob-choices">
+      {items.map((item) => {
+        const on = value === item.key;
+        return (
+          <button key={item.key} type="button" className={`ob-choice${on ? " is-on" : ""}`} onClick={() => onChange(item.key)}>
+            <span className="ob-radio" />
+            <span>
+              <span className="ob-choice__title">{item.title}</span>
+              {item.desc ? <span className="ob-choice__desc">{item.desc}</span> : null}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ fontSize: 14, fontWeight: 500, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 12 }}>
-      {children}
-    </div>
-  );
-}
-
-function Input({ label, labelFr, value, onChange, placeholder, placeholderFr }: { label: string; labelFr?: string; value: string; onChange: (v: string) => void; placeholder: string; placeholderFr?: string }) {
+function UsernameField({
+  value,
+  onChange,
+  status,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  status: string;
+}) {
   const lang = useLang();
+  const message = profileUsernameStatusMessage(status as ProfileUsernameStatus, lang);
+  const color = profileUsernameStatusColor(status as ProfileUsernameStatus);
   return (
-    <div style={{ marginBottom: 24 }}>
-      <FieldLabel>{lang === "fr" && labelFr ? labelFr : label}</FieldLabel>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={lang === "fr" && placeholderFr ? placeholderFr : placeholder}
-        style={inputStyle}
-      />
+    <div className="ob-field">
+      <label>{lang === "fr" ? "Nom d'utilisateur" : "Username"}</label>
+      <div className="ob-input-wrap">
+        <span className="ob-prefix">@</span>
+        <input
+          className="ob-input"
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value.toLowerCase())}
+          placeholder={lang === "fr" ? "ton pseudo" : "yourname"}
+        />
+      </div>
+      {message ? <p className="ob-hint" style={{ color }}>{message}</p> : null}
     </div>
   );
 }
 
-function ReferralHandleInput({
+function ReferralHandleField({
   source,
   value,
   onChange,
@@ -601,33 +636,19 @@ function ReferralHandleInput({
   const lang = useLang();
   const copy = referralHandleFieldCopy(source, lang);
   const showAtPrefix = source !== "reddit";
-
   return (
-    <div>
-      <FieldLabel>{copy.label}</FieldLabel>
-      <div style={{ position: "relative" }}>
-        {showAtPrefix && (
-          <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "rgba(0,0,0,0.35)", fontSize: 16, letterSpacing: "-0.02em" }}>@</span>
-        )}
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={copy.placeholder}
-          style={{ ...inputStyle, paddingLeft: showAtPrefix ? 40 : 16 }}
-          autoComplete="off"
-        />
+    <div className="ob-field">
+      <label>{copy.label}</label>
+      <div className={showAtPrefix ? "ob-input-wrap" : undefined}>
+        {showAtPrefix ? <span className="ob-prefix">@</span> : null}
+        <input className="ob-input" type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={copy.placeholder} autoComplete="off" />
       </div>
-      {copy.hint && (
-        <p style={{ fontSize: 13, color: "#7A7A7A", marginTop: 10, marginBottom: 0, letterSpacing: "-0.02em", lineHeight: 1.45 }}>
-          {copy.hint}
-        </p>
-      )}
+      {copy.hint ? <p className="ob-hint">{copy.hint}</p> : null}
     </div>
   );
 }
 
-function ReferralDetailsInput({
+function ReferralDetailsField({
   source,
   value,
   onChange,
@@ -638,141 +659,18 @@ function ReferralDetailsInput({
 }) {
   const lang = useLang();
   const copy = referralDetailsFieldCopy(source, lang);
-
   return (
-    <div>
-      <FieldLabel>
+    <div className="ob-field">
+      <label>
         {copy.label}
-        {!copy.required && (
+        {!copy.required ? (
           <span style={{ fontWeight: 400, color: "#9A9A9A" }}>
             {lang === "fr" ? " (optionnel)" : " (optional)"}
           </span>
-        )}
-      </FieldLabel>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={copy.placeholder}
-        rows={4}
-        style={textareaStyle}
-      />
-      {copy.hint && (
-        <p style={{ fontSize: 13, color: "#7A7A7A", marginTop: 10, marginBottom: 0, letterSpacing: "-0.02em", lineHeight: 1.45 }}>
-          {copy.hint}
-        </p>
-      )}
+        ) : null}
+      </label>
+      <textarea className="ob-textarea" value={value} onChange={(e) => onChange(e.target.value)} placeholder={copy.placeholder} rows={4} />
+      {copy.hint ? <p className="ob-hint">{copy.hint}</p> : null}
     </div>
   );
-}
-
-function UsernameInput({ value, onChange, status }: { value: string; onChange: (v: string) => void; status: string }) {
-  const lang = useLang();
-  const message = profileUsernameStatusMessage(status as ProfileUsernameStatus, lang);
-  const color = profileUsernameStatusColor(status as ProfileUsernameStatus);
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <FieldLabel>{lang === "fr" ? "Nom d'utilisateur" : "Username"}</FieldLabel>
-      <div style={{ position: "relative" }}>
-        <span style={{ position: "absolute", left: 16, top: "50%", transform: "translateY(-50%)", color: "rgba(0,0,0,0.35)", fontSize: 16, letterSpacing: "-0.02em" }}>@</span>
-        <input type="text" value={value} onChange={(e) => onChange(e.target.value.toLowerCase())} placeholder={lang === "fr" ? "ton pseudo" : "yourname"} style={{ ...inputStyle, paddingLeft: 40 }} />
-      </div>
-      {message && <div style={{ fontSize: 13, color, marginTop: 10, letterSpacing: "-0.02em" }}>{message}</div>}
-    </div>
-  );
-}
-
-const formPanelStyle: React.CSSProperties = {
-  background: "#FFFFFF",
-  border: "1px solid rgba(0, 0, 0, 0.08)",
-  borderRadius: 24,
-  padding: "36px 32px",
-  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.04)",
-  maxWidth: 640,
-  margin: "0 auto",
-};
-
-const avatarRingStyle: React.CSSProperties = {
-  width: 112,
-  height: 112,
-  borderRadius: "50%",
-  border: "2px dashed rgba(0, 71, 255, 0.25)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  overflow: "hidden",
-  background: "rgba(0, 71, 255, 0.04)",
-  transition: "border-color 0.2s ease, background 0.2s ease",
-};
-
-const avatarLabelStyle: React.CSSProperties = {
-  marginTop: 12,
-  fontSize: 14,
-  fontWeight: 500,
-  color: "#0047FF",
-  cursor: "pointer",
-  letterSpacing: "-0.02em",
-};
-
-const optionGridStyle: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-  gap: 12,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  background: "#FFFFFF",
-  border: "1px solid rgba(0, 0, 0, 0.1)",
-  borderRadius: 14,
-  padding: "14px 16px",
-  fontSize: 16,
-  fontFamily: "inherit",
-  color: "#0A0A0A",
-  letterSpacing: "-0.02em",
-  outline: "none",
-  boxSizing: "border-box",
-  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-};
-
-const textareaStyle: React.CSSProperties = {
-  ...inputStyle,
-  resize: "vertical",
-  minHeight: 112,
-  lineHeight: 1.5,
-};
-
-const primaryBtn: React.CSSProperties = {
-  width: "100%",
-  background: "#0047FF",
-  color: "#FFFFFF",
-  border: "none",
-  borderRadius: 14,
-  padding: "16px 0",
-  fontSize: 16,
-  fontWeight: 500,
-  letterSpacing: "-0.025em",
-  cursor: "pointer",
-  fontFamily: "inherit",
-  boxShadow: "0 8px 24px rgba(0, 71, 255, 0.22)",
-};
-
-function optionCardStyle(active: boolean, options?: { compact?: boolean; tall?: boolean }): React.CSSProperties {
-  return {
-    ...selectionCardStyle(active, {
-      unselectedBackground: "#FFFFFF",
-      unselectedBorder: "1px solid rgba(0, 0, 0, 0.1)",
-    }),
-    borderRadius: 16,
-    padding: options?.compact ? "18px 20px" : options?.tall ? "24px 22px" : "22px 20px",
-    minHeight: options?.tall ? 80 : options?.compact ? 64 : 88,
-    cursor: "pointer",
-    textAlign: "left",
-    fontFamily: "inherit",
-    transition: "all 0.18s ease",
-    boxShadow: active ? "0 8px 24px rgba(0, 71, 255, 0.18)" : "0 2px 8px rgba(0, 0, 0, 0.03)",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
-  };
 }

@@ -85,7 +85,7 @@ export function AffiliateLinksView({
   return (
     <div
       style={{
-        padding: isMobile ? "56px 16px 24px" : "40px 40px 48px",
+        padding: isMobile ? "16px 16px 24px" : "40px 40px 48px",
         background: "var(--ws-bg)",
         minHeight: "100%",
         boxSizing: "border-box",

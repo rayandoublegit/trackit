@@ -4,7 +4,7 @@ import { getSameAsUrls, getTwitterHandle } from "@/lib/social-links";
 export const SITE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://thentrack.it").replace(/\/$/, "");
 export const SITE_NAME = "Trackit";
 export const SITE_LEGAL_NAME = "Trackit Inc.";
-export const SITE_EMAIL = "contact@thentrack.it";
+export const SITE_EMAIL = "hello@thentrack.it";
 
 export const DEFAULT_TITLE =
   "Trackit — Creator affiliate platform | Find creators, track sales, pay commissions";

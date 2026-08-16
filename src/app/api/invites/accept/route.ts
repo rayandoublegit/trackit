@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
+import { insertBrandNotification } from "@/lib/brand-notifications";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
   CREATOR_ROW_SYNC_SELECT,
@@ -165,6 +166,11 @@ export async function POST(req: Request) {
   await syncCreatorRowsByProfileHandle(supabase, creatorId, {
     username: socialHandle,
     full_name: fullName || null,
+  });
+
+  await insertBrandNotification(supabase, invite.brand_id, "creator_joined", {
+    creatorName: fullName || `@${socialHandle.replace(/^@/, "")}`,
+    handle: socialHandle,
   });
 
   return NextResponse.json({ ok: true, brandId: invite.brand_id, handle: socialHandle });

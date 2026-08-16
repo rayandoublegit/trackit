@@ -51,22 +51,114 @@ export function setDisplayCurrency(currency: DisplayCurrency): void {
 }
 
 export function detectAppLangFromBrowser(): AppLang {
+  return detectAppLangFromLocation();
+}
+
+const FRENCH_REGIONS = new Set([
+  "FR",
+  "BE",
+  "LU",
+  "MC",
+  "MQ",
+  "GP",
+  "GF",
+  "RE",
+  "YT",
+  "NC",
+  "PF",
+  "WF",
+  "BL",
+  "MF",
+  "PM",
+  "TF",
+]);
+
+const FRENCH_TIMEZONES = new Set([
+  "Europe/Paris",
+  "Europe/Brussels",
+  "Europe/Luxembourg",
+  "Europe/Monaco",
+  "America/Martinique",
+  "America/Guadeloupe",
+  "America/Cayenne",
+  "America/Miquelon",
+  "America/Marigot",
+  "Indian/Reunion",
+  "Indian/Mayotte",
+  "Pacific/Noumea",
+  "Pacific/Tahiti",
+  "Pacific/Wallis",
+  "Pacific/Marquesas",
+  "Pacific/Gambier",
+]);
+
+function localeRegions(): string[] {
+  if (typeof navigator === "undefined") return [];
+  const locales = [navigator.language, ...(navigator.languages ?? [])].filter(Boolean);
+  const regions: string[] = [];
+  for (const locale of locales) {
+    try {
+      const region = new Intl.Locale(locale).maximize().region;
+      if (region) regions.push(region.toUpperCase());
+    } catch {
+      const match = locale.match(/[-_]([A-Za-z]{2})$/);
+      if (match) regions.push(match[1].toUpperCase());
+    }
+  }
+  return regions;
+}
+
+/** Infer UI language from timezone + locale region (location), not just browser UI language. */
+export function detectAppLangFromLocation(): AppLang {
   if (typeof navigator === "undefined") return "en";
+
+  let timeZone = "";
+  try {
+    timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    timeZone = "";
+  }
+
+  if (FRENCH_TIMEZONES.has(timeZone)) return "fr";
+
+  const regions = localeRegions();
+  if (regions.some((region) => FRENCH_REGIONS.has(region))) return "fr";
+
+  const englishRegions = new Set(["US", "GB", "AU", "NZ", "IE"]);
+  if (regions.some((region) => englishRegions.has(region))) return "en";
+  if (
+    /America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage|Adak|Boise|Detroit|Indiana|Kentucky|Menominee|Nome|Sitka|Yakutat|Honolulu)|Pacific\/Honolulu/.test(
+      timeZone,
+    )
+  ) {
+    return "en";
+  }
+
   return navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+function syncDocumentLang(lang: AppLang) {
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = lang;
 }
 
 export function getAppLang(): AppLang {
   if (typeof window === "undefined") return "en";
   const stored = localStorage.getItem(TRACKIT_LANG_KEY);
-  if (stored === "en" || stored === "fr") return stored;
-  const detected = detectAppLangFromBrowser();
+  if (stored === "en" || stored === "fr") {
+    syncDocumentLang(stored);
+    return stored;
+  }
+  const detected = detectAppLangFromLocation();
   localStorage.setItem(TRACKIT_LANG_KEY, detected);
+  syncDocumentLang(detected);
   return detected;
 }
 
 export function setAppLang(lang: AppLang): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TRACKIT_LANG_KEY, lang);
+  syncDocumentLang(lang);
   notifyLocaleUpdated();
 }
 

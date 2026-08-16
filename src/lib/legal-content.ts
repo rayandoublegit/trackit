@@ -12,7 +12,7 @@ export type LegalDocument = {
   sections: LegalSection[];
 };
 
-const CONTACT = "contact@thentrack.it";
+const CONTACT = "hello@thentrack.it";
 const LAST_UPDATED = "May 27, 2026";
 const LAST_UPDATED_FR = "27 mai 2026";
 

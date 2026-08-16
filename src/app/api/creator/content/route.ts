@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
+import { insertBrandNotification, resolveCreatorDisplayName } from "@/lib/brand-notifications";
 import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
@@ -182,6 +183,13 @@ export async function POST(request: Request) {
   if (campaignSyncErr) {
     console.error("campaign content sync failed:", campaignSyncErr.message);
   }
+
+  const creatorName = await resolveCreatorDisplayName(admin, userId);
+  await insertBrandNotification(admin, targetBrandId, "content_uploaded", {
+    creatorName,
+    title,
+    fileName,
+  });
 
   return NextResponse.json({
     ok: true,

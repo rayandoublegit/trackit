@@ -91,7 +91,7 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
     <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div
         style={{
-          paddingTop: isMobile ? 56 : 40,
+          paddingTop: isMobile ? 16 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,

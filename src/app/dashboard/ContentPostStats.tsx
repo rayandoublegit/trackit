@@ -20,8 +20,8 @@ export function ContentPostStatsDisplay({
           marginTop: 8,
           fontSize: 11,
           fontWeight: 500,
-          color: "#6B7280",
-          background: "#F3F4F6",
+          color: "var(--ws-text-muted)",
+          background: "var(--ws-surface-2)",
           borderRadius: 6,
           padding: "3px 8px",
           letterSpacing: "-0.01em",
@@ -47,13 +47,13 @@ export function ContentPostStatsDisplay({
         gap: "6px 12px",
         marginTop: 8,
         fontSize: 12,
-        color: "#6B7280",
+        color: "var(--ws-text-muted)",
         letterSpacing: "-0.01em",
       }}
     >
       {entries.map(({ label, value }) => (
         <span key={label}>
-          <span style={{ fontWeight: 600, color: "#1A1A1A" }}>{formatCompactStat(value, lang)}</span>{" "}
+          <span style={{ fontWeight: 600, color: "var(--ws-text)" }}>{formatCompactStat(value, lang)}</span>{" "}
           {label}
         </span>
       ))}

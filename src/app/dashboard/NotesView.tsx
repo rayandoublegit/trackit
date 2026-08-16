@@ -15,7 +15,7 @@ function NotesPageHeader({
   return (
     <div
       style={{
-        paddingTop: isMobile ? 56 : 40,
+        paddingTop: isMobile ? 16 : 40,
         paddingRight: isMobile ? 16 : 40,
         paddingBottom: isMobile ? 16 : 24,
         paddingLeft: isMobile ? 16 : 40,

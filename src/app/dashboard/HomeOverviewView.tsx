@@ -30,7 +30,7 @@ function OverviewHeader({
   return (
     <div
       style={{
-        paddingTop: isMobile ? 56 : subtitle ? 40 : 28,
+        paddingTop: isMobile ? 16 : subtitle ? 40 : 28,
         paddingRight: isMobile ? 16 : 40,
         paddingBottom: isMobile ? 16 : subtitle ? 28 : 16,
         paddingLeft: isMobile ? 16 : 40,

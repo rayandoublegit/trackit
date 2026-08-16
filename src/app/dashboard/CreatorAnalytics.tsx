@@ -97,7 +97,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
     return { bg: "#FFF7ED", color: "#D97706" };
   };
 
-  const pad = isMobile ? "56px 16px 48px" : "40px 40px 48px";
+  const pad = isMobile ? "16px 16px 48px" : "40px 40px 48px";
 
   if (loading) {
     return (
@@ -111,7 +111,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
     <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div
         style={{
-          paddingTop: isMobile ? 56 : 40,
+          paddingTop: isMobile ? 16 : 40,
           paddingRight: isMobile ? 16 : 40,
           paddingBottom: isMobile ? 16 : 24,
           paddingLeft: isMobile ? 16 : 40,

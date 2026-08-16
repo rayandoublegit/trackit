@@ -42,6 +42,29 @@ export function getClientBrandWorkspaceId(): string | null {
   return readActiveWorkspaceId();
 }
 
+const TAB_TITLE_KEY = "trackit_dashboard_tab_title";
+
+/** Titre d'onglet du dashboard : nom du workspace, sinon « Dashboard ». */
+export function applyDashboardTabTitle(name?: string | null) {
+  if (typeof document === "undefined") return;
+  const next = (name || "").trim() || "Dashboard";
+  document.title = next;
+  try {
+    sessionStorage.setItem(TAB_TITLE_KEY, next);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readCachedDashboardTabTitle(): string {
+  if (typeof window === "undefined") return "Dashboard";
+  try {
+    return sessionStorage.getItem(TAB_TITLE_KEY) || "Dashboard";
+  } catch {
+    return "Dashboard";
+  }
+}
+
 export function workspaceStorageKey(base: string, workspaceId?: string | null) {
   const id = workspaceId ?? getClientBrandWorkspaceId();
   return id ? `${base}.${id}` : base;

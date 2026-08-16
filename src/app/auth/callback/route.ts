@@ -27,6 +27,7 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      const creatorOnly = searchParams.get("role") === "creator";
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -36,6 +37,13 @@ export async function GET(request: Request) {
           .select("onboarding_completed, account_type")
           .eq("id", user.id)
           .maybeSingle();
+        if (creatorOnly) {
+          if (profile?.account_type === "creator") {
+            return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
+          }
+          await supabase.auth.signOut();
+          return NextResponse.redirect(`${origin}/auth?mode=login&role=creator&error=not_creator`);
+        }
         if (profile && profile.account_type === "creator") {
           return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
         }

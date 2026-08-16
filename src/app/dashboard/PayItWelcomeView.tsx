@@ -288,7 +288,7 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
 }
 
 export function PayItWelcomeLoading({ isMobile }: { isMobile?: boolean }) {
-  const pad = isMobile ? "56px 16px 48px" : "48px 48px 64px";
+  const pad = isMobile ? "16px 16px 48px" : "48px 48px 64px";
   return (
     <div style={{ minHeight: "100%", background: "var(--ws-bg)", padding: pad }}>
       <div style={{ maxWidth: 1120, margin: "0 auto", opacity: 0.5 }}>
@@ -331,7 +331,7 @@ export function PayItWelcomeView({
   primaryLabel?: string;
 }) {
   const lang = useLang();
-  const pad = isMobile ? "56px 16px 48px" : "48px 48px 64px";
+  const pad = isMobile ? "16px 16px 48px" : "48px 48px 64px";
 
   const features: { icon: ReactNode; title: string; description: string }[] =
     lang === "fr"

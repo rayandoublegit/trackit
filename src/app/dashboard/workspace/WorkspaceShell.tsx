@@ -17,7 +17,7 @@ import {
   type WorkspaceSpace,
 } from "@/lib/dashboard-view-storage";
 import { beginWorkspaceSwitch } from "@/lib/workspace-switch";
-import type { BrandWorkspace } from "@/lib/workspaces";
+import { applyDashboardTabTitle, type BrandWorkspace } from "@/lib/workspaces";
 import {
   createWbBoard,
   deleteWbBoard,
@@ -40,6 +40,12 @@ import {
   type MinoChat,
 } from "@/lib/mino-chats-storage";
 import { getLastCampaignId, rememberLastCampaignId } from "@/lib/last-campaign-storage";
+import {
+  buildDashboardSearchCatalog,
+  highlightSearchMatch,
+  searchDashboardCatalog,
+  type DashboardSearchHit,
+} from "@/lib/dashboard-search";
 import { useDashboardTheme } from "../DashboardThemeProvider";
 import { useDashboardNavigationOptional } from "../DashboardNavigationProvider";
 import { WsIcon } from "./WorkspaceIcons";
@@ -112,6 +118,7 @@ export function WorkspaceShell({
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchIndex, setSearchIndex] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const [stripeConnectActive, setStripeConnectActive] = useState(false);
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
@@ -144,6 +151,7 @@ export function WorkspaceShell({
   const profileRef = useRef<HTMLDivElement>(null);
   const minoMenuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isMobile) setSidebarOpen(false);
@@ -303,13 +311,16 @@ export function WorkspaceShell({
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setSearchOpen(true);
         setProfileOpen(false);
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
       }
       if (e.key === "Escape") {
         setSearchOpen(false);
+        setSearch("");
         setProfileOpen(false);
         setCreateWbOpen(false);
+        searchInputRef.current?.blur();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -330,6 +341,8 @@ export function WorkspaceShell({
     if (isCreator) {
       return [
         { space: "home", label: "Home", icon: "home" },
+        { space: "scripts", label: "Scripts", icon: "list" },
+        { space: "content", label: lang === "fr" ? "Contenu" : "Content", icon: "camera" },
         { space: "analytics", label: lang === "fr" ? "Stats" : "Stats", icon: "analytics" },
         { space: "payit", label: "Pay it", icon: "payit" },
         { space: "whiteboard", label: "Board", icon: "whiteboard" },
@@ -343,7 +356,7 @@ export function WorkspaceShell({
       { space: "planner", label: "Planner", icon: "planner" },
       { space: "whiteboard", label: lang === "fr" ? "Board" : "Board", icon: "whiteboard" },
       { space: "integrations", label: lang === "fr" ? "Integrations" : "Integrations", icon: "integrations" },
-      { space: "ai", label: "AI", icon: "ai" },
+      { space: "ai", label: "Mino", icon: "ai" },
     ];
   }, [isCreator, lang]);
 
@@ -358,7 +371,9 @@ export function WorkspaceShell({
       whiteboard: "Whiteboard",
       integrations: lang === "fr" ? "Intégrations" : "Integrations",
       analytics: "Analytics",
-      ai: "AI",
+      ai: "Mino",
+      scripts: "Scripts",
+      content: lang === "fr" ? "Contenu" : "Content",
     };
     return map[activeSpace];
   }, [activeSpace, lang]);
@@ -371,7 +386,17 @@ export function WorkspaceShell({
           { id: "balance", label: lang === "fr" ? "Solde" : "Balance", view: "balance", icon: "billing" },
         ];
       }
-      return [{ id: "home", label: "Home", view: "dashboard", icon: "home" }];
+      if (activeSpace === "scripts") {
+        return [{ id: "scripts", label: "Scripts", view: "scripts", icon: "list" }];
+      }
+      if (activeSpace === "content") {
+        return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" }];
+      }
+      return [
+        { id: "home", label: "Home", view: "dashboard", icon: "home" },
+        { id: "scripts", label: "Scripts", view: "scripts", icon: "list" },
+        { id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" },
+      ];
     }
 
     switch (activeSpace) {
@@ -436,7 +461,11 @@ export function WorkspaceShell({
       case "analytics":
         return [{ id: "analytics", label: "Analytics", view: "analytics", icon: "analytics" }];
       case "ai":
-        return [{ id: "ai", label: "AI Chats", view: "ai", icon: "ai" }];
+        return [{ id: "ai", label: "Mino", view: "ai", icon: "ai" }];
+      case "scripts":
+        return [{ id: "scripts", label: "Scripts", view: "scripts", icon: "list" }];
+      case "content":
+        return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "brand-content", icon: "camera" }];
       default:
         return [
           { id: "inbox", label: "Inbox", view: "notifications", icon: "inbox" },
@@ -565,6 +594,23 @@ export function WorkspaceShell({
     profile?.full_name ||
     (profile?.username ? `@${profile.username}` : "Trackit");
 
+  const tabWorkspaceName = (() => {
+    if (isCreator) return "Dashboard";
+    const active = brandSpaces.find((space) => space.id === (activeSpaceId || userId));
+    const named = (active?.name || "").trim();
+    if (named) return named;
+    if (brandSpaces.length > 0) return (brandSpaces[0]?.name || "").trim() || "Dashboard";
+    return "";
+  })();
+
+  useEffect(() => {
+    if (isCreator) {
+      applyDashboardTabTitle("Dashboard");
+      return;
+    }
+    if (tabWorkspaceName) applyDashboardTabTitle(tabWorkspaceName);
+  }, [isCreator, tabWorkspaceName]);
+
   const displayName =
     actorProfile?.full_name ||
     profile?.full_name ||
@@ -577,43 +623,50 @@ export function WorkspaceShell({
     : "";
 
   const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const catalog: Array<{ label: string; view: DashboardView; group: string }> = [
-      { label: "Inbox", view: "notifications", group: "Home" },
-      { label: "Outreach", view: "outreach", group: "Home" },
-      { label: "Tasks", view: "tasks", group: "Home" },
-      { label: "AI Chat", view: "ai", group: "Home" },
-      { label: "Discovery", view: "discovery", group: "Discover" },
-      { label: "Inbox", view: "findit-inbox", group: "Discover" },
-      { label: lang === "fr" ? "Gérer" : "Manage", view: "creators", group: "Discover" },
-      { label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", group: "Trackit" },
-      { label: lang === "fr" ? "Liens" : "Links", view: "links", group: "Trackit" },
-      { label: lang === "fr" ? "Contenu" : "Content", view: "brand-content", group: "Trackit" },
-      { label: "Pay it", view: "payouts", group: "Pay it" },
-      { label: "Planner", view: "planner", group: "Tools" },
-      { label: "Meetings", view: "planner", group: "Tools" },
-      { label: "Planner Notes", view: "planner-notes", group: "Tools" },
-      { label: "Notes", view: "notes", group: "Tools" },
-      { label: "Whiteboard", view: "whiteboard", group: "Tools" },
-      { label: lang === "fr" ? "Intégrations" : "Integrations", view: "integrations", group: "Tools" },
-      { label: "Analytics", view: "analytics", group: "More" },
-      { label: lang === "fr" ? "Paramètres" : "Settings", view: "settings", group: "More" },
-      { label: lang === "fr" ? "Facturation" : "Billing", view: "billing", group: "More" },
-      ...campaigns.map((c) => ({ label: c.name, view: "campaigns" as DashboardView, group: "Campaigns" })),
-    ];
-    if (!q) return catalog.slice(0, 8);
-    return catalog.filter((item) => item.label.toLowerCase().includes(q)).slice(0, 10);
-  }, [campaigns, lang, search]);
+    const catalog = buildDashboardSearchCatalog({
+      lang,
+      isCreator,
+      campaigns: isCreator ? [] : campaigns,
+      boards: wbBoards,
+      chats: minoChats.map((c) => ({ id: c.id, title: c.title })),
+    });
+    return searchDashboardCatalog(catalog, search);
+  }, [campaigns, isCreator, lang, minoChats, search, wbBoards]);
+
+  useEffect(() => {
+    setSearchIndex(0);
+  }, [search]);
+
+  const goToSearchHit = (item: DashboardSearchHit) => {
+    if (item.campaignId) {
+      rememberLastCampaignId(userId, item.campaignId);
+      dashNav?.navigate({
+        view: "campaigns",
+        campaign: { type: "detail", id: item.campaignId, tab: "analytics" },
+      });
+    } else if (item.boardId) {
+      setActiveWbBoardId(userId, item.boardId);
+      onNavigate("whiteboard");
+    } else if (item.chatId) {
+      setActiveMinoChatId(userId, item.chatId);
+      onNavigate("ai");
+    } else {
+      onNavigate(item.view);
+    }
+    setSearch("");
+    setSearchOpen(false);
+    if (isMobile) setSidebarOpen(false);
+  };
 
   const goSpace = (space: WorkspaceSpace) => {
     onNavigate(defaultViewForSpace(space));
-    if (isMobile) setSidebarOpen(true);
+    if (isMobile) setSidebarOpen(false);
   };
 
   const flushContent = view === "discovery" || view === "whiteboard";
 
   return (
-    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}`}>
+    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}`}>
       <header className="ws-topbar">
           <button
             type="button"
@@ -657,13 +710,37 @@ export function WorkspaceShell({
             <div className="ws-search-wrap__inner">
               <WsIcon name="search" size={16} />
               <input
+                ref={searchInputRef}
                 value={search}
                 onChange={(e) => {
-                  setSearch(e.target.value);
-                  setSearchOpen(true);
+                  const next = e.target.value;
+                  setSearch(next);
+                  setSearchOpen(next.trim().length > 0);
                 }}
-                onFocus={() => setSearchOpen(true)}
+                onFocus={() => {
+                  if (search.trim()) setSearchOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (!search.trim()) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSearchOpen(true);
+                    setSearchIndex((i) => (searchResults.length ? (i + 1) % searchResults.length : 0));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSearchOpen(true);
+                    setSearchIndex((i) =>
+                      searchResults.length ? (i - 1 + searchResults.length) % searchResults.length : 0,
+                    );
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    const hit = searchResults[searchIndex] ?? searchResults[0];
+                    if (hit) goToSearchHit(hit);
+                  }
+                }}
                 placeholder={lang === "fr" ? "Rechercher" : "Search"}
+                autoComplete="off"
+                spellCheck={false}
               />
               <span className="ws-search-kbd">⌘K</span>
               <button
@@ -673,40 +750,50 @@ export function WorkspaceShell({
                 aria-label={lang === "fr" ? "Parler à Mino" : "Chat with Mino"}
                 onClick={() => onNavigate("ai")}
               >
-                <WsIcon name="sparkle" size={14} />
-                <span>Ask AI</span>
+                <WsIcon name="sparkle" size={16} />
+                <span>Ask Mino</span>
               </button>
             </div>
-            {searchOpen && (
+            {searchOpen && search.trim() ? (
               <div className="ws-search-panel">
-                {searchResults.map((item) => (
-                  <button
-                    key={`${item.group}-${item.label}-${item.view}`}
-                    type="button"
-                    className="ws-search-panel__item"
-                    onClick={() => {
-                      onNavigate(item.view);
-                      setSearch("");
-                      setSearchOpen(false);
-                    }}
-                  >
-                    {item.label}
-                    <span className="ws-search-panel__meta">{item.group}</span>
-                  </button>
-                ))}
+                {searchResults.map((item, i) => {
+                  const parts = highlightSearchMatch(item.label, search);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`ws-search-panel__item${i === searchIndex ? " is-active" : ""}`}
+                      onMouseEnter={() => setSearchIndex(i)}
+                      onClick={() => goToSearchHit(item)}
+                    >
+                      <span>
+                        {parts.match ? (
+                          <>
+                            {parts.before}
+                            <mark className="ws-search-panel__mark">{parts.match}</mark>
+                            {parts.after}
+                          </>
+                        ) : (
+                          item.label
+                        )}
+                      </span>
+                      <span className="ws-search-panel__meta">{item.group}</span>
+                    </button>
+                  );
+                })}
                 {searchResults.length === 0 && (
                   <div style={{ padding: 14, color: "var(--ws-text-muted)", fontSize: 13 }}>
                     {lang === "fr" ? "Aucun résultat" : "No results"}
                   </div>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
 
           <div className="ws-top-actions">
             <button
               type="button"
-              className="ws-icon-btn"
+              className="ws-icon-btn ws-top-actions__desk"
               data-tip={lang === "fr" ? "Planifier" : "Planner"}
               aria-label={lang === "fr" ? "Planifier" : "Planner"}
               onClick={() => onNavigate("planner")}
@@ -715,7 +802,7 @@ export function WorkspaceShell({
             </button>
             <button
               type="button"
-              className="ws-icon-btn"
+              className="ws-icon-btn ws-top-actions__desk"
               data-tip={lang === "fr" ? "Notes" : "Notes"}
               aria-label={lang === "fr" ? "Notes" : "Notes"}
               onClick={() => onNavigate("planner-notes")}
@@ -728,13 +815,14 @@ export function WorkspaceShell({
               data-tip="Notifications"
               aria-label="Notifications"
               onClick={() => onNavigate("notifications")}
+              style={isCreator ? { display: "none" } : undefined}
             >
               <WsIcon name="bell" size={17} />
               {notificationUnread > 0 ? <span className="ws-dot" /> : null}
             </button>
             <button
               type="button"
-              className="ws-icon-btn"
+              className="ws-icon-btn ws-top-actions__desk"
               data-tip="Analytics"
               aria-label="Analytics"
               onClick={openRecentCampaignAnalytics}
@@ -743,7 +831,7 @@ export function WorkspaceShell({
             </button>
             <button
               type="button"
-              className="ws-icon-btn"
+              className="ws-icon-btn ws-top-actions__desk"
               data-tip="Whiteboard"
               aria-label="Whiteboard"
               onClick={() => onNavigate("whiteboard")}
@@ -840,7 +928,7 @@ export function WorkspaceShell({
                   </button>
                   <button type="button" className="ws-menu__item" onClick={() => { onNavigate("ai"); setProfileOpen(false); }}>
                     <WsIcon name="ai" size={16} />
-                    AI Chats
+                    Mino
                   </button>
                   {!isCreator && (
                     <button type="button" className="ws-menu__item" onClick={() => { onNavigate("billing"); setProfileOpen(false); }}>
@@ -862,6 +950,15 @@ export function WorkspaceShell({
             </div>
           </div>
       </header>
+
+      {isMobile && sidebarOpen ? (
+        <button
+          type="button"
+          className="ws-sidebar-backdrop"
+          aria-label={lang === "fr" ? "Fermer le menu" : "Close menu"}
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
 
       <div className="ws-shell__body">
         <aside className="ws-rail" aria-label="Primary">
@@ -1446,7 +1543,7 @@ export function WorkspaceShell({
                     ) : null}
 
                     <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
-                      <div className="ws-sidebar__section-label">AI Chats</div>
+                      <div className="ws-sidebar__section-label">Mino</div>
                       <button
                         type="button"
                         className={`ws-sidebar__link${view === "ai" ? " is-active" : ""}`}

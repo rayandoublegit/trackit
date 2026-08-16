@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthedActorId, getAuthedUserId } from "@/lib/api-auth";
+import { workspaceAvatarOrNull } from "@/lib/workspace-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,8 @@ async function ensureDefaultWorkspace(ownerId: string) {
     .eq("id", ownerId)
     .maybeSingle();
 
-  // Seed the name from the profile as a starting value only; the workspace
-  // photo stays independent from the account picture (no avatar copy).
+  // Seed the name from the profile as a starting value only. Never copy the
+  // account picture onto the workspace.
   const name =
     (profile?.business_name && String(profile.business_name).trim()) ||
     (profile?.full_name && String(profile.full_name).trim()) ||
@@ -59,28 +60,22 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  // One-time cleanup: older default workspaces were seeded with the account
-  // profile picture (same storage file), which kept them visually linked.
-  // The account file lives at `avatars/${ownerId}/avatar.*`; workspace photos
-  // live at `avatars/${ownerId}/workspaces/${workspaceId}/avatar.*`. Anchor on
-  // the bucket segment so a default workspace's own photo (workspaceId ===
-  // ownerId) is never mistaken for the account picture.
-  const legacyMarker = `/avatars/${ownerId}/avatar.`;
-  const workspaces = (data || []).map((w) =>
-    w.avatar_url && w.avatar_url.includes(legacyMarker) ? { ...w, avatar_url: null } : w,
-  );
-  const legacyIds = (data || [])
-    .filter((w) => w.avatar_url && w.avatar_url.includes(legacyMarker))
-    .map((w) => w.id);
-  if (legacyIds.length > 0) {
-    await admin.from("workspaces").update({ avatar_url: null }).in("id", legacyIds);
-  }
-
   const { data: profile } = await admin
     .from("profiles")
-    .select("active_workspace_id")
+    .select("active_workspace_id, avatar_url")
     .eq("id", ownerId)
     .maybeSingle();
+
+  const accountAvatar = profile?.avatar_url ?? null;
+  const detached: string[] = [];
+  const workspaces = (data || []).map((w) => {
+    const avatar_url = workspaceAvatarOrNull(ownerId, w.id, w.avatar_url, accountAvatar);
+    if (avatar_url !== (w.avatar_url || null)) detached.push(w.id);
+    return { ...w, avatar_url };
+  });
+  if (detached.length > 0) {
+    await admin.from("workspaces").update({ avatar_url: null }).in("id", detached);
+  }
 
   return NextResponse.json({
     ok: true,
@@ -104,7 +99,11 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const name = String(body.name || "").trim();
-  const avatarUrl = body.avatarUrl ? String(body.avatarUrl).trim() : null;
+  const avatarUrl = workspaceAvatarOrNull(
+    ownerId,
+    "",
+    body.avatarUrl ? String(body.avatarUrl).trim() : null,
+  );
   if (!name) {
     return NextResponse.json({ ok: false, error: "Name required" }, { status: 400 });
   }

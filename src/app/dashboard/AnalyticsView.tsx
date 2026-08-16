@@ -403,7 +403,7 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   return (
     <>
       <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
-      <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 56 : undefined }}>
+      <div style={{ padding: isMobile ? 16 : "24px 40px 40px", paddingTop: isMobile ? 16 : undefined }}>
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
           <SplitHeaderActions
             variant="white"
@@ -687,7 +687,7 @@ function AnalyticsHeader({ lang, range, setRange, compare, setCompare, isMobile,
     { id: "custom", label: lang === "fr" ? "Personnalisé" : "Custom" },
   ];
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFF" }}>
+    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 20, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid var(--ws-border)", background: "var(--ws-surface)" }}>
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.04em" }}>{lang === "fr" ? "Analytiques" : "Analytics"}</h1>
       </div>

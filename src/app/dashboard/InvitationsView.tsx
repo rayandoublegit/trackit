@@ -44,7 +44,7 @@ export function InvitationsView({
   const linkCardRef = useRef<HTMLDivElement>(null);
   const canInvite = canInviteCreators(plan);
 
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const pagePad = isMobile ? "16px 16px 40px" : "48px 64px 64px";
 
   const generate = async () => {
     if (!canInvite) {

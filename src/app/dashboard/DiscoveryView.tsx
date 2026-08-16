@@ -233,8 +233,8 @@ function formatCount(n: number) {
 
 function DiscoveryHeader({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 0, paddingLeft: isMobile ? 16 : 40, background: "#FFFFFF" }}>
-      <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>
+    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 0, paddingLeft: isMobile ? 16 : 40, background: "var(--ws-surface)" }}>
+      <h1 style={{ fontSize: isMobile ? 24 : 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 6 }}>
         {lang === "fr" ? "Recherche" : "Discovery"}
       </h1>
       <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
@@ -2472,7 +2472,7 @@ export function DiscoveryView({
 
   const creatorsGridStyle: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+    gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))",
     gap: 16,
   };
 
@@ -2480,7 +2480,7 @@ export function DiscoveryView({
     <>
       <DiscoveryHeader lang={lang} isMobile={isMobile} />
       <DiscoveryTabs lang={lang} activeTab={activeTab} savedCount={savedCreators.length} onTabChange={setActiveTab} />
-      <div style={{ padding: isMobile ? "56px 16px 16px" : "40px" }}>
+      <div style={{ padding: isMobile ? "16px 16px 16px" : "40px" }}>
         {activeTab === "discover" && (
           <>
         <div style={{ background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 16, padding: 20, marginBottom: 24, marginTop: 20 }}>

@@ -132,7 +132,7 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
     if (activeFolder === id) setActiveFolder(null);
   };
 
-  const pad = isMobile ? "56px 16px 40px" : "40px";
+  const pad = isMobile ? "16px 16px 40px" : "40px";
 
   if (!isPaid) {
     return (

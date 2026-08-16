@@ -90,6 +90,7 @@ import {
   setNotificationsUserId,
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
+import { syncBrandServerNotifications } from "@/lib/server-notifications-sync";
 import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
@@ -117,7 +118,6 @@ import {
   DashboardNavigationProvider,
   useDashboardNavigationController,
 } from "./DashboardNavigationProvider";
-import { getDashboardTheme } from "@/lib/dashboard-theme";
 import { DashboardThemeProvider, useDashboardTheme } from "./DashboardThemeProvider";
 import { WorkspaceShell } from "./workspace/WorkspaceShell";
 import { WhiteboardView } from "./WhiteboardView";
@@ -316,7 +316,7 @@ function DashboardPageContent() {
   }, []);
 
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768);
+    const check = () => setIsMobile(window.innerWidth < 900);
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -347,6 +347,25 @@ function DashboardPageContent() {
       removeSoundUnlock();
     };
   }, [user?.id, lang, isCreator, loading]);
+
+  // Notifications serveur (actions des créateurs) — marques uniquement.
+  useEffect(() => {
+    if (!user?.id || loading || isCreator) return;
+    const userId = user.id;
+    let cancelled = false;
+    const sync = () => {
+      if (cancelled || document.visibilityState === "hidden") return;
+      void syncBrandServerNotifications(userId, lang);
+    };
+    sync();
+    const interval = window.setInterval(sync, 30_000);
+    window.addEventListener("focus", sync);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", sync);
+    };
+  }, [user?.id, loading, isCreator, lang]);
 
   const loadSidebarCounts = useCallback(async (userId: string) => {
     if (!supabase) return;
@@ -578,14 +597,10 @@ function DashboardPageContent() {
         avatarRetryRef.current = false;
         setAvatarBroken(false);
         const displayBusinessName = activeSpaceMeta?.name || profileData.business_name;
-        const displayAvatar =
-          activeSpaceId !== workspaceId
-            ? activeSpaceMeta?.avatar_url ?? profileData.avatar_url
-            : profileData.avatar_url;
         setProfile({
           full_name: profileData.full_name,
           username: profileData.username,
-          avatar_url: displayAvatar,
+          avatar_url: profileData.avatar_url,
           business_name: displayBusinessName,
           shopify_store: profileData.shopify_store ?? null,
           plan: normalizePlan(profileData.plan),
@@ -594,12 +609,12 @@ function DashboardPageContent() {
           buildBootstrapFromProfile(workspaceUser, {
             ...profileData,
             business_name: displayBusinessName,
-            avatar_url: displayAvatar,
+            avatar_url: profileData.avatar_url,
           }),
         );
         setLoading(false);
 
-        void resolveAvatarUrl(supabase, workspaceId, displayAvatar).then((avatar_url) => {
+        void resolveAvatarUrl(supabase, workspaceId, profileData.avatar_url).then((avatar_url) => {
           if (cancelled) return;
           setProfile((prev) => (prev ? { ...prev, avatar_url } : prev));
         });
@@ -826,8 +841,9 @@ function DashboardPageContent() {
   };
 
   if (loading) {
-    const bootBg = getDashboardTheme() === "dark" ? "#000000" : "#FAFAFA";
-    return <div style={{ minHeight: "100vh", background: bootBg }} />;
+    // Fond résolu en CSS via data-dashboard-theme (posé avant hydratation) :
+    // le HTML serveur et client restent identiques — pas de mismatch.
+    return <div style={{ minHeight: "100vh", background: "var(--ws-bg, #FAFAFA)" }} />;
   }
 
   if (workspaceAccessError) {
@@ -891,7 +907,7 @@ function DashboardPageContent() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: isMobile ? "56px 24px 40px" : "48px 40px",
+              padding: isMobile ? "16px 16px 40px" : "48px 40px",
               background: "var(--ws-surface)",
             }}
           >
@@ -923,6 +939,10 @@ function DashboardPageContent() {
             userId={user?.id}
             isMobile={isMobile}
             onNavigate={goToSidebarItem}
+            onUnreadChange={setNotificationUnread}
+            onOpenAction={(action) => {
+              if (action === "feedback") goToSidebarItem("feedback");
+            }}
           />
           </KeepAlivePane>
         )}
@@ -1101,7 +1121,7 @@ function DashboardPageContent() {
           {isCreator ? (
             <CreatorScripts userId={user.id} isMobile={isMobile} />
           ) : (
-            <div style={{ padding: isMobile ? "56px 16px 16px" : "40px", background: "#FFFFFF", minHeight: "100vh" }}>
+            <div style={{ padding: isMobile ? "16px 16px 16px" : "40px", background: "var(--ws-surface)", minHeight: "100vh" }}>
               <ScriptsManager
                 brandId={user.id}
                 isMobile={isMobile}
@@ -1203,7 +1223,9 @@ function DashboardPageContent() {
             fallbackName={
               profile?.business_name || profile?.full_name || profile?.username || "Workspace"
             }
-            onSaved={() => void reloadProfile(user.id)}
+            onSaved={() => {
+              window.dispatchEvent(new Event("trackit:workspaces-updated"));
+            }}
           />
           </KeepAlivePane>
         )}
@@ -1252,8 +1274,7 @@ function DashboardPageContent() {
 }
 
 function DashboardBootFallback() {
-  const bootBg = typeof window !== "undefined" && getDashboardTheme() === "dark" ? "#000000" : "#FAFAFA";
-  return <div style={{ minHeight: "100vh", background: bootBg }} />;
+  return <div style={{ minHeight: "100vh", background: "var(--ws-bg, #FAFAFA)" }} />;
 }
 
 export default function DashboardPage() {
@@ -1268,7 +1289,7 @@ function PageHeader({ title, subtitle, right, isMobile, dense }: { title: string
   const { theme } = useDashboardTheme();
   const dark = theme === "dark";
   return (
-    <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: dark ? "transparent" : "#FFFFFF" }}>
+    <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: dense ? (isMobile ? 8 : 12) : (isMobile ? 16 : 24), paddingLeft: isMobile ? 16 : 40, background: dark ? "transparent" : "#FFFFFF" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 24 }}>
         <div>
           <h1 style={{ fontSize: isMobile ? 30 : 32, fontWeight: 600, color: dark ? "#F3F3F4" : "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: subtitle ? 6 : 0 }}>{title}</h1>
@@ -3183,7 +3204,7 @@ function ShopifyConnectPage({
   onConnect: () => void;
   onClose: () => void;
 }) {
-  const pagePad = isMobile ? "56px 20px 40px" : "48px 64px 64px";
+  const pagePad = isMobile ? "16px 16px 40px" : "48px 64px 64px";
 
   const steps =
     lang === "fr"
@@ -4011,7 +4032,7 @@ function AutomationView({
           onClose={() => setUpgradeModalOpen(false)}
         />
       )}
-      <div style={{ paddingTop: isMobile ? 56 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
+      <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 24, paddingLeft: isMobile ? 16 : 40, borderBottom: "1px solid #EFEFEF", background: "#FFFFFF" }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.04em", margin: 0, marginBottom: 6, display: "flex", alignItems: "center" }}>
             {lang === "fr" ? "Automatisation" : "Automation"}
@@ -4950,7 +4971,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "ai",
-      label: "Ask AI",
+      label: "Ask Mino",
       view: "ai",
       section: "main",
       iconKey: "ai",
@@ -5297,8 +5318,8 @@ function DashboardTopBar({
               top: "calc(100% + 8px)",
               right: 0,
               width: 380,
-              background: "#FFFFFF",
-              border: "1px solid #EFEFEF",
+              background: "var(--ws-surface)",
+              border: "1px solid var(--ws-border)",
               borderRadius: 12,
               boxShadow: notificationsOpen ? "0 12px 32px rgba(0,0,0,0.1)" : "none",
               overflow: "hidden",

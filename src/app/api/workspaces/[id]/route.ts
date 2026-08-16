@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthedActorId, getAuthedUserId } from "@/lib/api-auth";
+import { workspaceAvatarOrNull } from "@/lib/workspace-avatar";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,9 @@ export async function PATCH(request: Request, { params }: Params) {
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.name === "string" && body.name.trim()) patch.name = body.name.trim();
   if (body.avatarUrl === null) patch.avatar_url = null;
-  if (typeof body.avatarUrl === "string") patch.avatar_url = body.avatarUrl.trim() || null;
+  if (typeof body.avatarUrl === "string") {
+    patch.avatar_url = workspaceAvatarOrNull(ownerId, id, body.avatarUrl.trim() || null);
+  }
 
   const { data, error } = await admin
     .from("workspaces")

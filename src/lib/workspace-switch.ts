@@ -10,6 +10,7 @@
 
 import { rememberClientBrandSpace } from "@/lib/brand-workspace";
 import { setWorkspaceClientIdentity } from "@/lib/supabase";
+import { applyDashboardTabTitle } from "@/lib/workspaces";
 
 export const WORKSPACE_SWITCH_FLAG_KEY = "trackit_ws_switch_v1";
 export const WORKSPACE_SWITCH_VEIL_ID = "ws-switch-boot-overlay";
@@ -132,6 +133,7 @@ export function beginWorkspaceSwitch(opts: BeginWorkspaceSwitchOptions): void {
 
   rememberClientBrandSpace(opts.workspaceId);
   setWorkspaceClientIdentity(opts.actorId || opts.ownerId, opts.ownerId, opts.workspaceId);
+  applyDashboardTabTitle(opts.name);
 
   const flag: WorkspaceSwitchFlag = {
     name: opts.name || "",

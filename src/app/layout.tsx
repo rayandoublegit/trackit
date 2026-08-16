@@ -63,13 +63,18 @@ const PRELOAD_FONTS = [
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {PRELOAD_FONTS.map((href) => (
           <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
         ))}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k="trackit_lang";var l=localStorage.getItem(k);if(l!=="fr"&&l!=="en"){var tz="";try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||""}catch(e){}var frTz=/Paris|Brussels|Luxembourg|Monaco|Martinique|Guadeloupe|Cayenne|Miquelon|Marigot|Reunion|Mayotte|Noumea|Tahiti|Wallis|Marquesas|Gambier/;var loc="";try{loc=(new Intl.Locale(navigator.language||"").maximize().region||"").toUpperCase()}catch(e){}var frReg=/^(FR|BE|LU|MC|MQ|GP|GF|RE|YT|NC|PF|WF|BL|MF|PM|TF)$/;var lang=(navigator.language||"").toLowerCase();l=(frTz.test(tz)||frReg.test(loc)||lang.indexOf("fr")===0)?"fr":"en";localStorage.setItem(k,l)}document.documentElement.lang=l}catch(e){}})();`,
+          }}
+        />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <SeoJsonLd data={[organizationJsonLd(), websiteJsonLd(), softwareApplicationJsonLd()]} />
         {children}
         <Script

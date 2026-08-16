@@ -11,7 +11,9 @@ import {
 export type Lang = AppLang;
 
 export function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>(() =>
+    typeof window === "undefined" ? "en" : getAppLang()
+  );
 
   useEffect(() => {
     setLang(getAppLang());

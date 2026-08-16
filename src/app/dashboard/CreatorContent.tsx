@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
 import {
   CREATOR_CONTENT_MAX_FILE_LABEL,
@@ -10,11 +11,10 @@ import {
 } from "@/lib/content-upload-limits";
 import { CONTENT_UPDATED_EVENT, dispatchContentUpdated } from "@/lib/outreach-history-events";
 import { supabase } from "@/lib/supabase";
-import { ContentPostStatsDisplay } from "./ContentPostStats";
+import { formatCompactStat } from "@/lib/content-shared";
 import { InfoTip } from "./analytics-metric-cards";
 
-const BLUE = "var(--ws-accent)";
-const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
 
 type BrandOption = { id: string; name: string; creatorRowId: string | null };
 
@@ -38,8 +38,6 @@ type ContentItem = {
   posted_at?: string | null;
   stats_updated_at?: string | null;
 };
-
-const externFont = "'InterDisplay', 'Inter Display', sans-serif";
 
 function ContentTrackedLink({ lang, linkUrl }: { lang: "en" | "fr"; linkUrl: string }) {
   const [copied, setCopied] = useState(false);
@@ -74,9 +72,9 @@ function ContentTrackedLink({ lang, linkUrl }: { lang: "en" | "fr"; linkUrl: str
           style={{
             flex: 1,
             minWidth: 0,
-            fontFamily: externFont,
+            fontFamily: drawerFont,
             fontSize: 13,
-            color: BLUE,
+            color: "var(--ws-accent)",
             letterSpacing: "-0.02em",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -130,23 +128,119 @@ function safeStorageName(name: string): string {
   return name.replace(/[^\w.\-()+ ]/g, "_").slice(0, 120);
 }
 
+function formatDate(iso: string, lang: "fr" | "en") {
+  try {
+    return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function CreatorContentCard({
+  item,
+  lang,
+  onDelete,
+}: {
+  item: ContentItem;
+  lang: "fr" | "en";
+  onDelete: (id: string) => void;
+}) {
+  const isImage = isImageFile(item);
+  const isVideo = isVideoFile(item);
+
+  return (
+    <article className="bc-card">
+      <div className="bc-card__media">
+        {isImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.file_url} alt="" />
+        ) : isVideo ? (
+          <video src={item.file_url} controls />
+        ) : (
+          <div className="bc-card__file">{item.file_name}</div>
+        )}
+      </div>
+      <div className="bc-card__body">
+        <div className="bc-card__title">{item.title}</div>
+        <div className="bc-card__meta">
+          {item.brandName || "—"}
+          {" · "}
+          {formatDate(item.created_at, lang)}
+          {item.file_size ? ` · ${formatBytes(item.file_size)}` : ""}
+        </div>
+        {item.notes ? <p className="bc-card__notes">{item.notes}</p> : null}
+        <div className="bc-card__metrics">
+          {(
+            [
+              { label: lang === "fr" ? "Vues" : "Views", value: item.views },
+              { label: lang === "fr" ? "Likes" : "Likes", value: item.likes },
+              { label: lang === "fr" ? "Comms" : "Comments", value: item.comments },
+              { label: lang === "fr" ? "Shares" : "Shares", value: item.shares },
+            ] as const
+          ).map((m) => (
+            <div key={m.label} className="bc-card__metric">
+              <span>{m.label}</span>
+              <strong>{formatCompactStat(m.value, lang)}</strong>
+            </div>
+          ))}
+        </div>
+        {item.linkUrl ? <ContentTrackedLink lang={lang} linkUrl={item.linkUrl} /> : null}
+        <div className="bc-card__actions" style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <a className="bc-card__download" href={item.file_url} target="_blank" rel="noreferrer">
+            {lang === "fr" ? "Télécharger" : "Download"} →
+          </a>
+          <button
+            type="button"
+            onClick={() => onDelete(item.id)}
+            style={{
+              marginLeft: "auto",
+              border: "none",
+              background: "none",
+              color: "var(--ws-danger)",
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              padding: 0,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {lang === "fr" ? "Supprimer" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile?: boolean }) {
   const lang = useLang();
+  const fr = lang === "fr";
   const fileRef = useRef<HTMLInputElement>(null);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [brandId, setBrandId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
+  // Panneau d'upload
+  const [addOpen, setAddOpen] = useState(false);
+  const [shown, setShown] = useState(false);
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [postUrl, setPostUrl] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"error" | "success">("error");
   const [lastUploadedLink, setLastUploadedLink] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
+
+  const brandName = brands.find((b) => b.id === brandId)?.name || brands[0]?.name || "";
 
   const load = async (): Promise<BrandOption[]> => {
     if (!userId) {
@@ -186,45 +280,65 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     const onUpdated = () => void load();
     window.addEventListener(CONTENT_UPDATED_EVENT, onUpdated);
     return () => window.removeEventListener(CONTENT_UPDATED_EVENT, onUpdated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  useEffect(() => {
+    if (!addOpen) {
+      setShown(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(id);
+  }, [addOpen]);
+
+  useEffect(() => {
+    if (!addOpen) return;
+    setTitle("");
+    setNotes("");
+    setPostUrl("");
+    setPendingFiles([]);
+    setDragOver(false);
+    setMessage("");
+    setMessageTone("error");
+    setLastUploadedLink(null);
+  }, [addOpen]);
 
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
     if (!files.length) return;
     const tooLarge = files.find((f) => isCreatorContentFileTooLarge(f.size));
     if (tooLarge) {
-      setError(creatorContentFileTooLargeMessage(lang, tooLarge.name));
+      setMessageTone("error");
+      setMessage(creatorContentFileTooLargeMessage(lang, tooLarge.name));
       return;
     }
     setPendingFiles((prev) => [...prev, ...files]);
-    setError(null);
+    setMessage("");
   };
 
   const uploadAll = async () => {
     if (!userId) return;
     if (!pendingFiles.length) {
-      setError(lang === "fr" ? "Ajoutez au moins un fichier." : "Add at least one file.");
+      setMessageTone("error");
+      setMessage(fr ? "Ajoutez au moins un fichier." : "Add at least one file.");
       return;
     }
     if (!supabase) {
-      setError(lang === "fr" ? "Stockage indisponible." : "Storage unavailable.");
+      setMessageTone("error");
+      setMessage(fr ? "Stockage indisponible." : "Storage unavailable.");
       return;
     }
 
     const trimmedPostUrl = postUrl.trim();
     if (trimmedPostUrl && !/tiktok\.com\//i.test(trimmedPostUrl)) {
-      setError(
-        lang === "fr"
-          ? "L'URL doit être un lien TikTok (tiktok.com)."
-          : "URL must be a TikTok link (tiktok.com).",
-      );
+      setMessageTone("error");
+      setMessage(fr ? "L'URL doit être un lien TikTok (tiktok.com)." : "URL must be a TikTok link (tiktok.com).");
       return;
     }
 
     setUploading(true);
-    setError(null);
-    setSuccess(null);
+    setMessage("");
     setLastUploadedLink(null);
 
     try {
@@ -236,14 +350,14 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         error?: string;
       };
       if (!prepRes.ok) {
-        throw new Error(prep.error ?? (lang === "fr" ? "Impossible de charger vos marques." : "Could not load your brands."));
+        throw new Error(prep.error ?? (fr ? "Impossible de charger vos marques." : "Could not load your brands."));
       }
       const brandList = prep.brands?.length ? prep.brands : brands;
       const uploadBrand = brandList.find((b) => b.id === brandId) ?? brandList[0] ?? null;
       if (!uploadBrand?.id) {
         throw new Error(
           prep.linkError ??
-            (lang === "fr"
+            (fr
               ? "Aucune marque liée. Acceptez d'abord l'invitation de la marque."
               : "No linked brand. Accept the brand invite first."),
         );
@@ -298,9 +412,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         if (!res.ok || !data?.ok) {
           throw new Error(
             data.error ??
-              (lang === "fr"
-                ? "Impossible de lier votre compte à la marque."
-                : "Could not link your account to the brand."),
+              (fr ? "Impossible de lier votre compte à la marque." : "Could not link your account to the brand."),
           );
         }
         if (data.brandId) setBrandId(data.brandId);
@@ -314,15 +426,21 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       setNotes("");
       setPostUrl("");
       setLastUploadedLink(latestLinkUrl);
-      setSuccess(
-        lang === "fr"
-          ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à la marque.`
-          : `${uploaded} file${uploaded > 1 ? "s" : ""} sent to the brand.`,
+      setMessageTone("success");
+      setMessage(
+        fr
+          ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à ${brandName || (fr ? "la marque" : "the brand")}.`
+          : `${uploaded} file${uploaded > 1 ? "s" : ""} sent to ${brandName || "the brand"}.`,
       );
       dispatchContentUpdated();
       await load();
+      // Sans lien à copier, referme le panneau ; sinon laisse le créateur copier son lien.
+      if (!latestLinkUrl) {
+        setTimeout(() => setAddOpen(false), 600);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : lang === "fr" ? "Échec de l'envoi." : "Upload failed.");
+      setMessageTone("error");
+      setMessage(err instanceof Error ? err.message : fr ? "Échec de l'envoi." : "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -340,7 +458,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "12px 14px",
-    borderRadius: 12,
+    borderRadius: 10,
     border: "1px solid var(--ws-border)",
     fontSize: 15,
     fontFamily: "inherit",
@@ -348,179 +466,104 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     boxSizing: "border-box",
     color: "var(--ws-text)",
     background: "var(--ws-input)",
+    letterSpacing: "-0.01em",
   };
 
-  const fmtDate = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-    } catch {
-      return iso;
-    }
-  };
+  const canSubmit = Boolean(pendingFiles.length > 0 && !uploading && brands.length > 0);
 
-  return (
-    <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
-      <div
-        style={{
-          paddingTop: isMobile ? 56 : 40,
-          paddingRight: isMobile ? 16 : 40,
-          paddingBottom: isMobile ? 16 : 24,
-          paddingLeft: isMobile ? 16 : 40,
-          borderBottom: "1px solid var(--ws-border)",
-        }}
-      >
-        <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: 36, width: "auto", marginBottom: 20, opacity: 0.9 }} />
-        <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: 0, marginBottom: 8 }}>
-          Content
-        </h1>
-        <p style={{ fontSize: 15, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: 0, maxWidth: 620, lineHeight: 1.5 }}>
-          {lang === "fr"
-            ? "Importez vos vidéos, fichiers et livrables — la marque les retrouve dans Gérer les créateurs, à côté des scripts."
-            : "Upload your videos, files, and deliverables — the brand sees them in Manage creators, next to scripts."}
-        </p>
-      </div>
-
-      <div style={{ padding: isMobile ? "20px 16px 48px" : "32px 40px 48px", maxWidth: 960 }}>
-        {!loading && brands.length > 0 && (
-          <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--ws-text)", lineHeight: 1.5 }}>
-            <span style={{ fontWeight: 600, color: "#1A7F37" }}>
-              {lang === "fr" ? "A rejoint · " : "Joined · "}
-            </span>
-            {lang === "fr" ? "Vos fichiers sont envoyés à " : "Your files are sent to "}
-            <strong>{brands.find((b) => b.id === brandId)?.name || brands[0]?.name}</strong>
-          </p>
-        )}
-        {!loading && brands.length === 0 && linkError && (
-          <p
+  const drawer =
+    addOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            onClick={() => {
+              if (!uploading) setAddOpen(false);
+            }}
             style={{
-              margin: "0 0 20px",
-              fontSize: 13,
-              color: "var(--ws-danger)",
-              lineHeight: 1.5,
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.4)",
+              zIndex: 1200,
+              display: "flex",
+              justifyContent: "flex-end",
             }}
           >
-            {lang === "fr"
-              ? "Aucune marque associée. Vérifiez dans Paramètres que votre pseudo correspond à celui de la marque, ou acceptez l'invitation reçue."
-              : "No linked brand. Check Settings to confirm your handle matches the brand's records, or accept your invite."}
-          </p>
-        )}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-            gap: isMobile ? 28 : 40,
-            alignItems: "start",
-          }}
-        >
             <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                pickFiles(e.dataTransfer.files);
-              }}
+              onClick={(e) => e.stopPropagation()}
               style={{
-                background: dragOver ? "var(--ws-hover)" : "var(--ws-surface-2)",
-                border: dragOver ? "2px dashed var(--ws-accent)" : "2px solid transparent",
-                borderRadius: 16,
-                minHeight: isMobile ? 300 : 420,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 32,
-                textAlign: "center",
-                transition: "background 0.15s, border-color 0.15s",
-                opacity: uploading ? 0.7 : 1,
-                pointerEvents: uploading ? "none" : "auto",
+                width: "min(560px, 100%)",
+                height: "100%",
+                background: "var(--ws-surface)",
+                color: "var(--ws-text)",
+                overflowY: "auto",
+                transform: shown ? "translateX(0)" : "translateX(40px)",
+                opacity: shown ? 1 : 0,
+                transition: "transform .18s ease, opacity .18s ease",
+                padding: "28px 28px 56px",
+                boxSizing: "border-box",
+                fontFamily: drawerFont,
               }}
             >
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: 14,
-                  background: "var(--ws-surface)",
-                  border: "1px solid var(--ws-border)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 20,
-                  boxShadow: "var(--ws-shadow)",
-                }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-                  <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M4 20h16" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(false)}
+                  disabled={uploading}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--ws-text-dim)",
+                    fontWeight: 500,
+                    fontSize: 14,
+                    cursor: uploading ? "default" : "pointer",
+                    padding: 0,
+                    fontFamily: "inherit",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  {fr ? "Retour" : "Back"}
+                </button>
+                <button
+                  type="button"
+                  disabled={!canSubmit}
+                  onClick={() => void uploadAll()}
+                  style={{
+                    fontFamily: drawerFont,
+                    letterSpacing: "-0.02em",
+                    fontSize: 14,
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    color: "var(--ws-btn-text)",
+                    background: "var(--ws-btn)",
+                    border: "none",
+                    padding: "11px 16px",
+                    opacity: canSubmit ? 1 : 0.45,
+                    cursor: canSubmit ? "pointer" : "default",
+                  }}
+                >
+                  {uploading
+                    ? fr
+                      ? "Envoi…"
+                      : "Uploading…"
+                    : fr
+                      ? "Envoyer à la marque"
+                      : "Send to brand"}
+                </button>
               </div>
-              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 6px", letterSpacing: "-0.02em" }}>
-                {lang === "fr" ? "Glisser-déposer pour importer" : "Drag and drop to upload"}
-              </p>
-              <p style={{ fontSize: 13, color: "var(--ws-text-dim)", margin: "0 0 20px", lineHeight: 1.45, maxWidth: 280 }}>
-                {lang === "fr"
-                  ? `Vidéos (1–2 min+), images, PDF… jusqu’à ${CREATOR_CONTENT_MAX_FILE_LABEL} par fichier.`
-                  : `Videos (1–2+ min), images, PDFs… up to ${CREATOR_CONTENT_MAX_FILE_LABEL} per file.`}
-              </p>
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                style={{
-                  background: BLUE,
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "10px 20px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: uploading ? "wait" : "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                {lang === "fr" ? "Choisir des fichiers" : "Choose files"}
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                multiple
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  pickFiles(e.target.files);
-                  e.target.value = "";
-                }}
-              />
-              {pendingFiles.length > 0 && (
-                <div style={{ marginTop: 20, width: "100%", textAlign: "left" }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: "var(--ws-text-dim)", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {lang === "fr" ? "Fichiers sélectionnés" : "Selected files"}
-                  </p>
-                  <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-                    {pendingFiles.map((f, i) => (
-                      <li key={`${f.name}-${i}`} style={{ fontSize: 13, color: "var(--ws-text)", padding: "6px 0", borderBottom: "1px solid var(--ws-border)" }}>
-                        {f.name}
-                        <span style={{ color: "var(--ws-text-dim)", marginLeft: 8 }}>{formatBytes(f.size)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
 
-            <div>
-              {brands.length >= 1 && (
+              <h2 style={{ fontSize: 22, fontWeight: 600, color: "var(--ws-text)", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+                {fr ? "Ajouter du contenu" : "Add content"}
+              </h2>
+              <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.02em" }}>
+                {fr
+                  ? "Vos fichiers arrivent directement dans le dashboard de la marque, avec vos stats."
+                  : "Your files land directly in the brand's dashboard, along with your stats."}
+              </p>
+
+              {brands.length > 0 ? (
                 <div
                   style={{
-                    marginBottom: 16,
-                    padding: "10px 14px",
+                    marginBottom: 24,
+                    padding: "12px 14px",
                     borderRadius: 10,
                     background: "var(--ws-surface-2)",
                     border: "1px solid var(--ws-border)",
@@ -529,149 +572,240 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                   }}
                 >
                   <span style={{ fontWeight: 600, color: "var(--ws-text)" }}>
-                    {lang === "fr" ? "Destination : " : "Destination: "}
+                    {fr ? "Destination : " : "Destination: "}
                   </span>
-                  {brands.find((b) => b.id === brandId)?.name || brands[0]?.name}
+                  {brandName}
                 </div>
+              ) : (
+                <p style={{ fontSize: 14, color: "var(--ws-danger)", margin: "0 0 24px", lineHeight: 1.5 }}>
+                  {fr
+                    ? "Aucune marque associée. Acceptez d'abord l'invitation de la marque."
+                    : "No linked brand. Accept the brand invite first."}
+                </p>
               )}
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
-                {lang === "fr" ? "Titre" : "Title"}
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={lang === "fr" ? "Ex : UGC v1 — hook A" : "e.g. UGC v1 — hook A"}
-                style={{ ...inputStyle, marginBottom: 16 }}
-              />
 
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
-                {lang === "fr" ? "Notes" : "Notes"}
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={lang === "fr" ? "Contexte, version, instructions…" : "Context, version, notes…"}
-                rows={4}
-                style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5, marginBottom: 16 }}
-              />
-
-              <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: 0 }}>
-                  {lang === "fr" ? "Ajouter un URL" : "Add a URL"}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
+                  {fr ? "Titre" : "Title"}
                 </label>
-                <InfoTip
-                  lang={lang}
-                  text={
-                    lang === "fr"
-                      ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement. La marque voit ces stats dans sa campagne et peut mesurer la performance de votre contenu."
-                      : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement. Your brand sees these stats in their campaign and can measure how your content performs."
-                  }
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={fr ? "Ex : UGC v1 — hook A" : "e.g. UGC v1 — hook A"}
+                  style={inputStyle}
                 />
               </div>
-              <input
-                type="url"
-                value={postUrl}
-                onChange={(e) => setPostUrl(e.target.value)}
-                placeholder="https://www.tiktok.com/@toncompte/video/..."
-                style={{ ...inputStyle, marginBottom: 20 }}
-              />
 
-              {error && <p style={{ fontSize: 13, color: "var(--ws-danger)", margin: "0 0 12px" }}>{error}</p>}
-              {success && <p style={{ fontSize: 13, color: "var(--ws-text)", margin: "0 0 12px" }}>{success}</p>}
-              {lastUploadedLink && <ContentTrackedLink lang={lang} linkUrl={lastUploadedLink} />}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
+                  {fr ? "Notes" : "Notes"}
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder={fr ? "Contexte, version, instructions…" : "Context, version, notes…"}
+                  style={{ ...inputStyle, resize: "vertical" }}
+                />
+              </div>
 
-              <button
-                type="button"
-                onClick={() => void uploadAll()}
-                disabled={uploading || pendingFiles.length === 0}
-                className="hero-cta-shopify"
-                style={{ padding: "12px 24px", fontSize: 14, opacity: uploading || pendingFiles.length === 0 ? 0.55 : 1 }}
-              >
-                {uploading
-                  ? lang === "fr"
-                    ? "Envoi en cours…"
-                    : "Uploading…"
-                  : lang === "fr"
-                    ? "Envoyer à la marque"
-                    : "Send to brand"}
-              </button>
-            </div>
-          </div>
-
-        <div style={{ marginTop: 40 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 16px" }}>
-            {lang === "fr" ? "Contenu envoyé" : "Uploaded content"}
-          </h2>
-          {loading ? (
-            <div style={{ color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</div>
-          ) : items.length === 0 ? (
-            <div style={{ border: "1px solid var(--ws-border)", borderRadius: 14, padding: "32px 20px", textAlign: "center", color: "var(--ws-text-muted)", fontSize: 14 }}>
-              {lang === "fr" ? "Aucun fichier envoyé pour le moment." : "No files uploaded yet."}
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {items.map((item) => (
-                <div key={item.id} style={{ border: "1px solid var(--ws-border)", borderRadius: 14, padding: "16px 18px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{item.title}</div>
-                      <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 4 }}>
-                        {fmtDate(item.created_at)}
-                        {item.brandName ? ` · ${item.brandName}` : ""}
-                        {item.file_size ? ` · ${formatBytes(item.file_size)}` : ""}
-                      </div>
-                      {item.notes && (
-                        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "8px 0 0", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{item.notes}</p>
-                      )}
-                      <ContentPostStatsDisplay item={item} lang={lang} />
-                      {isVideoFile(item) && (
-                        <video
-                          src={item.file_url}
-                          controls
-                          style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, background: "#000" }}
-                        />
-                      )}
-                      {isImageFile(item) && !isVideoFile(item) && (
-                        <img
-                          src={item.file_url}
-                          alt=""
-                          style={{ display: "block", marginTop: 12, maxWidth: "100%", maxHeight: 280, borderRadius: 12, border: "1px solid var(--ws-border)" }}
-                        />
-                      )}
-                      <a
-                        href={item.file_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ display: "inline-block", marginTop: 10, fontSize: 14, color: BLUE, fontWeight: 500, textDecoration: "none" }}
-                      >
-                        {item.file_name} →
-                      </a>
-                      {item.linkUrl ? <ContentTrackedLink lang={lang} linkUrl={item.linkUrl} /> : null}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void removeItem(item.id)}
-                      style={{
-                        border: "1px solid #FECACA",
-                        background: "var(--ws-surface)",
-                        color: "var(--ws-danger)",
-                        borderRadius: 8,
-                        padding: "6px 12px",
-                        fontSize: 13,
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      {lang === "fr" ? "Supprimer" : "Delete"}
-                    </button>
-                  </div>
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
+                  {fr ? "Fichiers" : "Files"}
+                </label>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    pickFiles(e.dataTransfer.files);
+                  }}
+                  onClick={() => fileRef.current?.click()}
+                  style={{
+                    border: `2px dashed ${dragOver ? "var(--ws-accent)" : "var(--ws-border)"}`,
+                    borderRadius: 14,
+                    padding: "32px 20px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    background: dragOver ? "var(--ws-hover)" : "var(--ws-surface-2)",
+                  }}
+                >
+                  <p style={{ margin: 0, fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
+                    {fr
+                      ? `Glissez des images ou vidéos ici (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2 min+), ou cliquez pour parcourir`
+                      : `Drag images or videos here (max ${CREATOR_CONTENT_MAX_FILE_LABEL}, 1–2+ min), or click to browse`}
+                  </p>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    multiple
+                    accept="image/*,video/*,.pdf,.doc,.docx"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      pickFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
                 </div>
-              ))}
+                {pendingFiles.length > 0 ? (
+                  <ul style={{ margin: "12px 0 0", padding: 0, listStyle: "none" }}>
+                    {pendingFiles.map((file, i) => (
+                      <li
+                        key={`${file.name}-${i}`}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: 13,
+                          color: "var(--ws-text-muted)",
+                          padding: "8px 0",
+                          borderBottom: "1px solid var(--ws-border)",
+                        }}
+                      >
+                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {file.name}
+                          <span style={{ color: "var(--ws-text-dim)", marginLeft: 8 }}>{formatBytes(file.size)}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFiles((list) => list.filter((_, idx) => idx !== i))}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: "var(--ws-text-dim)",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            fontSize: 12,
+                          }}
+                        >
+                          {fr ? "Retirer" : "Remove"}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: 0 }}>
+                    {fr ? "Ajouter un URL" : "Add a URL"}
+                  </label>
+                  <InfoTip
+                    lang={lang}
+                    text={
+                      fr
+                        ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement. La marque voit ces stats dans sa campagne et peut mesurer la performance de votre contenu."
+                        : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement. Your brand sees these stats in their campaign and can measure how your content performs."
+                    }
+                  />
+                </div>
+                <input
+                  type="url"
+                  value={postUrl}
+                  onChange={(e) => setPostUrl(e.target.value)}
+                  placeholder="https://www.tiktok.com/@toncompte/video/..."
+                  style={inputStyle}
+                />
+                <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "8px 0 0", lineHeight: 1.45 }}>
+                  {fr ? "Optionnel — associé au premier fichier envoyé." : "Optional — linked to the first uploaded file."}
+                </p>
+              </div>
+
+              {message ? (
+                <p
+                  style={{
+                    fontSize: 14,
+                    margin: 0,
+                    color: messageTone === "success" ? "var(--ws-text)" : "var(--ws-danger)",
+                  }}
+                >
+                  {message}
+                </p>
+              ) : null}
+              {lastUploadedLink ? <ContentTrackedLink lang={lang} linkUrl={lastUploadedLink} /> : null}
             </div>
-          )}
-        </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div className={`bc-page${isMobile ? " is-mobile" : ""}`}>
+      <div className="bc-topbar">
+        <h1 className="bc-topbar__title">{fr ? "Contenu" : "Content"}</h1>
+        <button type="button" className="bc-cta" onClick={() => setAddOpen(true)}>
+          {fr ? "Ajouter" : "Add"}
+        </button>
       </div>
+
+      <div className="bc-rule" aria-hidden />
+
+      <div className="bc-main">
+        <div className="bc-hero-row">
+          <h2 className="bc-hero-title">
+            {fr ? "Vos clips. Votre contenu." : "Your clips. Your content."}
+          </h2>
+          {brandName ? (
+            <span
+              style={{
+                flex: "0 0 auto",
+                marginLeft: "auto",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "10px 14px",
+                borderRadius: 12,
+                border: "1px solid var(--ws-border)",
+                background: "var(--ws-surface-2)",
+                fontSize: 13.5,
+                color: "var(--ws-text-muted)",
+                letterSpacing: "-0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {fr ? "Envoyé à" : "Sent to"}
+              <strong style={{ color: "var(--ws-text)", fontWeight: 600 }}>{brandName}</strong>
+            </span>
+          ) : null}
+        </div>
+
+        {!loading && brands.length === 0 && linkError ? (
+          <p style={{ margin: "0 0 20px", fontSize: 13.5, color: "var(--ws-danger)", lineHeight: 1.5 }}>
+            {fr
+              ? "Aucune marque associée. Vérifiez dans Paramètres que votre pseudo correspond à celui de la marque, ou acceptez l'invitation reçue."
+              : "No linked brand. Check Settings to confirm your handle matches the brand's records, or accept your invite."}
+          </p>
+        ) : null}
+
+        {loading ? (
+          <p className="bc-empty">{fr ? "Chargement…" : "Loading…"}</p>
+        ) : items.length === 0 ? (
+          <div className="bc-empty-block">
+            <p>
+              {fr
+                ? "Aucune vidéo pour l’instant. Ajoutez du contenu — il arrive directement chez votre marque."
+                : "No videos yet. Add content — it lands directly in your brand's dashboard."}
+            </p>
+            <button type="button" className="bc-cta" onClick={() => setAddOpen(true)}>
+              {fr ? "Ajouter" : "Add"}
+            </button>
+          </div>
+        ) : (
+          <div className="bc-grid">
+            {items.map((item) => (
+              <CreatorContentCard key={item.id} item={item} lang={lang} onDelete={(id) => void removeItem(id)} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {drawer}
     </div>
   );
 }

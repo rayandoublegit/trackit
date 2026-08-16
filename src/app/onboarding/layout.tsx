@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { buildPageMetadata } from "@/lib/site-seo";
+import "./onboarding.css";
 
 export const metadata = buildPageMetadata({
   title: "Trackit onboarding",

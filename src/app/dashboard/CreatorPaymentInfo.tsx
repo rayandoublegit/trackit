@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
-import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 
 const BLUE = "#0047FF";
 
@@ -38,19 +37,21 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "12px 14px",
   borderRadius: 12,
-  border: "1px solid rgba(0,0,0,0.1)",
+  border: "1px solid var(--ws-border)",
   fontSize: 15,
   fontFamily: "inherit",
   outline: "none",
   boxSizing: "border-box",
   marginBottom: 14,
+  background: "var(--ws-input)",
+  color: "var(--ws-text)",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: 13,
   fontWeight: 500,
-  color: "rgba(0,0,0,0.55)",
+  color: "var(--ws-text-muted)",
   marginBottom: 6,
   letterSpacing: "-0.01em",
 };
@@ -137,19 +138,19 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
   const config = FIELD_CONFIG[method];
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "#FFFFFF" }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 24, paddingBottom: 48, background: "var(--ws-surface)" }}>
       <div style={{ maxWidth: 560 }}>
-        <h2 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em", marginBottom: 6 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.025em", marginBottom: 6, color: "var(--ws-text)" }}>
           {lang === "fr" ? "Mes coordonnées de paiement" : "My payment details"}
         </h2>
-        <p style={{ fontSize: 14, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, marginBottom: 28 }}>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5, marginBottom: 28 }}>
           {lang === "fr"
             ? "Ces informations sont utilisées pour vous verser vos commissions. Elles restent confidentielles."
             : "These details are used to pay your commissions. They stay confidential."}
         </p>
 
         {loading ? (
-          <div style={{ fontSize: 14, color: "rgba(0,0,0,0.4)" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
+          <div style={{ fontSize: 14, color: "var(--ws-text-dim)" }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>
         ) : (
           <div ref={rootRef}>
             <label style={labelStyle}>{lang === "fr" ? "Moyen de paiement" : "Payment method"}</label>
@@ -157,15 +158,15 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
               <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(0,0,0,0.1)", background: "#FFFFFF", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid var(--ws-border)", background: "var(--ws-input)", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
               >
-                <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>{current.label}</span>
+                <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{current.label}</span>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ flexShrink: 0, transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>
                   <path d="M6 9l6 6 6-6" stroke="#9A9A9A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
               {open && (
-                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#FFFFFF", border: "1px solid #EFEFEF", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.08)", zIndex: 20, overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 12, boxShadow: "var(--ws-shadow)", zIndex: 20, overflow: "hidden" }}>
                   {METHOD_OPTIONS.map((option, i) => {
                     const active = option.id === method;
                     return (
@@ -173,9 +174,9 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
                       key={option.id}
                       type="button"
                       onClick={() => { setMethod(option.id); setValue(""); setOpen(false); setSaved(false); setError(""); }}
-                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "none", borderBottom: i < METHOD_OPTIONS.length - 1 ? "1px solid #F5F5F5" : "none", ...selectionCardStyle(active, { unselectedBackground: "#FFFFFF", unselectedBorder: "none" }), cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
+                      style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", border: "none", borderBottom: i < METHOD_OPTIONS.length - 1 ? "1px solid var(--ws-border)" : "none", background: active ? BLUE : "var(--ws-surface)", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}
                     >
-                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: selectionTextPrimary(active), letterSpacing: "-0.02em" }}>{option.label}</span>
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: active ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.02em" }}>{option.label}</span>
                     </button>
                   );})}
                 </div>
@@ -193,21 +194,21 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
             )}
 
             <label style={labelStyle}>{current.label}</label>
-            <div style={{ display: "flex", alignItems: "stretch", marginBottom: 14, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "stretch", marginBottom: 14, border: "1px solid var(--ws-border)", borderRadius: 12, overflow: "hidden", background: "var(--ws-input)" }}>
               {config.prefix && (
-                <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "#FAFAFA", borderRight: "1px solid rgba(0,0,0,0.08)", fontSize: 14, color: "#9A9A9A", whiteSpace: "nowrap" }}>{config.prefix}</span>
+                <span style={{ display: "flex", alignItems: "center", padding: "0 12px", background: "var(--ws-surface-2)", borderRight: "1px solid var(--ws-border)", fontSize: 14, color: "var(--ws-text-dim)", whiteSpace: "nowrap" }}>{config.prefix}</span>
               )}
               <input
                 type="text"
                 value={value}
                 onChange={(e) => { setValue(e.target.value); setSaved(false); }}
                 placeholder={config.placeholder}
-                style={{ flex: 1, padding: "12px 14px", border: "none", fontSize: 15, fontFamily: method === "iban" ? "monospace" : "inherit", letterSpacing: method === "iban" ? "0.04em" : "normal", outline: "none", boxSizing: "border-box" }}
+                style={{ flex: 1, padding: "12px 14px", border: "none", fontSize: 15, fontFamily: method === "iban" ? "monospace" : "inherit", letterSpacing: method === "iban" ? "0.04em" : "normal", outline: "none", boxSizing: "border-box", background: "transparent", color: "var(--ws-text)" }}
               />
             </div>
 
             {error && (
-              <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>
+              <div style={{ fontSize: 14, color: "var(--ws-danger)", padding: "10px 12px", borderRadius: 10, background: "rgba(239,68,68,0.1)", marginBottom: 14 }}>{error}</div>
             )}
             {saved && (
               <div style={{ fontSize: 14, color: "#1A7F37", padding: "10px 12px", borderRadius: 10, background: "rgba(26,127,55,0.08)", marginBottom: 14 }}>

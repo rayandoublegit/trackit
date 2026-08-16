@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
+import { insertBrandNotification, resolveCreatorDisplayName } from "@/lib/brand-notifications";
 import { findCreatorRowsForProfile } from "@/lib/creator-account";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,13 @@ export async function POST(request: Request) {
   const status = (body?.status as string | undefined)?.trim() || "done";
   if (!userId || !scriptId) return NextResponse.json({ error: "Missing userId or scriptId" }, { status: 400 });
 
+  const { data: existingRead } = await supabaseAdmin
+    .from("script_reads")
+    .select("status")
+    .eq("script_id", scriptId)
+    .eq("creator_id", userId)
+    .maybeSingle();
+
   const { error } = await supabaseAdmin
     .from("script_reads")
     .upsert(
@@ -82,6 +90,22 @@ export async function POST(request: Request) {
       { onConflict: "script_id,creator_id" }
     );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Notifie la marque la première fois que le créateur marque le script comme fait.
+  if (status === "done" && existingRead?.status !== "done") {
+    const { data: script } = await supabaseAdmin
+      .from("scripts")
+      .select("brand_id, title")
+      .eq("id", scriptId)
+      .maybeSingle();
+    if (script?.brand_id) {
+      const creatorName = await resolveCreatorDisplayName(supabaseAdmin, userId);
+      await insertBrandNotification(supabaseAdmin, String(script.brand_id), "script_done", {
+        creatorName,
+        scriptTitle: script.title || "",
+      });
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
