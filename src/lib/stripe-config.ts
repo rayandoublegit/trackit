@@ -66,8 +66,8 @@ export function stripePriceEnvCandidates(
       ? ["STRIPE_GROWTH_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_EUR_PRICE_ID"]
       : [
           "STRIPE_GROWTH_PRICE_ID",
-          "STRIPE_BASIC_PRICE_ID",
           "NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID",
+          "STRIPE_BASIC_PRICE_ID",
         ];
   }
   if (tier === "pro") {
@@ -78,7 +78,7 @@ export function stripePriceEnvCandidates(
     }
     return currency === "eur"
       ? ["STRIPE_PRO2_EUR_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_EUR_PRICE_ID"]
-      : ["STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID"];
+      : ["STRIPE_PRO2_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID"];
   }
   if (annual) {
     return currency === "eur"
@@ -180,9 +180,9 @@ export function getGrowthPriceId(currency: "usd" | "eur" = "usd", annual = false
         )
       : pick(
           process.env.STRIPE_GROWTH_PRICE_ID,
-          process.env.STRIPE_BASIC_PRICE_ID,
           process.env.NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID,
-          TRACKIT_STRIPE_DEFAULT_PRICE_IDS.growthUsdMonthly
+          TRACKIT_STRIPE_DEFAULT_PRICE_IDS.growthUsdMonthly,
+          process.env.STRIPE_BASIC_PRICE_ID
         );
   return id;
 }
@@ -207,9 +207,9 @@ export function getProPriceId(currency: "usd" | "eur" = "usd", annual = false): 
         )
       : pick(
           process.env.STRIPE_PRO2_PRICE_ID,
-          process.env.STRIPE_PRO_PRICE_ID,
           process.env.NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID,
-          TRACKIT_STRIPE_DEFAULT_PRICE_IDS.proUsdMonthly
+          TRACKIT_STRIPE_DEFAULT_PRICE_IDS.proUsdMonthly,
+          process.env.STRIPE_PRO_PRICE_ID
         );
   return id;
 }

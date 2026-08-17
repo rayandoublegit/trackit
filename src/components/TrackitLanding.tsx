@@ -273,7 +273,7 @@ export default function TrackitLanding() {
     void (async () => {
       try {
         const res = await fetch("/api/billing/plan", { credentials: "include" });
-        if (res.status === 401) {
+        if (!res.ok) {
           if (!cancelled) {
             setIsLoggedIn(false);
             setCurrentPlan("free");

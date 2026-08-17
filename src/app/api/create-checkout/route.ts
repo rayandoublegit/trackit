@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
 
     const checkoutEnvCandidates = (() => {
       if (growthPriceIds().includes(priceId)) {
-        return ["STRIPE_GROWTH_PRICE_ID", "STRIPE_BASIC_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID"];
+        return ["STRIPE_GROWTH_PRICE_ID", "NEXT_PUBLIC_STRIPE_GROWTH_PRICE_ID", "STRIPE_BASIC_PRICE_ID"];
       }
       if (proPriceIds().includes(priceId)) {
-        return ["STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID"];
+        return ["STRIPE_PRO2_PRICE_ID", "NEXT_PUBLIC_STRIPE_PRO2_PRICE_ID", "STRIPE_PRO_PRICE_ID"];
       }
       if (scalePriceIds().includes(priceId)) {
         return ["STRIPE_SCALE_PRICE_ID", "NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID"];
@@ -115,9 +115,8 @@ export async function POST(request: NextRequest) {
         const workspace = await resolveWorkspaceContextForUser(sessionUser);
         resolvedUserId = workspace.ownerId;
         resolvedEmail = workspace.ownerEmail ?? resolvedEmail;
-      } else if (!resolvedUserId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
+      // Guest checkout is allowed: Stripe collects email, webhook links by customer email.
     } else if (onboarding) {
       return NextResponse.json({ error: "Not configured" }, { status: 500 });
     }

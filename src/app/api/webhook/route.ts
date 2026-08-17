@@ -28,7 +28,7 @@ const supabaseAdmin =
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (!stripe || !supabaseAdmin) return;
 
-  const userId =
+  let userId =
     session.metadata?.userId ??
     session.client_reference_id ??
     null;
@@ -47,6 +47,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     typeof session.subscription === "string"
       ? session.subscription
       : session.subscription?.id ?? null;
+
+  if (!userId && customerId) {
+    userId = await resolveUserId({
+      supabase: supabaseAdmin,
+      stripe,
+      customerId,
+    });
+  }
 
   let plan = resolvePlanFromCheckout(null, session.metadata?.plan);
   let subscriptionStatus: "active" | "inactive" = "active";

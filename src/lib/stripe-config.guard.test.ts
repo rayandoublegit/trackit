@@ -72,4 +72,16 @@ describe("stripe config guard", () => {
     const pkg = JSON.parse(readRepoFile("package.json"));
     expect(pkg.scripts["check:stripe"]).toBe("tsx scripts/check-stripe-prices.ts");
   });
+
+  it("create-checkout allows guest checkout without a session user", () => {
+    const src = readRepoFile("src/app/api/create-checkout/route.ts");
+    expect(src).toContain("Guest checkout is allowed");
+    expect(src).not.toMatch(/else if \(!resolvedUserId\) \{\s*return NextResponse\.json\(\{ error: "Unauthorized" \}/);
+  });
+
+  it("client checkout sends cookies and falls back to Checkout on 401", () => {
+    const src = readRepoFile("src/lib/checkout.ts");
+    expect(src).toContain('credentials: "include"');
+    expect(src).toContain("res.status === 401");
+  });
 });

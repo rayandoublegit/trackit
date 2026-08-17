@@ -104,7 +104,7 @@ export async function upgradeToPlanTier(
     return;
   }
 
-  if (res.status === 404 && payload.noSubscription) {
+  if (res.status === 401 || (res.status === 404 && payload.noSubscription)) {
     await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual));
     return;
   }
@@ -129,14 +129,16 @@ export async function handleUpgrade(
           ...stripePriceEnvCandidates("scale", "usd", false),
         ];
   assertNonEmptyStripePriceId(priceId, envVarCandidates);
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = supabase
+    ? (await supabase.auth.getUser()).data.user
+    : null;
   const base =
     typeof window !== "undefined"
       ? `${window.location.origin}/dashboard?view=billing`
       : undefined;
   const res = await fetch("/api/create-checkout", {
     method: "POST",
+    credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       priceId,
