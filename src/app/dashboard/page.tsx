@@ -3514,6 +3514,7 @@ function IntegrationsView({
   const lang = useLang();
   const { theme } = useDashboardTheme();
   const dark = theme === "dark";
+  const searchParams = useSearchParams();
   const [shopDomain, setShopDomain] = useState("");
   const [shopToken, setShopToken] = useState("");
   const [shopError, setShopError] = useState("");
@@ -3527,6 +3528,12 @@ function IntegrationsView({
   const [connectedStores, setConnectedStores] = useState<string[]>([]);
   const [connectPageOpen, setConnectPageOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(true);
+  const [stripeDisconnecting, setStripeDisconnecting] = useState(false);
+  const [stripeNotice, setStripeNotice] = useState<"connected" | "error" | null>(null);
+  const [stripeError, setStripeError] = useState("");
 
   const cardBg = dark ? "transparent" : "#FFFFFF";
   const cardBorder = dark ? "rgba(255,255,255,0.1)" : "#EFEFEF";
@@ -3599,6 +3606,61 @@ function IntegrationsView({
       window.history.replaceState({}, "", "/dashboard");
     }
   }, [lang, user?.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/stripe-connect/status", { credentials: "include" });
+        const payload = (await res.json().catch(() => ({}))) as {
+          connected?: boolean;
+          stripeAccountId?: string | null;
+        };
+        if (cancelled) return;
+        setStripeConnected(Boolean(payload.connected && payload.stripeAccountId));
+        setStripeAccountId(payload.stripeAccountId ?? null);
+      } catch {
+        if (!cancelled) {
+          setStripeConnected(false);
+          setStripeAccountId(null);
+        }
+      } finally {
+        if (!cancelled) setStripeLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const stripeStatus = searchParams.get("stripe");
+    if (stripeStatus !== "connected" && stripeStatus !== "error") return;
+
+    if (stripeStatus === "connected") {
+      const account = searchParams.get("account")?.trim() || "";
+      if (account) {
+        setStripeAccountId(account);
+        setStripeConnected(true);
+      }
+      setStripeNotice("connected");
+      setStripeError("");
+    } else {
+      setStripeNotice("error");
+      setStripeError(
+        lang === "fr"
+          ? "La connexion Stripe a échoué. Réessayez."
+          : "Stripe connection failed. Please try again.",
+      );
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    params.delete("stripe");
+    params.delete("account");
+    if (!params.get("view")) params.set("view", "integrations");
+    const next = params.toString();
+    window.history.replaceState({}, "", `/dashboard${next ? `?${next}` : "?view=integrations"}`);
+  }, [lang, searchParams]);
 
   const openConnectPage = (prefillDomain = "", changing = false) => {
     if (!canUseShopify(plan)) {
@@ -3691,7 +3753,15 @@ function IntegrationsView({
 
   const apps = [
     { name: "Shopify", desc: "Connect your store to track sales", logo: "/shopify-logo.svg", logoH: 39 },
-    { name: "Stripe", desc: "Track analytics and everything automatically", logo: "/stripe-logo.svg", logoH: 28 },
+    {
+      name: "Stripe",
+      desc:
+        lang === "fr"
+          ? "Connectez votre compte Stripe pour tracker les ventes de votre SaaS attribuées à vos affiliés"
+          : "Connect your Stripe account to track SaaS sales attributed to your affiliates",
+      logo: "/stripe-logo.svg",
+      logoH: 28,
+    },
     { name: "Zapier", desc: "Automate workflows with 5000+ apps", logo: "/zapier-logo.svg", logoH: 34 },
     { name: "Notion", desc: "Sync your workspace and docs", logo: "/notion-logo.svg", logoH: 34 },
     { name: "Make", desc: "Advanced visual automation", logo: "/make-logo.svg", logoH: 34 },
@@ -3736,10 +3806,20 @@ function IntegrationsView({
           ✓ {connectedShop} connected successfully
         </div>
       )}
+      {stripeNotice === "connected" && (
+        <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: dark ? "rgba(34,197,94,0.12)" : "#f0fdf4", border: dark ? "1px solid rgba(34,197,94,0.28)" : "1px solid #bbf7d0", borderRadius: 10, color: dark ? "#86efac" : "#15803d", fontSize: 14, fontWeight: 500 }}>
+          {lang === "fr" ? "Stripe connecté avec succès." : "Stripe connected successfully."}
+        </div>
+      )}
+      {stripeNotice === "error" && (
+        <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: dark ? "rgba(248,113,113,0.12)" : "#fef2f2", border: dark ? "1px solid rgba(248,113,113,0.28)" : "1px solid #fecaca", borderRadius: 10, color: dark ? "#fca5a5" : "#b91c1c", fontSize: 14, fontWeight: 500 }}>
+          {stripeError || (lang === "fr" ? "La connexion Stripe a échoué." : "Stripe connection failed.")}
+        </div>
+      )}
       <div style={{ padding: isMobile ? "12px 16px 16px" : "24px 40px 40px" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16, width: "100%" }}>
           {apps.map((app) => (
-            <div key={app.name} style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 16, padding: 24, display: "flex", alignItems: app.name === "Shopify" && !isShopifyConnected ? "center" : "flex-start", gap: 16, width: "100%", boxSizing: "border-box" }}>
+            <div key={app.name} style={{ background: cardBg, border: `1px solid ${cardBorder}`, borderRadius: 16, padding: 24, display: "flex", alignItems: (app.name === "Shopify" && !isShopifyConnected) || (app.name === "Stripe" && !stripeConnected) ? "center" : "flex-start", gap: 16, width: "100%", boxSizing: "border-box" }}>
               <div style={{ width: 52, height: 52, borderRadius: 12, background: logoBoxBg, border: `1px solid ${cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <img src={app.logo} alt={app.name} width={34} height={app.logoH} style={{ display: "block", objectFit: "contain" }} />
               </div>
@@ -3755,9 +3835,7 @@ function IntegrationsView({
                         ? "Connectez votre boutique pour suivre les ventes"
                         : "Connect your store to track sales"
                     : app.name === "Stripe"
-                      ? lang === "fr"
-                        ? "Suivez les analytics et tout le reste automatiquement"
-                        : "Track analytics and everything automatically"
+                      ? app.desc
                       : app.name === "Zapier"
                         ? lang === "fr"
                           ? "Automatisez vos workflows avec 5000+ applications"
@@ -3770,6 +3848,22 @@ function IntegrationsView({
                             ? "Automatisation visuelle avancée"
                             : "Advanced visual automation"}
               </div>
+                {app.name === "Stripe" && (
+                  <div style={{ marginTop: 10 }}>
+                    {stripeConnected && stripeAccountId ? (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#22C55E", marginBottom: 4, letterSpacing: "-0.01em" }}>
+                          {lang === "fr" ? "Compte connecté ✓" : "Account connected ✓"}
+                        </div>
+                        <div style={{ fontSize: 13, color: titleColor, fontWeight: 500, marginBottom: 10, letterSpacing: "-0.01em", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          {stripeAccountId}
+                        </div>
+                      </>
+                    ) : stripeError && stripeNotice !== "error" ? (
+                      <div style={{ color: "#f87171", fontSize: 12, marginTop: 8 }}>{stripeError}</div>
+                    ) : null}
+                  </div>
+                )}
                 {app.name === "Shopify" && (
                   <div style={{ marginTop: 10 }}>
                     {isShopifyConnected ? (
@@ -3993,6 +4087,58 @@ function IntegrationsView({
                     {lang === "fr" ? "Connecter →" : "Connect →"}
                   </button>
                 ) : null
+              ) : app.name === "Stripe" ? (
+                stripeLoading ? null : stripeConnected ? (
+                  <button
+                    type="button"
+                    disabled={stripeDisconnecting}
+                    onClick={() => {
+                      if (stripeDisconnecting) return;
+                      setStripeDisconnecting(true);
+                      setStripeError("");
+                      void (async () => {
+                        try {
+                          const res = await fetch("/api/stripe-connect/disconnect", {
+                            method: "POST",
+                            credentials: "include",
+                          });
+                          const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+                          if (!res.ok || !payload.ok) {
+                            setStripeError(
+                              payload.error ||
+                                (lang === "fr" ? "Impossible de déconnecter Stripe." : "Could not disconnect Stripe."),
+                            );
+                            return;
+                          }
+                          setStripeConnected(false);
+                          setStripeAccountId(null);
+                          setStripeNotice(null);
+                        } catch {
+                          setStripeError(lang === "fr" ? "Erreur réseau" : "Network error");
+                        } finally {
+                          setStripeDisconnecting(false);
+                        }
+                      })();
+                    }}
+                    style={{ ...secondaryBtn, alignSelf: "center", opacity: stripeDisconnecting ? 0.6 : 1 }}
+                  >
+                    {stripeDisconnecting
+                      ? lang === "fr"
+                        ? "Déconnexion…"
+                        : "Disconnecting…"
+                      : lang === "fr"
+                        ? "Déconnecter"
+                        : "Disconnect"}
+                  </button>
+                ) : (
+                  <a
+                    href="/api/stripe-connect/authorize"
+                    className="hero-cta-shopify hero-cta-compact"
+                    style={{ flexShrink: 0, alignSelf: "center", textDecoration: "none" }}
+                  >
+                    {lang === "fr" ? "Connecter Stripe" : "Connect Stripe"}
+                  </a>
+                )
               ) : (
                 <button type="button" style={{ ...secondaryBtn, alignSelf: "center" }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</button>
               )}

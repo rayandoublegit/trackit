@@ -3602,6 +3602,77 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
   );
 }
 
+function StripePromoCodeCell({
+  lang,
+  code,
+  creating,
+  copied,
+  onCreate,
+  onCopy,
+}: {
+  lang: "en" | "fr";
+  code?: string;
+  creating: boolean;
+  copied: boolean;
+  onCreate: () => void;
+  onCopy: () => void;
+}) {
+  if (code) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <code
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: "var(--ws-text)",
+            background: "var(--ws-surface-2)",
+            border: "1px solid var(--ws-border)",
+            borderRadius: 8,
+            padding: "4px 8px",
+            letterSpacing: "0.02em",
+          }}
+        >
+          {code}
+        </code>
+        <button
+          type="button"
+          onClick={onCopy}
+          style={{
+            ...btnSecondary,
+            padding: "5px 10px",
+            fontSize: 12,
+          }}
+        >
+          {copied ? (lang === "fr" ? "Copié" : "Copied") : lang === "fr" ? "Copier" : "Copy"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={creating}
+      onClick={onCreate}
+      style={{
+        ...btnSecondary,
+        padding: "6px 10px",
+        fontSize: 12,
+        opacity: creating ? 0.65 : 1,
+        cursor: creating ? "wait" : "pointer",
+      }}
+    >
+      {creating
+        ? lang === "fr"
+          ? "Création…"
+          : "Creating…"
+        : lang === "fr"
+          ? "Code promo Stripe"
+          : "Stripe promo code"}
+    </button>
+  );
+}
+
 function CreatorsTab({
   lang,
   campaign,
@@ -3620,6 +3691,39 @@ function CreatorsTab({
   onAddCreator: () => void;
 }) {
   const [attachingId, setAttachingId] = useState<string | null>(null);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [promoByCreator, setPromoByCreator] = useState<Record<string, string>>({});
+  const [creatingPromoId, setCreatingPromoId] = useState<string | null>(null);
+  const [copiedPromoId, setCopiedPromoId] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/stripe-connect/status?campaignId=${encodeURIComponent(campaign.id)}`,
+          { credentials: "include" },
+        );
+        const payload = (await res.json().catch(() => ({}))) as {
+          connected?: boolean;
+          promoCodes?: { creatorRowId?: string; code?: string }[];
+        };
+        if (cancelled || !res.ok) return;
+        setStripeConnected(Boolean(payload.connected));
+        const next: Record<string, string> = {};
+        for (const row of payload.promoCodes ?? []) {
+          if (row.creatorRowId && row.code) next[row.creatorRowId] = row.code;
+        }
+        setPromoByCreator(next);
+      } catch {
+        if (!cancelled) setStripeConnected(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [campaign.id]);
 
   const handleAttachSales = async (row: CampaignCreatorRow) => {
     if (!userId || attachingId) return;
@@ -3644,6 +3748,55 @@ function CreatorsTab({
     }
   };
 
+  const handleCreatePromo = async (creatorRowId: string) => {
+    if (creatingPromoId) return;
+    setPromoError("");
+    setCreatingPromoId(creatorRowId);
+    try {
+      const res = await fetch("/api/affiliate-codes/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creatorRowId, campaignId: campaign.id }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        code?: string;
+        error?: string;
+        errorFr?: string;
+        errorCode?: string;
+      };
+      if (!res.ok || !payload.code) {
+        if (payload.errorCode === "stripe_not_connected" || payload.error === "Connect Stripe in Integrations first.") {
+          setStripeConnected(false);
+        }
+        setPromoError(
+          lang === "fr"
+            ? payload.errorFr || payload.error || "Impossible de créer le code promo."
+            : payload.error || "Could not create the promo code.",
+        );
+        return;
+      }
+      setPromoByCreator((prev) => ({ ...prev, [creatorRowId]: payload.code as string }));
+    } catch {
+      setPromoError(lang === "fr" ? "Erreur réseau" : "Network error");
+    } finally {
+      setCreatingPromoId(null);
+    }
+  };
+
+  const handleCopyPromo = async (creatorRowId: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedPromoId(creatorRowId);
+      window.setTimeout(() => {
+        setCopiedPromoId((current) => (current === creatorRowId ? null : current));
+      }, 1600);
+    } catch {
+      setPromoError(lang === "fr" ? "Impossible de copier le code." : "Could not copy the code.");
+    }
+  };
+
   const headers = [
     lang === "fr" ? "Créateur" : "Creator",
     lang === "fr" ? "Pseudo" : "Handle",
@@ -3651,6 +3804,7 @@ function CreatorsTab({
     lang === "fr" ? "Ventes" : "Sales",
     lang === "fr" ? "Revenus" : "Revenue",
     lang === "fr" ? "Commission" : "Commission",
+    ...(stripeConnected ? [lang === "fr" ? "Code promo Stripe" : "Stripe promo"] : []),
   ];
 
   return (
@@ -3725,10 +3879,25 @@ function CreatorsTab({
               <td style={{ padding: "14px", color: "var(--ws-text)", fontWeight: 500 }}>{row.salesCount}</td>
               <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.salesAmount, currency)}</td>
               <td style={{ padding: "14px", color: "var(--ws-text)" }}>{formatCurrencyWithCode(row.commission, currency)}</td>
+              {stripeConnected ? (
+                <td style={{ padding: "14px" }}>
+                  <StripePromoCodeCell
+                    lang={lang}
+                    code={promoByCreator[row.id]}
+                    creating={creatingPromoId === row.id}
+                    copied={copiedPromoId === row.id}
+                    onCreate={() => void handleCreatePromo(row.id)}
+                    onCopy={() => void handleCopyPromo(row.id, promoByCreator[row.id] || "")}
+                  />
+                </td>
+              ) : null}
           </tr>
           ))
         )}
       </Table>
+      {promoError ? (
+        <div style={{ marginTop: 10, fontSize: 12, color: "#DC2626" }}>{promoError}</div>
+      ) : null}
       <div style={{ marginTop: 16 }}>
         <BtnSm onClick={onAddCreator}>{lang === "fr" ? "+ Ajouter un créateur" : "+ Add creator"}</BtnSm>
       </div>
