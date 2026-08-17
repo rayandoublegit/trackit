@@ -371,10 +371,10 @@ export function HeroPreviewShell() {
             <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
           </a>
           <div className="hp-nav__links">
-            {[
+            {([
               { label: t.affiliates, items: t.affiliateItems },
               { label: t.solutions, items: t.solutionItems.map((label) => ({ label })) },
-            ].map((item) => (
+            ] as { label: string; items: { label: string; href?: string }[] }[]).map((item) => (
               <div key={item.label} className="hp-nav__item">
                 <button type="button" className="hp-nav__link">
                   {item.label}
@@ -384,7 +384,7 @@ export function HeroPreviewShell() {
                 </button>
                 <div className="hp-nav__menu">
                   {item.items.map((sub) =>
-                    "href" in sub && sub.href ? (
+                    sub.href ? (
                       <a key={sub.label} href={sub.href} className="hp-nav__menu-item">
                         {sub.label}
                       </a>

@@ -288,7 +288,8 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
       return;
     }
 
-    const motion = ICON_FLIGHT.map((flight) => ({
+    const motion: Array<{ x: number; y: number; r: number; o: number; s: number; wx: number; wy: number }> =
+      ICON_FLIGHT.map((flight) => ({
       x: flight.x,
       y: flight.y,
       r: flight.r,
