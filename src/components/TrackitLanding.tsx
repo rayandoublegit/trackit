@@ -7,7 +7,7 @@ import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroPreviewShell } from "@/app/hero-preview/HeroPreviewShell";
 import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade, upgradeToPlanTier } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
@@ -132,7 +132,6 @@ export default function TrackitLanding() {
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [subscriptionInterval, setSubscriptionInterval] = useState<BillingInterval | null>(null);
   const [planLoading, setPlanLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [payingTier, setPayingTier] = useState<LandingPaidTier | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
@@ -275,7 +274,6 @@ export default function TrackitLanding() {
         const res = await fetch("/api/billing/plan", { credentials: "include" });
         if (!res.ok) {
           if (!cancelled) {
-            setIsLoggedIn(false);
             setCurrentPlan("free");
             setSubscriptionInterval(null);
           }
@@ -286,12 +284,10 @@ export default function TrackitLanding() {
           billingInterval?: BillingInterval | null;
         };
         if (cancelled) return;
-        setIsLoggedIn(true);
         setCurrentPlan(normalizePlan(payload.plan));
         setSubscriptionInterval(payload.billingInterval ?? null);
       } catch {
         if (!cancelled) {
-          setIsLoggedIn(false);
           setCurrentPlan("free");
           setSubscriptionInterval(null);
         }
@@ -327,11 +323,12 @@ export default function TrackitLanding() {
         alert("Pricing not configured. Please contact support.");
         return;
       }
-      if (isLoggedIn) {
-        await upgradeToPlanTier(paid, lang, annual);
-        return;
-      }
-      await handleUpgrade(priceId, { cancelUrl: window.location.href });
+      await handleUpgrade(priceId, {
+        cancelUrl: window.location.href,
+        tier: paid === "basic" ? "growth" : paid,
+        currency,
+        annual,
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : "Could not start checkout");
     } finally {

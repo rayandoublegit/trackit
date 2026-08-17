@@ -84,4 +84,10 @@ describe("stripe config guard", () => {
     expect(src).toContain('credentials: "include"');
     expect(src).toContain("res.status === 401");
   });
+
+  it("landing pay opens Stripe Checkout instead of change-plan", () => {
+    const src = readRepoFile("src/components/TrackitLanding.tsx");
+    expect(src).toContain("handleUpgrade");
+    expect(src).not.toContain("upgradeToPlanTier");
+  });
 });

@@ -233,12 +233,19 @@ export function PricingBento({
         return;
       }
 
-      if (resolvedUserId) {
+      // First purchase always goes through Checkout. change-plan is only for an
+      // existing Stripe subscription (cookie session + known billing interval).
+      if (resolvedUserId && subscriptionInterval) {
         await upgradeToPlanTier(tier, lang, annual);
         return;
       }
 
-      await handleUpgrade(priceId, { cancelUrl: cancelUrl ?? (typeof window !== "undefined" ? window.location.href : undefined) });
+      await handleUpgrade(priceId, {
+        cancelUrl: cancelUrl ?? (typeof window !== "undefined" ? window.location.href : undefined),
+        tier: tier === "basic" ? "growth" : tier,
+        currency,
+        annual,
+      });
     } catch (err) {
       alert(err instanceof Error ? err.message : lang === "fr" ? "Impossible de démarrer le paiement" : "Could not start checkout");
     } finally {
