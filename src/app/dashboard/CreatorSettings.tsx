@@ -347,10 +347,11 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         ? await resolveAvatarUrl(supabase, userId, savedAvatar)
         : savedAvatar;
       setAvatarUrl(resolved ?? null);
+      const cacheUrl = resolved ?? savedAvatar ?? null;
       if (previousUsername && savedUsername && previousUsername !== savedUsername) {
-        renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? savedAvatar);
-      } else if (savedUsername && (resolved || savedAvatar)) {
-        setCachedAvatarUrl(savedUsername, resolved ?? savedAvatar);
+        renameCachedAvatarUrl(previousUsername, savedUsername, cacheUrl);
+      } else if (savedUsername && cacheUrl) {
+        setCachedAvatarUrl(savedUsername, cacheUrl);
       }
       setAvatarFile(null);
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
