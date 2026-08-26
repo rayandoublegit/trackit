@@ -58,9 +58,21 @@ export async function GET(request: Request) {
     (brands || []).map((b) => [b.id, b.business_name || b.full_name || (b.username ? `@${b.username}` : "")]),
   );
 
+  const { data: creatorProfile } = await admin
+    .from("profiles")
+    .select("username, full_name")
+    .eq("id", userId)
+    .maybeSingle();
+  const creatorHandle = String(creatorProfile?.username || "")
+    .replace(/^@+/, "")
+    .trim();
+  const creatorDisplayName = String(creatorProfile?.full_name || "").trim() || null;
+
   const result = (items || []).map((item) => ({
     ...item,
     brandName: brandName.get(item.brand_id) || "",
+    creatorHandle: creatorHandle || null,
+    creatorName: creatorDisplayName,
   }));
 
   const contentIds = (items || []).map((item) => item.id);
@@ -106,14 +118,14 @@ export async function POST(request: Request) {
   const userId = access.actorId;
   const brandId = (body?.brandId as string | undefined)?.trim() || null;
   const creatorRowId = (body?.creatorRowId as string | undefined)?.trim() || null;
-  const title = (body?.title as string | undefined)?.trim();
+  const titleRaw = (body?.title as string | undefined)?.trim() || "";
   const notes = (body?.notes as string | undefined)?.trim() || null;
-  const fileUrl = (body?.fileUrl as string | undefined)?.trim();
-  const fileName = (body?.fileName as string | undefined)?.trim();
+  const fileUrlRaw = (body?.fileUrl as string | undefined)?.trim() || "";
+  const fileNameRaw = (body?.fileName as string | undefined)?.trim() || "";
   const fileType = (body?.fileType as string | undefined)?.trim() || null;
   const fileSize = typeof body?.fileSize === "number" ? body.fileSize : null;
 
-  if (!userId || !title || !fileUrl || !fileName) {
+  if (!userId) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -153,6 +165,39 @@ export async function POST(request: Request) {
     );
   }
   const postUrl = rawPostUrl;
+
+  const hookIdRaw = typeof body?.hookId === "string" ? body.hookId.trim() : "";
+  if (!hookIdRaw) {
+    return NextResponse.json({ error: "Hook is required" }, { status: 400 });
+  }
+  const { data: hookRow, error: hookErr } = await admin
+    .from("hooks")
+    .select("id")
+    .eq("id", hookIdRaw)
+    .eq("brand_id", targetBrandId)
+    .maybeSingle();
+  if (hookErr) return NextResponse.json({ error: hookErr.message }, { status: 500 });
+  if (!hookRow) return NextResponse.json({ error: "Hook not found" }, { status: 400 });
+  const hookId = hookRow.id;
+
+  // Auto-title when the creator skips details: Contenu numéro N
+  let title = titleRaw;
+  if (!title) {
+    const { count } = await admin
+      .from("creator_content")
+      .select("id", { count: "exact", head: true })
+      .eq("creator_user_id", userId)
+      .eq("creator_row_id", targetCreatorRowId);
+    const nextNum = (count ?? 0) + 1;
+    title = `Contenu numéro ${nextNum}`;
+  }
+
+  // File is optional — URL-only posts store the TikTok link as the media ref.
+  const fileUrl = fileUrlRaw || postUrl;
+  const fileName = fileNameRaw || "tiktok-post.url";
+  const resolvedFileType = fileUrlRaw ? fileType : "text/uri-list";
+  const resolvedFileSize = fileUrlRaw ? fileSize : null;
+
   let stats: {
     views: number | null;
     likes: number | null;
@@ -181,20 +226,6 @@ export async function POST(request: Request) {
   }
   const views = Math.max(0, Math.floor(Number(stats.views)));
 
-  const hookIdRaw = typeof body?.hookId === "string" ? body.hookId.trim() : "";
-  let hookId: string | null = null;
-  if (hookIdRaw) {
-    const { data: hookRow, error: hookErr } = await admin
-      .from("hooks")
-      .select("id")
-      .eq("id", hookIdRaw)
-      .eq("brand_id", targetBrandId)
-      .maybeSingle();
-    if (hookErr) return NextResponse.json({ error: hookErr.message }, { status: 500 });
-    if (!hookRow) return NextResponse.json({ error: "Hook not found" }, { status: 400 });
-    hookId = hookRow.id;
-  }
-
   const insertPayload: Record<string, unknown> = {
     brand_id: targetBrandId,
     post_url: postUrl,
@@ -210,10 +241,10 @@ export async function POST(request: Request) {
     notes,
     file_url: fileUrl,
     file_name: fileName,
-    file_type: fileType,
-    file_size: fileSize,
+    file_type: resolvedFileType,
+    file_size: resolvedFileSize,
+    hook_id: hookId,
   };
-  if (hookId) insertPayload.hook_id = hookId;
 
   let { data, error } = await admin.from("creator_content").insert(insertPayload).select("id").single();
   if (error?.message?.includes("hook_id") && hookId) {

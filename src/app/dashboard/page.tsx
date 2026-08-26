@@ -399,7 +399,7 @@ function DashboardPageContent() {
   useEffect(() => {
     if (!user?.id || loading || isCreator || DEV_BYPASS_PLAN) return;
     if (typeof window === "undefined") return;
-    const key = `trackit_demo_preset_v6_${user.id}`;
+    const key = `trackit_demo_preset_v7_${user.id}`;
     const lockKey = `${key}_lock`;
     if (sessionStorage.getItem(key) === "1") return;
     if (sessionStorage.getItem(lockKey) === "1") return;
@@ -420,11 +420,14 @@ function DashboardPageContent() {
           if (cancelled) return;
           if (data.ok) {
             sessionStorage.setItem(key, "1");
-            if (Array.isArray(data.affiliates) && data.affiliates.length > 0) {
-              const existing = loadAffiliates(user.id);
-              if (existing.length === 0) {
-                saveAffiliates(user.id, data.affiliates as StoredAffiliate[]);
-              }
+            // Strip previously injected demo affiliate rows from localStorage.
+            const existing = loadAffiliates(user.id);
+            const cleaned = existing.filter((row) => {
+              const dest = String(row.destinationUrl || row.link || "").toLowerCase();
+              return !dest.includes("demo.trackit.shop") && !dest.includes("trackit-demo");
+            });
+            if (cleaned.length !== existing.length) {
+              saveAffiliates(user.id, cleaned);
             }
             if (data.seeded) {
               dispatchCampaignsUpdated();
@@ -4488,7 +4491,13 @@ function AffiliatesView({
   const [creatorAvatarMap, setCreatorAvatarMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setAffiliates(loadAffiliates(userId));
+    const rows = loadAffiliates(userId);
+    const cleaned = rows.filter((row) => {
+      const dest = String(row.destinationUrl || row.link || "").toLowerCase();
+      return !dest.includes("demo.trackit.shop") && !dest.includes("trackit-demo");
+    });
+    if (cleaned.length !== rows.length) saveAffiliates(userId, cleaned);
+    setAffiliates(cleaned);
     setAffiliatesLoaded(true);
   }, [userId]);
 

@@ -34,11 +34,26 @@ function formatDate(iso: string, lang: "fr" | "en") {
 function ContentCard({ item, lang, brandId }: { item: ContentListItem; lang: "fr" | "en"; brandId?: string }) {
   const isImage = isImageContentFile(item);
   const isVideo = isVideoContentFile(item);
+  const urlOnly =
+    item.file_type === "text/uri-list" ||
+    /\.url$/i.test(item.file_name || "") ||
+    (/tiktok\.com\//i.test(item.file_url || "") && item.file_url === (item.post_url || item.file_url));
+  const openUrl = item.post_url || (urlOnly ? item.file_url : null);
+  const handle = String(item.creatorHandle || "").replace(/^@+/, "").trim();
 
   return (
     <article className="bc-card">
       <div className="bc-card__media">
-        {isImage ? (
+        {urlOnly ? (
+          <div className="bc-card__file" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", justifyContent: "center", padding: 20 }}>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>TikTok</span>
+            {openUrl ? (
+              <a href={openUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "var(--ws-accent)", textDecoration: "none" }}>
+                {lang === "fr" ? "Voir le post →" : "View post →"}
+              </a>
+            ) : null}
+          </div>
+        ) : isImage ? (
           <img src={item.file_url} alt="" />
         ) : isVideo ? (
           <video src={item.file_url} controls />
@@ -48,8 +63,13 @@ function ContentCard({ item, lang, brandId }: { item: ContentListItem; lang: "fr
       </div>
       <div className="bc-card__body">
         <div className="bc-card__title">{item.title}</div>
+        {handle ? (
+          <div style={{ fontSize: 13, color: "var(--ws-text-muted)", marginTop: 4, letterSpacing: "-0.01em" }}>
+            @{handle}
+          </div>
+        ) : null}
         <div className="bc-card__meta">
-          {item.creatorName || (item.creatorHandle ? `@${item.creatorHandle}` : "—")}
+          {item.creatorName || (handle ? `@${handle}` : "—")}
           {" · "}
           {formatDate(item.created_at, lang)}
           {item.file_size ? ` · ${formatContentBytes(item.file_size)}` : ""}
@@ -83,14 +103,25 @@ function ContentCard({ item, lang, brandId }: { item: ContentListItem; lang: "fr
           </div>
         ) : null}
         <div className="bc-card__actions">
-          <ContentFileActions
-            lang={lang}
-            brandId={brandId}
-            contentId={item.id}
-            fileUrl={item.file_url}
-            fileName={item.file_name}
-            openLabel={lang === "fr" ? "Télécharger" : "Download"}
-          />
+          {urlOnly && openUrl ? (
+            <a
+              href={openUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="bc-card__download"
+            >
+              {lang === "fr" ? "Ouvrir le post" : "Open post"} →
+            </a>
+          ) : (
+            <ContentFileActions
+              lang={lang}
+              brandId={brandId}
+              contentId={item.id}
+              fileUrl={item.file_url}
+              fileName={item.file_name}
+              openLabel={lang === "fr" ? "Télécharger" : "Download"}
+            />
+          )}
         </div>
       </div>
     </article>

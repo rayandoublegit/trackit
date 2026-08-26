@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { generateAffiliateSlug } from "@/lib/affiliate-short-link";
 import { resolveOwnerActiveWorkspaceId } from "@/lib/workspace-db";
 import {
   DEMO_CAMPAIGN_DESCRIPTION,
@@ -40,7 +39,6 @@ export type DemoPresetResult = {
   affiliates?: DemoPresetAffiliate[];
 };
 
-const DEST = "https://demo.trackit.shop/";
 const CONTENT_TITLES = [
   "Hook UGC — unboxing produit",
   "Story time — avant / après",
@@ -54,155 +52,23 @@ function daysAgoIso(daysAgo: number, rand: () => number): string {
   return d.toISOString();
 }
 
-async function loadAffiliatesFromDb(
+async function purgeDemoAffiliateLinks(
   admin: SupabaseClient,
   userId: string,
   campaignId: string,
-  creators: DemoCreatorSeed[],
-): Promise<DemoPresetAffiliate[]> {
+): Promise<void> {
+  // Demo campaign only — wipe every seeded affiliate link + fake clicks.
   const { data: links } = await admin
     .from("affiliate_links")
-    .select("id, slug, creator_username, destination_url")
+    .select("id")
     .eq("brand_id", userId)
     .eq("campaign_id", campaignId);
 
-  if (!links?.length) return [];
+  const ids = (links || []).map((row) => String(row.id)).filter(Boolean);
+  if (!ids.length) return;
 
-  const rateByHandle = new Map(creators.map((c) => [c.handle.toLowerCase(), c.commissionRate]));
-  const promoByHandle = new Map(creators.map((c) => [c.handle.toLowerCase(), c.promoCode]));
-  const platformByHandle = new Map(creators.map((c) => [c.handle.toLowerCase(), c.platform]));
-  const out: DemoPresetAffiliate[] = [];
-
-  for (const link of links) {
-    const handle = String(link.creator_username || "").replace(/^@/, "");
-    const slug = String(link.slug);
-    const { count } = await admin
-      .from("link_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("link_id", link.id);
-
-    const { data: attributedSales } = await admin
-      .from("sales")
-      .select("order_amount, commission_amount")
-      .eq("user_id", userId)
-      .eq("attributed_ref", slug);
-
-    const clicks = count ?? 0;
-    let salesRevenue = 0;
-    let commission = 0;
-    let salesCount = 0;
-    for (const s of attributedSales || []) {
-      salesCount += 1;
-      salesRevenue += Number(s.order_amount) || 0;
-      commission += Number(s.commission_amount) || 0;
-    }
-    if (salesCount === 0) {
-      const rate = rateByHandle.get(handle.toLowerCase()) ?? 15;
-      const conversions = Math.max(1, Math.round(clicks * 0.04));
-      salesRevenue = Math.round(conversions * 72 * 100) / 100;
-      commission = Math.round(salesRevenue * (rate / 100) * 100) / 100;
-      salesCount = conversions;
-    }
-
-    const dest = String(link.destination_url || DEST);
-    out.push({
-      creator: `@${handle}`,
-      platform: platformByHandle.get(handle.toLowerCase()) || "TikTok",
-      ref: slug,
-      code: promoByHandle.get(handle.toLowerCase()) || "DEMO",
-      clicks,
-      conversions: salesCount,
-      sales: Math.round(salesRevenue * 100) / 100,
-      commission: Math.round(commission * 100) / 100,
-      status: "active",
-      destinationUrl: dest,
-      link: `${dest.replace(/\/$/, "")}/${slug}`,
-    });
-  }
-  return out;
-}
-
-async function ensureAffiliateLinks(
-  admin: SupabaseClient,
-  userId: string,
-  campaignId: string,
-  demoCreators: DemoCreatorSeed[],
-  rand: () => number,
-): Promise<Map<string, { linkId: string; slug: string }>> {
-  const slugByHandle = new Map<string, { linkId: string; slug: string }>();
-
-  const { data: existing } = await admin
-    .from("affiliate_links")
-    .select("id, slug, creator_username")
-    .eq("brand_id", userId)
-    .eq("campaign_id", campaignId);
-
-  for (const row of existing || []) {
-    const handle = String(row.creator_username || "")
-      .replace(/^@/, "")
-      .toLowerCase();
-    if (handle) slugByHandle.set(handle, { linkId: String(row.id), slug: String(row.slug) });
-  }
-
-  for (const c of demoCreators) {
-    const key = c.handle.toLowerCase();
-    if (slugByHandle.has(key)) continue;
-
-    let slug = `tk${generateAffiliateSlug(6)}`;
-    let linkId: string | null = null;
-
-    for (let attempt = 0; attempt < 6; attempt++) {
-      const { data: link, error } = await admin
-        .from("affiliate_links")
-        .insert({
-          slug,
-          brand_id: userId,
-          creator_username: c.handle,
-          campaign_id: campaignId,
-          destination_url: DEST,
-          active: true,
-        })
-        .select("id, slug")
-        .single();
-
-      if (!error && link) {
-        linkId = String(link.id);
-        slug = String(link.slug);
-        break;
-      }
-      slug = `tk${generateAffiliateSlug(7)}`;
-    }
-
-    if (linkId) slugByHandle.set(key, { linkId, slug });
-  }
-
-  // Ensure click volume for analytics charts (uniques, devices, sources)
-  for (const [, meta] of slugByHandle) {
-    const { count } = await admin
-      .from("link_clicks")
-      .select("id", { count: "exact", head: true })
-      .eq("link_id", meta.linkId);
-
-    if ((count ?? 0) >= 20) continue;
-
-    const clicks = 45 + Math.floor(rand() * 160);
-    const sources = ["direct", "tiktok.com", "instagram.com", "youtube.com"];
-    const clickRows = Array.from({ length: Math.min(clicks, 90) }, (_, i) => {
-      const ipSeed = Math.floor(rand() * 400);
-      return {
-        link_id: meta.linkId,
-        ref_code: meta.slug,
-        country: ["FR", "BE", "CH", "CA", "LU"][Math.floor(rand() * 5)],
-        device: rand() > 0.35 ? "mobile" : rand() > 0.5 ? "desktop" : "tablet",
-        referrer_domain: sources[Math.floor(rand() * sources.length)],
-        ip_hash: `demo_ip_${userId.slice(0, 6)}_${ipSeed}`,
-        created_at: daysAgoToIso(Math.floor(rand() * 28), 9 + (i % 12)),
-      };
-    });
-    if (clickRows.length) await admin.from("link_clicks").insert(clickRows);
-  }
-
-  return slugByHandle;
+  await admin.from("link_clicks").delete().in("link_id", ids);
+  await admin.from("affiliate_links").delete().in("id", ids).eq("brand_id", userId);
 }
 
 async function ensureAttributedSales(
@@ -734,8 +600,11 @@ export async function seedDemoPresetForUser(
       .in("creator_id", extraCreatorIds);
   }
 
-  // ── Affiliate links + clicks first (needed for sales attribution) ─
-  const slugByHandle = await ensureAffiliateLinks(admin, userId, campaignId, demoCreators, rand);
+  // ── Affiliate links: no longer seed mock data ─────────────────────
+  // Purge any previously seeded demo affiliate links + fake clicks.
+  await purgeDemoAffiliateLinks(admin, userId, campaignId);
+
+  const slugByHandle = new Map<string, { linkId: string; slug: string }>();
 
   const shopDomain = profile?.shopify_store
     ? String(profile.shopify_store).includes(".")
@@ -765,15 +634,13 @@ export async function seedDemoPresetForUser(
   // ── Campaign content (2–3 posts + views/likes stats) ──────────────
   await ensureDemoContent(admin, userId, campaignId, demoCreators, creatorIdsByHandle, rand);
 
-  const affiliates = await loadAffiliatesFromDb(admin, userId, campaignId, demoCreators);
-
   return {
     ok: true,
     seeded: true,
     campaignId,
     folderId,
     creatorHandles: demoCreators.map((c) => c.handle),
-    affiliates,
+    affiliates: [] as DemoPresetAffiliate[],
   };
 }
 
