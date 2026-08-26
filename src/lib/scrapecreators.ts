@@ -116,16 +116,60 @@ export async function searchTikTokUsersRaw(query: string, cursor?: number): Prom
   return scGet(`/v1/tiktok/search/users?query=${encodeURIComponent(query)}${c}`);
 }
 
+function normalizeTikTokPostUrl(input: string): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    // Keep path only for canonical www/m tiktok links; drop tracking query noise.
+    if (/tiktok\.com$/i.test(u.hostname) || /\.tiktok\.com$/i.test(u.hostname)) {
+      u.hash = "";
+      // Short links (vm/vt) need the full URL as-is for redirect resolution by the API.
+      if (/^(vm|vt)\.tiktok\.com$/i.test(u.hostname)) {
+        return u.toString();
+      }
+      // Strip query for standard /@user/video/ID urls
+      if (/\/video\/\d+/i.test(u.pathname) || /\/photo\/\d+/i.test(u.pathname)) {
+        u.search = "";
+      }
+      return u.toString();
+    }
+  } catch {
+    /* keep raw */
+  }
+  return raw;
+}
+
 // Fetch a single TikTok video by its public URL (post performance).
 export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
   const key = process.env.SCRAPECREATORS_API_KEY;
   if (!key) throw new Error("SCRAPECREATORS_API_KEY missing");
-  const res = await fetch(
-    `https://api.scrapecreators.com/v1/tiktok/video?url=${encodeURIComponent(postUrl)}`,
-    { headers: { "x-api-key": key } }
-  );
-  if (!res.ok) throw new Error(`video fetch ${res.status}`);
-  return res.json();
+  const url = normalizeTikTokPostUrl(postUrl);
+  if (!url) throw new Error("TikTok URL is empty");
+
+  const endpoint = `https://api.scrapecreators.com/v2/tiktok/video?url=${encodeURIComponent(url)}`;
+  const res = await fetch(endpoint, {
+    headers: { "x-api-key": key, Accept: "application/json" },
+    cache: "no-store",
+  });
+  const text = await res.text();
+  let body: any = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = null;
+  }
+  if (!res.ok) {
+    const detail =
+      (body && (body.error || body.message || body.detail)) ||
+      text.slice(0, 180) ||
+      res.statusText;
+    throw new Error(`ScrapeCreators video ${res.status}: ${detail}`);
+  }
+  if (body && body.success === false) {
+    throw new Error(String(body.error || body.message || "ScrapeCreators returned success=false"));
+  }
+  return body ?? {};
 }
 
 // Defensive parse across ScrapeCreators response shapes.
@@ -133,15 +177,20 @@ export function parseVideoStats(raw: any): {
   views: number | null; likes: number | null; comments: number | null;
   shares: number | null; postedAt: string | null;
 } {
-  const d = raw?.aweme_detail ?? raw?.data ?? raw ?? {};
-  const st = d.statistics ?? d.stats ?? {};
+  const d = raw?.aweme_detail ?? raw?.data?.aweme_detail ?? raw?.data ?? raw?.video ?? raw ?? {};
+  const st = d.statistics ?? d.stats ?? d.stat ?? {};
   const n = (v: unknown) => (typeof v === "number" ? v : v != null && !isNaN(Number(v)) ? Number(v) : null);
-  const created = n(d.create_time);
+  const created = n(d.create_time ?? d.createTime ?? d.created_at);
+  const views = n(
+    st.play_count ?? st.playCount ?? st.view_count ?? st.viewCount ?? st.views ?? d.play_count ?? d.views,
+  );
   return {
-    views: n(st.play_count ?? st.playCount ?? st.views),
-    likes: n(st.digg_count ?? st.diggCount ?? st.likes),
-    comments: n(st.comment_count ?? st.commentCount ?? st.comments),
-    shares: n(st.share_count ?? st.shareCount ?? st.shares),
-    postedAt: created ? new Date(created * 1000).toISOString() : null,
+    views,
+    likes: n(st.digg_count ?? st.diggCount ?? st.like_count ?? st.likes ?? d.likes),
+    comments: n(st.comment_count ?? st.commentCount ?? st.comments ?? d.comments),
+    shares: n(st.share_count ?? st.shareCount ?? st.shares ?? d.shares),
+    postedAt: created
+      ? new Date(created > 1e12 ? created : created * 1000).toISOString()
+      : null,
   };
 }

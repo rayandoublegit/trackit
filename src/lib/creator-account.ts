@@ -178,6 +178,8 @@ export async function syncCreatorRowsByProfileHandle(
       const patch: Record<string, unknown> = {};
       if (owned.linked_user_id !== userId) patch.linked_user_id = userId;
       if (normalizeCreatorHandle(owned.handle) !== handle) patch.handle = handle;
+      const nextName = (profileRow?.full_name || "").trim();
+      if (nextName && owned.full_name !== nextName) patch.full_name = nextName;
       if (Object.keys(patch).length) {
         await supabase.from("creators").update(patch).eq("id", owned.id);
       }
@@ -609,6 +611,7 @@ export type CreatorStatsPayload = {
   totalCommissions: number;
   balance: number;
   totalEarned: number;
+  totalPaidOut?: number;
   salesCount: number;
   sales: {
     id: string;
@@ -715,8 +718,10 @@ export async function buildCreatorStatsPayload(
     .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
 
   const balanceFromRows = rows.reduce((sum, row) => sum + (Number(row.balance) || 0), 0);
-  const balanceFromLedger = Math.max(0, totalCommissions - totalPaidOut);
-  const balance = sales.length > 0 ? balanceFromLedger : balanceFromRows;
+  // Outstanding balance includes commissions + RPM credits minus payouts (kept on creators.balance).
+  const balance = balanceFromRows;
+  const totalEarnedFromRows = rows.reduce((sum, row) => sum + (Number(row.total_earned) || 0), 0);
+  const totalEarned = Math.max(totalCommissions, totalEarnedFromRows);
 
   const primaryRow = rows[0];
   let brandName: string | null = null;
@@ -744,7 +749,8 @@ export async function buildCreatorStatsPayload(
     totalSales,
     totalCommissions,
     balance,
-    totalEarned: totalCommissions,
+    totalEarned,
+    totalPaidOut,
     salesCount: sales.length,
     sales: sales.map((s) => ({
       id: s.id,

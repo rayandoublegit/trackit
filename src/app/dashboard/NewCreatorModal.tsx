@@ -10,6 +10,8 @@ const SIMULATE_CREATOR_ID = "simulate-new-creator";
 const SIMULATE_STORAGE_KEY = "trackit_simulate_new_creator";
 const HOLD_MS = 1400;
 
+type PayoutModel = "commission" | "rpm";
+
 type PendingCreator = {
   id: string;
   handle: string;
@@ -18,6 +20,9 @@ type PendingCreator = {
   platform: string | null;
   commission_rate: number | null;
   discount_code: string | null;
+  payout_model?: string | null;
+  rpm_rate?: number | null;
+  rpm_per_views?: number | null;
 };
 
 const SIMULATE_CREATOR: PendingCreator = {
@@ -28,6 +33,9 @@ const SIMULATE_CREATOR: PendingCreator = {
   platform: "tiktok",
   commission_rate: 12,
   discount_code: "NOEMI12",
+  payout_model: "commission",
+  rpm_rate: null,
+  rpm_per_views: null,
 };
 
 function wantsSimulateNewCreator() {
@@ -48,7 +56,10 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const [queue, setQueue] = useState<PendingCreator[]>([]);
   const [simulate, setSimulate] = useState(false);
   const [phase, setPhase] = useState<Phase>("simple");
+  const [payoutModel, setPayoutModel] = useState<PayoutModel>("commission");
   const [commission, setCommission] = useState("");
+  const [rpmAmount, setRpmAmount] = useState("1");
+  const [rpmPerViews, setRpmPerViews] = useState("1000");
   const [discount, setDiscount] = useState("");
   const [platform, setPlatform] = useState("");
   const [niche, setNiche] = useState("");
@@ -70,17 +81,20 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
   const showList = phase === "list";
 
   const infoComplete = useMemo(() => {
-    const commissionOk = commission.trim() !== "" && Number.isFinite(Number(commission));
     const engagementOk = engagement.trim() !== "" && Number.isFinite(Number(engagement));
-    return (
-      commissionOk &&
-      discount.trim().length > 0 &&
+    const sharedOk =
       platform.trim().length > 0 &&
       niche.trim().length > 0 &&
       followers.trim().length > 0 &&
-      engagementOk
-    );
-  }, [commission, discount, platform, niche, followers, engagement]);
+      engagementOk;
+    if (payoutModel === "rpm") {
+      const amountOk = rpmAmount.trim() !== "" && Number(rpmAmount) > 0;
+      const viewsOk = rpmPerViews.trim() !== "" && Number(rpmPerViews) >= 1;
+      return amountOk && viewsOk && sharedOk;
+    }
+    const commissionOk = commission.trim() !== "" && Number.isFinite(Number(commission));
+    return commissionOk && discount.trim().length > 0 && sharedOk;
+  }, [payoutModel, commission, rpmAmount, rpmPerViews, discount, platform, niche, followers, engagement]);
 
   const listReady = folders.length === 0 || selectedFolderId.trim().length > 0;
   const canHoldAdd = showList && infoComplete && listReady && !saving;
@@ -131,8 +145,22 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     setSaveError(null);
     setHoldProgress(0);
     holdDone.current = false;
-    // Prefill known invite values; empty fields still block until user fills everything.
+    const model: PayoutModel =
+      String(current.payout_model || "").toLowerCase() === "rpm" ? "rpm" : "commission";
+    setPayoutModel(model);
     setCommission(current.commission_rate != null ? String(current.commission_rate) : "");
+    const perViews =
+      current.rpm_per_views != null && Number(current.rpm_per_views) > 0
+        ? Number(current.rpm_per_views)
+        : 1000;
+    setRpmPerViews(String(perViews));
+    if (current.rpm_rate != null && Number(current.rpm_rate) > 0) {
+      // rpm_rate is EUR / 1000 views — show amount for the chosen per-views unit
+      const amount = (Number(current.rpm_rate) / 1000) * perViews;
+      setRpmAmount(String(Math.round(amount * 10000) / 10000));
+    } else {
+      setRpmAmount("1");
+    }
     setDiscount(current.discount_code || "");
     setPlatform(current.platform || "");
     setNiche("");
@@ -258,8 +286,11 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
         body: JSON.stringify({
           brandId,
           creatorId: current.id,
-          commissionRate: commission,
-          discountCode: discount,
+          payoutModel,
+          commissionRate: payoutModel === "commission" ? commission : undefined,
+          rpmAmount: payoutModel === "rpm" ? Number(rpmAmount) : undefined,
+          rpmPerViews: payoutModel === "rpm" ? Number(rpmPerViews) : undefined,
+          discountCode: discount.trim() || undefined,
           platform,
           avatarUrl,
           niche,
@@ -619,6 +650,57 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
           color: #6E6E6E;
           letter-spacing: -0.01em;
         }
+        .ncm-model-switch {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 4px;
+          padding: 4px;
+          border-radius: 14px;
+          background: #1A1A1A;
+          border: 1px solid #2A2A2A;
+        }
+        .ncm-model-switch__btn {
+          border: none;
+          border-radius: 11px;
+          padding: 10px 12px;
+          font-size: 13px;
+          font-weight: 650;
+          font-family: inherit;
+          letter-spacing: -0.02em;
+          cursor: pointer;
+          background: transparent;
+          color: #8A8A8A;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .ncm-model-switch__btn:hover:not(:disabled) { color: #F5F5F5; }
+        .ncm-model-switch__btn.is-active {
+          background: #FFFFFF;
+          color: #111111;
+        }
+        .ncm-model-switch__btn:disabled {
+          opacity: 0.55;
+          cursor: not-allowed;
+        }
+        .ncm-rpm-row {
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          gap: 8px;
+          align-items: end;
+        }
+        .ncm-rpm-sep {
+          padding-bottom: 14px;
+          font-size: 13px;
+          color: #8A8A8A;
+          letter-spacing: -0.01em;
+          white-space: nowrap;
+        }
+        .ncm-model-hint {
+          margin: 0;
+          font-size: 12px;
+          color: #6E6E6E;
+          letter-spacing: -0.01em;
+          line-height: 1.4;
+        }
       `}</style>
 
       <div className="ncm-overlay" role="dialog" aria-modal="true" aria-labelledby="ncm-title">
@@ -700,20 +782,88 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
           <div className={`ncm-expand${expanded ? " is-open" : ""}`}>
             <div className="ncm-expand__inner">
               <div className="ncm-fields">
-                <div>
-                  <label style={labelStyle}>{lang === "fr" ? "Commission (%)" : "Commission (%)"} *</label>
-                  <input
-                    type="number"
-                    value={commission}
-                    onChange={(e) => setCommission(e.target.value)}
-                    className="ncm-field"
-                    style={fieldStyle}
+                <div className="ncm-model-switch" role="group" aria-label={lang === "fr" ? "Modèle de paiement" : "Payout model"}>
+                  <button
+                    type="button"
+                    className={`ncm-model-switch__btn${payoutModel === "commission" ? " is-active" : ""}`}
                     disabled={saving || showList}
-                    required
-                  />
+                    onClick={() => setPayoutModel("commission")}
+                  >
+                    Commission
+                  </button>
+                  <button
+                    type="button"
+                    className={`ncm-model-switch__btn${payoutModel === "rpm" ? " is-active" : ""}`}
+                    disabled={saving || showList}
+                    onClick={() => setPayoutModel("rpm")}
+                  >
+                    RPM
+                  </button>
                 </div>
+                <p className="ncm-model-hint">
+                  {payoutModel === "rpm"
+                    ? lang === "fr"
+                      ? "Prix pour un nombre de vues (ex. 1 € / 1 000 vues). Switch pour revenir à la commission."
+                      : "Price for a number of views (e.g. €1 / 1,000 views). Switch back to commission anytime."
+                    : lang === "fr"
+                      ? "Commission sur les ventes. Switch pour passer en RPM (vues)."
+                      : "Commission on sales. Switch to RPM (views) anytime."}
+                </p>
+
+                {payoutModel === "commission" ? (
+                  <div>
+                    <label style={labelStyle}>{lang === "fr" ? "Commission (%)" : "Commission (%)"} *</label>
+                    <input
+                      type="number"
+                      value={commission}
+                      onChange={(e) => setCommission(e.target.value)}
+                      className="ncm-field"
+                      style={fieldStyle}
+                      disabled={saving || showList}
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div className="ncm-rpm-row">
+                    <div>
+                      <label style={labelStyle}>{lang === "fr" ? "Prix (€)" : "Price (€)"} *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rpmAmount}
+                        onChange={(e) => setRpmAmount(e.target.value)}
+                        placeholder="1"
+                        className="ncm-field"
+                        style={fieldStyle}
+                        disabled={saving || showList}
+                        required
+                      />
+                    </div>
+                    <span className="ncm-rpm-sep">{lang === "fr" ? "pour" : "per"}</span>
+                    <div>
+                      <label style={labelStyle}>{lang === "fr" ? "Vues" : "Views"} *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={rpmPerViews}
+                        onChange={(e) => setRpmPerViews(e.target.value)}
+                        placeholder="1000"
+                        className="ncm-field"
+                        style={fieldStyle}
+                        disabled={saving || showList}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <label style={labelStyle}>{lang === "fr" ? "Code promo" : "Promo code"} *</label>
+                  <label style={labelStyle}>
+                    {lang === "fr" ? "Code promo" : "Promo code"}
+                    {payoutModel === "commission" ? " *" : ""}
+                  </label>
                   <input
                     type="text"
                     value={discount}
@@ -722,7 +872,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                     className="ncm-field"
                     style={fieldStyle}
                     disabled={saving || showList}
-                    required
+                    required={payoutModel === "commission"}
                   />
                 </div>
                 <div>

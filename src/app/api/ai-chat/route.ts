@@ -9,7 +9,30 @@ function isDeepAsk(text: string) {
   );
 }
 
-function systemPrompt(lang: "fr" | "en") {
+function systemPrompt(lang: "fr" | "en", role: "brand" | "creator") {
+  if (role === "creator") {
+    if (lang === "fr") {
+      return [
+        "Tu t’appelles Mino. Tu es l’assistant Trackit pour les créateurs, chaleureux et utile.",
+        "Tu parles comme une vraie personne, jamais comme un bot corporate.",
+        "Style obligatoire: pas de markdown, pas de # titres, pas de puces avec - ou *, pas de gras **, texte simple.",
+        "emojis ok avec parcimonie (1 ou 2 max).",
+        "Pour un bonjour ou une question courte: 1 à 3 phrases.",
+        "Tu aides le créateur sur: analytiques (ventes, commissions, RPM / vues), poster du contenu avec URL TikTok, communauté, infos/règles/pricing de la marque, hooks, Pay it / solde, planner, whiteboard, paramètres.",
+        "Si l’utilisateur veut ouvrir une section, dis-le simplement (Analytiques, Contenu, Communauté, Pay it, etc.).",
+      ].join("\n");
+    }
+    return [
+      "Your name is Mino. You are Trackit’s assistant for creators: warm and useful.",
+      "Talk like a real person, never like a corporate bot.",
+      "Required style: no markdown, no # headings, no bullet points with - or *, no ** bold, plain text.",
+      "emojis ok sparingly (1–2 max).",
+      "For hellos or short questions: 1–3 sentences.",
+      "You help creators with: analytics (sales, commissions, RPM / views), posting content with a TikTok URL, community, brand infos/rules/pricing, hooks, Pay it / balance, planner, whiteboard, settings.",
+      "If the user wants to open a section, say it simply (Analytics, Content, Community, Pay it, etc.).",
+    ].join("\n");
+  }
+
   if (lang === "fr") {
     return [
       "Tu t’appelles Mino. Tu es l’assistant de Trackit, chaleureux, humain et utile.",
@@ -49,9 +72,11 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       messages?: ChatMessage[];
       lang?: "fr" | "en";
+      role?: "brand" | "creator";
     };
     const messages = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
     const lang = body.lang === "en" ? "en" : "fr";
+    const role = body.role === "creator" ? "creator" : "brand";
     const last = messages.filter((m) => m.role === "user").at(-1)?.content?.trim();
     if (!last) {
       return NextResponse.json({ ok: false, error: "Empty message" }, { status: 400 });
@@ -72,7 +97,7 @@ export async function POST(request: Request) {
     const message = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: deep ? 1200 : 220,
-      system: systemPrompt(lang),
+      system: systemPrompt(lang, role),
       messages: messages.map((m) => ({
         role: m.role,
         content: m.content,

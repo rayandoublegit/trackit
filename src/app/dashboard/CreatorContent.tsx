@@ -233,6 +233,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [postUrl, setPostUrl] = useState("");
+  const [hookId, setHookId] = useState("");
+  const [hooks, setHooks] = useState<{ id: string; title: string; brandName?: string }[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -297,12 +299,38 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     setTitle("");
     setNotes("");
     setPostUrl("");
+    setHookId("");
     setPendingFiles([]);
     setDragOver(false);
     setMessage("");
     setMessageTone("error");
     setLastUploadedLink(null);
   }, [addOpen]);
+
+  useEffect(() => {
+    if (!addOpen || !userId) return;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/creator/hooks?userId=${encodeURIComponent(userId)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setHooks([]);
+          return;
+        }
+        const rows = ((data.hooks || []) as { id: string; title: string; brandName?: string }[]).map((h) => ({
+          id: h.id,
+          title: h.title,
+          brandName: h.brandName,
+        }));
+        setHooks(rows);
+      } catch {
+        setHooks([]);
+      }
+    })();
+  }, [addOpen, userId]);
 
   const pickFiles = (list: FileList | File[] | null | undefined) => {
     const files = Array.from(list ?? []).filter((f) => f.size > 0);
@@ -331,7 +359,16 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
     }
 
     const trimmedPostUrl = postUrl.trim();
-    if (trimmedPostUrl && !/tiktok\.com\//i.test(trimmedPostUrl)) {
+    if (!trimmedPostUrl) {
+      setMessageTone("error");
+      setMessage(
+        fr
+          ? "L’URL du post TikTok est obligatoire pour calculer les vues."
+          : "A TikTok post URL is required so we can track views.",
+      );
+      return;
+    }
+    if (!/tiktok\.com\//i.test(trimmedPostUrl)) {
       setMessageTone("error");
       setMessage(fr ? "L'URL doit être un lien TikTok (tiktok.com)." : "URL must be a TikTok link (tiktok.com).");
       return;
@@ -367,6 +404,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       let uploaded = 0;
       let lastCreatorRowId = uploadBrand.creatorRowId;
       let latestLinkUrl: string | null = null;
+      let lastViews: number | null = null;
+      let lastRpmAmount = 0;
 
       for (let i = 0; i < pendingFiles.length; i++) {
         const file = pendingFiles[i];
@@ -399,7 +438,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
             fileName: file.name,
             fileType: file.type || null,
             fileSize: file.size,
-            ...(i === 0 && trimmedPostUrl ? { postUrl: trimmedPostUrl } : {}),
+            ...(hookId ? { hookId } : {}),
+            postUrl: trimmedPostUrl,
           }),
         });
         const data = (await res.json()) as {
@@ -408,6 +448,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           brandId?: string;
           creatorRowId?: string;
           linkUrl?: string | null;
+          stats?: { views?: number | null; likes?: number | null };
+          rpm?: { amount?: number; rpmRate?: number };
         };
         if (!res.ok || !data?.ok) {
           throw new Error(
@@ -418,6 +460,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         if (data.brandId) setBrandId(data.brandId);
         if (data.creatorRowId) lastCreatorRowId = data.creatorRowId;
         if (data.linkUrl) latestLinkUrl = data.linkUrl;
+        if (typeof data.stats?.views === "number") lastViews = data.stats.views;
+        if (typeof data.rpm?.amount === "number") lastRpmAmount += data.rpm.amount;
         uploaded += 1;
       }
 
@@ -427,12 +471,29 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       setPostUrl("");
       setLastUploadedLink(latestLinkUrl);
       setMessageTone("success");
+      const viewsPart =
+        lastViews != null
+          ? fr
+            ? ` · ${new Intl.NumberFormat("fr-FR").format(lastViews)} vues`
+            : ` · ${new Intl.NumberFormat("en-US").format(lastViews)} views`
+          : "";
+      const rpmPart =
+        lastRpmAmount > 0
+          ? fr
+            ? ` · +${lastRpmAmount.toFixed(2)} € RPM`
+            : ` · +€${lastRpmAmount.toFixed(2)} RPM`
+          : "";
       setMessage(
         fr
-          ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à ${brandName || (fr ? "la marque" : "the brand")}.`
-          : `${uploaded} file${uploaded > 1 ? "s" : ""} sent to ${brandName || "the brand"}.`,
+          ? `${uploaded} fichier${uploaded > 1 ? "s" : ""} envoyé${uploaded > 1 ? "s" : ""} à ${brandName || "la marque"}${viewsPart}${rpmPart}.`
+          : `${uploaded} file${uploaded > 1 ? "s" : ""} sent to ${brandName || "the brand"}${viewsPart}${rpmPart}.`,
       );
       dispatchContentUpdated();
+      try {
+        window.dispatchEvent(new Event("trackit:rpm-updated"));
+      } catch {
+        /* ignore */
+      }
       await load();
       // Sans lien à copier, referme le panneau ; sinon laisse le créateur copier son lien.
       if (!latestLinkUrl) {
@@ -612,6 +673,39 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
+                  {fr ? "Hook utilisé" : "Hook used"}
+                </label>
+                <select
+                  value={hookId}
+                  onChange={(e) => setHookId(e.target.value)}
+                  disabled={hooks.length === 0}
+                  style={{ ...inputStyle, cursor: hooks.length ? "pointer" : "default" }}
+                >
+                  <option value="">
+                    {hooks.length === 0
+                      ? fr
+                        ? "Aucun hook disponible"
+                        : "No hooks available"
+                      : fr
+                        ? "Choisir un hook (optionnel)"
+                        : "Choose a hook (optional)"}
+                  </option>
+                  {hooks.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.title}
+                      {h.brandName ? ` — ${h.brandName}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.4 }}>
+                  {fr
+                    ? "La marque pourra filtrer ce contenu par hook dans Contenu."
+                    : "The brand can filter this content by hook in Content."}
+                </p>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                   {fr ? "Fichiers" : "Files"}
                 </label>
                 <div
@@ -694,26 +788,32 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-text)", margin: 0 }}>
-                    {fr ? "Ajouter un URL" : "Add a URL"}
+                    {fr ? "URL du post" : "Post URL"}
+                    <span style={{ color: "var(--ws-danger)", marginLeft: 4 }} aria-hidden>
+                      *
+                    </span>
                   </label>
                   <InfoTip
                     lang={lang}
                     text={
                       fr
-                        ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement. La marque voit ces stats dans sa campagne et peut mesurer la performance de votre contenu."
-                        : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement. Your brand sees these stats in their campaign and can measure how your content performs."
+                        ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement. Obligatoire — sans URL, les stats ne peuvent pas être calculées."
+                        : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement. Required — without a URL, stats can’t be calculated."
                     }
                   />
                 </div>
                 <input
                   type="url"
+                  required
                   value={postUrl}
                   onChange={(e) => setPostUrl(e.target.value)}
                   placeholder="https://www.tiktok.com/@toncompte/video/..."
                   style={inputStyle}
                 />
                 <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "8px 0 0", lineHeight: 1.45 }}>
-                  {fr ? "Optionnel — associé au premier fichier envoyé." : "Optional — linked to the first uploaded file."}
+                  {fr
+                    ? "Obligatoire — lien TikTok pour calculer les vues et l’engagement."
+                    : "Required — TikTok link so we can calculate views and engagement."}
                 </p>
               </div>
 

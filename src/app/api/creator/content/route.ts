@@ -9,6 +9,7 @@ import {
   CREATOR_CONTENT_MAX_FILE_BYTES,
   CREATOR_CONTENT_MAX_FILE_LABEL,
 } from "@/lib/content-upload-limits";
+import { settleNewContentRpm } from "@/lib/rpm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { buildTrackitShortLink } from "@/lib/affiliate-short-link";
 
@@ -137,41 +138,92 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Creator not linked to brand" }, { status: 403 });
   }
 
-  // Performance-by-content: creator may submit the TikTok post URL.
-  const postUrl = typeof body.postUrl === "string" && /tiktok\.com\//.test(body.postUrl) ? body.postUrl.trim() : null;
-  let stats: { views: number | null; likes: number | null; comments: number | null; shares: number | null; postedAt: string | null } | null = null;
-  if (postUrl) {
-    try {
-      stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
-    } catch (e) {
-      // No credits / API down: store the URL anyway, stats stay pending.
-      console.error("post stats fetch skipped:", (e as Error).message);
-    }
+  // Performance-by-content: TikTok post URL required to fetch views / engagement.
+  const rawPostUrl = typeof body.postUrl === "string" ? body.postUrl.trim() : "";
+  if (!rawPostUrl) {
+    return NextResponse.json(
+      { error: "TikTok post URL is required to track views" },
+      { status: 400 },
+    );
+  }
+  if (!/tiktok\.com\//i.test(rawPostUrl)) {
+    return NextResponse.json(
+      { error: "URL must be a TikTok link (tiktok.com)" },
+      { status: 400 },
+    );
+  }
+  const postUrl = rawPostUrl;
+  let stats: {
+    views: number | null;
+    likes: number | null;
+    comments: number | null;
+    shares: number | null;
+    postedAt: string | null;
+  };
+  try {
+    stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+  } catch (e) {
+    console.error("post stats fetch failed:", (e as Error).message);
+    return NextResponse.json(
+      {
+        error:
+          "Impossible de récupérer les stats TikTok (ScrapeCreators). Vérifiez l’URL et réessayez.",
+        detail: (e as Error).message,
+      },
+      { status: 502 },
+    );
+  }
+  if (stats.views == null || !Number.isFinite(Number(stats.views))) {
+    return NextResponse.json(
+      { error: "ScrapeCreators n’a pas renvoyé de vues pour cette URL." },
+      { status: 502 },
+    );
+  }
+  const views = Math.max(0, Math.floor(Number(stats.views)));
+
+  const hookIdRaw = typeof body?.hookId === "string" ? body.hookId.trim() : "";
+  let hookId: string | null = null;
+  if (hookIdRaw) {
+    const { data: hookRow, error: hookErr } = await admin
+      .from("hooks")
+      .select("id")
+      .eq("id", hookIdRaw)
+      .eq("brand_id", targetBrandId)
+      .maybeSingle();
+    if (hookErr) return NextResponse.json({ error: hookErr.message }, { status: 500 });
+    if (!hookRow) return NextResponse.json({ error: "Hook not found" }, { status: 400 });
+    hookId = hookRow.id;
   }
 
-  const { data, error } = await admin
-    .from("creator_content")
-    .insert({
-      brand_id: targetBrandId,
-      post_url: postUrl,
-      views: stats?.views ?? null,
-      likes: stats?.likes ?? null,
-      comments: stats?.comments ?? null,
-      shares: stats?.shares ?? null,
-      posted_at: stats?.postedAt ?? null,
-      stats_updated_at: stats ? new Date().toISOString() : null,
-      creator_row_id: targetCreatorRowId,
-      creator_user_id: userId,
-      title,
-      notes,
-      file_url: fileUrl,
-      file_name: fileName,
-      file_type: fileType,
-      file_size: fileSize,
-    })
-    .select("id")
-    .single();
+  const insertPayload: Record<string, unknown> = {
+    brand_id: targetBrandId,
+    post_url: postUrl,
+    views,
+    likes: stats.likes ?? null,
+    comments: stats.comments ?? null,
+    shares: stats.shares ?? null,
+    posted_at: stats.postedAt ?? null,
+    stats_updated_at: new Date().toISOString(),
+    creator_row_id: targetCreatorRowId,
+    creator_user_id: userId,
+    title,
+    notes,
+    file_url: fileUrl,
+    file_name: fileName,
+    file_type: fileType,
+    file_size: fileSize,
+  };
+  if (hookId) insertPayload.hook_id = hookId;
+
+  let { data, error } = await admin.from("creator_content").insert(insertPayload).select("id").single();
+  if (error?.message?.includes("hook_id") && hookId) {
+    delete insertPayload.hook_id;
+    const retry = await admin.from("creator_content").insert(insertPayload).select("id").single();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Insert failed" }, { status: 500 });
 
   const syncErr = await syncContentRefToDiscoverySaved(admin, targetBrandId, targetCreatorRowId, {
     id: data.id,
@@ -182,6 +234,17 @@ export async function POST(request: Request) {
   const campaignSyncErr = await backfillCreatorContentToCampaigns(admin, targetBrandId, targetCreatorRowId);
   if (campaignSyncErr) {
     console.error("campaign content sync failed:", campaignSyncErr.message);
+  }
+
+  // Credit RPM from scraped views → creator balance (baseline 0 so current views count).
+  const rpm = await settleNewContentRpm(admin, {
+    brandId: targetBrandId,
+    creatorRowId: targetCreatorRowId,
+    contentId: data.id,
+    views,
+  });
+  if (rpm.error) {
+    console.error("rpm settle on upload failed:", rpm.error);
   }
 
   const creatorName = await resolveCreatorDisplayName(admin, userId);
@@ -196,6 +259,18 @@ export async function POST(request: Request) {
     id: data.id,
     brandId: targetBrandId,
     creatorRowId: targetCreatorRowId,
+    stats: {
+      views,
+      likes: stats.likes,
+      comments: stats.comments,
+      shares: stats.shares,
+      postedAt: stats.postedAt,
+    },
+    rpm: {
+      amount: rpm.amount,
+      rpmRate: rpm.rpmRate,
+      linked: rpm.linked,
+    },
   });
 }
 

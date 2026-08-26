@@ -131,6 +131,11 @@ export function CreatorAvatar({
   );
 
   if (!activeSrc) {
+    const letterSource = (displayName || resolvedUsername || alt || "?")
+      .trim()
+      .replace(/^@+/, "");
+    const letter = letterSource.charAt(0).toUpperCase() || "?";
+    const showLetter = Boolean(displayName?.trim() || resolvedUsername);
     return (
       <div
         style={{
@@ -146,7 +151,21 @@ export function CreatorAvatar({
         aria-hidden={!alt}
         title={alt || displayName || undefined}
       >
-        <ProfileIcon size={size} />
+        {showLetter ? (
+          <span
+            style={{
+              fontSize: Math.max(11, Math.round(size * 0.38)),
+              fontWeight: 600,
+              color: "#8A8A8A",
+              lineHeight: 1,
+              userSelect: "none",
+            }}
+          >
+            {letter}
+          </span>
+        ) : (
+          <ProfileIcon size={size} />
+        )}
       </div>
     );
   }

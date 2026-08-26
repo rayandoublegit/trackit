@@ -6,7 +6,7 @@ import { useLang } from "@/lib/useLang";
 import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
-import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
+import { resolveAvatarUrl, toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
 import {
   fetchProfileUsernameAvailability,
@@ -257,15 +257,19 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
     savingRef.current = true;
     setSaving(true);
-    if (!options?.silent) setError("");
+    setError("");
     setSaved(false);
 
     try {
       let newAvatarUrl = avatarUrl;
       if (avatarFile) {
-        const ext = avatarFile.name.split(".").pop() || "jpg";
-        const path = `${userId}/avatar.${ext}`;
-        const { error: upErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+        const ext = avatarFile.name.split(".").pop()?.toLowerCase() || "jpg";
+        const safeExt = ["jpg", "jpeg", "png", "webp"].includes(ext) ? ext : "jpg";
+        const path = `${userId}/avatar.${safeExt}`;
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, avatarFile, {
+          upsert: true,
+          contentType: avatarFile.type || "image/jpeg",
+        });
         if (upErr) {
           if (!options?.silent) setError(upErr.message);
           return false;
@@ -274,22 +278,56 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         newAvatarUrl = pub.publicUrl + "?t=" + Date.now();
       }
 
+      const persistAvatarUrl =
+        toPersistableAvatarUrl(supabase, userId, newAvatarUrl) ?? newAvatarUrl;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
       const res = await fetch("/api/creator/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         credentials: "include",
         body: JSON.stringify({
           full_name: fullName.trim(),
           username: usernameToSave,
-          avatar_url: newAvatarUrl,
+          avatar_url: persistAvatarUrl,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; profile?: { full_name?: string; username?: string; avatar_url?: string | null } };
-      if (!res.ok) {
+      let data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        profile?: { full_name?: string; username?: string; avatar_url?: string | null };
+      };
+
+      // Fallback: cookie/bearer auth failed — persist with the browser session (RLS).
+      if (!res.ok && res.status === 401) {
+        const { error: directErr } = await supabase
+          .from("profiles")
+          .update({
+            full_name: fullName.trim(),
+            username: usernameToSave || null,
+            avatar_url: persistAvatarUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", userId);
+        if (directErr) {
+          setError(directErr.message);
+          return false;
+        }
+        data = {
+          profile: {
+            full_name: fullName.trim(),
+            username: usernameToSave,
+            avatar_url: persistAvatarUrl,
+          },
+        };
+      } else if (!res.ok) {
         const msg = res.status === 409
           ? profileUsernameTakenMessage(lang)
           : (data.error || (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
-        if (!options?.silent) setError(msg);
+        setError(msg);
         return false;
       }
 
@@ -302,12 +340,17 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       setInitialUsername(savedUsername);
       setUsernameStatus(savedUsername ? "available" : "idle");
 
-      const resolved = newAvatarUrl && supabase ? await resolveAvatarUrl(supabase, userId, newAvatarUrl) : newAvatarUrl;
+      const savedAvatar =
+        toPersistableAvatarUrl(supabase, userId, data.profile?.avatar_url ?? persistAvatarUrl) ??
+        persistAvatarUrl;
+      const resolved = savedAvatar && supabase
+        ? await resolveAvatarUrl(supabase, userId, savedAvatar)
+        : savedAvatar;
       setAvatarUrl(resolved ?? null);
       if (previousUsername && savedUsername && previousUsername !== savedUsername) {
-        renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? newAvatarUrl);
-      } else if (savedUsername && resolved) {
-        setCachedAvatarUrl(savedUsername, resolved);
+        renameCachedAvatarUrl(previousUsername, savedUsername, resolved ?? savedAvatar);
+      } else if (savedUsername && (resolved || savedAvatar)) {
+        setCachedAvatarUrl(savedUsername, resolved ?? savedAvatar);
       }
       setAvatarFile(null);
       if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
@@ -316,19 +359,23 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       patchDashboardBootstrap(userId, {
         full_name: savedName,
         username: savedUsername,
-        avatar_url: resolved ?? newAvatarUrl,
+        avatar_url: resolved ?? savedAvatar,
       });
       dispatchProfileUpdated({
         full_name: savedName,
         username: savedUsername,
-        avatar_url: resolved ?? newAvatarUrl,
+        avatar_url: resolved ?? savedAvatar,
       });
       window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
 
       if (savedUsername) {
         await fetch("/api/creator/sync-brand-link", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          credentials: "include",
           body: JSON.stringify({ userId }),
         });
       }
@@ -354,16 +401,16 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   ]);
 
   useEffect(() => {
-    if (!hydratedRef.current || loading) return;
+    if (!hydratedRef.current || loading || saving) return;
     if (!hasPendingChanges() || !canPersist()) return;
     const timer = setTimeout(() => { void persistProfile({ silent: true }); }, 800);
     return () => clearTimeout(timer);
-  }, [fullName, username, loading, hasPendingChanges, canPersist, persistProfile]);
+  }, [fullName, username, loading, saving, hasPendingChanges, canPersist, persistProfile]);
 
   useEffect(() => {
-    if (!hydratedRef.current || loading || !avatarFile) return;
+    if (!hydratedRef.current || loading || saving || !avatarFile) return;
     void persistProfile({ silent: true });
-  }, [avatarFile, loading, persistProfile]);
+  }, [avatarFile, loading, saving, persistProfile]);
 
   if (loading) {
     return (
@@ -392,7 +439,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
               {displayAvatar ? (
                 <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <span style={{ fontSize: 34, color: "var(--ws-text-dim)", fontWeight: 600 }}>{(fullName || "?").charAt(0).toUpperCase()}</span>
+                <span style={{ fontSize: 34, color: "var(--ws-text-dim)", fontWeight: 600 }}>{(fullName.trim() || username.trim() || "?").charAt(0).toUpperCase()}</span>
               )}
             </div>
             <div>
@@ -563,23 +610,27 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           )}
         </div>
 
-        {error && (
-          <div style={{ fontSize: 14, color: "var(--ws-danger)", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 14 }}>{error}</div>
-        )}
-        {saved && !saving && (
-          <div style={{ fontSize: 14, color: "#1A7F37", padding: "10px 12px", borderRadius: 10, background: "rgba(26,127,55,0.08)", marginBottom: 14 }}>
-            {lang === "fr" ? "Modifications enregistrées." : "Changes saved."}
+        {(saving || saved || error) && (
+          <div
+            style={{
+              fontSize: 13,
+              color: error ? "var(--ws-danger)" : saved ? "#1A7F37" : "var(--ws-text-muted)",
+              padding: "10px 12px",
+              borderRadius: 10,
+              background: error
+                ? "rgba(153,35,35,0.06)"
+                : saved
+                  ? "rgba(26,127,55,0.08)"
+                  : "var(--ws-hover)",
+              marginBottom: 14,
+            }}
+          >
+            {error
+              || (saving
+                ? (lang === "fr" ? "Enregistrement automatique…" : "Saving automatically…")
+                : (lang === "fr" ? "Modifications enregistrées." : "Changes saved."))}
           </div>
         )}
-        {saving && (
-          <div style={{ fontSize: 14, color: "var(--ws-text-muted)", padding: "10px 12px", borderRadius: 10, background: "var(--ws-hover)", marginBottom: 14 }}>
-            {lang === "fr" ? "Enregistrement..." : "Saving..."}
-          </div>
-        )}
-
-        <button type="button" onClick={() => void persistProfile()} disabled={saving || signingOut} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: BLUE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, fontFamily: "inherit", cursor: saving || signingOut ? "default" : "pointer", letterSpacing: "-0.01em", opacity: saving || signingOut ? 0.7 : 1 }}>
-          {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : (lang === "fr" ? "Enregistrer" : "Save")}
-        </button>
 
         <div style={{ marginTop: 32, paddingTop: 24, borderTop: "1px solid var(--ws-border)" }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 6 }}>{lang === "fr" ? "Compte" : "Account"}</div>

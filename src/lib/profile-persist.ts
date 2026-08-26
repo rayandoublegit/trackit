@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { syncCreatorRowsByProfileHandle } from "@/lib/creator-account";
+import { CREATOR_ROW_SYNC_SELECT, syncCreatorRowsByProfileHandle } from "@/lib/creator-account";
+import {
+  syncCreatorToDiscoverySaved,
+  type BrandCreatorSyncRow,
+} from "@/lib/creator-discovery-sync";
 import {
   isProfileUsernameConflictError,
   isValidProfileUsername,
@@ -126,16 +130,29 @@ export async function saveUserProfile(
     await syncCreatorRowsByProfileHandle(admin, userId, updated);
   }
 
-  const creatorPatch: Record<string, string> = {};
+  const creatorPatch: Record<string, string | null> = {};
   if (typeof update.avatar_url === "string" && update.avatar_url) {
     creatorPatch.avatar_url = update.avatar_url;
   }
-  if (typeof update.full_name === "string" && update.full_name) {
+  if (typeof update.full_name === "string") {
     creatorPatch.full_name = update.full_name;
   }
   if (newUsername) creatorPatch.handle = newUsername;
   if (Object.keys(creatorPatch).length) {
     await admin.from("creators").update(creatorPatch).eq("linked_user_id", userId);
+  }
+
+  // Keep brand CRM (discovery_saved) in sync with profile name / handle / avatar.
+  if (updated.account_type === "creator") {
+    const { data: linkedCreators } = await admin
+      .from("creators")
+      .select(`${CREATOR_ROW_SYNC_SELECT}, user_id`)
+      .eq("linked_user_id", userId);
+    for (const row of linkedCreators ?? []) {
+      const brandId = typeof row.user_id === "string" ? row.user_id : "";
+      if (!brandId) continue;
+      await syncCreatorToDiscoverySaved(admin, brandId, row as BrandCreatorSyncRow);
+    }
   }
 
   return {

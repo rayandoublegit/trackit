@@ -12,7 +12,11 @@ import {
   removeContentRefFromDiscoverySaved,
   syncContentRefToDiscoverySaved,
 } from "@/lib/content-creator-sync";
-import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
+import {
+  CONTENT_LIST_SELECT,
+  CONTENT_STATS_SELECT,
+  type ContentListItem,
+} from "@/lib/content-shared";
 import {
   CREATOR_CONTENT_MAX_FILE_BYTES,
   CREATOR_CONTENT_MAX_FILE_LABEL,
@@ -26,7 +30,7 @@ async function enrichContentItems(
   admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
   brandId: string,
   rows: Record<string, unknown>[],
-) {
+): Promise<ContentListItem[]> {
   const creatorIds = [...new Set(rows.map((r) => r.creator_row_id).filter(Boolean))] as string[];
   const contentIds = rows.map((r) => String(r.id));
 
@@ -67,18 +71,29 @@ async function enrichContentItems(
     campaignsByContent.set(link.content_id, list);
   }
 
+  const hookIds = [
+    ...new Set(rows.map((r) => (r.hook_id ? String(r.hook_id) : null)).filter(Boolean)),
+  ] as string[];
+  const { data: hooks } = hookIds.length
+    ? await admin.from("hooks").select("id, title").in("id", hookIds)
+    : { data: [] as { id: string; title: string }[] };
+  const hookTitleById = new Map((hooks || []).map((h) => [h.id, h.title]));
+
   return rows.map((item) => {
     const meta = item.creator_row_id ? nameById.get(String(item.creator_row_id)) : null;
+    const hookIdValue = item.hook_id ? String(item.hook_id) : null;
     return {
-      ...item,
+      ...(item as unknown as ContentListItem),
       creatorName: meta?.name || null,
       creatorHandle: meta?.handle || null,
       campaignNames: campaignsByContent.get(String(item.id)) ?? [],
-    };
-  });
+      hook_id: hookIdValue,
+      hookTitle: hookIdValue ? hookTitleById.get(hookIdValue) || null : null,
+    } satisfies ContentListItem;
+  }) as ContentListItem[];
 }
 
-// GET — brand lists content (optionally by creator handle or campaign)
+// GET — brand lists content (optionally by creator handle, campaign, hook, search, quality)
 export async function GET(request: Request) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
@@ -87,27 +102,93 @@ export async function GET(request: Request) {
   const requestedBrandId = searchParams.get("brandId");
   const targetHandle = searchParams.get("targetHandle")?.trim().replace(/^@/, "") || null;
   const campaignId = searchParams.get("campaignId")?.trim() || null;
+  const hookId = searchParams.get("hookId")?.trim() || null;
+  const q = searchParams.get("q")?.trim().toLowerCase() || "";
+  const quality = searchParams.get("quality")?.trim().toLowerCase() || ""; // "" | "top" | "with-stats"
+  const sort = searchParams.get("sort")?.trim().toLowerCase() || "recent"; // recent | views
   if (!requestedBrandId) return NextResponse.json({ error: "No brandId" }, { status: 400 });
   const access = await requireWorkspaceAccess(request, requestedBrandId);
   if ("error" in access) return access.error;
   const brandId = access.workspaceId;
+
+  const applyClientFilters = (items: ContentListItem[]) => {
+    let next = items;
+    if (hookId) {
+      next = next.filter((item) => String(item.hook_id || "") === hookId);
+    }
+    if (q) {
+      next = next.filter((item) => {
+        const hay = [
+          item.title,
+          item.notes,
+          item.hookTitle,
+          item.creatorName,
+          item.creatorHandle,
+          ...(item.campaignNames || []),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (quality === "with-stats") {
+      next = next.filter((item) => (item.views ?? 0) > 0 || Boolean(item.post_url));
+    } else if (quality === "top") {
+      const scored = next
+        .map((item) => ({ item, views: item.views ?? 0 }))
+        .filter((row) => row.views > 0)
+        .sort((a, b) => b.views - a.views);
+      if (scored.length === 0) {
+        next = [];
+      } else {
+        const cutoff = Math.max(1, Math.ceil(scored.length * 0.25));
+        const minViews = scored[Math.min(cutoff, scored.length) - 1]?.views ?? 1;
+        next = scored.filter((row) => row.views >= minViews).map((row) => row.item);
+      }
+    }
+    if (sort === "views") {
+      next = [...next].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+    }
+    return next;
+  };
 
   if (campaignId) {
     const { ids: contentIds, error: resolveErr } = await resolveCampaignContentIds(admin, brandId, campaignId);
     if (resolveErr) return NextResponse.json({ error: resolveErr.message }, { status: 500 });
     if (contentIds.length === 0) return NextResponse.json({ ok: true, items: [] });
 
-    const { data, error } = await admin
+    let query = admin
       .from("creator_content")
-      .select(
-        `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
-      )
+      .select(CONTENT_LIST_SELECT)
       .eq("brand_id", brandId)
       .in("id", contentIds)
       .order("created_at", { ascending: false });
+    if (hookId) query = query.eq("hook_id", hookId);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    const items = await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]);
+    const { data, error } = await query;
+    if (error) {
+      // Graceful if hook_id migration not applied yet.
+      if (String(error.message || "").includes("hook_id")) {
+        const fallback = await admin
+          .from("creator_content")
+          .select(
+            `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
+          )
+          .eq("brand_id", brandId)
+          .in("id", contentIds)
+          .order("created_at", { ascending: false });
+        if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+        const items = applyClientFilters(
+          await enrichContentItems(admin, brandId, (fallback.data || []) as Record<string, unknown>[]),
+        );
+        return NextResponse.json({ ok: true, items });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    const items = applyClientFilters(
+      await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]),
+    );
     return NextResponse.json({ ok: true, items });
   }
 
@@ -137,21 +218,40 @@ export async function GET(request: Request) {
     const { data, error } = await loadBrandContentForCreators(admin, brandId, creatorRowIds, linkedUserIds);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    const items = await enrichContentItems(admin, brandId, data);
+    const items = applyClientFilters(await enrichContentItems(admin, brandId, data));
     return NextResponse.json({ ok: true, items });
   }
 
-  const { data, error } = await admin
+  let listQuery = admin
     .from("creator_content")
-    .select(
-      `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
-    )
+    .select(CONTENT_LIST_SELECT)
     .eq("brand_id", brandId)
     .order("created_at", { ascending: false });
+  if (hookId) listQuery = listQuery.eq("hook_id", hookId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { data, error } = await listQuery;
 
-  const items = await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]);
+  if (error) {
+    if (String(error.message || "").includes("hook_id")) {
+      const fallback = await admin
+        .from("creator_content")
+        .select(
+          `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`,
+        )
+        .eq("brand_id", brandId)
+        .order("created_at", { ascending: false });
+      if (fallback.error) return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+      const items = applyClientFilters(
+        await enrichContentItems(admin, brandId, (fallback.data || []) as Record<string, unknown>[]),
+      );
+      return NextResponse.json({ ok: true, items });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const items = applyClientFilters(
+    await enrichContentItems(admin, brandId, (data || []) as Record<string, unknown>[]),
+  );
   return NextResponse.json({ ok: true, items });
 }
 

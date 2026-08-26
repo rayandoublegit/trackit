@@ -4,8 +4,7 @@ import { getAuthedUserId } from "@/lib/api-auth";
 
 export const dynamic = "force-dynamic";
 
-/** Views the assistant is allowed to open, with hints for the model. */
-const NAVIGABLE_VIEWS: Array<{ view: string; hint: string }> = [
+const BRAND_NAVIGABLE_VIEWS: Array<{ view: string; hint: string }> = [
   { view: "dashboard", hint: "home overview" },
   { view: "notifications", hint: "inbox / notifications" },
   { view: "outreach", hint: "outreach messages to creators" },
@@ -25,6 +24,27 @@ const NAVIGABLE_VIEWS: Array<{ view: string; hint: string }> = [
   { view: "integrations", hint: "shopify / stripe integrations" },
   { view: "billing", hint: "plan and billing" },
   { view: "help", hint: "help center" },
+  { view: "rpm", hint: "RPM campaigns" },
+  { view: "hooks", hint: "hooks library" },
+  { view: "community", hint: "community chat" },
+];
+
+const CREATOR_NAVIGABLE_VIEWS: Array<{ view: string; hint: string }> = [
+  { view: "dashboard", hint: "home" },
+  { view: "analytics", hint: "analytics — sales, commissions, RPM views & earnings" },
+  { view: "content", hint: "upload content with TikTok URL" },
+  { view: "community", hint: "brand community chat" },
+  { view: "infos", hint: "brand rules" },
+  { view: "infos-howto", hint: "how it works" },
+  { view: "infos-pricing", hint: "pricing model" },
+  { view: "hooks", hint: "hooks from the brand" },
+  { view: "payouts", hint: "Pay it — get paid" },
+  { view: "balance", hint: "balance / solde" },
+  { view: "planner", hint: "meetings / planner" },
+  { view: "whiteboard", hint: "whiteboard" },
+  { view: "settings", hint: "account settings / Stripe Connect" },
+  { view: "help", hint: "help" },
+  { view: "feedback", hint: "feedback" },
 ];
 
 export type AiCommandAction =
@@ -40,9 +60,14 @@ function clamp(s: unknown, max: number): string {
   return String(s ?? "").trim().slice(0, max);
 }
 
-function sanitizeAction(raw: unknown): AiCommandAction | null {
+function navigableForRole(role: "brand" | "creator") {
+  return role === "creator" ? CREATOR_NAVIGABLE_VIEWS : BRAND_NAVIGABLE_VIEWS;
+}
+
+function sanitizeAction(raw: unknown, role: "brand" | "creator"): AiCommandAction | null {
   if (!raw || typeof raw !== "object") return null;
   const a = raw as Record<string, unknown>;
+  const views = navigableForRole(role);
   switch (a.action) {
     case "create_meeting": {
       const when = clamp(a.when, 16);
@@ -64,6 +89,13 @@ function sanitizeAction(raw: unknown): AiCommandAction | null {
         say: clamp(a.say, 200),
       };
     case "pay_creator": {
+      if (role === "creator") {
+        return {
+          action: "navigate",
+          view: "payouts",
+          say: clamp(a.say, 200) || "Opening Pay it.",
+        };
+      }
       const creator = clamp(a.creator, 80);
       if (!creator) return null;
       const amount = Number(a.amount);
@@ -75,10 +107,17 @@ function sanitizeAction(raw: unknown): AiCommandAction | null {
       };
     }
     case "create_campaign":
+      if (role === "creator") {
+        return {
+          action: "navigate",
+          view: "content",
+          say: clamp(a.say, 200) || "Opening Content.",
+        };
+      }
       return { action: "create_campaign", say: clamp(a.say, 200) };
     case "navigate": {
       const view = clamp(a.view, 40);
-      if (!NAVIGABLE_VIEWS.some((v) => v.view === view)) return null;
+      if (!views.some((v) => v.view === view)) return null;
       return { action: "navigate", view, say: clamp(a.say, 200) };
     }
     case "clarify":
@@ -92,18 +131,17 @@ function sanitizeAction(raw: unknown): AiCommandAction | null {
   }
 }
 
-/** Local wall-clock "YYYY-MM-DDTHH:mm" from a base date. */
 function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Regex-only fallback when the model is unavailable. */
 function localFallback(
   text: string,
   lang: "fr" | "en",
   nowLocal: string,
   creators: string[],
+  role: "brand" | "creator",
 ): AiCommandAction {
   const fr = lang === "fr";
   const q = text.toLowerCase();
@@ -129,7 +167,59 @@ function localFallback(
     return toLocalInput(day);
   };
 
-  // Pay a creator
+  if (role === "creator") {
+    const CREATOR_NAV: Array<{ keys: string[]; view: string }> = [
+      { keys: ["analytic", "stats", "vue", "vues", "rpm", "gain", "commission", "vente"], view: "analytics" },
+      { keys: ["contenu", "content", "upload", "poster", "post", "vidéo", "video", "tiktok"], view: "content" },
+      { keys: ["communauté", "community", "chat", "message"], view: "community" },
+      { keys: ["règle", "regle", "rule", "infos", "information"], view: "infos" },
+      { keys: ["comment ça marche", "how it works", "howto"], view: "infos-howto" },
+      { keys: ["pricing", "prix", "rémunération", "remuneration"], view: "infos-pricing" },
+      { keys: ["hook", "accroche"], view: "hooks" },
+      { keys: ["payout", "paiement", "pay it", "être payé", "etre paye", "encaisser"], view: "payouts" },
+      { keys: ["solde", "balance"], view: "balance" },
+      { keys: ["planner", "agenda", "rendez", "meeting", "rdv"], view: "planner" },
+      { keys: ["whiteboard", "board"], view: "whiteboard" },
+      { keys: ["setting", "paramètre", "réglage", "stripe"], view: "settings" },
+      { keys: ["help", "aide"], view: "help" },
+    ];
+    const hit = CREATOR_NAV.find((r) => r.keys.some((k) => q.includes(k)));
+    if (hit) {
+      return {
+        action: "navigate",
+        view: hit.view,
+        say: fr ? "J'ouvre ça." : "Opening it.",
+      };
+    }
+
+    if (/\b(meeting|rendez[- ]?vous|rdv|call)\b/i.test(q)) {
+      const when = parseWhen();
+      if (!when) {
+        return {
+          action: "clarify",
+          question: fr
+            ? "À quelle heure veux-tu ce rendez-vous ?"
+            : "What time should I set the meeting for?",
+        };
+      }
+      return {
+        action: "create_meeting",
+        title: fr ? "Rendez-vous" : "Meeting",
+        when,
+        withWho: "",
+        say: fr ? "C'est noté — rendez-vous ajouté." : "Done — meeting added.",
+      };
+    }
+
+    return {
+      action: "chat",
+      reply: fr
+        ? "Je peux ouvrir tes Analytiques, Contenu, Communauté, Infos, Pay it, ou ajouter un rendez-vous. Dis-moi ce que tu veux faire."
+        : "I can open Analytics, Content, Community, Infos, Pay it, or add a meeting. Tell me what you need.",
+    };
+  }
+
+  // Brand fallback (existing behavior)
   if (/\b(pay|paye[rz]?|paie|payout|virement)\b/i.test(q)) {
     const named = creators.find((c) => c && q.includes(c.toLowerCase()));
     const amountMatch = text.match(/(\d+(?:[.,]\d{1,2})?)\s*(?:€|\$|eur|usd)?/);
@@ -147,7 +237,6 @@ function localFallback(
     };
   }
 
-  // Meeting / rendez-vous
   if (/\b(meeting|rendez[- ]?vous|rdv|call)\b/i.test(q)) {
     const when = parseWhen();
     if (!when) {
@@ -172,7 +261,6 @@ function localFallback(
     };
   }
 
-  // Task
   if (/\b(task|tâche|todo|rappelle|reminder)\b/i.test(q)) {
     const title = text
       .replace(/\b(ajoute|add|crée|create|nouvelle?|new)\b/gi, "")
@@ -187,7 +275,6 @@ function localFallback(
     };
   }
 
-  // Campaign creation
   if (/\b(cr[ée]e|create|nouvelle|new)\b.*\b(campagne|campaign)\b/i.test(q)) {
     return {
       action: "create_campaign",
@@ -195,7 +282,6 @@ function localFallback(
     };
   }
 
-  // Simple navigation
   const NAV_KEYS: Array<{ keys: string[]; view: string }> = [
     { keys: ["inbox", "notif"], view: "notifications" },
     { keys: ["outreach", "message"], view: "outreach" },
@@ -211,6 +297,8 @@ function localFallback(
     { keys: ["setting", "paramètre", "réglage"], view: "settings" },
     { keys: ["shopify", "stripe", "intégration", "integration"], view: "integrations" },
     { keys: ["créateur", "creator", "crm"], view: "creators" },
+    { keys: ["rpm"], view: "rpm" },
+    { keys: ["communauté", "community"], view: "community" },
   ];
   const hit = NAV_KEYS.find((r) => r.keys.some((k) => q.includes(k)));
   if (hit) {
@@ -239,6 +327,7 @@ export async function POST(request: NextRequest) {
   const lang: "fr" | "en" = body.lang === "en" ? "en" : "fr";
   const nowLocal = clamp(body.now, 16);
   const weekday = clamp(body.weekday, 20);
+  const role: "brand" | "creator" = body.role === "creator" ? "creator" : "brand";
   const creators = (Array.isArray(body.creators) ? body.creators : [])
     .map((c: unknown) => clamp(c, 80))
     .filter(Boolean)
@@ -250,43 +339,62 @@ export async function POST(request: NextRequest) {
 
   if (!text) return NextResponse.json({ ok: false, error: "Missing text" }, { status: 400 });
 
+  const views = navigableForRole(role);
+
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({
       ok: true,
-      command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators),
+      command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators, role),
       source: "fallback",
     });
   }
 
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 500,
-      messages: [
-        {
-          role: "user",
-          content: `You are Mino, the execution assistant of Trackit (a creator-marketing dashboard). Convert the user's request into EXACTLY ONE JSON object. Output JSON only — no markdown, no prose.
+    const roleBlurb =
+      role === "creator"
+        ? `The user is a CREATOR on Trackit. They can open analytics (sales/commissions/RPM), upload content, join community, read brand infos/rules/pricing, hooks, Pay it / balance, planner, whiteboard, settings. They cannot pay other creators or create brand campaigns.`
+        : `The user is a BRAND on Trackit. They manage campaigns, creators, outreach, payouts, discovery, and content.`;
 
-Local now: ${nowLocal || "unknown"}${weekday ? ` (${weekday})` : ""}. User language: ${lang}. Every human-facing string ("say", "question", "reply") must be written in ${lang === "fr" ? "French" : "English"}, short, warm and natural.
+    const actionsBlurb =
+      role === "creator"
+        ? `Possible actions (pick one):
+{"action":"create_meeting","title":"...","when":"YYYY-MM-DDTHH:mm","withWho":"...","say":"..."}
+{"action":"navigate","view":"one of the navigable views","say":"..."}
+{"action":"clarify","question":"..."}
+{"action":"chat","reply":"..."}
 
-Known creators: ${creators.length ? JSON.stringify(creators) : "none"}
-Known campaigns: ${campaigns.length ? JSON.stringify(campaigns) : "none"}
-Navigable views: ${NAVIGABLE_VIEWS.map((v) => `${v.view} (${v.hint})`).join(", ")}
-
-Possible actions (pick one):
+Do NOT use pay_creator or create_campaign. For money/payout questions, navigate to "payouts" or "balance" or "analytics". For posting a TikTok URL / content, navigate to "content". For views/RPM/commissions, navigate to "analytics".`
+        : `Possible actions (pick one):
 {"action":"create_meeting","title":"...","when":"YYYY-MM-DDTHH:mm","withWho":"...","say":"..."}
 {"action":"create_task","title":"...","due":"YYYY-MM-DDTHH:mm or empty","say":"..."}
 {"action":"pay_creator","creator":"...","amount":number or null,"say":"..."}
 {"action":"create_campaign","say":"..."}
 {"action":"navigate","view":"one of the navigable views","say":"..."}
 {"action":"clarify","question":"..."}
-{"action":"chat","reply":"..."}
+{"action":"chat","reply":"..."}`;
+
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 500,
+      messages: [
+        {
+          role: "user",
+          content: `You are Mino, the execution assistant of Trackit. Convert the user's request into EXACTLY ONE JSON object. Output JSON only — no markdown, no prose.
+
+${roleBlurb}
+
+Local now: ${nowLocal || "unknown"}${weekday ? ` (${weekday})` : ""}. User language: ${lang}. Every human-facing string ("say", "question", "reply") must be written in ${lang === "fr" ? "French" : "English"}, short, warm and natural.
+
+Known creators: ${role === "brand" && creators.length ? JSON.stringify(creators) : "n/a"}
+Known campaigns: ${role === "brand" && campaigns.length ? JSON.stringify(campaigns) : "n/a"}
+Navigable views: ${views.map((v) => `${v.view} (${v.hint})`).join(", ")}
+
+${actionsBlurb}
 
 Rules:
-- Prefer EXECUTING over asking. Use clarify ONLY when a required detail is truly missing (e.g. meeting without any time, payment without any creator). Ask ONE short question.
-- create_meeting.when is local wall-clock, no timezone. No date given: today; if that time already passed today, use tomorrow. "say" must confirm what was scheduled and when.
-- pay_creator.creator: pick the best matching name from known creators if one fits, otherwise pass the raw name.
+- Prefer EXECUTING over asking. Use clarify ONLY when a required detail is truly missing. Ask ONE short question.
+- create_meeting.when is local wall-clock, no timezone. No date given: today; if that time already passed today, use tomorrow.
 - If "Previous context" is present, the user is answering your last question: merge both to build the action.
 - Greetings, questions, or anything that is not an actionable command: use chat with a brief helpful reply (you can mention what you can do).
 
@@ -299,7 +407,7 @@ User request: """${text}"""`,
     const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? (JSON.parse(jsonMatch[0]) as unknown) : null;
-    const command = sanitizeAction(parsed);
+    const command = sanitizeAction(parsed, role);
     if (!command) throw new Error("unparseable action");
 
     return NextResponse.json({ ok: true, command, source: "claude" });
@@ -307,7 +415,7 @@ User request: """${text}"""`,
     console.error("POST /api/ai-command", e);
     return NextResponse.json({
       ok: true,
-      command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators),
+      command: localFallback(context ? `${context}\n${text}` : text, lang, nowLocal, creators, role),
       source: "fallback",
     });
   }

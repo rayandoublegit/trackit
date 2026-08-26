@@ -40,6 +40,7 @@ import {
   type MinoChat,
 } from "@/lib/mino-chats-storage";
 import { getLastCampaignId, rememberLastCampaignId } from "@/lib/last-campaign-storage";
+import { getLastCommunityId, rememberLastCommunityId } from "@/lib/last-community-storage";
 import {
   buildDashboardSearchCatalog,
   highlightSearchMatch,
@@ -145,6 +146,9 @@ export function WorkspaceShell({
   const [activeMinoId, setActiveMinoId] = useState<string | null>(null);
   const [aiChatsOpen, setAiChatsOpen] = useState(false);
   const [campaignsNavOpen, setCampaignsNavOpen] = useState(true);
+  const [communitiesNavOpen, setCommunitiesNavOpen] = useState(true);
+  const [communities, setCommunities] = useState<Array<{ id: string; name: string; avatar_url?: string | null }>>([]);
+  const [activeCommunityId, setActiveCommunityId] = useState<string | null>(null);
   const [minoMenuId, setMinoMenuId] = useState<string | null>(null);
   const [minoRenamingId, setMinoRenamingId] = useState<string | null>(null);
   const [minoRenameDraft, setMinoRenameDraft] = useState("");
@@ -167,6 +171,7 @@ export function WorkspaceShell({
         if (cancelled) return;
         const seen = new Set<string>();
         const list = (rows || [])
+          .filter((r: { commission_type?: string }) => String(r.commission_type || "").toLowerCase() !== "rpm")
           .map((r: { id?: string; name?: string; status?: string }) => ({
             id: String(r.id || ""),
             name: String(r.name || "Campaign"),
@@ -188,6 +193,57 @@ export function WorkspaceShell({
       window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, load);
     };
   }, [userId, isCreator]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    const load = () => {
+      const url = isCreator
+        ? `/api/creator/communities?userId=${encodeURIComponent(userId)}`
+        : `/api/communities?brandId=${encodeURIComponent(userId)}`;
+      void fetch(url, { credentials: "include", cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => {
+          if (cancelled) return;
+          const rows = ((d.communities || []) as { id: string; name: string; avatar_url?: string | null }[]).map(
+            (c) => ({ id: c.id, name: c.name, avatar_url: c.avatar_url }),
+          );
+          setCommunities(rows);
+          const remembered = getLastCommunityId(userId);
+          const next =
+            (remembered && rows.some((c) => c.id === remembered) ? remembered : null) ||
+            (view === "community" ? rows[0]?.id || null : null);
+          if (view === "community") setActiveCommunityId(next);
+        })
+        .catch(() => {
+          if (!cancelled) setCommunities([]);
+        });
+    };
+    load();
+    window.addEventListener("trackit:communities-updated", load);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("trackit:communities-updated", load);
+    };
+  }, [userId, isCreator, view]);
+
+  useEffect(() => {
+    if (!userId || !activeCommunityId) return;
+    rememberLastCommunityId(userId, activeCommunityId);
+  }, [userId, activeCommunityId]);
+
+  useEffect(() => {
+    if (view === "community" || activeCommunityId) setCommunitiesNavOpen(true);
+  }, [view, activeCommunityId]);
+
+  useEffect(() => {
+    const onSelect = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) setActiveCommunityId(id);
+    };
+    window.addEventListener("trackit:community-select", onSelect);
+    return () => window.removeEventListener("trackit:community-select", onSelect);
+  }, []);
 
   useEffect(() => {
     if (!userId || isCreator) {
@@ -341,9 +397,11 @@ export function WorkspaceShell({
     if (isCreator) {
       return [
         { space: "home", label: "Home", icon: "home" },
-        { space: "scripts", label: "Scripts", icon: "list" },
+        { space: "infos", label: "Infos", icon: "list" },
+        { space: "hooks", label: "Hooks", icon: "list" },
+        { space: "community", label: lang === "fr" ? "Communauté" : "Community", icon: "users" },
         { space: "content", label: lang === "fr" ? "Contenu" : "Content", icon: "camera" },
-        { space: "analytics", label: lang === "fr" ? "Stats" : "Stats", icon: "analytics" },
+        { space: "analytics", label: "Track", icon: "analytics" },
         { space: "payit", label: "Pay it", icon: "payit" },
         { space: "whiteboard", label: "Board", icon: "whiteboard" },
       ];
@@ -370,10 +428,13 @@ export function WorkspaceShell({
       notes: "Notes",
       whiteboard: "Whiteboard",
       integrations: lang === "fr" ? "Intégrations" : "Integrations",
-      analytics: "Analytics",
+      analytics: lang === "fr" ? "Tracking" : "Tracking",
       ai: "Mino",
       scripts: "Scripts",
       content: lang === "fr" ? "Contenu" : "Content",
+      hooks: "Hooks",
+      infos: "Infos",
+      community: lang === "fr" ? "Communauté" : "Community",
     };
     return map[activeSpace];
   }, [activeSpace, lang]);
@@ -386,17 +447,43 @@ export function WorkspaceShell({
           { id: "balance", label: lang === "fr" ? "Solde" : "Balance", view: "balance", icon: "billing" },
         ];
       }
-      if (activeSpace === "scripts") {
-        return [{ id: "scripts", label: "Scripts", view: "scripts", icon: "list" }];
+      if (activeSpace === "analytics") {
+        return [
+          {
+            id: "analytics",
+            label: lang === "fr" ? "Analytiques" : "Analytics",
+            view: "analytics",
+            icon: "analytics",
+          },
+        ];
+      }
+      if (activeSpace === "infos") {
+        return [
+          { id: "infos-rules", label: lang === "fr" ? "Règles" : "Rules", view: "infos", icon: "list" },
+          {
+            id: "infos-howto",
+            label: lang === "fr" ? "Comment ça marche" : "How it works",
+            view: "infos-howto",
+            icon: "list",
+          },
+          {
+            id: "infos-pricing",
+            label: lang === "fr" ? "Modèle de pricing" : "Pricing model",
+            view: "infos-pricing",
+            icon: "list",
+          },
+        ];
+      }
+      if (activeSpace === "hooks") {
+        return [{ id: "hooks", label: "Hooks", view: "hooks", icon: "list" }];
+      }
+      if (activeSpace === "community") {
+        return [{ id: "community", label: lang === "fr" ? "Communauté" : "Community", view: "community", icon: "users" }];
       }
       if (activeSpace === "content") {
         return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" }];
       }
-      return [
-        { id: "home", label: "Home", view: "dashboard", icon: "home" },
-        { id: "scripts", label: "Scripts", view: "scripts", icon: "list" },
-        { id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" },
-      ];
+      return [{ id: "home", label: "Home", view: "dashboard", icon: "home" }];
     }
 
     switch (activeSpace) {
@@ -416,6 +503,15 @@ export function WorkspaceShell({
           { id: "discovery", label: "Discovery", view: "discovery", icon: "findit" },
           { id: "findit-inbox", label: "Inbox", view: "findit-inbox", icon: "inbox" },
           { id: "creators", label: lang === "fr" ? "Gérer" : "Manage", view: "creators", icon: "users" },
+        ];
+      case "hooks":
+        return [
+          { id: "campaigns", label: lang === "fr" ? "Toutes les campagnes" : "All campaigns", view: "campaigns", icon: "grid" },
+          { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", icon: "invite" },
+        ];
+      case "community":
+        return [
+          { id: "community", label: lang === "fr" ? "Communauté" : "Community", view: "community", icon: "users" },
         ];
       case "trackit":
         return [
@@ -464,6 +560,12 @@ export function WorkspaceShell({
         return [{ id: "ai", label: "Mino", view: "ai", icon: "ai" }];
       case "scripts":
         return [{ id: "scripts", label: "Scripts", view: "scripts", icon: "list" }];
+      case "infos":
+        return [
+          { id: "infos", label: lang === "fr" ? "Informations" : "Information", view: "infos", icon: "list" },
+        ];
+      case "hooks":
+        return [{ id: "hooks", label: "Hooks", view: "hooks", icon: "list" }];
       case "content":
         return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "brand-content", icon: "camera" }];
       default:
@@ -611,16 +713,17 @@ export function WorkspaceShell({
     if (tabWorkspaceName) applyDashboardTabTitle(tabWorkspaceName);
   }, [isCreator, tabWorkspaceName]);
 
+  // Non-delegated (creators / owners): prefer live `profile` so Settings edits apply immediately.
+  // Delegated admins: show the actor's own identity, not the workspace owner's.
+  const accountProfile =
+    workspaceDelegated && actorProfile ? actorProfile : profile ?? actorProfile;
+
   const displayName =
-    actorProfile?.full_name ||
-    profile?.full_name ||
-    actorProfile?.username ||
-    profile?.username ||
+    accountProfile?.full_name ||
+    accountProfile?.username ||
     "You";
 
-  const avatarUrl = !avatarBroken
-    ? actorProfile?.avatar_url || profile?.avatar_url || ""
-    : "";
+  const avatarUrl = !avatarBroken ? accountProfile?.avatar_url || "" : "";
 
   const searchResults = useMemo(() => {
     const catalog = buildDashboardSearchCatalog({
@@ -663,7 +766,7 @@ export function WorkspaceShell({
     if (isMobile) setSidebarOpen(false);
   };
 
-  const flushContent = view === "discovery" || view === "whiteboard";
+  const flushContent = view === "discovery" || view === "whiteboard" || view === "community";
 
   return (
     <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}`}>
@@ -791,24 +894,6 @@ export function WorkspaceShell({
           </div>
 
           <div className="ws-top-actions">
-            <button
-              type="button"
-              className="ws-icon-btn ws-top-actions__desk"
-              data-tip={lang === "fr" ? "Planifier" : "Planner"}
-              aria-label={lang === "fr" ? "Planifier" : "Planner"}
-              onClick={() => onNavigate("planner")}
-            >
-              <WsIcon name="call" size={17} />
-            </button>
-            <button
-              type="button"
-              className="ws-icon-btn ws-top-actions__desk"
-              data-tip={lang === "fr" ? "Notes" : "Notes"}
-              aria-label={lang === "fr" ? "Notes" : "Notes"}
-              onClick={() => onNavigate("planner-notes")}
-            >
-              <WsIcon name="mic" size={17} />
-            </button>
             <button
               type="button"
               className="ws-icon-btn"
@@ -967,7 +1052,14 @@ export function WorkspaceShell({
               <button
                 key={item.space}
                 type="button"
-                className={`ws-rail__item${activeSpace === item.space ? " is-active" : ""}`}
+                className={`ws-rail__item${
+                  activeSpace === item.space ||
+                  (!isCreator &&
+                    item.space === "trackit" &&
+                    (activeSpace === "community" || activeSpace === "hooks" || activeSpace === "infos"))
+                    ? " is-active"
+                    : ""
+                }`}
                 onClick={() => goSpace(item.space)}
                 title={item.label}
               >
@@ -1047,7 +1139,11 @@ export function WorkspaceShell({
                         ))}
                     </div>
                   </>
-                ) : activeSpace === "trackit" && !isCreator ? (
+                ) : (activeSpace === "trackit" ||
+                    activeSpace === "hooks" ||
+                    activeSpace === "infos" ||
+                    activeSpace === "community") &&
+                  !isCreator ? (
                   <>
                     {(
                       [
@@ -1120,6 +1216,53 @@ export function WorkspaceShell({
                         <WsIcon name="camera" size={15} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {lang === "fr" ? "Contenu" : "Content"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ws-sidebar__link${view === "rpm" ? " is-active" : ""}`}
+                        onMouseEnter={() => prefetchDashboardData("rpm")}
+                        onFocus={() => prefetchDashboardData("rpm")}
+                        onClick={() => {
+                          onNavigate("rpm");
+                          if (isMobile) setSidebarOpen(false);
+                        }}
+                      >
+                        <WsIcon name="analytics" size={15} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          RPM
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ws-sidebar__link${
+                          view === "infos" || view === "infos-howto" || view === "infos-pricing" ? " is-active" : ""
+                        }`}
+                        onMouseEnter={() => prefetchDashboardData("infos")}
+                        onFocus={() => prefetchDashboardData("infos")}
+                        onClick={() => {
+                          onNavigate("infos");
+                          if (isMobile) setSidebarOpen(false);
+                        }}
+                      >
+                        <WsIcon name="list" size={15} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {lang === "fr" ? "Informations" : "Information"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`ws-sidebar__link${view === "hooks" ? " is-active" : ""}`}
+                        onMouseEnter={() => prefetchDashboardData("hooks")}
+                        onFocus={() => prefetchDashboardData("hooks")}
+                        onClick={() => {
+                          onNavigate("hooks");
+                          if (isMobile) setSidebarOpen(false);
+                        }}
+                      >
+                        <WsIcon name="list" size={15} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          Hooks
                         </span>
                       </button>
                     </div>
@@ -1210,6 +1353,92 @@ export function WorkspaceShell({
                           {lang === "fr" ? "Liens" : "Links"}
                         </span>
                       </button>
+                      <button
+                        type="button"
+                        className={`ws-sidebar__link ws-sidebar__link--toggle${
+                          communitiesNavOpen ? " is-expanded" : ""
+                        }${view === "community" ? " is-active" : ""}`}
+                        aria-expanded={communitiesNavOpen}
+                        onClick={() => {
+                          setCommunitiesNavOpen(true);
+                          onNavigate("community");
+                          if (isMobile) setSidebarOpen(false);
+                        }}
+                      >
+                        <WsIcon name="users" size={15} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                          {lang === "fr" ? "Communauté" : "Community"}
+                        </span>
+                        <span
+                          className="ws-sidebar__chev"
+                          aria-hidden
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCommunitiesNavOpen((open) => !open);
+                          }}
+                        >
+                          <WsIcon name="chevron" size={12} />
+                        </span>
+                      </button>
+                      {communitiesNavOpen ? (
+                        <div className="ws-sidebar__nest">
+                          {communities.length === 0 ? (
+                            <button
+                              type="button"
+                              className="ws-sidebar__link"
+                              onClick={() => {
+                                onNavigate("community");
+                                window.dispatchEvent(new CustomEvent("trackit:community-create"));
+                                if (isMobile) setSidebarOpen(false);
+                              }}
+                            >
+                              <WsIcon name="plus" size={15} />
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {lang === "fr" ? "Créer une communauté" : "Create a community"}
+                              </span>
+                            </button>
+                          ) : (
+                            <>
+                              {communities.map((c) => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  className={`ws-sidebar__link${
+                                    view === "community" && activeCommunityId === c.id ? " is-active" : ""
+                                  }`}
+                                  onClick={() => {
+                                    rememberLastCommunityId(userId, c.id);
+                                    setActiveCommunityId(c.id);
+                                    onNavigate("community");
+                                    window.dispatchEvent(
+                                      new CustomEvent("trackit:community-select", { detail: { id: c.id } }),
+                                    );
+                                    if (isMobile) setSidebarOpen(false);
+                                  }}
+                                >
+                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {c.name}
+                                  </span>
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                className="ws-sidebar__link ws-spaces-new"
+                                onClick={() => {
+                                  onNavigate("community");
+                                  window.dispatchEvent(new CustomEvent("trackit:community-create"));
+                                  if (isMobile) setSidebarOpen(false);
+                                }}
+                              >
+                                <WsIcon name="plus" size={15} />
+                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {lang === "fr" ? "Nouvelle communauté" : "New community"}
+                                </span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 ) : activeSpace === "whiteboard" ? (
@@ -1389,10 +1618,59 @@ export function WorkspaceShell({
                       </div>
                     ))}
                   </>
+                ) : isCreator && activeSpace === "community" ? (
+                  <div className="ws-sidebar__section">
+                    <div className="ws-sidebar__section-label">
+                      {lang === "fr" ? "Communautés" : "Communities"}
+                    </div>
+                    {communities.length === 0 ? (
+                      <p
+                        style={{
+                          margin: "8px 10px 0",
+                          fontSize: 12.5,
+                          lineHeight: 1.4,
+                          color: "var(--ws-text-muted)",
+                          letterSpacing: "-0.02em",
+                        }}
+                      >
+                        {lang === "fr"
+                          ? "Aucune communauté pour l’instant."
+                          : "No communities yet."}
+                      </p>
+                    ) : (
+                      communities.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`ws-sidebar__link${
+                            view === "community" && activeCommunityId === c.id ? " is-active" : ""
+                          }`}
+                          onClick={() => {
+                            rememberLastCommunityId(userId, c.id);
+                            setActiveCommunityId(c.id);
+                            onNavigate("community");
+                            window.dispatchEvent(
+                              new CustomEvent("trackit:community-select", { detail: { id: c.id } }),
+                            );
+                            if (isMobile) setSidebarOpen(false);
+                          }}
+                        >
+                          <WsIcon name="users" size={15} />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {c.name}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 ) : (
                 <div className="ws-sidebar__section">
                   {activeSpace === "home" ? (
                     <div className="ws-sidebar__section-label">Home</div>
+                  ) : activeSpace === "infos" ? (
+                    <div className="ws-sidebar__section-label">
+                      {lang === "fr" ? "Informations" : "Information"}
+                    </div>
                   ) : null}
                   {sideLinks.map((link) => (
                     <button

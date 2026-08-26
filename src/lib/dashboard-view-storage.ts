@@ -6,6 +6,12 @@ export const DASHBOARD_VIEWS = [
   "creators",
   "campaigns",
   "brand-content",
+  "rpm",
+  "hooks",
+  "infos",
+  "infos-howto",
+  "infos-pricing",
+  "community",
   "links",
   "affiliates",
   "outreach",
@@ -47,6 +53,9 @@ export const WORKSPACE_SPACES = [
   "ai",
   "scripts",
   "content",
+  "hooks",
+  "infos",
+  "community",
 ] as const;
 
 export type WorkspaceSpace = (typeof WORKSPACE_SPACES)[number];
@@ -67,6 +76,7 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
       return "findit";
     case "campaigns":
     case "brand-content":
+    case "rpm":
     case "links":
     case "affiliates":
     case "invitations":
@@ -92,6 +102,14 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
       return "scripts";
     case "content":
       return "content";
+    case "infos":
+    case "infos-howto":
+    case "infos-pricing":
+      return "infos";
+    case "hooks":
+      return "hooks";
+    case "community":
+      return "community";
     case "settings":
     case "billing":
     case "help":
@@ -128,6 +146,12 @@ export function defaultViewForSpace(space: WorkspaceSpace): DashboardView {
       return "scripts";
     case "content":
       return "content";
+    case "infos":
+      return "infos";
+    case "hooks":
+      return "hooks";
+    case "community":
+      return "community";
     default:
       return "discovery";
   }
@@ -147,6 +171,7 @@ export function loadDashboardView(userId?: string | null): DashboardView | null 
   if (typeof window === "undefined") return null;
   try {
     const saved = localStorage.getItem(viewStorageKey(userId));
+    if (saved === "rules") return "infos";
     if (saved && isDashboardView(saved)) return saved;
     return null;
   } catch {
@@ -170,6 +195,7 @@ export function readViewFromUrl(search?: string): DashboardView | null {
   const qs = search ?? (typeof window !== "undefined" ? window.location.search : "");
   if (!qs) return null;
   const value = new URLSearchParams(qs).get("view");
+  if (value === "rules") return "infos";
   if (value && isDashboardView(value)) return value;
   return null;
 }

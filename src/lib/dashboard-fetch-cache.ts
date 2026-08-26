@@ -143,6 +143,9 @@ export function prefetchDashboardData(view: string): void {
     case "brand-content":
       warm("/api/content");
       break;
+    case "rpm":
+      warm("/api/rpm");
+      break;
     case "invitations":
       warm("/api/invitations");
       break;

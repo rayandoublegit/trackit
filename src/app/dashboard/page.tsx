@@ -37,6 +37,10 @@ import { CreatorAffiliateReadPanel } from "./CreatorAffiliateReadPanel";
 import { NewCreatorModal } from "./NewCreatorModal";
 import { InvitationsView } from "./InvitationsView";
 import { BrandContentView } from "./BrandContentView";
+import { RpmView } from "./RpmView";
+import { HooksView } from "./HooksView";
+import { InfosView } from "./InfosView";
+import { CommunityView } from "./CommunityView";
 import { AnalyticsView } from "./AnalyticsView";
 import { CreatorScripts } from "./CreatorScripts";
 import { CreatorContent } from "./CreatorContent";
@@ -136,6 +140,11 @@ const CREATOR_ALLOWED_VIEWS: View[] = [
   "dashboard",
   "analytics",
   "scripts",
+  "infos",
+  "infos-howto",
+  "infos-pricing",
+  "hooks",
+  "community",
   "content",
   "whiteboard",
   "ai",
@@ -780,18 +789,20 @@ function DashboardPageContent() {
       const detail = (event as CustomEvent<ProfileUpdatedDetail>).detail;
       setAvatarBroken(false);
       if (detail) {
-        setProfile((prev) => prev ? {
-          ...prev,
+        const patch = {
           ...(detail.full_name !== undefined ? { full_name: detail.full_name } : {}),
           ...(detail.username !== undefined ? { username: detail.username } : {}),
           ...(detail.avatar_url !== undefined ? { avatar_url: detail.avatar_url } : {}),
-        } : prev);
+        };
+        setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
+        setActorProfile((prev) => (prev ? { ...prev, ...patch } : prev));
       }
       void reloadProfile(user.id);
+      void reloadActorProfile();
     };
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdated);
-  }, [user?.id, reloadProfile]);
+  }, [user?.id, reloadProfile, reloadActorProfile]);
 
   const sidebarNavEntries = useMemo(
     () => (isCreator ? buildCreatorSidebarNavEntries(lang) : buildSidebarNavEntries(lang, sidebarCounts)),
@@ -1138,6 +1149,53 @@ function DashboardPageContent() {
           <BrandContentView userId={user.id} isMobile={isMobile} />
           </KeepAlivePane>
         )}
+        {keep("rpm") && user && !isCreator && (
+          <KeepAlivePane active={view === "rpm"}>
+            <RpmView userId={user.id} isMobile={isMobile} plan={plan} />
+          </KeepAlivePane>
+        )}
+        {keep("hooks") && user && (
+          <KeepAlivePane active={view === "hooks"}>
+            <HooksView
+              userId={user.id}
+              isMobile={isMobile}
+              isCreator={isCreator}
+              displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
+            />
+          </KeepAlivePane>
+        )}
+        {(keep("infos") || keep("infos-howto") || keep("infos-pricing")) && user && (
+          <KeepAlivePane
+            active={view === "infos" || view === "infos-howto" || view === "infos-pricing"}
+          >
+            <InfosView
+              userId={user.id}
+              isMobile={isMobile}
+              isCreator={isCreator}
+              section={
+                view === "infos-howto" ? "howto" : view === "infos-pricing" ? "pricing" : "rules"
+              }
+            />
+          </KeepAlivePane>
+        )}
+        {keep("community") && user && (
+          <KeepAlivePane active={view === "community"}>
+            <CommunityView
+              userId={user.id}
+              isMobile={isMobile}
+              isCreator={isCreator}
+              onCommunityChange={(id) => {
+                if (id) {
+                  try {
+                    window.dispatchEvent(new Event("trackit:communities-updated"));
+                  } catch {
+                    /* ignore */
+                  }
+                }
+              }}
+            />
+          </KeepAlivePane>
+        )}
         {keep("content") && user && isCreator && (
           <KeepAlivePane active={view === "content"}>
           <CreatorContent userId={user.id} isMobile={isMobile} />
@@ -1199,6 +1257,7 @@ function DashboardPageContent() {
             isMobile={isMobile}
             onNavigate={goToSidebarItem}
             userId={user?.id}
+            isCreator={isCreator}
             displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
           />
           </KeepAlivePane>
@@ -1232,7 +1291,14 @@ function DashboardPageContent() {
         {keep("settings") && user && (
           <KeepAlivePane active={view === "settings"}>
           {isCreator ? (
-            <CreatorSettings userId={user.id} isMobile={isMobile} onSaved={() => void reloadProfile(user.id)} />
+            <CreatorSettings
+              userId={actorId || user.id}
+              isMobile={isMobile}
+              onSaved={() => {
+                void reloadProfile(user.id);
+                void reloadActorProfile();
+              }}
+            />
           ) : (
             <SettingsView
               isMobile={isMobile}
@@ -5082,14 +5148,6 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
       section: "main",
       iconKey: "analytics",
       keywords: ["analytics", "sales", "ventes", "commissions", "performance", "stats"],
-    },
-    {
-      id: "scripts",
-      label: "Scripts",
-      view: "scripts",
-      section: "main",
-      iconKey: "scripts",
-      keywords: ["scripts", "brief", "briefs", "video"],
     },
     {
       id: "content",

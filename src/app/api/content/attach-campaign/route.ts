@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { requireWorkspaceAccess } from "@/lib/api-auth";
+import { baselineRpmLinksForContent } from "@/lib/rpm";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
   const [{ data: content, error: contentErr }, { data: campaign, error: campaignErr }] = await Promise.all([
     admin
       .from("creator_content")
-      .select("id, creator_row_id")
+      .select("id, creator_row_id, views")
       .eq("id", contentId)
       .eq("brand_id", brandId)
       .maybeSingle(),
@@ -53,6 +54,13 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
+
+  await baselineRpmLinksForContent(
+    admin,
+    brandId,
+    contentId,
+    Number(content.views ?? 0),
+  );
 
   return NextResponse.json({ ok: true, campaignName: campaign.name });
 }

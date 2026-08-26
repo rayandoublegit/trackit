@@ -326,7 +326,9 @@ async function fetchCampaignBoardData(resolvedUserId: string): Promise<{
   const salesTotals = computeCampaignSalesTotals(salesRows, creatorCounts, linkMeta);
 
   return {
-    campaigns: dedupeCampaignRows(campaignData).map((row) =>
+    campaigns: dedupeCampaignRows(campaignData)
+      .filter((row) => String((row as { commission_type?: string }).commission_type || "").toLowerCase() !== "rpm")
+      .map((row) =>
       mapDbCampaign(
         row as Record<string, unknown>,
         creatorCounts[String(row.id)] ?? [],

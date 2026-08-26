@@ -72,11 +72,13 @@ export function AiChatView({
   onNavigate,
   displayName,
   userId,
+  isCreator,
 }: {
   isMobile?: boolean;
   onNavigate: (view: DashboardView) => void;
   displayName?: string | null;
   userId?: string;
+  isCreator?: boolean;
 }) {
   const lang = useLang();
   const fr = lang === "fr";
@@ -151,7 +153,7 @@ export function AiChatView({
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || isCreator) {
       setCampaignNames([]);
       return;
     }
@@ -172,9 +174,27 @@ export function AiChatView({
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, isCreator]);
 
   const suggestions = useMemo(() => {
+    if (isCreator) {
+      return fr
+        ? [
+            "Ouvre mes analytiques",
+            "Montre mon solde / Pay it",
+            "Ouvre Contenu pour poster une vidéo",
+            "Ouvre la Communauté",
+            "Ouvre les infos de la marque",
+          ]
+        : [
+            "Open my analytics",
+            "Show my balance / Pay it",
+            "Open Content to post a video",
+            "Open Community",
+            "Open brand infos",
+          ];
+    }
+
     const firstCampaign = campaignNames[0];
     const chips: string[] = [];
 
@@ -195,7 +215,7 @@ export function AiChatView({
     }
 
     return chips.slice(0, 5);
-  }, [fr, campaignNames]);
+  }, [fr, campaignNames, isCreator]);
 
   useEffect(() => {
     if (!chatMode) return;
@@ -341,6 +361,12 @@ export function AiChatView({
       }
 
       case "pay_creator": {
+        if (isCreator) {
+          setPendingContext(null);
+          setStatus(cmd.say || (fr ? "J'ouvre Pay it." : "Opening Pay it."));
+          window.setTimeout(() => onNavigate("payouts"), 700);
+          return;
+        }
         const found = matchCreator(creators, cmd.creator);
         if (!found) {
           const names = creators
@@ -369,6 +395,12 @@ export function AiChatView({
       }
 
       case "create_campaign":
+        if (isCreator) {
+          setPendingContext(null);
+          setStatus(cmd.say || (fr ? "J'ouvre Contenu." : "Opening Content."));
+          window.setTimeout(() => onNavigate("content"), 700);
+          return;
+        }
         setPendingContext(null);
         setStatus(cmd.say || (fr ? "J'ouvre la création de campagne." : "Opening campaign creation."));
         window.setTimeout(() => {
@@ -398,7 +430,7 @@ export function AiChatView({
     setChatBusy(true);
     setStatus(fr ? "Mino s'en occupe…" : "Mino is on it…");
     try {
-      const creators = await ensureCreators();
+      const creators = isCreator ? [] : await ensureCreators();
       const { now, weekday } = localNowInput();
       const res = await fetch("/api/ai-command", {
         method: "POST",
@@ -410,8 +442,9 @@ export function AiChatView({
           lang: fr ? "fr" : "en",
           now,
           weekday,
+          role: isCreator ? "creator" : "brand",
           creators: creators.map((c) => c.name || c.handle).filter(Boolean),
-          campaigns: campaignNames,
+          campaigns: isCreator ? [] : campaignNames,
         }),
       });
       const data = (await res.json()) as { ok?: boolean; command?: AiCommand };
@@ -456,7 +489,11 @@ export function AiChatView({
       const res = await fetch("/api/ai-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, lang: fr ? "fr" : "en" }),
+        body: JSON.stringify({
+          messages: nextMessages,
+          lang: fr ? "fr" : "en",
+          role: isCreator ? "creator" : "brand",
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; reply?: string; error?: string };
       const reply =

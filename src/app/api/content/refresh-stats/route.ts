@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireWorkspaceAccess } from "@/lib/api-auth";
+import { baselineAndSettleRpmForContent } from "@/lib/rpm";
 import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
 
 const supa = createClient(
@@ -28,6 +29,16 @@ export async function POST(req: NextRequest) {
       shares: stats.shares, posted_at: stats.postedAt,
       stats_updated_at: new Date().toISOString(),
     }).eq("id", row.id);
+
+    if (row.brand_id) {
+      await baselineAndSettleRpmForContent(
+        supa,
+        String(row.brand_id),
+        String(row.id),
+        Number(stats.views ?? 0),
+      );
+    }
+
     return NextResponse.json({ ok: true, stats });
   } catch (e) {
     return NextResponse.json({ ok: false, pending: true, reason: (e as Error).message }, { status: 200 });

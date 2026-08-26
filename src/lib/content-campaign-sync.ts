@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCreatorHandle } from "@/lib/creator-account";
-import { CONTENT_STATS_SELECT } from "@/lib/content-shared";
+import { CONTENT_LIST_SELECT, CONTENT_STATS_SELECT } from "@/lib/content-shared";
+import { baselineRpmLinksForContent } from "@/lib/rpm";
 
 type CreatorMembership = {
   creatorRowId: string;
@@ -82,6 +83,30 @@ async function loadCreatorContentForMembers(
   return { data: [...merged.values()], error: null };
 }
 
+async function baselineRpmForLinkedContent(
+  admin: SupabaseClient,
+  brandId: string,
+  contentIds: string[],
+): Promise<void> {
+  const ids = [...new Set(contentIds.filter(Boolean))];
+  if (ids.length === 0) return;
+
+  const { data: rows } = await admin
+    .from("creator_content")
+    .select("id, views")
+    .eq("brand_id", brandId)
+    .in("id", ids);
+
+  for (const row of rows || []) {
+    await baselineRpmLinksForContent(
+      admin,
+      brandId,
+      String(row.id),
+      Number(row.views ?? 0),
+    );
+  }
+}
+
 async function upsertCampaignContentLinks(
   admin: SupabaseClient,
   brandId: string,
@@ -103,6 +128,12 @@ async function upsertCampaignContentLinks(
 
   if (error?.message?.includes("campaign_content")) return null;
   if (error) return new Error(error.message);
+
+  await baselineRpmForLinkedContent(
+    admin,
+    brandId,
+    rows.map((row) => row.contentId),
+  );
   return null;
 }
 
@@ -288,41 +319,44 @@ export async function loadBrandContentForCreators(
     return { data: [] as Record<string, unknown>[], error: null as Error | null };
   }
 
-  const select = `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`;
+  const legacySelect = `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, ${CONTENT_STATS_SELECT}`;
+  let select = CONTENT_LIST_SELECT;
 
-  const byRow =
-    creatorRowIds.length > 0
-      ? await admin
-          .from("creator_content")
-          .select(select)
-          .eq("brand_id", brandId)
-          .in("creator_row_id", creatorRowIds)
-          .order("created_at", { ascending: false })
-      : { data: [] as Record<string, unknown>[], error: null };
+  const fetchBucket = async (column: "creator_row_id" | "creator_user_id", ids: string[]) => {
+    if (ids.length === 0) return { data: [] as Record<string, unknown>[], error: null as { message?: string } | null };
+    let res = await admin
+      .from("creator_content")
+      .select(select)
+      .eq("brand_id", brandId)
+      .in(column, ids)
+      .order("created_at", { ascending: false });
+    if (res.error?.message?.includes("hook_id") && select !== legacySelect) {
+      select = legacySelect;
+      res = await admin
+        .from("creator_content")
+        .select(select)
+        .eq("brand_id", brandId)
+        .in(column, ids)
+        .order("created_at", { ascending: false });
+    }
+    return res;
+  };
 
+  const byRow = await fetchBucket("creator_row_id", creatorRowIds);
   if (byRow.error?.message?.includes("creator_content")) {
     return { data: [], error: null };
   }
   if (byRow.error) return { data: [], error: new Error(byRow.error.message) };
 
-  const byUser =
-    linkedUserIds.length > 0
-      ? await admin
-          .from("creator_content")
-          .select(select)
-          .eq("brand_id", brandId)
-          .in("creator_user_id", linkedUserIds)
-          .order("created_at", { ascending: false })
-      : { data: [] as Record<string, unknown>[], error: null };
-
+  const byUser = await fetchBucket("creator_user_id", linkedUserIds);
   if (byUser.error?.message?.includes("creator_content")) {
     return { data: (byRow.data || []) as Record<string, unknown>[], error: null };
   }
   if (byUser.error) return { data: [], error: new Error(byUser.error.message) };
 
   const merged = new Map<string, Record<string, unknown>>();
-  for (const row of [...(byRow.data || []), ...(byUser.data || [])]) {
-    merged.set(String(row.id), row as Record<string, unknown>);
+  for (const row of [...(byRow.data || []), ...(byUser.data || [])] as Record<string, unknown>[]) {
+    merged.set(String(row.id), row);
   }
 
   const data = [...merged.values()].sort((a, b) => {

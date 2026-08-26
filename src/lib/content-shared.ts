@@ -19,6 +19,8 @@ export type ContentListItem = {
   creator_row_id: string;
   creator_user_id: string;
   created_at: string;
+  hook_id?: string | null;
+  hookTitle?: string | null;
   creatorName?: string | null;
   creatorHandle?: string | null;
   campaignNames?: string[];
@@ -26,6 +28,10 @@ export type ContentListItem = {
 
 export const CONTENT_STATS_SELECT =
   "post_url, views, likes, comments, shares, posted_at, stats_updated_at";
+
+/** Base columns for brand Contenu lists (includes optional hook link). */
+export const CONTENT_LIST_SELECT =
+  `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, hook_id, ${CONTENT_STATS_SELECT}`;
 
 export function formatCompactStat(n: number | null | undefined, lang: "en" | "fr" = "fr"): string {
   if (n == null || !Number.isFinite(n)) return "0";

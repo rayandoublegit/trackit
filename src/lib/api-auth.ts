@@ -1,4 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 import { DEV_BYPASS_PLAN, DEV_BYPASS_USER_ID } from "@/lib/dev-bypass";
@@ -7,16 +8,26 @@ import { resolveWorkspaceContextForUser } from "@/lib/workspace-access";
 type RequestLike = NextRequest | Request;
 
 async function readRequestCookies(request?: RequestLike) {
-  if (request && "cookies" in request && typeof request.cookies?.getAll === "function") {
-    return request.cookies.getAll();
-  }
-  return (await cookies()).getAll();
+  // Prefer next/headers — request.cookies can miss chunked auth cookies in some
+  // App Router edge cases. Merge both so neither source alone is a blind spot.
+  const fromHeaders = (await cookies()).getAll();
+  const fromRequest =
+    request && "cookies" in request && typeof request.cookies?.getAll === "function"
+      ? request.cookies.getAll()
+      : [];
+  if (!fromRequest.length) return fromHeaders;
+  if (!fromHeaders.length) return fromRequest;
+  const byName = new Map<string, { name: string; value: string }>();
+  for (const c of fromRequest) byName.set(c.name, c);
+  for (const c of fromHeaders) byName.set(c.name, c);
+  return Array.from(byName.values());
 }
 
 async function getAuthedSupabaseUser(request?: RequestLike) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return null;
+
   const cookieList = await readRequestCookies(request);
   const supabase = createServerClient(url, anon, {
     cookies: {
@@ -27,8 +38,18 @@ async function getAuthedSupabaseUser(request?: RequestLike) {
     },
   });
   const {
-    data: { user },
+    data: { user: cookieUser },
   } = await supabase.auth.getUser();
+  if (cookieUser) return cookieUser;
+
+  // Bearer fallback when the browser has a session but cookies weren't forwarded.
+  const auth = request?.headers?.get("authorization")?.trim() || "";
+  if (!auth.toLowerCase().startsWith("bearer ")) return null;
+  const token = auth.slice(7).trim();
+  if (!token) return null;
+  const {
+    data: { user },
+  } = await createClient(url, anon).auth.getUser(token);
   return user;
 }
 
