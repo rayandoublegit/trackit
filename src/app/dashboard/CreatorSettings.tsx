@@ -415,7 +415,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
 
   if (loading) {
     return (
-      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, color: "var(--ws-text-dim)", fontSize: 14, background: "var(--ws-surface)", minHeight: "100vh" }}>
+      <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32, color: "var(--ws-text-dim)", fontSize: 14, background: "var(--ws-surface)", minHeight: "100%" }}>
         {lang === "fr" ? "Chargement..." : "Loading..."}
       </div>
     );
@@ -424,7 +424,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
   const displayAvatar = avatarPreview || avatarUrl;
 
   return (
-    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: 32, paddingBottom: 48, background: "var(--ws-surface)", minHeight: "100vh", flex: 1 }}>
+    <div style={{ paddingLeft: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32, paddingBottom: isMobile ? 72 : 48, background: "var(--ws-surface)", minHeight: "100%", flex: 1, boxSizing: "border-box" }}>
       <div style={{ maxWidth: 640 }}>
 
         <div style={{ marginBottom: 32 }}>

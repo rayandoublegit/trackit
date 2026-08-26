@@ -268,7 +268,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
   const pendingTotal = Math.max(stats?.balance ?? 0, rpm?.totals.pending ?? 0);
   const rpmGains = rpm?.totals.accrued ?? 0;
 
-  const pad = isMobile ? "16px 16px 48px" : "40px 40px 48px";
+  const pad = isMobile ? "16px 16px calc(48px + env(safe-area-inset-bottom, 0px))" : "40px 40px 48px";
 
   if (loading && !stats) {
     return (

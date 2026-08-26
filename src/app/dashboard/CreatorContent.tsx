@@ -629,7 +629,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                width: "min(560px, 100%)",
+                width: isMobile ? "100%" : "min(560px, 100%)",
                 height: "100%",
                 background: "var(--ws-surface)",
                 color: "var(--ws-text)",
@@ -637,7 +637,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                 transform: shown ? "translateX(0)" : "translateX(40px)",
                 opacity: shown ? 1 : 0,
                 transition: "transform .18s ease, opacity .18s ease",
-                padding: "28px 28px 56px",
+                padding: isMobile ? "20px 16px 72px" : "28px 28px 56px",
                 boxSizing: "border-box",
                 fontFamily: drawerFont,
               }}

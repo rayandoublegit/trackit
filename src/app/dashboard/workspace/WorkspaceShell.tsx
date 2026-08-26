@@ -769,7 +769,7 @@ export function WorkspaceShell({
   const flushContent = view === "discovery" || view === "whiteboard" || view === "community";
 
   return (
-    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}`}>
+    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}${isCreator ? " is-creator" : ""}`}>
       <header className="ws-topbar">
           <button
             type="button"
