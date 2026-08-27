@@ -61,7 +61,7 @@ export async function GET(request: NextRequest, ctx: Ctx) {
     isBrand ||
     role === "owner" ||
     role === "admin" ||
-    (Boolean(membership?.can_post) && community.members_can_post !== false);
+    Boolean(membership?.can_post);
 
   return NextResponse.json({
     ok: true,
@@ -108,6 +108,16 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Sync default speak permission onto non-admin members when the brand toggles it.
+  if (typeof body?.membersCanPost === "boolean") {
+    await admin
+      .from("community_members")
+      .update({ can_post: body.membersCanPost })
+      .eq("community_id", id)
+      .eq("role", "member");
+  }
+
   return NextResponse.json({ ok: true, community: data });
 }
 

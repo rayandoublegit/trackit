@@ -34,11 +34,12 @@ async function assertMemberAccess(
   }
 
   const role = membership?.role || (isBrandOwner ? "owner" : "member");
+  // Admins/owners always post. Members use per-member can_post (roles UI).
   const canPost =
     isBrandOwner ||
     role === "owner" ||
     role === "admin" ||
-    (Boolean(membership?.can_post) && community.members_can_post !== false);
+    Boolean(membership?.can_post);
 
   return {
     community,

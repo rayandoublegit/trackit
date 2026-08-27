@@ -177,6 +177,8 @@ export function CommunityView({
   const messageFileRef = useRef<HTMLInputElement>(null);
   const attachWrapRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const sendingLockRef = useRef(false);
   const pendingPreviewRef = useRef<string | null>(null);
 
@@ -259,7 +261,7 @@ export function CommunityView({
     [fr],
   );
 
-  const loadMessages = useCallback(async (communityId: string) => {
+  const loadMessages = useCallback(async (communityId: string, opts?: { forceScroll?: boolean }) => {
     try {
       const res = await fetch(`/api/communities/${communityId}/messages?limit=100`, {
         credentials: "include",
@@ -272,7 +274,9 @@ export function CommunityView({
       }
       setMessages((data.messages || []) as MessageRow[]);
       if (typeof data.canPost === "boolean") setCanPost(data.canPost);
-      queueMicrotask(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+      if (opts?.forceScroll || stickToBottomRef.current) {
+        queueMicrotask(() => bottomRef.current?.scrollIntoView({ behavior: opts?.forceScroll ? "smooth" : "auto" }));
+      }
     } catch {
       setError(fr ? "Erreur réseau (messages)" : "Network error (messages)");
     }
@@ -329,8 +333,9 @@ export function CommunityView({
 
   useEffect(() => {
     if (!activeId || screen === "create" || screen === "settings") return;
+    stickToBottomRef.current = true;
     void loadDetail(activeId);
-    void loadMessages(activeId);
+    void loadMessages(activeId, { forceScroll: true });
     const t = window.setInterval(() => void loadMessages(activeId), 3000);
     const onFocus = () => void loadMessages(activeId);
     window.addEventListener("focus", onFocus);
@@ -554,6 +559,7 @@ export function CommunityView({
               : null,
         };
         setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
+        stickToBottomRef.current = true;
         queueMicrotask(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
       }
 
@@ -592,6 +598,7 @@ export function CommunityView({
       setDetail(data.community);
       window.dispatchEvent(new Event("trackit:communities-updated"));
       await loadCommunities({ preferId: activeId, openChat: false });
+      await loadDetail(activeId);
     } catch {
       setError(fr ? "Erreur réseau" : "Network error");
     } finally {
@@ -619,12 +626,33 @@ export function CommunityView({
 
   const updateMember = async (userIdToUpdate: string, patch: { role?: string; canPost?: boolean }) => {
     if (!activeId) return;
-    await fetch(`/api/communities/${activeId}/members`, {
+    setError("");
+    // Optimistic UI so toggles feel instant
+    setMembers((list) =>
+      list.map((m) => {
+        if (m.userId !== userIdToUpdate) return m;
+        const nextRole = patch.role ?? m.role;
+        const nextCanPost =
+          nextRole === "admin" || nextRole === "owner"
+            ? true
+            : typeof patch.canPost === "boolean"
+              ? patch.canPost
+              : m.canPost;
+        return { ...m, role: nextRole, canPost: nextCanPost };
+      }),
+    );
+    const res = await fetch(`/api/communities/${activeId}/members`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: userIdToUpdate, ...patch }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error || (fr ? "Mise à jour du rôle impossible" : "Could not update role"));
+      await loadDetail(activeId);
+      return;
+    }
     await loadDetail(activeId);
   };
 
@@ -914,7 +942,7 @@ export function CommunityView({
 
   if (screen === "settings" && detail && !isCreator) {
     return (
-      <div className={`cm-page${isMobile ? " is-mobile" : ""}`}>
+      <div className={`cm-page cm-page--full${isMobile ? " is-mobile" : ""}`}>
         <div className="cm-settings">
           <button type="button" className="cm-back" onClick={() => setScreen("chat")}>
             ← {fr ? "Retour au chat" : "Back to chat"}
@@ -933,7 +961,9 @@ export function CommunityView({
                 checked={editMembersCanPost}
                 onChange={(e) => setEditMembersCanPost(e.target.checked)}
               />
-              {fr ? "Les membres peuvent répondre" : "Members can reply"}
+              {fr
+                ? "Les membres (rôle Member) peuvent répondre — appliqué à tous les membres à l’enregistrement"
+                : "Members (Member role) can reply — applied to all members on save"}
             </label>
             <button type="button" className="cm-btn" disabled={savingSettings} onClick={() => void saveSettings()}>
               {savingSettings ? "…" : fr ? "Enregistrer" : "Save"}
@@ -960,29 +990,36 @@ export function CommunityView({
 
           <div className="cm-panel">
             <h2 className="cm-section-title">{fr ? "Membres & rôles" : "Members & roles"}</h2>
+            <p className="cm-hint">
+              {fr
+                ? "Admin peut toujours parler. Member : cochez « Peut parler » pour autoriser les messages."
+                : "Admins can always speak. Members: enable “Can speak” to allow messages."}
+            </p>
             <ul className="cm-member-list">
               {members.map((m) => (
                 <li key={m.userId}>
                   <div className="cm-member-main">
                     <strong>{m.name}</strong>
-                    <span>{m.role}</span>
+                    <span className={`cm-role-pill is-${m.role}`}>{m.role}</span>
                   </div>
                   {m.role !== "owner" ? (
                     <div className="cm-member-actions">
                       <select
                         value={m.role}
                         onChange={(e) => void updateMember(m.userId, { role: e.target.value })}
+                        aria-label={fr ? "Rôle" : "Role"}
                       >
-                        <option value="member">member</option>
-                        <option value="admin">admin</option>
+                        <option value="member">{fr ? "Member" : "Member"}</option>
+                        <option value="admin">Admin</option>
                       </select>
                       <label className="cm-check compact">
                         <input
                           type="checkbox"
-                          checked={m.canPost}
+                          checked={m.role === "admin" ? true : m.canPost}
+                          disabled={m.role === "admin"}
                           onChange={(e) => void updateMember(m.userId, { canPost: e.target.checked })}
                         />
-                        {fr ? "Répondre" : "Reply"}
+                        {fr ? "Peut parler" : "Can speak"}
                       </label>
                       <button type="button" className="cm-link-danger" onClick={() => void removeMember(m.userId)}>
                         {fr ? "Retirer" : "Remove"}
@@ -1046,7 +1083,16 @@ export function CommunityView({
 
             {error ? <p className="cm-error">{error}</p> : null}
 
-            <div className="cm-chat__messages">
+            <div
+              className="cm-chat__messages"
+              ref={messagesScrollRef}
+              onScroll={() => {
+                const el = messagesScrollRef.current;
+                if (!el) return;
+                const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+                stickToBottomRef.current = distance < 80;
+              }}
+            >
               {messages.length === 0 ? (
                 <p className="cm-empty">
                   {fr ? "Aucun message — démarrez la conversation." : "No messages yet — start the conversation."}

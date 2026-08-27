@@ -127,15 +127,23 @@ export async function PATCH(request: NextRequest, ctx: Ctx) {
   const updates: Record<string, unknown> = {};
   if (body?.role === "admin" || body?.role === "member") updates.role = body.role;
   if (typeof body?.canPost === "boolean") updates.can_post = body.canPost;
+  // Admins can always post — keep flag in sync with role.
+  if (updates.role === "admin") updates.can_post = true;
   if (!Object.keys(updates).length) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("community_members")
     .update(updates)
     .eq("community_id", id)
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .select("role, can_post")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({
+    ok: true,
+    role: updated?.role ?? updates.role,
+    canPost: updated?.can_post ?? updates.can_post,
+  });
 }
 
 export async function DELETE(request: NextRequest, ctx: Ctx) {
