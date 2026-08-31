@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
 import { insertBrandNotification, resolveCreatorDisplayName } from "@/lib/brand-notifications";
-import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
+import { detectPostPlatform, fetchPostStatsByUrl, isSupportedPostUrl } from "@/lib/scrapecreators";
 import { findCreatorRowsForProfile, resolveCreatorUploadTarget } from "@/lib/creator-account";
 import { syncContentRefToDiscoverySaved } from "@/lib/content-creator-sync";
 import { backfillCreatorContentToCampaigns } from "@/lib/content-campaign-sync";
@@ -150,35 +150,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Creator not linked to brand" }, { status: 403 });
   }
 
-  // Performance-by-content: TikTok post URL required to fetch views / engagement.
+  // Performance-by-content: TikTok or Instagram post URL required to fetch views / engagement.
   const rawPostUrl = typeof body.postUrl === "string" ? body.postUrl.trim() : "";
   if (!rawPostUrl) {
     return NextResponse.json(
-      { error: "TikTok post URL is required to track views" },
+      { error: "Post URL is required to track views (TikTok or Instagram)" },
       { status: 400 },
     );
   }
-  if (!/tiktok\.com\//i.test(rawPostUrl)) {
+  const platform = detectPostPlatform(rawPostUrl);
+  if (!platform || !isSupportedPostUrl(rawPostUrl)) {
     return NextResponse.json(
-      { error: "URL must be a TikTok link (tiktok.com)" },
+      { error: "URL must be a TikTok or Instagram post/reel link" },
       { status: 400 },
     );
   }
   const postUrl = rawPostUrl;
 
   const hookIdRaw = typeof body?.hookId === "string" ? body.hookId.trim() : "";
-  if (!hookIdRaw) {
-    return NextResponse.json({ error: "Hook is required" }, { status: 400 });
+  let hookId: string | null = null;
+  if (hookIdRaw) {
+    const { data: hookRow, error: hookErr } = await admin
+      .from("hooks")
+      .select("id")
+      .eq("id", hookIdRaw)
+      .eq("brand_id", targetBrandId)
+      .maybeSingle();
+    if (hookErr) return NextResponse.json({ error: hookErr.message }, { status: 500 });
+    if (!hookRow) return NextResponse.json({ error: "Hook not found" }, { status: 400 });
+    hookId = hookRow.id;
   }
-  const { data: hookRow, error: hookErr } = await admin
-    .from("hooks")
-    .select("id")
-    .eq("id", hookIdRaw)
-    .eq("brand_id", targetBrandId)
-    .maybeSingle();
-  if (hookErr) return NextResponse.json({ error: hookErr.message }, { status: 500 });
-  if (!hookRow) return NextResponse.json({ error: "Hook not found" }, { status: 400 });
-  const hookId = hookRow.id;
 
   // Auto-title when the creator skips details: Contenu numéro N
   let title = titleRaw;
@@ -192,9 +193,10 @@ export async function POST(request: Request) {
     title = `Contenu numéro ${nextNum}`;
   }
 
-  // File is optional — URL-only posts store the TikTok link as the media ref.
+  // File is optional — URL-only posts store the social link as the media ref.
   const fileUrl = fileUrlRaw || postUrl;
-  const fileName = fileNameRaw || "tiktok-post.url";
+  const fileName =
+    fileNameRaw || (platform === "instagram" ? "instagram-post.url" : "tiktok-post.url");
   const resolvedFileType = fileUrlRaw ? fileType : "text/uri-list";
   const resolvedFileSize = fileUrlRaw ? fileSize : null;
 
@@ -206,25 +208,30 @@ export async function POST(request: Request) {
     postedAt: string | null;
   };
   try {
-    stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+    stats = await fetchPostStatsByUrl(postUrl);
   } catch (e) {
     console.error("post stats fetch failed:", (e as Error).message);
     return NextResponse.json(
       {
         error:
-          "Impossible de récupérer les stats TikTok (ScrapeCreators). Vérifiez l’URL et réessayez.",
+          platform === "instagram"
+            ? "Impossible de récupérer les stats Instagram (ScrapeCreators). Vérifiez l’URL et réessayez."
+            : "Impossible de récupérer les stats TikTok (ScrapeCreators). Vérifiez l’URL et réessayez.",
         detail: (e as Error).message,
       },
       { status: 502 },
     );
   }
-  if (stats.views == null || !Number.isFinite(Number(stats.views))) {
+  // TikTok must return views. Instagram reels usually do; feed posts may only have likes.
+  const hasViews = stats.views != null && Number.isFinite(Number(stats.views));
+  const hasLikes = stats.likes != null && Number.isFinite(Number(stats.likes));
+  if (!hasViews && !(platform === "instagram" && hasLikes)) {
     return NextResponse.json(
       { error: "ScrapeCreators n’a pas renvoyé de vues pour cette URL." },
       { status: 502 },
     );
   }
-  const views = Math.max(0, Math.floor(Number(stats.views)));
+  const views = hasViews ? Math.max(0, Math.floor(Number(stats.views))) : 0;
 
   const insertPayload: Record<string, unknown> = {
     brand_id: targetBrandId,
@@ -247,7 +254,7 @@ export async function POST(request: Request) {
   };
 
   let { data, error } = await admin.from("creator_content").insert(insertPayload).select("id").single();
-  if (error?.message?.includes("hook_id") && hookId) {
+  if (error?.message?.includes("hook_id")) {
     delete insertPayload.hook_id;
     const retry = await admin.from("creator_content").insert(insertPayload).select("id").single();
     data = retry.data;

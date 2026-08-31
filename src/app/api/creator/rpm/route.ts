@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
 import { findCreatorRowsForProfile } from "@/lib/creator-account";
 import { isRpmCampaign, resolveRpmRate, rpmGrossAmount } from "@/lib/rpm";
-import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
+import { fetchPostStatsByUrl, isSupportedPostUrl } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -61,19 +61,19 @@ export async function GET(request: Request) {
 
   if (contentErr) return NextResponse.json({ error: contentErr.message }, { status: 500 });
 
-  // Refresh stale / missing TikTok stats so views stay accurate.
+  // Refresh stale / missing TikTok / Instagram stats so views stay accurate.
   if (shouldRefresh && content?.length) {
     const now = Date.now();
     let refreshed = 0;
     for (const row of content) {
       if (refreshed >= REFRESH_MAX) break;
       const url = typeof row.post_url === "string" ? row.post_url.trim() : "";
-      if (!url || !/tiktok\.com\//i.test(url)) continue;
+      if (!url || !isSupportedPostUrl(url)) continue;
       const updatedAt = row.stats_updated_at ? new Date(row.stats_updated_at).getTime() : 0;
       const stale = !updatedAt || now - updatedAt > REFRESH_STALE_MS || row.views == null;
       if (!stale) continue;
       try {
-        const stats = parseVideoStats(await fetchTikTokVideoRaw(url));
+        const stats = await fetchPostStatsByUrl(url);
         const patch = {
           views: stats.views,
           likes: stats.likes,

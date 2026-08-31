@@ -116,6 +116,44 @@ export async function searchTikTokUsersRaw(query: string, cursor?: number): Prom
   return scGet(`/v1/tiktok/search/users?query=${encodeURIComponent(query)}${c}`);
 }
 
+export type PostPlatform = "tiktok" | "instagram";
+
+export type PostVideoStats = {
+  views: number | null;
+  likes: number | null;
+  comments: number | null;
+  shares: number | null;
+  postedAt: string | null;
+};
+
+/** Detect TikTok vs Instagram post/reel URL (rejects profile-only links). */
+export function detectPostPlatform(input: string): PostPlatform | null {
+  const raw = String(input || "").trim();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    const host = u.hostname.replace(/^www\./i, "").toLowerCase();
+    if (host === "tiktok.com" || host.endsWith(".tiktok.com")) {
+      // Short links or /video|/photo paths count as posts.
+      if (/^(vm|vt)\.tiktok\.com$/i.test(u.hostname)) return "tiktok";
+      if (/\/(video|photo)\//i.test(u.pathname)) return "tiktok";
+      // Accept generic tiktok.com URLs that still look like share links.
+      if (/tiktok\.com\//i.test(raw)) return "tiktok";
+    }
+    if (host === "instagram.com" || host.endsWith(".instagram.com")) {
+      if (/\/(p|reel|reels|tv)\//i.test(u.pathname)) return "instagram";
+    }
+  } catch {
+    if (/tiktok\.com\//i.test(raw)) return "tiktok";
+    if (/instagram\.com\/(p|reel|reels|tv)\//i.test(raw)) return "instagram";
+  }
+  return null;
+}
+
+export function isSupportedPostUrl(input: string): boolean {
+  return detectPostPlatform(input) != null;
+}
+
 function normalizeTikTokPostUrl(input: string): string {
   const raw = String(input || "").trim();
   if (!raw) return "";
@@ -140,14 +178,28 @@ function normalizeTikTokPostUrl(input: string): string {
   return raw;
 }
 
-// Fetch a single TikTok video by its public URL (post performance).
-export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
+function normalizeInstagramPostUrl(input: string): string {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw.includes("://") ? raw : `https://${raw}`);
+    if (!/instagram\.com$/i.test(u.hostname) && !/\.instagram\.com$/i.test(u.hostname)) {
+      return raw;
+    }
+    u.hash = "";
+    // Keep shortcode path; drop tracking query noise.
+    if (/\/(p|reel|reels|tv)\//i.test(u.pathname)) {
+      u.search = "";
+    }
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
+async function scFetchJson(endpoint: string, label: string): Promise<any> {
   const key = process.env.SCRAPECREATORS_API_KEY;
   if (!key) throw new Error("SCRAPECREATORS_API_KEY missing");
-  const url = normalizeTikTokPostUrl(postUrl);
-  if (!url) throw new Error("TikTok URL is empty");
-
-  const endpoint = `https://api.scrapecreators.com/v2/tiktok/video?url=${encodeURIComponent(url)}`;
   const res = await fetch(endpoint, {
     headers: { "x-api-key": key, Accept: "application/json" },
     cache: "no-store",
@@ -164,7 +216,7 @@ export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
       (body && (body.error || body.message || body.detail)) ||
       text.slice(0, 180) ||
       res.statusText;
-    throw new Error(`ScrapeCreators video ${res.status}: ${detail}`);
+    throw new Error(`ScrapeCreators ${label} ${res.status}: ${detail}`);
   }
   if (body && body.success === false) {
     throw new Error(String(body.error || body.message || "ScrapeCreators returned success=false"));
@@ -172,25 +224,115 @@ export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
   return body ?? {};
 }
 
-// Defensive parse across ScrapeCreators response shapes.
-export function parseVideoStats(raw: any): {
-  views: number | null; likes: number | null; comments: number | null;
-  shares: number | null; postedAt: string | null;
-} {
+// Fetch a single TikTok video by its public URL (post performance).
+export async function fetchTikTokVideoRaw(postUrl: string): Promise<any> {
+  const url = normalizeTikTokPostUrl(postUrl);
+  if (!url) throw new Error("TikTok URL is empty");
+  return scFetchJson(
+    `https://api.scrapecreators.com/v2/tiktok/video?url=${encodeURIComponent(url)}`,
+    "tiktok/video",
+  );
+}
+
+/** Fetch Instagram post/reel details (views / likes / comments). */
+export async function fetchInstagramPostRaw(postUrl: string): Promise<any> {
+  const url = normalizeInstagramPostUrl(postUrl);
+  if (!url) throw new Error("Instagram URL is empty");
+  return scFetchJson(
+    `https://api.scrapecreators.com/v1/instagram/post?url=${encodeURIComponent(url)}`,
+    "instagram/post",
+  );
+}
+
+function numOrNull(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (v != null && v !== "" && !isNaN(Number(v))) return Number(v);
+  return null;
+}
+
+function postedAtFromUnixOrIso(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) {
+    const t = Date.parse(value);
+    if (!Number.isNaN(t)) return new Date(t).toISOString();
+  }
+  const n = numOrNull(value);
+  if (n == null) return null;
+  return new Date(n > 1e12 ? n : n * 1000).toISOString();
+}
+
+export function parseInstagramPostStats(raw: any): PostVideoStats {
+  const media =
+    raw?.data?.xdt_shortcode_media ??
+    raw?.xdt_shortcode_media ??
+    raw?.data?.shortcode_media ??
+    raw?.shortcode_media ??
+    raw?.data ??
+    raw ??
+    {};
+  const likes = numOrNull(
+    media?.edge_media_preview_like?.count ??
+      media?.edge_liked_by?.count ??
+      media?.like_count ??
+      media?.likes,
+  );
+  const comments = numOrNull(
+    media?.edge_media_to_parent_comment?.count ??
+      media?.edge_media_to_comment?.count ??
+      media?.edge_media_preview_comment?.count ??
+      media?.comment_count ??
+      media?.comments,
+  );
+  const views = numOrNull(
+    media?.video_play_count ??
+      media?.video_view_count ??
+      media?.play_count ??
+      media?.view_count ??
+      media?.ig_play_count,
+  );
+  return {
+    views,
+    likes,
+    comments,
+    shares: null,
+    postedAt: postedAtFromUnixOrIso(
+      media?.created_at ?? media?.taken_at_timestamp ?? media?.taken_at,
+    ),
+  };
+}
+
+// Defensive parse across ScrapeCreators TikTok response shapes.
+export function parseVideoStats(raw: any): PostVideoStats {
+  // Instagram GraphQL shape (in case a caller passes IG raw into this parser).
+  if (raw?.data?.xdt_shortcode_media || raw?.xdt_shortcode_media) {
+    return parseInstagramPostStats(raw);
+  }
   const d = raw?.aweme_detail ?? raw?.data?.aweme_detail ?? raw?.data ?? raw?.video ?? raw ?? {};
   const st = d.statistics ?? d.stats ?? d.stat ?? {};
-  const n = (v: unknown) => (typeof v === "number" ? v : v != null && !isNaN(Number(v)) ? Number(v) : null);
-  const created = n(d.create_time ?? d.createTime ?? d.created_at);
-  const views = n(
+  const created = numOrNull(d.create_time ?? d.createTime ?? d.created_at);
+  const views = numOrNull(
     st.play_count ?? st.playCount ?? st.view_count ?? st.viewCount ?? st.views ?? d.play_count ?? d.views,
   );
   return {
     views,
-    likes: n(st.digg_count ?? st.diggCount ?? st.like_count ?? st.likes ?? d.likes),
-    comments: n(st.comment_count ?? st.commentCount ?? st.comments ?? d.comments),
-    shares: n(st.share_count ?? st.shareCount ?? st.shares ?? d.shares),
+    likes: numOrNull(st.digg_count ?? st.diggCount ?? st.like_count ?? st.likes ?? d.likes),
+    comments: numOrNull(st.comment_count ?? st.commentCount ?? st.comments ?? d.comments),
+    shares: numOrNull(st.share_count ?? st.shareCount ?? st.shares ?? d.shares),
     postedAt: created
       ? new Date(created > 1e12 ? created : created * 1000).toISOString()
       : null,
   };
+}
+
+/** Platform-aware post stats (TikTok or Instagram) via ScrapeCreators. */
+export async function fetchPostStatsByUrl(postUrl: string): Promise<PostVideoStats & { platform: PostPlatform }> {
+  const platform = detectPostPlatform(postUrl);
+  if (!platform) {
+    throw new Error("URL must be a TikTok or Instagram post/reel link");
+  }
+  if (platform === "instagram") {
+    const stats = parseInstagramPostStats(await fetchInstagramPostRaw(postUrl));
+    return { ...stats, platform };
+  }
+  const stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+  return { ...stats, platform };
 }

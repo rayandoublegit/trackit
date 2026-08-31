@@ -9,7 +9,7 @@ import {
   resolveRpmRate,
   RPM_COMMISSION_TYPE,
 } from "@/lib/rpm";
-import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
+import { fetchPostStatsByUrl } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { syncCampaignCreators } from "@/lib/db";
 
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
 
         if (syncLive && typeof row.post_url === "string" && row.post_url.trim()) {
           try {
-            const stats = parseVideoStats(await fetchTikTokVideoRaw(row.post_url));
+            const stats = await fetchPostStatsByUrl(row.post_url);
             const nextViews = Number(stats.views ?? views);
             await admin
               .from("creator_content")

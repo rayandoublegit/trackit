@@ -147,9 +147,17 @@ export function AddBrandContentPanel({
       return;
     }
     const trimmedPostUrl = postUrl.trim();
-    if (trimmedPostUrl && !/tiktok\.com\//i.test(trimmedPostUrl)) {
+    if (
+      trimmedPostUrl &&
+      !/tiktok\.com\//i.test(trimmedPostUrl) &&
+      !/instagram\.com\/(p|reel|reels|tv)\//i.test(trimmedPostUrl)
+    ) {
       setMessageTone("error");
-      setMessage(lang === "fr" ? "L'URL doit être un lien TikTok (tiktok.com)." : "URL must be a TikTok link (tiktok.com).");
+      setMessage(
+        lang === "fr"
+          ? "L'URL doit être un lien TikTok ou Instagram (post/reel)."
+          : "URL must be a TikTok or Instagram post/reel link.",
+      );
       return;
     }
     if (!supabase) {
@@ -490,8 +498,8 @@ export function AddBrandContentPanel({
                   lang={lang}
                   text={
                     lang === "fr"
-                      ? "Collez l'URL du post TikTok publié pour récupérer les vues, likes et l'engagement. Les stats apparaîtront dans Performance par contenu."
-                      : "Paste the published TikTok post URL to fetch views, likes, and engagement. Stats will show in Performance by content."
+                      ? "Collez l'URL du post TikTok ou Instagram publié pour récupérer les vues, likes et l'engagement. Les stats apparaîtront dans Performance par contenu."
+                      : "Paste the published TikTok or Instagram post URL to fetch views, likes, and engagement. Stats will show in Performance by content."
                   }
                 />
               </div>
@@ -499,7 +507,7 @@ export function AddBrandContentPanel({
                 type="url"
                 value={postUrl}
                 onChange={(e) => setPostUrl(e.target.value)}
-                placeholder="https://www.tiktok.com/@compte/video/..."
+                placeholder="https://www.tiktok.com/@…/video/… ou https://www.instagram.com/reel/…"
                 style={inputStyle}
               />
               <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", lineHeight: 1.45 }}>

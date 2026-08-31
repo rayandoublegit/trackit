@@ -146,8 +146,20 @@ function isUrlOnlyContent(item: Pick<ContentItem, "file_url" | "file_type" | "fi
   if (item.file_type === "text/uri-list") return true;
   if (/\.url$/i.test(item.file_name || "")) return true;
   const media = item.file_url || "";
-  if (/tiktok\.com\//i.test(media) && media === (item.post_url || media)) return true;
+  if (
+    (/tiktok\.com\//i.test(media) || /instagram\.com\//i.test(media)) &&
+    media === (item.post_url || media)
+  ) {
+    return true;
+  }
   return false;
+}
+
+function platformLabelFromUrl(url: string | null | undefined, fr: boolean): string {
+  const u = String(url || "");
+  if (/instagram\.com\//i.test(u)) return "Instagram";
+  if (/tiktok\.com\//i.test(u)) return "TikTok";
+  return fr ? "Lien" : "Link";
 }
 
 function CreatorContentCard({
@@ -170,7 +182,9 @@ function CreatorContentCard({
       <div className="bc-card__media">
         {urlOnly ? (
           <div className="bc-card__file" style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", justifyContent: "center", padding: 20 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.02em" }}>TikTok</span>
+            <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.02em" }}>
+              {platformLabelFromUrl(openUrl || item.post_url, lang === "fr")}
+            </span>
             {openUrl ? (
               <a
                 href={openUrl}
@@ -393,19 +407,18 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       setMessageTone("error");
       setMessage(
         fr
-          ? "L’URL du post TikTok est obligatoire pour calculer les vues."
-          : "A TikTok post URL is required so we can track views.",
+          ? "L’URL du post est obligatoire pour calculer les vues (TikTok ou Instagram)."
+          : "A post URL is required so we can track views (TikTok or Instagram).",
       );
       return;
     }
-    if (!/tiktok\.com\//i.test(trimmedPostUrl)) {
+    if (!/tiktok\.com\//i.test(trimmedPostUrl) && !/instagram\.com\/(p|reel|reels|tv)\//i.test(trimmedPostUrl)) {
       setMessageTone("error");
-      setMessage(fr ? "L'URL doit être un lien TikTok (tiktok.com)." : "URL must be a TikTok link (tiktok.com).");
-      return;
-    }
-    if (!hookId.trim()) {
-      setMessageTone("error");
-      setMessage(fr ? "Choisissez où utiliser (hook)." : "Choose where to use (hook).");
+      setMessage(
+        fr
+          ? "L'URL doit être un lien TikTok ou Instagram (post/reel)."
+          : "URL must be a TikTok or Instagram post/reel link.",
+      );
       return;
     }
 
@@ -467,7 +480,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                   fileSize: payload.fileSize,
                 }
               : {}),
-            hookId,
+            hookId: hookId.trim() || null,
             postUrl: trimmedPostUrl,
           }),
         });
@@ -604,8 +617,11 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
   const canSubmit = Boolean(
     postUrl.trim() &&
-      /tiktok\.com\//i.test(postUrl.trim()) &&
-      hookId.trim() &&
+      (/tiktok\.com\//i.test(postUrl.trim()) ||
+        /instagram\.com\/(p|reel|reels|tv)\//i.test(postUrl.trim())) &&
+      !uploading &&
+      brands.length > 0,
+  );
       !uploading &&
       brands.length > 0,
   );
@@ -735,8 +751,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                     lang={lang}
                     text={
                       fr
-                        ? "Collez l'URL de votre post TikTok publié pour que Trackit récupère les vues, likes et l'engagement."
-                        : "Paste the URL of your published TikTok post so Trackit can fetch views, likes, and engagement."
+                        ? "Collez l'URL de votre post TikTok ou Instagram publié pour que Trackit récupère les vues, likes et l'engagement."
+                        : "Paste the URL of your published TikTok or Instagram post so Trackit can fetch views, likes, and engagement."
                     }
                   />
                 </div>
@@ -746,7 +762,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                     required
                     value={postUrl}
                     onChange={(e) => setPostUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@toncompte/video/..."
+                    placeholder="https://www.tiktok.com/@…/video/… ou https://www.instagram.com/reel/…"
                     style={{ ...inputStyle, flex: 1 }}
                   />
                   <button
@@ -897,8 +913,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "var(--ws-text)", marginBottom: 8 }}>
                   {fr ? "Où utiliser" : "Where to use"}
-                  <span style={{ color: "var(--ws-danger)", marginLeft: 4 }} aria-hidden>
-                    *
+                  <span style={{ marginLeft: 6, fontWeight: 500, color: "var(--ws-text-muted)", fontSize: 12 }}>
+                    {fr ? "(optionnel)" : "(optional)"}
                   </span>
                 </label>
                 <select
@@ -906,7 +922,6 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                   onChange={(e) => setHookId(e.target.value)}
                   disabled={hooks.length === 0}
                   style={{ ...inputStyle, cursor: hooks.length ? "pointer" : "default" }}
-                  required
                 >
                   <option value="">
                     {hooks.length === 0
@@ -914,8 +929,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                         ? "Aucun hook disponible"
                         : "No hooks available"
                       : fr
-                        ? "Choisir un hook"
-                        : "Choose a hook"}
+                        ? "Aucun hook"
+                        : "No hook"}
                   </option>
                   {hooks.map((h) => (
                     <option key={h.id} value={h.id}>
@@ -926,8 +941,8 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                 </select>
                 <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.4 }}>
                   {fr
-                    ? "Obligatoire — la marque filtrera ce contenu par hook."
-                    : "Required — the brand will filter this content by hook."}
+                    ? "Optionnel — la marque pourra filtrer ce contenu par hook."
+                    : "Optional — the brand can filter this content by hook."}
                 </p>
               </div>
 

@@ -21,7 +21,7 @@ import {
   CREATOR_CONTENT_MAX_FILE_BYTES,
   CREATOR_CONTENT_MAX_FILE_LABEL,
 } from "@/lib/content-upload-limits";
-import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
+import { fetchPostStatsByUrl, isSupportedPostUrl } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -282,8 +282,11 @@ export async function POST(request: Request) {
       { status: 413 }
     );
   }
-  if (postUrlRaw && !/tiktok\.com\//i.test(postUrlRaw)) {
-    return NextResponse.json({ error: "URL must be a TikTok link (tiktok.com)." }, { status: 400 });
+  if (postUrlRaw && !isSupportedPostUrl(postUrlRaw)) {
+    return NextResponse.json(
+      { error: "URL must be a TikTok or Instagram post/reel link." },
+      { status: 400 },
+    );
   }
 
   const { data: creator, error: creatorErr } = await admin
@@ -306,11 +309,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const postUrl = postUrlRaw && /tiktok\.com\//i.test(postUrlRaw) ? postUrlRaw : null;
+  const postUrl = postUrlRaw && isSupportedPostUrl(postUrlRaw) ? postUrlRaw : null;
   let stats: { views: number | null; likes: number | null; comments: number | null; shares: number | null; postedAt: string | null } | null = null;
   if (postUrl) {
     try {
-      stats = parseVideoStats(await fetchTikTokVideoRaw(postUrl));
+      stats = await fetchPostStatsByUrl(postUrl);
     } catch (e) {
       console.error("post stats fetch skipped:", (e as Error).message);
     }

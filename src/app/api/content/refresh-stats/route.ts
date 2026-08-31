@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireWorkspaceAccess } from "@/lib/api-auth";
 import { baselineAndSettleRpmForContent } from "@/lib/rpm";
-import { fetchTikTokVideoRaw, parseVideoStats } from "@/lib/scrapecreators";
+import { fetchPostStatsByUrl } from "@/lib/scrapecreators";
 
 const supa = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   if ("error" in access) return access.error;
 
   try {
-    const stats = parseVideoStats(await fetchTikTokVideoRaw(row.post_url));
+    const stats = await fetchPostStatsByUrl(row.post_url);
     await supa.from("creator_content").update({
       views: stats.views, likes: stats.likes, comments: stats.comments,
       shares: stats.shares, posted_at: stats.postedAt,
