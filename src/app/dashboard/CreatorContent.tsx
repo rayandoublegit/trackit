@@ -622,9 +622,6 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       !uploading &&
       brands.length > 0,
   );
-      !uploading &&
-      brands.length > 0,
-  );
 
   const drawer =
     addOpen && typeof document !== "undefined"
