@@ -7,6 +7,7 @@ import type { DashboardView } from "@/lib/dashboard-view-storage";
 import { SAMPLE_CAMPAIGN_DETAILS, sampleDailyRevenue } from "@/lib/sample-campaign-preview";
 import { ActivityFeed, RevenueChart } from "./SampleCampaignPreview";
 import { CountUp } from "./sample-motion";
+import { samplesHidden } from "@/lib/sample-workspace";
 
 const BLUE = "#0047FF";
 
@@ -18,6 +19,7 @@ type GettingStarted = {
   creatorsCount: number;
   outreachCount: number;
   salesCount: number;
+  countsLoaded?: boolean;
 };
 
 
@@ -64,6 +66,7 @@ function MetricCard({
   hint?: string;
   accent?: boolean;
 }) {
+  const lang = useLang();
   return (
     <div
       className="sp-list-in"
@@ -79,7 +82,7 @@ function MetricCard({
         {label}
       </div>
       <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
-        {typeof value === "number" ? <CountUp value={value} format={(n) => Math.round(n).toLocaleString()} /> : value}
+        {typeof value === "number" ? <CountUp value={value} format={(n) => Math.round(n).toLocaleString(lang === "fr" ? "fr-FR" : "en-US")} /> : value}
       </div>
       {hint && (
         <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "var(--ws-text-dim)", marginTop: 8, letterSpacing: "-0.01em" }}>
@@ -134,6 +137,7 @@ function QuickAction({
 
 function BrandHomeOverview({
   lang,
+  userId,
   isMobile,
   displayName,
   businessName,
@@ -142,6 +146,7 @@ function BrandHomeOverview({
   onNavigate,
 }: {
   lang: "en" | "fr";
+  userId?: string;
   isMobile?: boolean;
   displayName: string;
   businessName: string | null;
@@ -150,7 +155,12 @@ function BrandHomeOverview({
   onNavigate: (view: DashboardView) => void;
 }) {
   const setupDone = [gettingStarted.creators, gettingStarted.outreach, gettingStarted.sales].filter(Boolean).length;
-  const programEmpty = gettingStarted.creatorsCount === 0 && gettingStarted.salesCount === 0 && activeCampaigns === 0;
+  const programEmpty =
+    gettingStarted.countsLoaded === true &&
+    !samplesHidden(userId) &&
+    gettingStarted.creatorsCount === 0 &&
+    gettingStarted.salesCount === 0 &&
+    activeCampaigns === 0;
   const setupTotal = 3;
 
   return (
@@ -565,6 +575,7 @@ export function HomeOverviewView({
   return (
     <BrandHomeOverview
       lang={lang}
+      userId={userId}
       isMobile={isMobile}
       displayName={displayName}
       businessName={businessName}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { CountUp, SampleAvatar, useLiveFeed } from "./sample-motion";
 import {
@@ -259,6 +259,8 @@ function Overview({
 }
 
 export function RevenueChart({ lang, days }: { lang: Lang; days: number[] }) {
+  // Home and the campaign preview can both be mounted: each chart needs its own gradient id.
+  const gradientId = `sp-area-${useId().replace(/:/g, "")}`;
   const [hover, setHover] = useState<number | null>(null);
   const width = 640;
   const height = 200;
@@ -292,7 +294,7 @@ export function RevenueChart({ lang, days }: { lang: Lang; days: number[] }) {
         }}
       >
         <defs>
-          <linearGradient id="sp-area" x1="0" x2="0" y1="0" y2="1">
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="var(--ws-accent)" stopOpacity="0.28" />
             <stop offset="100%" stopColor="var(--ws-accent)" stopOpacity="0" />
           </linearGradient>
@@ -300,7 +302,7 @@ export function RevenueChart({ lang, days }: { lang: Lang; days: number[] }) {
         {[0.25, 0.5, 0.75].map((f) => (
           <line key={f} x1={0} x2={width} y1={height * f} y2={height * f} className="sp-chart__grid" />
         ))}
-        <path d={area} fill="url(#sp-area)" className="sp-chart__area" />
+        <path d={area} fill={`url(#${gradientId})`} className="sp-chart__area" />
         <path d={line} fill="none" className="sp-chart__line" pathLength={1} />
         {active ? <line x1={active[0]} x2={active[0]} y1={0} y2={height} className="sp-chart__cursor" /> : null}
       </svg>
@@ -352,10 +354,11 @@ export function ActivityFeed({
   detail: SampleCampaignDetail;
   byId: Map<string, SampleCreator>;
 }) {
-  const feed = useLiveFeed(detail.activity, 5, 2800);
+  const host = useRef<HTMLUListElement>(null);
+  const feed = useLiveFeed(detail.activity, 5, 2800, host);
   const fr = lang === "fr";
   return (
-    <ul className="sp-feed">
+    <ul className="sp-feed" ref={host}>
       {feed.map(({ item, key }, i) => {
         const c = byId.get(item.creatorId);
         if (!c) return null;

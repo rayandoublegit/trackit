@@ -382,7 +382,7 @@ export function GiftingView({
                       className="gv-field"
                       aria-label={fr ? "Pseudo à inviter" : "Handle to invite"}
                       value={value}
-                      required
+                      required={paid}
                       onChange={(event) => setInviteHandles((prev) => ({ ...prev, [campaign.id]: event.target.value }))}
                       placeholder="@handle"
                     />
@@ -610,10 +610,11 @@ function hueOf(text: string): number {
   return h;
 }
 
+/** Deadlines are calendar dates (YYYY-MM-DD): format them in UTC so no timezone shifts the day. */
 function formatDay(value: string, lang: Lang): string {
-  const date = new Date(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00Z` : value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric" });
+  return date.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function ContractSheet({

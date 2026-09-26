@@ -83,7 +83,8 @@ export function giftNextStep(status: string, isCreator: boolean, lang: Lang): st
 
 const KNOWN_ERRORS: { match: RegExp; en: string; fr: string }[] = [
   {
-    match: /server misconfigured|relation .* does not exist|column .* does not exist|could not find the (table|function)|schema cache/i,
+    // Only errors about the gifting schema itself; a missing admin client or another table is a real failure.
+    match: /(relation|column|table|function).*(gift_\w+|creator_links).*(does not exist|not find|schema cache)|could not find the (table|function) .*(gift_\w+|creator_links)/i,
     en: "Gifting is not set up on this workspace yet. The sample below shows how it works.",
     fr: "Le gifting n’est pas encore activé sur cet espace. L’exemple ci-dessous montre comment il fonctionne.",
   },

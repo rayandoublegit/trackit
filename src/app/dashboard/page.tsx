@@ -297,6 +297,8 @@ function DashboardPageContent() {
     creatorsCount: 0,
     outreachCount: 0,
     salesCount: 0,
+    /** True once the counts below were read without error (drives the home sample). */
+    countsLoaded: false,
   });
 
   const reloadProfile = useCallback(async (userId: string) => {
@@ -753,7 +755,10 @@ function DashboardPageContent() {
     if (!user?.id) return;
     const check = async () => {
       const { supabase } = await import("@/lib/supabase");
-      if (!supabase) return;
+      if (!supabase) {
+        if (DEV_BYPASS_PLAN) setGettingStarted((prev) => ({ ...prev, countsLoaded: true }));
+        return;
+      }
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -762,17 +767,17 @@ function DashboardPageContent() {
         .single();
       const shopifyConnected = !!(profile?.shopify_store && profile?.shopify_access_token);
 
-      const { count: creatorsCount } = await supabase
+      const { count: creatorsCount, error: creatorsError } = await supabase
         .from("creators")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      const { count: outreachCount } = await supabase
+      const { count: outreachCount, error: outreachError } = await supabase
         .from("outreach_history")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id);
 
-      const { count: salesCount } = await supabase
+      const { count: salesCount, error: salesError } = await supabase
         .from("sales")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id);
@@ -786,6 +791,7 @@ function DashboardPageContent() {
         creatorsCount: creatorsCount || 0,
         outreachCount: outreachCount || 0,
         salesCount: salesCount || 0,
+        countsLoaded: !creatorsError && !outreachError && !salesError,
       });
     };
     check();

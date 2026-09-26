@@ -43,7 +43,10 @@ describe("gifting board", () => {
   });
 
   it("turns server errors into plain sentences and keeps unknown ones", () => {
-    expect(friendlyGiftError("Server misconfigured", "fr")).toMatch(/pas encore activé/);
+    expect(friendlyGiftError('relation "public.gift_missions" does not exist', "fr")).toMatch(/pas encore activé/);
+    expect(isGiftSetupError("Server misconfigured")).toBe(false);
+    expect(isGiftSetupError('column profiles.business_type does not exist')).toBe(false);
+    expect(isGiftSetupError("Could not find the function public.gift_commit_mission_action in the schema cache")).toBe(true);
     expect(isGiftSetupError('relation "public.gift_campaigns" does not exist')).toBe(true);
     expect(isGiftSetupError("column gift_missions.revision does not exist")).toBe(true);
     expect(friendlyGiftError("Creator must join this brand before a gift mission can be sent.", "en")).toMatch(/not connected/);

@@ -1,29 +1,33 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 export function prefersReducedMotion(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Counts from 0 to `target` once the element mounts. */
+/** Counts from 0 to `target` on mount, then from the shown value to each new target. */
 export function useCountUp(target: number, durationMs = 1100, delayMs = 0): number {
   const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0));
   const frame = useRef<number | null>(null);
+  const shown = useRef(value);
+  shown.current = value;
 
   useEffect(() => {
     if (prefersReducedMotion()) {
       setValue(target);
       return;
     }
+    const from = shown.current;
+    if (from === target) return;
     let start: number | null = null;
     const timer = window.setTimeout(() => {
       const tick = (now: number) => {
         if (start === null) start = now;
         const t = Math.min(1, (now - start) / durationMs);
         const eased = 1 - Math.pow(1 - t, 3);
-        setValue(target * eased);
+        setValue(from + (target - from) * eased);
         if (t < 1) frame.current = window.requestAnimationFrame(tick);
       };
       frame.current = window.requestAnimationFrame(tick);
@@ -76,8 +80,16 @@ export function SampleAvatar({ name, hue, size = 32 }: { name: string; hue: numb
   );
 }
 
-/** Rotates through `items`, prepending one every `everyMs`, keeping `keep` visible. */
-export function useLiveFeed<T>(items: T[], keep = 5, everyMs = 2600): { item: T; key: number }[] {
+/**
+ * Rotates through `items`, prepending one every `everyMs`, keeping `keep` visible.
+ * Pauses while `hostRef` is not rendered (a hidden dashboard pane) or the tab is hidden.
+ */
+export function useLiveFeed<T>(
+  items: T[],
+  keep = 5,
+  everyMs = 2600,
+  hostRef?: RefObject<HTMLElement | null>,
+): { item: T; key: number }[] {
   const [feed, setFeed] = useState(() =>
     items.slice(0, Math.min(keep, items.length)).map((item, i) => ({ item, key: i })),
   );
@@ -88,13 +100,15 @@ export function useLiveFeed<T>(items: T[], keep = 5, everyMs = 2600): { item: T;
     cursor.current = Math.min(keep, items.length);
     if (items.length <= 1 || prefersReducedMotion()) return;
     const id = window.setInterval(() => {
+      if (document.hidden) return;
+      if (hostRef?.current && hostRef.current.offsetParent === null) return;
       const next = items[cursor.current % items.length];
       const key = cursor.current;
       cursor.current += 1;
       setFeed((list) => [{ item: next, key }, ...list].slice(0, keep));
     }, everyMs);
     return () => window.clearInterval(id);
-  }, [items, keep, everyMs]);
+  }, [items, keep, everyMs, hostRef]);
 
   return feed;
 }

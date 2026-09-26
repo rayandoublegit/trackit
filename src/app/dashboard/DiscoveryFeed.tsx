@@ -1141,6 +1141,13 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
 
     const d = await fetch(`/api/catalog?${qs}`).then((r) => r.json());
     if (gen !== fetchGenRef.current) return { count: 0 };
+    if (d.error) {
+      // A failed catalog call returns no creators: keep what is already listed and never spend quota on it.
+      setError(d.error);
+      setHasMore(false);
+      if (mode !== "append") setCreators([]);
+      return { count: 0 };
+    }
 
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
     const rows = list;

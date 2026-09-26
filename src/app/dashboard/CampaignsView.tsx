@@ -1294,6 +1294,11 @@ export function CampaignsView({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [samplesOff, setSamplesOff] = useState(false);
   const [samplePreviewId, setSamplePreviewId] = useState<string | null>(null);
+  // The sample preview is local state: any navigation (sidebar, back, another view) closes it.
+  const navKey = JSON.stringify(navState);
+  useEffect(() => {
+    setSamplePreviewId(null);
+  }, [navKey]);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2174,6 +2179,7 @@ function CampaignsBoard({
   const creatorsInCampaigns = useMemo(() => {
     const ids = new Set<string>();
     for (const c of campaigns) {
+      if (c.id.startsWith("sample-")) continue;
       for (const id of c.creatorIds ?? []) ids.add(id);
     }
     return ids.size;
