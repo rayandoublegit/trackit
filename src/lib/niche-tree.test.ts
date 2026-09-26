@@ -25,6 +25,6 @@ describe("buildSeedTargets", () => {
   it("still returns parent + sub targets", () => {
     const t = buildSeedTargets();
     expect(t.length).toBeGreaterThan(100);
-    expect(t.find((x) => x.query === "fitness")).toBeTruthy();
+    expect(t.find((x) => x.tags.includes("fitness"))).toBeTruthy();
   });
 });

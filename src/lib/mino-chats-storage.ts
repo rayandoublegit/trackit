@@ -8,6 +8,13 @@ export type MinoChat = {
   messages: MinoChatMessage[];
   createdAt: number;
   updatedAt: number;
+  folderId?: string | null;
+};
+
+export type MinoFolder = {
+  id: string;
+  name: string;
+  createdAt: number;
 };
 
 export const MINO_CHATS_EVENT = "trackit:mino-chats-updated";
@@ -19,6 +26,10 @@ function listKey(userId?: string) {
 
 function activeKey(userId?: string) {
   return workspaceStorageKey(`trackit.mino.active.${userId || "anon"}`);
+}
+
+function foldersKey(userId?: string) {
+  return workspaceStorageKey(`trackit.mino.folders.${userId || "anon"}`);
 }
 
 function newId() {
@@ -118,4 +129,44 @@ export function deleteMinoChat(userId: string | undefined, chatId: string) {
   if (getActiveMinoChatId(userId) === chatId) {
     setActiveMinoChatId(userId, next[0]?.id || null);
   }
+}
+
+export function loadMinoFolders(userId?: string): MinoFolder[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(foldersKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as MinoFolder[];
+    return Array.isArray(parsed) ? parsed.sort((a, b) => a.createdAt - b.createdAt) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMinoFolders(userId: string | undefined, folders: MinoFolder[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(foldersKey(userId), JSON.stringify(folders));
+    window.dispatchEvent(new CustomEvent(MINO_CHATS_EVENT));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function createMinoFolder(userId: string | undefined, name: string): MinoFolder | null {
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (!clean) return null;
+  const folder: MinoFolder = {
+    id: `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name: clean.length > 40 ? `${clean.slice(0, 40)}…` : clean,
+    createdAt: Date.now(),
+  };
+  saveMinoFolders(userId, [...loadMinoFolders(userId), folder]);
+  return folder;
+}
+
+export function moveMinoChatToFolder(userId: string | undefined, chatId: string, folderId: string | null) {
+  const existing = loadMinoChats(userId).find((chat) => chat.id === chatId);
+  if (!existing) return;
+  upsertMinoChat(userId, { ...existing, folderId: folderId || null });
 }

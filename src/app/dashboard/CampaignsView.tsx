@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampaignStatus, updateCampaign, deleteCampaign, getCampaignCreatorAttribution, syncCampaignCreators, attachCreatorSalesToCampaign, fetchCreatorBrandSalesSummary } from "@/lib/db";
 import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { CampaignKindChooser } from "./CampaignKindChooser";
+import { EmptyStage } from "./EmptyStage";
+import { GiftingView } from "./GiftingView";
+import { RpmView } from "./RpmView";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { notifyCampaignCreated, notifyCreatorPaid, notifySaleRecorded } from "@/lib/notifications-storage";
@@ -1246,6 +1250,7 @@ export function CampaignsView({
   const creatingCampaignRef = useRef(false);
 
   const campaignNav = navState.view === "campaigns" ? navState.campaign : undefined;
+  const createKind = campaignNav?.type === "new" ? campaignNav.kind : undefined;
   const modalOpen = campaignNav?.type === "new";
   const addCreatorsId = campaignNav?.type === "addCreators" ? campaignNav.id : null;
   const editId = campaignNav?.type === "edit" ? campaignNav.id : null;
@@ -1732,18 +1737,67 @@ export function CampaignsView({
     setUpgradeModalOpen(true);
   }, [modalOpen, canOpenNewCampaign, navigate]);
 
-  if (modalOpen && canOpenNewCampaign) {
+  if (modalOpen && canOpenNewCampaign && !createKind) {
     return (
-      <NewCampaignOnboarding
-        lang={lang}
-        userId={userId}
-        plan={plan}
+      <CampaignKindChooser
         isMobile={isMobile}
         onClose={goBack}
-        onCreate={handleCreateCampaign}
-        onSaveDraft={handleSaveDraft}
-        onLaunchDraft={handleLaunchDraft}
+        onPick={(kind) => navigate({ view: "campaigns", campaign: { type: "new", kind } })}
       />
+    );
+  }
+
+  if (modalOpen && canOpenNewCampaign && createKind === "gifting") {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
+          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
+        >
+          Change type
+        </button>
+        <GiftingView isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} />
+      </div>
+    );
+  }
+
+  if (modalOpen && canOpenNewCampaign && createKind === "rpm") {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
+          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
+        >
+          Change type
+        </button>
+        <RpmView userId={userId} isMobile={isMobile} plan={plan} />
+      </div>
+    );
+  }
+
+  if (modalOpen && canOpenNewCampaign) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
+          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
+        >
+          Change type
+        </button>
+        <NewCampaignOnboarding
+          lang={lang}
+          userId={userId}
+          plan={plan}
+          isMobile={isMobile}
+          onClose={goBack}
+          onCreate={handleCreateCampaign}
+          onSaveDraft={handleSaveDraft}
+          onLaunchDraft={handleLaunchDraft}
+        />
+      </div>
     );
   }
 
@@ -1867,6 +1921,7 @@ export function CampaignsView({
         search={search}
         setSearch={setSearch}
         onOpenCampaign={openCampaign}
+        onCreate={tryOpenNewCampaign}
         onDeleteAll={() => void handleDeleteAllCampaigns()}
       />
       {upgradeModalOpen && (
@@ -1996,6 +2051,7 @@ function CampaignsBoard({
   search,
   setSearch,
   onOpenCampaign,
+  onCreate,
   onDeleteAll,
 }: {
   lang: "en" | "fr";
@@ -2011,9 +2067,11 @@ function CampaignsBoard({
   search: string;
   setSearch: (s: string) => void;
   onOpenCampaign: (id: string) => void;
+  onCreate: () => void;
   onDeleteAll: () => void;
 }) {
   const pad = isMobile ? "16px 16px 24px" : "40px 40px 48px";
+  const fr = lang === "fr";
 
   const tabCounts = useMemo(
     () => ({
@@ -2054,6 +2112,37 @@ function CampaignsBoard({
     { id: "drafts", label: lang === "fr" ? "Brouillons" : "Drafts", count: tabCounts.drafts },
     { id: "finished", label: lang === "fr" ? "Terminées" : "Finished", count: tabCounts.finished },
   ];
+
+  if (campaigns.length === 0) {
+    return (
+      <EmptyStage
+        isMobile={isMobile}
+        scene="campaign"
+        kicker="Track it"
+        title={fr ? "Une campagne, de l’idée au paiement" : "A campaign, from brief to payout"}
+        lead={
+          fr
+            ? "C’est ici que vos créateurs, vos ventes et leurs commissions se rejoignent. Rien n’est lancé pour l’instant — créez la première et cette page se remplit toute seule."
+            : "This is where creators, sales and commissions meet. Nothing is live yet — create the first one and this page fills itself in."
+        }
+        steps={
+          fr
+            ? [
+                { title: "Posez le brief", body: "Nom, dates, plateforme et taux de commission." },
+                { title: "Ajoutez des créateurs", body: "Depuis Discovery, ou via une invitation." },
+                { title: "Les ventes arrivent", body: "Chaque commande calcule la commission due." },
+              ]
+            : [
+                { title: "Set the brief", body: "Name, dates, platform and commission rate." },
+                { title: "Add creators", body: "From Discovery, or with an invite." },
+                { title: "Sales come in", body: "Every order calculates what each creator is owed." },
+              ]
+        }
+        primaryLabel={fr ? "Créer une campagne" : "Create a campaign"}
+        onPrimary={onCreate}
+      />
+    );
+  }
 
   return (
     <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
@@ -2180,14 +2269,23 @@ function CampaignsBoard({
         </div>
 
         {filtered.length === 0 ? (
-          <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14, border: "1px solid var(--ws-border)", borderRadius: 12 }}>
-            {boardTab === "drafts"
-              ? lang === "fr"
-                ? "Aucun brouillon. Commencez une campagne et quittez pour la retrouver ici."
-                : "No drafts yet. Start a campaign and leave to resume it here."
-              : lang === "fr"
-                ? "Aucune campagne dans cet onglet."
-                : "No campaigns in this tab."}
+          <div className="es-tab-empty">
+            <p>
+              {boardTab === "drafts"
+                ? fr
+                  ? "Aucun brouillon. Commencez une campagne et quittez-la pour la retrouver ici."
+                  : "No drafts yet. Start a campaign and leave it to resume here."
+                : boardTab === "finished"
+                  ? fr
+                    ? "Aucune campagne terminée. Celles que vous clôturez atterrissent ici."
+                    : "No finished campaigns. The ones you close land here."
+                  : fr
+                    ? "Aucune campagne active. Lancez-en une, ou reprenez un brouillon."
+                    : "No active campaigns. Launch one, or pick up a draft."}
+            </p>
+            <button type="button" className="es-primary" onClick={onCreate}>
+              {fr ? "Créer une campagne" : "Create a campaign"}
+            </button>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

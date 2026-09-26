@@ -16,6 +16,7 @@ import {
 import { buildEnrichmentRow } from "@/lib/creator-enrichment";
 import { creatorAvatarApiUrl, feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import type { NormalizedFilters } from "@/lib/creator-discovery-filters";
+import { searchRapidApiCreators } from "@/lib/rapidapi-creators";
 import { pickTikTokAvatarUrl, proxiedImageUrl } from "@/lib/tiktok-avatar";
 
 export interface DiscoveryCreatorResult {
@@ -167,6 +168,9 @@ export async function liveSearchAndEnrich(
   opts: { limit?: number } = {}
 ): Promise<DiscoveryCreatorResult[]> {
   const limit = Math.min(Math.max(opts.limit ?? Number(process.env.LIVE_ENRICH_LIMIT ?? 6), 1), 20);
+  if (process.env.RAPIDAPI_KEY && !process.env.SCRAPECREATORS_API_KEY) {
+    return searchRapidApiCreators(niche, f.platform, limit);
+  }
   const key = niche.toLowerCase().trim();
 
   let pool: DiscoveryCreatorResult[];

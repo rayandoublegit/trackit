@@ -87,7 +87,7 @@ function mapVideoThumbnails(
   const thumbs = displayVideoThumbnails(
     Array.isArray(videoThumbnails) ? videoThumbnails : [],
     Array.isArray(topVideos) ? topVideos : [],
-    3
+    6
   );
   return thumbs.map((t) => ({
     views: t.views,
@@ -108,7 +108,7 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
   const rawFrequency = Number(c.post_frequency ?? 0);
   const postFrequency = postsAnalyzed >= 2 ? rawFrequency : 0;
   return {
-    username: String(c.username), displayName: String(c.display_name ?? c.username),
+    username: String(c.platform) === "Instagram" ? String(c.username).replace(/^ig_/, "") : String(c.username), displayName: String(c.display_name ?? c.username),
     avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
     followersCount: Number(c.followers ?? 0),
     engagementRate: Number(c.engagement_rate ?? 0),
@@ -153,7 +153,7 @@ export async function buildFeed(opts: { limitPerNiche?: number } = {}): Promise<
 
   // Cold start (empty enriched DB) or no DB: live-aggregate so the feed is never
   // empty. The value/rentabilité ranking sinks low-value creators to the bottom.
-  if (pool.length === 0 && process.env.SCRAPECREATORS_API_KEY) {
+  if (pool.length === 0 && (process.env.SCRAPECREATORS_API_KEY || process.env.RAPIDAPI_KEY)) {
     const limit = Number(opts.limitPerNiche ?? process.env.FEED_LIMIT_PER_NICHE ?? 3);
     for (const niche of feedNiches()) {
       try {
@@ -416,7 +416,15 @@ export async function buildFeedPage(
   limit: number
 ): Promise<{ creators: FeedCreator[]; hasMore: boolean }> {
   const hasDb = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL);
-  if (!hasDb) return { creators: [], hasMore: false };
+  if (!hasDb) {
+    if (!process.env.RAPIDAPI_KEY && !process.env.SCRAPECREATORS_API_KEY) return { creators: [], hasMore: false };
+    const live = await liveSearchAndEnrich(
+      filters.niche || "creators",
+      normalizeDiscoveryFilters({ niche: filters.niche, platform: filters.platform, includeLowQuality: true }),
+      { limit },
+    );
+    return { creators: rankFeed(live).slice(0, limit), hasMore: false };
+  }
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 
   const build = (opts: { requireAuthenticity: boolean; nicheInSql: boolean }) => {
@@ -490,6 +498,15 @@ export async function buildFeedPage(
       seen.add(row.username);
       creators.push(row);
     }
+  }
+
+  if (creators.length === 0 && process.env.SCRAPECREATORS_API_KEY) {
+    const live = await liveSearchAndEnrich(
+      filters.niche || "creators",
+      normalizeDiscoveryFilters({ niche: filters.niche, platform: filters.platform, includeLowQuality: true }),
+      { limit },
+    );
+    return { creators: rankFeed(live).slice(0, limit), hasMore: false };
   }
 
   const hasMore = creators.length >= limit;

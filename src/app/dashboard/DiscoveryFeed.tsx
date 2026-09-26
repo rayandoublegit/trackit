@@ -26,6 +26,7 @@ import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
+import { NICHE_TREE } from "@/lib/niche-tree";
 import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
 import { prefetchCreatorDetail } from "@/lib/creator-detail-cache";
 import {
@@ -622,14 +623,7 @@ function FilterSidebar({
           onChange={(v) => onChange({ niche: v })}
           options={[
             { value: "", label: t.allNiches },
-            { value: "lifestyle", label: t.nicheLifestyle },
-            { value: "fitness", label: "Fitness" },
-            { value: "food", label: "Food" },
-            { value: "travel", label: t.nicheTravel },
-            { value: "fashion", label: t.nicheFashion },
-            { value: "beauty", label: t.nicheBeauty },
-            { value: "tech", label: "Tech" },
-            { value: "e-commerce", label: t.nicheEcom },
+            ...Object.keys(NICHE_TREE).map((niche) => ({ value: niche, label: niche })),
           ]}
         />
         <FilterSelect
@@ -1100,6 +1094,12 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     mode: "replace" | "append" = "replace",
   ): Promise<{ count: number; blocked?: boolean }> => {
     const gen = fetchGenRef.current;
+    if (plan === "free" && isGlobalSearch) {
+      setGatePaywall(true);
+      setShowDiscoveryGate(true);
+      setHasMore(false);
+      return { count: 0, blocked: true };
+    }
     const countsTowardQuota = hasDiscoveryCap && discoveryLimit != null && !allNichesBrowse && !isGlobalSearch;
     const shouldSyncQuota = hasDiscoveryCap && discoveryLimit != null;
     let quotaBlocked = false;
@@ -1113,10 +1113,11 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
 
     const off = batchIndex * batchSize;
     const qs = new URLSearchParams({ ...apiParams, offset: String(off), limit: String(batchSize) }).toString();
-    if (shouldSyncQuota) {
+    if (shouldSyncQuota && workspaceUserId) {
       const { supabase } = await import("@/lib/supabase");
-      if (!supabase) return { count: 0 };
-      if (!workspaceUserId) return { count: 0 };
+      if (!supabase) {
+        /* quota is optional; the catalog still loads */
+      } else {
       const quota = await syncDiscoveryQuota(supabase, workspaceUserId, plan);
       if (!quota) return { count: 0 };
       setDiscoveriesResetAt(quota.resetAt);
@@ -1129,6 +1130,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         quotaBlocked = true;
       } else {
         quotaUsedBefore = quota.used ?? 0;
+      }
       }
     }
 

@@ -6,9 +6,11 @@ import {
 
 export const DASHBOARD_HISTORY_KEY = "trackit_dashboard";
 
+export type CampaignKind = "rpm" | "gifting" | "affiliate";
+
 export type CampaignsScreen =
   | { type: "list" }
-  | { type: "new" }
+  | { type: "new"; kind?: CampaignKind }
   | { type: "detail"; id: string; tab?: string }
   | { type: "addCreators"; id: string }
   | { type: "addSale"; id: string }
@@ -96,7 +98,11 @@ export function parseDashboardNavState(
 
   const campaign = params.get("campaign");
   if (campaign === "new") {
-    state.campaign = { type: "new" };
+    const kind = params.get("campaignKind");
+    state.campaign = {
+      type: "new",
+      ...(kind === "rpm" || kind === "gifting" || kind === "affiliate" ? { kind } : {}),
+    };
   } else if (campaign === "addCreators") {
     const campaignId = params.get("campaignId");
     if (campaignId) state.campaign = { type: "addCreators", id: campaignId };
@@ -142,6 +148,7 @@ export function buildDashboardUrl(state: DashboardNavState): string {
   }
 
   url.searchParams.delete("campaign");
+  url.searchParams.delete("campaignKind");
   url.searchParams.delete("campaignId");
   url.searchParams.delete("campaignTab");
   url.searchParams.delete("creator");
@@ -154,6 +161,7 @@ export function buildDashboardUrl(state: DashboardNavState): string {
   if (state.view === "campaigns" && state.campaign) {
     if (state.campaign.type === "new") {
       url.searchParams.set("campaign", "new");
+      if (state.campaign.kind) url.searchParams.set("campaignKind", state.campaign.kind);
     } else if (state.campaign.type === "addCreators") {
       url.searchParams.set("campaign", "addCreators");
       url.searchParams.set("campaignId", state.campaign.id);

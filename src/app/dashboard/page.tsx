@@ -46,10 +46,18 @@ import { CreatorScripts } from "./CreatorScripts";
 import { CreatorContent } from "./CreatorContent";
 import { ScriptsManager } from "./ScriptsManager";
 import { CampaignsView } from "./CampaignsView";
+import { GiftingView } from "./GiftingView";
 import { AffiliateLinksView } from "./AffiliateLinksView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
 import { MyCreatorsView } from "./MyCreatorsView";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
+
+// Preview locale uniquement : /dashboard?as=creator. Lu avant que la navigation
+// ne réécrive l'URL, donc le tableau créateur reste accessible sans compte.
+const DEV_CREATOR_PREVIEW =
+  typeof window !== "undefined" &&
+  Boolean(DEV_BYPASS_PLAN) &&
+  new URLSearchParams(window.location.search).get("as") === "creator";
 import { CreatorsView } from "./CreatorsView";
 import { SplitHeaderActions, type SplitMenuItem } from "./SplitHeaderActions";
 import { OutreachHistorySection } from "./OutreachView";
@@ -82,6 +90,7 @@ import { BillingView } from "./BillingView";
 import { FeedbackView } from "./FeedbackView";
 import { NotesView } from "./NotesView";
 import { HomeOverviewView } from "./HomeOverviewView";
+import { CreatorDesk } from "./CreatorDesk";
 import { HelpCenterView } from "./HelpCenterView";
 import { NotificationsPanel } from "./NotificationsView";
 import {
@@ -154,6 +163,7 @@ const CREATOR_ALLOWED_VIEWS: View[] = [
   "feedback",
   "help",
   "planner",
+  "gifting",
 ];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
@@ -464,8 +474,17 @@ function DashboardPageContent() {
 
   useEffect(() => {
     if (DEV_BYPASS_PLAN) {
+      const asCreator = DEV_CREATOR_PREVIEW;
+      setIsCreator(asCreator);
       setUser({ id: "00000000-0000-0000-0000-000000000000" } as User);
-      setProfile({ full_name: "Preview", username: "preview", avatar_url: null, business_name: null, shopify_store: null, plan: DEV_BYPASS_PLAN });
+      setProfile({
+        full_name: asCreator ? "Creator" : "Preview",
+        username: asCreator ? "creator" : "preview",
+        avatar_url: null,
+        business_name: null,
+        shopify_store: null,
+        plan: DEV_BYPASS_PLAN,
+      });
       setLoading(false);
       return;
     }
@@ -971,6 +990,15 @@ function DashboardPageContent() {
         )}
         {keep("dashboard") && (
           <KeepAlivePane active={view === "dashboard"}>
+          {isCreator ? (
+            <CreatorDesk
+              userId={user?.id}
+              isMobile={isMobile}
+              fullName={profile?.full_name ?? null}
+              username={profile?.username ?? null}
+              onNavigate={goToSidebarItem}
+            />
+          ) : (
           <HomeOverviewView
             isMobile={isMobile}
             isCreator={isCreator}
@@ -982,6 +1010,7 @@ function DashboardPageContent() {
             activeCampaigns={sidebarCounts.activeCampaigns}
             onNavigate={goToSidebarItem}
           />
+          )}
           </KeepAlivePane>
         )}
         {keep("discovery") && (
@@ -1025,6 +1054,11 @@ function DashboardPageContent() {
             onUpgradeScale={handleUpgradeScale}
             userId={user?.id}
           />
+          </KeepAlivePane>
+        )}
+        {keep("gifting") && user && (
+          <KeepAlivePane active={view === "gifting"}>
+            <GiftingView isMobile={isMobile} isCreator={isCreator} plan={plan} onUpgrade={handleUpgradeBasic} />
           </KeepAlivePane>
         )}
         {keep("campaigns") && user && (
@@ -5159,6 +5193,14 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
       keywords: ["analytics", "sales", "ventes", "commissions", "performance", "stats"],
     },
     {
+      id: "gifting",
+      label: "Gifting",
+      view: "gifting",
+      section: "main",
+      iconKey: "campaigns",
+      keywords: ["gifting", "gift", "colis", "contrat", "wishlist", "ads", "expédition"],
+    },
+    {
       id: "content",
       label: "Content",
       view: "content",
@@ -5230,6 +5272,12 @@ function buildSidebarNavEntries(
       iconKey: "campaigns",
       keywords: ["campaign", "collaborations", "track it", "trackit"],
       children: [
+        {
+          id: "gifting",
+          label: "Gifting",
+          view: "gifting",
+          keywords: ["gifting", "gift", "colis", "contrat", "wishlist", "ads", "expédition"],
+        },
         {
           id: "invitations",
           label: lang === "fr" ? "Invitations" : "Invitations",

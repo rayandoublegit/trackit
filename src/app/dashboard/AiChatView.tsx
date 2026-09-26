@@ -20,6 +20,68 @@ import {
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
+const MINO_TYPE_LINES = {
+  en: [
+    "Which creator are we looking for today?",
+    "Manage my creators",
+    "Find influencers in any niche",
+    "Start an outreach",
+    "Track a campaign",
+    "Send a gift",
+    "See which video is due",
+    "Pay a creator",
+  ],
+  fr: [
+    "Quel créateur on cherche aujourd’hui ?",
+    "Gérer mes créateurs",
+    "Trouver des influenceurs, n’importe quelle niche",
+    "Lancer un outreach",
+    "Suivre une campagne",
+    "Envoyer un cadeau",
+    "Voir quelle vidéo est due",
+    "Payer un créateur",
+  ],
+};
+
+function MinoTypeLine({ fr }: { fr: boolean }) {
+  const lines = fr ? MINO_TYPE_LINES.fr : MINO_TYPE_LINES.en;
+  const [index, setIndex] = useState(0);
+  const [count, setCount] = useState(0);
+  const [deleting, setDeleting] = useState(false);
+  const full = lines[index] || "";
+
+  useEffect(() => {
+    const done = deleting ? count === 0 : count >= full.length;
+    const delay = done ? (deleting ? 420 : 2400) : deleting ? 48 : 92;
+    const timer = window.setTimeout(() => {
+      if (!deleting && count >= full.length) {
+        setDeleting(true);
+        return;
+      }
+      if (deleting && count === 0) {
+        setDeleting(false);
+        setIndex((i) => (i + 1) % lines.length);
+        return;
+      }
+      setCount((n) => n + (deleting ? -1 : 1));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [count, deleting, full.length, lines.length]);
+
+  const lastWordAt = full.lastIndexOf(" ") + 1;
+  const shown = full.slice(0, count);
+  const lead = shown.slice(0, Math.min(shown.length, lastWordAt));
+  const accent = shown.length > lastWordAt ? shown.slice(lastWordAt) : "";
+
+  return (
+    <h1 className="ai-hero__title ai-hero__type" aria-live="polite">
+      <span>{lead}</span>
+      {accent ? <span className="ai-hero__accent">{accent}</span> : null}
+      <span className="ai-hero__caret" aria-hidden />
+    </h1>
+  );
+}
+
 type AiCommand =
   | { action: "create_meeting"; title: string; when: string; withWho: string; say: string }
   | { action: "create_task"; title: string; due: string; say: string }
@@ -70,7 +132,6 @@ function matchCreator(list: PayableCreator[], query: string): PayableCreator | n
 export function AiChatView({
   isMobile,
   onNavigate,
-  displayName,
   userId,
   isCreator,
 }: {
@@ -97,10 +158,6 @@ export function AiChatView({
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  const firstName =
-    (displayName || "").trim().split(/\s+/)[0] ||
-    (fr ? "toi" : "there");
 
   const activeChat = useMemo(
     () => chats.find((c) => c.id === activeChatId) || null,
@@ -140,7 +197,7 @@ export function AiChatView({
       }
       const chat = loadMinoChats(userId).find((c) => c.id === id);
       if (!chat) return;
-      setChatMode(true);
+      setChatMode(chat.messages.length > 0);
       setMessages(chat.messages);
     };
     window.addEventListener(MINO_CHATS_EVENT, onChats);
@@ -283,7 +340,7 @@ export function AiChatView({
     setActiveMinoChatId(userId, chatId);
     setActiveChatId(chatId);
     setMessages(chat.messages);
-    setChatMode(true);
+    setChatMode(chat.messages.length > 0);
     setStatus("");
     setDropdownOpen(false);
     textareaRef.current?.focus();
@@ -294,7 +351,7 @@ export function AiChatView({
     setActiveChatId(chat.id);
     setMessages([]);
     setChats(loadMinoChats(userId));
-    setChatMode(true);
+    setChatMode(false);
     setStatus("");
     setDropdownOpen(false);
     setPrompt("");
@@ -465,10 +522,16 @@ export function AiChatView({
     const text = raw.trim();
     if (!text || chatBusy) return;
 
-    if (!chatMode) {
+    const startingSession = !chatMode && !!activeChatId && messages.length === 0;
+    if (
+      !chatMode &&
+      !startingSession &&
+      !(!isCreator && /\b(influenc|créat|creat|cherche|find|search|niche)\b/i.test(text))
+    ) {
       await executeAsk(text);
       return;
     }
+    setChatMode(true);
 
     let chatId = activeChatId;
     if (!chatId) {
@@ -523,8 +586,9 @@ export function AiChatView({
   const dropdownLabel = activeChat?.title || "Ask, Build, Create";
 
   return (
-    <div className={`ai-page${isMobile ? " is-mobile" : ""}${chatMode ? " is-chat" : ""}`}>
+    <div className={`ai-page${isMobile ? " is-mobile" : ""}${chatMode ? " is-chat" : ""}${messages.length > 0 ? " is-thread" : ""}`}>
       <div className="ai-hero">
+        {messages.length > 0 ? (
         <div className="ai-chat-head" ref={dropdownRef}>
           <button
             type="button"
@@ -561,24 +625,15 @@ export function AiChatView({
               )}
             </div>
           ) : null}
-          {chatMode ? (
-            <p className="ai-chat-head__sub">
-              <MinoCompanion size={16} motion="soft" />
-              {fr ? "Chat avec Mino" : "Chat with Mino"}
-            </p>
-          ) : null}
         </div>
+        ) : null}
 
-        {!chatMode ? (
+        {messages.length === 0 ? (
           <>
             <div className="ai-hero__mino">
-              <MinoCompanion size={52} />
+              <MinoCompanion size={84} />
             </div>
-            <h1 className="ai-hero__title">
-              {fr
-                ? `Que veux-tu demander à Mino aujourd’hui, ${firstName} ?`
-                : `What do you want to ask Mino today, ${firstName}?`}
-            </h1>
+            <MinoTypeLine fr={fr} />
           </>
         ) : null}
 

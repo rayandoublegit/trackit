@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { buildFeedPage, type FeedFilters } from "@/lib/discovery-feed";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;

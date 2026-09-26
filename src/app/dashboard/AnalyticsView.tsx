@@ -19,6 +19,7 @@ import { useAnalyticsAutoRefresh } from "@/lib/analytics-auto-refresh";
 import { SplitHeaderActions } from "./SplitHeaderActions";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { AddSalePanel } from "./AddSalePanel";
+import { EmptyStage } from "./EmptyStage";
 import {
   AnalyticsChartCard as ChartCard,
   AnalyticsSectionHeader,
@@ -374,20 +375,37 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
   }
 
   if (!HAS_DATA) {
+    const fr = lang === "fr";
     return (
       <>
-        <AnalyticsHeader isMobile={isMobile} lang={lang} range={range} setRange={setRange} compare={compare} setCompare={setCompare} analyticsData={analyticsData} />
-        <div style={{ padding: 80, textAlign: "center" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
-          <h2 style={{ fontSize: 22, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Pas de données pour l'instant." : "No data yet."}</h2>
-          <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 24px" }}>{lang === "fr" ? "Connectez votre boutique Shopify et lancez votre première campagne pour voir les analytiques ici." : "Connect your Shopify store and start your first campaign to see analytics here."}</p>
-          <button type="button" className="hero-cta-shopify" style={{ padding: "10px 22px", fontSize: 13 }} onClick={() => onConnectShopify?.()}>{lang === "fr" ? "Connecter Shopify →" : "Connect Shopify →"}</button>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={() => setShowAddSalePanel(true)} style={{ background: "none", border: "none", color: "#0047FF", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}>
-              {lang === "fr" ? "Ou ajoutez vos ventes manuellement" : "Or add your sales manually"}
-            </button>
-          </div>
-        </div>
+        <EmptyStage
+          isMobile={isMobile}
+          scene="analytics"
+          kicker={fr ? "Analytiques" : "Analytics"}
+          title={fr ? "Voyez ce qui convertit vraiment" : "See what actually converts"}
+          lead={
+            fr
+              ? "Revenu, commissions et performance des créateurs apparaissent dès qu’une boutique est connectée ou qu’une vente est ajoutée."
+              : "Revenue, commissions and creator performance show up once a store is connected or a sale is added."
+          }
+          steps={
+            fr
+              ? [
+                  { title: "Connectez la boutique", body: "Les commandes Shopify remontent toutes seules." },
+                  { title: "Ou ajoutez une vente", body: "À la main, rattachée à une campagne et un créateur." },
+                  { title: "Comparez", body: "Par créateur, par campagne, sur la période que vous choisissez." },
+                ]
+              : [
+                  { title: "Connect the store", body: "Shopify orders come in on their own." },
+                  { title: "Or add a sale", body: "By hand, tied to a campaign and a creator." },
+                  { title: "Compare", body: "By creator, by campaign, over the period you pick." },
+                ]
+          }
+          primaryLabel={fr ? "Connecter Shopify" : "Connect Shopify"}
+          onPrimary={() => onConnectShopify?.()}
+          secondaryLabel={fr ? "Ajouter une vente" : "Add a sale"}
+          onSecondary={() => setShowAddSalePanel(true)}
+        />
         <AddSalePanel
           open={showAddSalePanel}
           onClose={() => setShowAddSalePanel(false)}

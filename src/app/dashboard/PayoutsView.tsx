@@ -34,6 +34,7 @@ import {
   peekDashboardCache,
 } from "@/lib/dashboard-fetch-cache";
 import { PayItWelcomeLoading } from "./PayItWelcomeView";
+import { EmptyStage } from "./EmptyStage";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGateModalProps, runTierUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
@@ -2623,6 +2624,9 @@ export function PayoutsView({
   const [completedPayouts, setCompletedPayouts] = useState<CompletedPayout[]>([]);
   const [trackedSales, setTrackedSales] = useState<TrackedSale[]>([]);
   const [connectStatus, setConnectStatus] = useState<"none" | "pending" | "active">("none");
+  const [creatorsReady, setCreatorsReady] = useState(false);
+  const [salesReady, setSalesReady] = useState(false);
+  const [payoutsReady, setPayoutsReady] = useState(false);
 
   // Check Stripe Connect status on mount + after returning from onboarding
   useEffect(() => {
@@ -2649,7 +2653,10 @@ export function PayoutsView({
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setCreatorsReady(true);
+      return;
+    }
     let cancelled = false;
     const keyPath = `/api/creators-list?userId=${userId}`;
     const cached = peekDashboardCache<unknown[]>(`GET:${keyPath}`);
@@ -2659,7 +2666,10 @@ export function PayoutsView({
       .then((data) => {
         if (!cancelled && Array.isArray(data)) setCreators(data as any[]);
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => {
+        if (!cancelled) setCreatorsReady(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -2717,22 +2727,32 @@ export function PayoutsView({
   };
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setPayoutsReady(true);
+      return;
+    }
     const cached = peekDashboardCache<{ payouts?: CompletedPayout[] }>("GET:/api/payouts/history");
     if (cached?.payouts) setCompletedPayouts(cached.payouts);
-    void loadCompletedPayouts();
+    void loadCompletedPayouts().finally(() => setPayoutsReady(true));
   }, [userId]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setSalesReady(true);
+      return;
+    }
     let cancelled = false;
 
     const cachedSales = peekTrackedSales(userId);
     if (cachedSales) setTrackedSales(cachedSales);
 
     const loadSales = async () => {
-      const rows = await fetchTrackedSales(userId);
-      if (!cancelled) setTrackedSales(rows);
+      try {
+        const rows = await fetchTrackedSales(userId);
+        if (!cancelled) setTrackedSales(rows);
+      } finally {
+        if (!cancelled) setSalesReady(true);
+      }
     };
 
     void loadSales();
@@ -2907,6 +2927,47 @@ export function PayoutsView({
         <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Paiements" : "Payouts"} subtitle={lang === "fr" ? "Vos commissions et vos coordonnées de virement" : "Your commissions and payout details"} />
         <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
       </>
+    );
+  }
+
+  const payItBlank =
+    creatorsReady &&
+    salesReady &&
+    payoutsReady &&
+    creators.length === 0 &&
+    trackedSales.length === 0 &&
+    completedPayouts.length === 0;
+  if (payItBlank) {
+    const fr = lang === "fr";
+    return (
+      <EmptyStage
+        isMobile={isMobile}
+        scene="pay"
+        kicker="Pay it"
+        title={fr ? "Payez chaque créateur depuis ici" : "Pay every creator from here"}
+        lead={
+          fr
+            ? "Tant qu’aucune vente n’est trackée, cette page reste vide. Une campagne active suffit : les commissions se calculent, puis vous payez en un clic."
+            : "Until a sale is tracked, this page has nothing to show. One live campaign is enough — commissions calculate themselves, then you pay in one click."
+        }
+        steps={
+          fr
+            ? [
+                { title: "Une vente est trackée", body: "Shopify, ou une vente ajoutée à la main sur une campagne." },
+                { title: "La commission se calcule", body: "Chaque créateur voit ce qui lui est dû." },
+                { title: "Vous payez", body: "À la main, ou automatiquement le 1er du mois." },
+              ]
+            : [
+                { title: "A sale gets tracked", body: "From Shopify, or added by hand on a campaign." },
+                { title: "Commission calculates", body: "Each creator sees exactly what they’re owed." },
+                { title: "You pay", body: "Manually, or automatically on the 1st of the month." },
+              ]
+        }
+        primaryLabel={fr ? "Ouvrir les campagnes" : "Open campaigns"}
+        onPrimary={() => navigate({ view: "campaigns" })}
+        secondaryLabel={fr ? "Trouver des créateurs" : "Find creators"}
+        onSecondary={() => navigate({ view: "discovery" })}
+      />
     );
   }
 
@@ -3440,6 +3501,40 @@ export function TransactionsView({
         />
         <CreatorPaymentInfo userId={userId} isMobile={isMobile} />
       </>
+    );
+  }
+
+  if (!loading && rows.length === 0) {
+    const fr = lang === "fr";
+    return (
+      <EmptyStage
+        isMobile={isMobile}
+        scene="pay"
+        kicker={fr ? "Paiements" : "Payments"}
+        title={fr ? "L’historique se construit tout seul" : "The ledger fills itself"}
+        lead={
+          fr
+            ? "Chaque commission et chaque virement apparaîtra ici, groupé par mois. Il n’y a encore aucune transaction."
+            : "Every commission and every transfer will show up here, grouped by month. There are no transactions yet."
+        }
+        steps={
+          fr
+            ? [
+                { title: "Une vente crée une commission", body: "Elle apparaît dès qu’une commande est attribuée à un créateur." },
+                { title: "Un paiement la solde", body: "Le virement est enregistré à côté, avec la date et le montant." },
+                { title: "Vous filtrez", body: "Par type, par période, ou par créateur." },
+              ]
+            : [
+                { title: "A sale creates a commission", body: "It shows up as soon as an order is attributed to a creator." },
+                { title: "A payout settles it", body: "The transfer is recorded next to it, with the date and amount." },
+                { title: "You filter", body: "By type, by period, or by creator." },
+              ]
+        }
+        primaryLabel={fr ? "Ouvrir les campagnes" : "Open campaigns"}
+        onPrimary={() => navigate({ view: "campaigns" })}
+        secondaryLabel={fr ? "Retour à Pay it" : "Back to Pay it"}
+        onSecondary={() => navigate({ view: "payouts" })}
+      />
     );
   }
 

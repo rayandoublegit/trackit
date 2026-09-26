@@ -11,7 +11,7 @@ import {
 import { creatorMatchesFollowerRange } from "@/lib/discovery-follower-ranges";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+export const maxDuration = 60;
 
 function parseNonNegInt(raw: string | null): number | undefined {
   if (raw == null || raw === "") return undefined;
@@ -91,14 +91,7 @@ export async function GET(req: NextRequest) {
         .order("followers", { ascending: false, nullsFirst: false })
         .range(from, to);
 
-      if (error) {
-        return NextResponse.json({
-          creators: [],
-          hasMore: false,
-          count: 0,
-          error: error.message,
-        });
-      }
+      if (error) return NextResponse.json({ creators: [], hasMore: false, count: 0, error: error.message });
 
       const rows = (data ?? []) as unknown as Record<string, unknown>[];
       const hasMore = rows.length > limit;
@@ -140,14 +133,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { data, error } = await q;
-    if (error) {
-      return NextResponse.json({
-        creators: [],
-        hasMore: false,
-        count: 0,
-        error: error.message,
-      });
-    }
+    if (error) return NextResponse.json({ creators: [], hasMore: false, count: 0, error: error.message });
 
     let rows = (data ?? []) as unknown as Record<string, unknown>[];
     if (curatedRows.length) {

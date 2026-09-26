@@ -12,6 +12,7 @@ import {
   dismissWorkspaceSwitchVeil,
 } from "@/lib/workspace-switch";
 import { applyDashboardTabTitle, type BrandWorkspace } from "@/lib/workspaces";
+import { useDashboardTheme } from "../DashboardThemeProvider";
 import { WsIcon } from "./WorkspaceIcons";
 
 type WorkspaceSwitcherProps = {
@@ -21,6 +22,9 @@ type WorkspaceSwitcherProps = {
   delegated?: boolean;
   fallbackName: string;
   fallbackAvatarUrl?: string | null;
+  onOpenSettings?: () => void;
+  onOpenBilling?: () => void;
+  onSignOut?: () => void;
 };
 
 export function WorkspaceSwitcher({
@@ -30,6 +34,9 @@ export function WorkspaceSwitcher({
   delegated,
   fallbackName,
   fallbackAvatarUrl,
+  onOpenSettings,
+  onOpenBilling,
+  onSignOut,
 }: WorkspaceSwitcherProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -46,6 +53,8 @@ export function WorkspaceSwitcher({
   const [confirmTarget, setConfirmTarget] = useState<BrandWorkspace | null>(null);
 
   const fr = lang === "fr";
+  const { theme, setTheme } = useDashboardTheme();
+  const blackTheme = theme === "dark";
 
   // After the post-switch reload the boot veil (plain DOM, injected before
   // hydration) is still covering the page: hold it briefly so the dashboard
@@ -261,6 +270,56 @@ export function WorkspaceSwitcher({
             </button>
           )}
           {error && !createOpen ? <p className="ws-workspace-menu__error">{error}</p> : null}
+          {onOpenSettings || onOpenBilling || onSignOut ? <div className="ws-workspace-menu__sep" /> : null}
+          {onOpenSettings ? (
+            <button
+              type="button"
+              className="ws-workspace-menu__account"
+              onClick={() => {
+                setOpen(false);
+                onOpenSettings();
+              }}
+            >
+              {fr ? "Paramètres" : "Settings"}
+            </button>
+          ) : null}
+          <div className="ws-workspace-menu__theme">
+            <span>{fr ? "Thème noir" : "Black theme"}</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={blackTheme}
+              aria-label={fr ? "Thème noir" : "Black theme"}
+              className={`ws-switch${blackTheme ? " is-on" : ""}`}
+              onClick={() => setTheme(blackTheme ? "light" : "dark")}
+            >
+              <span />
+            </button>
+          </div>
+          {onOpenBilling ? (
+            <button
+              type="button"
+              className="ws-workspace-menu__account"
+              onClick={() => {
+                setOpen(false);
+                onOpenBilling();
+              }}
+            >
+              {fr ? "Facturation" : "Billing"}
+            </button>
+          ) : null}
+          {onSignOut ? (
+            <button
+              type="button"
+              className="ws-workspace-menu__account"
+              onClick={() => {
+                setOpen(false);
+                onSignOut();
+              }}
+            >
+              {fr ? "Déconnexion" : "Log out"}
+            </button>
+          ) : null}
         </div>
       )}
 

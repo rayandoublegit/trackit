@@ -30,14 +30,19 @@ import {
 } from "@/lib/whiteboard-storage";
 import { getWorkspaceEditId, setWorkspaceEditId } from "@/lib/workspace-edit";
 import {
+  createMinoChat,
+  createMinoFolder,
   deleteMinoChat,
   getActiveMinoChatId,
   loadMinoChats,
+  loadMinoFolders,
   MINO_ACTIVE_EVENT,
   MINO_CHATS_EVENT,
+  moveMinoChatToFolder,
   renameMinoChat,
   setActiveMinoChatId,
   type MinoChat,
+  type MinoFolder,
 } from "@/lib/mino-chats-storage";
 import { getLastCampaignId, rememberLastCampaignId } from "@/lib/last-campaign-storage";
 import { getLastCommunityId, rememberLastCommunityId } from "@/lib/last-community-storage";
@@ -121,6 +126,7 @@ export function WorkspaceShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchIndex, setSearchIndex] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [stripeConnectActive, setStripeConnectActive] = useState(false);
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [brandSpaces, setBrandSpaces] = useState<BrandWorkspace[]>([]);
@@ -143,10 +149,12 @@ export function WorkspaceShell({
   const [createWbOpen, setCreateWbOpen] = useState(false);
   const [newWbName, setNewWbName] = useState("");
   const [minoChats, setMinoChats] = useState<MinoChat[]>([]);
+  const [minoFolders, setMinoFolders] = useState<MinoFolder[]>([]);
   const [activeMinoId, setActiveMinoId] = useState<string | null>(null);
-  const [aiChatsOpen, setAiChatsOpen] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [campaignsNavOpen, setCampaignsNavOpen] = useState(true);
-  const [communitiesNavOpen, setCommunitiesNavOpen] = useState(true);
   const [communities, setCommunities] = useState<Array<{ id: string; name: string; avatar_url?: string | null }>>([]);
   const [activeCommunityId, setActiveCommunityId] = useState<string | null>(null);
   const [minoMenuId, setMinoMenuId] = useState<string | null>(null);
@@ -233,10 +241,6 @@ export function WorkspaceShell({
   }, [userId, activeCommunityId]);
 
   useEffect(() => {
-    if (view === "community" || activeCommunityId) setCommunitiesNavOpen(true);
-  }, [view, activeCommunityId]);
-
-  useEffect(() => {
     const onSelect = (e: Event) => {
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
       if (id) setActiveCommunityId(id);
@@ -314,6 +318,7 @@ export function WorkspaceShell({
   useEffect(() => {
     const refresh = () => {
       setMinoChats(loadMinoChats(userId));
+      setMinoFolders(loadMinoFolders(userId));
       setActiveMinoId(getActiveMinoChatId(userId));
     };
     refresh();
@@ -396,25 +401,17 @@ export function WorkspaceShell({
   const railItems: RailItem[] = useMemo(() => {
     if (isCreator) {
       return [
-        { space: "home", label: "Home", icon: "home" },
+        { space: "home", label: lang === "fr" ? "Accueil" : "Home", icon: "home" },
         { space: "infos", label: "Infos", icon: "list" },
-        { space: "hooks", label: "Hooks", icon: "list" },
-        { space: "community", label: lang === "fr" ? "Communauté" : "Community", icon: "users" },
         { space: "content", label: lang === "fr" ? "Contenu" : "Content", icon: "camera" },
-        { space: "analytics", label: "Track", icon: "analytics" },
         { space: "payit", label: "Pay it", icon: "payit" },
-        { space: "whiteboard", label: "Board", icon: "whiteboard" },
       ];
     }
     return [
       { space: "home", label: "Home", icon: "home" },
       { space: "findit", label: "Discover", icon: "findit" },
-      { space: "trackit", label: "Track", icon: "trackit" },
+      { space: "trackit", label: "Campaign", icon: "trackit" },
       { space: "payit", label: "Pay it", icon: "payit" },
-      { space: "planner", label: "Planner", icon: "planner" },
-      { space: "whiteboard", label: lang === "fr" ? "Board" : "Board", icon: "whiteboard" },
-      { space: "integrations", label: lang === "fr" ? "Integrations" : "Integrations", icon: "integrations" },
-      { space: "ai", label: "Mino", icon: "ai" },
     ];
   }, [isCreator, lang]);
 
@@ -422,7 +419,7 @@ export function WorkspaceShell({
     const map: Record<WorkspaceSpace, string> = {
       home: "Home",
       findit: "Discover",
-      trackit: "Track It",
+      trackit: lang === "fr" ? "Campagnes" : "Campaigns",
       payit: "Pay it",
       planner: lang === "fr" ? "Planner" : "Planner",
       notes: "Notes",
@@ -441,6 +438,13 @@ export function WorkspaceShell({
 
   const sideLinks: SideLink[] = useMemo(() => {
     if (isCreator) {
+      if (activeSpace === "home") {
+        return [
+          { id: "home", label: lang === "fr" ? "Aujourd’hui" : "Today", view: "dashboard", icon: "home" },
+          { id: "infos", label: "Infos", view: "infos", icon: "list" },
+          { id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" },
+        ];
+      }
       if (activeSpace === "payit") {
         return [
           { id: "payouts", label: "Pay it", view: "payouts", icon: "payit" },
@@ -483,6 +487,12 @@ export function WorkspaceShell({
       if (activeSpace === "content") {
         return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "content", icon: "camera" }];
       }
+      if (activeSpace === "trackit") {
+        return [
+          { id: "today", label: lang === "fr" ? "Aujourd’hui" : "Today", view: "dashboard", icon: "home" },
+          { id: "gifting", label: "Gifting", view: "gifting", icon: "invite" },
+        ];
+      }
       return [{ id: "home", label: "Home", view: "dashboard", icon: "home" }];
     }
 
@@ -503,11 +513,7 @@ export function WorkspaceShell({
           { id: "discovery", label: "Discovery", view: "discovery", icon: "findit" },
           { id: "findit-inbox", label: "Inbox", view: "findit-inbox", icon: "inbox" },
           { id: "creators", label: lang === "fr" ? "Gérer" : "Manage", view: "creators", icon: "users" },
-        ];
-      case "hooks":
-        return [
-          { id: "campaigns", label: lang === "fr" ? "Toutes les campagnes" : "All campaigns", view: "campaigns", icon: "grid" },
-          { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", icon: "invite" },
+          { id: "outreach", label: "Outreach", view: "outreach", icon: "invite" },
         ];
       case "community":
         return [
@@ -515,7 +521,7 @@ export function WorkspaceShell({
         ];
       case "trackit":
         return [
-          { id: "campaigns", label: lang === "fr" ? "Toutes les campagnes" : "All campaigns", view: "campaigns", icon: "grid" },
+          { id: "campaigns", label: lang === "fr" ? "Campagnes" : "Campaigns", view: "campaigns", icon: "grid" },
           { id: "invitations", label: lang === "fr" ? "Invitations" : "Invitations", view: "invitations", icon: "invite" },
         ];
       case "payit":
@@ -766,10 +772,83 @@ export function WorkspaceShell({
     if (isMobile) setSidebarOpen(false);
   };
 
-  const flushContent = view === "discovery" || view === "whiteboard" || view === "community";
+  const openMinoChat = (chatId: string) => {
+    setActiveMinoChatId(userId, chatId);
+    onNavigate("ai");
+    if (isMobile) setSidebarOpen(false);
+  };
+
+  const renderMinoChat = (chat: MinoChat) => {
+    const active = view === "ai" && activeMinoId === chat.id;
+    return (
+      <div
+        key={chat.id}
+        className={`ws-chat-row${active ? " is-active" : ""}`}
+        draggable={minoRenamingId !== chat.id}
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/mino-chat", chat.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMinoMenuId(chat.id);
+        }}
+      >
+        {minoRenamingId === chat.id ? (
+          <input
+            className="ws-chat-rename"
+            value={minoRenameDraft}
+            autoFocus
+            onChange={(e) => setMinoRenameDraft(e.target.value)}
+            onBlur={() => {
+              renameMinoChat(userId, chat.id, minoRenameDraft);
+              setMinoRenamingId(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                renameMinoChat(userId, chat.id, minoRenameDraft);
+                setMinoRenamingId(null);
+              }
+              if (e.key === "Escape") setMinoRenamingId(null);
+            }}
+          />
+        ) : (
+          <button type="button" className="ws-sidebar__link" onClick={() => openMinoChat(chat.id)}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{chat.title}</span>
+          </button>
+        )}
+        {minoMenuId === chat.id ? (
+          <div className="ws-chat-menu" ref={minoMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setMinoRenamingId(chat.id);
+                setMinoRenameDraft(chat.title);
+                setMinoMenuId(null);
+              }}
+            >
+              {lang === "fr" ? "Renommer" : "Rename"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                deleteMinoChat(userId, chat.id);
+                setMinoMenuId(null);
+              }}
+            >
+              {lang === "fr" ? "Supprimer" : "Delete"}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const flushContent = view === "discovery" || view === "whiteboard" || view === "community" || view === "ai";
+  const homeBrand = activeSpace === "home" && !isCreator;
 
   return (
-    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}${isCreator ? " is-creator" : ""}`}>
+    <div className={`ws-shell${sidebarOpen ? " is-sidebar-open" : ""}${isMobile ? " is-mobile" : ""}${isCreator ? " is-creator" : ""}${homeBrand ? " is-home" : ""}`}>
       <header className="ws-topbar">
           <button
             type="button"
@@ -787,6 +866,9 @@ export function WorkspaceShell({
               actorId={actorId || userId}
               delegated={workspaceDelegated}
               fallbackName={workspaceName}
+              onOpenSettings={() => onNavigate("settings")}
+              onOpenBilling={() => onNavigate("billing")}
+              onSignOut={onSignOut}
             />
           ) : (
             <button
@@ -803,6 +885,7 @@ export function WorkspaceShell({
             </button>
           )}
 
+          <div className="ws-search-cluster">
           <div className="ws-search-wrap" ref={searchRef}>
             <div className="ws-search-wrap__led" aria-hidden>
               <span className="ws-search-wrap__led-spin" />
@@ -892,19 +975,23 @@ export function WorkspaceShell({
               </div>
             ) : null}
           </div>
+          </div>
 
+          {!isCreator ? (
+            <div className="ws-feature-pills">
+              <button type="button" className="ws-feature-pill" onClick={openRecentCampaignAnalytics}>
+                <WsIcon name="analytics" size={16} />
+                <span>Stats</span>
+              </button>
+              <button type="button" className="ws-feature-pill" onClick={() => onNavigate("whiteboard")}>
+                <WsIcon name="whiteboard" size={16} />
+                <span>Whiteboard</span>
+              </button>
+            </div>
+          ) : null}
+
+          {isCreator ? (
           <div className="ws-top-actions">
-            <button
-              type="button"
-              className="ws-icon-btn"
-              data-tip="Notifications"
-              aria-label="Notifications"
-              onClick={() => onNavigate("notifications")}
-              style={isCreator ? { display: "none" } : undefined}
-            >
-              <WsIcon name="bell" size={17} />
-              {notificationUnread > 0 ? <span className="ws-dot" /> : null}
-            </button>
             <button
               type="button"
               className="ws-icon-btn ws-top-actions__desk"
@@ -1034,6 +1121,7 @@ export function WorkspaceShell({
               )}
             </div>
           </div>
+          ) : null}
       </header>
 
       {isMobile && sidebarOpen ? (
@@ -1056,28 +1144,72 @@ export function WorkspaceShell({
                   activeSpace === item.space ||
                   (!isCreator &&
                     item.space === "trackit" &&
-                    (activeSpace === "community" || activeSpace === "hooks" || activeSpace === "infos"))
+                    (activeSpace === "hooks" || activeSpace === "infos"))
                     ? " is-active"
                     : ""
                 }`}
-                onClick={() => goSpace(item.space)}
+                onClick={() => {
+                  setMoreOpen(false);
+                  goSpace(item.space);
+                }}
                 title={item.label}
               >
                 <WsIcon name={item.icon} size={18} />
                 <span>{item.label}</span>
               </button>
             ))}
-          </div>
-          <div className="ws-rail__foot">
             <button
               type="button"
-              className={`ws-rail__item${view === "help" ? " is-active" : ""}`}
-              onClick={() => onNavigate("help")}
-              title="Help"
+              className={`ws-rail__item${
+                moreOpen ||
+                activeSpace === "integrations" ||
+                activeSpace === "planner" ||
+                activeSpace === "community"
+                  ? " is-active"
+                  : ""
+              }`}
+              onClick={() => setMoreOpen((open) => !open)}
+              title={lang === "fr" ? "Plus" : "More"}
+              aria-expanded={moreOpen}
             >
-              <WsIcon name="help" size={18} />
-              <span>Help</span>
+              <WsIcon name="plus" size={18} />
+              <span>+</span>
             </button>
+            <div className={`ws-rail__fold${moreOpen ? " is-open" : ""}`}>
+              <div className="ws-rail__fold-inner">
+                {!isCreator && (
+                  <button
+                    type="button"
+                    className={`ws-rail__item${activeSpace === "integrations" ? " is-active" : ""}`}
+                    onClick={() => goSpace("integrations")}
+                    title={lang === "fr" ? "Intégrations" : "Integrations"}
+                  >
+                    <WsIcon name="integrations" size={18} />
+                    <span>Integrations</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`ws-rail__item${activeSpace === "planner" ? " is-active" : ""}`}
+                  onClick={() => goSpace("planner")}
+                  title="Planner"
+                >
+                  <WsIcon name="planner" size={18} />
+                  <span>Planner</span>
+                </button>
+                {!isCreator && (
+                  <button
+                    type="button"
+                    className={`ws-rail__item${activeSpace === "community" ? " is-active" : ""}`}
+                    onClick={() => goSpace("community")}
+                    title={lang === "fr" ? "Communauté" : "Community"}
+                  >
+                    <WsIcon name="users" size={18} />
+                    <span>Community</span>
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -1087,7 +1219,8 @@ export function WorkspaceShell({
               <div className="ws-sidebar__head">
                 <h2 className="ws-sidebar__title">{sideTitle}</h2>
               </div>
-              <div className="ws-sidebar__body">
+              <div className={`ws-sidebar__body${homeBrand ? " is-docked" : ""}`}>
+                <div className="ws-sidebar__scroll">
                 {activeSpace === "findit" && !isCreator ? (
                   <>
                     <div className="ws-sidebar__section">
@@ -1118,7 +1251,7 @@ export function WorkspaceShell({
                         {lang === "fr" ? "Gestion" : "Manage"}
                       </div>
                       {sideLinks
-                        .filter((link) => link.id === "findit-inbox" || link.id === "creators")
+                        .filter((link) => link.id === "findit-inbox" || link.id === "creators" || link.id === "outreach")
                         .map((link) => (
                           <button
                             key={link.id}
@@ -1139,142 +1272,36 @@ export function WorkspaceShell({
                         ))}
                     </div>
                   </>
-                ) : (activeSpace === "trackit" ||
-                    activeSpace === "hooks" ||
-                    activeSpace === "infos" ||
-                    activeSpace === "community") &&
-                  !isCreator ? (
+                ) : activeSpace === "trackit" && !isCreator ? (
                   <>
-                    {(
-                      [
-                        {
-                          id: "home",
-                          label: "Home",
-                          linkIds: ["campaigns"] as const,
-                        },
-                        {
-                          id: "creators",
-                          label: lang === "fr" ? "Créateurs" : "Creators",
-                          linkIds: ["invitations"] as const,
-                        },
-                      ] as const
-                    ).map((section, sectionIndex) => (
-                      <div
-                        key={section.id}
-                        className="ws-sidebar__section"
-                        style={sectionIndex > 0 ? { marginTop: 14 } : undefined}
-                      >
-                        <div className="ws-sidebar__section-label">{section.label}</div>
-                        {sideLinks
-                          .filter((link) => (section.linkIds as readonly string[]).includes(link.id))
-                          .map((link) => (
-                            <button
-                              key={link.id}
-                              type="button"
-                              className={`ws-sidebar__link${
-                                link.view === "campaigns"
-                                  ? view === "campaigns" && !activeCampaignId
-                                    ? " is-active"
-                                    : ""
-                                  : view === link.view
-                                    ? " is-active"
-                                    : ""
-                              }`}
-                              onMouseEnter={() => prefetchDashboardData(link.view)}
-                              onFocus={() => prefetchDashboardData(link.view)}
-                              onClick={() => {
-                                if (link.view === "campaigns") {
-                                  dashNav?.navigate({ view: "campaigns" });
-                                } else {
-                                  onNavigate(link.view);
-                                }
-                                if (isMobile) setSidebarOpen(false);
-                              }}
-                            >
-                              {link.icon ? <WsIcon name={link.icon} size={15} /> : null}
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {link.label}
-                              </span>
-                            </button>
-                          ))}
-                      </div>
-                    ))}
-                    <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
-                      <div className="ws-sidebar__section-label">
-                        {lang === "fr" ? "Gestion" : "Manage"}
-                      </div>
+                    <button
+                      type="button"
+                      className="ws-sidebar__link"
+                      onClick={() => {
+                        dashNav?.navigate({ view: "campaigns", campaign: { type: "new" } });
+                        if (isMobile) setSidebarOpen(false);
+                      }}
+                      style={{
+                        marginBottom: 14,
+                        background: "var(--ws-text)",
+                        color: "var(--ws-bg)",
+                        borderRadius: 999,
+                        justifyContent: "center",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <WsIcon name="plus" size={15} />
+                      <span>{lang === "fr" ? "Créer une campagne" : "Create a campaign"}</span>
+                    </button>
+                    <div className="ws-sidebar__section">
                       <button
                         type="button"
-                        className={`ws-sidebar__link${view === "brand-content" ? " is-active" : ""}`}
-                        onMouseEnter={() => prefetchDashboardData("brand-content")}
-                        onFocus={() => prefetchDashboardData("brand-content")}
-                        onClick={() => {
-                          onNavigate("brand-content");
-                          if (isMobile) setSidebarOpen(false);
-                        }}
-                      >
-                        <WsIcon name="camera" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {lang === "fr" ? "Contenu" : "Content"}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`ws-sidebar__link${view === "rpm" ? " is-active" : ""}`}
-                        onMouseEnter={() => prefetchDashboardData("rpm")}
-                        onFocus={() => prefetchDashboardData("rpm")}
-                        onClick={() => {
-                          onNavigate("rpm");
-                          if (isMobile) setSidebarOpen(false);
-                        }}
-                      >
-                        <WsIcon name="analytics" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          RPM
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`ws-sidebar__link${
-                          view === "infos" || view === "infos-howto" || view === "infos-pricing" ? " is-active" : ""
-                        }`}
-                        onMouseEnter={() => prefetchDashboardData("infos")}
-                        onFocus={() => prefetchDashboardData("infos")}
-                        onClick={() => {
-                          onNavigate("infos");
-                          if (isMobile) setSidebarOpen(false);
-                        }}
-                      >
-                        <WsIcon name="list" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {lang === "fr" ? "Informations" : "Information"}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`ws-sidebar__link${view === "hooks" ? " is-active" : ""}`}
-                        onMouseEnter={() => prefetchDashboardData("hooks")}
-                        onFocus={() => prefetchDashboardData("hooks")}
-                        onClick={() => {
-                          onNavigate("hooks");
-                          if (isMobile) setSidebarOpen(false);
-                        }}
-                      >
-                        <WsIcon name="list" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          Hooks
-                        </span>
-                      </button>
-                    </div>
-                    <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
-                      <div className="ws-sidebar__section-label">Tracking</div>
-                      <button
-                        type="button"
-                        className={`ws-sidebar__link ws-sidebar__link--toggle${
-                          campaignsNavOpen ? " is-expanded" : ""
-                        }${activeCampaignId ? " is-active" : ""}`}
+                        className={`ws-sidebar__link ws-sidebar__link--toggle${campaignsNavOpen ? " is-expanded" : ""}${activeCampaignId ? " is-active" : ""}`}
                         aria-expanded={campaignsNavOpen}
-                        onClick={() => setCampaignsNavOpen((open) => !open)}
+                        onClick={() => {
+                          setCampaignsNavOpen((open) => !open);
+                          dashNav?.navigate({ view: "campaigns" });
+                        }}
                       >
                         <WsIcon name="campaign" size={15} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
@@ -1284,25 +1311,15 @@ export function WorkspaceShell({
                           <WsIcon name="chevron" size={12} />
                         </span>
                       </button>
-                      {campaignsNavOpen ? (
-                        <div className="ws-sidebar__nest">
-                          {campaigns.length === 0 ? (
-                            <button
-                              type="button"
-                              className="ws-sidebar__link"
-                              onClick={() => {
-                                dashNav?.navigate({ view: "campaigns", campaign: { type: "new" } });
-                                if (isMobile) setSidebarOpen(false);
-                              }}
-                            >
-                              <WsIcon name="plus" size={15} />
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {lang === "fr" ? "Créer une campagne" : "Create a campaign"}
-                              </span>
-                            </button>
-                          ) : (
-                            <>
-                              {campaigns.map((c) => (
+                      <div className={`ws-sidebar__fold${campaignsNavOpen ? " is-open" : ""}`}>
+                        <div className="ws-sidebar__fold-inner">
+                          <div className="ws-sidebar__nest">
+                            {campaigns.length === 0 ? (
+                              <p style={{ margin: "8px 12px", color: "var(--ws-text-muted)", fontSize: 13 }}>
+                                {lang === "fr" ? "Aucune campagne" : "No campaigns"}
+                              </p>
+                            ) : (
+                              campaigns.map((c) => (
                                 <button
                                   key={c.id}
                                   type="button"
@@ -1320,125 +1337,28 @@ export function WorkspaceShell({
                                     {c.name}
                                   </span>
                                 </button>
-                              ))}
-                              <button
-                                type="button"
-                                className="ws-sidebar__link ws-spaces-new"
-                                onClick={() => {
-                                  dashNav?.navigate({ view: "campaigns", campaign: { type: "new" } });
-                                  if (isMobile) setSidebarOpen(false);
-                                }}
-                              >
-                                <WsIcon name="plus" size={15} />
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {lang === "fr" ? "Nouvelle campagne" : "New campaign"}
-                                </span>
-                              </button>
-                            </>
-                          )}
+                              ))
+                            )}
+                          </div>
                         </div>
-                      ) : null}
+                      </div>
+                    </div>
+                    <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
                       <button
                         type="button"
-                        className={`ws-sidebar__link${view === "links" ? " is-active" : ""}`}
-                        onMouseEnter={() => prefetchDashboardData("links")}
-                        onFocus={() => prefetchDashboardData("links")}
+                        className={`ws-sidebar__link${view === "brand-content" ? " is-active" : ""}`}
+                        onMouseEnter={() => prefetchDashboardData("brand-content")}
+                        onFocus={() => prefetchDashboardData("brand-content")}
                         onClick={() => {
-                          onNavigate("links");
+                          onNavigate("brand-content");
                           if (isMobile) setSidebarOpen(false);
                         }}
                       >
-                        <WsIcon name="list" size={15} />
+                        <WsIcon name="camera" size={15} />
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {lang === "fr" ? "Liens" : "Links"}
+                          {lang === "fr" ? "Contenu" : "Content"}
                         </span>
                       </button>
-                      <button
-                        type="button"
-                        className={`ws-sidebar__link ws-sidebar__link--toggle${
-                          communitiesNavOpen ? " is-expanded" : ""
-                        }${view === "community" ? " is-active" : ""}`}
-                        aria-expanded={communitiesNavOpen}
-                        onClick={() => {
-                          setCommunitiesNavOpen(true);
-                          onNavigate("community");
-                          if (isMobile) setSidebarOpen(false);
-                        }}
-                      >
-                        <WsIcon name="users" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {lang === "fr" ? "Communauté" : "Community"}
-                        </span>
-                        <span
-                          className="ws-sidebar__chev"
-                          aria-hidden
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setCommunitiesNavOpen((open) => !open);
-                          }}
-                        >
-                          <WsIcon name="chevron" size={12} />
-                        </span>
-                      </button>
-                      {communitiesNavOpen ? (
-                        <div className="ws-sidebar__nest">
-                          {communities.length === 0 ? (
-                            <button
-                              type="button"
-                              className="ws-sidebar__link"
-                              onClick={() => {
-                                onNavigate("community");
-                                window.dispatchEvent(new CustomEvent("trackit:community-create"));
-                                if (isMobile) setSidebarOpen(false);
-                              }}
-                            >
-                              <WsIcon name="plus" size={15} />
-                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {lang === "fr" ? "Créer une communauté" : "Create a community"}
-                              </span>
-                            </button>
-                          ) : (
-                            <>
-                              {communities.map((c) => (
-                                <button
-                                  key={c.id}
-                                  type="button"
-                                  className={`ws-sidebar__link${
-                                    view === "community" && activeCommunityId === c.id ? " is-active" : ""
-                                  }`}
-                                  onClick={() => {
-                                    rememberLastCommunityId(userId, c.id);
-                                    setActiveCommunityId(c.id);
-                                    onNavigate("community");
-                                    window.dispatchEvent(
-                                      new CustomEvent("trackit:community-select", { detail: { id: c.id } }),
-                                    );
-                                    if (isMobile) setSidebarOpen(false);
-                                  }}
-                                >
-                                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                    {c.name}
-                                  </span>
-                                </button>
-                              ))}
-                              <button
-                                type="button"
-                                className="ws-sidebar__link ws-spaces-new"
-                                onClick={() => {
-                                  onNavigate("community");
-                                  window.dispatchEvent(new CustomEvent("trackit:community-create"));
-                                  if (isMobile) setSidebarOpen(false);
-                                }}
-                              >
-                                <WsIcon name="plus" size={15} />
-                                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                  {lang === "fr" ? "Nouvelle communauté" : "New community"}
-                                </span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      ) : null}
                     </div>
                   </>
                 ) : activeSpace === "whiteboard" ? (
@@ -1663,11 +1583,9 @@ export function WorkspaceShell({
                       ))
                     )}
                   </div>
-                ) : (
+                ) : activeSpace === "home" ? null : (
                 <div className="ws-sidebar__section">
-                  {activeSpace === "home" ? (
-                    <div className="ws-sidebar__section-label">Home</div>
-                  ) : activeSpace === "infos" ? (
+                  {activeSpace === "infos" ? (
                     <div className="ws-sidebar__section-label">
                       {lang === "fr" ? "Informations" : "Information"}
                     </div>
@@ -1690,288 +1608,132 @@ export function WorkspaceShell({
                 </div>
                 )}
 
-                {activeSpace === "home" ? (
-                  <>
-                    {!isCreator ? (
-                    <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
-                      <div className="ws-sidebar__section-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <span>Spaces</span>
-                        {!workspaceDelegated ? (
-                          <button
-                            type="button"
-                            className="ws-spaces-add"
-                            title={lang === "fr" ? "Nouveau workspace" : "New workspace"}
-                            onClick={() => {
-                              setCreateSpaceOpen((v) => !v);
-                              setCreateSpaceError("");
-                              setNewSpaceName("");
-                            }}
-                          >
-                            +
-                          </button>
-                        ) : null}
-                      </div>
-                      {(brandSpaces.length
-                        ? brandSpaces
-                        : [
-                            {
-                              id: userId || "default",
-                              owner_id: userId || "",
-                              name: workspaceName,
-                              avatar_url: null,
-                            },
-                          ]
-                      ).map((space) => {
-                        const isCurrent = (activeSpaceId || userId) === space.id;
-                        const editingThis =
-                          view === "workspace" &&
-                          (getWorkspaceEditId() || activeSpaceId || userId) === space.id;
-                        const letter = String(space.name || "W").slice(0, 1).toUpperCase();
-                        return (
-                          <button
-                            key={space.id}
-                            type="button"
-                            className={`ws-sidebar__link${
-                              editingThis || (view !== "workspace" && isCurrent) ? " is-active" : ""
-                            }`}
-                            disabled={spacesBusy}
-                            onClick={() => {
-                              setWorkspaceEditId(space.id);
-                              onNavigate("workspace");
-                              if (isMobile) setSidebarOpen(false);
-                            }}
-                            onMouseEnter={(e) => openSpaceHover(space, e.currentTarget)}
-                            onMouseLeave={scheduleSpaceHoverClose}
-                            onFocus={(e) => openSpaceHover(space, e.currentTarget)}
-                            onBlur={scheduleSpaceHoverClose}
-                          >
-                            {space.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={space.avatar_url}
-                                alt=""
-                                style={{
-                                  width: 16,
-                                  height: 16,
-                                  borderRadius: 4,
-                                  objectFit: "cover",
-                                  flexShrink: 0,
-                                }}
-                              />
-                            ) : (
-                              <span
-                                className="ws-workspace-mark"
-                                style={{ width: 16, height: 16, fontSize: 9, borderRadius: 4 }}
-                                aria-hidden
-                              >
-                                {letter}
-                              </span>
-                            )}
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {space.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                      {!workspaceDelegated ? (
-                        createSpaceOpen ? (
-                          <div className="ws-spaces-create">
-                            <input
-                              value={newSpaceName}
-                              onChange={(e) => setNewSpaceName(e.target.value)}
-                              placeholder={lang === "fr" ? "Nom du workspace" : "Workspace name"}
-                              autoFocus
-                              maxLength={60}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void createBrandSpace();
-                                if (e.key === "Escape") setCreateSpaceOpen(false);
-                              }}
-                            />
-                            <div className="ws-spaces-create__actions">
-                              <button type="button" onClick={() => setCreateSpaceOpen(false)}>
-                                {lang === "fr" ? "Annuler" : "Cancel"}
-                              </button>
-                              <button
-                                type="button"
-                                className="is-primary"
-                                disabled={!newSpaceName.trim() || spacesBusy}
-                                onClick={() => void createBrandSpace()}
-                              >
-                                {spacesBusy ? "…" : lang === "fr" ? "Créer" : "Create"}
-                              </button>
-                            </div>
-                            {createSpaceError ? <p className="ws-spaces-create__error">{createSpaceError}</p> : null}
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            className="ws-sidebar__link ws-spaces-new"
-                            onClick={() => {
-                              setCreateSpaceOpen(true);
-                              setCreateSpaceError("");
-                              setNewSpaceName("");
-                            }}
-                          >
-                            <WsIcon name="plus" size={15} />
-                            <span>{lang === "fr" ? "New Space" : "New Space"}</span>
-                          </button>
-                        )
-                      ) : null}
-                    </div>
-                    ) : null}
-
-                    <div className="ws-sidebar__section" style={{ marginTop: 14 }}>
-                      <div className="ws-sidebar__section-label">Mino</div>
+                {activeSpace === "home" && !isCreator ? (
+                  <div className="ws-sidebar__section">
+                    <button
+                      type="button"
+                      className="ws-sidebar__link"
+                      onClick={() => {
+                        createMinoChat(userId, lang === "fr");
+                        onNavigate("ai");
+                        if (isMobile) setSidebarOpen(false);
+                      }}
+                    >
+                      <WsIcon name="plus" size={15} />
+                      <span>{lang === "fr" ? "Nouveau chat" : "New chat"}</span>
+                    </button>
+                    <div className="ws-sidebar__section-label" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 14 }}>
+                      <span>{lang === "fr" ? "Dossiers" : "Folders"}</span>
                       <button
                         type="button"
-                        className={`ws-sidebar__link${view === "ai" ? " is-active" : ""}`}
+                        className="ws-spaces-add"
+                        title={lang === "fr" ? "Nouveau dossier" : "New folder"}
                         onClick={() => {
-                          setAiChatsOpen((v) => !v);
-                          if (activeMinoId) {
-                            setActiveMinoChatId(userId, activeMinoId);
-                          }
-                          onNavigate("ai");
-                          if (isMobile) setSidebarOpen(false);
+                          setCreateFolderOpen((v) => !v);
+                          setNewFolderName("");
                         }}
                       >
-                        <WsIcon name="ai" size={15} />
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                          {minoChats.find((c) => c.id === activeMinoId)?.title || "Ask, Build, Create"}
-                        </span>
-                        <span style={{ opacity: 0.55, fontSize: 11 }}>{aiChatsOpen || view === "ai" ? "▴" : "▾"}</span>
+                        +
                       </button>
-                      {aiChatsOpen || view === "ai" ? (
-                        <>
+                    </div>
+                    {createFolderOpen ? (
+                      <div className="ws-spaces-create">
+                        <input
+                          value={newFolderName}
+                          onChange={(e) => setNewFolderName(e.target.value)}
+                          placeholder={lang === "fr" ? "Nom du dossier" : "Folder name"}
+                          autoFocus
+                          maxLength={40}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              createMinoFolder(userId, newFolderName);
+                              setCreateFolderOpen(false);
+                              setNewFolderName("");
+                            }
+                            if (e.key === "Escape") setCreateFolderOpen(false);
+                          }}
+                        />
+                        <div className="ws-spaces-create__actions">
+                          <button type="button" onClick={() => setCreateFolderOpen(false)}>
+                            {lang === "fr" ? "Annuler" : "Cancel"}
+                          </button>
                           <button
                             type="button"
-                            className="ws-sidebar__link ws-spaces-new"
+                            className="is-primary"
+                            disabled={!newFolderName.trim()}
                             onClick={() => {
-                              setActiveMinoChatId(userId, null);
-                              setAiChatsOpen(true);
-                              onNavigate("ai");
-                              if (isMobile) setSidebarOpen(false);
+                              createMinoFolder(userId, newFolderName);
+                              setCreateFolderOpen(false);
+                              setNewFolderName("");
                             }}
                           >
-                            <WsIcon name="plus" size={15} />
-                            <span>{lang === "fr" ? "Nouvelle conversation" : "New chat"}</span>
+                            {lang === "fr" ? "Créer" : "Create"}
                           </button>
-                          {minoChats.map((c) => {
-                            const active = view === "ai" && activeMinoId === c.id;
-                            const renaming = minoRenamingId === c.id;
-                            return (
-                              <div
-                                key={c.id}
-                                className={`ws-sidebar__link-row${active ? " is-active" : ""}`}
-                                ref={minoMenuId === c.id ? minoMenuRef : undefined}
-                              >
-                                {renaming ? (
-                                  <form
-                                    className="mino-sidebar-rename"
-                                    onSubmit={(e) => {
-                                      e.preventDefault();
-                                      const next = renameMinoChat(userId, c.id, minoRenameDraft);
-                                      if (next) {
-                                        setMinoRenamingId(null);
-                                        setMinoRenameDraft("");
-                                      }
-                                    }}
-                                  >
-                                    <input
-                                      value={minoRenameDraft}
-                                      onChange={(e) => setMinoRenameDraft(e.target.value)}
-                                      autoFocus
-                                      maxLength={60}
-                                      aria-label={lang === "fr" ? "Renommer le chat" : "Rename chat"}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Escape") {
-                                          e.preventDefault();
-                                          setMinoRenamingId(null);
-                                          setMinoRenameDraft("");
-                                        }
-                                      }}
-                                      onBlur={() => {
-                                        renameMinoChat(userId, c.id, minoRenameDraft);
-                                        setMinoRenamingId(null);
-                                        setMinoRenameDraft("");
-                                      }}
-                                    />
-                                  </form>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className={`ws-sidebar__link${active ? " is-active" : ""}`}
-                                    onClick={() => {
-                                      setActiveMinoChatId(userId, c.id);
-                                      setAiChatsOpen(true);
-                                      setMinoMenuId(null);
-                                      onNavigate("ai");
-                                      if (isMobile) setSidebarOpen(false);
-                                    }}
-                                  >
-                                    <WsIcon name="ai" size={15} />
-                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      {c.title}
-                                    </span>
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  className={`mino-sidebar-more${minoMenuId === c.id ? " is-open" : ""}`}
-                                  title={lang === "fr" ? "Options" : "Options"}
-                                  aria-haspopup="menu"
-                                  aria-expanded={minoMenuId === c.id}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMinoMenuId((id) => (id === c.id ? null : c.id));
-                                  }}
-                                >
-                                  <WsIcon name="more" size={14} />
-                                </button>
-                                {minoMenuId === c.id ? (
-                                  <div className="mino-sidebar-menu" role="menu">
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setMinoMenuId(null);
-                                        setMinoRenamingId(c.id);
-                                        setMinoRenameDraft(c.title);
-                                      }}
-                                    >
-                                      {lang === "fr" ? "Renommer" : "Rename"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="is-danger"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setMinoMenuId(null);
-                                        const ok = window.confirm(
-                                          lang === "fr"
-                                            ? `Supprimer « ${c.title} » ?`
-                                            : `Delete “${c.title}”?`,
-                                        );
-                                        if (!ok) return;
-                                        if (minoRenamingId === c.id) {
-                                          setMinoRenamingId(null);
-                                          setMinoRenameDraft("");
-                                        }
-                                        deleteMinoChat(userId, c.id);
-                                      }}
-                                    >
-                                      {lang === "fr" ? "Supprimer" : "Delete"}
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </>
-                      ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                    {minoFolders.map((folder) => (
+                      <div
+                        key={folder.id}
+                        className={`ws-chat-folder${dropTarget === folder.id ? " is-drop" : ""}`}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "move";
+                          setDropTarget(folder.id);
+                        }}
+                        onDragLeave={() => setDropTarget((current) => (current === folder.id ? null : current))}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const chatId = e.dataTransfer.getData("text/mino-chat");
+                          if (chatId) moveMinoChatToFolder(userId, chatId, folder.id);
+                          setDropTarget(null);
+                        }}
+                      >
+                        <div className="ws-chat-folder__name">{folder.name}</div>
+                        {minoChats.filter((chat) => chat.folderId === folder.id).map(renderMinoChat)}
+                      </div>
+                    ))}
+                    <div
+                      className={`ws-chat-loose${dropTarget === "loose" ? " is-drop" : ""}`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDropTarget("loose");
+                      }}
+                      onDragLeave={() => setDropTarget((current) => (current === "loose" ? null : current))}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const chatId = e.dataTransfer.getData("text/mino-chat");
+                        if (chatId) moveMinoChatToFolder(userId, chatId, null);
+                        setDropTarget(null);
+                      }}
+                    >
+                      <div className="ws-sidebar__section-label" style={{ marginTop: 14 }}>
+                        {lang === "fr" ? "Chats" : "Chats"}
+                      </div>
+                      {minoChats.filter((chat) => !chat.folderId).length === 0 ? (
+                        <p className="ws-chat-empty">{lang === "fr" ? "Aucun chat" : "No chats yet"}</p>
+                      ) : (
+                        minoChats.filter((chat) => !chat.folderId).map(renderMinoChat)
+                      )}
                     </div>
-                  </>
+                  </div>
+                ) : null}
+                </div>
+                {homeBrand ? (
+                  <div className="ws-sidebar__dock">
+                    <button
+                      type="button"
+                      className={`ws-sidebar__dock-item${view === "outreach" ? " is-active" : ""}`}
+                      onClick={() => {
+                        onNavigate("outreach");
+                        if (isMobile) setSidebarOpen(false);
+                      }}
+                    >
+                      <WsIcon name="invite" size={14} />
+                      <span>Outreach</span>
+                    </button>
+                  </div>
                 ) : null}
               </div>
             </aside>

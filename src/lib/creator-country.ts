@@ -80,7 +80,8 @@ export function resolveCreatorCountryCode(
     if (LOCATION_TO_CODE[loc]) return LOCATION_TO_CODE[loc];
     if (loc.length === 2 && LOCATION_TO_CODE[loc]) return LOCATION_TO_CODE[loc];
     for (const [key, code] of Object.entries(LOCATION_TO_CODE)) {
-      if (loc.includes(key)) return code;
+      if (key.length <= 2) continue;
+      if (loc === key || loc.includes(key)) return code;
     }
   }
 

@@ -37,6 +37,7 @@ export const DASHBOARD_VIEWS = [
   "ai",
   "meetings",
   "tasks",
+  "gifting",
 ] as const;
 
 /** Primary icon-rail spaces in the ClickUp-style workspace shell. */
@@ -64,7 +65,6 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
   switch (view) {
     case "dashboard":
     case "notifications":
-    case "outreach":
     case "tasks":
     case "ai":
     case "workspace":
@@ -73,6 +73,7 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
     case "findit-inbox":
     case "creators":
     case "my-creators":
+    case "outreach":
       return "findit";
     case "campaigns":
     case "brand-content":
@@ -81,6 +82,7 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
     case "affiliates":
     case "invitations":
     case "automation":
+    case "gifting":
       return "trackit";
     case "payouts":
     case "balance":
@@ -123,7 +125,7 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
 export function defaultViewForSpace(space: WorkspaceSpace): DashboardView {
   switch (space) {
     case "home":
-      return "notifications";
+      return "ai";
     case "findit":
       return "discovery";
     case "trackit":
