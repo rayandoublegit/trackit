@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { selectProfileRow } from "@/lib/profile-row";
 import {
   HAYTAM_WORKSPACE_ADMIN_EMAIL,
   normalizeWorkspaceEmail,
@@ -15,17 +16,17 @@ export async function getAuthRedirectPath(
     return "/dashboard";
   }
 
-  const { data } = await supabase
-    .from("profiles")
-    .select("onboarding_completed, account_type")
-    .eq("id", userId)
-    .maybeSingle();
+  const data = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
+    supabase,
+    userId,
+    ["onboarding_completed", "account_type"]
+  );
 
-  // Les créateurs invités ont leur propre espace, jamais l'onboarding marque.
   if (data && data.account_type === "creator") {
     return "/dashboard?view=analytics";
   }
-  if (!data || data.onboarding_completed === false) {
+  const finished = data?.onboarding_completed === true || user?.user_metadata?.onboarding_completed === true;
+  if (!finished) {
     return "/onboarding";
   }
   return "/dashboard";

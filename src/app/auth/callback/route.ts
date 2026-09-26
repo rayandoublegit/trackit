@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { selectProfileRow } from "@/lib/profile-row";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -32,11 +33,10 @@ export async function GET(request: Request) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("onboarding_completed, account_type")
-          .eq("id", user.id)
-          .maybeSingle();
+        const profile = await selectProfileRow<{
+          onboarding_completed?: boolean | null;
+          account_type?: string | null;
+        }>(supabase, user.id, ["onboarding_completed", "account_type"]);
         if (creatorOnly) {
           if (profile?.account_type === "creator") {
             return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
@@ -47,7 +47,9 @@ export async function GET(request: Request) {
         if (profile && profile.account_type === "creator") {
           return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
         }
-        if (!profile || profile.onboarding_completed === false) {
+        const finished =
+          profile?.onboarding_completed === true || user.user_metadata?.onboarding_completed === true;
+        if (!finished) {
           return NextResponse.redirect(`${origin}/onboarding`);
         }
         return NextResponse.redirect(`${origin}/dashboard`);

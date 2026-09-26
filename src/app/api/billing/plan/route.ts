@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { resolvePlanFromCheckout } from "@/lib/checkout";
 import { compAccess, grantsAccessWithoutStripe, planFromProfile } from "@/lib/comp-plan";
+import { selectProfileRow } from "@/lib/profile-row";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -55,11 +56,11 @@ export async function GET(request: NextRequest) {
   }
   const workspace = await resolveWorkspaceContextForUser(user);
 
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("plan, subscription_active, subscription_status")
-    .eq("id", workspace.ownerId)
-    .maybeSingle();
+  const profile = await selectProfileRow<{
+    plan?: string | null;
+    subscription_active?: boolean | null;
+    subscription_status?: string | null;
+  }>(admin, workspace.ownerId, ["plan", "subscription_active", "subscription_status"]);
 
   const access = compAccess(profile?.subscription_status);
   let plan: PlanTier = planFromProfile(profile?.plan, profile?.subscription_status);

@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { grantsAccessWithoutStripe, whopMembershipId } from "@/lib/comp-plan";
+import { updateProfileRow } from "@/lib/profile-row";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { cancelWhopMembership } from "@/lib/whop";
@@ -90,10 +91,12 @@ export async function POST(request: NextRequest) {
     if (!grantsAccessWithoutStripe(profile?.subscription_status) && !String(profile?.subscription_status ?? "").startsWith("whop:")) {
       return NextResponse.json({ ok: true, ignored: "not whop" });
     }
-    await db
-      .from("profiles")
-      .update({ plan: "free", subscription_active: false, subscription_status: "inactive" })
-      .eq("id", userId);
+    const saved = await updateProfileRow(db, userId, {
+      plan: "free",
+      subscription_active: false,
+      subscription_status: "inactive",
+    });
+    if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 500 });
     return NextResponse.json({ ok: true });
   }
 
@@ -109,14 +112,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { error } = await db
-    .from("profiles")
-    .update({
-      plan: meta.plan,
-      subscription_active: true,
-      subscription_status: meta.membershipId ? `whop:${meta.membershipId}` : "whop:active",
-    })
-    .eq("id", userId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const saved = await updateProfileRow(db, userId, {
+    plan: meta.plan,
+    subscription_active: true,
+    subscription_status: meta.membershipId ? `whop:${meta.membershipId}` : "whop:active",
+  });
+  if (!saved.ok) return NextResponse.json({ error: saved.error }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

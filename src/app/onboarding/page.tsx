@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { selectProfileRow } from "@/lib/profile-row";
 import { useLang } from "@/lib/useLang";
 import { PricingPlans } from "@/components/PricingPlans";
 import {
@@ -182,17 +183,14 @@ export default function OnboardingPage() {
     void s.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.replace("/auth?mode=signup"); return; }
 
+      if (user.user_metadata?.onboarding_completed === true) {
+        clearOnboardingDraft();
+        router.replace("/dashboard");
+        return;
+      }
+
       try {
-        let profile: { onboarding_completed?: boolean } | null = null;
-        for (let i = 0; i < 5; i++) {
-          const { data } = await s
-            .from("profiles")
-            .select("onboarding_completed")
-            .eq("id", user.id)
-            .maybeSingle();
-          if (data) { profile = data as { onboarding_completed?: boolean }; break; }
-          await new Promise((res) => setTimeout(res, 600));
-        }
+        const profile = await selectProfileRow<{ onboarding_completed?: boolean }>(s, user.id, ["onboarding_completed"]);
 
         if (profile?.onboarding_completed) {
           clearOnboardingDraft();

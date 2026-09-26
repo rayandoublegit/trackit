@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { selectProfileRow, updateProfileRow } from "@/lib/profile-row";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
@@ -241,14 +242,27 @@ export function SettingsView({
       email: actorEmail ?? authUser.email,
     } as User;
     setUser(actorUser);
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name, username, avatar_url, business_name, business_type, niche, shopify_store_url")
-      .eq("id", actorUserId)
-      .maybeSingle();
+    const data = await selectProfileRow<ProfileRow>(supabase, actorUserId, [
+      "full_name",
+      "username",
+      "avatar_url",
+      "business_name",
+      "business_type",
+      "niche",
+      "shopify_store_url",
+    ]);
     if (data) {
-      // Keep the DB URL as source of truth — never overwrite with a short-lived signed URL.
-      setProfile({ ...data });
+      const meta = authUser.user_metadata ?? {};
+      setProfile({
+        full_name: data.full_name ?? null,
+        username: data.username ?? null,
+        avatar_url: data.avatar_url ?? null,
+        business_name: data.business_name ?? null,
+        business_type: data.business_type ?? (typeof meta.business_type === "string" ? meta.business_type : null),
+        niche: data.niche ?? (typeof meta.niche === "string" ? meta.niche : null),
+        shopify_store_url:
+          data.shopify_store_url ?? (typeof meta.shopify_store_url === "string" ? meta.shopify_store_url : null),
+      });
     }
   };
 
@@ -502,19 +516,26 @@ function GeneralSettings({
     if (!supabase) return;
     setSaving(true);
     setMessage(null);
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        business_name: storeName.trim(),
-        shopify_store_url: websiteUrl.trim() || null,
-        business_type: LABEL_TO_BUSINESS_TYPE[businessType] ?? "other",
-        niche: niche.trim(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", userId);
+    const saved = await updateProfileRow(supabase, userId, {
+      business_name: storeName.trim(),
+      shopify_store_url: websiteUrl.trim() || null,
+      business_type: LABEL_TO_BUSINESS_TYPE[businessType] ?? "other",
+      niche: niche.trim(),
+      updated_at: new Date().toISOString(),
+    });
+    if (supabase) {
+      await supabase.auth.updateUser({
+        data: {
+          business_name: storeName.trim(),
+          shopify_store_url: websiteUrl.trim() || null,
+          business_type: LABEL_TO_BUSINESS_TYPE[businessType] ?? "other",
+          niche: niche.trim(),
+        },
+      });
+    }
     setSaving(false);
-    if (error) {
-      setMessage({ text: error.message, type: "error" });
+    if (!saved.ok) {
+      setMessage({ text: saved.error, type: "error" });
       return;
     }
     // Keep the active brand-workspace name in sync with Settings.

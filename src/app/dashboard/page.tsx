@@ -86,6 +86,7 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { planFromProfile } from "@/lib/comp-plan";
+import { selectProfileRow } from "@/lib/profile-row";
 import { BalanceView, LiveSalesFeed, PayoutsView, TransactionsView } from "./PayoutsView";
 import { BillingView } from "./BillingView";
 import { FeedbackView } from "./FeedbackView";
@@ -293,11 +294,27 @@ function DashboardPageContent() {
 
   const reloadProfile = useCallback(async (userId: string) => {
     if (!supabase) return;
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type, onboarding_completed")
-      .eq("id", userId)
-      .maybeSingle();
+    const profileData = await selectProfileRow<{
+      full_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+      business_name: string | null;
+      plan: string | null;
+      subscription_status: string | null;
+      shopify_store: string | null;
+      account_type: string | null;
+      onboarding_completed: boolean | null;
+    }>(supabase, userId, [
+      "full_name",
+      "username",
+      "avatar_url",
+      "business_name",
+      "plan",
+      "subscription_status",
+      "shopify_store",
+      "account_type",
+      "onboarding_completed",
+    ]);
     if (!profileData) return;
     setAvatarBroken(false);
     setProfile((prev) => ({
@@ -600,12 +617,18 @@ function DashboardPageContent() {
 
         let profileData = workspaceContext?.ownerProfile ?? null;
         if (!profileData) {
-          const result = await supabase
-            .from("profiles")
-            .select("id, onboarding_completed, full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type")
-            .eq("id", workspaceId)
-            .maybeSingle();
-          profileData = result.data as WorkspaceProfile | null;
+          profileData = await selectProfileRow<WorkspaceProfile>(supabase, workspaceId, [
+            "id",
+            "onboarding_completed",
+            "full_name",
+            "username",
+            "avatar_url",
+            "business_name",
+            "plan",
+            "subscription_status",
+            "shopify_store",
+            "account_type",
+          ]);
         }
 
         if (cancelled) return;

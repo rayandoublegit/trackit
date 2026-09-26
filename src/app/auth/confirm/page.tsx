@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { selectProfileRow } from "@/lib/profile-row";
 
 function ConfirmContent() {
   const router = useRouter();
@@ -30,12 +31,16 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
+            client,
+            user.id,
+            ["onboarding_completed", "account_type"]
+          );
           if (profile && profile.account_type === "creator") {
             router.replace("/dashboard?view=analytics");
             return;
           }
-          if (!profile || profile.onboarding_completed === false) {
+          if (!profile || (profile.onboarding_completed !== true && user.user_metadata?.onboarding_completed !== true)) {
             router.replace("/onboarding");
           } else {
             router.replace("/dashboard");
@@ -59,12 +64,16 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
+            client,
+            user.id,
+            ["onboarding_completed", "account_type"]
+          );
           if (profile && profile.account_type === "creator") {
             router.replace("/dashboard?view=analytics");
             return;
           }
-          if (!profile || profile.onboarding_completed === false) {
+          if (!profile || (profile.onboarding_completed !== true && user.user_metadata?.onboarding_completed !== true)) {
             router.replace("/onboarding");
           } else {
             router.replace("/dashboard");
@@ -81,12 +90,16 @@ function ConfirmContent() {
         setStatus("success");
         const { data: { user } } = await client.auth.getUser();
         if (user) {
-          const { data: profile } = await client.from("profiles").select("onboarding_completed, account_type").eq("id", user.id).maybeSingle();
+          const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
+            client,
+            user.id,
+            ["onboarding_completed", "account_type"]
+          );
           if (profile && profile.account_type === "creator") {
             router.replace("/dashboard?view=analytics");
             return;
           }
-          if (!profile || profile.onboarding_completed === false) {
+          if (!profile || (profile.onboarding_completed !== true && user.user_metadata?.onboarding_completed !== true)) {
             router.replace("/onboarding");
           } else {
             router.replace("/dashboard");

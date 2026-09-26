@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { selectProfileRow } from "@/lib/profile-row";
 import {
   HAYTAM_WORKSPACE_ADMIN_EMAIL,
   normalizeWorkspaceEmail,
@@ -50,12 +51,21 @@ async function findAuthUserByEmail(email: string): Promise<User | null> {
 async function loadProfile(userId: string): Promise<WorkspaceProfile | null> {
   const admin = getSupabaseAdmin();
   if (!admin) return null;
-  const { data } = await admin
-    .from("profiles")
-    .select(PROFILE_SELECT)
-    .eq("id", userId)
-    .maybeSingle();
-  return (data as WorkspaceProfile | null) ?? null;
+  const data = await selectProfileRow<Partial<WorkspaceProfile>>(admin, userId, PROFILE_SELECT.split(", "));
+  if (!data) return null;
+  return {
+    id: userId,
+    full_name: null,
+    username: null,
+    avatar_url: null,
+    business_name: null,
+    shopify_store: null,
+    plan: null,
+    subscription_status: null,
+    account_type: null,
+    onboarding_completed: null,
+    ...data,
+  };
 }
 
 /**

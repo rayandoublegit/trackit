@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { upsertProfileRow } from "@/lib/profile-row";
 import {
   isValidProfileUsername,
   normalizeProfileUsername,
@@ -36,27 +37,45 @@ export async function saveOnboardingProfileAdmin(
     return { ok: false, error: "Invalid username" };
   }
 
-  const { error: profileErr } = await admin.from("profiles").upsert(
-    {
-      id: userId,
-      email: email ?? null,
-      full_name: payload.fullName.trim(),
-      username,
-      avatar_url: payload.avatarUrl ?? null,
-      business_name: payload.businessName.trim(),
-      business_type: payload.businessType,
-      niche: payload.niche.trim(),
-      revenue_range: payload.revenueRange,
-      referral_source: payload.referralSource ?? null,
-      shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
-      onboarding_completed: markComplete,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
+  const saved = await upsertProfileRow(admin, {
+    id: userId,
+    email: email ?? null,
+    full_name: payload.fullName.trim(),
+    username,
+    avatar_url: payload.avatarUrl ?? null,
+    business_name: payload.businessName.trim(),
+    business_type: payload.businessType,
+    niche: payload.niche.trim(),
+    revenue_range: payload.revenueRange,
+    referral_source: payload.referralSource ?? null,
+    shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
+    onboarding_completed: markComplete,
+    updated_at: new Date().toISOString(),
+  });
+  if (!saved.ok) return saved;
 
-  if (profileErr) {
-    return { ok: false, error: profileErr.message };
+  try {
+    const { data: existingUser } = await admin.auth.admin.getUserById(userId);
+    const previous =
+      existingUser.user?.user_metadata && typeof existingUser.user.user_metadata === "object"
+        ? existingUser.user.user_metadata
+        : {};
+    await admin.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        ...previous,
+        onboarding_completed: markComplete,
+        full_name: payload.fullName.trim(),
+        username,
+        business_name: payload.businessName.trim(),
+        business_type: payload.businessType,
+        niche: payload.niche.trim(),
+        revenue_range: payload.revenueRange,
+        referral_source: payload.referralSource ?? null,
+        shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
+      },
+    });
+  } catch {
+    /* Profile row is the source of truth when those columns exist. */
   }
 
   if (payload.referralSource) {
@@ -74,7 +93,12 @@ export async function saveOnboardingProfileAdmin(
       },
       { onConflict: "user_id" }
     );
-    if (referralErr) {
+    const referralMessage = referralErr?.message ?? "";
+    const referralMissing =
+      referralMessage.includes("schema cache") ||
+      referralMessage.includes("does not exist") ||
+      referralMessage.includes("Could not find");
+    if (referralErr && !referralMissing) {
       return { ok: false, error: referralErr.message };
     }
   }
