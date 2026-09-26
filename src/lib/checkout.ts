@@ -104,8 +104,16 @@ export async function upgradeToPlanTier(
     return;
   }
 
-  if (res.status === 401 || (res.status === 404 && payload.noSubscription)) {
-    await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual));
+  if (
+    res.status === 401 ||
+    (res.status === 404 && payload.noSubscription) ||
+    payload.error === "Not configured"
+  ) {
+    await handleUpgrade(getPriceIdForPlanTier(tier, lang, annual) || "", {
+      tier: tier === "basic" ? "growth" : tier,
+      currency: checkoutCurrencyFromLang(lang),
+      annual,
+    });
     return;
   }
 

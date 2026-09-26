@@ -78,6 +78,17 @@ export async function createWhopCheckout(input: {
   return url.startsWith("http") ? url : `https://whop.com${url}`;
 }
 
-export async function cancelWhopMembership(membershipId: string): Promise<void> {
-  await whopFetch(`/memberships/${membershipId}/cancel`, { method: "POST", body: JSON.stringify({}) });
+export async function cancelWhopMembership(
+  membershipId: string,
+  mode: "immediate" | "at_period_end" = "immediate"
+): Promise<void> {
+  await whopFetch(`/memberships/${membershipId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({ cancellation_mode: mode }),
+  });
+}
+
+export async function whopMembershipManageUrl(membershipId: string): Promise<string | null> {
+  const json = await whopFetch(`/memberships/${membershipId}`);
+  return typeof json.manage_url === "string" && json.manage_url ? json.manage_url : null;
 }

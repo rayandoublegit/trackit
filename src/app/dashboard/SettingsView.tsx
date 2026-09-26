@@ -929,6 +929,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const [invoicesLoading, setInvoicesLoading] = useState(true);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
   const [nextBillingDate, setNextBillingDate] = useState<number | null>(null);
+  const [billingProvider, setBillingProvider] = useState<"stripe" | "whop" | "gift" | "comp">("stripe");
 
   const currency = checkoutCurrencyFromLang(lang);
   const periodShort = lang === "fr" ? "/mois" : "/mo";
@@ -937,10 +938,16 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
     let cancelled = false;
     void fetch("/api/billing/plan", { credentials: "include" })
       .then(async (res) => {
-        const data = (await res.json()) as { plan?: string; billingInterval?: BillingInterval | null; error?: string };
+        const data = (await res.json()) as {
+          plan?: string;
+          billingInterval?: BillingInterval | null;
+          billingProvider?: "stripe" | "whop" | "gift" | "comp";
+          error?: string;
+        };
         if (!res.ok) throw new Error(data.error ?? "Failed to load plan");
         if (!cancelled) {
           setCurrentPlan(normalizePlan(data.plan));
+          if (data.billingProvider) setBillingProvider(data.billingProvider);
           if (data.billingInterval === "year") setAnnual(true);
         }
       })
@@ -1010,6 +1017,25 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
   const isPaidPlan = currentPlan !== "free";
 
   const openBillingPortal = async () => {
+    if (billingProvider === "whop") {
+      setPortalLoading(true);
+      try {
+        const res = await fetch("/api/billing/whop-portal", { method: "POST", credentials: "include" });
+        const data = (await res.json()) as { url?: string; error?: string };
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        alert(data.error ?? (lang === "fr" ? "Impossible d'ouvrir Whop." : "Could not open Whop billing."));
+      } catch (err) {
+        console.error("Whop portal error:", err);
+        alert(lang === "fr" ? "Impossible d'ouvrir Whop." : "Could not open Whop billing.");
+      } finally {
+        setPortalLoading(false);
+      }
+      return;
+    }
+
     const client = supabase;
     setPortalLoading(true);
     try {
@@ -1214,7 +1240,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
             </div>
           )}
         </div>
-        {!planLoading && isPaidPlan && (
+        {!planLoading && isPaidPlan && (billingProvider === "stripe" || billingProvider === "whop") && (
           <button
             type="button"
             onClick={() => void openBillingPortal()}
@@ -1236,9 +1262,13 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
               ? lang === "fr"
                 ? "Ouverture du portail..."
                 : "Opening portal..."
-              : lang === "fr"
-                ? "Annuler l'abonnement"
-                : "Cancel subscription"}
+              : billingProvider === "whop"
+                ? lang === "fr"
+                  ? "Gérer sur Whop"
+                  : "Manage on Whop"
+                : lang === "fr"
+                  ? "Annuler l'abonnement"
+                  : "Cancel subscription"}
           </button>
         )}
       </Card>

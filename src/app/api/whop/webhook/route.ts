@@ -27,16 +27,26 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
 }
 
+function membershipIdFrom(data: Record<string, unknown>): string {
+  const nested = asRecord(data.membership);
+  const candidates = [nested?.id, data.membership_id, data.id];
+  for (const candidate of candidates) {
+    const id = String(candidate ?? "");
+    if (id.startsWith("mem_")) return id;
+  }
+  return "";
+}
+
 function readMeta(data: Record<string, unknown>): { userId: string; plan: PlanTier; email: string; membershipId: string } {
-  const meta = asRecord(data.metadata) ?? asRecord(asRecord(data.plan)?.metadata) ?? {};
-  const user = asRecord(data.user) ?? asRecord(data.member);
-  const membership = asRecord(data.membership);
-  const planRaw = String(meta.plan ?? data.plan_id ?? "");
+  const planRecord = asRecord(data.plan);
+  const meta = asRecord(data.metadata) ?? asRecord(planRecord?.metadata) ?? {};
+  const user = asRecord(data.user);
+  const planRaw = String(meta.plan ?? "");
   return {
     userId: String(meta.userId ?? meta.user_id ?? ""),
     plan: normalizePlan(planRaw === "growth" ? "basic" : planRaw),
     email: String(meta.email ?? user?.email ?? ""),
-    membershipId: String(membership?.id ?? data.membership_id ?? data.id ?? ""),
+    membershipId: membershipIdFrom(data),
   };
 }
 

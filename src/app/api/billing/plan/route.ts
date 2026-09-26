@@ -145,6 +145,15 @@ export async function GET(request: NextRequest) {
     console.error("billing/plan:", err);
   }
 
+  const status = (profile?.subscription_status ?? "").toLowerCase();
+  const billingProvider = status.startsWith("whop:")
+    ? "whop"
+    : status === "comped"
+      ? "comp"
+      : status.startsWith("gifted:")
+        ? "gift"
+        : "stripe";
+
   return NextResponse.json({
     plan,
     billingInterval,
@@ -152,5 +161,6 @@ export async function GET(request: NextRequest) {
     priceId,
     currency,
     hasActiveSubscription,
+    billingProvider,
   });
 }
