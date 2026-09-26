@@ -35,6 +35,7 @@ import {
 } from "@/lib/dashboard-fetch-cache";
 import { PayItWelcomeLoading } from "./PayItWelcomeView";
 import { EmptyStage } from "./EmptyStage";
+import { hideSamples, SAMPLE_PAYOUT_CREATORS, SAMPLE_PAYOUTS, SAMPLE_SALES, samplesHidden } from "@/lib/sample-workspace";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import { UpgradeModal } from "./UpgradeModal";
 import { getGateModalProps, runTierUpgrade, type GateFeatureKey } from "@/lib/plan-marketing";
@@ -2627,6 +2628,7 @@ export function PayoutsView({
   const [creatorsReady, setCreatorsReady] = useState(false);
   const [salesReady, setSalesReady] = useState(false);
   const [payoutsReady, setPayoutsReady] = useState(false);
+  const [samplesOff, setSamplesOff] = useState(false);
 
   // Check Stripe Connect status on mount + after returning from onboarding
   useEffect(() => {
@@ -2639,6 +2641,10 @@ export function PayoutsView({
       .then((r) => r.json())
       .then((d) => { if (d?.status) setConnectStatus(d.status); })
       .catch(() => {});
+  }, [userId]);
+
+  useEffect(() => {
+    setSamplesOff(samplesHidden(userId));
   }, [userId]);
 
   useEffect(() => {
@@ -2798,10 +2804,21 @@ export function PayoutsView({
       .reduce((sum, s) => sum + (Number(s.order_amount) || 0), 0);
   }, [activeCreator?.id, trackedSales]);
 
-  const payoutOverviewStats = useMemo(
-    () => computePayoutOverviewStats(creators, completedPayouts, trackedSales),
-    [creators, completedPayouts, trackedSales],
-  );
+  const payoutOverviewStats = useMemo(() => {
+    const sample =
+      creatorsReady &&
+      salesReady &&
+      payoutsReady &&
+      creators.length === 0 &&
+      trackedSales.length === 0 &&
+      completedPayouts.length === 0 &&
+      !samplesOff;
+    return computePayoutOverviewStats(
+      sample ? SAMPLE_PAYOUT_CREATORS : creators,
+      sample ? SAMPLE_PAYOUTS : completedPayouts,
+      sample ? SAMPLE_SALES : trackedSales,
+    );
+  }, [creators, completedPayouts, trackedSales, creatorsReady, salesReady, payoutsReady, samplesOff]);
 
   const handleManualCreatorPay = (creator: (typeof creators)[number]) => {
     if (!canUseManualPayouts(plan as PlanTier)) {
@@ -2937,7 +2954,7 @@ export function PayoutsView({
     creators.length === 0 &&
     trackedSales.length === 0 &&
     completedPayouts.length === 0;
-  if (payItBlank) {
+  if (payItBlank && samplesOff) {
     const fr = lang === "fr";
     return (
       <EmptyStage
@@ -3041,6 +3058,11 @@ export function PayoutsView({
     />
   ) : null;
 
+  const showSamples = payItBlank && !samplesOff;
+  const viewCreators = showSamples ? SAMPLE_PAYOUT_CREATORS : creators;
+  const viewSales = showSamples ? SAMPLE_SALES : trackedSales;
+  const viewPayouts = showSamples ? SAMPLE_PAYOUTS : completedPayouts;
+
   return (
     <>
       {upgradeFeature && (
@@ -3054,21 +3076,41 @@ export function PayoutsView({
         />
       )}
       <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)" }}>
-      <PayoutsPageHeader isMobile={isMobile} title={lang === "fr" ? "Aperçu" : "Overview"} />
+      <PayoutsPageHeader
+        isMobile={isMobile}
+        title={lang === "fr" ? "Aperçu" : "Overview"}
+        trailing={
+          showSamples ? (
+            <button
+              type="button"
+              className="sample-clear"
+              onClick={() => {
+                hideSamples(userId);
+                setSamplesOff(true);
+              }}
+            >
+              {lang === "fr" ? "Supprimer l’exemple" : "Remove sample"}
+            </button>
+          ) : null
+        }
+      />
       <div style={{ padding: isMobile ? "12px 16px 16px" : "16px 40px 40px", position: "relative", background: "var(--ws-bg)" }}>
         <PayoutsOverviewPanel
           stats={payoutOverviewStats}
-          sales={trackedSales}
-          completedPayouts={completedPayouts}
+          sales={viewSales}
+          completedPayouts={viewPayouts}
           lang={lang}
           isMobile={isMobile}
         />
 
         <CreatorsPayoutTable
-          creators={creators}
+          creators={viewCreators}
           lang={lang}
           isMobile={isMobile}
-          onSelectCreator={openCreatorPayout}
+          onSelectCreator={(creator) => {
+            if (showSamples) return;
+            openCreatorPayout(creator);
+          }}
         />
 
         <LiveSalesFeed isMobile={isMobile} userId={userId} />

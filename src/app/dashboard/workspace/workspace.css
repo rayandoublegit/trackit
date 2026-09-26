@@ -1890,6 +1890,7 @@ body.dashboard-page {
   font-weight: 550;
   letter-spacing: -0.02em;
   text-align: left;
+  text-decoration: none;
   padding: 8px 10px;
   border-radius: 10px;
   cursor: pointer;
@@ -7123,6 +7124,8 @@ body.dashboard-page {
 .es-primary{border:none;background:var(--ws-btn);color:var(--ws-btn-text)}
 .es-secondary{border:1px solid var(--ws-border);background:transparent;color:var(--ws-text)}
 .es-secondary:hover{background:var(--ws-hover)}
+.sample-clear{flex-shrink:0;border:1px solid var(--ws-border);background:var(--ws-surface);color:var(--ws-text);border-radius:999px;padding:8px 14px;font:inherit;font-size:12.5px;font-weight:600;letter-spacing:-.01em;cursor:pointer}
+.sample-clear:hover{background:var(--ws-hover)}
 .es-tab-empty{min-height:360px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:16px;padding:28px;border:1px dashed var(--ws-border);border-radius:16px;background:var(--ws-surface-2)}
 .es-tab-empty p{margin:0;max-width:46ch;font-size:14.5px;line-height:1.5;color:var(--ws-text-muted)}
 .es-scene{position:relative;min-height:420px;border-radius:22px;border:1px solid var(--ws-border);background:radial-gradient(120% 80% at 80% 0%,color-mix(in srgb,var(--ws-accent) 10%,transparent),transparent 55%),var(--ws-surface-2);overflow:hidden;display:flex;flex-direction:column;justify-content:space-between;padding:28px 26px 24px}

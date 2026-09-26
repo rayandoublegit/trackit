@@ -85,6 +85,7 @@ import {
   normalizePlan,
   type PlanTier,
 } from "@/lib/plan-limits";
+import { planFromProfile } from "@/lib/comp-plan";
 import { BalanceView, LiveSalesFeed, PayoutsView, TransactionsView } from "./PayoutsView";
 import { BillingView } from "./BillingView";
 import { FeedbackView } from "./FeedbackView";
@@ -294,7 +295,7 @@ function DashboardPageContent() {
     if (!supabase) return;
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("full_name, username, avatar_url, business_name, plan, shopify_store, account_type, onboarding_completed")
+      .select("full_name, username, avatar_url, business_name, plan, subscription_status, shopify_store, account_type, onboarding_completed")
       .eq("id", userId)
       .maybeSingle();
     if (!profileData) return;
@@ -305,7 +306,7 @@ function DashboardPageContent() {
       avatar_url: profileData.avatar_url,
       business_name: profileData.business_name,
       shopify_store: profileData.shopify_store ?? prev?.shopify_store ?? null,
-      plan: normalizePlan(profileData.plan),
+      plan: planFromProfile(profileData.plan, profileData.subscription_status),
     }));
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (authUser) {
@@ -634,7 +635,7 @@ function DashboardPageContent() {
           avatar_url: profileData.avatar_url,
           business_name: displayBusinessName,
           shopify_store: profileData.shopify_store ?? null,
-          plan: normalizePlan(profileData.plan),
+          plan: planFromProfile(profileData.plan, profileData.subscription_status),
         });
         writeDashboardBootstrap(
           buildBootstrapFromProfile(workspaceUser, {

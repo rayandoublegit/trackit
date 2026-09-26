@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { checkoutPlanMetadata } from "@/lib/checkout";
+import { COMPED_STATUS, giftedStatus, isCompStatus } from "@/lib/comp-plan";
 import { normalizePlan } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
@@ -174,6 +175,119 @@ export async function POST(req: NextRequest) {
       const message = err instanceof Error ? err.message : "Stripe error";
       return NextResponse.json({ error: message }, { status: 500 });
     }
+  }
+
+  // --- Poser un plan sans Stripe (ou aligner un abo Stripe existant) ---
+  if (action === "setPlan" || action === "giftMonth" || action === "revokeComp") {
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    const stripe = stripeKey ? new Stripe(stripeKey) : null;
+
+    if (action === "revokeComp") {
+      if (target.stripe_subscription_id && stripe) {
+        return NextResponse.json(
+          { error: "Cet utilisateur a un abonnement Stripe. Annule-le depuis les actions Stripe." },
+          { status: 400 }
+        );
+      }
+      const { error } = await db
+        .from("profiles")
+        .update({
+          plan: "free",
+          subscription_active: false,
+          subscription_status: "inactive",
+        })
+        .eq("id", userId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, userId, action, plan: "free" });
+    }
+
+    const requested = normalizePlan(action === "giftMonth" ? value || "pro" : value);
+    if (action === "setPlan" && requested === "free") {
+      if (target.stripe_subscription_id && stripe) {
+        try {
+          await stripe.subscriptions.cancel(target.stripe_subscription_id);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Stripe error";
+          return NextResponse.json({ error: message }, { status: 500 });
+        }
+      }
+      const { error } = await db
+        .from("profiles")
+        .update({
+          plan: "free",
+          subscription_active: false,
+          subscription_status: "inactive",
+          stripe_subscription_id: null,
+        })
+        .eq("id", userId);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, userId, action, plan: "free" });
+    }
+
+    if (requested === "free") {
+      return NextResponse.json({ error: "Choisis un plan payant a offrir." }, { status: 400 });
+    }
+
+    if (action === "giftMonth" && target.stripe_subscription_id && stripe) {
+      try {
+        const coupon = await stripe.coupons.create({
+          percent_off: 100,
+          duration: "repeating",
+          duration_in_months: 1,
+          name: "Trackit — 1 month gifted",
+        });
+        await stripe.subscriptions.update(target.stripe_subscription_id, {
+          discounts: [{ coupon: coupon.id }],
+        });
+        await db
+          .from("profiles")
+          .update({ subscription_status: giftedStatus(30) })
+          .eq("id", userId);
+        return NextResponse.json({ ok: true, userId, action, plan: requested, stripe: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Stripe error";
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
+    if (action === "setPlan" && target.stripe_subscription_id && stripe) {
+      const newPriceId = priceIdForPlan(requested);
+      if (!newPriceId) {
+        return NextResponse.json({ error: "Price Stripe manquant pour ce plan." }, { status: 400 });
+      }
+      try {
+        const sub = await stripe.subscriptions.retrieve(target.stripe_subscription_id);
+        const currentItem = sub.items.data[0];
+        if (!currentItem) {
+          return NextResponse.json({ error: "Abonnement sans item." }, { status: 400 });
+        }
+        await stripe.subscriptions.update(target.stripe_subscription_id, {
+          items: [{ id: currentItem.id, price: newPriceId }],
+          proration_behavior: "create_prorations",
+          metadata: { ...sub.metadata, userId: target.id, plan: checkoutPlanMetadata(requested) },
+        });
+        const refreshed = await stripe.subscriptions.retrieve(target.stripe_subscription_id, {
+          expand: ["items.data.price"],
+        });
+        await syncFromStripeSubscription(db, stripe, refreshed, userId);
+        return NextResponse.json({ ok: true, userId, action, plan: requested, stripe: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Stripe error";
+        return NextResponse.json({ error: message }, { status: 500 });
+      }
+    }
+
+    const status = action === "giftMonth" ? giftedStatus(30) : COMPED_STATUS;
+    const { error } = await db
+      .from("profiles")
+      .update({
+        plan: requested,
+        subscription_active: true,
+        subscription_status: status,
+      })
+      .eq("id", userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, userId, action, plan: requested, comp: !isCompStatus(status) ? false : true });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

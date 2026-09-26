@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PLAN_PRICES } from "@/lib/plan-marketing";
+import { compAccess } from "@/lib/comp-plan";
+import { normalizePlan } from "@/lib/plan-limits";
 
 const BLUE = "#0047FF";
 
@@ -172,6 +174,7 @@ export default function AdminConsolePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [listFilter, setListFilter] = useState<"all" | "paid" | "gift" | "free">("all");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [detailUser, setDetailUser] = useState<AdminUser | null>(null);
@@ -274,11 +277,17 @@ export default function AdminConsolePage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const q = query.trim().toLowerCase();
-    if (!q) return data.users;
-    return data.users.filter((u) =>
-      [u.email, u.full_name, u.username, u.plan, u.role].filter(Boolean).some((f) => (f as string).toLowerCase().includes(q))
-    );
-  }, [data, query]);
+    return data.users.filter((u) => {
+      const access = compAccess(u.subscription_status);
+      const plan = normalizePlan(u.plan);
+      const paid = Boolean(u.stripe_subscription_id) || (u.subscription_active && access.kind === null && plan !== "free");
+      if (listFilter === "paid" && !paid) return false;
+      if (listFilter === "gift" && !access.active) return false;
+      if (listFilter === "free" && (paid || access.active || plan !== "free")) return false;
+      if (!q) return true;
+      return [u.email, u.full_name, u.username, u.plan, u.role].filter(Boolean).some((f) => (f as string).toLowerCase().includes(q));
+    });
+  }, [data, query, listFilter]);
 
   const m = data?.metrics;
 
@@ -416,10 +425,34 @@ export default function AdminConsolePage() {
             )}
 
             {/* Recherche */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0 }}>Utilisateurs</h2>
                 <button onClick={exportCsv} style={{ fontSize: 12, fontWeight: 500, color: "#0047FF", background: "#F0F5FF", border: "1px solid #D6E4FF", borderRadius: 8, padding: "6px 12px", cursor: "pointer", letterSpacing: "-0.01em" }}>Exporter CSV</button>
+                {([
+                  ["all", "Tous"],
+                  ["paid", "Ont payé"],
+                  ["gift", "Offerts"],
+                  ["free", "Gratuits"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setListFilter(id)}
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      borderRadius: 999,
+                      padding: "6px 12px",
+                      cursor: "pointer",
+                      border: "1px solid #EFEFEF",
+                      background: listFilter === id ? "#111" : "#fff",
+                      color: listFilter === id ? "#fff" : "#5A5A5A",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
               <input
                 value={query}
@@ -454,9 +487,19 @@ export default function AdminConsolePage() {
                           <span style={{ fontWeight: 500, color: "#1A1A1A" }}>{planLabel(u.plan)}</span>
                         </td>
                         <td style={{ padding: "12px 16px" }}>
-                          <span style={{ fontSize: 12, color: u.subscription_active ? "#1B873F" : "#B0B0B0" }}>
-                            {u.subscription_status ?? (u.subscription_active ? "active" : "-")}
-                          </span>
+                          {(() => {
+                            const access = compAccess(u.subscription_status);
+                            const label = access.kind === "gift"
+                              ? `offert jusqu'au ${access.until ? dateShort(access.until) : "?"}`
+                              : access.kind === "comp"
+                                ? "offert (sans date)"
+                                : u.subscription_status ?? (u.subscription_active ? "active" : "-");
+                            return (
+                              <span style={{ fontSize: 12, color: u.subscription_active || access.active ? "#1B873F" : "#B0B0B0" }}>
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td style={{ padding: "12px 16px" }}>
                           <select
@@ -472,26 +515,50 @@ export default function AdminConsolePage() {
                         </td>
                         <td style={{ padding: "12px 16px", color: "#9A9A9A" }}>{dateShort(u.created_at)}</td>
                         <td style={{ padding: "12px 16px" }}>
-                          {u.stripe_subscription_id ? (
-                            <div style={{ display: "flex", gap: 6 }}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                            <select
+                              key={`${u.id}-${u.plan}-${u.subscription_status}`}
+                              defaultValue={normalizePlan(u.plan)}
+                              disabled={busyId === u.id}
+                              onChange={(e) => {
+                                const next = e.target.value;
+                                void act(u.id, "setPlan", next, `Passer ${u.email ?? "cet utilisateur"} sur ${next} ?`);
+                              }}
+                              style={{ border: "1px solid #EFEFEF", borderRadius: 8, padding: "5px 8px", fontSize: 11, fontFamily: "inherit" }}
+                            >
+                              <option value="free">Free</option>
+                              <option value="basic">Starter</option>
+                              <option value="pro">Pro</option>
+                              <option value="scale">Scale</option>
+                            </select>
+                            <button
+                              type="button"
+                              disabled={busyId === u.id}
+                              onClick={() => act(u.id, "giftMonth", normalizePlan(u.plan) === "free" ? "pro" : normalizePlan(u.plan), `Offrir 1 mois à ${u.email ?? "cet utilisateur"} ?`)}
+                              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #D6E4FF", background: "#F0F5FF", color: "#0047FF", cursor: "pointer", fontSize: 11, fontWeight: 600, fontFamily: "inherit" }}
+                            >
+                              1 mois offert
+                            </button>
+                            {compAccess(u.subscription_status).kind ? (
+                              <button
+                                type="button"
+                                disabled={busyId === u.id}
+                                onClick={() => act(u.id, "revokeComp", undefined, `Retirer l'offre de ${u.email ?? "cet utilisateur"} ?`)}
+                                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #EFEFEF", background: "#fff", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}
+                              >
+                                Retirer
+                              </button>
+                            ) : null}
+                            {u.stripe_subscription_id ? (
                               <button
                                 disabled={busyId === u.id}
-                                onClick={() => act(u.id, "cancel", undefined, `Programmer l'annulation de ${u.email} a la fin de la periode payee ?`)}
-                                style={{ padding: "6px 11px", borderRadius: 8, border: "1px solid #EFEFEF", background: "#FFFFFF", cursor: "pointer", fontSize: 11, fontFamily: "inherit", color: "#5A5A5A", letterSpacing: "-0.01em" }}
+                                onClick={() => act(u.id, "cancelNow", undefined, `ANNULER MAINTENANT l'abonnement Stripe de ${u.email} ?`)}
+                                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #FFD9D9", background: "#FFF5F5", color: "#D93838", cursor: "pointer", fontSize: 11, fontWeight: 500, fontFamily: "inherit" }}
                               >
-                                Annuler (fin periode)
+                                Stop Stripe
                               </button>
-                              <button
-                                disabled={busyId === u.id}
-                                onClick={() => act(u.id, "cancelNow", undefined, `ANNULER MAINTENANT l'abonnement de ${u.email} ? Acces coupe immediatement.`)}
-                                style={{ padding: "6px 11px", borderRadius: 8, border: "1px solid #FFD9D9", background: "#FFF5F5", color: "#D93838", cursor: "pointer", fontSize: 11, fontWeight: 500, fontFamily: "inherit", letterSpacing: "-0.01em" }}
-                              >
-                                Annuler now
-                              </button>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: 11, color: "#C8C8C8" }}>pas d&apos;abonnement</span>
-                          )}
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     ))}

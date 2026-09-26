@@ -51,6 +51,7 @@ export function WorkspaceSwitcher({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<BrandWorkspace | null>(null);
+  const [staff, setStaff] = useState(false);
 
   const fr = lang === "fr";
   const { theme, setTheme } = useDashboardTheme();
@@ -103,6 +104,20 @@ export function WorkspaceSwitcher({
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/admin/me", { credentials: "include", cache: "no-store" })
+      .then((res) => {
+        if (!cancelled) setStaff(res.ok);
+      })
+      .catch(() => {
+        if (!cancelled) setStaff(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -307,6 +322,11 @@ export function WorkspaceSwitcher({
             >
               {fr ? "Facturation" : "Billing"}
             </button>
+          ) : null}
+          {staff ? (
+            <a className="ws-workspace-menu__account" href="/admin/console">
+              {fr ? "Console staff" : "Staff console"}
+            </a>
           ) : null}
           {onSignOut ? (
             <button

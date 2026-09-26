@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { resolvePlanFromCheckout } from "@/lib/checkout";
+import { compAccess, planFromProfile } from "@/lib/comp-plan";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -56,16 +57,17 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await admin
     .from("profiles")
-    .select("plan, subscription_active")
+    .select("plan, subscription_active, subscription_status")
     .eq("id", workspace.ownerId)
     .maybeSingle();
 
-  let plan: PlanTier = normalizePlan(profile?.plan);
+  const access = compAccess(profile?.subscription_status);
+  let plan: PlanTier = planFromProfile(profile?.plan, profile?.subscription_status);
   let billingInterval: BillingInterval | null = null;
-  let nextBillingDate: number | null = null;
+  let nextBillingDate: number | null = access.until ? Math.floor(Date.parse(access.until) / 1000) : null;
   let priceId: string | null = null;
   let currency: string | null = null;
-  let hasActiveSubscription = Boolean(profile?.subscription_active);
+  let hasActiveSubscription = Boolean(profile?.subscription_active) || access.active;
 
   try {
     const stripe = new Stripe(stripeKey);
@@ -127,7 +129,7 @@ export async function GET(request: NextRequest) {
                 : null,
             });
           }
-        } else if (hasActiveSubscription || plan !== "free") {
+        } else if (!access.active && (hasActiveSubscription || plan !== "free")) {
           plan = "free";
           hasActiveSubscription = false;
           await syncProfileSubscription(admin, workspace.ownerId, {

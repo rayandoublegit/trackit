@@ -6,6 +6,7 @@ import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignKindChooser } from "./CampaignKindChooser";
 import { EmptyStage } from "./EmptyStage";
+import { hideSamples, SAMPLE_CAMPAIGNS, samplesHidden } from "@/lib/sample-workspace";
 import { GiftingView } from "./GiftingView";
 import { RpmView } from "./RpmView";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
@@ -1240,6 +1241,7 @@ export function CampaignsView({
   const lang = useLang();
   const { navState, navigate, goBack } = useDashboardNavigation();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [samplesOff, setSamplesOff] = useState(false);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1323,6 +1325,10 @@ export function CampaignsView({
     return () => {
       cancelled = true;
     };
+  }, [userId]);
+
+  useEffect(() => {
+    setSamplesOff(samplesHidden(userId));
   }, [userId]);
 
   useEffect(() => {
@@ -1696,6 +1702,7 @@ export function CampaignsView({
   };
 
   const openCampaign = (id: string, tab: DetailTab = "analytics") => {
+    if (id.startsWith("sample-")) return;
     const campaign = campaigns.find((c) => c.id === id);
     if (campaign?.status === "Draft") {
       openEditCampaign(id);
@@ -1910,7 +1917,15 @@ export function CampaignsView({
       <CampaignsBoard
         lang={lang}
         isMobile={isMobile}
-        campaigns={campaigns}
+        campaigns={campaigns.length === 0 && !samplesOff ? SAMPLE_CAMPAIGNS : campaigns}
+        onDismissSamples={
+          campaigns.length === 0 && !samplesOff
+            ? () => {
+                hideSamples(userId);
+                setSamplesOff(true);
+              }
+            : undefined
+        }
         kpiStats={kpiStats}
         plan={plan}
         billableActiveCampaigns={activeCampaignCount}
@@ -2052,6 +2067,7 @@ function CampaignsBoard({
   setSearch,
   onOpenCampaign,
   onCreate,
+  onDismissSamples,
   onDeleteAll,
 }: {
   lang: "en" | "fr";
@@ -2068,6 +2084,7 @@ function CampaignsBoard({
   setSearch: (s: string) => void;
   onOpenCampaign: (id: string) => void;
   onCreate: () => void;
+  onDismissSamples?: () => void;
   onDeleteAll: () => void;
 }) {
   const pad = isMobile ? "16px 16px 24px" : "40px 40px 48px";
@@ -2147,7 +2164,8 @@ function CampaignsBoard({
   return (
     <div style={{ minHeight: "100%", background: "var(--ws-surface)" }}>
       <div style={{ padding: pad }}>
-        <div style={{ marginBottom: 28 }}>
+        <div style={{ marginBottom: 28, display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start" }}>
+          <div>
           <h1 style={{ fontSize: isMobile ? 26 : 30, fontWeight: 600, color: "var(--ws-text)", margin: 0, marginBottom: 6, letterSpacing: "-0.03em", maxWidth: 520 }}>
             {lang === "fr" ? "Campagnes" : "Campaigns"}
           </h1>
@@ -2156,6 +2174,12 @@ function CampaignsBoard({
               ? "Gérez vos campagnes et suivez les performances et commissions de vos créateurs."
               : "Manage your campaigns and track creator performance and commissions."}
           </p>
+          </div>
+          {onDismissSamples ? (
+            <button type="button" className="sample-clear" onClick={onDismissSamples}>
+              {fr ? "Supprimer l’exemple" : "Remove sample"}
+            </button>
+          ) : null}
         </div>
 
         <div
