@@ -36,3 +36,12 @@
 .tbl-empty__ghost b{display:block;height:16px;border-radius:999px;background:color-mix(in srgb,var(--ws-accent) 16%,var(--ws-pill))}
 @keyframes tbl-ghost{0%,100%{opacity:.45;transform:translateX(0)}50%{opacity:1;transform:translateX(4px)}}
 @media (prefers-reduced-motion:reduce){.tbl-empty__ghost{animation:none}}
+
+/* Find it inbox: messages arriving */
+.fi-empty__stack{position:relative;width:240px;height:120px}
+.fi-empty__stack span{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:28px 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:6px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--ws-border);background:var(--ws-surface);box-shadow:var(--ws-shadow);animation:fi-arrive 2.7s ease-in-out infinite;opacity:0}
+.fi-empty__stack b{grid-row:span 2;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,color-mix(in srgb,var(--ws-accent) 60%,#fff),var(--ws-accent))}
+.fi-empty__stack i{display:block;height:8px;border-radius:5px;background:var(--ws-pill)}
+.fi-empty__stack i:last-child{width:60%}
+@keyframes fi-arrive{0%{opacity:0;transform:translateY(-16px) scale(.96)}15%,70%{opacity:1;transform:translateY(34px) scale(1)}100%{opacity:0;transform:translateY(80px) scale(.96)}}
+@media (prefers-reduced-motion:reduce){.fi-empty__stack span{animation:none;opacity:1;transform:translateY(34px)}.fi-empty__stack span+span{display:none}}

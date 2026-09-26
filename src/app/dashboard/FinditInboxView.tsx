@@ -1,5 +1,8 @@
 "use client";
 
+import "./sample-preview.css";
+import "./discovery-motion.css";
+
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
@@ -248,11 +251,22 @@ export function FinditInboxView({
       {loading ? (
         <p className="fi-inbox__empty">{fr ? "Chargement…" : "Loading…"}</p>
       ) : items.length === 0 ? (
-        <p className="fi-inbox__empty">
-          {fr
-            ? "Il semblerait que votre inbox Discover soit encore calme — dès qu’un créateur envoie du contenu, il apparaîtra ici."
-            : "Looks like your Discover inbox is still quiet — as soon as a creator sends content, it’ll show up here."}
-        </p>
+        <div className="sp-empty" style={{ marginTop: 8 }}>
+          <div className="fi-empty__stack" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <span key={i} style={{ animationDelay: `${i * 0.9}s` }}>
+                <b />
+                <i />
+                <i />
+              </span>
+            ))}
+          </div>
+          <p>
+            {fr
+              ? "Il semblerait que votre inbox Discover soit encore calme — dès qu’un créateur envoie du contenu, il apparaîtra ici."
+              : "Looks like your Discover inbox is still quiet — as soon as a creator sends content, it’ll show up here."}
+          </p>
+        </div>
       ) : (
         <ul className="fi-inbox__list">
           {items.map((item) => (

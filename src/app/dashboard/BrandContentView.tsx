@@ -1,5 +1,8 @@
 "use client";
 
+import "./sample-preview.css";
+import "./gifting-view.css";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import {
@@ -396,9 +399,22 @@ export function BrandContentView({ userId, isMobile }: { userId?: string; isMobi
         ) : null}
 
         {loading ? (
-          <p className="bc-empty">{fr ? "Chargement…" : "Loading…"}</p>
+          <div className="sp-videos" aria-label={fr ? "Chargement…" : "Loading…"}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="gv-skeleton" style={{ animationDelay: `${i * 0.08}s` }}>
+                <span style={{ height: "auto", aspectRatio: "9 / 16" }} />
+              </div>
+            ))}
+          </div>
         ) : items.length === 0 ? (
           <div className="bc-empty-block">
+            {!hasActiveFilters ? (
+              <div className="sp-empty__phones" aria-hidden style={{ margin: "0 auto 14px", justifyContent: "center" }}>
+                {[0, 1, 2].map((i) => (
+                  <span key={i} style={{ animationDelay: `${i * 0.4}s` }}><i /></span>
+                ))}
+              </div>
+            ) : null}
             <p>
               {hasActiveFilters
                 ? fr
