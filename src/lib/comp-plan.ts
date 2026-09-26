@@ -37,3 +37,16 @@ export function planFromProfile(plan: string | null | undefined, status: string 
 export function isCompStatus(status: string | null | undefined): boolean {
   return compAccess(status).kind !== null;
 }
+
+/** Paid access that must survive a Stripe sync: staff grants and Whop memberships. */
+export function grantsAccessWithoutStripe(status: string | null | undefined): boolean {
+  if (compAccess(status).active) return true;
+  return (status ?? "").toLowerCase().startsWith("whop:");
+}
+
+export function whopMembershipId(status: string | null | undefined): string | null {
+  const raw = (status ?? "").trim();
+  if (!raw.toLowerCase().startsWith("whop:")) return null;
+  const id = raw.slice("whop:".length);
+  return id && id !== "active" ? id : null;
+}

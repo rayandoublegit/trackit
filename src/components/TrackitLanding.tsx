@@ -319,11 +319,7 @@ export default function TrackitLanding() {
           : paid === "pro"
             ? getProPriceId(currency, annual)
             : getScalePriceId(currency, annual);
-      if (!priceId?.trim()) {
-        alert("Pricing not configured. Please contact support.");
-        return;
-      }
-      await handleUpgrade(priceId, {
+      await handleUpgrade(priceId || "", {
         cancelUrl: window.location.href,
         tier: paid === "basic" ? "growth" : paid,
         currency,

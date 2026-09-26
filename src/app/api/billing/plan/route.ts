@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
 import { resolvePlanFromCheckout } from "@/lib/checkout";
-import { compAccess, planFromProfile } from "@/lib/comp-plan";
+import { compAccess, grantsAccessWithoutStripe, planFromProfile } from "@/lib/comp-plan";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import {
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
                 : null,
             });
           }
-        } else if (!access.active && (hasActiveSubscription || plan !== "free")) {
+        } else if (!grantsAccessWithoutStripe(profile?.subscription_status) && (hasActiveSubscription || plan !== "free")) {
           plan = "free";
           hasActiveSubscription = false;
           await syncProfileSubscription(admin, workspace.ownerId, {

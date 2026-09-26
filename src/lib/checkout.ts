@@ -128,6 +128,27 @@ export async function handleUpgrade(
           ...stripePriceEnvCandidates("pro", "usd", false),
           ...stripePriceEnvCandidates("scale", "usd", false),
         ];
+  const resolved = resolvePlanFromCheckout(priceId, options?.tier === "growth" ? "basic" : options?.tier);
+  if (resolved !== "free") {
+    const whop = await fetch("/api/billing/whop-checkout", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tier: resolved,
+        annual: options?.annual ?? false,
+        currency: options?.currency ?? "usd",
+      }),
+    });
+    const whopPayload = (await whop.json().catch(() => ({}))) as { url?: string; error?: string; fallback?: boolean };
+    if (whop.ok && whopPayload.url) {
+      window.location.href = whopPayload.url;
+      return;
+    }
+    if (!whopPayload.fallback && whop.status !== 401) {
+      throw new Error(whopPayload.error ?? "Could not start checkout");
+    }
+  }
   assertNonEmptyStripePriceId(priceId, envVarCandidates);
   const user = supabase
     ? (await supabase.auth.getUser()).data.user

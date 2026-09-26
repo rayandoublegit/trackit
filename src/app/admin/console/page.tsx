@@ -493,7 +493,9 @@ export default function AdminConsolePage() {
                               ? `offert jusqu'au ${access.until ? dateShort(access.until) : "?"}`
                               : access.kind === "comp"
                                 ? "offert (sans date)"
-                                : u.subscription_status ?? (u.subscription_active ? "active" : "-");
+                                : (u.subscription_status ?? "").toLowerCase().startsWith("whop:")
+                                  ? "Whop"
+                                  : u.subscription_status ?? (u.subscription_active ? "active" : "-");
                             return (
                               <span style={{ fontSize: 12, color: u.subscription_active || access.active ? "#1B873F" : "#B0B0B0" }}>
                                 {label}

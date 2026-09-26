@@ -765,7 +765,10 @@ function DashboardPageContent() {
 
   const handleUpgradeBasic = useCallback(async () => {
     try {
-      await handleUpgrade(getGrowthPriceId(checkoutCurrency));
+      await handleUpgrade(getGrowthPriceId(checkoutCurrency) || "", {
+        tier: "growth",
+        currency: checkoutCurrency,
+      });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not start checkout");
     }
@@ -773,7 +776,10 @@ function DashboardPageContent() {
 
   const handleUpgradePro = useCallback(async () => {
     try {
-      await handleUpgrade(getProPriceId(checkoutCurrency));
+      await handleUpgrade(getProPriceId(checkoutCurrency) || "", {
+        tier: "pro",
+        currency: checkoutCurrency,
+      });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not start checkout");
     }
@@ -781,7 +787,10 @@ function DashboardPageContent() {
 
   const handleUpgradeScale = useCallback(async () => {
     try {
-      await handleUpgrade(getScalePriceId(checkoutCurrency));
+      await handleUpgrade(getScalePriceId(checkoutCurrency) || "", {
+        tier: "scale",
+        currency: checkoutCurrency,
+      });
     } catch (e) {
       alert(e instanceof Error ? e.message : "Could not start checkout");
     }

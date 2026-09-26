@@ -181,14 +181,6 @@ export function PricingBento({
     }
 
     const priceId = priceIdForTier(prices, tier, currency, annual);
-    if (!priceId?.trim()) {
-      alert(
-        lang === "fr"
-          ? "Paiement indisponible : les prix Stripe ne sont pas configurés."
-          : "Checkout unavailable: Stripe prices are not configured.",
-      );
-      return;
-    }
 
     setPayingTier(tier);
     try {
@@ -212,6 +204,26 @@ export function PricingBento({
 
       if (onboarding) {
         const origin = typeof window !== "undefined" ? window.location.origin : "";
+        const whop = await fetch("/api/billing/whop-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            tier,
+            annual,
+            currency,
+            onboarding,
+          }),
+        });
+        const whopData = (await whop.json().catch(() => ({}))) as { url?: string; error?: string; fallback?: boolean };
+        if (whop.ok && whopData.url) {
+          window.location.href = whopData.url;
+          return;
+        }
+        if (!whopData.fallback) {
+          alert(whopData.error || (lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout"));
+          return;
+        }
         const res = await fetch("/api/create-checkout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

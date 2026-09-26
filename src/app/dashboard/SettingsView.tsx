@@ -1050,7 +1050,11 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
           : target === "pro"
             ? getProPriceId(currency, annual)
             : getScalePriceId(currency, annual);
-      await handleUpgrade(priceId);
+      await handleUpgrade(priceId || "", {
+        tier: target,
+        currency,
+        annual,
+      });
     } catch (err) {
       console.error("Checkout error:", err);
       alert(err instanceof Error ? err.message : "Could not start checkout");
