@@ -1,5 +1,8 @@
 "use client";
 
+import "./sample-preview.css";
+import "./discovery-motion.css";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import type { FeedCreator } from "@/lib/discovery-feed";
@@ -190,9 +193,32 @@ export function MyCreatorsView({ plan, isMobile, onUpgrade, onReachOut }: { plan
       </div>
 
       {loading ? (
-        <div style={{ color: "#9A9A9A", fontSize: 14 }}>{t.loading}</div>
+        <div className="df-skeleton" aria-hidden>
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="df-skeleton__row" style={{ animationDelay: `${i * 0.08}s` }}>
+              <span className="df-skeleton__avatar" />
+              <span className="df-skeleton__lines"><i style={{ width: "52%" }} /><i style={{ width: "30%" }} /></span>
+              <span className="df-skeleton__stat" />
+              <span className="df-skeleton__stat" />
+            </div>
+          ))}
+        </div>
       ) : rows.length === 0 ? (
-        <div style={{ color: "#9A9A9A", fontSize: 14 }}>{t.emptySaved}</div>
+        <div className="mc-empty">
+          <div className="mc-empty__board" aria-hidden>
+            {stages.slice(0, 4).map((stage, i) => (
+              <div key={stage.key} className="mc-empty__col" style={{ animationDelay: `${i * 90}ms` }}>
+                <span className="mc-empty__label">{stage.label}</span>
+                <span className="mc-empty__ghost" style={{ animationDelay: `${0.4 + i * 0.7}s` }} />
+                {i < 2 ? <span className="mc-empty__ghost is-still" /> : null}
+              </div>
+            ))}
+          </div>
+          <p>{t.emptySaved}</p>
+          <button type="button" className="es-primary" onClick={() => navigate({ view: "discovery" })}>
+            {lang === "fr" ? "Trouver des créateurs" : "Find creators"}
+          </button>
+        </div>
       ) : mode === "list" ? (
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
           {visibleRows.map((r) => <MiniCard key={r.creator_username} lang={lang} r={r} onOpen={() => openCreator(rowToCreator(r))} />)}

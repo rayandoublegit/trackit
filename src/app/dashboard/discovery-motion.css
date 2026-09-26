@@ -1,0 +1,38 @@
+/* Discovery: loading skeleton and empty state */
+.df-skeleton{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.df-skeleton__row{display:grid;grid-template-columns:44px minmax(0,1fr) 72px 72px;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--ws-border);border-radius:14px;background:var(--ws-surface);animation:sp-rise .4s ease both}
+.df-skeleton__avatar,.df-skeleton__stat,.df-skeleton__lines i{display:block;background:linear-gradient(110deg,var(--ws-pill) 30%,var(--ws-hover) 50%,var(--ws-pill) 70%);background-size:200% 100%;animation:sp-shimmer 1.4s linear infinite}
+.df-skeleton__avatar{width:44px;height:44px;border-radius:50%}
+.df-skeleton__lines{display:flex;flex-direction:column;gap:8px}
+.df-skeleton__lines i{height:10px;border-radius:6px}
+.df-skeleton__stat{height:12px;border-radius:6px}
+.df-empty__orbit{position:relative;width:84px;height:84px}
+.df-empty__orbit span{position:absolute;inset:0;border-radius:50%;border:1.5px dashed var(--ws-border-strong);animation:df-spin 12s linear infinite}
+.df-empty__orbit span:nth-child(2){inset:14px;border-style:solid;border-color:color-mix(in srgb,var(--ws-accent) 35%,transparent);animation-duration:8s;animation-direction:reverse}
+.df-empty__orbit span:nth-child(3){inset:32px;border:none;background:var(--ws-accent);opacity:.85;animation:sp-bob 2.4s ease-in-out infinite}
+@keyframes df-spin{to{transform:rotate(360deg)}}
+@media (max-width:640px){.df-skeleton__row{grid-template-columns:40px minmax(0,1fr) 56px}.df-skeleton__row .df-skeleton__stat:last-child{display:none}}
+@media (prefers-reduced-motion:reduce){.df-skeleton *,.df-empty__orbit span{animation:none!important}}
+
+/* My creators: empty pipeline */
+.mc-empty{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;padding:28px 20px 36px;border:1px dashed var(--ws-border);border-radius:18px;background:var(--ws-surface-2)}
+.mc-empty p{margin:0;max-width:52ch;font-size:14px;line-height:1.55;color:var(--ws-text-muted)}
+.mc-empty__board{display:grid;grid-template-columns:repeat(4,minmax(110px,160px));gap:10px}
+@media (max-width:640px){.mc-empty__board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.mc-empty__col{display:flex;flex-direction:column;gap:8px;min-height:130px;padding:10px;border-radius:12px;background:var(--ws-surface);border:1px solid var(--ws-border);animation:sp-rise .45s ease both}
+.mc-empty__label{font-size:11.5px;font-weight:650;color:var(--ws-text-muted);text-align:left}
+.mc-empty__ghost{display:block;height:34px;border-radius:9px;background:linear-gradient(110deg,var(--ws-pill) 30%,color-mix(in srgb,var(--ws-accent) 14%,var(--ws-pill)) 50%,var(--ws-pill) 70%);background-size:200% 100%;animation:mc-slot 3.2s ease-in-out infinite,sp-shimmer 1.8s linear infinite}
+.mc-empty__ghost.is-still{animation:sp-shimmer 1.8s linear infinite;opacity:.6}
+@keyframes mc-slot{0%,100%{opacity:0;transform:translateX(-18px)}25%,75%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.mc-empty *{animation:none!important}}
+
+/* Campaign tables: empty state with ghost rows */
+.tbl-empty{display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 16px 30px;text-align:center}
+.tbl-empty p{margin:0;max-width:54ch;font-size:13.5px;line-height:1.55;color:var(--ws-text-muted)}
+.tbl-empty__ghosts{display:flex;flex-direction:column;gap:8px;width:min(440px,100%)}
+.tbl-empty__ghost{display:grid;grid-template-columns:28px 1fr 60px 40px;align-items:center;gap:10px;padding:8px 10px;border:1px dashed var(--ws-border);border-radius:10px;background:var(--ws-surface);animation:tbl-ghost 3.6s ease-in-out infinite}
+.tbl-empty__ghost span{width:28px;height:28px;border-radius:50%;background:var(--ws-pill)}
+.tbl-empty__ghost i{display:block;height:8px;border-radius:5px;background:var(--ws-pill)}
+.tbl-empty__ghost b{display:block;height:16px;border-radius:999px;background:color-mix(in srgb,var(--ws-accent) 16%,var(--ws-pill))}
+@keyframes tbl-ghost{0%,100%{opacity:.45;transform:translateX(0)}50%{opacity:1;transform:translateX(4px)}}
+@media (prefers-reduced-motion:reduce){.tbl-empty__ghost{animation:none}}

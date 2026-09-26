@@ -98,6 +98,17 @@ export function discoveryCopy(lang: Lang) {
       fr ? `${n} créateur${n !== 1 ? "s" : ""}` : `${n} creator${n !== 1 ? "s" : ""}`,
     error: fr ? "Erreur" : "Error",
     noCreators: fr ? "Aucun créateur pour ces filtres." : "No creators match these filters.",
+    noCreatorsHint: fr
+      ? "Élargissez la niche, le palier d’abonnés ou le seuil de vues. Les filtres se combinent."
+      : "Widen the niche, the follower tier or the view threshold. Filters combine.",
+    catalogDownTitle: fr ? "Le catalogue de créateurs ne répond pas" : "The creator catalog is not responding",
+    catalogDownBody: fr
+      ? "Les profils déjà sauvegardés restent dans vos listes. Réessayez dans un instant."
+      : "Profiles you already saved stay in your lists. Try again in a moment.",
+    networkDownBody: fr
+      ? "La connexion a échoué. Vérifiez votre réseau, puis réessayez."
+      : "The connection failed. Check your network, then try again.",
+    retry: fr ? "Réessayer" : "Try again",
     creatorNotInDatabaseTitle: fr
       ? "Nous n'avons pas encore ce créateur dans notre base de données."
       : "We don't have this creator in our database yet.",

@@ -1,5 +1,9 @@
 "use client";
 
+import { CountUp } from "./sample-motion";
+import "./sample-preview.css";
+import "./campaign-kind.css";
+
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { formatCompactStat } from "@/lib/content-shared";
 import { getSavedCreators, saveCreator } from "@/lib/db";
@@ -1029,6 +1033,7 @@ export function RpmView({
         </div>
       ) : campaigns.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: "center", padding: 40 }}>
+          <RpmMockup fr={fr} />
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8, fontFamily: "inherit", letterSpacing: "-0.025em" }}>
             {fr ? "Aucune campagne RPM" : "No RPM campaigns yet"}
           </div>
@@ -1078,6 +1083,37 @@ export function RpmView({
         </div>
       )}
       </div>
+    </div>
+  );
+}
+
+/** Animated example of the RPM maths: views times the rate per 1,000. Fictional numbers. */
+function RpmMockup({ fr }: { fr: boolean }) {
+  const views = 128_400;
+  const rate = 6;
+  const money = (n: number) =>
+    new Intl.NumberFormat(fr ? "fr-FR" : "en-US", { style: "currency", currency: fr ? "EUR" : "USD", maximumFractionDigits: 2 }).format(n);
+  const count = (n: number) => new Intl.NumberFormat(fr ? "fr-FR" : "en-US").format(Math.round(n));
+  return (
+    <div className="rpm-mock" aria-hidden>
+      <span className="sp-sample-tag" style={{ marginLeft: 0 }}>{fr ? "Exemple" : "Sample"}</span>
+      <div className="rpm-mock__row">
+        <div className="rpm-mock__cell">
+          <small>{fr ? "Vues suivies" : "Tracked views"}</small>
+          <strong><CountUp value={views} format={count} /></strong>
+        </div>
+        <span className="rpm-mock__op">×</span>
+        <div className="rpm-mock__cell">
+          <small>{fr ? "Tarif / 1 000 vues" : "Rate / 1,000 views"}</small>
+          <strong>{money(rate)}</strong>
+        </div>
+        <span className="rpm-mock__op">=</span>
+        <div className="rpm-mock__cell is-total">
+          <small>{fr ? "Dû au créateur" : "Owed to creator"}</small>
+          <strong><CountUp value={(views / 1000) * rate} format={money} delayMs={200} /></strong>
+        </div>
+      </div>
+      <div className="rpm-mock__bar"><span /></div>
     </div>
   );
 }

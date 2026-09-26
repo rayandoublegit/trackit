@@ -4,6 +4,9 @@ import { useLang } from "@/lib/useLang";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import type { DashboardView } from "@/lib/dashboard-view-storage";
+import { SAMPLE_CAMPAIGN_DETAILS, sampleDailyRevenue } from "@/lib/sample-campaign-preview";
+import { ActivityFeed, RevenueChart } from "./SampleCampaignPreview";
+import { CountUp } from "./sample-motion";
 
 const BLUE = "#0047FF";
 
@@ -63,6 +66,7 @@ function MetricCard({
 }) {
   return (
     <div
+      className="sp-list-in"
       style={{
         background: accent ? BLUE : "var(--ws-surface)",
         border: accent ? "none" : "1px solid var(--ws-border)",
@@ -74,8 +78,8 @@ function MetricCard({
       <div style={{ fontSize: 12, fontWeight: 500, color: accent ? "rgba(255,255,255,0.8)" : "var(--ws-text-dim)", marginBottom: 10, letterSpacing: "-0.01em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1 }}>
-        {value}
+      <div style={{ fontSize: 28, fontWeight: 600, color: accent ? "#FFFFFF" : "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>
+        {typeof value === "number" ? <CountUp value={value} format={(n) => Math.round(n).toLocaleString()} /> : value}
       </div>
       {hint && (
         <div style={{ fontSize: 12, color: accent ? "rgba(255,255,255,0.65)" : "var(--ws-text-dim)", marginTop: 8, letterSpacing: "-0.01em" }}>
@@ -146,6 +150,7 @@ function BrandHomeOverview({
   onNavigate: (view: DashboardView) => void;
 }) {
   const setupDone = [gettingStarted.creators, gettingStarted.outreach, gettingStarted.sales].filter(Boolean).length;
+  const programEmpty = gettingStarted.creatorsCount === 0 && gettingStarted.salesCount === 0 && activeCampaigns === 0;
   const setupTotal = 3;
 
   return (
@@ -182,7 +187,7 @@ function BrandHomeOverview({
           <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
             {lang === "fr" ? "Actions rapides" : "Quick actions"}
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: 12 }}>
             <QuickAction
               label={lang === "fr" ? "Trouver des créateurs" : "Find creators"}
               description={lang === "fr" ? "Parcourir la recherche et sauvegarder des profils." : "Browse discovery and save profiles."}
@@ -194,6 +199,11 @@ function BrandHomeOverview({
               onClick={() => onNavigate("campaigns")}
             />
             <QuickAction
+              label={lang === "fr" ? "Envoyer un cadeau" : "Send a gift"}
+              description={lang === "fr" ? "Contrat, colis et vidéo en retour." : "Contract, parcel and a video back."}
+              onClick={() => onNavigate("gifting")}
+            />
+            <QuickAction
               label={lang === "fr" ? "Voir les paiements" : "View payouts"}
               description={lang === "fr" ? "Commissions et versements créateurs." : "Commissions and creator payouts."}
               onClick={() => onNavigate("payouts")}
@@ -201,6 +211,7 @@ function BrandHomeOverview({
           </div>
         </div>
 
+        <div style={{ display: "grid", gridTemplateColumns: isMobile || !programEmpty ? "1fr" : "minmax(0,1fr) minmax(0,1.25fr)", gap: 16, alignItems: "start" }}>
         {setupDone < setupTotal && (
           <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 20 : 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -263,8 +274,33 @@ function BrandHomeOverview({
             ))}
           </div>
         )}
+        {programEmpty ? <ProgramPreview lang={lang} onOpen={() => onNavigate("campaigns")} /> : null}
+        </div>
       </div>
     </>
+  );
+}
+
+function ProgramPreview({ lang, onOpen }: { lang: "en" | "fr"; onOpen: () => void }) {
+  const fr = lang === "fr";
+  const sample = SAMPLE_CAMPAIGN_DETAILS["sample-summer"];
+  const byId = new Map(sample.creators.map((c) => [c.id, c]));
+  return (
+    <section className="sp-card" style={{ padding: 20 }}>
+      <div className="sp-card__head">
+        <div>
+          <span className="sp-sample-tag" style={{ marginLeft: 0 }}>{fr ? "Exemple" : "Sample"}</span>
+          <h2 style={{ marginTop: 8 }}>{fr ? "Ce que vous verrez ici, une fois lancé" : "What you will see here once live"}</h2>
+        </div>
+        <button type="button" className="sample-clear" onClick={onOpen}>
+          {fr ? "Ouvrir l’exemple" : "Open the sample"}
+        </button>
+      </div>
+      <RevenueChart lang={lang} days={sampleDailyRevenue(sample)} />
+      <div style={{ marginTop: 14 }}>
+        <ActivityFeed lang={lang} detail={sample} byId={byId} />
+      </div>
+    </section>
   );
 }
 

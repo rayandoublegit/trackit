@@ -1,3 +1,5 @@
+import { SAMPLE_CAMPAIGN_DETAILS, sampleCampaignTotals } from "@/lib/sample-campaign-preview";
+
 export function samplesHidden(userId?: string | null): boolean {
   if (!userId || typeof window === "undefined") return false;
   try {
@@ -16,14 +18,18 @@ export function hideSamples(userId?: string | null) {
   }
 }
 
+const summer = sampleCampaignTotals(SAMPLE_CAMPAIGN_DETAILS["sample-summer"]);
+const launch = sampleCampaignTotals(SAMPLE_CAMPAIGN_DETAILS["sample-launch"]);
+const idsOf = (id: string) => SAMPLE_CAMPAIGN_DETAILS[id].creators.filter((c) => c.status !== "shortlisted").map((c) => c.id);
+
 export const SAMPLE_CAMPAIGNS = [
   {
     id: "sample-summer",
     name: "Summer drop",
-    creators: 6,
+    creators: summer.creators,
     platform: "TikTok, Instagram",
-    sales: 4820,
-    commission: 724,
+    sales: summer.revenue,
+    commission: summer.commission,
     status: "Active" as const,
     start: "Jun 2",
     end: "Aug 31",
@@ -31,17 +37,17 @@ export const SAMPLE_CAMPAIGNS = [
     endRaw: "2026-08-31",
     description: "Sample campaign",
     commissionType: "percentage",
-    commissionRate: 15,
-    creatorIds: ["sample-sarah", "sample-mike", "sample-luna"],
+    commissionRate: SAMPLE_CAMPAIGN_DETAILS["sample-summer"].commissionRate,
+    creatorIds: idsOf("sample-summer"),
     createdAt: "2026-06-02T10:00:00.000Z",
   },
   {
     id: "sample-launch",
     name: "Serum launch",
-    creators: 3,
+    creators: launch.creators,
     platform: "Instagram",
-    sales: 1960,
-    commission: 294,
+    sales: launch.revenue,
+    commission: launch.commission,
     status: "Active" as const,
     start: "Sep 4",
     end: "Oct 4",
@@ -49,22 +55,22 @@ export const SAMPLE_CAMPAIGNS = [
     endRaw: "2026-10-04",
     description: "Sample campaign",
     commissionType: "percentage",
-    commissionRate: 15,
-    creatorIds: ["sample-luna"],
+    commissionRate: SAMPLE_CAMPAIGN_DETAILS["sample-launch"].commissionRate,
+    creatorIds: idsOf("sample-launch"),
     createdAt: "2026-09-04T10:00:00.000Z",
   },
   {
     id: "sample-draft",
     name: "Holiday gifting",
     creators: 0,
-    platform: "TikTok",
+    platform: "TikTok, Instagram",
     sales: 0,
     commission: 0,
     status: "Draft" as const,
     start: "",
     end: "",
     description: "Sample draft",
-    commissionRate: 12,
+    commissionRate: SAMPLE_CAMPAIGN_DETAILS["sample-draft"].commissionRate,
     creatorIds: [],
     createdAt: "2026-09-20T10:00:00.000Z",
   },

@@ -8,6 +8,9 @@ import { CampaignKindChooser } from "./CampaignKindChooser";
 import { EmptyStage } from "./EmptyStage";
 import { hideSamples, SAMPLE_CAMPAIGNS, samplesHidden } from "@/lib/sample-workspace";
 import { GiftingView } from "./GiftingView";
+import { SampleCampaignPreview } from "./SampleCampaignPreview";
+import "./discovery-motion.css";
+import { getSampleCampaignDetail } from "@/lib/sample-campaign-preview";
 import { RpmView } from "./RpmView";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
@@ -1033,11 +1036,59 @@ function formatPendingPayoutsSub(count: number, lang: "en" | "fr"): string {
   return lang === "fr" ? `${count} paiements en attente` : `${count} pending payouts`;
 }
 
-function EmptyTableRow({ lang, colSpan }: { lang: "en" | "fr"; colSpan: number }) {
+function EmptyTableRow({
+  lang,
+  colSpan,
+  message,
+  actionLabel,
+  onAction,
+}: {
+  lang: "en" | "fr";
+  colSpan: number;
+  message?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
   return (
     <tr>
-      <td colSpan={colSpan} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-        {lang === "fr" ? "Aucune donnée pour le moment." : "No data yet."}
+      <td colSpan={colSpan} style={{ padding: 0 }}>
+        <div className="tbl-empty">
+          <div className="tbl-empty__ghosts" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="tbl-empty__ghost" style={{ animationDelay: `${i * 0.18}s` }}>
+                <span />
+                <i style={{ width: `${46 - i * 8}%` }} />
+                <i style={{ width: `${18 + i * 4}%` }} />
+                <b />
+              </div>
+            ))}
+          </div>
+          <p>{message ?? (lang === "fr" ? "Aucune donnée pour le moment." : "No data yet.")}</p>
+          {actionLabel && onAction ? (
+            <button type="button" className="es-primary" onClick={onAction}>
+              {actionLabel}
+            </button>
+          ) : null}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function LoadingTableRow({ colSpan }: { colSpan: number }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "8px 14px" }}>
+        <div className="df-skeleton" aria-hidden style={{ margin: 0 }}>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="df-skeleton__row" style={{ animationDelay: `${i * 0.08}s` }}>
+              <span className="df-skeleton__avatar" />
+              <span className="df-skeleton__lines"><i style={{ width: "46%" }} /><i style={{ width: "24%" }} /></span>
+              <span className="df-skeleton__stat" />
+              <span className="df-skeleton__stat" />
+            </div>
+          ))}
+        </div>
       </td>
     </tr>
   );
@@ -1242,6 +1293,7 @@ export function CampaignsView({
   const { navState, navigate, goBack } = useDashboardNavigation();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [samplesOff, setSamplesOff] = useState(false);
+  const [samplePreviewId, setSamplePreviewId] = useState<string | null>(null);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1702,7 +1754,10 @@ export function CampaignsView({
   };
 
   const openCampaign = (id: string, tab: DetailTab = "analytics") => {
-    if (id.startsWith("sample-")) return;
+    if (id.startsWith("sample-")) {
+      if (getSampleCampaignDetail(id)) setSamplePreviewId(id);
+      return;
+    }
     const campaign = campaigns.find((c) => c.id === id);
     if (campaign?.status === "Draft") {
       openEditCampaign(id);
@@ -1756,29 +1811,17 @@ export function CampaignsView({
 
   if (modalOpen && canOpenNewCampaign && createKind === "gifting") {
     return (
-      <div>
-        <button
-          type="button"
-          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
-          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
-        >
-          Change type
-        </button>
-        <GiftingView isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} />
+      <div style={{ background: "var(--ws-surface)", minHeight: "100%" }}>
+        <ChangeTypeButton lang={lang} isMobile={isMobile} onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })} />
+        <GiftingView isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} startCreating />
       </div>
     );
   }
 
   if (modalOpen && canOpenNewCampaign && createKind === "rpm") {
     return (
-      <div>
-        <button
-          type="button"
-          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
-          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
-        >
-          Change type
-        </button>
+      <div style={{ background: "var(--ws-surface)", minHeight: "100%" }}>
+        <ChangeTypeButton lang={lang} isMobile={isMobile} onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })} />
         <RpmView userId={userId} isMobile={isMobile} plan={plan} />
       </div>
     );
@@ -1786,14 +1829,8 @@ export function CampaignsView({
 
   if (modalOpen && canOpenNewCampaign) {
     return (
-      <div>
-        <button
-          type="button"
-          onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })}
-          style={{ margin: "16px 24px 0", border: 0, background: "transparent", color: "var(--ws-text-muted)", cursor: "pointer", font: "inherit" }}
-        >
-          Change type
-        </button>
+      <div style={{ background: "var(--ws-surface)", minHeight: "100%" }}>
+        <ChangeTypeButton lang={lang} isMobile={isMobile} onClick={() => navigate({ view: "campaigns", campaign: { type: "new" } })} />
         <NewCampaignOnboarding
           lang={lang}
           userId={userId}
@@ -1912,6 +1949,30 @@ export function CampaignsView({
     );
   }
 
+  const samplePreview = samplePreviewId && campaigns.length === 0 && !samplesOff ? getSampleCampaignDetail(samplePreviewId) : null;
+  const samplePreviewCampaign = samplePreview ? SAMPLE_CAMPAIGNS.find((c) => c.id === samplePreview.id) : null;
+  if (samplePreview && samplePreviewCampaign) {
+    return (
+      <SampleCampaignPreview
+        lang={lang}
+        isMobile={isMobile}
+        detail={samplePreview}
+        name={samplePreviewCampaign.name}
+        isDraft={samplePreviewCampaign.status === "Draft"}
+        onBack={() => setSamplePreviewId(null)}
+        onCreate={() => {
+          setSamplePreviewId(null);
+          tryOpenNewCampaign();
+        }}
+        onDismiss={() => {
+          hideSamples(userId);
+          setSamplesOff(true);
+          setSamplePreviewId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <CampaignsBoard
@@ -1943,6 +2004,17 @@ export function CampaignsView({
         <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
       )}
     </>
+  );
+}
+
+function ChangeTypeButton({ lang, isMobile, onClick }: { lang: "en" | "fr"; isMobile?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="sp-back" onClick={onClick} style={{ margin: isMobile ? "12px 12px 0" : "20px 36px 0" }}>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {lang === "fr" ? "Changer de type" : "Change type"}
+    </button>
   );
 }
 
@@ -2193,7 +2265,7 @@ function CampaignsBoard({
             flexWrap: "wrap",
           }}
         >
-          <div style={{ display: "flex", gap: 28, overflowX: "auto", minWidth: 0 }}>
+          <div style={{ display: "flex", gap: 28, overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", minWidth: 0, marginBottom: -1 }}>
             {boardTabs.map((tab) => (
               <button
                 key={tab.id}
@@ -2203,7 +2275,6 @@ function CampaignsBoard({
                   background: "none",
                   border: "none",
                   padding: "0 0 12px",
-                  marginBottom: -1,
                   fontSize: 14,
                   fontFamily: "inherit",
                   fontWeight: boardTab === tab.id ? 600 : 400,
@@ -2313,7 +2384,7 @@ function CampaignsBoard({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {filtered.map((campaign) => {
+            {filtered.map((campaign, index) => {
               const platforms = platformsForCampaign(campaign.platform);
               const totalCreators = campaign.creators ?? campaign.creatorIds?.length ?? 0;
               const salesRevenue = Number(campaign.sales ?? 0) || 0;
@@ -2327,8 +2398,10 @@ function CampaignsBoard({
                 <button
                   key={campaign.id}
                   type="button"
+                  className="sp-list-in"
                   onClick={() => onOpenCampaign(campaign.id)}
                   style={{
+                    animationDelay: `${index * 60}ms`,
                     display: "block",
                     width: "100%",
                     textAlign: "left",
@@ -2349,7 +2422,10 @@ function CampaignsBoard({
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{campaign.name}</div>
+                    <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
+                      {campaign.name}
+                      {campaign.id.startsWith("sample-") ? <span className="sp-sample-tag">{fr ? "Exemple" : "Sample"}</span> : null}
+                    </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       {campaign.status === "Draft" && (
                         <span title={lang === "fr" ? "Brouillon" : "Draft"} style={{ color: "var(--ws-text-dim)", display: "flex" }}>
@@ -3935,13 +4011,19 @@ function CreatorsTab({
     <Card title={lang === "fr" ? "Créateurs de la campagne" : "Campaign creators"}>
       <Table headers={headers}>
         {loading ? (
-          <tr>
-            <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-              {lang === "fr" ? "Chargement…" : "Loading…"}
-            </td>
-          </tr>
+          <LoadingTableRow colSpan={headers.length} />
         ) : rows.length === 0 ? (
-          <EmptyTableRow lang={lang} colSpan={headers.length} />
+          <EmptyTableRow
+            lang={lang}
+            colSpan={headers.length}
+            message={
+              lang === "fr"
+                ? "Aucun créateur dans cette campagne. Ajoutez-en : leurs ventes, commissions et codes promo s’afficheront ici."
+                : "No creators in this campaign yet. Add some: their sales, commissions and promo codes will show up here."
+            }
+            actionLabel={lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
+            onAction={onAddCreator}
+          />
         ) : (
           rows.map((row) => (
             <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
@@ -4116,17 +4198,9 @@ function AnalyticsTab({
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                    {lang === "fr" ? "Chargement…" : "Loading…"}
-                  </td>
-                </tr>
+                <LoadingTableRow colSpan={monthHeaders.length} />
               ) : monthRows.length === 0 ? (
-                <tr>
-                  <td colSpan={monthHeaders.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                    {monthEmptyMessage}
-                  </td>
-                </tr>
+                <EmptyTableRow lang={lang} colSpan={monthHeaders.length} message={monthEmptyMessage} />
               ) : (
                 monthRows.map((row, index) => {
                   const displayName = row.full_name || row.handle || "—";
@@ -4185,17 +4259,9 @@ function AnalyticsTab({
       <Card title={lang === "fr" ? "Performance par créateur" : "Performance by creator"}>
         <Table headers={headers}>
           {loading ? (
-            <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                {lang === "fr" ? "Chargement…" : "Loading…"}
-              </td>
-            </tr>
+            <LoadingTableRow colSpan={headers.length} />
           ) : rows.length === 0 ? (
-            <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                {emptyMessage}
-              </td>
-            </tr>
+            <EmptyTableRow lang={lang} colSpan={headers.length} message={emptyMessage} />
           ) : (
             rows.map((row) => (
                 <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>
@@ -4584,17 +4650,9 @@ function PayoutsTab({
         )}
         <Table headers={headers}>
           {loading ? (
-            <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                {lang === "fr" ? "Chargement…" : "Loading…"}
-              </td>
-            </tr>
+            <LoadingTableRow colSpan={headers.length} />
           ) : rows.length === 0 ? (
-            <tr>
-              <td colSpan={headers.length} style={{ padding: "32px 14px", textAlign: "center", color: "var(--ws-text-dim)", fontSize: 13 }}>
-                {emptyMessage}
-              </td>
-            </tr>
+            <EmptyTableRow lang={lang} colSpan={headers.length} message={emptyMessage} />
           ) : (
             rows.map((row) => (
           <tr key={row.id} style={{ borderBottom: "1px solid var(--ws-border)" }}>

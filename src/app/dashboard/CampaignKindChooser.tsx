@@ -1,24 +1,72 @@
 "use client";
 
 import type { CampaignKind } from "@/lib/dashboard-navigation";
+import { useLang } from "@/lib/useLang";
+import "./sample-preview.css";
+import "./campaign-kind.css";
 
-const CHOICES: { kind: CampaignKind; title: string; text: string }[] = [
+const CHOICES: { kind: CampaignKind; title: { en: string; fr: string }; text: { en: string; fr: string }; tags: { en: string[]; fr: string[] } }[] = [
   {
     kind: "affiliate",
-    title: "Affiliation",
-    text: "A code, a commission, and the sales tied to the campaign.",
+    title: { en: "Affiliation", fr: "Affiliation" },
+    text: {
+      en: "A code, a commission, and the sales tied to the campaign.",
+      fr: "Un code, une commission, et les ventes rattachées à la campagne.",
+    },
+    tags: { en: ["Promo code", "Commission", "Payouts"], fr: ["Code promo", "Commission", "Paiements"] },
   },
   {
     kind: "gifting",
-    title: "Gifting",
-    text: "A gifted product, a frozen contract, a parcel, then the video.",
+    title: { en: "Gifting", fr: "Gifting" },
+    text: {
+      en: "A gifted product, a frozen contract, a parcel, then the video.",
+      fr: "Un produit offert, un contrat figé, un colis, puis la vidéo.",
+    },
+    tags: { en: ["Contract", "Parcel", "Ad rights"], fr: ["Contrat", "Colis", "Droits ads"] },
   },
   {
     kind: "rpm",
-    title: "RPM",
-    text: "A rate per thousand views, tracked on the published videos.",
+    title: { en: "RPM", fr: "RPM" },
+    text: {
+      en: "A rate per thousand views, tracked on the published videos.",
+      fr: "Un tarif pour mille vues, suivi sur les vidéos publiées.",
+    },
+    tags: { en: ["Views", "Rate per 1,000", "Payouts"], fr: ["Vues", "Tarif pour 1 000", "Paiements"] },
   },
 ];
+
+function KindScene({ kind }: { kind: CampaignKind }) {
+  if (kind === "affiliate") {
+    return (
+      <div className="ck-scene ck-scene--affiliate" aria-hidden>
+        <span className="ck-code">SUMMER15</span>
+        <span className="ck-coin">€</span>
+        <span className="ck-coin" style={{ animationDelay: ".6s" }}>€</span>
+        <span className="ck-coin" style={{ animationDelay: "1.2s" }}>€</span>
+      </div>
+    );
+  }
+  if (kind === "gifting") {
+    return (
+      <div className="ck-scene ck-scene--gifting" aria-hidden>
+        <span className="ck-track" />
+        <span className="ck-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5v-9z" fill="currentColor" fillOpacity=".12" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+            <path d="M3 7.5L12 12l9-4.5M12 12v9" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="ck-scene ck-scene--rpm" aria-hidden>
+      {[38, 62, 48, 80, 66, 94].map((h, i) => (
+        <span key={i} style={{ ["--h" as string]: `${h}%`, animationDelay: `${i * 0.12}s` }} />
+      ))}
+    </div>
+  );
+}
 
 export function CampaignKindChooser({
   isMobile,
@@ -29,23 +77,41 @@ export function CampaignKindChooser({
   onPick: (kind: CampaignKind) => void;
   onClose: () => void;
 }) {
+  const lang = useLang();
+  const fr = lang === "fr";
   return (
-    <div style={{ minHeight: "100%", background: "var(--ws-bg)", color: "var(--ws-text)", padding: isMobile ? 16 : "48px 64px" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
-        <button type="button" onClick={onClose} style={quiet}>
-          Back
+    <div className={`ck-page${isMobile ? " is-mobile" : ""}`}>
+      <div className="ck-inner">
+        <button type="button" onClick={onClose} className="sp-back">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {fr ? "Retour" : "Back"}
         </button>
-        <h1 style={{ fontSize: isMobile ? 28 : 36, letterSpacing: "-0.04em", margin: "18px 0 8px" }}>
-          Create a campaign
-        </h1>
-        <p style={{ margin: "0 0 28px", color: "var(--ws-text-muted)" }}>
-          One start. The rest of the flow depends on what you want to measure.
+        <h1>{fr ? "Créer une campagne" : "Create a campaign"}</h1>
+        <p className="ck-lead">
+          {fr
+            ? "Un seul départ. La suite dépend de ce que vous voulez mesurer."
+            : "One start. The rest of the flow depends on what you want to measure."}
         </p>
-        <div style={{ display: "grid", gap: 12 }}>
-          {CHOICES.map((choice) => (
-            <button key={choice.kind} type="button" onClick={() => onPick(choice.kind)} style={card}>
-              <strong style={{ fontSize: 18 }}>{choice.title}</strong>
-              <span style={{ color: "var(--ws-text-muted)" }}>{choice.text}</span>
+        <div className="ck-grid">
+          {CHOICES.map((choice, i) => (
+            <button
+              key={choice.kind}
+              type="button"
+              onClick={() => onPick(choice.kind)}
+              className="ck-card"
+              style={{ animationDelay: `${i * 80}ms` }}
+            >
+              <KindScene kind={choice.kind} />
+              <strong>{choice.title[lang]}</strong>
+              <span className="ck-text">{choice.text[lang]}</span>
+              <span className="ck-tags">
+                {choice.tags[lang].map((tag) => (
+                  <em key={tag}>{tag}</em>
+                ))}
+              </span>
+              <span className="ck-go" aria-hidden>→</span>
             </button>
           ))}
         </div>
@@ -53,25 +119,3 @@ export function CampaignKindChooser({
     </div>
   );
 }
-
-const quiet: React.CSSProperties = {
-  border: 0,
-  background: "transparent",
-  color: "var(--ws-text-muted)",
-  padding: 0,
-  cursor: "pointer",
-  font: "inherit",
-};
-
-const card: React.CSSProperties = {
-  display: "grid",
-  gap: 6,
-  textAlign: "left",
-  padding: "18px 18px",
-  borderRadius: 16,
-  border: "1px solid var(--ws-border)",
-  background: "var(--ws-surface)",
-  color: "inherit",
-  cursor: "pointer",
-  font: "inherit",
-};

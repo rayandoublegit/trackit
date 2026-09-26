@@ -2726,7 +2726,7 @@ export function PayoutsView({
         { credentials: "include" },
         { preferCache: true, ttlMs: 20_000 },
       );
-      setCompletedPayouts(Array.isArray(data.payouts) ? data.payouts : []);
+      setCompletedPayouts(Array.isArray(data?.payouts) ? data.payouts : []);
     } catch (e) {
       console.error(e);
     }

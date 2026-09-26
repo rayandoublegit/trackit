@@ -269,6 +269,13 @@ function DashboardPageContent() {
       navigate({ view: "dashboard" }, { replace: true });
     }
   }, [isCreator, view, navigate]);
+
+  // Marque : « content » est l'espace de dépôt créateur, qui ne rend rien pour une marque.
+  useEffect(() => {
+    if (!loading && user && !isCreator && view === "content") {
+      navigate({ view: "brand-content" }, { replace: true });
+    }
+  }, [loading, user, isCreator, view, navigate]);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
   const [shopifyStore, setShopifyStore] = useState<string | null>(null);
   const plan = normalizePlan(profile?.plan);

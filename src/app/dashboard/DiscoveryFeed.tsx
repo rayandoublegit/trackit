@@ -1,5 +1,9 @@
 "use client";
 
+import "./sample-preview.css";
+import "./gifting-view.css";
+import "./discovery-motion.css";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlanTier } from "@/lib/plan-limits";
 import {
@@ -1005,6 +1009,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [filterPaywall, setFilterPaywall] = useState(false);
   const [gatePaywall, setGatePaywall] = useState(false);
   const [selected, setSelected] = useState<FeedCreator | null>(null);
@@ -1213,7 +1218,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       .catch(() => { if (!cancelled) setError("network"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [discoverAndFetch, isMobile, plan]);
+  }, [discoverAndFetch, isMobile, plan, retryKey]);
 
   useEffect(() => {
     if (!hasDiscoveryCap) return;
@@ -1499,7 +1504,32 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             </div>
           </div>
 
-          {error && <div style={{ color: "#dc2626", fontSize: 14, marginBottom: 12 }}>{t.error} : {error}</div>}
+          {error && (
+            <div className="gv-alert" role="alert" style={{ marginBottom: 12 }}>
+              <div>
+                <strong>{t.catalogDownTitle}</strong>
+                <p>{error === "network" ? t.networkDownBody : t.catalogDownBody}</p>
+              </div>
+              <button type="button" className="sample-clear" onClick={() => setRetryKey((k) => k + 1)}>
+                {t.retry}
+              </button>
+            </div>
+          )}
+          {loading && !discoveryGateActive && items.length === 0 && !error ? (
+            <div className="df-skeleton" aria-hidden>
+              {Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="df-skeleton__row" style={{ animationDelay: `${i * 0.08}s` }}>
+                  <span className="df-skeleton__avatar" />
+                  <span className="df-skeleton__lines">
+                    <i style={{ width: `${48 + ((i * 17) % 30)}%` }} />
+                    <i style={{ width: `${28 + ((i * 11) % 20)}%` }} />
+                  </span>
+                  <span className="df-skeleton__stat" />
+                  <span className="df-skeleton__stat" />
+                </div>
+              ))}
+            </div>
+          ) : null}
           {!loading && !error && isCreatorSearchMiss && (
             <div
               style={{
@@ -1541,8 +1571,14 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             </div>
           )}
           {!loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && (
-            <div style={{ background: "var(--ws-surface)", border: "1px dashed var(--ws-border)", borderRadius: 12, padding: 48, textAlign: "center", color: "var(--ws-text-dim)", fontSize: 14 }}>
-              {t.noCreators}
+            <div className="sp-empty">
+              <div className="df-empty__orbit" aria-hidden>
+                <span /><span /><span />
+              </div>
+              <p>
+                <strong style={{ display: "block", color: "var(--ws-text)", marginBottom: 4 }}>{t.noCreators}</strong>
+                {t.noCreatorsHint}
+              </p>
             </div>
           )}
 
