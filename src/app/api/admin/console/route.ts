@@ -8,6 +8,7 @@ import { compAccess } from "@/lib/comp-plan";
 import { normalizePlan } from "@/lib/plan-limits";
 import { PLAN_PRICES } from "@/lib/plan-marketing";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { listProfileRows } from "@/lib/profile-row";
 
 export const dynamic = "force-dynamic";
 
@@ -85,18 +86,38 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 
-  const { data: users, error } = await db
-    .from("profiles")
-    .select(
-      "id, email, full_name, username, plan, role, subscription_active, subscription_status, stripe_customer_id, stripe_subscription_id, account_type, created_at"
-    )
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const listed = await listProfileRows<ProfileRow>(db, [
+    "id",
+    "email",
+    "full_name",
+    "username",
+    "plan",
+    "role",
+    "subscription_active",
+    "subscription_status",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "account_type",
+    "created_at",
+  ]);
+  if (listed.error) {
+    return NextResponse.json({ error: listed.error }, { status: 500 });
   }
 
-  const rows = (users ?? []) as ProfileRow[];
+  const emails = new Map<string, string>();
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error: usersError } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+    if (usersError || !data.users.length) break;
+    for (const user of data.users) {
+      if (user.email) emails.set(user.id, user.email);
+    }
+    if (data.users.length < 1000) break;
+  }
+
+  const rows = listed.rows.map((user) => ({
+    ...user,
+    email: user.email || emails.get(user.id) || null,
+  }));
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   let metrics = metricsFromProfiles(rows);
   let growth = null;

@@ -4,6 +4,7 @@ import { checkoutPlanMetadata } from "@/lib/checkout";
 import { COMPED_STATUS, giftedStatus, isCompStatus } from "@/lib/comp-plan";
 import { normalizePlan } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/admin-auth";
+import { selectProfileRow } from "@/lib/profile-row";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { syncFromStripeSubscription } from "@/lib/stripe-billing";
 import {
@@ -55,14 +56,20 @@ export async function POST(req: NextRequest) {
   }
 
   // Recupere le profil cible
-  const { data: target, error: targetErr } = await db
-    .from("profiles")
-    .select("id, email, role, stripe_subscription_id, stripe_customer_id")
-    .eq("id", userId)
-    .maybeSingle();
+  const target = await selectProfileRow<{
+    id: string;
+    email: string | null;
+    role: string | null;
+    stripe_subscription_id: string | null;
+    stripe_customer_id: string | null;
+  }>(db, userId, ["id", "email", "role", "stripe_subscription_id", "stripe_customer_id"]);
 
-  if (targetErr || !target) {
+  if (!target) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+  if (!target.email) {
+    const { data: authUser } = await db.auth.admin.getUserById(userId);
+    target.email = authUser.user?.email ?? null;
   }
 
   // --- Action: changer le role (DB) ---
