@@ -8,7 +8,7 @@ import {
 export function discoveryCopy(lang: Lang) {
   const fr = lang === "fr";
   return {
-    findItTitle: "Find It",
+    findItTitle: fr ? "Trouver des créateurs" : "Find creators",
     findItSubtitle: fr
       ? "Trouve les meilleurs créateurs pour ton produit."
       : "Find the best creators for your product.",

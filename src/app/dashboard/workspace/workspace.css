@@ -200,9 +200,9 @@ body.dashboard-page {
 }
 
 .ws-rail__item span {
-  font-size: 9px;
+  font-size: 8.5px;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.035em;
   line-height: 1.1;
   text-align: center;
   max-width: 100%;

@@ -8,6 +8,7 @@ import { SAMPLE_CAMPAIGN_DETAILS, sampleDailyRevenue } from "@/lib/sample-campai
 import { ActivityFeed, RevenueChart } from "./SampleCampaignPreview";
 import { CountUp } from "./sample-motion";
 import { samplesHidden } from "@/lib/sample-workspace";
+import { HOME_STEP_ORDER, homeStepById, homeStepDone, nextHomeStep, type HomeStep } from "@/lib/home-next-step";
 
 const BLUE = "#0047FF";
 
@@ -154,14 +155,21 @@ function BrandHomeOverview({
   activeCampaigns: number;
   onNavigate: (view: DashboardView) => void;
 }) {
-  const setupDone = [gettingStarted.creators, gettingStarted.outreach, gettingStarted.sales].filter(Boolean).length;
+  const progress = {
+    shopify: gettingStarted.shopify,
+    creatorsCount: gettingStarted.creatorsCount,
+    salesCount: gettingStarted.salesCount,
+    activeCampaigns,
+  };
+  const nextStep = nextHomeStep(progress);
+  const setupDone = HOME_STEP_ORDER.filter((id) => homeStepDone(id, progress)).length;
   const programEmpty =
     gettingStarted.countsLoaded === true &&
     !samplesHidden(userId) &&
     gettingStarted.creatorsCount === 0 &&
     gettingStarted.salesCount === 0 &&
     activeCampaigns === 0;
-  const setupTotal = 3;
+  const setupTotal = HOME_STEP_ORDER.length;
 
   return (
     <>
@@ -179,6 +187,9 @@ function BrandHomeOverview({
         }
       />
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32 }}>
+        {gettingStarted.countsLoaded ? (
+          <NextStepCard lang={lang} step={nextStep} done={setupDone} total={setupTotal} onGo={() => onNavigate(nextStep.view)} />
+        ) : null}
         <div
           style={{
             display: "grid",
@@ -236,9 +247,10 @@ function BrandHomeOverview({
               <div style={{ width: `${(setupDone / setupTotal) * 100}%`, height: "100%", background: BLUE, borderRadius: 999, transition: "width 0.3s ease" }} />
             </div>
             {[
-              { done: gettingStarted.creators, label: lang === "fr" ? "Ajouter vos premiers créateurs" : "Add your first creators", view: "discovery" as DashboardView },
-              { done: gettingStarted.outreach, label: lang === "fr" ? "Envoyer un premier message" : "Send your first outreach", view: "outreach" as DashboardView },
-              { done: gettingStarted.sales, label: lang === "fr" ? "Suivre votre première vente" : "Track your first sale", view: "payouts" as DashboardView },
+              ...HOME_STEP_ORDER.map((id) => {
+                const step = homeStepById(id);
+                return { done: homeStepDone(id, progress), label: step.title[lang], view: step.view };
+              }),
             ].map((step) => (
               <button
                 key={step.label}
@@ -288,6 +300,54 @@ function BrandHomeOverview({
         </div>
       </div>
     </>
+  );
+}
+
+function NextStepCard({
+  lang,
+  step,
+  done,
+  total,
+  onGo,
+}: {
+  lang: "en" | "fr";
+  step: HomeStep;
+  done: number;
+  total: number;
+  onGo: () => void;
+}) {
+  const fr = lang === "fr";
+  const pct = total > 0 ? done / total : 0;
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <section className="hs-card" key={step.id}>
+      <div className="hs-ring" aria-label={fr ? `${done} étapes sur ${total}` : `${done} of ${total} steps`}>
+        <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden>
+          <circle cx="32" cy="32" r={r} className="hs-ring__track" />
+          <circle
+            cx="32"
+            cy="32"
+            r={r}
+            className="hs-ring__fill"
+            strokeDasharray={c}
+            style={{ ["--hs-off" as string]: `${c * (1 - pct)}`, ["--hs-full" as string]: `${c}` }}
+          />
+        </svg>
+        <span>
+          {done}/{total}
+        </span>
+      </div>
+      <div className="hs-copy">
+        <p className="hs-kicker">{step.id === "grow" ? (fr ? "Et maintenant" : "What next") : fr ? "Prochaine étape" : "Next step"}</p>
+        <h2>{step.title[lang]}</h2>
+        <p>{step.body[lang]}</p>
+      </div>
+      <button type="button" className="es-primary hs-cta" onClick={onGo}>
+        {step.cta[lang]}
+        <span aria-hidden>→</span>
+      </button>
+    </section>
   );
 }
 

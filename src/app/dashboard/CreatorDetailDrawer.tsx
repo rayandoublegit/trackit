@@ -26,6 +26,8 @@ import { PlatformBrandIcon } from "@/app/dashboard/PlatformBrandIcon";
 import { discoveryCopy, engagementInsightCopy } from "@/lib/discovery-copy";
 import type { Lang } from "@/lib/useLang";
 import { setCachedAvatarUrl } from "@/lib/avatar-url-cache";
+import { useDashboardNavigationOptional } from "@/app/dashboard/DashboardNavigationProvider";
+import { queueCreatorForCampaign, queueCreatorForGift, requestCampaignsTab } from "@/lib/creator-handoff";
 import {
   fetchCreatorDetail,
   getCachedCreatorDetail,
@@ -58,6 +60,19 @@ const drawerActionBase: CSSProperties = {
   letterSpacing: "-0.02em",
   fontSize: 13,
   borderRadius: 8,
+};
+
+const drawerMenuItem: CSSProperties = {
+  textAlign: "left",
+  border: "none",
+  background: "transparent",
+  borderRadius: 8,
+  padding: "8px 10px",
+  font: "inherit",
+  fontSize: 13,
+  fontWeight: 550,
+  color: "var(--ws-text)",
+  cursor: "pointer",
 };
 
 const drawerBtnSecondary: CSSProperties = {
@@ -767,6 +782,37 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
     }
   };
 
+  const nav = useDashboardNavigationOptional();
+  const [routeBusy, setRouteBusy] = useState(false);
+  const fr = lang === "fr";
+
+  /** Brings the campaign picker below into view and opens it: adding to a campaign happens in place. */
+  const openCampaignPicker = () => {
+    campaignMenuRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    setCampaignMenuOpen(true);
+  };
+
+  /** Saves the creator (campaigns and gifts only take saved creators), then opens the target screen with them pre-selected. */
+  const routeCreator = async (target: { newCampaign?: boolean; gift?: boolean }) => {
+    if (!creator || !nav || routeBusy) return;
+    setRouteBusy(true);
+    try {
+      if (!(await ensureSaved())) return;
+      if (target.gift) {
+        queueCreatorForGift(creator.username);
+        requestCampaignsTab("gifting");
+        nav.navigate({ view: "campaigns" });
+      } else {
+        queueCreatorForCampaign(creator.username);
+        nav.navigate({ view: "campaigns", campaign: { type: "new", kind: "affiliate" } });
+      }
+      setCampaignMenuOpen(false);
+      onClose();
+    } finally {
+      setRouteBusy(false);
+    }
+  };
+
   const onToggleHide = () => {
     if (!creator) return;
     if (hidden) {
@@ -1180,6 +1226,16 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                       );
                     })
                   )}
+                  {nav ? (
+                    <button
+                      type="button"
+                      onClick={() => void routeCreator({ newCampaign: true })}
+                      disabled={routeBusy}
+                      style={{ ...drawerMenuItem, width: "100%", marginTop: 4, color: "var(--ws-accent)", fontWeight: 650 }}
+                    >
+                      + {fr ? "Nouvelle campagne avec ce créateur" : "New campaign with this creator"}
+                    </button>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1320,6 +1376,14 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 </div>
               )}
             </div>
+            <button type="button" onClick={openCampaignPicker} style={{ ...drawerBtnSecondary, fontWeight: 650 }}>
+              {fr ? "Ajouter à une campagne" : "Add to a campaign"}
+            </button>
+            {nav ? (
+              <button type="button" onClick={() => void routeCreator({ gift: true })} disabled={routeBusy} style={drawerBtnSecondary}>
+                {fr ? "Envoyer un cadeau" : "Send a gift"}
+              </button>
+            ) : null}
             <button type="button" onClick={onToggleHide} style={drawerBtnSecondary}>
               {hidden ? t.unhideCreator : t.hideCreator}
             </button>

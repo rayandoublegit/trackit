@@ -403,23 +403,23 @@ export function WorkspaceShell({
         { space: "home", label: lang === "fr" ? "Accueil" : "Home", icon: "home" },
         { space: "infos", label: "Infos", icon: "list" },
         { space: "content", label: lang === "fr" ? "Contenu" : "Content", icon: "camera" },
-        { space: "payit", label: "Pay it", icon: "payit" },
+        { space: "payit", label: lang === "fr" ? "Paiements" : "Payouts", icon: "payit" },
       ];
     }
     return [
-      { space: "home", label: "Home", icon: "home" },
-      { space: "findit", label: "Discover", icon: "findit" },
-      { space: "trackit", label: "Campaign", icon: "trackit" },
-      { space: "payit", label: "Pay it", icon: "payit" },
+      { space: "home", label: lang === "fr" ? "Accueil" : "Home", icon: "home" },
+      { space: "findit", label: lang === "fr" ? "Créateurs" : "Creators", icon: "findit" },
+      { space: "trackit", label: lang === "fr" ? "Campagnes" : "Campaigns", icon: "trackit" },
+      { space: "payit", label: lang === "fr" ? "Paiements" : "Payouts", icon: "payit" },
     ];
   }, [isCreator, lang]);
 
   const sideTitle = useMemo(() => {
     const map: Record<WorkspaceSpace, string> = {
-      home: "Home",
-      findit: "Discover",
+      home: lang === "fr" ? "Accueil" : "Home",
+      findit: lang === "fr" ? "Créateurs" : "Creators",
       trackit: lang === "fr" ? "Campagnes" : "Campaigns",
-      payit: "Pay it",
+      payit: lang === "fr" ? "Paiements" : "Payouts",
       planner: lang === "fr" ? "Planner" : "Planner",
       notes: "Notes",
       whiteboard: "Whiteboard",
@@ -446,7 +446,7 @@ export function WorkspaceShell({
       }
       if (activeSpace === "payit") {
         return [
-          { id: "payouts", label: "Pay it", view: "payouts", icon: "payit" },
+          { id: "payouts", label: lang === "fr" ? "Mes gains" : "My earnings", view: "payouts", icon: "payit" },
           { id: "balance", label: lang === "fr" ? "Solde" : "Balance", view: "balance", icon: "billing" },
         ];
       }
@@ -492,27 +492,23 @@ export function WorkspaceShell({
           { id: "gifting", label: "Gifting", view: "gifting", icon: "invite" },
         ];
       }
-      return [{ id: "home", label: "Home", view: "dashboard", icon: "home" }];
+      return [{ id: "home", label: lang === "fr" ? "Accueil" : "Home", view: "dashboard", icon: "home" }];
     }
 
     switch (activeSpace) {
       case "home":
         return [
-          {
-            id: "inbox",
-            label: "Inbox",
-            view: "notifications",
-            icon: "inbox",
-          },
-          { id: "outreach", label: "Outreach", view: "outreach", icon: "invite" },
-          { id: "tasks", label: "Tasks", view: "tasks", icon: "tasks" },
+          { id: "overview", label: lang === "fr" ? "Vue d’ensemble" : "Overview", view: "dashboard", icon: "home" },
+          { id: "inbox", label: "Notifications", view: "notifications", icon: "inbox" },
+          { id: "outreach", label: lang === "fr" ? "Prospection" : "Outreach", view: "outreach", icon: "invite" },
+          { id: "tasks", label: lang === "fr" ? "Tâches" : "Tasks", view: "tasks", icon: "tasks" },
         ];
       case "findit":
         return [
-          { id: "discovery", label: "Discovery", view: "discovery", icon: "findit" },
-          { id: "findit-inbox", label: "Inbox", view: "findit-inbox", icon: "inbox" },
-          { id: "creators", label: lang === "fr" ? "Gérer" : "Manage", view: "creators", icon: "users" },
-          { id: "outreach", label: "Outreach", view: "outreach", icon: "invite" },
+          { id: "discovery", label: lang === "fr" ? "Rechercher" : "Search", view: "discovery", icon: "findit" },
+          { id: "findit-inbox", label: lang === "fr" ? "Réception" : "Inbox", view: "findit-inbox", icon: "inbox" },
+          { id: "creators", label: lang === "fr" ? "Mes listes" : "My lists", view: "creators", icon: "users" },
+          { id: "outreach", label: lang === "fr" ? "Prospection" : "Outreach", view: "outreach", icon: "invite" },
         ];
       case "community":
         return [
@@ -525,7 +521,7 @@ export function WorkspaceShell({
         ];
       case "payit":
         return [
-          { id: "payouts", label: "Pay it", view: "payouts", icon: "payit" },
+          { id: "payouts", label: lang === "fr" ? "À payer" : "To pay", view: "payouts", icon: "payit" },
           ...(stripeConnectActive
             ? [{ id: "balance", label: lang === "fr" ? "Solde" : "Balance", view: "balance" as const, icon: "billing" as const }]
             : []),
@@ -575,9 +571,9 @@ export function WorkspaceShell({
         return [{ id: "content", label: lang === "fr" ? "Contenu" : "Content", view: "brand-content", icon: "camera" }];
       default:
         return [
-          { id: "inbox", label: "Inbox", view: "notifications", icon: "inbox" },
-          { id: "outreach", label: "Outreach", view: "outreach", icon: "invite" },
-          { id: "tasks", label: "Tasks", view: "tasks", icon: "tasks" },
+          { id: "inbox", label: "Notifications", view: "notifications", icon: "inbox" },
+          { id: "outreach", label: lang === "fr" ? "Prospection" : "Outreach", view: "outreach", icon: "invite" },
+          { id: "tasks", label: lang === "fr" ? "Tâches" : "Tasks", view: "tasks", icon: "tasks" },
         ];
     }
   }, [activeSpace, campaigns, isCreator, lang, notificationUnread, stripeConnectActive]);
@@ -936,7 +932,7 @@ export function WorkspaceShell({
                 onClick={() => onNavigate("ai")}
               >
                 <WsIcon name="sparkle" size={16} />
-                <span>Ask Mino</span>
+                <span>{lang === "fr" ? "Demander à Mino" : "Ask Mino"}</span>
               </button>
             </div>
             {searchOpen && search.trim() ? (
@@ -976,18 +972,6 @@ export function WorkspaceShell({
           </div>
           </div>
 
-          {!isCreator ? (
-            <div className="ws-feature-pills">
-              <button type="button" className="ws-feature-pill" onClick={openRecentCampaignAnalytics}>
-                <WsIcon name="analytics" size={16} />
-                <span>Stats</span>
-              </button>
-              <button type="button" className="ws-feature-pill" onClick={() => onNavigate("whiteboard")}>
-                <WsIcon name="whiteboard" size={16} />
-                <span>Whiteboard</span>
-              </button>
-            </div>
-          ) : null}
 
           {isCreator ? (
           <div className="ws-top-actions">
@@ -999,15 +983,6 @@ export function WorkspaceShell({
               onClick={openRecentCampaignAnalytics}
             >
               <WsIcon name="analytics" size={17} />
-            </button>
-            <button
-              type="button"
-              className="ws-icon-btn ws-top-actions__desk"
-              data-tip="Whiteboard"
-              aria-label="Whiteboard"
-              onClick={() => onNavigate("whiteboard")}
-            >
-              <WsIcon name="whiteboard" size={17} />
             </button>
 
             <div
@@ -1179,7 +1154,7 @@ export function WorkspaceShell({
                 {activeSpace === "findit" && !isCreator ? (
                   <>
                     <div className="ws-sidebar__section">
-                      <div className="ws-sidebar__section-label">Navigation</div>
+                      <div className="ws-sidebar__section-label">{lang === "fr" ? "Trouver" : "Find"}</div>
                       {sideLinks
                         .filter((link) => link.id === "discovery")
                         .map((link) => (
@@ -1686,7 +1661,7 @@ export function WorkspaceShell({
                       }}
                     >
                       <WsIcon name="invite" size={14} />
-                      <span>Outreach</span>
+                      <span>{lang === "fr" ? "Prospection" : "Outreach"}</span>
                     </button>
                   </div>
                 ) : null}

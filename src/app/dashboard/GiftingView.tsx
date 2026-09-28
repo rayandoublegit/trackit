@@ -14,6 +14,7 @@ import {
 } from "@/lib/gifting-board";
 import { SAMPLE_CAMPAIGN_DETAILS } from "@/lib/sample-campaign-preview";
 import { useLang } from "@/lib/useLang";
+import { takeCreatorForGift } from "@/lib/creator-handoff";
 import { GiftPipeline } from "./SampleCampaignPreview";
 import { CountUp, SampleAvatar } from "./sample-motion";
 import "./sample-preview.css";
@@ -59,6 +60,7 @@ export function GiftingView({
   plan = "free",
   onUpgrade,
   startCreating = false,
+  embedded = false,
 }: {
   isMobile?: boolean;
   isCreator?: boolean;
@@ -66,6 +68,8 @@ export function GiftingView({
   onUpgrade?: () => void;
   /** Opens the new-campaign form right away (used from "Create a campaign"). */
   startCreating?: boolean;
+  /** Shown inside the Campaigns board: no page padding or page title. */
+  embedded?: boolean;
 }) {
   const lang = useLang();
   const fr = lang === "fr";
@@ -93,6 +97,25 @@ export function GiftingView({
   const [creating, setCreating] = useState(startCreating && !isCreator);
   const paid = plan !== "free";
   const [openId, setOpenId] = useState<string | null>(null);
+  // A creator sent from Discovery ("Send a gift") waits here until a campaign is picked.
+  const [pendingHandle, setPendingHandle] = useState<string | null>(null);
+  useEffect(() => {
+    if (isCreator) return;
+    const handle = takeCreatorForGift();
+    if (handle) setPendingHandle(handle);
+  }, [isCreator]);
+  useEffect(() => {
+    if (!pendingHandle || !loaded || loadError) return;
+    if (campaigns.length === 0) {
+      setCreating(true);
+      return;
+    }
+    setInviteHandles((prev) => {
+      const next = { ...prev };
+      for (const c of campaigns) if (!next[c.id]) next[c.id] = pendingHandle;
+      return next;
+    });
+  }, [pendingHandle, loaded, loadError, campaigns]);
 
   const load = useCallback(async () => {
     try {
@@ -175,9 +198,9 @@ export function GiftingView({
   const campaignTitle = (id: string) => campaigns.find((c) => c.id === id)?.name ?? "";
 
   return (
-    <div className={`gv-page${isMobile ? " is-mobile" : ""}`}>
+    <div className={`gv-page${isMobile ? " is-mobile" : ""}${embedded ? " is-embedded" : ""}`}>
       <header className="gv-head">
-        <div>
+        <div className="gv-head__copy">
           <p className="es-kicker">Gifting</p>
           <h1>
             {isCreator
@@ -194,7 +217,7 @@ export function GiftingView({
                 : "Lists, a frozen contract, the parcel and ad rights. A shown fee never triggers a payment."}
           </p>
         </div>
-        {!isCreator && !setupMissing ? (
+        {!isCreator && !loadError ? (
           <button type="button" className="es-primary" onClick={() => setCreating((v) => !v)}>
             {creating ? (fr ? "Fermer" : "Close") : fr ? "Nouvelle campagne cadeau" : "New gift campaign"}
           </button>
@@ -214,6 +237,26 @@ export function GiftingView({
           </div>
         ))}
       </div>
+
+      {pendingHandle && !isCreator && !loadError ? (
+        <div className="gv-alert is-info" role="status">
+          <div>
+            <strong>{fr ? `Cadeau pour @${pendingHandle}` : `Gift for @${pendingHandle}`}</strong>
+            <p>
+              {campaigns.length === 0
+                ? fr
+                  ? "Créez d’abord la campagne cadeau (produit, brief, droits), puis envoyez-lui la mission."
+                  : "Create the gift campaign first (product, brief, rights), then send them the mission."
+                : fr
+                  ? "Le pseudo est prêt dans chaque campagne ci-dessous : cliquez sur « Envoyer la mission » dans la bonne."
+                  : "The handle is filled in on each campaign below: click “Send mission” on the right one."}
+            </p>
+          </div>
+          <button type="button" className="gv-alert__close" aria-label={fr ? "Fermer" : "Dismiss"} onClick={() => setPendingHandle(null)}>
+            ×
+          </button>
+        </div>
+      ) : null}
 
       {loadError ? (
         <div className={`gv-alert${setupMissing ? " is-info" : ""}`} role="alert">
@@ -249,7 +292,7 @@ export function GiftingView({
         </div>
       ) : null}
 
-      {!isCreator && creating && !setupMissing ? (
+      {!isCreator && creating && !loadError ? (
         <section className="gv-card gift-create">
           <header className="gift-create__head">
             <h2>{fr ? "Campagne cadeau" : "Gift campaign"}</h2>
@@ -409,7 +452,7 @@ export function GiftingView({
                   : "Fictional creators. Each card moves one column per step: signature, shipping, delivery, video, approval."}
               </p>
             </div>
-            {!isCreator && !setupMissing ? (
+            {!isCreator && !loadError ? (
               <button type="button" className="es-primary" onClick={() => setCreating(true)}>
                 {fr ? "Créer la mienne" : "Create mine"}
               </button>

@@ -125,7 +125,7 @@ export function spaceForView(view: DashboardView): WorkspaceSpace {
 export function defaultViewForSpace(space: WorkspaceSpace): DashboardView {
   switch (space) {
     case "home":
-      return "ai";
+      return "dashboard";
     case "findit":
       return "discovery";
     case "trackit":
@@ -223,8 +223,9 @@ export function readInitialDashboardView(userId?: string | null): DashboardView 
   const params = new URLSearchParams(window.location.search);
   if (params.get("connect") === "return") return "payouts";
   const fromUrl = readViewFromUrl(window.location.search);
-  if (fromUrl && fromUrl !== "dashboard") return fromUrl;
+  if (fromUrl) return fromUrl;
   const saved = loadDashboardView(userId) ?? loadDashboardView();
-  if (saved && saved !== "dashboard") return saved;
-  return "discovery";
+  if (saved) return saved;
+  // First visit lands on Home, which shows the next step to take.
+  return "dashboard";
 }

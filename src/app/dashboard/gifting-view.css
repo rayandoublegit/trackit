@@ -100,3 +100,6 @@ button.gv-chip{cursor:pointer}
 @media (prefers-reduced-motion:reduce){
   .gv-page *,.gv-page *::before,.gv-page *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition:none!important}
 }
+.gv-page.is-embedded{padding:0;min-height:0;background:transparent}
+.gv-page.is-embedded .gv-head{justify-content:flex-end}
+.gv-page.is-embedded .gv-head__copy{display:none}

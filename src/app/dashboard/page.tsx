@@ -51,6 +51,7 @@ import { AffiliateLinksView } from "./AffiliateLinksView";
 import { DiscoveryFeed } from "./DiscoveryFeed";
 import { MyCreatorsView } from "./MyCreatorsView";
 import { DEV_BYPASS_PLAN } from "@/lib/dev-bypass";
+import { requestCampaignsTab } from "@/lib/creator-handoff";
 
 // Preview locale uniquement : /dashboard?as=creator. Lu avant que la navigation
 // ne réécrive l'URL, donc le tableau créateur reste accessible sans compte.
@@ -278,6 +279,11 @@ function DashboardPageContent() {
     }
     if (!loading && user && RETIRED_VIEWS.includes(view)) {
       navigate({ view: "dashboard" }, { replace: true });
+    }
+    // Côté marque, le gifting est un type de campagne : il vit dans l'onglet Cadeaux de Campagnes.
+    if (!loading && user && !isCreator && view === "gifting") {
+      requestCampaignsTab("gifting");
+      navigate({ view: "campaigns" }, { replace: true });
     }
   }, [loading, user, isCreator, view, navigate]);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
@@ -1106,7 +1112,7 @@ function DashboardPageContent() {
           />
           </KeepAlivePane>
         )}
-        {keep("gifting") && user && (
+        {keep("gifting") && user && isCreator && (
           <KeepAlivePane active={view === "gifting"}>
             <GiftingView isMobile={isMobile} isCreator={isCreator} plan={plan} onUpgrade={handleUpgradeBasic} />
           </KeepAlivePane>

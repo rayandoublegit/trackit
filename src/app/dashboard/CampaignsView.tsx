@@ -11,6 +11,7 @@ import { GiftingView } from "./GiftingView";
 import { SampleCampaignPreview } from "./SampleCampaignPreview";
 import "./discovery-motion.css";
 import { getSampleCampaignDetail } from "@/lib/sample-campaign-preview";
+import { takeCampaignsTab, takeCreatorForCampaign } from "@/lib/creator-handoff";
 import { RpmView } from "./RpmView";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
@@ -81,7 +82,7 @@ import {
 
 type CampaignStatus = "Active" | "Paused" | "Completed" | "Draft";
 type CampaignFilter = "all" | "active" | "paused" | "completed";
-type BoardTab = "active" | "drafts" | "finished";
+type BoardTab = "active" | "drafts" | "finished" | "gifting";
 type CampaignSort = "recent" | "name";
 type DetailTab = "creators" | "analytics";
 type CampaignDateRange = { start: string; end: string };
@@ -1298,6 +1299,7 @@ export function CampaignsView({
   const navKey = JSON.stringify(navState);
   useEffect(() => {
     setSamplePreviewId(null);
+    if (takeCampaignsTab() === "gifting") setBoardTab("gifting");
   }, [navKey]);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [creators, setCreators] = useState<CreatorBalanceRow[]>([]);
@@ -2004,6 +2006,7 @@ export function CampaignsView({
         onOpenCampaign={openCampaign}
         onCreate={tryOpenNewCampaign}
         onDeleteAll={() => void handleDeleteAllCampaigns()}
+        onUpgrade={onUpgrade}
       />
       {upgradeModalOpen && (
         <CampaignUpgradeModal plan={plan} lang={lang} onClose={() => setUpgradeModalOpen(false)} onUpgrade={onUpgrade} onUpgradePro={onUpgradePro} onUpgradeScale={onUpgradeScale} />
@@ -2146,6 +2149,7 @@ function CampaignsBoard({
   onCreate,
   onDismissSamples,
   onDeleteAll,
+  onUpgrade,
 }: {
   lang: "en" | "fr";
   isMobile?: boolean;
@@ -2163,6 +2167,7 @@ function CampaignsBoard({
   onCreate: () => void;
   onDismissSamples?: () => void;
   onDeleteAll: () => void;
+  onUpgrade?: () => void;
 }) {
   const pad = isMobile ? "16px 16px 24px" : "40px 40px 48px";
   const fr = lang === "fr";
@@ -2202,15 +2207,18 @@ function CampaignsBoard({
     return list;
   }, [campaigns, boardTab, search, sortOrder]);
 
-  const boardTabs: { id: BoardTab; label: string; count: number }[] = [
+  const boardTabs: { id: BoardTab; label: string; count: number | null }[] = [
     { id: "active", label: lang === "fr" ? "Actives" : "Active", count: tabCounts.active },
     { id: "drafts", label: lang === "fr" ? "Brouillons" : "Drafts", count: tabCounts.drafts },
     { id: "finished", label: lang === "fr" ? "Terminées" : "Finished", count: tabCounts.finished },
+    { id: "gifting", label: lang === "fr" ? "Cadeaux" : "Gifting", count: null },
   ];
 
-  if (campaigns.length === 0) {
+  if (campaigns.length === 0 && boardTab !== "gifting") {
     return (
       <EmptyStage
+        secondaryLabel={fr ? "Voir les cadeaux" : "See gifting"}
+        onSecondary={() => setBoardTab("gifting")}
         isMobile={isMobile}
         scene="campaign"
         kicker="Track it"
@@ -2290,12 +2298,17 @@ function CampaignsBoard({
                   whiteSpace: "nowrap",
                 }}
               >
-                {tab.label} ({tab.count})
+                {tab.label}
+                {tab.count === null ? null : ` (${tab.count})`}
               </button>
             ))}
           </div>
         </div>
 
+        {boardTab === "gifting" ? (
+          <GiftingView isMobile={isMobile} plan={plan} onUpgrade={onUpgrade} embedded />
+        ) : (
+        <>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", marginBottom: 24 }}>
           <div
             style={{
@@ -2358,6 +2371,7 @@ function CampaignsBoard({
               {lang === "fr" ? "Supprimer toutes les campagnes" : "Delete all campaigns"}
             </button>
           )}
+          {plan === "free" || creatorPool > 0 ? (
           <div style={{ marginLeft: isMobile ? 0 : "auto", fontSize: 13, color: "var(--ws-text-muted)", width: isMobile ? "100%" : "auto" }}>
             {plan === "free" ? (
               lang === "fr"
@@ -2367,6 +2381,7 @@ function CampaignsBoard({
               ? `${creatorsInCampaigns} sur ${creatorPool} créateurs (${creatorPct} %) ajoutés aux campagnes`
               : `${creatorsInCampaigns} of ${creatorPool} creators (${creatorPct}%) added to campaigns`}
           </div>
+          ) : null}
         </div>
 
         {filtered.length === 0 ? (
@@ -2485,6 +2500,8 @@ function CampaignsBoard({
               );
             })}
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
@@ -5465,6 +5482,20 @@ function NewCampaignOnboarding({
     const handles = parseHandlesFromText(usernameDraft);
     addHandles(handles, "manual");
   };
+
+  // A creator picked from Discovery ("Add to a campaign") arrives pre-selected, once.
+  const queuedCreatorRef = useRef<string | null | undefined>(undefined);
+  if (queuedCreatorRef.current === undefined && typeof window !== "undefined") {
+    queuedCreatorRef.current = takeCreatorForCampaign();
+  }
+  useEffect(() => {
+    const handle = queuedCreatorRef.current;
+    if (!handle || loadingCreators || !savedByHandle.has(handle)) return;
+    if ((isAddCreatorsMode || isEditMode) && !hasPreloadedCampaignCreatorsRef.current) return;
+    queuedCreatorRef.current = null;
+    addHandles([handle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingCreators, savedByHandle, addedCreators.length, isAddCreatorsMode, isEditMode]);
 
   const onCsvSelected = async (file: File | undefined) => {
     if (!file) return;
