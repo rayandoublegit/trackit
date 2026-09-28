@@ -1,6 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminDevPreview, requireAdmin } from "@/lib/admin-auth";
+import { countRows } from "@/lib/admin-data";
+import { devUserDetail } from "@/lib/admin-dev-fixtures";
+import type { UserSession, UserUsage } from "@/lib/admin-types";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +21,7 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseAdmin();
   if (!db) {
+    if (adminDevPreview()) return NextResponse.json(devUserDetail(userId));
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 
@@ -86,10 +90,40 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Usage across the product and recent sessions. A failed count stays null.
+  const byUser = (column: string) => (q: { eq: (c: string, v: string) => unknown }) => q.eq(column, userId);
+  const [campaigns, creators, sales, outreach, gifts, sessionRows, salesRows] = await Promise.all([
+    countRows(db, "campaigns", byUser("user_id")),
+    countRows(db, "creators", byUser("user_id")),
+    countRows(db, "sales", byUser("user_id")),
+    countRows(db, "outreach_history", byUser("user_id")),
+    countRows(db, "gift_missions", byUser("user_id")),
+    db
+      .from("user_sessions")
+      .select("device_label, location_label, ip_address, last_active_at")
+      .eq("user_id", userId)
+      .order("last_active_at", { ascending: false })
+      .limit(8),
+    db.from("sales").select("order_amount").eq("user_id", userId).limit(5000),
+  ]);
+  const usage: UserUsage = {
+    campaigns: campaigns.count,
+    creators: creators.count,
+    sales: sales.count,
+    salesRevenue: salesRows.error
+      ? null
+      : Math.round(((salesRows.data ?? []) as { order_amount: number | string | null }[]).reduce((s, r) => s + (Number(r.order_amount) || 0), 0) * 100) / 100,
+    outreach: outreach.count,
+    giftMissions: gifts.count,
+  };
+  const sessions: UserSession[] = sessionRows.error ? [] : ((sessionRows.data ?? []) as UserSession[]);
+
   return NextResponse.json({
     ok: true,
     profile,
     subscription,
     invoices,
+    usage,
+    sessions,
   });
 }

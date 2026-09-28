@@ -29,7 +29,6 @@ const emptyRow = (): Row => ({
 });
 
 export default function AddCreatorPage() {
-  const [secret, setSecret] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [platform, setPlatform] = useState<"TikTok" | "Instagram">("TikTok");
   const [loadHandle, setLoadHandle] = useState("");
@@ -55,7 +54,6 @@ export default function AddCreatorPage() {
     try {
       const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(h)}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${secret}` },
       });
       const data = await res.json();
       if (!data.ok) { setLoadMsg(data.error || "delete failed"); return; }
@@ -72,7 +70,6 @@ export default function AddCreatorPage() {
     setLoadMsg("loading…");
     try {
       const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(loadHandle)}`, {
-        headers: { Authorization: `Bearer ${secret}` },
       });
       const data = await res.json();
       if (!data.ok) { setLoadMsg(data.error || "not found"); return; }
@@ -114,7 +111,7 @@ export default function AddCreatorPage() {
       try {
         const res = await fetch("/api/admin/add-creator", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             handle: r.handle, displayName: r.displayName,
             followers: r.followers.trim(), bio: r.bio,
@@ -157,14 +154,12 @@ export default function AddCreatorPage() {
   const pending = rows.filter((r) => r.handle.trim()).length;
 
   return (
-    <div style={{ maxWidth: 560, margin: "40px auto", padding: 24, fontFamily: "system-ui, sans-serif" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Add Creators (manual)</h1>
-      <p style={{ color: "#888", fontSize: 13, marginBottom: 20 }}>
-        Curate by hand. Saved cards disappear once they&apos;re in the DB. Total saved this session: {savedTotal}.
+    <div className="ad-card" style={{ maxWidth: 640, width: "100%", padding: 24, color: "var(--ad-text)" }}>
+      <h1 style={{ fontSize: 22, marginBottom: 4, letterSpacing: "-0.03em" }}>Ajouter des créateurs</h1>
+      <p style={{ color: "var(--ad-muted)", fontSize: 13, marginBottom: 20 }}>
+        Curation à la main, avec votre session staff. Les fiches enregistrées disparaissent une fois en base. Enregistrées pendant cette session : {savedTotal}.
       </p>
 
-      <label style={label}>Admin secret</label>
-      <input style={field} type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="admin secret" />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         <button

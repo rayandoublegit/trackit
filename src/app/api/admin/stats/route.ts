@@ -1,23 +1,25 @@
-import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { adminDevPreview, requireAdmin } from "@/lib/admin-auth";
+import { devCatalog } from "@/lib/admin-dev-fixtures";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-const ADMIN_SECRET = "trackit_admin_2026";
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // Official Trackit niches (from the discovery dropdown). Only these are tracked.
 const OFFICIAL_NICHES = ["fitness", "fashion", "beauty", "tech", "food", "travel"];
 const TARGET_PER_NICHE = 100;
 
-export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+export async function GET(request: NextRequest) {
+  // Staff session only (email allowlist or admin/staff role), no shared password.
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const supabaseAdmin = getSupabaseAdmin();
+  if (!supabaseAdmin) {
+    if (adminDevPreview()) return NextResponse.json(devCatalog());
+    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
   }
 
   // Supabase caps .select() at 1000 rows by default. Paginate to read the whole table.

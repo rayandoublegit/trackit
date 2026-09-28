@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import Stripe from "stripe";
-import { requireAdmin } from "@/lib/admin-auth";
+import { adminDevPreview, requireAdmin } from "@/lib/admin-auth";
+import { devConsole } from "@/lib/admin-dev-fixtures";
 import { computeMetrics, type AdminMetrics } from "@/lib/admin-metrics";
 import { computeGrowth } from "@/lib/admin-growth";
 import { computeOps } from "@/lib/admin-ops";
@@ -83,6 +84,7 @@ export async function GET(req: NextRequest) {
 
   const db = getSupabaseAdmin();
   if (!db) {
+    if (adminDevPreview()) return NextResponse.json(devConsole(admin));
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 

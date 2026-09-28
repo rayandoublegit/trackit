@@ -1,6 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { DEV_BYPASS_PLAN, DEV_BYPASS_USER_ID } from "@/lib/dev-bypass";
+
+/** True only in `next dev` with the local preview bypass on. */
+export function adminDevPreview(): boolean {
+  return process.env.NODE_ENV !== "production" && Boolean(DEV_BYPASS_PLAN);
+}
 
 // Liste des emails admin. On lit ADMIN_EMAILS (separes par virgule) si presente,
 // sinon on retombe sur l'email proprietaire par defaut. La verite finale reste
@@ -25,6 +31,8 @@ export type AdminContext = {
  * Retourne le contexte admin si autorise, sinon null.
  */
 export async function requireAdmin(req: NextRequest): Promise<AdminContext | null> {
+  // Local preview only (never in a production build): the console opens with sample data.
+  if (adminDevPreview()) return { userId: DEV_BYPASS_USER_ID, email: "dev@localhost", role: "admin" };
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseAnonKey) return null;

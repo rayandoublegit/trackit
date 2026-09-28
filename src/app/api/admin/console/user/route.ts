@@ -4,6 +4,7 @@ import { checkoutPlanMetadata } from "@/lib/checkout";
 import { COMPED_STATUS, giftedStatus, isCompStatus } from "@/lib/comp-plan";
 import { normalizePlan } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/admin-auth";
+import { logAdminAction } from "@/lib/admin-data";
 import { selectProfileRow } from "@/lib/profile-row";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { syncFromStripeSubscription } from "@/lib/stripe-billing";
@@ -54,6 +55,17 @@ export async function POST(req: NextRequest) {
   if (!userId || !action) {
     return NextResponse.json({ error: "Missing userId or action" }, { status: 400 });
   }
+  let targetEmail: string | null = null;
+  // Every successful change is written to the staff audit log before answering.
+  const done = async (payload: Record<string, unknown>) => {
+    await logAdminAction(db, admin, {
+      action: `user.${action}`,
+      targetUserId: userId,
+      targetEmail,
+      details: { value: value ?? null, result: payload },
+    });
+    return NextResponse.json(payload);
+  };
 
   // Recupere le profil cible
   const target = await selectProfileRow<{
@@ -71,6 +83,7 @@ export async function POST(req: NextRequest) {
     const { data: authUser } = await db.auth.admin.getUserById(userId);
     target.email = authUser.user?.email ?? null;
   }
+  targetEmail = target.email;
 
   // --- Action: changer le role (DB) ---
   if (action === "role") {
@@ -92,7 +105,7 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, userId, role: newRole });
+    return done({ ok: true, userId, role: newRole });
   }
 
   // --- Actions Stripe: annulation ---
@@ -130,7 +143,7 @@ export async function POST(req: NextRequest) {
           .update({ subscription_status: "cancel_scheduled" })
           .eq("id", userId);
       }
-      return NextResponse.json({ ok: true, userId, action });
+      return done({ ok: true, userId, action });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Stripe error";
       return NextResponse.json({ error: message }, { status: 500 });
@@ -177,7 +190,7 @@ export async function POST(req: NextRequest) {
         expand: ["items.data.price"],
       });
       await syncFromStripeSubscription(db, stripe, refreshed, userId);
-      return NextResponse.json({ ok: true, userId, action, plan: newPlan });
+      return done({ ok: true, userId, action, plan: newPlan });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Stripe error";
       return NextResponse.json({ error: message }, { status: 500 });
@@ -205,7 +218,7 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", userId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, userId, action, plan: "free" });
+      return done({ ok: true, userId, action, plan: "free" });
     }
 
     const requested = normalizePlan(action === "giftMonth" ? value || "pro" : value);
@@ -228,7 +241,7 @@ export async function POST(req: NextRequest) {
         })
         .eq("id", userId);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-      return NextResponse.json({ ok: true, userId, action, plan: "free" });
+      return done({ ok: true, userId, action, plan: "free" });
     }
 
     if (requested === "free") {
@@ -250,7 +263,7 @@ export async function POST(req: NextRequest) {
           .from("profiles")
           .update({ subscription_status: giftedStatus(30) })
           .eq("id", userId);
-        return NextResponse.json({ ok: true, userId, action, plan: requested, stripe: true });
+        return done({ ok: true, userId, action, plan: requested, stripe: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Stripe error";
         return NextResponse.json({ error: message }, { status: 500 });
@@ -277,7 +290,7 @@ export async function POST(req: NextRequest) {
           expand: ["items.data.price"],
         });
         await syncFromStripeSubscription(db, stripe, refreshed, userId);
-        return NextResponse.json({ ok: true, userId, action, plan: requested, stripe: true });
+        return done({ ok: true, userId, action, plan: requested, stripe: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : "Stripe error";
         return NextResponse.json({ error: message }, { status: 500 });
@@ -294,7 +307,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", userId);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, userId, action, plan: requested, comp: !isCompStatus(status) ? false : true });
+    return done({ ok: true, userId, action, plan: requested, comp: !isCompStatus(status) ? false : true });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

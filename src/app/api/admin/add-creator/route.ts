@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const ADMIN_SECRET = "trackit_admin_2026";
 const AVATAR_BUCKET = "avatars";
 
 const supabaseAdmin = createClient(
@@ -122,9 +122,9 @@ async function fetchTikTokVideo(videoUrl: string): Promise<{ url: string; thumbn
   }
 }
 
-export async function DELETE(request: Request) {
-  const auth = request.headers.get("authorization") || "";
-  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+export async function DELETE(request: NextRequest) {
+  // Staff session only (email allowlist or admin/staff role), no shared password.
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   const url = new URL(request.url);
@@ -151,9 +151,9 @@ export async function DELETE(request: Request) {
   return NextResponse.json({ ok: true, deleted: username });
 }
 
-export async function GET(request: Request) {
-  const auth = request.headers.get("authorization") || "";
-  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+export async function GET(request: NextRequest) {
+  // Staff session only (email allowlist or admin/staff role), no shared password.
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   const url = new URL(request.url);
@@ -176,9 +176,9 @@ export async function GET(request: Request) {
   return NextResponse.json({ ok: true, creator: data });
 }
 
-export async function POST(request: Request) {
-  const auth = request.headers.get("authorization") || "";
-  if (auth !== `Bearer ${ADMIN_SECRET}`) {
+export async function POST(request: NextRequest) {
+  // Staff session only (email allowlist or admin/staff role), no shared password.
+  if (!(await requireAdmin(request))) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
