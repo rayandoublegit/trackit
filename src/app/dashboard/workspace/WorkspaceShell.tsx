@@ -126,7 +126,6 @@ export function WorkspaceShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchIndex, setSearchIndex] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [stripeConnectActive, setStripeConnectActive] = useState(false);
   const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [brandSpaces, setBrandSpaces] = useState<BrandWorkspace[]>([]);
@@ -1148,68 +1147,24 @@ export function WorkspaceShell({
                     ? " is-active"
                     : ""
                 }`}
-                onClick={() => {
-                  setMoreOpen(false);
-                  goSpace(item.space);
-                }}
+                onClick={() => goSpace(item.space)}
                 title={item.label}
               >
                 <WsIcon name={item.icon} size={18} />
                 <span>{item.label}</span>
               </button>
             ))}
-            <button
-              type="button"
-              className={`ws-rail__item${
-                moreOpen ||
-                activeSpace === "integrations" ||
-                activeSpace === "planner" ||
-                activeSpace === "community"
-                  ? " is-active"
-                  : ""
-              }`}
-              onClick={() => setMoreOpen((open) => !open)}
-              title={lang === "fr" ? "Plus" : "More"}
-              aria-expanded={moreOpen}
-            >
-              <WsIcon name="plus" size={18} />
-              <span>+</span>
-            </button>
-            <div className={`ws-rail__fold${moreOpen ? " is-open" : ""}`}>
-              <div className="ws-rail__fold-inner">
-                {!isCreator && (
-                  <button
-                    type="button"
-                    className={`ws-rail__item${activeSpace === "integrations" ? " is-active" : ""}`}
-                    onClick={() => goSpace("integrations")}
-                    title={lang === "fr" ? "Intégrations" : "Integrations"}
-                  >
-                    <WsIcon name="integrations" size={18} />
-                    <span>Integrations</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className={`ws-rail__item${activeSpace === "planner" ? " is-active" : ""}`}
-                  onClick={() => goSpace("planner")}
-                  title="Planner"
-                >
-                  <WsIcon name="planner" size={18} />
-                  <span>Planner</span>
-                </button>
-                {!isCreator && (
-                  <button
-                    type="button"
-                    className={`ws-rail__item${activeSpace === "community" ? " is-active" : ""}`}
-                    onClick={() => goSpace("community")}
-                    title={lang === "fr" ? "Communauté" : "Community"}
-                  >
-                    <WsIcon name="users" size={18} />
-                    <span>Community</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            {!isCreator && (
+              <button
+                type="button"
+                className={`ws-rail__item${activeSpace === "integrations" ? " is-active" : ""}`}
+                onClick={() => goSpace("integrations")}
+                title={lang === "fr" ? "Intégrations" : "Integrations"}
+              >
+                <WsIcon name="integrations" size={18} />
+                <span>{lang === "fr" ? "Intégrations" : "Integrations"}</span>
+              </button>
+            )}
           </div>
         </aside>
 

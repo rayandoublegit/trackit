@@ -9,6 +9,8 @@ import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
 import { useLang } from "@/lib/useLang";
 import { translateAuthError } from "@/lib/auth-errors";
 import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
+import { AuthShowcase } from "./AuthShowcase";
+import "./auth-showcase.css";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
@@ -203,16 +205,21 @@ function AuthPageContent() {
 
   if (checkingSession) {
     return (
-      <div className="auth-shell">
-        <p className="auth-status">
-          {lang === "fr" ? "Connexion en cours..." : "Signing you in..."}
-        </p>
-      </div>
+      <>
+        <div className="auth-shell auth-shell--split">
+          <p className="auth-status">
+            {lang === "fr" ? "Connexion en cours..." : "Signing you in..."}
+          </p>
+        </div>
+        <AuthShowcase />
+      </>
     );
   }
 
   return (
-    <div className="auth-shell">
+    <>
+    <AuthShowcase />
+    <div className="auth-shell auth-shell--split">
       <div className="auth-card">
         <Link href="/" className="auth-card__logo">
           <img src={TRACKIT_LOGO} alt="Trackit" />
@@ -433,6 +440,7 @@ function AuthPageContent() {
         {lang === "fr" ? "Besoin d'aide ?" : "Need help?"}
       </Link>
     </div>
+    </>
   );
 }
 
@@ -440,7 +448,7 @@ export default function AuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="auth-shell">
+        <div className="auth-shell auth-shell--split">
           <p className="auth-status">Loading...</p>
         </div>
       }

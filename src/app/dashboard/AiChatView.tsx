@@ -256,14 +256,14 @@ export function AiChatView({
     const chips: string[] = [];
 
     if (fr) {
-      chips.push("Ajoute un rendez-vous demain à 14:00");
+      chips.push("Trouver des créateurs beauté");
       chips.push("Paye un créateur");
       chips.push("Crée une tâche : relancer les créateurs");
       if (firstCampaign) chips.push(`Ouvre la campagne « ${firstCampaign} »`);
       else chips.push("Crée une nouvelle campagne");
       chips.push("Ouvre Inbox");
     } else {
-      chips.push("Add a meeting tomorrow at 2pm");
+      chips.push("Discover beauty creators");
       chips.push("Pay a creator");
       chips.push("Create a task: follow up with creators");
       if (firstCampaign) chips.push(`Open campaign “${firstCampaign}”`);
@@ -405,7 +405,6 @@ export function AiChatView({
               ? `C'est noté — « ${cmd.title} » ajouté ${formatWhen(cmd.when, true)}.`
               : `Done — “${cmd.title}” added ${formatWhen(cmd.when, false)}.`),
         );
-        window.setTimeout(() => onNavigate("planner"), 700);
         return;
       }
 

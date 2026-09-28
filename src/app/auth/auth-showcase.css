@@ -1,0 +1,173 @@
+/* ── Sign-in page: motion panel on the right ───────── */
+@media (min-width: 1024px) {
+  .auth-shell.auth-shell--split {
+    right: min(54vw, 860px);
+    justify-content: center;
+  }
+  .auth-shell--split .auth-help {
+    position: absolute;
+    bottom: 24px;
+  }
+}
+
+.ash {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .ash {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: calc(min(54vw, 860px) - 24px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 28px 36px 26px;
+    box-sizing: border-box;
+    border-radius: 28px;
+    overflow: hidden;
+    isolation: isolate;
+    color: #fff;
+    background: #07080d;
+    font-family: "InterDisplay", "Inter Display", sans-serif;
+    animation: ash-in 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+
+.ash-bg { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.ash-blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.75; }
+.ash-blob--a { width: 520px; height: 520px; right: -140px; top: -160px; background: radial-gradient(circle, #0047ff, transparent 65%); animation: ash-drift 14s ease-in-out infinite alternate; }
+.ash-blob--b { width: 420px; height: 420px; left: -120px; bottom: -140px; background: radial-gradient(circle, #7c3aed, transparent 65%); opacity: 0.5; animation: ash-drift 18s ease-in-out infinite alternate-reverse; }
+.ash-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at 60% 40%, #000 20%, transparent 75%);
+  animation: ash-grid 20s linear infinite;
+}
+
+.ash-progress { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.ash-progress button { position: relative; height: 4px; padding: 0; border: none; border-radius: 99px; background: rgba(255,255,255,.16); overflow: hidden; cursor: pointer; }
+.ash-progress button::before { content: ""; position: absolute; inset: -8px 0; }
+.ash-progress button span { position: absolute; inset: 0; border-radius: inherit; background: #fff; transform: scaleX(0); transform-origin: left; }
+.ash-progress button.is-done span { transform: scaleX(1); opacity: .55; }
+.ash-progress button.is-on span { animation: ash-fill linear forwards; }
+
+.ash-stage { flex: 1; min-height: 0; display: grid; place-items: center; }
+.ash-scene { width: min(100%, 480px); display: flex; flex-direction: column; gap: 14px; }
+
+.ash-copy { max-width: 520px; animation: ash-rise .6s cubic-bezier(.2,.8,.2,1) both; }
+.ash-kicker { margin: 0 0 10px; font-size: 12px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: #8fb0ff; }
+.ash-copy h2 { margin: 0; font-size: clamp(26px, 2.4vw, 36px); font-weight: 680; letter-spacing: -.045em; line-height: 1.1; }
+.ash-copy p:last-child { margin: 12px 0 0; font-size: 15px; line-height: 1.55; color: rgba(255,255,255,.66); }
+.ash-note { position: absolute; right: 22px; bottom: 16px; margin: 0; font-size: 11px; color: rgba(255,255,255,.35); }
+
+.ash-avatar { display: inline-grid; place-items: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,.2); }
+
+/* Shared glass card */
+.ash-search, .ash-results li, .ash-card, .ash-toast, .ash-contract, .ash-order, .ash-split__part, .ash-paid {
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px;
+}
+
+/* Scene 1: discover */
+.ash-search { display: flex; align-items: center; gap: 10px; padding: 14px 16px; color: rgba(255,255,255,.7); animation: ash-rise .5s ease both; }
+.ash-typed { display: inline-block; overflow: hidden; white-space: nowrap; color: #fff; font-size: 15px; width: 0; animation: ash-type 1s steps(26, end) .35s forwards; }
+.ash-caret { width: 2px; height: 18px; background: #8fb0ff; animation: ash-blink .8s step-end infinite; }
+.ash-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ash-chips span { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: rgba(91,140,255,.18); color: #cfdcff; border: 1px solid rgba(91,140,255,.35); animation: ash-pop .4s cubic-bezier(.2,.9,.3,1.3) both; }
+.ash-results { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ash-results li { display: grid; grid-template-columns: 36px 1fr 64px 56px 74px; align-items: center; gap: 12px; padding: 10px 12px; animation: ash-slide .55s cubic-bezier(.2,.8,.2,1) both; }
+.ash-results__who strong, .ash-results__stat strong { display: block; font-size: 13.5px; font-weight: 620; }
+.ash-results small { display: block; font-size: 11.5px; color: rgba(255,255,255,.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ash-results__stat { text-align: right; }
+.ash-save { position: relative; justify-self: end; display: grid; place-items: center; min-width: 64px; height: 30px; border-radius: 999px; font-size: 12px; font-weight: 650; color: #07080d; background: #fff; overflow: hidden; }
+.ash-save i, .ash-save b { grid-area: 1 / 1; font-style: normal; transition: none; }
+.ash-save i { animation: ash-out .3s ease forwards; animation-delay: inherit; }
+.ash-save b { color: #fff; opacity: 0; animation: ash-saved .35s ease forwards; animation-delay: inherit; }
+.ash-save::before { content: ""; position: absolute; inset: 0; background: #10b981; transform: scale(0); border-radius: inherit; animation: ash-grow .35s ease forwards; animation-delay: inherit; }
+.ash-save b { position: relative; }
+
+/* Scene 2: campaign */
+.ash-card { padding: 18px; animation: ash-rise .5s ease both; }
+.ash-card__top { display: flex; justify-content: space-between; align-items: flex-start; }
+.ash-card__top small, .ash-kpis small, .ash-contract small, .ash-order small, .ash-split small { display: block; font-size: 11.5px; color: rgba(255,255,255,.55); }
+.ash-card__top strong { font-size: 18px; letter-spacing: -.03em; }
+.ash-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 650; color: #fca5a5; }
+.ash-live i { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: ash-blink 1.2s ease-in-out infinite; }
+.ash-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0 10px; }
+.ash-kpis strong { display: block; margin-top: 2px; font-size: 24px; font-weight: 680; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.ash-spark { display: block; width: 100%; height: 96px; overflow: visible; }
+.ash-spark__line { stroke: #8fb0ff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: ash-draw 1.8s cubic-bezier(.6,0,.2,1) .4s forwards; }
+.ash-spark__area { opacity: 0; animation: ash-fade .8s ease 1.6s forwards; }
+.ash-toast { display: flex; align-items: center; gap: 10px; padding: 10px 14px; align-self: flex-end; width: min(100%, 340px); box-shadow: 0 20px 40px rgba(0,0,0,.35); animation: ash-toast .6s cubic-bezier(.2,.9,.3,1.2) 2.4s both; }
+.ash-toast div { flex: 1; min-width: 0; }
+.ash-toast strong { display: block; font-size: 13px; }
+.ash-toast small { font-size: 11.5px; color: rgba(255,255,255,.55); }
+.ash-toast b { color: #34d399; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* Scene 3: gifting */
+.ash-contract { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 18px 20px; background: #fff; color: #111; border-color: transparent; box-shadow: 0 30px 60px rgba(0,0,0,.4); transform: rotate(-1.5deg); animation: ash-paper .6s cubic-bezier(.2,.8,.2,1) both; }
+.ash-contract small { color: #71717a; letter-spacing: .12em; text-transform: uppercase; font-size: 10.5px; }
+.ash-contract strong { font-size: 19px; letter-spacing: -.03em; }
+.ash-contract__line { display: block; height: 7px; width: 100%; border-radius: 4px; background: #ececef; }
+.ash-contract__ads { display: flex; justify-content: space-between; margin-top: 4px; padding: 9px 12px; border-radius: 10px; font-size: 12.5px; background: #eef4ff; color: #0037c4; border: 1px solid #0047ff; }
+.ash-signature { width: 220px; height: 60px; margin-top: 6px; }
+.ash-signature path { fill: none; stroke: #111; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: ash-draw 1.4s ease-in-out .7s forwards; }
+.ash-contract__signed { text-transform: none !important; letter-spacing: 0 !important; opacity: 0; animation: ash-fade .4s ease 2.1s forwards; }
+.ash-rail { position: relative; height: 56px; margin: 12px 14px 0; }
+.ash-rail__track { position: absolute; left: 0; right: 0; top: 14px; height: 2px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.3) 0 8px, transparent 8px 14px); animation: ash-dash 1s linear infinite; }
+.ash-rail__stop { position: absolute; top: 8px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ash-rail__stop i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); background: #07080d; animation: ash-stop .3s ease forwards; animation-delay: inherit; }
+.ash-rail__stop em { font-style: normal; font-size: 11px; color: rgba(255,255,255,.55); white-space: nowrap; }
+.ash-rail__parcel { position: absolute; top: -4px; left: 0; display: grid; place-items: center; width: 36px; height: 36px; margin-left: -18px; border-radius: 12px; background: #fff; color: #0047ff; box-shadow: 0 10px 24px rgba(0,71,255,.45); animation: ash-travel 3.4s cubic-bezier(.6,0,.4,1) 1.1s both; }
+
+/* Scene 4: payout */
+.ash-order { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 18px; animation: ash-rise .5s ease both; }
+.ash-order strong { font-size: 34px; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
+.ash-order span { font-size: 12px; color: #8fb0ff; }
+.ash-split { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 26px; }
+.ash-split__beam { position: absolute; left: 25%; right: 25%; top: 0; height: 26px; border: 2px solid rgba(143,176,255,.5); border-bottom: none; border-radius: 14px 14px 0 0; clip-path: inset(0 50% 0 50%); animation: ash-beam .6s ease .5s forwards; }
+.ash-split__part { display: flex; align-items: center; gap: 10px; padding: 12px 14px; opacity: 0; animation: ash-rise .5s ease forwards; }
+.ash-split__part:nth-of-type(2) { animation-delay: .9s; }
+.ash-split__part:nth-of-type(3) { animation-delay: 1.05s; }
+.ash-split__part strong { font-size: 18px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.ash-split__part--creator { border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.08); }
+.ash-brand { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 8px; background: #0047ff; font-size: 13px; font-weight: 800; }
+.ash-paid { display: flex; align-items: center; gap: 12px; padding: 12px 16px; align-self: center; box-shadow: 0 20px 40px rgba(0,0,0,.35); animation: ash-toast .6s cubic-bezier(.2,.9,.3,1.2) 2s both; }
+.ash-paid__check { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #10b981; font-weight: 800; box-shadow: 0 0 0 0 rgba(16,185,129,.5); animation: ash-ring 1.6s ease-out 2.4s infinite; }
+.ash-paid strong { display: block; font-size: 14px; }
+.ash-paid small { font-size: 12px; color: rgba(255,255,255,.55); }
+
+@keyframes ash-in { from { opacity: 0; transform: translateX(24px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes ash-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes ash-slide { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes ash-pop { from { opacity: 0; transform: scale(.7); } to { opacity: 1; transform: none; } }
+@keyframes ash-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes ash-type { to { width: 24ch; } }
+@keyframes ash-blink { 50% { opacity: 0; } }
+@keyframes ash-out { to { opacity: 0; transform: translateY(-8px); } }
+@keyframes ash-saved { to { opacity: 1; } }
+@keyframes ash-grow { to { transform: scale(1.2); } }
+@keyframes ash-draw { to { stroke-dashoffset: 0; } }
+@keyframes ash-fade { to { opacity: 1; } }
+@keyframes ash-toast { from { opacity: 0; transform: translateY(18px) scale(.94); } to { opacity: 1; transform: none; } }
+@keyframes ash-paper { from { opacity: 0; transform: rotate(-6deg) translateY(30px); } to { opacity: 1; transform: rotate(-1.5deg); } }
+@keyframes ash-dash { to { background-position: 14px 0; } }
+@keyframes ash-stop { to { border-color: #8fb0ff; background: #0047ff; box-shadow: 0 0 0 5px rgba(0,71,255,.25); } }
+@keyframes ash-travel { from { left: 0; } to { left: 100%; } }
+@keyframes ash-beam { to { clip-path: inset(0 0 0 0); } }
+@keyframes ash-ring { 0% { box-shadow: 0 0 0 0 rgba(16,185,129,.5); } 100% { box-shadow: 0 0 0 12px transparent; } }
+@keyframes ash-drift { from { transform: translate3d(0,0,0); } to { transform: translate3d(-60px,40px,0); } }
+@keyframes ash-grid { to { background-position: 44px 44px; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ash *, .ash { animation-duration: .001ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; }
+  .ash-typed { width: 24ch; }
+}

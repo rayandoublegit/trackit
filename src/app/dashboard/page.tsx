@@ -155,7 +155,6 @@ const CREATOR_ALLOWED_VIEWS: View[] = [
   "infos-howto",
   "infos-pricing",
   "hooks",
-  "community",
   "content",
   "whiteboard",
   "ai",
@@ -164,9 +163,11 @@ const CREATOR_ALLOWED_VIEWS: View[] = [
   "settings",
   "feedback",
   "help",
-  "planner",
   "gifting",
 ];
+
+// Planner et Communauté ont été retirés de la navigation : un ancien lien ou une vue mémorisée ramène à l'accueil.
+const RETIRED_VIEWS: View[] = ["planner", "planner-notes", "meetings", "community"];
 
 type SidebarNavSection = "main" | "tools" | "workspace" | "footer";
 
@@ -274,6 +275,9 @@ function DashboardPageContent() {
   useEffect(() => {
     if (!loading && user && !isCreator && view === "content") {
       navigate({ view: "brand-content" }, { replace: true });
+    }
+    if (!loading && user && RETIRED_VIEWS.includes(view)) {
+      navigate({ view: "dashboard" }, { replace: true });
     }
   }, [loading, user, isCreator, view, navigate]);
   const [outreachSendRequest, setOutreachSendRequest] = useState<OutreachSendRequest | null>(null);
