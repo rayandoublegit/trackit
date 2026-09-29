@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLang } from "@/lib/useLang";
 import { prefersReducedMotion } from "@/app/dashboard/sample-motion";
-import { Avatar } from "@/app/auth/AuthShowcase";
-import "@/app/auth/auth-showcase.css";
+import { MinoCompanion } from "@/components/MinoCompanion";
 import "./product-film.css";
 
 // Landing hero: centered headline, then a launch-style product film. The film
 // is one timeline in milliseconds; every shot derives its frame from it, so
-// pause, loop and reduced motion are exact. Every person and number is fictional.
+// pause, loop and reduced motion are exact. Names and numbers are fictional;
+// photos are free Unsplash images, hotlinked as Unsplash asks.
 
 type Lang = "en" | "fr";
 type ShotId = "find" | "flash" | "mino" | "track" | "gift" | "pay" | "outro";
@@ -88,12 +88,32 @@ function Cursor({ p, from, at, click, dx = 180, dy = 150 }: { p: number; from: n
   );
 }
 
-function Sparkle({ size = 14 }: { size?: number }) {
+const unsplash = (id: string, w: number, h = w) =>
+  `https://images.unsplash.com/photo-${id}?w=${w * 2}&h=${h * 2}&fit=crop&crop=faces&auto=format&q=70`;
+
+const FACES: Record<string, string> = {
+  "Sarah Cole": "1580489944761-15a19d654956",
+  "Luna Park": "1489278353717-f64c6ee8a4d2",
+  "Nora Diallo": "1662850886700-4ec19bd30d11",
+  "Maya Chen": "1630939687530-241d630735df",
+  "Inès Morel": "1534180477871-5d6cc81f3920",
+  "Zoé Martin": "1544507888-56d73eb6046e",
+};
+const PRODUCT_PHOTO = "1741896135512-084b251887f7";
+const VIDEO_PHOTO = "1758521540165-b7e99f9a98ce";
+
+function Face({ name, size = 32 }: { name: string; size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9z" />
-    </svg>
+    <span className="pf-face" style={{ width: size, height: size }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={unsplash(FACES[name], size)} alt="" loading="lazy" decoding="async" />
+    </span>
   );
+}
+
+function ShopifyMark({ size = 14 }: { size?: number }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className="pf-logo" src="/shopify-logo.svg" alt="" width={size} height={size} />;
 }
 
 function SearchIcon() {
@@ -149,7 +169,7 @@ function FindShot({ p, lang }: { p: number; lang: Lang }) {
         {CREATORS.map((c, i) => (
           <div key={c.name} className={`pf-card${i === 1 && picked ? " is-picked" : ""}`} style={pop(p, 2950 + i * 110, 520, 30)}>
             <div className="pf-card__top">
-              <Avatar name={c.name} hue={c.hue} size={34} />
+              <Face name={c.name} size={34} />
               <div>
                 <strong>{c.name}</strong>
                 <span>{c.handle}</span>
@@ -226,27 +246,27 @@ function MinoShot({ p, lang }: { p: number; lang: Lang }) {
     <div className="pf-shot pf-mino">
       <div className="pf-bar pf-bar--top pf-bar--mino" style={pop(p, 0, 460, 20)}>
         <span className="pf-mino__badge">
-          <Sparkle />
+          <MinoCompanion size={22} />
           Mino
         </span>
         <Typed p={p} at={320} speed={32} text={fr ? "Quels créateurs ont le plus vendu ce mois-ci ?" : "Which creators sold the most this month?"} />
       </div>
       {thinking ? (
         <div className="pf-mino__thinking">
-          <Sparkle size={13} />
+          <MinoCompanion size={18} />
           {fr ? "Mino analyse 48 créateurs et 1 204 ventes…" : "Mino is reading 48 creators and 1,204 sales…"}
         </div>
       ) : null}
       <div className="pf-answer" style={pop(p, 2450, 480, 26)}>
         <p className="pf-answer__title">
-          <Sparkle size={13} />
+          <MinoCompanion size={18} />
           {fr ? "Vos 3 meilleures créatrices sur 30 jours" : "Your top 3 creators over 30 days"}
         </p>
         {rows.map((r, i) => {
           const g = outCubic(prog(p, 2700 + i * 160, 800));
           return (
             <div key={r.name} className="pf-answer__row" style={pop(p, 2600 + i * 140, 420)}>
-              <Avatar name={r.name} hue={r.hue} size={28} />
+              <Face name={r.name} size={28} />
               <span className="pf-answer__name">{r.name}</span>
               <span className="pf-answer__track">
                 <span style={{ width: `${r.w * g}%` }} />
@@ -293,7 +313,10 @@ function TrackShot({ p, lang }: { p: number; lang: Lang }) {
   return (
     <div className="pf-shot pf-track">
       <div className="pf-panel pf-track__main" style={pop(p, 0, 480, 24)}>
-        <span className="pf-track__label">{fr ? "Ventes générées par vos créateurs · septembre" : "Sales driven by your creators · September"}</span>
+        <span className="pf-track__label">
+          <ShopifyMark size={16} />
+          {fr ? "Ventes Shopify générées par vos créateurs · septembre" : "Shopify sales driven by your creators · September"}
+        </span>
         <div className="pf-track__big">
           {money(48920 * count, lang)}
           <span className="pf-delta" style={pop(p, 2400, 380, 8)}>
@@ -318,9 +341,14 @@ function TrackShot({ p, lang }: { p: number; lang: Lang }) {
         </span>
         {[...shown].reverse().map((s) => (
           <div key={s.code} className="pf-sale" style={pop(p, 1000 + SALES.indexOf(s) * 800, 460, -18)}>
-            <Avatar name={s.name} hue={s.hue} size={30} />
+            <span className="pf-sale__who">
+              <Face name={s.name} size={32} />
+              <span className="pf-sale__shop">
+                <ShopifyMark size={11} />
+              </span>
+            </span>
             <div>
-              <strong>{fr ? "Nouvelle vente" : "New sale"}</strong>
+              <strong>{fr ? "Nouvelle vente Shopify" : "New Shopify sale"}</strong>
               <span>
                 {s.name} · {fr ? "code" : "code"} {s.code}
               </span>
@@ -349,9 +377,14 @@ function GiftShot({ p, lang }: { p: number; lang: Lang }) {
     <div className="pf-shot pf-gift">
       <div className="pf-panel pf-gift__product" style={pop(p, 0, 480, 24)}>
         <div className="pf-gift__img">
-          <span />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={unsplash(PRODUCT_PHOTO, 182, 150)} alt="" loading="lazy" decoding="async" />
+          <span className="pf-gift__shop">
+            <ShopifyMark size={12} />
+            {fr ? "Produit Shopify" : "Shopify product"}
+          </span>
         </div>
-        <strong>{fr ? "Coffret Glow Routine" : "Glow Routine box"}</strong>
+        <strong>{fr ? "Sérum Glow Routine" : "Glow Routine serum"}</strong>
         <span>
           {fr ? "Offert à" : "Gifted to"} Luna Park · {money(89, lang)}
         </span>
@@ -376,6 +409,8 @@ function GiftShot({ p, lang }: { p: number; lang: Lang }) {
         <div className={`pf-phone__screen${doneCount === 4 ? " is-live" : ""}`}>
           {doneCount === 4 ? (
             <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="pf-phone__video" src={unsplash(VIDEO_PHOTO, 176, 346)} alt="" decoding="async" style={pop(p, at(3), 500, 0)} />
               <span className="pf-phone__play" style={pop(p, at(3), 400, 0)}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
                   <path d="M8 5v14l11-7z" />
@@ -424,7 +459,7 @@ function PayShot({ p, lang }: { p: number; lang: Lang }) {
           const paid = p >= 2300 + i * 160;
           return (
             <div key={r.name} className="pf-pay__row" style={pop(p, 200 + i * 110, 420)}>
-              <Avatar name={r.name} hue={r.hue} size={30} />
+              <Face name={r.name} size={30} />
               <span className="pf-pay__name">{r.name}</span>
               <em>
                 {r.sales} {fr ? "ventes" : "sales"}
@@ -615,6 +650,33 @@ export function ProductFilm() {
   );
 }
 
+function LiveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0047ff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12h4l3-8 4 16 3-8h4" />
+    </svg>
+  );
+}
+
+function GiftIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0047ff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="8" width="18" height="4" rx="1" />
+      <path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" />
+      <path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" />
+    </svg>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0047ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5" />
+      <circle cx="16.5" cy="14" r="1.2" fill="#0047ff" />
+    </svg>
+  );
+}
+
 function Chip({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
     <li className="pf-chip-proof">
@@ -632,10 +694,13 @@ export function ProductFilmHero() {
       <div className="pf-hero__bg" aria-hidden />
       <div className="pf-hero__inner">
         <span className="pf-pill">
-          <span className="pf-pill__spark" aria-hidden>
-            <Sparkle size={12} />
+          <span className="pf-pill__led" aria-hidden>
+            <span />
           </span>
-          {fr ? "Nouveau · Mino, l’IA qui pilote vos créateurs" : "New · Mino, the AI that runs your creators"}
+          <span className="pf-pill__label">
+            <MinoCompanion size={18} />
+            {fr ? "Nouveau · Mino, l’IA qui pilote vos créateurs" : "New · Mino, the AI that runs your creators"}
+          </span>
         </span>
         <h1 id="pf-title">
           {fr ? (
@@ -658,9 +723,9 @@ export function ProductFilmHero() {
           {fr ? "Tout au même endroit, suivi à la vente près." : "All in one place, tracked down to the sale."}
         </p>
         <ul className="pf-chips">
-          <Chip icon="⚡">{fr ? "Shopify en 1 clic" : "Shopify in 1 click"}</Chip>
-          <Chip icon="📈">{fr ? "Ventes suivies en direct" : "Sales tracked live"}</Chip>
-          <Chip icon="🎁">{fr ? "Gifting avec contrat" : "Gifting with contracts"}</Chip>
+          <Chip icon={<ShopifyMark size={15} />}>{fr ? "Shopify en 1 clic" : "Shopify in 1 click"}</Chip>
+          <Chip icon={<LiveIcon />}>{fr ? "Ventes suivies en direct" : "Sales tracked live"}</Chip>
+          <Chip icon={<GiftIcon />}>{fr ? "Gifting avec contrat" : "Gifting with contracts"}</Chip>
         </ul>
         <a className="pf-cta" href="/auth?mode=signup">
           {fr ? "Commencer gratuitement" : "Start for free"}
@@ -671,55 +736,58 @@ export function ProductFilmHero() {
           </span>
         </a>
         <ProductFilm />
-        <p className="pf-tools__label">{fr ? "Connecté à vos outils" : "Works with your stack"}</p>
-        <ul className="pf-tools">
+        <ul className="pf-tools" aria-label={fr ? "Intégrations" : "Integrations"}>
           <li>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="#95bf47" aria-hidden>
-              <path d="M15.3 3.6c-.1 0-.2 0-.3.1l-.8 2.5c-.5-.2-1-.3-1.6-.3-1.3 0-2 1.6-2.3 2.4l-1.7.5c-.5.2-.5.2-.6.7L6.5 20.3 16.6 22l2.9-.7s-2.9-17.6-3-17.7c-.1-.1-1.2 0-1.2 0zm-2.6.8-.6 1.8-1.4.4c.3-1.1.9-2.2 2-2.2z" />
-            </svg>
+            <ShopifyMark size={20} />
             Shopify
           </li>
           <li>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="#0b0d12" aria-hidden>
-              <path d="M16.6 2h-3.4v13.4a2.9 2.9 0 1 1-2.9-2.9c.3 0 .6 0 .8.1V9.1a6.3 6.3 0 1 0 5.5 6.3V8.6a8.2 8.2 0 0 0 4.4 1.3V6.5a4.7 4.7 0 0 1-4.4-4.5z" />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="pf-logo" src="/tiktok-logo.svg" alt="" width={20} height={20} />
             TikTok
           </li>
           <li>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e1306c" strokeWidth="2.2" aria-hidden>
-              <rect x="3" y="3" width="18" height="18" rx="5" />
-              <circle cx="12" cy="12" r="4" />
-              <circle cx="17.5" cy="6.5" r="1" fill="#e1306c" stroke="none" />
-            </svg>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="pf-logo" src="/instagram-logo.svg" alt="" width={20} height={20} />
             Instagram
           </li>
           <li>
-            <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden>
-              <rect x="2" y="5" width="20" height="14" rx="4" fill="#ff0033" />
-              <path d="M10 9v6l5-3z" fill="#fff" />
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
+              <rect x="1.5" y="5" width="21" height="14" rx="4.2" fill="#ff0033" />
+              <path d="M10 9v6l5.2-3z" fill="#fff" />
             </svg>
             YouTube
+          </li>
+          <li>
+            <MinoCompanion size={22} />
+            Mino
           </li>
         </ul>
         <div className="pf-cards">
           {[
             {
+              icon: <MinoCompanion size={24} />,
               k: fr ? "Mino, l’IA" : "Mino, the AI",
               t: fr ? "Posez une question, Mino agit : relances, campagnes, rapports." : "Ask a question, Mino acts: nudges, campaigns, reports.",
               m: fr ? "Réponses en langage courant" : "Answers in plain words",
             },
             {
+              icon: <GiftIcon />,
               k: fr ? "Gifting de bout en bout" : "Gifting end to end",
               t: fr ? "Contrat signé, colis suivi, vidéo validée avant publication." : "Signed contract, tracked parcel, video approved before it posts.",
               m: fr ? "Contrat figé à la signature" : "Contract frozen at signature",
             },
             {
+              icon: <WalletIcon />,
               k: fr ? "Commissions automatiques" : "Automatic commissions",
               t: fr ? "Chaque vente rattachée à son créateur, chacun payé en un clic." : "Every sale tied to its creator, everyone paid in one click.",
               m: fr ? "Paiement groupé en 1 clic" : "Batch payout in 1 click",
             },
           ].map((c) => (
             <div key={c.k} className="pf-feature">
+              <span className="pf-feature__icon" aria-hidden>
+                {c.icon}
+              </span>
               <strong>{c.k}</strong>
               <p>{c.t}</p>
               <span>{c.m}</span>
