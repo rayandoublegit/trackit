@@ -63,22 +63,20 @@ Billing: Whop (webhook `src/app/api/whop/webhook`) plus legacy Stripe price ids 
 
 ## 2. Where it runs
 
-| | thentrack.it (main) | partnerads.vercel.app |
-| --- | --- | --- |
-| Vercel project | `trackit` (team `klayans-projects`) | `partnerads` (team `theolcxlecurieux-4978s-projects`) |
-| Deploys | automatically on push to `main` of `github.com/rayandoublegit/trackit` | manually: `npx vercel deploy --prod --yes` from a folder linked to `partnerads` |
-| AI for Mino | Anthropic (`ANTHROPIC_API_KEY`) | OpenAI (`OPENAI_API_KEY`, gpt-4o-mini) |
-| Creator scraping source | ScrapeCreators (`SCRAPECREATORS_API_KEY`) | RapidAPI (`RAPIDAPI_*`) |
-| Database | Supabase `tokpuhzjhysqxwjkxfya` | same Supabase project |
+| | thentrack.it |
+| --- | --- |
+| Vercel project | `trackit` (team `klayans-projects`) |
+| Deploys | automatically on push to `main` of `github.com/rayandoublegit/trackit` |
+| AI for Mino | Anthropic (`ANTHROPIC_API_KEY`) |
+| Creator scraping source | ScrapeCreators (`SCRAPECREATORS_API_KEY`), RapidAPI (`RAPIDAPI_*`) as fallback |
+| Billing | Whop (`WHOP_API_KEY`, webhook secret), legacy Stripe |
+| Database | Supabase `tokpuhzjhysqxwjkxfya` |
 
 `/api/ai-chat` uses OpenAI when `OPENAI_API_KEY` is set, otherwise Anthropic.
 The scraper uses ScrapeCreators when its key is set, otherwise RapidAPI.
 
-**Warning, crons:** both Vercel projects read `vercel.json` and both have a
-`CRON_SECRET` and the service key, so **every cron runs twice** if both are
-deployed with the same `vercel.json`. The latest cron schedule (scraper) is only
-deployed on thentrack.it. Either stop deploying partnerads, or remove its
-`CRON_SECRET`, before redeploying it.
+The separate `partnerads` Vercel project (partnerads.vercel.app) was deleted on
+2026-09-29; thentrack.it is the only deployment, so crons run once.
 
 ### Local development
 
@@ -95,7 +93,6 @@ Supabase keys, API routes return empty data; the UI still renders.
 
 1. Commit on a branch, merge fast-forward into `main`, push. Vercel deploys thentrack.it.
 2. Check: `gh api repos/rayandoublegit/trackit/deployments` (latest status `success`).
-3. partnerads only if needed (see the cron warning).
 
 Build check without real keys:
 
@@ -219,7 +216,7 @@ scraper replaces it.
   (AI cost), `/api/creator-profile`, `/api/videos`.
 - New data tables are server-only; verified in `npm run test:db`.
 - **To do by the owner:** revoke the Supabase personal access token used for
-  migrations; remove unused secret keys in Supabase; check partnerads env.
+  migrations; remove unused secret keys in Supabase.
 
 ---
 
