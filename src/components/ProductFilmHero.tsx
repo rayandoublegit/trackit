@@ -604,7 +604,7 @@ export function ProductFilm() {
   };
 
   return (
-    <div className="pf-player">
+    <div className="pf-player" id="product">
       <div className="pf-bezel">
         <div ref={canvasRef} className={`pf-canvas is-${shot.id}`} style={{ aspectRatio: `${W} / ${H}` }}>
           <p className="pf-sr">

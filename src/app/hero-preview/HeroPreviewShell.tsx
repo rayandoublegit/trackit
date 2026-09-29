@@ -5,6 +5,7 @@ import { WsIcon } from "@/app/dashboard/workspace/WorkspaceIcons";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
 import { ProductFilmHero } from "@/components/ProductFilmHero";
+import { ANNOUNCEMENT_KEY, AnnouncementBar } from "@/components/AnnouncementBar";
 import { useLang } from "@/lib/useLang";
 import {
   HeroPreviewPageView,
@@ -273,11 +274,29 @@ export function HeroPreviewShell() {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [announcement, setAnnouncement] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const dashRef = useRef<HTMLDivElement>(null);
   const cutRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(ANNOUNCEMENT_KEY) === "closed") setAnnouncement(false);
+    } catch {
+      // storage blocked: keep the announcement
+    }
+  }, []);
+
+  const closeAnnouncement = () => {
+    setAnnouncement(false);
+    try {
+      localStorage.setItem(ANNOUNCEMENT_KEY, "closed");
+    } catch {
+      // storage blocked: hide for this visit only
+    }
+  };
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -363,63 +382,27 @@ export function HeroPreviewShell() {
 
   const side = sidebarFor(rail);
   const t = heroCopy(lang);
+  const navLinks = [
+    { label: t.affiliates, href: "/affiliation" },
+    { label: t.solutions, href: "#features" },
+    { label: t.product, href: "#product" },
+    { label: t.pricing, href: "#pricing" },
+  ];
 
   return (
-    <div className="hp-page">
+    <div className={`hp-page${announcement ? " has-annc" : ""}`}>
       <nav className="hp-nav">
+        {announcement ? <AnnouncementBar lang={lang} onClose={closeAnnouncement} /> : null}
         <div className="hp-nav__inner">
           <a className="hp-nav__brand" href="/" onClick={noop}>
             <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
           </a>
           <div className="hp-nav__links">
-            {([
-              { label: t.affiliates, items: t.affiliateItems },
-              { label: t.solutions, items: t.solutionItems.map((label) => ({ label })) },
-            ] as { label: string; items: { label: string; href?: string }[] }[]).map((item) => (
-              <div key={item.label} className="hp-nav__item">
-                <button type="button" className="hp-nav__link">
-                  {item.label}
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-                    <path d="M6 9l6 6 6-6" />
-                  </svg>
-                </button>
-                <div className="hp-nav__menu">
-                  {item.items.map((sub) =>
-                    sub.href ? (
-                      <a key={sub.label} href={sub.href} className="hp-nav__menu-item">
-                        {sub.label}
-                      </a>
-                    ) : (
-                      <button key={sub.label} type="button" className="hp-nav__menu-item" onClick={noop}>
-                        {sub.label}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </div>
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} className="hp-nav__link">
+                {l.label}
+              </a>
             ))}
-            <div className="hp-nav__item">
-              <button type="button" className="hp-nav__link">
-                {t.learn}
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              <div className="hp-nav__menu">
-                <a href="/blog" className="hp-nav__menu-item">
-                  Blog
-                </a>
-                <a href="#faq" className="hp-nav__menu-item">
-                  FAQ
-                </a>
-              </div>
-            </div>
-            <a href="#pricing" className="hp-nav__link">
-              {t.product}
-            </a>
-            <a href="#pricing" className="hp-nav__link">
-              {t.pricing}
-            </a>
           </div>
           <div className="hp-nav__actions">
             <a href="/auth?mode=login" className="hp-nav__login">
@@ -454,23 +437,11 @@ export function HeroPreviewShell() {
         </div>
         {navOpen ? (
           <div className="hp-nav__sheet">
-            {[t.affiliates, t.solutions].map((label) => (
-              <button key={label} type="button" className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
-                {label}
-              </button>
+            {navLinks.map((l) => (
+              <a key={l.href} href={l.href} className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
+                {l.label}
+              </a>
             ))}
-            <a href="/blog" className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
-              Blog
-            </a>
-            <a href="#faq" className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
-              FAQ
-            </a>
-            <a href="#pricing" className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
-              {t.product}
-            </a>
-            <a href="#pricing" className="hp-nav__sheet-link" onClick={() => setNavOpen(false)}>
-              {t.pricing}
-            </a>
             <a href="/auth?mode=login" className="hp-nav__login" onClick={() => setNavOpen(false)}>
               {t.login}
             </a>

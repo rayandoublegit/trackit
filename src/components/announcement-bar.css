@@ -1,0 +1,35 @@
+/* ── Landing: Q4 announcement bar (sits inside the fixed nav) ───────── */
+.annc { position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: center; justify-content: center; height: var(--hp-annc, 40px); padding: 0 44px; box-sizing: border-box; background: linear-gradient(90deg, #b91c1c 0%, #e11d48 50%, #b91c1c 100%); color: #fff; font-family: "InterDisplay", "Inter", system-ui, sans-serif; }
+.annc__shine { position: absolute; inset: 0; z-index: -1; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .22) 50%, transparent 70%); transform: translateX(-100%); animation: annc-shine 4.5s ease-in-out 1s infinite; }
+.annc__body { display: inline-flex; align-items: center; gap: 12px; min-width: 0; color: inherit; text-decoration: none; font-size: 13.5px; font-weight: 500; letter-spacing: -.01em; white-space: nowrap; }
+.annc__tag { flex-shrink: 0; padding: 3px 8px; border-radius: 6px; background: #fff; color: #be123c; font-size: 12px; font-weight: 800; letter-spacing: .02em; }
+.annc__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.annc__text strong { font-weight: 750; }
+.annc__short { display: none; }
+.annc__count { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, .22); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.annc__dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: annc-pulse 1.4s ease-out infinite; }
+.annc__cta { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(255, 255, 255, .5); }
+.annc__cta span { transition: transform .2s ease; }
+.annc__body:hover .annc__cta span { transform: translateX(3px); }
+.annc__close { position: absolute; right: 10px; top: 50%; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; padding: 0; border: none; border-radius: 8px; background: transparent; color: rgba(255, 255, 255, .85); cursor: pointer; }
+.annc__close:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+
+@keyframes annc-shine { 0% { transform: translateX(-100%); } 45%, 100% { transform: translateX(100%); } }
+@keyframes annc-pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, .7); } 100% { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); } }
+
+@media (max-width: 900px) {
+  .annc__long { display: none; }
+  .annc__short { display: inline; }
+}
+@media (max-width: 560px) {
+  .annc { padding: 0 38px 0 12px; justify-content: flex-start; }
+  .annc__body { gap: 8px; font-size: 12.5px; }
+  .annc__short, .annc__count .annc__dot { display: none; }
+  .annc__cta { font-size: 12.5px; }
+}
+@media (max-width: 380px) {
+  .annc__count { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .annc__shine, .annc__dot { animation: none; }
+}
