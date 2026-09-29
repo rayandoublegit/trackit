@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   getAppLang,
   LOCALE_UPDATED_EVENT,
@@ -10,26 +10,23 @@ import {
 
 export type Lang = AppLang;
 
+function subscribe(onChange: () => void): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === TRACKIT_LANG_KEY) onChange();
+  };
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(LOCALE_UPDATED_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(LOCALE_UPDATED_EVENT, onChange);
+  };
+}
+
+/**
+ * The app language. The server always renders English, so hydration uses "en"
+ * and React switches to the stored language right after — no hydration mismatch
+ * for French visitors. Client-side renders read the stored language directly.
+ */
 export function useLang(): Lang {
-  const [lang, setLang] = useState<Lang>(() =>
-    typeof window === "undefined" ? "en" : getAppLang()
-  );
-
-  useEffect(() => {
-    setLang(getAppLang());
-
-    const refresh = () => setLang(getAppLang());
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === TRACKIT_LANG_KEY) refresh();
-    };
-
-    window.addEventListener("storage", onStorage);
-    window.addEventListener(LOCALE_UPDATED_EVENT, refresh);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener(LOCALE_UPDATED_EVENT, refresh);
-    };
-  }, []);
-
-  return lang;
+  return useSyncExternalStore(subscribe, getAppLang, () => "en");
 }

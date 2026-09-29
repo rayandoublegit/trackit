@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { WsIcon } from "@/app/dashboard/workspace/WorkspaceIcons";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
+import { ProductFilmHero } from "@/components/ProductFilmHero";
 import { useLang } from "@/lib/useLang";
 import {
   HeroPreviewPageView,
@@ -479,6 +480,7 @@ export function HeroPreviewShell() {
           </div>
         ) : null}
       </nav>
+      <ProductFilmHero />
       <section className="hp-hero">
         <div className="hp-copy">
           <div className="hp-badge">

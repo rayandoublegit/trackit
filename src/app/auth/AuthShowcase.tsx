@@ -36,7 +36,7 @@ const CREATORS = [
   { name: "Nora Diallo", handle: "nora.daily", hue: 160, followers: "42K", views: "97K", niche: { en: "Lifestyle", fr: "Lifestyle" } },
 ];
 
-function Avatar({ name, hue, size = 32 }: { name: string; hue: number; size?: number }) {
+export function Avatar({ name, hue, size = 32 }: { name: string; hue: number; size?: number }) {
   const initials = name
     .split(" ")
     .map((p) => p[0])
@@ -58,7 +58,7 @@ function Avatar({ name, hue, size = 32 }: { name: string; hue: number; size?: nu
   );
 }
 
-function DiscoverScene({ lang }: { lang: "en" | "fr" }) {
+export function DiscoverScene({ lang }: { lang: "en" | "fr" }) {
   const fr = lang === "fr";
   return (
     <div className="ash-scene ash-discover">
@@ -102,7 +102,7 @@ function DiscoverScene({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-function CampaignScene({ lang }: { lang: "en" | "fr" }) {
+export function CampaignScene({ lang }: { lang: "en" | "fr" }) {
   const fr = lang === "fr";
   const money = (n: number) =>
     new Intl.NumberFormat(fr ? "fr-FR" : "en-US", { style: "currency", currency: fr ? "EUR" : "USD", maximumFractionDigits: 0 }).format(n);
@@ -158,7 +158,7 @@ function CampaignScene({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-function GiftingScene({ lang }: { lang: "en" | "fr" }) {
+export function GiftingScene({ lang }: { lang: "en" | "fr" }) {
   const fr = lang === "fr";
   const stages = fr ? ["Invité", "Signé", "Expédié", "Reçu", "Vidéo"] : ["Invited", "Signed", "Shipped", "Delivered", "Video"];
   return (
@@ -200,7 +200,7 @@ function GiftingScene({ lang }: { lang: "en" | "fr" }) {
   );
 }
 
-function PayoutScene({ lang }: { lang: "en" | "fr" }) {
+export function PayoutScene({ lang }: { lang: "en" | "fr" }) {
   const fr = lang === "fr";
   const money = (n: number) =>
     new Intl.NumberFormat(fr ? "fr-FR" : "en-US", { style: "currency", currency: fr ? "EUR" : "USD", maximumFractionDigits: 2 }).format(n);
