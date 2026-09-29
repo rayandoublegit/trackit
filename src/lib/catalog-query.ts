@@ -108,7 +108,8 @@ export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
 
   const applyFilters = (query: any) => {
     let out = query;
-    if (q.platform) out = out.eq("platform", q.platform);
+    // Stored platform values vary in case ("tiktok", "TikTok"): match without case.
+    if (q.platform) out = out.ilike("platform", q.platform);
     if (q.minFollowers != null) out = out.gte("followers", q.minFollowers);
     if (q.maxFollowers != null) out = out.lte("followers", q.maxFollowers);
     if (q.minEngagement) out = out.gte("engagement_rate", q.minEngagement);
