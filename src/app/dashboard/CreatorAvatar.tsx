@@ -131,18 +131,15 @@ export function CreatorAvatar({
   );
 
   if (!activeSrc) {
-    const letterSource = (displayName || resolvedUsername || alt || "?")
-      .trim()
-      .replace(/^@+/, "");
-    const letter = letterSource.charAt(0).toUpperCase() || "?";
-    const showLetter = Boolean(displayName?.trim() || resolvedUsername);
+    // No photo yet: a neutral profile icon, never initials.
     return (
       <div
         style={{
           width: size,
           height: size,
           borderRadius: "50%",
-          background: "#F0F0F0",
+          background: "var(--ws-pill, #F0F0F0)",
+          color: "var(--ws-text-dim, #8A8A8A)",
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
@@ -151,21 +148,7 @@ export function CreatorAvatar({
         aria-hidden={!alt}
         title={alt || displayName || undefined}
       >
-        {showLetter ? (
-          <span
-            style={{
-              fontSize: Math.max(11, Math.round(size * 0.38)),
-              fontWeight: 600,
-              color: "#8A8A8A",
-              lineHeight: 1,
-              userSelect: "none",
-            }}
-          >
-            {letter}
-          </span>
-        ) : (
-          <ProfileIcon size={size} />
-        )}
+        <ProfileIcon size={size} />
       </div>
     );
   }

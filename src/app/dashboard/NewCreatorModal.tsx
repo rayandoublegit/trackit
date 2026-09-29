@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { listFolders, type FolderRow } from "@/lib/workspace-client";
+import { PersonGlyph } from "@/components/FallbackGlyphs";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
 const SIMULATE_CREATOR_ID = "simulate-new-creator";
@@ -732,7 +733,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
               {displayAvatar ? (
                 <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                displayName.replace("@", "").charAt(0).toUpperCase()
+                <PersonGlyph size={34} color="#8A8A8E" />
               )}
               <input
                 type="file"

@@ -9,6 +9,7 @@ import { ActivityFeed, RevenueChart } from "./SampleCampaignPreview";
 import { CountUp } from "./sample-motion";
 import { samplesHidden } from "@/lib/sample-workspace";
 import { HOME_STEP_ORDER, homeStepById, homeStepDone, nextHomeStep, type HomeStep } from "@/lib/home-next-step";
+import { MinoHomeHero } from "./MinoHomeHero";
 
 const BLUE = "#0047FF";
 
@@ -136,6 +137,81 @@ function QuickAction({
   );
 }
 
+function Glyph({ d }: { d: string }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d={d} />
+    </svg>
+  );
+}
+
+const GLYPH = {
+  creators: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  outreach: "M22 2 11 13M22 2l-7 20-4-9-9-4z",
+  sales: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0",
+  campaigns: "M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13",
+  find: "M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.35-4.35",
+  gift: "M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z",
+  payouts: "M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5M16 14h.01",
+};
+
+function HomeMetric({
+  label,
+  value,
+  hint,
+  icon,
+  index,
+  accent,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  icon: string;
+  index: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className={`hm-metric${accent ? " is-accent" : ""}`} style={{ ["--i" as string]: index }}>
+      <div className="hm-metric__top">
+        <span className="hm-metric__label">{label}</span>
+        <span className="hm-metric__icon">
+          <Glyph d={icon} />
+        </span>
+      </div>
+      <div className="hm-metric__value">
+        <CountUp value={value} format={(n) => Math.round(n).toLocaleString("en-US")} />
+      </div>
+      {hint ? <div className="hm-metric__hint">{hint}</div> : null}
+    </div>
+  );
+}
+
+function HomeAction({
+  label,
+  description,
+  icon,
+  index,
+  onClick,
+}: {
+  label: string;
+  description: string;
+  icon: string;
+  index: number;
+  onClick: () => void;
+}) {
+  return (
+    <button type="button" className="hm-action" style={{ ["--i" as string]: index }} onClick={onClick}>
+      <span className="hm-action__icon">
+        <Glyph d={icon} />
+      </span>
+      <span className="hm-action__copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </span>
+    </button>
+  );
+}
+
 function BrandHomeOverview({
   lang,
   userId,
@@ -171,65 +247,42 @@ function BrandHomeOverview({
     activeCampaigns === 0;
   const setupTotal = HOME_STEP_ORDER.length;
 
+  const firstName = (displayName || "").trim().split(/\s+/)[0] || "";
+
   return (
     <>
-      <OverviewHeader
-        isMobile={isMobile}
-        title={displayName ? (lang === "fr" ? `Bonjour, ${displayName}` : `Hi, ${displayName}`) : lang === "fr" ? "Accueil" : "Home"}
-        subtitle={
-          businessName
-            ? lang === "fr"
-              ? `Vue d'ensemble de ${businessName} — créateurs, campagnes et ventes.`
-              : `Overview for ${businessName} — creators, campaigns, and sales.`
-            : lang === "fr"
-              ? "Vue d'ensemble de votre programme créateurs."
-              : "Overview of your creator program."
-        }
-      />
+      <MinoHomeHero firstName={firstName} userId={userId} isMobile={isMobile} onNavigate={onNavigate} />
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32 }}>
+        <div className="hm-section-title">
+          <h2>Your program</h2>
+          <span>{businessName ? businessName : "Creators, campaigns and sales"}</span>
+        </div>
+        <div className="hm-metrics">
+          <HomeMetric index={0} label="Creators" value={gettingStarted.creatorsCount} hint="Managed" icon={GLYPH.creators} />
+          <HomeMetric index={1} label="Outreach" value={gettingStarted.outreachCount} hint="Messages sent" icon={GLYPH.outreach} />
+          <HomeMetric index={2} label="Sales" value={gettingStarted.salesCount} hint="Tracked orders" icon={GLYPH.sales} />
+          <HomeMetric
+            index={3}
+            label="Active campaigns"
+            value={activeCampaigns}
+            hint={activeCampaigns > 0 ? "Running now" : "None running yet"}
+            icon={GLYPH.campaigns}
+            accent={activeCampaigns > 0}
+          />
+        </div>
+
         {gettingStarted.countsLoaded ? (
           <NextStepCard lang={lang} step={nextStep} done={setupDone} total={setupTotal} onGo={() => onNavigate(nextStep.view)} />
         ) : null}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
-            gap: 16,
-            marginBottom: 28,
-          }}
-        >
-          <MetricCard label={lang === "fr" ? "Créateurs" : "Creators"} value={gettingStarted.creatorsCount} hint={lang === "fr" ? "Gérés" : "Managed"} />
-          <MetricCard label={lang === "fr" ? "Messages" : "Outreach"} value={gettingStarted.outreachCount} hint={lang === "fr" ? "Envoyés" : "Sent"} />
-          <MetricCard label={lang === "fr" ? "Ventes" : "Sales"} value={gettingStarted.salesCount} hint={lang === "fr" ? "Suivies" : "Tracked"} />
-          <MetricCard label={lang === "fr" ? "Campagnes actives" : "Active campaigns"} value={activeCampaigns} accent={activeCampaigns > 0} />
-        </div>
 
-        <div style={{ marginBottom: 28 }}>
-          <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", margin: "0 0 12px" }}>
-            {lang === "fr" ? "Actions rapides" : "Quick actions"}
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)", gap: 12 }}>
-            <QuickAction
-              label={lang === "fr" ? "Trouver des créateurs" : "Find creators"}
-              description={lang === "fr" ? "Parcourir la recherche et sauvegarder des profils." : "Browse discovery and save profiles."}
-              onClick={() => onNavigate("discovery")}
-            />
-            <QuickAction
-              label={lang === "fr" ? "Lancer une campagne" : "Launch a campaign"}
-              description={lang === "fr" ? "Créer ou gérer vos collaborations." : "Create or manage collaborations."}
-              onClick={() => onNavigate("campaigns")}
-            />
-            <QuickAction
-              label={lang === "fr" ? "Envoyer un cadeau" : "Send a gift"}
-              description={lang === "fr" ? "Contrat, colis et vidéo en retour." : "Contract, parcel and a video back."}
-              onClick={() => onNavigate("gifting")}
-            />
-            <QuickAction
-              label={lang === "fr" ? "Voir les paiements" : "View payouts"}
-              description={lang === "fr" ? "Commissions et versements créateurs." : "Commissions and creator payouts."}
-              onClick={() => onNavigate("payouts")}
-            />
-          </div>
+        <div className="hm-section-title">
+          <h2>Jump back in</h2>
+        </div>
+        <div className="hm-actions">
+          <HomeAction index={0} label="Find creators" description="Search the catalog and save profiles." icon={GLYPH.find} onClick={() => onNavigate("discovery")} />
+          <HomeAction index={1} label="Launch a campaign" description="Codes, links and commissions." icon={GLYPH.campaigns} onClick={() => onNavigate("campaigns")} />
+          <HomeAction index={2} label="Send a gift" description="Contract, parcel and a video back." icon={GLYPH.gift} onClick={() => onNavigate("gifting")} />
+          <HomeAction index={3} label="Pay creators" description="Commissions ready to pay." icon={GLYPH.payouts} onClick={() => onNavigate("payouts")} />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile || !programEmpty ? "1fr" : "minmax(0,1fr) minmax(0,1.25fr)", gap: 16, alignItems: "start" }}>

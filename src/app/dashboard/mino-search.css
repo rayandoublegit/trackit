@@ -1,0 +1,99 @@
+/* ── Mino creator search: motion while searching, cards when done ───────── */
+.mino-search { align-self: stretch; width: 100%; max-width: 760px; margin: 4px 0 8px; padding: 18px 20px; border-radius: 20px; border: 1px solid var(--ws-border); background: var(--ws-surface); box-shadow: var(--ws-shadow); box-sizing: border-box; animation: mino-rise .45s cubic-bezier(.2, .8, .2, 1) both; overflow: hidden; position: relative; isolation: isolate; }
+.mino-search::before { content: ""; position: absolute; inset: -40% -10% auto; height: 160px; z-index: -1; background: radial-gradient(50% 60% at 50% 50%, var(--ws-accent-soft), transparent 70%); animation: mino-breathe 2.4s ease-in-out infinite; }
+.mino-search__head { display: flex; align-items: center; gap: 12px; }
+.mino-search__orb { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--ws-accent-soft); }
+.mino-search__orb::after { content: ""; position: absolute; inset: -3px; border-radius: 16px; border: 2px solid transparent; border-top-color: var(--ws-accent); animation: mino-spin .9s linear infinite; }
+.mino-search__title { display: flex; flex-direction: column; min-width: 0; }
+.mino-search__title strong { font-size: 15px; letter-spacing: -.02em; color: var(--ws-text); }
+.mino-search__title span { font-size: 13px; color: var(--ws-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-search__platforms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.mino-search__lane { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; gap: 6px 8px; padding: 10px 12px; border-radius: 12px; background: var(--ws-pill); animation: mino-rise .4s ease both; animation-delay: calc(var(--i) * 90ms); }
+.mino-search__lane-name { font-size: 12.5px; font-weight: 600; color: var(--ws-text); }
+.mino-search__bar { grid-column: 1 / -1; position: relative; height: 4px; border-radius: 99px; background: var(--ws-border); overflow: hidden; }
+.mino-search__bar span { position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: inherit; background: linear-gradient(90deg, transparent, var(--ws-accent), transparent); animation: mino-scan 1.3s ease-in-out infinite; animation-delay: calc(var(--i) * 180ms); }
+.mino-search__steps { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 0; padding: 0; }
+.mino-search__steps li { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ws-text-dim); transition: color .25s ease; }
+.mino-search__steps li.is-on { color: var(--ws-text); font-weight: 600; }
+.mino-search__steps li.is-done { color: var(--ws-text-muted); }
+.mino-search__tick { position: relative; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--ws-border-strong); box-sizing: border-box; }
+.mino-search__steps li.is-on .mino-search__tick { border-color: var(--ws-accent); border-top-color: transparent; animation: mino-spin .7s linear infinite; }
+.mino-search__steps li.is-done .mino-search__tick { border-color: #10b981; background: #10b981; }
+.mino-search__steps li.is-done .mino-search__tick::after { content: ""; position: absolute; left: 3.5px; top: 1.5px; width: 3px; height: 6px; border: solid #fff; border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); }
+.mino-search__ghosts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.mino-search__ghost { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 14px; border: 1px solid var(--ws-border); animation: mino-rise .45s ease both; animation-delay: calc(300ms + var(--i) * 120ms); }
+.mino-search__ghost-face, .mino-search__ghost-line { display: block; border-radius: 99px; background: linear-gradient(90deg, var(--ws-pill) 0%, var(--ws-hover) 40%, var(--ws-pill) 80%); background-size: 200% 100%; animation: mino-shimmer 1.2s linear infinite; }
+.mino-search__ghost-face { width: 38px; height: 38px; border-radius: 50%; }
+.mino-search__ghost-line { height: 9px; width: 80%; }
+.mino-search__ghost-line.is-short { width: 50%; }
+
+.mino-results { align-self: stretch; width: 100%; max-width: 900px; margin: 2px 0 10px; }
+.mino-results__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px; animation: mino-rise .4s ease both; }
+.mino-results__head > div { display: flex; flex-direction: column; min-width: 0; }
+.mino-results__head strong { font-size: 16px; letter-spacing: -.02em; color: var(--ws-text); }
+.mino-results__head div span { font-size: 13px; color: var(--ws-text-muted); }
+.mino-results__source { flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px; background: var(--ws-pill); font-size: 12px; font-weight: 600; color: var(--ws-text-muted); }
+.mino-results__source i { width: 7px; height: 7px; border-radius: 50%; background: var(--ws-accent); }
+.mino-results__source.is-live i { background: #ef4444; animation: mino-ping 1.4s ease-out infinite; }
+.mino-results__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 12px; }
+.mino-results__more { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: border-color .2s ease, transform .2s ease; }
+.mino-results__more:hover { border-color: var(--ws-accent); transform: translateY(-1px); }
+.mino-results__more span { transition: transform .2s ease; }
+.mino-results__more:hover span { transform: translateX(3px); }
+
+.mino-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; border: 1px solid var(--ws-border); background: var(--ws-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); animation: mino-card-in .55s cubic-bezier(.2, .9, .3, 1.15) both; animation-delay: calc(var(--i) * 70ms); transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.mino-card:hover { transform: translateY(-3px); border-color: var(--ws-border-strong); box-shadow: var(--ws-shadow); }
+.mino-card__top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mino-card__face { position: relative; flex-shrink: 0; display: inline-flex; }
+.mino-card__photo { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; background: var(--ws-pill); }
+.mino-card__platform { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ws-surface); box-shadow: 0 1px 4px rgba(0, 0, 0, .18); }
+.mino-card__who { display: flex; flex-direction: column; min-width: 0; }
+.mino-card__who strong { display: inline-flex; align-items: center; gap: 5px; font-size: 14.5px; letter-spacing: -.02em; color: var(--ws-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-card__who span { font-size: 12.5px; color: var(--ws-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-card__tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; }
+.mino-card__tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--ws-accent-soft); color: var(--ws-accent); font-size: 11.5px; font-weight: 650; text-transform: capitalize; }
+.mino-card__tag.is-geo { background: var(--ws-pill); color: var(--ws-text-muted); text-transform: none; }
+.mino-card__tag.is-mail { background: rgba(16, 185, 129, .12); color: #059669; text-transform: none; }
+.mino-card__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 0; padding: 10px 0 0; border-top: 1px solid var(--ws-border); }
+.mino-card__stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mino-card__stats dt { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ws-text-dim); }
+.mino-card__stats dd { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.02em; color: var(--ws-text); font-variant-numeric: tabular-nums; }
+.mino-card__stats dd.is-hot { color: #059669; }
+.mino-card__actions { display: flex; gap: 8px; }
+.mino-card__save { flex: 1; height: 34px; border: none; border-radius: 10px; background: var(--ws-btn); color: var(--ws-btn-text); font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: transform .15s ease, background .2s ease, opacity .2s ease; }
+.mino-card__save:active { transform: scale(.96); }
+.mino-card__save.is-saved { background: #10b981; color: #fff; cursor: default; animation: mino-pop .35s ease; }
+.mino-card__save.is-saving { opacity: .7; }
+.mino-card__save.is-limit { background: var(--ws-accent); color: #fff; }
+.mino-card__link { display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--ws-border); color: var(--ws-text); font-size: 13px; font-weight: 600; text-decoration: none; transition: border-color .2s ease; }
+.mino-card__link:hover { border-color: var(--ws-border-strong); }
+
+.mino-typing { display: inline-flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 16px; background: var(--ws-pill); color: var(--ws-text-muted); font-size: 13.5px; animation: mino-rise .3s ease both; }
+.mino-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--ws-accent); animation: mino-dot 1s ease-in-out infinite; }
+.mino-typing i:nth-of-type(2) { animation-delay: .15s; }
+.mino-typing i:nth-of-type(3) { animation-delay: .3s; }
+
+@keyframes mino-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mino-card-in { from { opacity: 0; transform: translateY(18px) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes mino-spin { to { transform: rotate(360deg); } }
+@keyframes mino-scan { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+@keyframes mino-shimmer { to { background-position: -200% 0; } }
+@keyframes mino-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes mino-ping { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .5); } 100% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); } }
+@keyframes mino-pop { 0% { transform: scale(1); } 45% { transform: scale(1.06); } 100% { transform: scale(1); } }
+@keyframes mino-dot { 0%, 100% { opacity: .3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+
+@media (max-width: 640px) {
+  .mino-search__platforms, .mino-search__ghosts { grid-template-columns: 1fr; }
+  .mino-search__ghost:nth-child(n + 2) { display: none; }
+  .mino-results__head { flex-direction: column; align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mino-search *, .mino-search, .mino-results *, .mino-typing, .mino-typing i { animation: none !important; transition: none !important; }
+}
+
+/* Chat turns: a bubble, and for Mino's searches the creator cards under it. */
+.ai-chat-turn { display: flex; flex-direction: column; gap: 10px; }
+.ai-chat-turn--user { align-items: flex-end; }
+.ai-chat-turn--assistant { align-items: flex-start; }
+.ai-page.is-thread .ai-chat-thread, .ai-page.is-thread .mtg-promptbox { width: min(880px, 100%); }

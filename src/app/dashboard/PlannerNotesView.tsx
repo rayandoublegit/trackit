@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
 import { getSavedCreators } from "@/lib/db";
+import { PersonGlyph } from "@/components/FallbackGlyphs";
 import {
   createPlannerMeetingNote,
   loadPlannerMeetingNotes,
@@ -173,7 +174,9 @@ function NoteEditor({
                     {c.avatarUrl ? (
                       <img src={c.avatarUrl} alt="" />
                     ) : (
-                      <span className="pn-avatar-fallback">{creatorDisplayName(c).slice(0, 1).toUpperCase()}</span>
+                      <span className="pn-avatar-fallback" aria-hidden>
+                        <PersonGlyph size={12} />
+                      </span>
                     )}
                     <span>@{c.handle}</span>
                   </button>
@@ -368,8 +371,8 @@ export function PlannerNotesView({ userId, isMobile }: { userId?: string; isMobi
                       c.avatarUrl ? (
                         <img key={c.handle} src={c.avatarUrl} alt="" />
                       ) : (
-                        <span key={c.handle} className="pn-avatar-fallback">
-                          {creatorDisplayName(c).slice(0, 1).toUpperCase()}
+                        <span key={c.handle} className="pn-avatar-fallback" aria-hidden>
+                          <PersonGlyph size={15} />
                         </span>
                       ),
                     )}

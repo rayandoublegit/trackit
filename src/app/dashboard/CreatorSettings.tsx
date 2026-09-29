@@ -8,6 +8,7 @@ import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { resolveAvatarUrl, toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
 import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-styles";
+import { PersonGlyph } from "@/components/FallbackGlyphs";
 import {
   fetchProfileUsernameAvailability,
   isValidProfileUsername,
@@ -440,7 +441,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
               {displayAvatar ? (
                 <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <span style={{ fontSize: 34, color: "var(--ws-text-dim)", fontWeight: 600 }}>{(fullName.trim() || username.trim() || "?").charAt(0).toUpperCase()}</span>
+                <PersonGlyph size={50} color="var(--ws-text-dim)" />
               )}
             </div>
             <div>

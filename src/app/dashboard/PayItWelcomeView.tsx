@@ -3,8 +3,19 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useLang, type Lang } from "@/lib/useLang";
 import { SALES_UPDATED_EVENT } from "@/lib/outreach-history-events";
+import { PersonGlyph } from "@/components/FallbackGlyphs";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
+
+const MOCK_PHOTO_QUERY = "?w=96&h=96&fit=crop&crop=faces&auto=format&q=70";
+const MOCK_PAYOUT_PHOTOS = [
+  "photo-1580489944761-15a19d654956",
+  "photo-1489278353717-f64c6ee8a4d2",
+  "photo-1662850886700-4ec19bd30d11",
+  "photo-1630939687530-241d630735df",
+  "photo-1534180477871-5d6cc81f3920",
+  "photo-1544507888-56d73eb6046e",
+].map((id) => `https://images.unsplash.com/${id}${MOCK_PHOTO_QUERY}`);
 const SETUP_STARTED_KEY = "payit_setup_started";
 
 type TrackedSale = { id: string };
@@ -140,7 +151,6 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
           { name: "@luna.beauty", amount: "€ 150", status: "Commission", statusBg: "#EEF2FF", statusColor: "#0047FF" },
         ];
 
-  const avatarColors = ["#F9A8D4", "#93C5FD", "#C4B5FD"];
 
   return (
     <div
@@ -245,17 +255,26 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
                   width: 32,
                   height: 32,
                   borderRadius: "50%",
-                  background: avatarColors[i],
+                  background: "#F3F4F6",
                   flexShrink: 0,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "#FFF",
+                  overflow: "hidden",
                 }}
               >
-                {row.name.charAt(1).toUpperCase()}
+                {MOCK_PAYOUT_PHOTOS[i] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={MOCK_PAYOUT_PHOTOS[i]}
+                    alt=""
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", display: "block" }}
+                  />
+                ) : (
+                  <PersonGlyph size={17} color="#9CA3AF" />
+                )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 12, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>

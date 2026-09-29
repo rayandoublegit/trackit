@@ -11,13 +11,18 @@ import {
   loadMinoChats,
   MINO_ACTIVE_EVENT,
   MINO_CHATS_EVENT,
+  MINO_PENDING_EVENT,
   setActiveMinoChatId,
+  takePendingMinoPrompt,
   titleFromMessage,
   upsertMinoChat,
   type MinoChat,
   type MinoChatMessage,
 } from "@/lib/mino-chats-storage";
 import { MinoCompanion } from "@/components/MinoCompanion";
+import { describeSearch, parseCreatorSearch } from "@/lib/mino-search-parse";
+import type { FeedCreator } from "@/lib/discovery-feed";
+import { MinoCreatorResults, MinoSearchMotion } from "./MinoCreatorResults";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
 const MINO_TYPE_LINES = {
@@ -157,7 +162,9 @@ export function AiChatView({
   const [chats, setChats] = useState<MinoChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [searchLabel, setSearchLabel] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const submitRef = useRef<(raw: string) => Promise<void>>(async () => {});
 
   const activeChat = useMemo(
     () => chats.find((c) => c.id === activeChatId) || null,
@@ -522,11 +529,8 @@ export function AiChatView({
     if (!text || chatBusy) return;
 
     const startingSession = !chatMode && !!activeChatId && messages.length === 0;
-    if (
-      !chatMode &&
-      !startingSession &&
-      !(!isCreator && /\b(influenc|créat|creat|cherche|find|search|niche)\b/i.test(text))
-    ) {
+    const creatorSearch = isCreator ? null : parseCreatorSearch(text);
+    if (!chatMode && !startingSession && !creatorSearch) {
       await executeAsk(text);
       return;
     }
@@ -546,6 +550,9 @@ export function AiChatView({
     setPrompt("");
     setChatBusy(true);
     setStatus("");
+    setSearchLabel(creatorSearch ? describeSearch(creatorSearch) : null);
+    // Let the search motion play in full even when results come back fast.
+    const minShow = new Promise((r) => window.setTimeout(r, creatorSearch ? 2200 : 0));
 
     try {
       const res = await fetch("/api/ai-chat", {
@@ -557,14 +564,28 @@ export function AiChatView({
           role: isCreator ? "creator" : "brand",
         }),
       });
-      const data = (await res.json()) as { ok?: boolean; reply?: string; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        reply?: string;
+        error?: string;
+        creators?: FeedCreator[];
+        search?: { label: string; sources: string[] };
+      };
+      await minShow;
       const reply =
         res.ok && data.reply
           ? data.reply
           : fr
             ? "Petit souci côté IA. Réessaie dans un instant."
             : "AI hiccup. Try again in a moment.";
-      const withReply = [...nextMessages, { role: "assistant" as const, content: reply }];
+      const withReply: MinoChatMessage[] = [
+        ...nextMessages,
+        {
+          role: "assistant" as const,
+          content: reply,
+          ...(res.ok && data.creators?.length ? { creators: data.creators, search: data.search } : {}),
+        },
+      ];
       setMessages(withReply);
       persistMessages(chatId, withReply, text);
     } catch {
@@ -579,8 +600,21 @@ export function AiChatView({
       persistMessages(chatId, withReply, text);
     } finally {
       setChatBusy(false);
+      setSearchLabel(null);
     }
   };
+  submitRef.current = submit;
+
+  // A prompt typed on Home is sent as soon as this view is shown.
+  useEffect(() => {
+    const consume = () => {
+      const text = takePendingMinoPrompt(userId);
+      if (text) void submitRef.current(text);
+    };
+    consume();
+    window.addEventListener(MINO_PENDING_EVENT, consume);
+    return () => window.removeEventListener(MINO_PENDING_EVENT, consume);
+  }, [userId]);
 
   const dropdownLabel = activeChat?.title || "Ask, Build, Create";
 
@@ -639,14 +673,30 @@ export function AiChatView({
         {chatMode && messages.length > 0 ? (
           <div className="ai-chat-thread" aria-live="polite">
             {messages.map((m, i) => (
-              <div key={`${m.role}-${i}`} className={`ai-chat-bubble ai-chat-bubble--${m.role}`}>
-                {m.content}
+              <div key={`${m.role}-${i}`} className={`ai-chat-turn ai-chat-turn--${m.role}`}>
+                <div className={`ai-chat-bubble ai-chat-bubble--${m.role}`}>{m.content}</div>
+                {m.role === "assistant" && m.creators?.length ? (
+                  <MinoCreatorResults
+                    creators={m.creators}
+                    label={m.search?.label ?? ""}
+                    sources={m.search?.sources ?? []}
+                    onOpenCatalog={() => onNavigate("discovery")}
+                  />
+                ) : null}
               </div>
             ))}
             {chatBusy ? (
-              <div className="ai-chat-bubble ai-chat-bubble--assistant is-typing">
-                {fr ? "Réflexion…" : "Thinking…"}
-              </div>
+              searchLabel ? (
+                <MinoSearchMotion label={searchLabel} />
+              ) : (
+                <div className="mino-typing" role="status">
+                  <MinoCompanion size={18} />
+                  Mino is thinking
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              )
             ) : null}
             <div ref={chatEndRef} />
           </div>
@@ -691,8 +741,8 @@ export function AiChatView({
             </div>
             <div className="mtg-promptbox__bar">
               <span className="mtg-promptbox__meta">
-                {fr ? "Propulsé par" : "Powered by"}
-                <img src="/claude-logo.svg" alt="Claude" className="mtg-promptbox__claude" width={16} height={16} />
+                <MinoCompanion size={16} />
+                Mino
               </span>
               <div className="mtg-promptbox__actions">
                 <button

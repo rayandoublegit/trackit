@@ -39,6 +39,9 @@ import {
 } from "@/lib/hidden-creators-storage";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { UpgradeModal } from "./UpgradeModal";
+import { CatalogFilterBar, type CatalogMode, type CatalogPreset, type CatalogSortKey } from "./CatalogFilterBar";
+import { PlatformLogo, platformKey } from "@/components/PlatformLogo";
+import { isStablePublicImageUrl } from "@/lib/client-image-url";
 
 function fmt(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
@@ -54,21 +57,6 @@ function Lock({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
-
-const filterSelectStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  background: "var(--ws-input)",
-  border: "1px solid var(--ws-border)",
-  borderRadius: 10,
-  padding: "9px 12px",
-  fontSize: 13,
-  fontFamily: "inherit",
-  color: "var(--ws-text)",
-  cursor: "pointer",
-  letterSpacing: "-0.01em",
-  boxSizing: "border-box",
-};
 
 const inputStyle: React.CSSProperties = {
   display: "block",
@@ -98,6 +86,11 @@ type FilterState = {
   hasEmail: boolean;
   hideSaved: boolean;
   showHidden: boolean;
+  activity: string;
+  verified: boolean;
+  preset: string;
+  reach: string;
+  likes: string;
 };
 
 const EMPTY_FILTERS: FilterState = {
@@ -114,7 +107,14 @@ const EMPTY_FILTERS: FilterState = {
   hasEmail: false,
   hideSaved: false,
   showHidden: false,
+  activity: "",
+  verified: false,
+  preset: "",
+  reach: "",
+  likes: "",
 };
+
+const LIKES_VAL: Record<string, number> = { "1k": 1_000, "10k": 10_000, "100k": 100_000 };
 
 /** Catalogue sans niche choisie : pas de cap plan ni quota decouverte. */
 function isAllNichesBrowse(f: FilterState): boolean {
@@ -123,7 +123,7 @@ function isAllNichesBrowse(f: FilterState): boolean {
 
 /** Performance / search filters (not niche or geo). Triggers refresh + discovery quota. */
 function hasActiveSearchFilters(f: FilterState): boolean {
-  if (f.followersRange || f.engagement || f.viewsFrom || f.viewsTo || f.age) return true;
+  if (f.followersRange || f.engagement || f.viewsFrom || f.viewsTo || f.age || f.activity || f.verified) return true;
   if (f.search.trim()) return true;
   if (f.hasEmail || f.hideSaved || f.showHidden) return true;
   return false;
@@ -152,15 +152,22 @@ const VIEWS_VAL: Record<string, number> = {
   "1m": 1_000_000,
 };
 
-function toParams(f: FilterState, debouncedSearch = ""): Record<string, string> {
+function toParams(f: FilterState, debouncedSearch = "", sort: CatalogSortKey = "followers"): Record<string, string> {
   const q = debouncedSearch.trim().replace(/^@/, "");
+  const p: Record<string, string> = { platform: f.platform || "tiktok", sort };
+  if (f.hasEmail) p.hasEmail = "1";
+  if (f.verified) p.verified = "1";
+  if (f.activity) p.activeWithinDays = f.activity;
+  if (Number(f.reach) > 0) p.minReach = f.reach;
+  if (LIKES_VAL[f.likes]) p.minLikes = String(LIKES_VAL[f.likes]);
+  if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) p.minViews = String(VIEWS_VAL[f.viewsFrom]);
+  if (f.viewsTo && VIEWS_VAL[f.viewsTo]) p.maxViews = String(VIEWS_VAL[f.viewsTo]);
   if (q.length >= 2) {
-    return { search: q };
+    p.search = q;
+    return p;
   }
 
-  const p: Record<string, string> = {};
   if (f.niche) p.niche = f.niche;
-  if (f.platform && f.platform !== "tiktok") p.platform = f.platform;
   const followers = followerRangeBounds(f.followersRange);
   if (followers.min != null) p.minFollowers = String(followers.min);
   if (followers.max != null) p.maxFollowers = String(followers.max);
@@ -230,6 +237,13 @@ function applyClientFilters(
       }
     }
     if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
+    if (f.verified) out = out.filter((c) => c.authenticityScore >= 60);
+    if (Number(f.reach) > 0) out = out.filter((c) => (c.viewsPerFollower ?? 0) >= Number(f.reach));
+    if (LIKES_VAL[f.likes]) out = out.filter((c) => (c.avgLikes ?? 0) >= LIKES_VAL[f.likes]);
+    if (f.activity) {
+      const since = Date.now() - Number(f.activity) * 86_400_000;
+      out = out.filter((c) => !c.lastPostAt || new Date(c.lastPostAt).getTime() >= since);
+    }
     if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
     if (f.showHidden) {
       out = out.filter((c) => hidden.has(c.username.toLowerCase()));
@@ -255,92 +269,6 @@ function applyClientFilters(
 
 function estimateEngagement(c: FeedCreator) {
   return Math.round((c.followersCount * c.engagementRate) / 100);
-}
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-  disabled,
-  onLocked,
-}: {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (v: string) => void;
-  disabled?: boolean;
-  onLocked?: () => void;
-}) {
-  const guard = disabled ? (e: React.SyntheticEvent) => { e.preventDefault(); onLocked?.(); } : undefined;
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
-      <select
-        value={value}
-        onChange={(e) => {
-          if (disabled) { onLocked?.(); return; }
-          onChange(e.target.value);
-        }}
-        onMouseDown={guard}
-        onKeyDown={guard}
-        style={{ ...filterSelectStyle, opacity: disabled ? 0.65 : 1 }}
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-function FilterToggle({
-  label,
-  checked,
-  onChange,
-  disabled,
-  onLocked,
-  onLabel,
-  offLabel,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  onLocked?: () => void;
-  onLabel: string;
-  offLabel: string;
-}) {
-  return (
-    <div>
-      <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{label}</div>
-      <label
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 14,
-          ...filterSelectStyle,
-          cursor: disabled ? "not-allowed" : "pointer",
-          opacity: disabled ? 0.65 : 1,
-        }}
-        onClick={(e) => {
-          if (disabled) { e.preventDefault(); onLocked?.(); }
-        }}
-      >
-        <span style={{ fontSize: 13, color: "var(--ws-text)", flex: 1, marginRight: 8 }}>{checked ? onLabel : offLabel}</span>
-        <input
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          onChange={(e) => {
-            if (disabled) { onLocked?.(); return; }
-            onChange(e.target.checked);
-          }}
-          style={{ width: 15, height: 15, cursor: disabled ? "not-allowed" : "pointer", flexShrink: 0, marginLeft: 4 }}
-        />
-      </label>
-    </div>
-  );
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -420,304 +348,59 @@ function NicheRequestSection({ lang, product }: { lang: "en" | "fr"; product: st
   );
 }
 
-function FilterSidebar({
-  lang,
-  isPaid,
-  isFree,
-  filters,
-  product,
-  onProductChange,
-  onProductBlur,
-  onChange,
-  onLocked,
-  isMobile,
-}: {
-  lang: "en" | "fr";
-  isPaid: boolean;
-  isFree: boolean;
-  filters: FilterState;
-  product: string;
-  onProductChange: (v: string) => void;
-  onProductBlur: () => void;
-  onChange: (patch: Partial<FilterState>) => void;
-  onLocked: () => void;
-  isMobile?: boolean;
-}) {
-  const t = discoveryCopy(lang);
-  const searchLocked = !isPaid;
-  const [platformNotice, setPlatformNotice] = useState<string | null>(null);
-  const [platformNoticeBlocked, setPlatformNoticeBlocked] = useState(false);
-  const platformNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+function ago(iso: string | null): string {
+  if (!iso) return "";
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  if (!Number.isFinite(days) || days < 0) return "";
+  if (days === 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} mo ago`;
+  return `${Math.floor(months / 12)} yr ago`;
+}
 
-  useEffect(() => {
-    return () => {
-      if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
-    };
-  }, []);
-
-  const showPlatformComingSoon = () => {
-    setPlatformNoticeBlocked(false);
-    setPlatformNotice(t.morePlatformsComing);
-    if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
-    platformNoticeTimerRef.current = setTimeout(() => setPlatformNotice(null), 4000);
-  };
-
-  const showPlatformFreeBlocked = (label: string) => {
-    setPlatformNoticeBlocked(true);
-    setPlatformNotice(t.platformFreeBlocked(label));
-    if (platformNoticeTimerRef.current) clearTimeout(platformNoticeTimerRef.current);
-    platformNoticeTimerRef.current = setTimeout(() => setPlatformNotice(null), 5000);
-  };
-
-  const platforms = [
-    { id: "instagram", label: "Instagram" },
-    { id: "tiktok", label: "TikTok" },
-    { id: "youtube", label: "YouTube" },
-  ] as const;
-
+/** Views of the videos we analyzed, as a small curve. */
+function ViewsSpark({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const W = 100;
+  const H = 30;
+  const max = Math.max(...values, 1);
+  const pts = values.map((v, i) => [(i / (values.length - 1)) * W, H - 2 - (v / max) * (H - 6)]);
+  const line = pts.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   return (
-    <aside
-      style={{
-        width: isMobile ? "100%" : 300,
-        flexShrink: 0,
-        alignSelf: "stretch",
-        background: "var(--ws-surface)",
-        borderRight: isMobile ? "none" : "1px solid var(--ws-border)",
-        borderBottom: isMobile ? "1px solid var(--ws-border)" : "none",
-        height: isMobile ? "auto" : "100%",
-        maxHeight: isMobile ? undefined : "100%",
-        minHeight: isMobile ? undefined : 0,
-        overflowY: isMobile ? "visible" : "auto",
-        overflowX: "hidden",
-        padding: isMobile ? "12px 16px 20px 52px" : "24px 20px 48px",
-        boxSizing: "border-box",
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      <h1 style={{ fontSize: 22, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", margin: "0 0 4px" }}>{t.findItTitle}</h1>
-      <p style={{ fontSize: 12, color: "var(--ws-text-dim)", margin: "0 0 20px", lineHeight: 1.45, letterSpacing: "-0.01em" }}>
-        {t.findItSubtitle}
-      </p>
-
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.yourProduct}</div>
-        <input
-          type="text"
-          value={product}
-          onChange={(e) => onProductChange(e.target.value)}
-          onBlur={onProductBlur}
-          placeholder={t.productPlaceholder}
-          style={inputStyle}
-        />
-      </div>
-
-      <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-        {platforms.map((p) => {
-          const active = filters.platform === p.id;
-          const paidOnly = p.id === "instagram" || p.id === "youtube";
-          const freeBlocked = isFree && paidOnly;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => {
-                if (freeBlocked) {
-                  showPlatformFreeBlocked(p.label);
-                  return;
-                }
-                if (paidOnly) {
-                  showPlatformComingSoon();
-                  return;
-                }
-                setPlatformNotice(null);
-                onChange({ platform: p.id });
-              }}
-              style={{
-                padding: "7px 14px",
-                borderRadius: 999,
-                border: active ? "1px solid var(--ws-btn)" : "1px solid var(--ws-border)",
-                background: active ? "var(--ws-btn)" : "var(--ws-surface)",
-                color: active ? "var(--ws-btn-text)" : freeBlocked ? "var(--ws-text-dim)" : "var(--ws-text)",
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: "inherit",
-                cursor: freeBlocked ? "not-allowed" : "pointer",
-                opacity: freeBlocked ? 0.72 : 1,
-                letterSpacing: "-0.01em",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              {freeBlocked ? <Lock size={11} /> : null}
-              {p.label}
-            </button>
-          );
-        })}
-      </div>
-      {platformNotice && (
-        <div
-          style={{
-            marginTop: -8,
-            marginBottom: 16,
-            padding: "4px 0",
-            fontSize: 12,
-            color: platformNoticeBlocked ? "#EAB308" : "var(--ws-accent)",
-            letterSpacing: "-0.01em",
-            lineHeight: 1.45,
-          }}
-        >
-          {platformNotice}
-        </div>
-      )}
-
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: "var(--ws-text-dim)", marginBottom: 4, letterSpacing: "-0.01em" }}>{t.search}</div>
-        <div style={{ position: "relative" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", opacity: 0.45 }}>
-            <circle cx="11" cy="11" r="7" stroke="var(--ws-text)" strokeWidth="1.8" />
-            <path d="M21 21l-4.35-4.35" stroke="var(--ws-text)" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            value={filters.search}
-            readOnly={searchLocked}
-            onChange={(e) => {
-              if (searchLocked) { onLocked(); return; }
-              onChange({ search: e.target.value });
-            }}
-            onClick={() => { if (searchLocked) onLocked(); }}
-            placeholder={t.searchPlaceholder}
-            style={{ ...inputStyle, paddingLeft: 34, cursor: searchLocked ? "not-allowed" : "text", opacity: searchLocked ? 0.65 : 1 }}
-          />
-        </div>
-      </div>
-
-      <NicheRequestSection lang={lang} product={product} />
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-        <FilterToggle
-          label={t.emailAvailable}
-          checked={filters.hasEmail}
-          onChange={(v) => onChange({ hasEmail: v })}
-          onLabel={t.required}
-          offLabel={t.all}
-        />
-        <FilterToggle
-          label={t.hideSaved}
-          checked={filters.hideSaved}
-          onChange={(v) => onChange({ hideSaved: v })}
-          onLabel={t.enabled}
-          offLabel={t.disabled}
-        />
-        <FilterToggle
-          label={t.hiddenCreators}
-          checked={filters.showHidden}
-          onChange={(v) => onChange({ showHidden: v })}
-          onLabel={t.enabled}
-          offLabel={t.disabled}
-        />
-      </div>
-
-      <SectionTitle>{t.demographics}</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-        <FilterSelect
-          label={t.niche}
-          value={filters.niche}
-          onChange={(v) => onChange({ niche: v })}
-          options={[
-            { value: "", label: t.allNiches },
-            ...Object.keys(NICHE_TREE).map((niche) => ({ value: niche, label: niche })),
-          ]}
-        />
-        <FilterSelect
-          label={t.location}
-          value={filters.country}
-          onChange={(v) => {
-            const language = languageFromCountry(v);
-            onChange(language != null ? { country: v, language } : { country: v });
-          }}
-          options={[
-            { value: "", label: t.all },
-            { value: "FR", label: t.france },
-            { value: "US", label: t.unitedStates },
-            { value: "ES", label: t.spain },
-            { value: "IT", label: t.italy },
-            { value: "DE", label: t.germany },
-            { value: "PT", label: t.portugal },
-          ]}
-        />
-        <FilterSelect
-          label={t.language}
-          value={filters.language}
-          onChange={(v) => onChange({ language: v })}
-          options={[
-            { value: "", label: t.allLanguages },
-            { value: "fr", label: t.french },
-            { value: "en", label: t.english },
-            { value: "es", label: t.spanish },
-            { value: "it", label: t.italian },
-            { value: "de", label: t.german },
-            { value: "pt", label: t.portuguese },
-          ]}
-        />
-      </div>
-
-      <SectionTitle>{t.performance}</SectionTitle>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <FilterSelect
-          label={t.followers}
-          value={filters.followersRange}
-          onChange={(v) => onChange({ followersRange: v })}
-          options={[
-            { value: "", label: t.all },
-            { value: "1-10k", label: "1–10K" },
-            { value: "10-100k", label: "10–100K" },
-            { value: "100-500k", label: "100–500K" },
-            { value: "500k+", label: "500K+" },
-          ]}
-        />
-        <FilterSelect
-          label={t.engagementRate}
-          value={filters.engagement}
-          onChange={(v) => onChange({ engagement: v })}
-          options={[
-            { value: "", label: t.all },
-            { value: "3+", label: "≥ 3%" },
-            { value: "6+", label: "≥ 6%" },
-            { value: "9+", label: "≥ 9%" },
-            { value: "12+", label: "≥ 12%" },
-          ]}
-        />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <FilterSelect
-            label={t.viewsFrom}
-            value={filters.viewsFrom}
-            onChange={(v) => onChange({ viewsFrom: v })}
-            options={[
-              { value: "", label: t.all },
-              { value: "10k", label: "10K" },
-              { value: "50k", label: "50K" },
-              { value: "100k", label: "100K" },
-              { value: "500k", label: "500K" },
-            ]}
-          />
-          <FilterSelect
-            label={t.viewsTo}
-            value={filters.viewsTo}
-            onChange={(v) => onChange({ viewsTo: v })}
-            options={[
-              { value: "", label: t.all },
-              { value: "50k", label: "50K" },
-              { value: "100k", label: "100K" },
-              { value: "500k", label: "500K" },
-              { value: "1m", label: "1M+" },
-            ]}
-          />
-        </div>
-      </div>
-    </aside>
+    <svg className="cf-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <path className="is-area" d={`${line} L${W},${H} L0,${H} Z`} />
+      <path className="is-line" d={line} />
+    </svg>
   );
+}
+
+type RowVideo = { cover: string; views: number; url: string };
+
+/**
+ * TikTok cover links expire. Stored covers are served as is; anything else goes
+ * through /api/creator-video-thumbs, which refetches the video once and stores
+ * the cover for good.
+ */
+function coverSrc(c: FeedCreator, cover: string, index: number): string {
+  if (isStablePublicImageUrl(cover)) return cover;
+  if (platformKey(c.platform) === "tiktok" && index < 3) {
+    return `/api/creator-video-thumbs?username=${encodeURIComponent(c.username)}&i=${index}`;
+  }
+  return cover;
+}
+
+function rowVideos(c: FeedCreator): RowVideo[] {
+  const top = (c.topVideos ?? [])
+    .filter((v) => v.cover)
+    .slice(0, 3)
+    .map((v, i) => ({ cover: coverSrc(c, v.cover, i), views: v.playCount, url: v.shareUrl }));
+  if (top.length) return top;
+  return (c.videoThumbnails ?? [])
+    .filter((v) => v.thumbnail)
+    .slice(0, 3)
+    .map((v) => ({ cover: v.thumbnail as string, views: v.views, url: v.url ?? "" }));
 }
 
 function FeedListRow({
@@ -732,9 +415,9 @@ function FeedListRow({
   onSavedOptimistic,
   onFoldersOptimistic,
   onUpgrade,
-  compact,
   avatarPriority,
   dimmed,
+  index,
 }: {
   lang: "en" | "fr";
   creator: FeedCreator;
@@ -747,83 +430,89 @@ function FeedListRow({
   onSavedOptimistic: (username: string, saved: boolean) => void;
   onFoldersOptimistic: (username: string, folderId: string, inFolder: boolean) => void;
   onUpgrade?: () => void;
-  compact?: boolean;
   avatarPriority?: boolean;
   dimmed?: boolean;
+  index: number;
 }) {
   const c = creator;
   const t = discoveryCopy(lang);
-  const engagement = estimateEngagement(c);
+  const instagram = platformKey(c.platform) === "instagram";
+  const videos = rowVideos(c);
+  const views = (c.videoThumbnails ?? []).map((v) => v.views).filter((v) => v > 0).slice(0, 10);
+  const posted = ago(c.lastPostAt);
 
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: compact ? 10 : 16,
-        padding: compact ? "12px 14px" : "14px 20px",
-        background: "var(--ws-surface)",
-        border: "1px solid var(--ws-border)",
-        borderRadius: 12,
-        transition: "box-shadow 0.15s ease, border-color 0.15s ease",
-        opacity: dimmed ? 0.48 : 1,
-        filter: dimmed ? "grayscale(0.85)" : "none",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = "var(--ws-shadow)";
-        e.currentTarget.style.borderColor = "var(--ws-border-strong)";
-        prefetchCreatorDetail(c.username);
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.borderColor = "var(--ws-border)";
-      }}
+      className={`cf-row${dimmed ? " is-dimmed" : ""}`}
+      style={{ ["--i" as string]: index }}
+      onMouseEnter={() => prefetchCreatorDetail(c.username)}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 200px", minWidth: 0 }}>
-        <CreatorAvatar
-          username={c.username}
-          src={c.avatarUrl}
-          displayName={c.displayName}
-          size={44}
-          alt={c.displayName}
-          priority={avatarPriority}
-        />
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {c.displayName}
-            </span>
+      <div className="cf-row__who" onClick={onOpen} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onOpen()}>
+        <span className="cf-row__face">
+          {instagram && c.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={c.avatarUrl} alt={c.displayName} width={52} height={52} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} referrerPolicy="no-referrer" />
+          ) : (
+            <CreatorAvatar username={c.username} src={c.avatarUrl} displayName={c.displayName} size={52} alt={c.displayName} priority={avatarPriority} />
+          )}
+          <span className="cf-row__platform">
+            <PlatformLogo platform={c.platform} size={13} />
+          </span>
+        </span>
+        <span className="cf-row__name">
+          <strong>
+            {c.displayName || c.username}
             {c.authenticityScore >= 60 && (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-label={t.verified} style={{ flexShrink: 0 }}>
                 <circle cx="12" cy="12" r="10" fill="var(--ws-accent)" />
                 <path d="M8 12.5l2.5 2.5L16 9" stroke="#FFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             )}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--ws-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            @{c.username}
-          </div>
-        </div>
+          </strong>
+          <span>@{c.username}</span>
+          <span className="cf-row__meta">
+            {c.countryCode ? <span className="cf-geo">{c.countryCode}</span> : null}
+            {posted ? <span>Posted {posted}</span> : null}
+          </span>
+        </span>
       </div>
-
-      {!compact && (
-        <>
-          <div style={{ flex: "0 0 90px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{fmt(c.followersCount)}</div>
-            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>{t.followers}</div>
-          </div>
-          <div style={{ flex: "0 0 70px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{c.engagementRate}%</div>
-            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>ER</div>
-          </div>
-          <div style={{ flex: "0 0 80px", textAlign: "right" }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{fmt(engagement)}</div>
-            <div style={{ fontSize: 10, color: "var(--ws-text-dim)", marginTop: 2 }}>{t.engagementShort}</div>
-          </div>
-        </>
-      )}
-
-      <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: compact ? 0 : "auto" }}>
+      <div className="cf-vids">
+        {videos.length ? (
+          videos.map((v, k) => (
+            <a key={`${v.cover}-${k}`} className="cf-vid" href={v.url || undefined} target="_blank" rel="noreferrer" onClick={(e) => { if (!v.url) e.preventDefault(); }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+              <span className="cf-vid__play" aria-hidden>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
+              </span>
+              <span className="cf-vid__views">{fmt(v.views)}</span>
+            </a>
+          ))
+        ) : (
+          <span className="cf-vids__none">No videos yet</span>
+        )}
+      </div>
+      <div className="cf-row__tags">
+        {c.primaryNiche ? <span className="cf-tag">{c.primaryNiche}</span> : null}
+        {c.email ? <span className="cf-tag is-mail">Email</span> : null}
+      </div>
+      <div className="cf-stat">
+        <b>{fmt(c.followersCount)}</b>
+        <small className={c.engagementRate >= 6 ? "is-hot" : ""}>{c.engagementRate ? `${c.engagementRate.toFixed(1)}% engagement` : "followers"}</small>
+      </div>
+      <div className="cf-stat is-views">
+        <b>{c.avgViews ? fmt(c.avgViews) : "—"}</b>
+        <ViewsSpark values={views} />
+      </div>
+      <div className="cf-inter">
+        <span>Likes</span>
+        <b>{c.avgLikes ? fmt(c.avgLikes) : "—"}</b>
+        <span>Comments</span>
+        <b>{c.avgComments ? fmt(c.avgComments) : "—"}</b>
+        <span>Shares</span>
+        <b>{c.avgShares ? fmt(c.avgShares) : "—"}</b>
+      </div>
+      <div className="cf-row__actions">
         <SaveCreatorDropdown
           lang={lang}
           creator={c}
@@ -836,26 +525,58 @@ function FeedListRow({
           onSavedOptimistic={onSavedOptimistic}
           onFoldersOptimistic={onFoldersOptimistic}
         />
-        <button
-          type="button"
-          onClick={onOpen}
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            color: "var(--ws-text)",
-            background: "var(--ws-surface)",
-            border: "1px solid var(--ws-border)",
-            borderRadius: 10,
-            padding: "8px 14px",
-            cursor: "pointer",
-            fontFamily: "inherit",
-            letterSpacing: "-0.01em",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <button type="button" className="cf-view" onClick={onOpen}>
           {t.view}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** "Filter by: Videos": the analyzed videos of the listed creators, most viewed first. */
+function VideoGrid({ creators, onOpen }: { creators: FeedCreator[]; onOpen: (c: FeedCreator) => void }) {
+  const videos = useMemo(() => {
+    const out: (RowVideo & { creator: FeedCreator })[] = [];
+    for (const c of creators) for (const v of rowVideos(c)) out.push({ ...v, creator: c });
+    return out.sort((a, b) => b.views - a.views).slice(0, 120);
+  }, [creators]);
+  if (!videos.length) return null;
+  return (
+    <div className="cf-vgrid">
+      {videos.map((v, i) => (
+        <a
+          key={`${v.creator.username}-${v.cover}-${i}`}
+          className="cf-vcard"
+          style={{ ["--i" as string]: i }}
+          href={v.url || undefined}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => {
+            if (!v.url) {
+              e.preventDefault();
+              onOpen(v.creator);
+            }
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="cf-vcard__cover" src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+          <span className="cf-vcard__shade" aria-hidden />
+          <span className="cf-vcard__views">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
+            {fmt(v.views)}
+          </span>
+          <span className="cf-vcard__play" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
+          </span>
+          <span className="cf-vcard__who">
+            <CreatorAvatar username={v.creator.username} src={v.creator.avatarUrl} displayName={v.creator.displayName} size={28} />
+            <span>
+              <strong>{v.creator.displayName || v.creator.username}</strong>
+              <small>{fmt(v.creator.followersCount)} followers</small>
+            </span>
+          </span>
+        </a>
+      ))}
     </div>
   );
 }
@@ -1039,7 +760,12 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     const found = creators.find((c) => c.username.replace(/^@/, "").toLowerCase() === handle);
     if (found) setSelected(found);
   }, [navState.view, navState.creator, creators]);
-  const [sort, setSort] = useState<"value" | "followers" | "engagement">("followers");
+  const [sort, setSort] = useState<CatalogSortKey>("followers");
+  const [mode, setMode] = useState<CatalogMode>("creators");
+  const applyPreset = (p: CatalogPreset) => {
+    setFilters((prev) => ({ ...EMPTY_FILTERS, platform: prev.platform, search: prev.search, preset: p.id === "all" ? "" : p.id, ...p.patch }));
+    setSort(p.sort);
+  };
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const scrollRootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
@@ -1090,7 +816,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     unlockFreeDiscoveryGate();
   }, [plan, unlockFreeDiscoveryGate]);
 
-  const apiParams = useMemo(() => toParams(filters, debouncedSearch), [filters, debouncedSearch]);
+  const apiParams = useMemo(() => toParams(filters, debouncedSearch, sort), [filters, debouncedSearch, sort]);
   const isGlobalSearch = debouncedSearch.trim().replace(/^@/, "").length >= 2;
   const shouldShowAllNichesTeaser = !isPaid && allNichesBrowse;
 
@@ -1282,14 +1008,6 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     void loadProduct();
   }, [workspaceUserId]);
 
-  const persistProduct = async () => {
-    const trimmed = product.trim();
-    const { supabase } = await import("@/lib/supabase");
-    if (!supabase) return;
-    if (!workspaceUserId) return;
-    await supabase.from("profiles").update({ business_name: trimmed || null }).eq("id", workspaceUserId);
-  };
-
   const loadNextBatch = useCallback(async () => {
     if (loadingNextRef.current || loadingMore || loading) return;
     if (showDiscoveryGate) return;
@@ -1375,9 +1093,13 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       ? regular
       : sort === "engagement"
         ? [...regular].sort((a, b) => b.engagementRate - a.engagementRate)
-        : sort === "followers"
-          ? [...regular].sort((a, b) => b.followersCount - a.followersCount)
-          : regular;
+        : sort === "views"
+          ? [...regular].sort((a, b) => b.avgViews - a.avgViews)
+          : sort === "reach"
+            ? [...regular].sort((a, b) => (b.viewsPerFollower ?? 0) - (a.viewsPerFollower ?? 0))
+            : sort === "recent"
+              ? [...regular].sort((a, b) => (b.lastPostAt ?? "").localeCompare(a.lastPostAt ?? ""))
+              : [...regular].sort((a, b) => b.followersCount - a.followersCount);
     const seen = new Set<string>();
     const out: FeedCreator[] = [];
     for (const c of [...curated, ...sortedRegular]) {
@@ -1457,7 +1179,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       ref={scrollRootRef}
       style={{
         display: "flex",
-        flexDirection: isMobile ? "column" : "row",
+        flexDirection: "column",
         flex: 1,
         height: "100%",
         minHeight: 0,
@@ -1467,19 +1189,6 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         alignItems: "stretch",
       }}
     >
-      <FilterSidebar
-        lang={lang}
-        isPaid={isPaid}
-        isFree={plan === "free"}
-        filters={filters}
-        product={product}
-        onProductChange={setProduct}
-        onProductBlur={() => void persistProduct()}
-        onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
-        onLocked={() => setFilterPaywall(true)}
-        isMobile={isMobile}
-      />
-
       <div
         ref={mainRef}
         style={{
@@ -1491,25 +1200,28 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           overflow: isMobile ? "visible" : "auto",
         }}
       >
-        <div style={{ padding: isMobile ? "8px 16px 32px 52px" : "20px 24px 40px" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              marginBottom: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              {loading && !discoveryGateActive ? (
-                <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
-                  {t.loading}
-                </p>
-              ) : null}
-            </div>
-          </div>
+        <CatalogFilterBar
+          filters={filters}
+          sort={sort}
+          mode={mode}
+          count={filtered.length}
+          loading={loading}
+          isPaid={isPaid}
+          isFree={plan === "free"}
+          isMobile={isMobile}
+          onChange={(patch) => setFilters((prev) => ({ ...prev, ...patch }))}
+          onSort={(next) => {
+            setSort(next);
+            setFilters((prev) => ({ ...prev, preset: "" }));
+          }}
+          onMode={setMode}
+          onPreset={applyPreset}
+          onReset={() => setFilters((prev) => ({ ...EMPTY_FILTERS, platform: prev.platform, search: prev.search }))}
+          onLocked={() => setFilterPaywall(true)}
+          onOpenLists={() => navigate({ view: "my-creators" })}
+          onOpenOutreach={() => navigate({ view: "outreach" })}
+        />
+        <div style={{ padding: isMobile ? "12px 16px 32px 52px" : "14px 28px 40px" }}>
 
           {error && (
             <div className="gv-alert" role="alert" style={{ marginBottom: 12 }}>
@@ -1586,17 +1298,33 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
                 <strong style={{ display: "block", color: "var(--ws-text)", marginBottom: 4 }}>{t.noCreators}</strong>
                 {t.noCreatorsHint}
               </p>
+              <div style={{ maxWidth: 360, margin: "8px auto 0", textAlign: "left" }}>
+                <NicheRequestSection lang={lang} product={product} />
+              </div>
             </div>
           )}
 
-          <div style={{ position: "relative", minHeight: feedGateActive && items.length === 0 ? 320 : undefined }}>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
+          {mode === "videos" && items.length > 0 ? <VideoGrid creators={items} onOpen={openCreator} /> : null}
+          <div
+            className="cf-results"
+            style={{
+              position: "relative",
+              minHeight: feedGateActive && items.length === 0 ? 320 : undefined,
+              display: mode === "videos" || (items.length === 0 && !feedGateActive) ? "none" : undefined,
+            }}
+          >
+            {items.length > 0 ? (
+              <div className="cf-head" aria-hidden>
+                <span>Creator</span>
+                <span>Top videos</span>
+                <span>Niche</span>
+                <span>Followers</span>
+                <span>Avg views</span>
+                <span>Interactions</span>
+                <span />
+              </div>
+            ) : null}
+            <div className="cf-list">
               {items.map((c, i) => {
                 const rowStyle = feedRowGateStyle(i, items.length, feedGateActive);
                 return (
@@ -1608,7 +1336,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
                       inFolders={folderIdsFor(c.username)}
                       folders={folders}
                       isPaid={isPaid}
-                      compact={isMobile}
+                      index={i}
                       avatarPriority={i < 10}
                       dimmed={filters.showHidden || hiddenUsernames.has(c.username.toLowerCase())}
                       onOpen={() => openCreator(c)}

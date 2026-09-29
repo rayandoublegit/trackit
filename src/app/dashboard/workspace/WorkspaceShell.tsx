@@ -54,6 +54,7 @@ import {
 } from "@/lib/dashboard-search";
 import { useDashboardTheme } from "../DashboardThemeProvider";
 import { useDashboardNavigationOptional } from "../DashboardNavigationProvider";
+import { PersonGlyph, WorkspaceGlyph } from "@/components/FallbackGlyphs";
 import { WsIcon } from "./WorkspaceIcons";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import "./workspace.css";
@@ -697,6 +698,9 @@ export function WorkspaceShell({
     profile?.full_name ||
     (profile?.username ? `@${profile.username}` : "Trackit");
 
+  const activeWorkspaceAvatar =
+    brandSpaces.find((space) => space.id === (activeSpaceId || userId))?.avatar_url || "";
+
   const tabWorkspaceName = (() => {
     if (isCreator) return "Dashboard";
     const active = brandSpaces.find((space) => space.id === (activeSpaceId || userId));
@@ -872,9 +876,14 @@ export function WorkspaceShell({
               onClick={() => onNavigate("settings")}
               title={lang === "fr" ? "Renommer dans Paramètres" : "Rename in Settings"}
             >
-              <span className="ws-workspace-mark" aria-hidden>
-                {String(workspaceName).slice(0, 1).toUpperCase()}
-              </span>
+              {activeWorkspaceAvatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="ws-workspace-mark is-photo" src={activeWorkspaceAvatar} alt="" aria-hidden />
+              ) : (
+                <span className="ws-workspace-mark" aria-hidden>
+                  <WorkspaceGlyph size={13} color="#fff" />
+                </span>
+              )}
               <span className="label">{workspaceName}</span>
               <WsIcon name="chevron" size={14} />
             </button>
@@ -1007,12 +1016,9 @@ export function WorkspaceShell({
                       placeItems: "center",
                       width: "100%",
                       height: "100%",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: "var(--ws-text)",
                     }}
                   >
-                    {String(displayName).slice(0, 1).toUpperCase()}
+                    <PersonGlyph size={17} color="var(--ws-text-dim)" />
                   </span>
                 )}
               </button>
@@ -1031,10 +1037,10 @@ export function WorkspaceShell({
                           background: "var(--ws-pill)",
                           display: "grid",
                           placeItems: "center",
-                          fontWeight: 700,
+                          flexShrink: 0,
                         }}
                       >
-                        {String(displayName).slice(0, 1).toUpperCase()}
+                        <PersonGlyph size={21} color="var(--ws-text-dim)" />
                       </div>
                     )}
                     <div>
@@ -1144,7 +1150,7 @@ export function WorkspaceShell({
         </aside>
 
         <div className="ws-stage">
-          <div className="ws-stage__body">
+          <div className={`ws-stage__body${view === "discovery" && !isCreator ? " is-full" : ""}`}>
             <aside className="ws-sidebar" aria-label="Secondary">
               <div className="ws-sidebar__head">
                 <h2 className="ws-sidebar__title">{sideTitle}</h2>
@@ -1688,7 +1694,7 @@ export function WorkspaceShell({
               <img className="ws-space-hovercard__mark is-photo" src={spaceHover.space.avatar_url} alt="" />
             ) : (
               <span className="ws-space-hovercard__mark" aria-hidden>
-                {String(spaceHover.space.name || "W").slice(0, 1).toUpperCase()}
+                <WorkspaceGlyph size={19} color="#fff" />
               </span>
             )}
             <div className="ws-space-hovercard__meta">
@@ -1763,7 +1769,7 @@ export function WorkspaceShell({
               <img className="ws-switch-confirm__mark is-photo is-danger" src={deleteSpaceTarget.avatar_url} alt="" />
             ) : (
               <span className="ws-switch-confirm__mark is-danger" aria-hidden>
-                {String(deleteSpaceTarget.name || "W").slice(0, 1).toUpperCase()}
+                <WorkspaceGlyph size={29} color="#fff" />
               </span>
             )}
             <h2 className="ws-switch-confirm__title">

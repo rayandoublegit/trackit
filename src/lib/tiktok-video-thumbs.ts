@@ -4,6 +4,7 @@ import { fetchTikTokVideosRaw, parseVideosRich, type RichVideo } from "@/lib/scr
 import { fetchRemoteImage, isAllowedImageHost } from "@/lib/fetch-remote-image";
 import { isStablePublicImageUrl } from "@/lib/client-image-url";
 import { isUiAvatarsUrl } from "@/lib/tiktok-avatar";
+import { fetchRapidApiTikTokVideos } from "@/lib/rapidapi-creators";
 import type { TopVideo } from "@/lib/creator-enrichment";
 
 const VIDEO_BUCKETS = ["creator-avatars", "avatars"] as const;
@@ -57,10 +58,13 @@ async function storeVideoCoverBuffer(
 export async function fetchFreshVideoCovers(username: string, limit = MAX_THUMBS): Promise<RichVideo[]> {
   const handle = username.replace(/^@/, "").trim();
   if (!handle) return [];
-  if (!process.env.SCRAPECREATORS_API_KEY) return [];
   try {
-    const raw = await fetchTikTokVideosRaw(handle);
-    const rich = parseVideosRich(raw).filter((v) => v.id && v.cover && !v.isAd);
+    // ScrapeCreators when configured, otherwise the RapidAPI TikTok scraper.
+    const rich = (
+      process.env.SCRAPECREATORS_API_KEY
+        ? parseVideosRich(await fetchTikTokVideosRaw(handle))
+        : await fetchRapidApiTikTokVideos(handle, 12)
+    ).filter((v) => v.id && v.cover && !v.isAd);
     return rich
       .slice()
       .sort((a, b) => b.playCount - a.playCount)

@@ -54,13 +54,26 @@ export function CountUp({
   return <>{format(current)}</>;
 }
 
-export function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
+// Sample people get real (free Unsplash) photos, never initials.
+const SAMPLE_FACES_WOMEN = [
+  "1580489944761-15a19d654956",
+  "1489278353717-f64c6ee8a4d2",
+  "1662850886700-4ec19bd30d11",
+  "1630939687530-241d630735df",
+  "1534180477871-5d6cc81f3920",
+  "1544507888-56d73eb6046e",
+];
+const SAMPLE_FACES_MEN = ["1625241152315-4a698f74ceb7", "1568602471122-7832951cc4c5", "1592234789031-94bf65f630ed"];
+const MALE_FIRST_NAMES = new Set(["mike", "tom", "alex", "leo", "max", "jake", "noah", "liam", "sam", "ben", "adam", "lucas", "hugo", "ryan", "omar", "theo"]);
+
+function samplePhoto(name: string, size: number): string {
+  const clean = name.replace(/^@/, "").trim().toLowerCase();
+  const first = clean.split(/[\s._-]+/)[0] ?? "";
+  const pool = MALE_FIRST_NAMES.has(first) ? SAMPLE_FACES_MEN : SAMPLE_FACES_WOMEN;
+  let h = 0;
+  for (let i = 0; i < clean.length; i++) h = (h * 31 + clean.charCodeAt(i)) >>> 0;
+  const id = pool[h % pool.length];
+  return `https://images.unsplash.com/photo-${id}?w=${size * 2}&h=${size * 2}&fit=crop&crop=faces&auto=format&q=70`;
 }
 
 export function SampleAvatar({ name, hue, size = 32 }: { name: string; hue: number; size?: number }) {
@@ -71,11 +84,21 @@ export function SampleAvatar({ name, hue, size = 32 }: { name: string; hue: numb
       style={{
         width: size,
         height: size,
-        fontSize: Math.round(size * 0.36),
+        overflow: "hidden",
         background: `linear-gradient(135deg, hsl(${hue} 80% 72%), hsl(${(hue + 40) % 360} 70% 56%))`,
       }}
     >
-      {initialsOf(name)}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={samplePhoto(name, size)}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
     </span>
   );
 }

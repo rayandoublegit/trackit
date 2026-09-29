@@ -41,6 +41,7 @@ import {
 import { PLAN_PRICES, planDisplayName, formatPricingAmount, checkoutCurrencyFromLang, annualFreeMonthsBadge } from "@/lib/plan-marketing";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { STRIPE_BILLING_PORTAL_LOGIN_URL } from "@/lib/open-billing-portal";
+import { PersonGlyph } from "@/components/FallbackGlyphs";
 
 const GROWTH_MONTHLY = PLAN_PRICES.growthMonthly;
 const PRO_MONTHLY = PLAN_PRICES.proMonthly;
@@ -860,7 +861,6 @@ function ProfileSettings({
   };
 
   const displayAvatar = avatarPreview ?? displayAvatarUrl;
-  const initial = (fullName[0] || username[0] || "?").toUpperCase();
 
   return (
     <Card>
@@ -870,7 +870,7 @@ function ProfileSettings({
             {displayAvatar ? (
               <img src={displayAvatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: 24, fontWeight: 600, color: "var(--ws-accent)" }}>{initial}</span>
+              <PersonGlyph size={38} color="var(--ws-accent)" />
             )}
           </div>
           <label style={{ cursor: "pointer" }}>
@@ -1587,10 +1587,8 @@ function TeamSettings({
                       >
                         {m.avatarUrl ? (
                           <img src={m.avatarUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        ) : m.name !== "—" ? (
-                          m.name.charAt(0).toUpperCase()
                         ) : (
-                          "?"
+                          <PersonGlyph size={19} />
                         )}
                       </div>
                       <div>

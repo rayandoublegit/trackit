@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
 import { getLastCommunityId, rememberLastCommunityId } from "@/lib/last-community-storage";
+import { CommunityGlyph, PersonGlyph } from "@/components/FallbackGlyphs";
 
 type CommunityRow = {
   id: string;
@@ -769,7 +770,7 @@ export function CommunityView({
                       ...(createAvatar ? { backgroundImage: `url(${createAvatar})` } : {}),
                     }}
                   >
-                    {!createAvatar ? (createName.slice(0, 1).toUpperCase() || "C") : null}
+                    {!createAvatar ? <CommunityGlyph size={32} color="#fff" /> : null}
                   </div>
                   <button type="button" style={secondaryBtn} onClick={() => createFileRef.current?.click()}>
                     {fr ? "Uploader une photo" : "Upload a photo"}
@@ -889,7 +890,7 @@ export function CommunityView({
                           className="cm-avatar sm"
                           style={c.avatarUrl ? { backgroundImage: `url(${c.avatarUrl})` } : undefined}
                         >
-                          {!c.avatarUrl ? c.name.slice(0, 1).toUpperCase() : null}
+                          {!c.avatarUrl ? <PersonGlyph size={18} color="#fff" /> : null}
                         </span>
                         <span style={{ minWidth: 0 }}>
                           <strong style={{ display: "block", fontSize: 14 }}>{c.name}</strong>
@@ -1067,7 +1068,7 @@ export function CommunityView({
                   className="cm-avatar"
                   style={detail.avatar_url ? { backgroundImage: `url(${detail.avatar_url})` } : undefined}
                 >
-                  {!detail.avatar_url ? detail.name.slice(0, 1).toUpperCase() : null}
+                  {!detail.avatar_url ? <CommunityGlyph size={21} color="#fff" /> : null}
                 </span>
                 <div>
                   <h2>{detail.name}</h2>

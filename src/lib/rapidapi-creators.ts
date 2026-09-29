@@ -1,5 +1,6 @@
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 import { computeMetrics, type VideoStat } from "@/lib/creator-metrics";
+import type { RichVideo } from "@/lib/scrapecreators";
 import { resolveCreatorCountryCode } from "@/lib/creator-country";
 import { EN_NICHE_QUERIES, FR_NICHE_QUERIES, NICHE_TREE } from "@/lib/niche-tree";
 
@@ -256,6 +257,42 @@ export async function enrichRapidApiCreator(row: DiscoveryCreatorResult): Promis
     countryCode,
     videoThumbnails: thumbs.slice(0, 6),
   };
+}
+
+/** True when the RapidAPI TikTok scraper is configured. */
+export function rapidApiTikTokAvailable(): boolean {
+  return Boolean(process.env.RAPIDAPI_KEY) && process.env.RAPIDAPI_HOST === TIKTOK_HOST && allowed(TIKTOK_HOST);
+}
+
+/** A creator's latest TikTok videos (cover, views, link, date) through RapidAPI. */
+export async function fetchRapidApiTikTokVideos(username: string, count = 12): Promise<RichVideo[]> {
+  if (!rapidApiTikTokAvailable()) return [];
+  const handle = username.replace(/^@/, "").trim();
+  if (!handle) return [];
+  const url = new URL(`https://${TIKTOK_HOST}/user/posts`);
+  url.searchParams.set("unique_id", handle);
+  url.searchParams.set("count", String(count));
+  const out: RichVideo[] = [];
+  for (const video of collectVideos(await rapidGet(url, TIKTOK_HOST))) {
+    const stats = asRecord(video.statistics ?? video.stats ?? video);
+    const id = String(video.video_id ?? video.aweme_id ?? video.id ?? "");
+    const cover = httpUrl(video.origin_cover ?? video.cover ?? video.dynamic_cover ?? video.thumbnail);
+    if (!id || !cover) continue;
+    out.push({
+      id,
+      cover,
+      shareUrl: httpUrl(video.share_url ?? video.url) || `https://www.tiktok.com/@${handle}/video/${id}`,
+      playUrl: httpUrl(video.play ?? video.wmplay) || "",
+      playCount: num(stats.play_count ?? video.play_count ?? video.views),
+      likeCount: num(stats.digg_count ?? video.digg_count ?? video.likes),
+      commentCount: num(stats.comment_count ?? video.comment_count ?? video.comments),
+      shareCount: num(stats.share_count ?? video.share_count ?? video.shares),
+      createTime: num(video.create_time ?? video.createTime),
+      desc: String(video.title ?? video.desc ?? ""),
+      isAd: Boolean(video.is_ad),
+    });
+  }
+  return out;
 }
 
 /** Catalog reads stay on the database. Live search is only for the one-shot seed. */

@@ -1,6 +1,15 @@
+import type { FeedCreator } from "@/lib/discovery-feed";
 import { workspaceStorageKey } from "@/lib/workspaces";
 
-export type MinoChatMessage = { role: "user" | "assistant"; content: string };
+export type MinoSearchMeta = { label: string; sources: string[] };
+
+export type MinoChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  /** Creators found by a Mino search, rendered as cards under the reply. */
+  creators?: FeedCreator[];
+  search?: MinoSearchMeta;
+};
 
 export type MinoChat = {
   id: string;
@@ -19,6 +28,7 @@ export type MinoFolder = {
 
 export const MINO_CHATS_EVENT = "trackit:mino-chats-updated";
 export const MINO_ACTIVE_EVENT = "trackit:mino-chat-active";
+export const MINO_PENDING_EVENT = "trackit:mino-pending";
 
 function listKey(userId?: string) {
   return workspaceStorageKey(`trackit.mino.chats.${userId || "anon"}`);
@@ -30,6 +40,33 @@ function activeKey(userId?: string) {
 
 function foldersKey(userId?: string) {
   return workspaceStorageKey(`trackit.mino.folders.${userId || "anon"}`);
+}
+
+function pendingKey(userId?: string) {
+  return workspaceStorageKey(`trackit.mino.pending.${userId || "anon"}`);
+}
+
+/** A prompt typed on Home, sent by the chat view as soon as it opens. */
+export function setPendingMinoPrompt(userId: string | undefined, text: string) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(pendingKey(userId), text);
+  } catch {
+    // storage blocked: the chat opens empty
+  }
+  window.dispatchEvent(new Event(MINO_PENDING_EVENT));
+}
+
+export function takePendingMinoPrompt(userId: string | undefined): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const key = pendingKey(userId);
+    const text = sessionStorage.getItem(key);
+    if (text) sessionStorage.removeItem(key);
+    return text;
+  } catch {
+    return null;
+  }
 }
 
 function newId() {

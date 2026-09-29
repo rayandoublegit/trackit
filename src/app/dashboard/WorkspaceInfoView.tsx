@@ -15,6 +15,7 @@ import {
 } from "@/lib/workspace-edit";
 import type { BrandWorkspace } from "@/lib/workspaces";
 import { uploadWorkspaceMark, workspaceAvatarOrNull } from "@/lib/workspace-avatar";
+import { WorkspaceGlyph } from "@/components/FallbackGlyphs";
 import { useDashboardTheme } from "./DashboardThemeProvider";
 
 const TIMEZONES: AppTimezone[] = [
@@ -262,7 +263,6 @@ export function WorkspaceInfoView({
   const muted = dark ? "#9A9AA0" : "#7A7A7A";
   const inputBg = dark ? "#1E1F23" : "#fff";
   const inputBorder = dark ? "rgba(255,255,255,0.12)" : "#E5E5E5";
-  const letter = String(name || "W").slice(0, 1).toUpperCase();
   const previewSrc = avatarPreview || avatarUrl;
 
   if (loading) {
@@ -318,7 +318,7 @@ export function WorkspaceInfoView({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={previewSrc} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: 24, fontWeight: 700, color: text }}>{letter}</span>
+              <WorkspaceGlyph size={38} color={muted} />
             )}
           </button>
           <div style={{ minWidth: 0 }}>

@@ -13,6 +13,7 @@ import {
 } from "@/lib/workspace-switch";
 import { applyDashboardTabTitle, type BrandWorkspace } from "@/lib/workspaces";
 import { useDashboardTheme } from "../DashboardThemeProvider";
+import { WorkspaceGlyph } from "@/components/FallbackGlyphs";
 import { WsIcon } from "./WorkspaceIcons";
 
 type WorkspaceSwitcherProps = {
@@ -132,10 +133,8 @@ export function WorkspaceSwitcher({
       id: ownerId,
       owner_id: ownerId,
       name: fallbackName,
-      avatar_url: null,
+      avatar_url: fallbackAvatarUrl ?? null,
     } satisfies BrandWorkspace);
-
-  const mark = String(active.name || fallbackName || "W").slice(0, 1).toUpperCase();
 
   useEffect(() => {
     const found = workspaces.find((w) => w.id === activeId);
@@ -230,7 +229,7 @@ export function WorkspaceSwitcher({
           <img className="ws-workspace-mark is-photo" src={active.avatar_url} alt="" />
         ) : (
           <span className="ws-workspace-mark" aria-hidden>
-            {mark}
+            <WorkspaceGlyph size={13} color="#fff" />
           </span>
         )}
         <span className="label">{active.name || fallbackName}</span>
@@ -243,7 +242,6 @@ export function WorkspaceSwitcher({
             {fr ? "Workspaces" : "Workspaces"}
           </div>
           {(workspaces.length ? workspaces : [active]).map((ws) => {
-            const letter = String(ws.name || "W").slice(0, 1).toUpperCase();
             const isActive = ws.id === activeId;
             return (
               <button
@@ -259,7 +257,7 @@ export function WorkspaceSwitcher({
                   <img className="ws-workspace-mark is-photo" src={ws.avatar_url} alt="" />
                 ) : (
                   <span className="ws-workspace-mark" aria-hidden>
-                    {letter}
+                    <WorkspaceGlyph size={13} color="#fff" />
                   </span>
                 )}
                 <span className="ws-workspace-menu__name">{ws.name}</span>
@@ -358,7 +356,7 @@ export function WorkspaceSwitcher({
               <img className="ws-switch-confirm__mark is-photo" src={confirmTarget.avatar_url} alt="" />
             ) : (
               <span className="ws-switch-confirm__mark" aria-hidden>
-                {String(confirmTarget.name || "W").slice(0, 1).toUpperCase()}
+                <WorkspaceGlyph size={29} color="#fff" />
               </span>
             )}
             <h2 className="ws-switch-confirm__title">
@@ -420,7 +418,9 @@ export function WorkspaceSwitcher({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarPreview} alt="" />
               ) : (
-                <span>{(name.trim() || "W").slice(0, 1).toUpperCase()}</span>
+                <span aria-hidden>
+                  <WorkspaceGlyph size={28} color="var(--ws-text-dim)" />
+                </span>
               )}
               <em>{fr ? "Photo" : "Photo"}</em>
             </button>
