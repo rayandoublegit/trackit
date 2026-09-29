@@ -25,6 +25,14 @@
     {
       "path": "/api/cron/seed-niches",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/scrape?budget=25",
+      "schedule": "5 * * * *"
+    },
+    {
+      "path": "/api/cron/scrape?budget=10&seedNiches=3&trigger=discovery",
+      "schedule": "35 4 * * *"
     }
   ]
 }
