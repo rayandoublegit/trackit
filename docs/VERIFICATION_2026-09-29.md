@@ -54,3 +54,18 @@ Le parcours gifting couvre, dans l'ordre, ce que fait `/api/gifting` :
 
 - **Parcours avec de vrais comptes en production :** connexion, Stripe, Whop, Shopify OAuth, emails Resend, dépôt réel d'une vidéo sur Supabase Storage. Il faut un compte marque et un compte créateur de test.
 - **Supabase local complet (Docker) :** Docker Desktop affiche une erreur au démarrage sur ce poste. Le test par PGlite couvre la base, pas l'authentification ni le stockage réels.
+
+## Mise à jour du 29 septembre, après application en production
+
+- **Script appliqué en production :** `supabase/manual/2026-09-29_enable_gifting_audit_sessions.sql`, sur le projet `tokpuhzjhysqxwjkxfya`. Vérifications :
+  - les 7 tables, le bucket privé et la fonction sont créés ;
+  - `anon` et `authenticated` sont refusés sur `gift_*` et `admin_audit_log` ;
+  - les 213 comptes ne sont pas touchés.
+- **Faille critique trouvée et corrigée :** `NEXT_PUBLIC_SUPABASE_ANON_KEY` contenait la clé `service_role`, publiée dans le code JavaScript du site. N'importe quel visiteur pouvait lire et écrire toute la base.
+  - La variable Vercel (Production et Preview) contient maintenant la clé `anon`, et le site est redéployé.
+  - Contrôle après correction : un visiteur obtient 0 profil, 0 vente, et 401 sur les tables gifting.
+- **Nouvelle règle :** insertion seule sur `affiliate_applications` (migration `000043`), pour que le formulaire public /affiliation fonctionne avec la vraie clé publique.
+- **Reste à faire :**
+  - Renouveler la clé `service_role`, exposée publiquement pendant des mois.
+  - Vérifier la même variable sur le projet Vercel `partnerads`.
+  - Révoquer le PAT Supabase utilisé pour cette intervention.
