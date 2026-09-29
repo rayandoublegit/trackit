@@ -403,7 +403,7 @@ export default function TrackitLanding() {
   }, []);
 
   return (
-    <main className="relative min-h-screen w-full overflow-x-hidden">
+    <main className="relative min-h-screen w-full overflow-x-hidden" style={{ overflowX: "clip" }}>
       <HeroPreviewShell />
       {/* TRACKIT SECTION */}
       <section className="section" id="features">
