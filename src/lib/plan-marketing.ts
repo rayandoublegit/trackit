@@ -28,7 +28,6 @@ import {
   type PlanTier,
 } from "@/lib/plan-limits";
 import { formatPricingHighlightLine, getPlanPricingFeatureLines, getPlanPricingHighlights } from "@/lib/plan-pricing-highlights";
-import { checkoutPlanTier } from "@/lib/checkout";
 
 /** Customer-facing plan names. Internal tiers: free | basic | pro | scale. */
 export const PLAN_PRICES = {
@@ -520,7 +519,7 @@ export function runGateUpgrade(
   const props = getGateModalProps(key, lang);
   const tier = props.requiredTier;
   if (tier === "free") return;
-  void checkoutPlanTier(tier, lang).catch((err) => {
+  void startTierCheckout(tier, lang).catch((err) => {
     if (handlers) {
       if (tier === "scale") void handlers.onUpgradeScale?.();
       else if (tier === "pro") void handlers.onUpgradePro?.();
@@ -531,9 +530,15 @@ export function runGateUpgrade(
   });
 }
 
+// Checkout pulls in the Supabase client: load it when a checkout starts.
+async function startTierCheckout(tier: Exclude<PlanTier, "free">, lang: Lang): Promise<void> {
+  const { checkoutPlanTier } = await import("@/lib/checkout");
+  await checkoutPlanTier(tier, lang);
+}
+
 export function runTierUpgrade(tier: PlanTier, lang: Lang): void {
   if (tier === "free") return;
-  void checkoutPlanTier(tier, lang).catch((err) => {
+  void startTierCheckout(tier, lang).catch((err) => {
     alert(err instanceof Error ? err.message : "Could not start checkout");
   });
 }

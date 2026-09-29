@@ -3335,8 +3335,9 @@ const shopifyConnectSecondaryBtn: React.CSSProperties = {
   letterSpacing: "-0.02em",
 };
 
+// Cloudinary-compressed rendition (3.5 MB instead of the 44 MB original).
 const SHOPIFY_CONNECT_DEMO_VIDEO =
-  "https://res.cloudinary.com/dqsk5btgz/video/upload/v1782785668/shopify_ydkzyy.mp4";
+  "https://res.cloudinary.com/dqsk5btgz/video/upload/q_auto,w_1280/v1782785668/shopify_ydkzyy.mp4";
 
 function ShopifyConnectPage({
   lang,

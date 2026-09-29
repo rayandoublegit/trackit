@@ -46,19 +46,12 @@ export const viewport = {
   initialScale: 1,
 };
 
+// Only the weights painted above the fold; the rest load on demand.
 const PRELOAD_FONTS = [
-  "/fonts/InterDisplay-SemiBold.ttf",
-  "/fonts/InterDisplay-Medium.ttf",
-  "/fonts/InterDisplay-Regular.ttf",
-  "/fonts/InterDisplay-Bold.ttf",
-  "/fonts/InterDisplay-MediumItalic.ttf",
-  "/fonts/InterDisplay-BoldItalic.ttf",
-  "/fonts/InstrumentSans-Regular.ttf",
-  "/fonts/InstrumentSans-Medium.ttf",
-  "/fonts/InstrumentSans-SemiBold.ttf",
-  "/fonts/InstrumentSans-Bold.ttf",
-  "/fonts/InstrumentSans-Italic.ttf",
-  "/fonts/InstrumentSans-BoldItalic.ttf",
+  "/fonts/InterDisplay-SemiBold.woff2",
+  "/fonts/InterDisplay-Medium.woff2",
+  "/fonts/InterDisplay-Bold.woff2",
+  "/fonts/InterDisplay-Regular.woff2",
 ] as const;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -66,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         {PRELOAD_FONTS.map((href) => (
-          <link key={href} rel="preload" href={href} as="font" type="font/ttf" crossOrigin="anonymous" />
+          <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
         ))}
         <script
           dangerouslySetInnerHTML={{

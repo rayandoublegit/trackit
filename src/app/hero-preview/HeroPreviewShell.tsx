@@ -1,12 +1,17 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
 import { ProductFilmHero } from "@/components/ProductFilmHero";
 import { ANNOUNCEMENT_KEY, AnnouncementBar } from "@/components/AnnouncementBar";
 import { useLang } from "@/lib/useLang";
-import { PremiumWorkspaceDemo } from "./PremiumWorkspaceDemo";
+// Below the product film: load the dashboard after the page is interactive.
+const PremiumWorkspaceDemo = dynamic(() => import("./PremiumWorkspaceDemo").then((m) => m.PremiumWorkspaceDemo), {
+  ssr: false,
+});
 import "@/app/dashboard/workspace/workspace.css";
 import "./hero-preview.css";
 
@@ -115,10 +120,6 @@ function heroCopy(lang: "en" | "fr") {
   };
 }
 
-function noop(e?: { preventDefault?: () => void }) {
-  e?.preventDefault?.();
-}
-
 export function HeroPreviewShell() {
   const lang = useLang();
   const [navOpen, setNavOpen] = useState(false);
@@ -194,9 +195,10 @@ export function HeroPreviewShell() {
       <nav className="hp-nav">
         {announcement ? <AnnouncementBar lang={lang} onClose={closeAnnouncement} /> : null}
         <div className="hp-nav__inner">
-          <a className="hp-nav__brand" href="/" onClick={noop}>
+          <Link className="hp-nav__brand" href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
-          </a>
+          </Link>
           <div className="hp-nav__links">
             {navLinks.map((l) => (
               <a key={l.href} href={l.href} className="hp-nav__link">

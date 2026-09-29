@@ -52,8 +52,10 @@ export function ScriptsManager({
     if (!brandId) { setLoading(false); return; }
     try {
       const res = await fetch(`/api/scripts?brandId=${brandId}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (data?.ok) setScripts(data.scripts || []);
+    } catch {
+      // Network error: keep the current list.
     } finally {
       setLoading(false);
     }

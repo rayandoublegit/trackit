@@ -7,10 +7,9 @@ import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroPreviewShell } from "@/app/hero-preview/HeroPreviewShell";
 import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
-import { getGrowthPriceId, getProPriceId, getScalePriceId, handleUpgrade } from "@/lib/checkout";
+import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/stripe-config";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import { getPlanPricingHighlights, type PricingHighlight } from "@/lib/plan-pricing-highlights";
-import { openStripeBillingPortal } from "@/lib/open-billing-portal";
 import { HOME_FAQ_EN, HOME_FAQ_FR } from "@/lib/home-faq";
 import { SocialFooterLinks } from "@/components/SocialFooterLinks";
 import { planCtaAction, planCtaLabel, type PaidTier } from "@/lib/pricing-cta";
@@ -113,7 +112,7 @@ function PricingTitleSparkle({ lang }: { lang: "en" | "fr" }) {
       <span className="section-title-line">
         {lang === "fr" ? (
           <>
-            le résultat d'une <span className="pricing-ai-word">agence</span>.
+            le résultat d&apos;une <span className="pricing-ai-word">agence</span>.
           </>
         ) : (
           <>
@@ -268,6 +267,8 @@ export default function TrackitLanding() {
   const faqItems = lang === "fr" ? HOME_FAQ_FR : HOME_FAQ_EN;
 
   useEffect(() => {
+    // Visitors without a Supabase session are on Free: skip the server call.
+    if (!/(?:^|;\s*)sb-[^=]*-auth-token/.test(document.cookie)) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -319,6 +320,8 @@ export default function TrackitLanding() {
           : paid === "pro"
             ? getProPriceId(currency, annual)
             : getScalePriceId(currency, annual);
+      // Checkout pulls in the Supabase client: load it on click, not with the page.
+      const { handleUpgrade } = await import("@/lib/checkout");
       await handleUpgrade(priceId || "", {
         cancelUrl: window.location.href,
         tier: paid === "basic" ? "growth" : paid,
@@ -338,6 +341,7 @@ export default function TrackitLanding() {
     if (action === "downgrade") {
       setPortalLoading(true);
       try {
+        const { openStripeBillingPortal } = await import("@/lib/open-billing-portal");
         await openStripeBillingPortal();
       } finally {
         setPortalLoading(false);
@@ -438,17 +442,6 @@ export default function TrackitLanding() {
         <p className="section-sub fade-up fade-up-delay-2">
           {t.section_sub}
         </p>
-
-        <div className="dashboard-wrap fade-up fade-up-delay-3">
-          <video
-            src="https://res.cloudinary.com/k40jzw77/video/upload/v1785269585/exporthatshi_q5mp9i.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            aria-label="Trackit dashboard"
-          />
-        </div>
 
         <div className="features-grid">
           <div className="feature">

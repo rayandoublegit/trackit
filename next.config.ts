@@ -27,6 +27,11 @@ const nextConfig: NextConfig = {
 
     return [
       {
+        // Self-hosted fonts never change under the same name: cache them for a year.
+        source: "/fonts/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
