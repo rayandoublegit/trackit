@@ -1,5 +1,16 @@
 import * as tus from "tus-js-client";
 
+/**
+ * Headers for a signed resumable upload. The signed token authorizes the write.
+ * A legacy public key is a JWT and may also go in Authorization; the newer
+ * sb_publishable_ keys are not JWTs and belong in the apikey header only.
+ */
+export function giftUploadHeaders(publicKey: string, signedToken: string): Record<string, string> {
+  const headers: Record<string, string> = { apikey: publicKey, "x-signature": signedToken, "x-upsert": "false" };
+  if (publicKey.startsWith("eyJ")) headers.authorization = `Bearer ${publicKey}`;
+  return headers;
+}
+
 export function giftResumableEndpoint(supabaseUrl: string) {
   const url = new URL(supabaseUrl);
   const match = url.hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i);
@@ -26,12 +37,7 @@ export async function uploadGiftVideoResumable(
       chunkSize: 6 * 1024 * 1024,
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
-      headers: {
-        authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
-        "x-signature": signedToken,
-        "x-upsert": "false",
-      },
+      headers: giftUploadHeaders(anonKey, signedToken),
       metadata: {
         bucketName: "gift-videos",
         objectName: path,
