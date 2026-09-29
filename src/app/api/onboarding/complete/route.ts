@@ -42,10 +42,8 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as OnboardingSavePayload;
   const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, body);
   if (!saved.ok) {
-    const lang =
-      request.headers.get("accept-language")?.toLowerCase().includes("fr") ? "fr" : "en";
     return NextResponse.json(
-      { error: profileUsernameSaveError({ message: saved.error }, lang) },
+      { error: profileUsernameSaveError({ message: saved.error }, "en") },
       { status: 400 }
     );
   }

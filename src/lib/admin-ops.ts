@@ -47,7 +47,7 @@ export async function computeOps(stripe: Stripe, db: SupabaseClient): Promise<Op
     const counts: Record<string, number> = {};
     for (const r of rows ?? []) {
       const raw = (r as { referral_source: string | null }).referral_source;
-      const key = raw && String(raw).trim() ? String(raw).trim() : "(non renseigne)";
+      const key = raw && String(raw).trim() ? String(raw).trim() : "(not specified)";
       counts[key] = (counts[key] ?? 0) + 1;
     }
     for (const [source, count] of Object.entries(counts)) acquisition.push({ source, count });

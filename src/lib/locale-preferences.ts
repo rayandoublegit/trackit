@@ -54,7 +54,7 @@ export function detectAppLangFromBrowser(): AppLang {
   return detectAppLangFromLocation();
 }
 
-/** The product UI is English. A stored choice in settings can still switch it. */
+/** The whole product is English. */
 export function detectAppLangFromLocation(): AppLang {
   return "en";
 }
@@ -64,23 +64,29 @@ function syncDocumentLang(lang: AppLang) {
   document.documentElement.lang = lang;
 }
 
+/**
+ * The site is English only, everywhere (landing, auth, dashboard, admin).
+ * A French choice stored by an older version is overwritten.
+ */
 export function getAppLang(): AppLang {
   if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem(TRACKIT_LANG_KEY);
-  if (stored === "en" || stored === "fr") {
-    syncDocumentLang(stored);
-    return stored;
+  try {
+    if (localStorage.getItem(TRACKIT_LANG_KEY) !== "en") localStorage.setItem(TRACKIT_LANG_KEY, "en");
+  } catch {
+    // storage blocked: English anyway
   }
-  const detected = detectAppLangFromLocation();
-  localStorage.setItem(TRACKIT_LANG_KEY, detected);
-  syncDocumentLang(detected);
-  return detected;
+  syncDocumentLang("en");
+  return "en";
 }
 
-export function setAppLang(lang: AppLang): void {
+export function setAppLang(_lang: AppLang): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(TRACKIT_LANG_KEY, lang);
-  syncDocumentLang(lang);
+  try {
+    localStorage.setItem(TRACKIT_LANG_KEY, "en");
+  } catch {
+    // storage blocked
+  }
+  syncDocumentLang("en");
   notifyLocaleUpdated();
 }
 

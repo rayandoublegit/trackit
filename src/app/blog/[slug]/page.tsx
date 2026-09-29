@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { BlogArticleBody } from "@/components/blog/BlogArticleBody";
 import { BlogShell } from "@/components/blog/BlogShell";
 import { SeoJsonLd } from "@/components/SeoJsonLd";
-import { estimateWordCount, getAllBlogSlugs, getBlogPost, getRelatedPosts } from "@/lib/blog";
+import { englishSlugFor, estimateWordCount, getAllBlogSlugs, getBlogPost, getRelatedPosts } from "@/lib/blog";
 import { absoluteUrl, articleJsonLd, breadcrumbJsonLd, buildPageMetadata } from "@/lib/site-seo";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -27,28 +27,21 @@ export async function generateMetadata({ params }: Props) {
     modifiedTime: post.updatedAt,
   });
 
-  if (post.alternateSlug) {
-    metadata.alternates = {
-      ...metadata.alternates,
-      canonical: absoluteUrl(`/blog/${post.slug}`),
-      languages: {
-        en: absoluteUrl(`/blog/${post.locale === "en" ? post.slug : post.alternateSlug}`),
-        fr: absoluteUrl(`/blog/${post.locale === "fr" ? post.slug : post.alternateSlug}`),
-      },
-    };
-  }
-
+  metadata.alternates = { ...metadata.alternates, canonical: absoluteUrl(`/blog/${post.slug}`) };
   return metadata;
 }
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
   const post = getBlogPost(slug);
-  if (!post) notFound();
+  if (!post) {
+    const english = englishSlugFor(slug);
+    if (english !== undefined) permanentRedirect(english ? `/blog/${english}` : "/blog");
+    notFound();
+  }
 
   const path = `/blog/${post.slug}`;
   const related = getRelatedPosts(post);
-  const alternate = post.alternateSlug ? getBlogPost(post.alternateSlug) : undefined;
 
   return (
     <>
@@ -71,7 +64,7 @@ export default async function BlogPostPage({ params }: Props) {
         ]}
       />
       <BlogShell narrow>
-        <Link href={`/blog${post.locale === "fr" ? "?lang=fr" : ""}`} style={{ fontSize: 14, color: "#0047FF", textDecoration: "none" }}>
+        <Link href="/blog" style={{ fontSize: 14, color: "#0047FF", textDecoration: "none" }}>
           ← Trackit blog
         </Link>
 
@@ -80,20 +73,13 @@ export default async function BlogPostPage({ params }: Props) {
           <h1 className="blog-title">{post.title}</h1>
           <p className="blog-lead" style={{ marginBottom: 12 }}>{post.description}</p>
           <time className="blog-meta" dateTime={post.publishedAt}>
-            {new Date(post.publishedAt).toLocaleDateString(post.locale === "fr" ? "fr-FR" : "en-US", {
+            {new Date(post.publishedAt).toLocaleDateString("en-US", {
               year: "numeric",
               month: "long",
               day: "numeric",
             })}{" "}
             · {post.readMinutes} min
           </time>
-          {alternate ? (
-            <p style={{ marginTop: 12, fontSize: 14 }}>
-              <Link href={`/blog/${alternate.slug}`} style={{ color: "#0047FF" }}>
-                {post.locale === "en" ? "Lire en français →" : "Read in English →"}
-              </Link>
-            </p>
-          ) : null}
         </header>
 
         <BlogArticleBody blocks={post.blocks} />

@@ -69,10 +69,10 @@ export function devOverview(): OverviewData {
     catalog: { total: 48_612 },
     gifting: { missions: 64 },
     attention: [
-      { kind: "billing", label: "Factures impayées", count: 3, href: "/admin/revenue" },
-      { kind: "requests", label: "Niches demandées cette semaine", count: 12, href: "/admin/requests" },
-      { kind: "lookups", label: "Créateurs introuvables cette semaine", count: 27, href: "/admin/requests" },
-      { kind: "schema", label: "Table admin_audit_log absente", count: 1, href: "/admin/system" },
+      { kind: "billing", label: "Unpaid invoices", count: 3, href: "/admin/revenue" },
+      { kind: "requests", label: "Niches requested this week", count: 12, href: "/admin/requests" },
+      { kind: "lookups", label: "Creators not found this week", count: 27, href: "/admin/requests" },
+      { kind: "schema", label: "admin_audit_log table missing", count: 1, href: "/admin/system" },
     ],
     warnings: [],
   };
@@ -134,7 +134,7 @@ export function devRequests(): RequestsData {
       { key: "padel", label: "Padel", count: 14, last: daysAgo(1) },
       { key: "pet care", label: "Pet care", count: 11, last: daysAgo(2) },
       { key: "saas b2b", label: "SaaS B2B", count: 8, last: daysAgo(4) },
-      { key: "parentalité", label: "Parentalité", count: 6, last: daysAgo(6) },
+      { key: "parenting", label: "Parenting", count: 6, last: daysAgo(6) },
       { key: "gaming mobile", label: "Gaming mobile", count: 4, last: daysAgo(9) },
     ],
     lookups: [
@@ -144,8 +144,8 @@ export function devRequests(): RequestsData {
       { key: "travelwithkai", label: "@travelwithkai", count: 3, last: daysAgo(8) },
     ],
     waitlist: [
-      { email: "julie@brand.example", first_name: "Julie", expectations: "Automatiser les relances créateurs", created_at: daysAgo(1) },
-      { email: "marc@shop.example", first_name: "Marc", expectations: "Paiements multi-devises", created_at: daysAgo(5) },
+      { email: "julie@brand.example", first_name: "Julie", expectations: "Automate creator follow-ups", created_at: daysAgo(1) },
+      { email: "marc@shop.example", first_name: "Marc", expectations: "Multi-currency payouts", created_at: daysAgo(5) },
     ],
     warnings: [],
   };
@@ -236,9 +236,9 @@ export function devConsole(admin: AdminContext) {
       acquisition: [
         { source: "TikTok", count: 402 },
         { source: "Google", count: 288 },
-        { source: "Bouche-à-oreille", count: 173 },
+        { source: "Word of mouth", count: 173 },
         { source: "Instagram", count: 141 },
-        { source: "(non renseigné)", count: 280 },
+        { source: "(not specified)", count: 280 },
       ],
     },
   };

@@ -4,13 +4,13 @@ import type { AuditData, SystemData } from "@/lib/admin-types";
 import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, ago, compact, useAdminData } from "../_components/ui";
 
 const ACTION_LABEL: Record<string, string> = {
-  "user.role": "Rôle changé",
-  "user.setPlan": "Plan appliqué",
-  "user.changePlan": "Plan Stripe changé",
-  "user.giftMonth": "Mois offert",
-  "user.revokeComp": "Accès offert retiré",
-  "user.cancel": "Abonnement annulé (fin de période)",
-  "user.cancelNow": "Abonnement annulé (immédiat)",
+  "user.role": "Role changed",
+  "user.setPlan": "Plan applied",
+  "user.changePlan": "Stripe plan changed",
+  "user.giftMonth": "Month gifted",
+  "user.revokeComp": "Comped access revoked",
+  "user.cancel": "Subscription canceled (end of period)",
+  "user.cancelNow": "Subscription canceled (immediately)",
 };
 
 export default function AdminSystemPage() {
@@ -24,8 +24,8 @@ export default function AdminSystemPage() {
   return (
     <>
       <PageHead
-        title="Système & audit"
-        lead="Branchements, tables et actions du staff. Les clés ne sont jamais affichées : seule leur présence est vérifiée."
+        title="System & audit"
+        lead="Integrations, tables and staff actions. Keys are never shown: only their presence is checked."
         actions={
           <RefreshButton
             onClick={() => {
@@ -40,11 +40,11 @@ export default function AdminSystemPage() {
       {data ? (
         <>
           <div className="ad-grid ad-grid--kpi">
-            <Kpi label="Services branchés" value={data.env.length - envKo.length} tone={envKo.length ? "warn" : "good"} sub={<>sur {data.env.length}</>} />
-            <Kpi label="Tables présentes" value={data.tables.length - missing.length} delay={60} tone={missing.length ? "warn" : "good"} sub={<>sur {data.tables.length}</>} />
-            <Kpi label="Tables en erreur" value={failing.length} delay={120} tone={failing.length ? "warn" : undefined} />
+            <Kpi label="Connected services" value={data.env.length - envKo.length} tone={envKo.length ? "warn" : "good"} sub={<>of {data.env.length}</>} />
+            <Kpi label="Tables present" value={data.tables.length - missing.length} delay={60} tone={missing.length ? "warn" : "good"} sub={<>of {data.tables.length}</>} />
+            <Kpi label="Tables with errors" value={failing.length} delay={120} tone={failing.length ? "warn" : undefined} />
             <div className="ad-kpi" style={{ animationDelay: "180ms" }}>
-              <span className="ad-kpi__label">Déploiement</span>
+              <span className="ad-kpi__label">Deployment</span>
               <strong className="ad-kpi__value" style={{ fontSize: 20 }}>{data.deploy.commit ?? "local"}</strong>
               <span className="ad-kpi__sub">
                 {data.deploy.environment}
@@ -72,26 +72,26 @@ export default function AdminSystemPage() {
                 <li key={t.table} style={{ animationDelay: `${i * 25}ms` }}>
                   <i className={t.missing || t.error ? "is-ko" : "is-ok"}>{t.missing || t.error ? "!" : "✓"}</i>
                   <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 12.5 }}>{t.table}</span>
-                  <small>{t.missing ? "absente" : t.error ? "erreur" : `${compact(t.count)} lignes`}</small>
+                  <small>{t.missing ? "missing" : t.error ? "error" : `${compact(t.count)} rows`}</small>
                 </li>
               ))}
             </ul>
             {missing.length > 0 ? (
               <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--ad-muted)" }}>
-                Les tables absentes désactivent la fonction correspondante. Les migrations sont dans <code>supabase/migrations</code> ; à appliquer sur la
-                base de production après sauvegarde.
+                Missing tables disable the matching feature. Migrations live in <code>supabase/migrations</code>; apply them to the
+                production database after a backup.
               </p>
             ) : null}
           </Card>
         </>
       ) : null}
 
-      <Card title="Journal d’audit" className="ad-card--flush" delay={160}>
+      <Card title="Audit log" className="ad-card--flush" delay={160}>
         {audit.data?.missing ? (
           <div style={{ padding: 16 }}>
-            <Pill tone="warn">Table admin_audit_log absente</Pill>
+            <Pill tone="warn">admin_audit_log table missing</Pill>
             <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--ad-muted)" }}>
-              Les actions staff sont écrites dans les logs serveur en attendant. Appliquez la migration <code>20260928_000042_admin_audit_log.sql</code>.
+              Staff actions are written to the server logs in the meantime. Apply the <code>20260928_000042_admin_audit_log.sql</code> migration.
             </p>
           </div>
         ) : !audit.data ? (
@@ -99,17 +99,17 @@ export default function AdminSystemPage() {
             <LoadState loading={audit.loading} error={audit.error} onRetry={audit.reload} />
           </div>
         ) : audit.data.entries.length === 0 ? (
-          <Empty>Aucune action staff enregistrée.</Empty>
+          <Empty>No staff actions recorded.</Empty>
         ) : (
           <div className="ad-table-wrap">
             <table className="ad-table">
               <thead>
                 <tr>
-                  <th>Quand</th>
+                  <th>When</th>
                   <th>Staff</th>
                   <th>Action</th>
-                  <th>Compte visé</th>
-                  <th>Valeur</th>
+                  <th>Target account</th>
+                  <th>Value</th>
                 </tr>
               </thead>
               <tbody>

@@ -255,7 +255,7 @@ export function CreatorAffiliatePanel({
               type="url"
               value={destinationUrl}
               onChange={(e) => setDestinationUrl(e.target.value)}
-              placeholder="https://votre-boutique.com"
+              placeholder="https://your-store.com"
               style={{
                 width: "100%",
                 boxSizing: "border-box",

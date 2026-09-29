@@ -7,7 +7,7 @@ import type { DayPoint } from "@/lib/admin-aggregate";
 
 function dayLabel(day: string): string {
   const d = new Date(`${day}T00:00:00Z`);
-  return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" });
+  return d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 export function AreaChart({
@@ -47,7 +47,7 @@ export function AreaChart({
             setHover(Math.max(0, Math.min(series.length - 1, Math.round((x - pad) / (step || 1)))));
           }}
           role="img"
-          aria-label="Courbe quotidienne"
+          aria-label="Daily trend"
         >
           <defs>
             <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
@@ -180,7 +180,7 @@ export function Donut({
           <li key={p.key}>
             <i style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
             <span>{labelOf(p.key)}</span>
-            <strong>{total > 0 ? `${Math.round((p.value / total) * 100)} %` : "—"}</strong>
+            <strong>{total > 0 ? `${Math.round((p.value / total) * 100)}%` : "—"}</strong>
           </li>
         ))}
       </ul>
@@ -196,9 +196,9 @@ export function Funnel({ steps }: { steps: { label: string; value: number }[] })
         <li key={s.label} style={{ animationDelay: `${i * 90}ms` }}>
           <div className="ad-funnel__bar" style={{ ["--w" as string]: `${Math.max(4, (s.value / top) * 100)}%` }}>
             <span>{s.label}</span>
-            <strong>{new Intl.NumberFormat("fr-FR").format(s.value)}</strong>
+            <strong>{new Intl.NumberFormat("en-US").format(s.value)}</strong>
           </div>
-          {i > 0 ? <small>{steps[i - 1].value > 0 ? `${Math.round((s.value / steps[i - 1].value) * 100)} % de l’étape précédente` : "—"}</small> : null}
+          {i > 0 ? <small>{steps[i - 1].value > 0 ? `${Math.round((s.value / steps[i - 1].value) * 100)}% of previous step` : "—"}</small> : null}
         </li>
       ))}
     </ol>

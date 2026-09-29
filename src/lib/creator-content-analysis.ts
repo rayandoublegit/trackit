@@ -12,18 +12,18 @@ export interface ContentAnalysis {
 type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
 export function buildAnalysisPrompt(meta: { displayName: string; niche: string; followers: number }): string {
-  return `Tu es analyste en marketing d'influence. On te montre des frames (couvertures de vidéos TikTok récentes) d'un créateur.
+  return `You are an influencer-marketing analyst. You are shown frames (covers of recent TikTok videos) from one creator.
 
-Créateur : ${meta.displayName} — niche "${meta.niche}", ${meta.followers} abonnés.
+Creator: ${meta.displayName} — niche "${meta.niche}", ${meta.followers} followers.
 
-Analyse VISUELLEMENT ces images et réponds UNIQUEMENT par un objet JSON en français, sans aucune prose :
+Analyze these images VISUALLY and reply ONLY with a JSON object in English, with no prose:
 {
-  "style": string,        // style/format visuel (ex: "talking-head face caméra", "démo produit", "vlog lifestyle", "transitions dynamiques")
-  "themes": string[],     // 2 à 4 thèmes/sujets récurrents observés
-  "production": string,   // "pro", "soignée" ou "amateur" + courte raison
-  "brandSafe": boolean,   // false si contenu adulte/choquant/dangereux
-  "brandFit": string,     // pour quel type de marque/produit ce créateur est idéal + angle de collab (1 phrase)
-  "summary": string       // résumé en 1 phrase de ce que fait ce créateur
+  "style": string,        // visual style/format (e.g. "talking head to camera", "product demo", "lifestyle vlog", "dynamic transitions")
+  "themes": string[],     // 2 to 4 recurring themes/topics observed
+  "production": string,   // "pro", "polished" or "amateur" + a short reason
+  "brandSafe": boolean,   // false if the content is adult/shocking/dangerous
+  "brandFit": string,     // which kind of brand/product this creator is ideal for + collab angle (1 sentence)
+  "summary": string       // 1-sentence summary of what this creator does
 }`;
 }
 

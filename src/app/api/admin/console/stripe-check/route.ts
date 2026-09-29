@@ -12,13 +12,13 @@ export async function GET(req: NextRequest) {
 
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key) {
-    return NextResponse.json({ error: "Pas de STRIPE_SECRET_KEY" }, { status: 500 });
+    return NextResponse.json({ error: "No STRIPE_SECRET_KEY" }, { status: 500 });
   }
 
   const stripe = new Stripe(key);
 
   // On ne renvoie JAMAIS la cle. Juste son mode + un indice non sensible.
-  const mode = key.startsWith("sk_live") ? "live" : key.startsWith("sk_test") ? "test" : "inconnu";
+  const mode = key.startsWith("sk_live") ? "live" : key.startsWith("sk_test") ? "test" : "unknown";
   const keyHint = key.slice(-6); // 6 derniers cars, suffit a distinguer les comptes
 
   // Les 3 vrais prix Trackit attendus (suffixe FC3qsxzaqx)
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     keyHint,
     expectedTrackitPrices: results,
     verdict: allFound
-      ? "BON COMPTE: les 3 prix Trackit existent sur la cle Vercel"
-      : "MAUVAIS COMPTE: les prix Trackit n'existent pas sur la cle Vercel",
+      ? "RIGHT ACCOUNT: all 3 Trackit prices exist on the Vercel key"
+      : "WRONG ACCOUNT: the Trackit prices do not exist on the Vercel key",
   });
 }

@@ -7,11 +7,11 @@ import { BarList, Bars, Donut, Funnel } from "../_components/charts";
 import type { ConsoleData } from "../_components/console-types";
 import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, dateFr, eur, num, pct, useAdminData } from "../_components/ui";
 
-const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function monthLabel(key: string): string {
   const [y, m] = key.split("-");
-  return `${MONTHS[Number(m) - 1] ?? m} ${y?.slice(2)}`;
+  return `${MONTHS[Number(m) - 1] ?? m} '${y?.slice(2)}`;
 }
 
 export default function AdminRevenuePage() {
@@ -29,13 +29,13 @@ export default function AdminRevenuePage() {
   return (
     <>
       <PageHead
-        title="Revenus"
+        title="Revenue"
         lead={
           data
             ? data.stripeMode === "off"
-              ? "Stripe n’est pas branché : le MRR est estimé à partir des plans en base."
-              : `Source : Stripe en direct (mode ${data.stripeMode}). Les abonnements Whop et les accès offerts sont comptés à part.`
-            : "MRR, croissance, impayés et acquisition."
+              ? "Stripe is not connected: MRR is estimated from the plans in the database."
+              : `Source: live Stripe (${data.stripeMode} mode). Whop subscriptions and comped access are counted separately.`
+            : "MRR, growth, unpaid invoices and acquisition."
         }
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
@@ -44,52 +44,52 @@ export default function AdminRevenuePage() {
         <>
           <div className="ad-grid ad-grid--kpi">
             <Kpi label="MRR" value={m.mrr} format={(n) => eur(n)} tone="accent" sub={<>ARR {eur(m.arr)}</>} />
-            <Kpi label="Abonnés actifs" value={m.activeSubscribers} delay={60} sub={<>{num(m.trialing)} en essai</>} />
-            <Kpi label="Nouveaux ce mois" value={m.newThisMonth} delay={120} tone="good" />
-            <Kpi label="Résiliations ce mois" value={m.canceledThisMonth} delay={180} sub={<>churn {pct(m.churnRatePct)}</>} />
-            <Kpi label="Impayés" value={m.pastDue} delay={240} tone={m.pastDue > 0 ? "warn" : undefined} sub={<>{num(data.ops.failedPayments.length)} factures ouvertes</>} />
-            <Kpi label="ARPU" value={g?.arpu ?? null} format={(n) => eur(n, 2)} delay={300} sub="par abonné et par mois" />
-            <Kpi label="LTV estimée" value={g?.ltv ?? null} format={(n) => eur(n)} delay={360} sub="ARPU ÷ churn" />
+            <Kpi label="Active subscribers" value={m.activeSubscribers} delay={60} sub={<>{num(m.trialing)} trialing</>} />
+            <Kpi label="New this month" value={m.newThisMonth} delay={120} tone="good" />
+            <Kpi label="Cancellations this month" value={m.canceledThisMonth} delay={180} sub={<>churn {pct(m.churnRatePct)}</>} />
+            <Kpi label="Past due" value={m.pastDue} delay={240} tone={m.pastDue > 0 ? "warn" : undefined} sub={<>{num(data.ops.failedPayments.length)} open invoices</>} />
+            <Kpi label="ARPU" value={g?.arpu ?? null} format={(n) => eur(n, 2)} delay={300} sub="per subscriber per month" />
+            <Kpi label="Estimated LTV" value={g?.ltv ?? null} format={(n) => eur(n)} delay={360} sub="ARPU ÷ churn" />
           </div>
 
           <div className="ad-grid ad-grid--3">
-            <Card title="MRR par plan" delay={80}>
+            <Card title="MRR by plan" delay={80}>
               {Object.keys(m.mrrByPlan).length === 0 ? (
-                <Empty>Aucun revenu récurrent.</Empty>
+                <Empty>No recurring revenue.</Empty>
               ) : (
                 <BarList
                   items={Object.entries(m.mrrByPlan)
-                    .map(([key, value]) => ({ key, value, hint: `${num(m.countByPlan[key] ?? 0)} abonnés` }))
+                    .map(([key, value]) => ({ key, value, hint: `${num(m.countByPlan[key] ?? 0)} subscribers` }))
                     .sort((a, b) => b.value - a.value)}
                   format={(n) => eur(n)}
                   labelOf={(k) => PLAN_LABELS[k as keyof typeof PLAN_LABELS] ?? k}
                 />
               )}
             </Card>
-            <Card title="Qui paie comment" delay={120}>
+            <Card title="Who pays how" delay={120}>
               <Donut
                 parts={(Object.keys(sources) as BillingSource[]).filter((k) => sources[k] > 0).map((k) => ({ key: k, value: sources[k] }))}
                 labelOf={(k) => BILLING_LABELS[k as BillingSource] ?? k}
-                center={{ value: num(sources.stripe + sources.whop), label: "payants" }}
+                center={{ value: num(sources.stripe + sources.whop), label: "paying" }}
               />
             </Card>
-            <Card title="Entonnoir" delay={160}>
+            <Card title="Funnel" delay={160}>
               {g ? (
                 <Funnel
                   steps={[
-                    { label: "Inscrits", value: g.funnel.signups },
-                    { label: "Onboarding fini", value: g.funnel.onboarded },
-                    { label: "Payants", value: g.funnel.paying },
+                    { label: "Signups", value: g.funnel.signups },
+                    { label: "Onboarding done", value: g.funnel.onboarded },
+                    { label: "Paying", value: g.funnel.paying },
                   ]}
                 />
               ) : (
-                <Empty>Disponible avec Stripe branché.</Empty>
+                <Empty>Available once Stripe is connected.</Empty>
               )}
             </Card>
           </div>
 
           <div className="ad-grid ad-grid--wide">
-            <Card title="MRR ajouté par mois" delay={200}>
+            <Card title="MRR added per month" delay={200}>
               {g && g.monthly.length > 0 ? (
                 <>
                   <Bars
@@ -100,10 +100,10 @@ export default function AdminRevenuePage() {
                   <table className="ad-table" style={{ marginTop: 12 }}>
                     <thead>
                       <tr>
-                        <th>Mois</th>
-                        <th className="ad-num">Nouveaux</th>
-                        <th className="ad-num">Résiliés</th>
-                        <th className="ad-num">MRR ajouté</th>
+                        <th>Month</th>
+                        <th className="ad-num">New</th>
+                        <th className="ad-num">Canceled</th>
+                        <th className="ad-num">MRR added</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -119,31 +119,31 @@ export default function AdminRevenuePage() {
                   </table>
                 </>
               ) : (
-                <Empty>Disponible avec Stripe branché.</Empty>
+                <Empty>Available once Stripe is connected.</Empty>
               )}
             </Card>
-            <Card title="Sources d’acquisition" delay={240}>
+            <Card title="Acquisition sources" delay={240}>
               {data.ops.acquisition.length === 0 ? (
-                <Empty>Aucune source renseignée.</Empty>
+                <Empty>No sources reported.</Empty>
               ) : (
                 <BarList items={data.ops.acquisition.slice(0, 8).map((a) => ({ key: a.source, value: a.count }))} format={num} />
               )}
             </Card>
           </div>
 
-          <Card title="Factures impayées" aside={<Pill tone={data.ops.failedPayments.length ? "warn" : "good"}>{num(data.ops.failedPayments.length)}</Pill>} className="ad-card--flush" delay={280}>
+          <Card title="Unpaid invoices" aside={<Pill tone={data.ops.failedPayments.length ? "warn" : "good"}>{num(data.ops.failedPayments.length)}</Pill>} className="ad-card--flush" delay={280}>
             {data.ops.failedPayments.length === 0 ? (
-              <Empty>Aucune facture en attente.</Empty>
+              <Empty>No pending invoices.</Empty>
             ) : (
               <div className="ad-table-wrap">
                 <table className="ad-table">
                   <thead>
                     <tr>
-                      <th>Client</th>
-                      <th>Émise</th>
-                      <th>Statut</th>
-                      <th className="ad-num">Reste dû</th>
-                      <th className="ad-num">Lien</th>
+                      <th>Customer</th>
+                      <th>Issued</th>
+                      <th>Status</th>
+                      <th className="ad-num">Amount due</th>
+                      <th className="ad-num">Link</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,7 +158,7 @@ export default function AdminRevenuePage() {
                         <td className="ad-num">
                           {f.hostedUrl ? (
                             <a href={f.hostedUrl} target="_blank" rel="noopener noreferrer">
-                              Ouvrir
+                              Open
                             </a>
                           ) : (
                             "—"

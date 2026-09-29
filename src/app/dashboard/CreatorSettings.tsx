@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { applyAppLocale, clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { resolveAvatarUrl, toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
@@ -548,29 +548,6 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
               })}
             </div>
           )}
-        </div>
-
-        <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 16 }}>{lang === "fr" ? "Préférences" : "Preferences"}</div>
-          <label style={labelStyle}>{lang === "fr" ? "Langue" : "Language"}</label>
-          <div style={{ display: "flex", gap: 8 }}>
-            {([["fr", "Français"], ["en", "English"]] as const).map(([code, label]) => {
-              const active = lang === code;
-              return (
-              <button
-                key={code}
-                type="button"
-                onClick={() => { if (code !== lang) { applyAppLocale(code); window.location.reload(); } }}
-                style={{
-                  flex: 1, padding: "11px 14px", borderRadius: 10, fontSize: 14, fontWeight: 500, fontFamily: "inherit", cursor: "pointer", letterSpacing: "-0.01em",
-                  ...selectionCardStyle(active, { unselectedBackground: "var(--ws-surface)", unselectedBorder: "1px solid var(--ws-border)" }),
-                  color: selectionTextPrimary(active),
-                }}
-              >
-                {label}
-              </button>
-            );})}
-          </div>
         </div>
 
         <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 22 : 28, marginBottom: 24 }}>

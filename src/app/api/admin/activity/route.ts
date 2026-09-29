@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
   ]);
 
   const note = (name: string, r: { error: string | null; missing: boolean }) => {
-    if (r.missing) warnings.push(`${name} : table absente`);
-    else if (r.error) warnings.push(`${name} : ${r.error}`);
+    if (r.missing) warnings.push(`${name}: table missing`);
+    else if (r.error) warnings.push(`${name}: ${r.error}`);
   };
   note("campaigns", campaigns);
   note("sales", sales);

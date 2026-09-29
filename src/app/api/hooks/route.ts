@@ -10,7 +10,7 @@ function missingTableMessage(error: { message?: string } | null) {
     msg.includes("hooks") &&
     (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("Could not find"))
   ) {
-    return "Table hooks absente — appliquez supabase/migrations/20260825_000034_hooks.sql dans le SQL Editor Trackit";
+    return "hooks table missing — apply supabase/migrations/20260825_000034_hooks.sql in the Trackit SQL Editor";
   }
   return msg || "Unknown error";
 }

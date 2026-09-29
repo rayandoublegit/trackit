@@ -8,11 +8,13 @@ import type { PipelineStage } from "@/lib/pipeline";
 export const DEMO_LIST_NAME = "Trackit";
 export const DEMO_CAMPAIGN_NAME = "Trackit";
 export const DEMO_CAMPAIGN_MARKER = "[trackit-demo-preset]";
-export const DEMO_CREATOR_NOTES = "Créateur démo Trackit";
+export const DEMO_CREATOR_NOTES = "Trackit demo creator";
+/** Marker written by earlier (French) seeds — still recognised so existing demo rows stay out of quota. */
+const LEGACY_DEMO_CREATOR_NOTES = "Créateur démo Trackit";
 /** Hard cap for creators shown in the Trackit demo list / campaign. */
 export const DEMO_LIST_MAX_CREATORS = 8;
 export const DEMO_CAMPAIGN_DESCRIPTION =
-  `Campagne démo Trackit — Explorez inventaire, ventes, ROI et affiliation avec des données d’exemple. ${DEMO_CAMPAIGN_MARKER}`;
+  `Trackit demo campaign — explore inventory, sales, ROI and affiliate tracking with sample data. ${DEMO_CAMPAIGN_MARKER}`;
 
 /** Campaign excluded from free-plan campaign quota. */
 export function isDemoPresetCampaign(row: {
@@ -29,7 +31,8 @@ export function isDemoPresetSavedCreator(row: {
   notes?: string | null;
   snapshot?: unknown;
 }): boolean {
-  if (String(row.notes || "").includes(DEMO_CREATOR_NOTES)) return true;
+  const notes = String(row.notes || "");
+  if (notes.includes(DEMO_CREATOR_NOTES) || notes.includes(LEGACY_DEMO_CREATOR_NOTES)) return true;
   const snap = row.snapshot && typeof row.snapshot === "object" ? (row.snapshot as Record<string, unknown>) : null;
   const crm = snap?.crm && typeof snap.crm === "object" ? (snap.crm as Record<string, unknown>) : null;
   return String(crm?.label || "") === "Demo Trackit";

@@ -273,7 +273,7 @@ function BrandInfosView({ userId, isMobile }: { userId?: string; isMobile?: bool
                 : savedAt
                   ? fr
                     ? `Dernière mise à jour · ${new Date(savedAt).toLocaleString("fr-FR")}`
-                    : `Last updated · ${new Date(savedAt).toLocaleString()}`
+                    : `Last updated · ${new Date(savedAt).toLocaleString("en-US")}`
                   : fr
                     ? "Aucun contenu pour l’instant"
                     : "No content yet"}

@@ -88,8 +88,8 @@ export default function AdminUsersPage() {
   return (
     <>
       <PageHead
-        title="Utilisateurs"
-        lead="Chaque compte, sa facturation, son usage réel. Les actions sont journalisées."
+        title="Users"
+        lead="Every account, its billing and its real usage. Actions are logged."
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
@@ -98,20 +98,20 @@ export default function AdminUsersPage() {
           <div className="ad-toolbar">
             <input
               className="ad-input"
-              placeholder="Rechercher un email, un nom, un identifiant…"
+              placeholder="Search an email, a name, an ID…"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setLimit(100);
               }}
-              aria-label="Rechercher un utilisateur"
+              aria-label="Search users"
             />
-            <div className="ad-seg" role="group" aria-label="Type de compte">
+            <div className="ad-seg" role="group" aria-label="Account type">
               {(
                 [
-                  ["all", "Tous"],
-                  ["brand", "Marques"],
-                  ["creator", "Créateurs"],
+                  ["all", "All"],
+                  ["brand", "Brands"],
+                  ["creator", "Creators"],
                 ] as const
               ).map(([id, label]) => (
                 <button key={id} type="button" className={typeFilter === id ? "is-on" : ""} onClick={() => setTypeFilter(id)}>
@@ -119,13 +119,13 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <div className="ad-seg" role="group" aria-label="Facturation">
+            <div className="ad-seg" role="group" aria-label="Billing">
               {(
                 [
-                  ["all", `Tous (${num(data.users.length)})`],
-                  ["paying", `Payants (${num(counts.paying)})`],
-                  ["offered", `Offerts (${num(counts.offered)})`],
-                  ["free", `Gratuits (${num(counts.free)})`],
+                  ["all", `All (${num(data.users.length)})`],
+                  ["paying", `Paying (${num(counts.paying)})`],
+                  ["offered", `Comped (${num(counts.offered)})`],
+                  ["free", `Free (${num(counts.free)})`],
                 ] as const
               ).map(([id, label]) => (
                 <button key={id} type="button" className={billingFilter === id ? "is-on" : ""} onClick={() => setBillingFilter(id)}>
@@ -133,22 +133,22 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Trier">
-              <option value="recent">Plus récents</option>
-              <option value="name">Nom A-Z</option>
-              <option value="plan">Plan le plus haut</option>
+            <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort">
+              <option value="recent">Most recent</option>
+              <option value="name">Name A-Z</option>
+              <option value="plan">Highest plan</option>
             </select>
           </div>
           <div className="ad-table-wrap">
             <table className="ad-table">
               <thead>
                 <tr>
-                  <th>Compte</th>
+                  <th>Account</th>
                   <th>Type</th>
                   <th>Plan</th>
-                  <th>Facturation</th>
-                  <th>Rôle</th>
-                  <th className="ad-num">Inscrit</th>
+                  <th>Billing</th>
+                  <th>Role</th>
+                  <th className="ad-num">Joined</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,7 +168,7 @@ export default function AdminUsersPage() {
                         </span>
                       </span>
                     </td>
-                    <td>{(user.account_type ?? "").toLowerCase() === "creator" ? <Pill>Créateur</Pill> : <Pill tone="accent">Marque</Pill>}</td>
+                    <td>{(user.account_type ?? "").toLowerCase() === "creator" ? <Pill>Creator</Pill> : <Pill tone="accent">Brand</Pill>}</td>
                     <td>{PLAN_LABELS[billing.plan]}</td>
                     <td>
                       <Pill tone={billingTone(billing.source)}>{BILLING_LABELS[billing.source]}</Pill>
@@ -179,11 +179,11 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
-            {rows.length === 0 ? <Empty>Aucun compte ne correspond.</Empty> : null}
+            {rows.length === 0 ? <Empty>No matching accounts.</Empty> : null}
             {rows.length > limit ? (
               <div style={{ padding: 14, display: "flex", justifyContent: "center" }}>
                 <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 200)}>
-                  Voir {Math.min(200, rows.length - limit)} de plus ({num(rows.length - limit)} restants)
+                  Show {Math.min(200, rows.length - limit)} more ({num(rows.length - limit)} remaining)
                 </button>
               </div>
             ) : null}
@@ -236,14 +236,14 @@ function UserDrawer({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setToast(body.error || `Refusé (${res.status})`);
+        setToast(body.error || `Refused (${res.status})`);
         return;
       }
-      setToast("Modification enregistrée.");
+      setToast("Change saved.");
       onChanged();
       reload();
     } catch {
-      setToast("Connexion impossible.");
+      setToast("Could not connect.");
     } finally {
       setBusy(false);
     }
@@ -257,8 +257,8 @@ function UserDrawer({
 
   return (
     <>
-      <button type="button" className="ad-drawer-bg" aria-label="Fermer" onClick={onClose} />
-      <aside className="ad-drawer" role="dialog" aria-modal="true" aria-label={`Compte ${displayName(user)}`}>
+      <button type="button" className="ad-drawer-bg" aria-label="Close" onClick={onClose} />
+      <aside className="ad-drawer" role="dialog" aria-modal="true" aria-label={`Account ${displayName(user)}`}>
         <div className="ad-drawer__head">
           <span className="ad-who">
             <Avatar name={displayName(user)} />
@@ -268,42 +268,42 @@ function UserDrawer({
             </span>
           </span>
           <button type="button" className="ad-btn" onClick={onClose}>
-            Fermer
+            Close
           </button>
         </div>
 
         <div className="ad-facts">
           <div className="ad-fact">
-            <span>Plan appliqué</span>
+            <span>Applied plan</span>
             <strong>{PLAN_LABELS[billing.plan]}</strong>
           </div>
           <div className="ad-fact">
-            <span>Facturation</span>
+            <span>Billing</span>
             <strong>
               {BILLING_LABELS[billing.source]}
-              {billing.until ? ` · jusqu’au ${dateFr(billing.until)}` : ""}
+              {billing.until ? ` · until ${dateFr(billing.until)}` : ""}
             </strong>
           </div>
           <div className="ad-fact">
-            <span>Inscrit</span>
+            <span>Joined</span>
             <strong>{dateFr(user.created_at)}</strong>
           </div>
           <div className="ad-fact">
-            <span>Dernière activité</span>
+            <span>Last activity</span>
             <strong>{sessions[0] ? ago(sessions[0].last_active_at) : loading ? "…" : "—"}</strong>
           </div>
         </div>
 
         {error ? <LoadState loading={false} error={error} onRetry={reload} /> : null}
 
-        <Card title="Usage du produit">
+        <Card title="Product usage">
           <div className="ad-facts">
-            <div className="ad-fact"><span>Campagnes</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
-            <div className="ad-fact"><span>Créateurs gérés</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
-            <div className="ad-fact"><span>Ventes suivies</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
-            <div className="ad-fact"><span>CA suivi</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
-            <div className="ad-fact"><span>Messages envoyés</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
-            <div className="ad-fact"><span>Missions gifting</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
+            <div className="ad-fact"><span>Campaigns</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
+            <div className="ad-fact"><span>Managed creators</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
+            <div className="ad-fact"><span>Tracked sales</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
+            <div className="ad-fact"><span>Tracked revenue</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
+            <div className="ad-fact"><span>Messages sent</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
+            <div className="ad-fact"><span>Gifting missions</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
           </div>
         </Card>
 
@@ -314,7 +314,7 @@ function UserDrawer({
                 <option value="basic">Growth</option>
                 <option value="pro">Pro</option>
                 <option value="scale">Scale</option>
-                <option value="free">Gratuit</option>
+                <option value="free">Free</option>
               </select>
               <button
                 type="button"
@@ -325,27 +325,27 @@ function UserDrawer({
                     "setPlan",
                     plan,
                     plan === "free"
-                      ? "Passer ce compte en gratuit ? Un abonnement Stripe éventuel sera annulé immédiatement."
-                      : `Appliquer le plan ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} ? Sans abonnement Stripe, l’accès est offert.`,
+                      ? "Move this account to Free? Any Stripe subscription will be canceled immediately."
+                      : `Apply the ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} plan? Without a Stripe subscription, access is comped.`,
                   )
                 }
               >
-                Appliquer le plan
+                Apply plan
               </button>
               {plan !== "free" ? (
-                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("giftMonth", plan, `Offrir 1 mois de ${plan} ?`)}>
-                  Offrir 1 mois
+                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("giftMonth", plan, `Gift 1 month of ${plan}?`)}>
+                  Gift 1 month
                 </button>
               ) : null}
               {isOffered(billing.source) ? (
-                <button type="button" className="ad-btn ad-btn--danger" disabled={busy} onClick={() => void act("revokeComp", undefined, "Retirer l’accès offert ?")}>
-                  Retirer l’accès offert
+                <button type="button" className="ad-btn ad-btn--danger" disabled={busy} onClick={() => void act("revokeComp", undefined, "Revoke comped access?")}>
+                  Revoke comped access
                 </button>
               ) : null}
             </div>
             <div className="ad-actions">
-              <select className="ad-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Rôle">
-                <option value="user">Utilisateur</option>
+              <select className="ad-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Role">
+                <option value="user">User</option>
                 <option value="staff">Staff</option>
                 <option value="admin">Admin</option>
               </select>
@@ -353,37 +353,37 @@ function UserDrawer({
                 type="button"
                 className="ad-btn"
                 disabled={busy || role === (user.role ?? "user")}
-                onClick={() => void act("role", role, `Donner le rôle « ${role} » à ce compte ?`)}
+                onClick={() => void act("role", role, `Give this account the "${role}" role?`)}
               >
-                Changer le rôle
+                Change role
               </button>
             </div>
             {user.stripe_subscription_id ? (
               <div className="ad-actions">
-                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("cancel", undefined, "Annuler l’abonnement Stripe à la fin de la période ?")}>
-                  Annuler en fin de période
+                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("cancel", undefined, "Cancel the Stripe subscription at the end of the period?")}>
+                  Cancel at period end
                 </button>
                 <button
                   type="button"
                   className="ad-btn ad-btn--danger"
                   disabled={busy}
-                  onClick={() => void act("cancelNow", undefined, "Annuler l’abonnement Stripe immédiatement ? Le compte repasse en gratuit.")}
+                  onClick={() => void act("cancelNow", undefined, "Cancel the Stripe subscription immediately? The account goes back to Free.")}
                 >
-                  Annuler maintenant
+                  Cancel now
                 </button>
               </div>
             ) : null}
-            {stripeMode === "test" ? <Pill tone="warn">Stripe en mode test</Pill> : null}
+            {stripeMode === "test" ? <Pill tone="warn">Stripe in test mode</Pill> : null}
           </div>
         </Card>
 
         {sub ? (
-          <Card title="Abonnement Stripe">
+          <Card title="Stripe subscription">
             <div className="ad-facts">
-              <div className="ad-fact"><span>Statut</span><strong>{sub.status}{sub.cancelAtPeriodEnd ? " · s’arrête" : ""}</strong></div>
-              <div className="ad-fact"><span>Montant</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? "an" : "mois"}</strong></div>
-              <div className="ad-fact"><span>Fin de période</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
-              <div className="ad-fact"><span>Prix</span><strong>{sub.priceId ?? "—"}</strong></div>
+              <div className="ad-fact"><span>Status</span><strong>{sub.status}{sub.cancelAtPeriodEnd ? " · ending" : ""}</strong></div>
+              <div className="ad-fact"><span>Amount</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? "year" : "month"}</strong></div>
+              <div className="ad-fact"><span>Period end</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
+              <div className="ad-fact"><span>Price</span><strong>{sub.priceId ?? "—"}</strong></div>
             </div>
             {detail && detail.invoices.length > 0 ? (
               <table className="ad-table" style={{ marginTop: 12 }}>
@@ -412,9 +412,9 @@ function UserDrawer({
           </Card>
         ) : null}
 
-        <Card title="Sessions récentes">
+        <Card title="Recent sessions">
           {sessions.length === 0 ? (
-            <Empty>{loading ? "Chargement…" : "Aucune session enregistrée."}</Empty>
+            <Empty>{loading ? "Loading…" : "No sessions recorded."}</Empty>
           ) : (
             <table className="ad-table">
               <tbody>
@@ -431,7 +431,7 @@ function UserDrawer({
           )}
         </Card>
 
-        <Card title="Fiche technique">
+        <Card title="Technical details">
           <dl className="ad-kv">
             {shownKeys.map((k) => (
               <div key={k} style={{ display: "contents" }}>

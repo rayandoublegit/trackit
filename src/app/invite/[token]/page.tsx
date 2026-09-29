@@ -24,26 +24,26 @@ export default function InvitePage() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (!token) { setInviteError("Lien invalide"); setLoading(false); return; }
+    if (!token) { setInviteError("Invalid link"); setLoading(false); return; }
     fetch(`/api/invites/accept?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.ok) setBrandName(data.brandName || "cette marque");
-        else setInviteError(data.error || "Lien invalide");
+        if (data.ok) setBrandName(data.brandName || "this brand");
+        else setInviteError(data.error || "Invalid link");
       })
-      .catch(() => setInviteError("Erreur de chargement"))
+      .catch(() => setInviteError("Could not load the invitation"))
       .finally(() => setLoading(false));
   }, [token]);
 
   const handleJoin = async () => {
     setFormError("");
-    if (!supabase) { setFormError("Service indisponible"); return; }
-    if (!email.trim() || !password) { setFormError("Entrez votre email et un mot de passe"); return; }
-    if (!fullName.trim()) { setFormError("Entrez votre nom complet"); return; }
+    if (!supabase) { setFormError("Service unavailable"); return; }
+    if (!email.trim() || !password) { setFormError("Enter your email and a password"); return; }
+    if (!fullName.trim()) { setFormError("Enter your full name"); return; }
     const cleanHandle = normalizeProfileUsername(socialHandle);
-    if (!cleanHandle) { setFormError("Entrez votre pseudo sur les réseaux"); return; }
+    if (!cleanHandle) { setFormError("Enter your social handle"); return; }
     if (!isValidProfileUsername(cleanHandle)) {
-      setFormError("Pseudo invalide : 3–20 caractères, lettres, chiffres et underscores uniquement.");
+      setFormError("Invalid handle: 3–20 characters, letters, numbers, and underscores only.");
       return;
     }
     setSubmitting(true);
@@ -61,10 +61,10 @@ export default function InvitePage() {
         const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
           email: email.trim(), password,
         });
-        if (signInErr) { setFormError("Ce compte existe déjà. Mot de passe incorrect ?"); setSubmitting(false); return; }
+        if (signInErr) { setFormError("This account already exists. Wrong password?"); setSubmitting(false); return; }
         userId = signInData?.user?.id || "";
       }
-      if (!userId) { setFormError("Impossible de créer le compte"); setSubmitting(false); return; }
+      if (!userId) { setFormError("Could not create the account"); setSubmitting(false); return; }
 
       const res = await fetch("/api/invites/accept", {
         method: "POST",
@@ -72,7 +72,7 @@ export default function InvitePage() {
         body: JSON.stringify({ token, creatorId: userId, fullName: fullName.trim(), socialHandle: cleanHandle }),
       });
       const data = await res.json();
-      if (!data.ok) { setFormError(data.error || "Échec de la liaison"); setSubmitting(false); return; }
+      if (!data.ok) { setFormError(data.error || "Could not link your account"); setSubmitting(false); return; }
 
       setDone(true);
     } finally {
@@ -130,25 +130,25 @@ function InviteUI(props: {
         <div style={{ flex: "1 1 380px", background: `linear-gradient(160deg, ${BLUE} 0%, #0035C4 100%)`, padding: "48px 44px", display: "flex", flexDirection: "column", justifyContent: "space-between", minHeight: 520 }}>
           <img src={TRACKIT_LOGO} alt="Trackit" style={{ height: 54, width: "auto", objectFit: "contain", alignSelf: "flex-start", filter: "brightness(0) invert(1)" }} />
           <div style={{ margin: "40px 0" }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.6)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 14 }}>Invitation créateur</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.6)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 14 }}>Creator invitation</div>
             <h1 style={{ fontSize: 30, fontWeight: 600, color: "#FFFFFF", letterSpacing: "-0.03em", lineHeight: 1.15, marginBottom: 28 }}>
-              Suivez vos ventes et vos commissions, en temps réel.
+              Track your sales and commissions in real time.
             </h1>
-            <Bullet>Voyez chaque vente que vous générez, à la seconde près</Bullet>
-            <Bullet>Suivez vos gains et vos paiements sans rien demander</Bullet>
-            <Bullet>Gérez vos infos de paiement en toute autonomie</Bullet>
+            <Bullet>See every sale you drive, the moment it happens</Bullet>
+            <Bullet>Follow your earnings and payouts without asking</Bullet>
+            <Bullet>Manage your payout details on your own</Bullet>
           </div>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", letterSpacing: "-0.01em" }}>Propulsé par Trackit</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", letterSpacing: "-0.01em" }}>Powered by Trackit</div>
         </div>
 
         <div style={{ flex: "1 1 380px", padding: "48px 44px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
           {loading ? (
-            <div style={{ fontSize: 15, color: "rgba(0,0,0,0.4)" }}>Chargement...</div>
+            <div style={{ fontSize: 15, color: "rgba(0,0,0,0.4)" }}>Loading...</div>
           ) : inviteError ? (
             <div>
-              <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 10 }}>Lien invalide</h2>
+              <h2 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 10 }}>Invalid link</h2>
               <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", lineHeight: 1.5 }}>
-                Cette invitation n'est plus valide ou a expiré. Demandez un nouveau lien à la marque qui vous a invité.
+                This invitation is no longer valid or has expired. Ask the brand that invited you for a new link.
               </p>
             </div>
           ) : done ? (
@@ -156,31 +156,31 @@ function InviteUI(props: {
               <div style={{ width: 52, height: 52, borderRadius: "50%", background: "#E8F0FF", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5L19 7" stroke={BLUE} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </div>
-              <h2 style={{ fontSize: 23, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 10 }}>Vous êtes connecté à {brandName}</h2>
+              <h2 style={{ fontSize: 23, fontWeight: 600, letterSpacing: "-0.02em", marginBottom: 10 }}>You're connected to {brandName}</h2>
               <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, marginBottom: 28 }}>
-                Retrouvez vos ventes et vos gains dès maintenant dans votre espace.
+                Your sales and earnings are now waiting in your dashboard.
               </p>
               <a href="/dashboard" style={{ ...btn, display: "block", textAlign: "center", textDecoration: "none", boxSizing: "border-box" }}>
-                Accéder à mon espace →
+                Go to my dashboard →
               </a>
             </div>
           ) : (
             <div>
               <h2 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.025em", marginBottom: 8, lineHeight: 1.2 }}>
-                {brandName} vous invite à les rejoindre
+                {brandName} invited you to join them
               </h2>
               <p style={{ fontSize: 15, color: "rgba(0,0,0,0.5)", lineHeight: 1.5, marginBottom: 28 }}>
-                Créez votre compte gratuit en quelques secondes.
+                Create your free account in seconds.
               </p>
-              <input type="text" placeholder="Votre nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} style={input} autoComplete="name" />
-              <input type="text" placeholder="Votre pseudo (ex : moncompte)" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} style={input} autoComplete="off" />
+              <input type="text" placeholder="Your full name" value={fullName} onChange={(e) => setFullName(e.target.value)} style={input} autoComplete="name" />
+              <input type="text" placeholder="Your handle (e.g. myaccount)" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} style={input} autoComplete="off" />
               <p style={{ fontSize: 12, color: "rgba(0,0,0,0.4)", margin: "-4px 0 12px", lineHeight: 1.45 }}>
-                Même pseudo que sur TikTok / Instagram — la marque vous retrouvera avec ce nom.
+                Use the same handle as on TikTok / Instagram — the brand will find you by this name.
               </p>
-              <input type="email" placeholder="Votre email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" />
+              <input type="email" placeholder="Your email" value={email} onChange={(e) => setEmail(e.target.value)} style={input} autoComplete="email" />
               <div style={{ position: "relative" }}>
-                <input type={showPassword ? "text" : "password"} placeholder="Choisissez un mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...input, paddingRight: 46 }} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />
-                <button type="button" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"} style={{ position: "absolute", right: 12, top: 14, background: "transparent", border: "none", padding: 0, cursor: "pointer", color: "rgba(0,0,0,0.4)", display: "flex" }}>
+                <input type={showPassword ? "text" : "password"} placeholder="Choose a password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ ...input, paddingRight: 46 }} autoComplete="new-password" onKeyDown={(e) => { if (e.key === "Enter") onJoin(); }} />
+                <button type="button" onClick={() => setShowPassword((s) => !s)} aria-label={showPassword ? "Hide password" : "Show password"} style={{ position: "absolute", right: 12, top: 14, background: "transparent", border: "none", padding: 0, cursor: "pointer", color: "rgba(0,0,0,0.4)", display: "flex" }}>
                   {showPassword ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/><path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
                   ) : (
@@ -192,10 +192,10 @@ function InviteUI(props: {
                 <div style={{ fontSize: 14, color: "#992323", padding: "10px 12px", borderRadius: 10, background: "rgba(153,35,35,0.06)", marginBottom: 12 }}>{formError}</div>
               )}
               <button type="button" onClick={onJoin} disabled={submitting} style={btn}>
-                {submitting ? "Création..." : "Rejoindre " + brandName + " →"}
+                {submitting ? "Creating..." : "Join " + brandName + " →"}
               </button>
               <p style={{ fontSize: 12, color: "rgba(0,0,0,0.35)", marginTop: 16, lineHeight: 1.5 }}>
-                En continuant, vous acceptez de partager vos coordonnées avec {brandName} pour le suivi de vos commissions.
+                By continuing, you agree to share your contact details with {brandName} to track your commissions.
               </p>
             </div>
           )}

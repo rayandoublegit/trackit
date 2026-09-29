@@ -489,7 +489,7 @@ function BrandSignalsGrid({ d, lang }: { d: CreatorDetail; lang: Lang }) {
         <Stat label={t.commentRate} value={fmtRate(d.avgComments ?? 0, avgViews)} />
         <Stat label={t.shareRate} value={fmtRate(d.avgShares ?? 0, avgViews)} />
         <Stat label={t.estCpm} value={cpmReady ? `$${d.estCpm}` : "—"} accent />
-        <Stat label={t.estCostPerPost} value={d.estCostPerPost > 0 ? `$${d.estCostPerPost.toLocaleString()}` : "—"} />
+        <Stat label={t.estCostPerPost} value={d.estCostPerPost > 0 ? `$${d.estCostPerPost.toLocaleString("en-US")}` : "—"} />
         <Stat label={t.valueScore} value={reliable && d.valueScore > 0 ? `${d.valueScore}/100` : "—"} accent />
         <Stat label={t.postFrequency} value={frequency > 0 ? t.postsPerWeek(frequency) : "—"} />
         <Stat label={t.creatorTier} value={d.valueTier ? valueTierLabel(d.valueTier, lang) : "—"} />

@@ -18,7 +18,7 @@ export function translateAuthError(message: string, lang: Lang): string {
     key.includes("exceed_storage_size_quota") ||
     key.includes("service for this project is restricted")
   ) {
-    return "Trackit est actuellement en maintenance.";
+    return "Trackit is currently under maintenance.";
   }
   if (lang !== "fr") return message;
   return AUTH_ERROR_FR[key] ?? message;

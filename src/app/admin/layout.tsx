@@ -4,7 +4,7 @@ import { AdminShell } from "./_components/AdminShell";
 import "./admin.css";
 
 export const metadata: Metadata = {
-  title: "Console staff · Trackit",
+  title: "Staff console · Trackit",
   robots: { index: false, follow: false },
 };
 

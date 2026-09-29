@@ -63,7 +63,7 @@ export async function computeMetrics(stripe: Stripe): Promise<AdminMetrics> {
       (price?.nickname ||
         (price?.metadata && price.metadata.plan) ||
         (sub.metadata && sub.metadata.plan) ||
-        "inconnu").toLowerCase();
+        "unknown").toLowerCase();
 
     if (price?.currency) currency = price.currency;
 

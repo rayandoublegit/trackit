@@ -24,8 +24,8 @@ export async function POST(request: Request) {
   const accessToken = String(body.accessToken || "").trim();
 
   if (!userId) return NextResponse.json({ ok: false, error: "No userId" }, { status: 400 });
-  if (!shop) return NextResponse.json({ ok: false, error: "Domaine manquant" }, { status: 400 });
-  if (!accessToken) return NextResponse.json({ ok: false, error: "Token manquant" }, { status: 400 });
+  if (!shop) return NextResponse.json({ ok: false, error: "Missing domain" }, { status: 400 });
+  if (!accessToken) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
 
   const { data: profile } = await supabaseAdmin.from("profiles").select("plan").eq("id", userId).maybeSingle();
   if (!canUseShopify(normalizePlan(profile?.plan))) {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
   shop = shop.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (!shop.endsWith(".myshopify.com")) {
     return NextResponse.json(
-      { ok: false, error: "Le domaine doit finir par .myshopify.com" },
+      { ok: false, error: "The domain must end with .myshopify.com" },
       { status: 400 },
     );
   }
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     });
     if (!shopRes.ok) {
       return NextResponse.json(
-        { ok: false, error: "Token ou domaine invalide (Shopify a refusé l'accès)" },
+        { ok: false, error: "Invalid token or domain (Shopify denied access)" },
         { status: 400 },
       );
     }
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     shopData = json.shop ?? null;
   } catch {
     return NextResponse.json(
-      { ok: false, error: "Impossible de joindre Shopify avec ces identifiants" },
+      { ok: false, error: "Couldn’t reach Shopify with these credentials" },
       { status: 400 },
     );
   }

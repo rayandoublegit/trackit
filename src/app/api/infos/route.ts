@@ -17,7 +17,7 @@ function missingTableMessage(error: { message?: string } | null) {
     (msg.includes("brand_infos") || msg.includes("brand_rules")) &&
     (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("Could not find"))
   ) {
-    return "Table brand_infos absente — appliquez supabase/migrations/20260825_000038_brand_infos.sql";
+    return "brand_infos table missing — apply supabase/migrations/20260825_000038_brand_infos.sql";
   }
   return msg || "Unknown error";
 }

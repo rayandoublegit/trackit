@@ -46,19 +46,19 @@ export async function GET(req: NextRequest) {
 
   // Only presence is reported, never a value.
   const env: SystemCheck[] = [
-    { key: "supabase", label: "Supabase (URL + clé publique)", ok: present("NEXT_PUBLIC_SUPABASE_URL") && present("NEXT_PUBLIC_SUPABASE_ANON_KEY") },
-    { key: "service", label: "Supabase clé service (serveur)", ok: present("SUPABASE_SERVICE_ROLE_KEY") },
-    { key: "stripe", label: "Stripe", ok: stripeMode !== "off", detail: stripeMode === "off" ? "absent" : `mode ${stripeMode}` },
+    { key: "supabase", label: "Supabase (URL + public key)", ok: present("NEXT_PUBLIC_SUPABASE_URL") && present("NEXT_PUBLIC_SUPABASE_ANON_KEY") },
+    { key: "service", label: "Supabase service key (server)", ok: present("SUPABASE_SERVICE_ROLE_KEY") },
+    { key: "stripe", label: "Stripe", ok: stripeMode !== "off", detail: stripeMode === "off" ? "missing" : `${stripeMode} mode` },
     { key: "stripe-webhook", label: "Stripe webhook secret", ok: present("STRIPE_WEBHOOK_SECRET") },
     { key: "whop", label: "Whop (API)", ok: present("WHOP_API_KEY") },
     { key: "whop-webhook", label: "Whop webhook secret", ok: present("WHOP_WEBHOOK_SECRET") },
     { key: "resend", label: "Resend (emails)", ok: present("RESEND_API_KEY") },
-    { key: "rapidapi", label: "RapidAPI (recherche créateurs)", ok: present("RAPIDAPI_KEY") },
-    { key: "scrapecreators", label: "ScrapeCreators (stats vidéos)", ok: present("SCRAPECREATORS_API_KEY") },
+    { key: "rapidapi", label: "RapidAPI (creator search)", ok: present("RAPIDAPI_KEY") },
+    { key: "scrapecreators", label: "ScrapeCreators (video stats)", ok: present("SCRAPECREATORS_API_KEY") },
     { key: "anthropic", label: "Anthropic (Mino)", ok: present("ANTHROPIC_API_KEY") },
     { key: "shopify", label: "Shopify (app OAuth)", ok: present("SHOPIFY_CLIENT_ID") },
-    { key: "cron", label: "Secret des tâches planifiées (CRON)", ok: present("CRON_SECRET") },
-    { key: "admins", label: "Liste ADMIN_EMAILS", ok: present("ADMIN_EMAILS"), detail: present("ADMIN_EMAILS") ? undefined : "valeur par défaut du code" },
+    { key: "cron", label: "Scheduled jobs secret (CRON)", ok: present("CRON_SECRET") },
+    { key: "admins", label: "ADMIN_EMAILS list", ok: present("ADMIN_EMAILS"), detail: present("ADMIN_EMAILS") ? undefined : "code default" },
   ];
 
   const deploy: SystemData["deploy"] = {

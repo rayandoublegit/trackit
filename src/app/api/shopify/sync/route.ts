@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
         status: ordersRes.status,
         message:
           ordersRes.status === 401 || ordersRes.status === 403
-            ? "Token Shopify invalide ou permission read_orders manquante."
-            : "Impossible de récupérer les commandes Shopify.",
+            ? "Invalid Shopify token or missing read_orders permission."
+            : "Couldn’t fetch Shopify orders.",
         details: details.slice(0, 500),
       },
       { status: 502 }

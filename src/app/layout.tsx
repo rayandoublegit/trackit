@@ -70,7 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ))}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k="trackit_lang";var rev="trackit_lang_rev";if(localStorage.getItem(rev)!=="en"){localStorage.setItem(k,"en");localStorage.setItem(rev,"en")}var l=localStorage.getItem(k);if(l!=="fr"&&l!=="en")l="en";localStorage.setItem(k,l);document.documentElement.lang=l}catch(e){}})();`,
+            __html: `(function(){try{localStorage.setItem("trackit_lang","en");document.documentElement.lang="en"}catch(e){}})();`,
           }}
         />
       </head>

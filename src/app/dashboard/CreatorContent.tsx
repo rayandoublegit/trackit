@@ -759,7 +759,7 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
                     required
                     value={postUrl}
                     onChange={(e) => setPostUrl(e.target.value)}
-                    placeholder="https://www.tiktok.com/@…/video/… ou https://www.instagram.com/reel/…"
+                    placeholder="https://www.tiktok.com/@…/video/… or https://www.instagram.com/reel/…"
                     style={{ ...inputStyle, flex: 1 }}
                   />
                   <button

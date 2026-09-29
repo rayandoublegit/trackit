@@ -40,9 +40,9 @@ export type DemoPresetResult = {
 };
 
 const CONTENT_TITLES = [
-  "Hook UGC — unboxing produit",
-  "Story time — avant / après",
-  "Haul + lien bio",
+  "UGC hook — product unboxing",
+  "Story time — before / after",
+  "Haul + link in bio",
 ];
 
 function daysAgoIso(daysAgo: number, rand: () => number): string {
@@ -209,7 +209,7 @@ async function ensureDemoContent(
     const shares = Math.floor(likes * (0.02 + rand() * 0.06));
     const postedAt = daysAgoToIso(3 + Math.floor(rand() * 25), 14 + i);
     const seed = `trackit-content-${userId.slice(0, 6)}-${c.handle}-${i}`;
-    const title = CONTENT_TITLES[i] ?? `Contenu démo ${i + 1}`;
+    const title = CONTENT_TITLES[i] ?? `Demo content ${i + 1}`;
     const postId = String(700_000_000_000_000_000 + Math.floor(rand() * 1e15));
 
     const row: Record<string, unknown> = {
@@ -217,7 +217,7 @@ async function ensureDemoContent(
       creator_row_id: creatorRowId,
       creator_user_id: userId,
       title,
-      notes: "Contenu démo Trackit — stats mockées pour analystes",
+      notes: "Trackit demo content — mock stats for analysts",
       file_url: `https://picsum.photos/seed/${encodeURIComponent(seed)}/800/500`,
       file_name: `${c.handle}-ugc-${i + 1}.jpg`,
       file_type: "image/jpeg",

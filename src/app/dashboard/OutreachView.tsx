@@ -1036,7 +1036,7 @@ function OutreachAIGeneratePanel({
                           type="email"
                           value={senderEmail}
                           onChange={(e) => setSenderEmail(e.target.value)}
-                          placeholder="vous@marque.com"
+                          placeholder="you@brand.com"
                           style={inputStyle}
                           autoComplete="email"
                         />
@@ -1733,7 +1733,7 @@ export function OutreachHistorySection({
                         <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
                         <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>
-                          {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString() : "—"}
+                          {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString("en-US") : "—"}
                         </div>
                       </div>
                       <div style={{ flexShrink: 0 }}>{outreachStatusBadge(item.status, lang)}</div>

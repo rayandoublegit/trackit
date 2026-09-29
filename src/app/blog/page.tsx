@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { BlogCard } from "@/components/blog/BlogCard";
 import { BlogShell } from "@/components/blog/BlogShell";
 import { SeoJsonLd } from "@/components/SeoJsonLd";
-import { BLOG_POSTS, getPostsByLocale } from "@/lib/blog";
+import { BLOG_POSTS } from "@/lib/blog";
 import { buildPageMetadata, itemListJsonLd } from "@/lib/site-seo";
 
 export const metadata = buildPageMetadata({
@@ -13,12 +12,8 @@ export const metadata = buildPageMetadata({
   keywords: ["Trackit blog", "creator marketing guides", "Trackit resources", "affiliate marketing tips"],
 });
 
-type Props = { searchParams: Promise<{ lang?: string }> };
-
-export default async function BlogIndexPage({ searchParams }: Props) {
-  const { lang } = await searchParams;
-  const locale = lang === "fr" ? "fr" : "en";
-  const posts = getPostsByLocale(locale);
+export default function BlogIndexPage() {
+  const posts = BLOG_POSTS;
 
   return (
     <>
@@ -34,21 +29,6 @@ export default async function BlogIndexPage({ searchParams }: Props) {
         <p className="blog-lead">
           In-depth articles on running creator affiliate programs with Trackit — discovery, outreach, Shopify tracking, and payouts.
         </p>
-
-        <div className="blog-locale-tabs" role="tablist" aria-label="Blog language">
-          <Link
-            href="/blog"
-            className={`blog-locale-tab${locale === "en" ? " blog-locale-tab--active" : ""}`}
-          >
-            English
-          </Link>
-          <Link
-            href="/blog?lang=fr"
-            className={`blog-locale-tab${locale === "fr" ? " blog-locale-tab--active" : ""}`}
-          >
-            Français
-          </Link>
-        </div>
 
         <div className="blog-grid">
           {posts.map((post) => (

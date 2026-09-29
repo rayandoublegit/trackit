@@ -5,7 +5,7 @@ describe("pipeline stages", () => {
   it("is ordered saved -> contacted -> in_progress -> nurturing -> signed -> lost", () => {
     expect(STAGE_KEYS).toEqual(["saved", "contacted", "in_progress", "nurturing", "signed", "lost"]);
   });
-  it("has a French label and a color for every stage", () => {
+  it("has a label and a color for every stage", () => {
     for (const s of PIPELINE_STAGES) {
       expect(s.label.length).toBeGreaterThan(0);
       expect(s.color).toMatch(/^#/);
@@ -13,8 +13,8 @@ describe("pipeline stages", () => {
     }
   });
   it("looks up labels and colors", () => {
-    expect(stageLabel("signed")).toBe("Signé");
-    expect(stageLabel("contacted")).toBe("Contacté");
+    expect(stageLabel("signed")).toBe("Signed");
+    expect(stageLabel("contacted")).toBe("Contacted");
     expect(stageColor("contacted").bg).toBe("#E6F1FB");
   });
   it("falls back gracefully for unknown keys", () => {

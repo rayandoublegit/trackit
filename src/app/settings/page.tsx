@@ -157,7 +157,6 @@ export default function SettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [savingLanguage, setSavingLanguage] = useState(false);
   const [wallpaper, setWallpaper] = useState<string>("");
   const [wallpaperType, setWallpaperType] = useState<"color" | "gradient" | "image">("color");
   const [savingWallpaper, setSavingWallpaper] = useState(false);
@@ -318,14 +317,6 @@ export default function SettingsPage() {
 
     setChangingPassword(false);
   }, [supabase, user, currentPassword, newPassword, confirmNewPassword]);
-
-  const saveLanguage = useCallback(async () => {
-    setSavingLanguage(true);
-    localStorage.setItem("klayan_lang", locale);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    setMessage({ text: "Language preference saved.", type: "success" });
-    setSavingLanguage(false);
-  }, [locale]);
 
   const saveWallpaper = useCallback((value: string, type: "color" | "gradient" | "image") => {
     localStorage.setItem("klayan_wallpaper", value);
@@ -605,53 +596,6 @@ export default function SettingsPage() {
             }}
           >
             {changingPassword ? t.updating : t.update_password}
-          </button>
-        </div>
-
-        {/* Language Section */}
-        <div style={sectionStyle}>
-          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 20 }}>{t.language_title}</div>
-          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            {[
-              { value: "en" as const, label: t.lang_en },
-              { value: "fr" as const, label: t.lang_fr },
-            ].map((l) => (
-              <button
-                key={l.value}
-                type="button"
-                onClick={() => setLocale(l.value)}
-                style={{
-                  background: locale === l.value ? "#ffffff" : "rgba(255,255,255,0.04)",
-                  color: locale === l.value ? "#000" : "rgba(255,255,255,0.6)",
-                  border: `1px solid ${locale === l.value ? "#ffffff" : "rgba(255,255,255,0.1)"}`,
-                  borderRadius: 10,
-                  padding: "12px 24px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {l.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => void saveLanguage()}
-            disabled={savingLanguage}
-            style={{
-              background: "#ffffff",
-              color: "#000",
-              border: "none",
-              borderRadius: 10,
-              padding: "12px 28px",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              opacity: savingLanguage ? 0.6 : 1,
-            }}
-          >
-            {savingLanguage ? t.saving : t.save_language}
           </button>
         </div>
 

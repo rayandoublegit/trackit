@@ -7,30 +7,30 @@ import { CountUp } from "@/app/dashboard/sample-motion";
 
 export function eur(n: number | null | undefined, decimals = 0): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: decimals, minimumFractionDigits: decimals }).format(n);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "EUR", maximumFractionDigits: decimals, minimumFractionDigits: decimals }).format(n);
 }
 
 export function num(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  return new Intl.NumberFormat("fr-FR").format(Math.round(n));
+  return new Intl.NumberFormat("en-US").format(Math.round(n));
 }
 
 export function compact(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
-  if (n < 10_000) return new Intl.NumberFormat("fr-FR").format(Math.round(n));
-  return new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  if (n < 10_000) return new Intl.NumberFormat("en-US").format(Math.round(n));
+  return new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
 export function pct(value: number | null | undefined, decimals = 1): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
-  return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: decimals, minimumFractionDigits: decimals }).format(value)} %`;
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: decimals, minimumFractionDigits: decimals }).format(value)}%`;
 }
 
 export function dateFr(value: string | number | null | undefined, withTime = false): string {
   if (value === null || value === undefined || value === "") return "—";
   const d = typeof value === "number" ? new Date(value < 1e12 ? value * 1000 : value) : new Date(value);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("fr-FR", withTime ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-US", withTime ? { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } : { day: "numeric", month: "short", year: "numeric" });
 }
 
 export function ago(value: string | null | undefined): string {
@@ -38,10 +38,10 @@ export function ago(value: string | null | undefined): string {
   const t = Date.parse(value);
   if (Number.isNaN(t)) return "—";
   const s = Math.max(0, (Date.now() - t) / 1000);
-  if (s < 60) return "à l’instant";
-  if (s < 3600) return `il y a ${Math.round(s / 60)} min`;
-  if (s < 86_400) return `il y a ${Math.round(s / 3600)} h`;
-  if (s < 86_400 * 30) return `il y a ${Math.round(s / 86_400)} j`;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)} min ago`;
+  if (s < 86_400) return `${Math.round(s / 3600)} h ago`;
+  if (s < 86_400 * 30) return `${Math.round(s / 86_400)} d ago`;
   return dateFr(value);
 }
 
@@ -62,13 +62,13 @@ export function useAdminData<T>(url: string) {
         const body = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
-          setError(res.status === 403 ? "Accès refusé." : body.error || `Erreur ${res.status}`);
+          setError(res.status === 403 ? "Access denied." : body.error || `Error ${res.status}`);
           return;
         }
         setData(body as T);
       })
       .catch(() => {
-        if (!cancelled) setError("Connexion impossible.");
+        if (!cancelled) setError("Could not connect.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -148,7 +148,7 @@ export function Kpi({
       <span className="ad-kpi__sub">
         {trend !== undefined && trend !== null ? (
           <em className={trend >= 0 ? "is-up" : "is-down"}>
-            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)} %
+            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}%
           </em>
         ) : null}
         {sub}
@@ -165,7 +165,7 @@ export function Warnings({ items }: { items: string[] | undefined }) {
   if (!items || items.length === 0) return null;
   return (
     <div className="ad-warn" role="status">
-      <strong>Lectures incomplètes</strong>
+      <strong>Incomplete reads</strong>
       <ul>
         {items.map((w) => (
           <li key={w}>{w}</li>
@@ -179,17 +179,17 @@ export function LoadState({ loading, error, onRetry }: { loading: boolean; error
   if (error) {
     return (
       <div className="ad-error" role="alert">
-        <strong>Chargement impossible</strong>
+        <strong>Could not load</strong>
         <p>{error}</p>
         <button type="button" className="ad-btn" onClick={onRetry}>
-          Réessayer
+          Retry
         </button>
       </div>
     );
   }
   if (loading) {
     return (
-      <div className="ad-skeleton" aria-label="Chargement">
+      <div className="ad-skeleton" aria-label="Loading">
         {[0, 1, 2, 3].map((i) => (
           <span key={i} style={{ animationDelay: `${i * 0.1}s` }} />
         ))}
@@ -209,7 +209,7 @@ export function RefreshButton({ onClick, loading }: { onClick: () => void; loadi
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className={loading ? "ad-spin" : ""}>
         <path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      Actualiser
+      Refresh
     </button>
   );
 }

@@ -105,7 +105,7 @@ function mediaKindFromUrl(url: string | null | undefined): "image" | "audio" | "
 
 function formatBubbleTime(iso: string) {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   } catch {
     return "";
   }

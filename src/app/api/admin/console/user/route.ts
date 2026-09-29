@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     // Garde-fou: empeche de te retirer ton propre acces admin par accident.
     if (target.id === admin.userId && newRole !== "admin") {
       return NextResponse.json(
-        { error: "Tu ne peux pas retirer ton propre acces admin." },
+        { error: "You can't remove your own admin access." },
         { status: 400 }
       );
     }
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     }
     if (!target.stripe_subscription_id) {
       return NextResponse.json(
-        { error: "Cet utilisateur n'a pas d'abonnement Stripe actif." },
+        { error: "This user has no active Stripe subscription." },
         { status: 400 }
       );
     }
@@ -158,24 +158,24 @@ export async function POST(req: NextRequest) {
     }
     if (!target.stripe_subscription_id) {
       return NextResponse.json(
-        { error: "Cet utilisateur n'a pas d'abonnement Stripe actif." },
+        { error: "This user has no active Stripe subscription." },
         { status: 400 }
       );
     }
     const newPlan = normalizePlan(value);
     const newPriceId = priceIdForPlan(newPlan);
     if (!newPriceId) {
-      return NextResponse.json({ error: "Plan inconnu ou price_id manquant: " + String(value) }, { status: 400 });
+      return NextResponse.json({ error: "Unknown plan or missing price_id: " + String(value) }, { status: 400 });
     }
     try {
       const stripe = new Stripe(stripeKey);
       const sub = await stripe.subscriptions.retrieve(target.stripe_subscription_id);
       const currentItem = sub.items.data[0];
       if (!currentItem) {
-        return NextResponse.json({ error: "Abonnement sans item, impossible de changer le plan." }, { status: 400 });
+        return NextResponse.json({ error: "Subscription has no item, cannot change the plan." }, { status: 400 });
       }
       if (currentItem.price.id === newPriceId) {
-        return NextResponse.json({ error: "L'utilisateur est deja sur ce plan." }, { status: 400 });
+        return NextResponse.json({ error: "The user is already on this plan." }, { status: 400 });
       }
       await stripe.subscriptions.update(target.stripe_subscription_id, {
         items: [{ id: currentItem.id, price: newPriceId }],
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
     if (action === "revokeComp") {
       if (target.stripe_subscription_id && stripe) {
         return NextResponse.json(
-          { error: "Cet utilisateur a un abonnement Stripe. Annule-le depuis les actions Stripe." },
+          { error: "This user has a Stripe subscription. Cancel it from the Stripe actions." },
           { status: 400 }
         );
       }
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (requested === "free") {
-      return NextResponse.json({ error: "Choisis un plan payant a offrir." }, { status: 400 });
+      return NextResponse.json({ error: "Pick a paid plan to gift." }, { status: 400 });
     }
 
     if (action === "giftMonth" && target.stripe_subscription_id && stripe) {
@@ -273,13 +273,13 @@ export async function POST(req: NextRequest) {
     if (action === "setPlan" && target.stripe_subscription_id && stripe) {
       const newPriceId = priceIdForPlan(requested);
       if (!newPriceId) {
-        return NextResponse.json({ error: "Price Stripe manquant pour ce plan." }, { status: 400 });
+        return NextResponse.json({ error: "Missing Stripe price for this plan." }, { status: 400 });
       }
       try {
         const sub = await stripe.subscriptions.retrieve(target.stripe_subscription_id);
         const currentItem = sub.items.data[0];
         if (!currentItem) {
-          return NextResponse.json({ error: "Abonnement sans item." }, { status: 400 });
+          return NextResponse.json({ error: "Subscription has no item." }, { status: 400 });
         }
         await stripe.subscriptions.update(target.stripe_subscription_id, {
           items: [{ id: currentItem.id, price: newPriceId }],

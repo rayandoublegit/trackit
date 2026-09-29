@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
   let users: OverviewData["users"] = { total: null, brands: null, creators: null, new7d: null, newPrev7d: null, signups: null };
   let paying: OverviewData["paying"] = { count: null, comped: null, mrrEstimate: null, byPlan: [] };
   if (profiles.error) {
-    warnings.push(`profiles : ${profiles.error}`);
+    warnings.push(`profiles: ${profiles.error}`);
   } else {
     const rows = profiles.rows;
     const signups = dailySeries(rows, (r) => r.created_at, 30, now);
@@ -98,18 +98,18 @@ export async function GET(req: NextRequest) {
       payingRows.push({ plan });
     }
     paying = { count, comped, mrrEstimate: mrr, byPlan: countBy(payingRows, (r) => r.plan) };
-    if (profiles.truncated) warnings.push("profiles : plus de 50 000 lignes, les totaux sont tronqués.");
+    if (profiles.truncated) warnings.push("profiles: more than 50,000 rows, totals are truncated.");
   }
 
   // Activity
   const active: OverviewData["active"] = sessions.error
     ? { d1: null, d7: null, d30: null }
     : { d1: activeUsers(sessions.rows, 1, now), d7: activeUsers(sessions.rows, 7, now), d30: activeUsers(sessions.rows, 30, now) };
-  if (sessions.error) warnings.push(`user_sessions : ${sessions.error}`);
+  if (sessions.error) warnings.push(`user_sessions: ${sessions.error}`);
 
   let salesBlock: OverviewData["sales"] = { count30d: null, revenue30d: null, revenuePrev30d: null, series: null };
   if (sales.error) {
-    warnings.push(`sales : ${sales.error}`);
+    warnings.push(`sales: ${sales.error}`);
   } else {
     const amount = (r: { order_amount: number | string | null }) => Number(r.order_amount) || 0;
     const sixty = dailySeries(sales.rows, (r) => r.created_at, 60, now, amount);
@@ -128,19 +128,19 @@ export async function GET(req: NextRequest) {
     ["gift_missions", missions],
   ] as const) {
     if (result.missing) {
-      attention.push({ kind: "schema", label: `Table ${name} absente`, count: 1, href: "/admin/system" });
+      attention.push({ kind: "schema", label: `${name} table missing`, count: 1, href: "/admin/system" });
     } else if (result.error) {
-      warnings.push(`${name} : ${result.error}`);
+      warnings.push(`${name}: ${result.error}`);
     }
   }
   if ((niches7d.count ?? 0) > 0) {
-    attention.push({ kind: "requests", label: "Niches demandées cette semaine", count: niches7d.count ?? 0, href: "/admin/requests" });
+    attention.push({ kind: "requests", label: "Niches requested this week", count: niches7d.count ?? 0, href: "/admin/requests" });
   }
   if ((lookups7d.count ?? 0) > 0) {
-    attention.push({ kind: "lookups", label: "Créateurs introuvables cette semaine", count: lookups7d.count ?? 0, href: "/admin/requests" });
+    attention.push({ kind: "lookups", label: "Creators not found this week", count: lookups7d.count ?? 0, href: "/admin/requests" });
   }
   if (warnings.length > 0) {
-    attention.push({ kind: "error", label: "Lectures en erreur", count: warnings.length, href: "/admin/system" });
+    attention.push({ kind: "error", label: "Failed reads", count: warnings.length, href: "/admin/system" });
   }
 
   const data: OverviewData = {

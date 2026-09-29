@@ -155,9 +155,9 @@ export default function AddCreatorPage() {
 
   return (
     <div className="ad-card" style={{ maxWidth: 640, width: "100%", padding: 24, color: "var(--ad-text)" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4, letterSpacing: "-0.03em" }}>Ajouter des créateurs</h1>
+      <h1 style={{ fontSize: 22, marginBottom: 4, letterSpacing: "-0.03em" }}>Add creators</h1>
       <p style={{ color: "var(--ad-muted)", fontSize: 13, marginBottom: 20 }}>
-        Curation à la main, avec votre session staff. Les fiches enregistrées disparaissent une fois en base. Enregistrées pendant cette session : {savedTotal}.
+        Manual curation with your staff session. Saved cards disappear once they are in the database. Saved this session: {savedTotal}.
       </p>
 
 
@@ -226,7 +226,7 @@ export default function AddCreatorPage() {
           <textarea style={{ ...field, minHeight: 48, resize: "vertical" }} value={r.bio} onChange={(e) => update(r.id, "bio", e.target.value)} placeholder="Bio text" />
 
           <label style={label}>Niches (comma-separated)</label>
-          <input style={field} value={r.niches} onChange={(e) => update(r.id, "niches", e.target.value)} placeholder="fitness, musculation" />
+          <input style={field} value={r.niches} onChange={(e) => update(r.id, "niches", e.target.value)} placeholder="fitness, gym" />
 
           <div style={{ display: "flex", gap: 8 }}>
             <div style={{ flex: 1 }}>

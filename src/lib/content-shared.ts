@@ -33,7 +33,7 @@ export const CONTENT_STATS_SELECT =
 export const CONTENT_LIST_SELECT =
   `id, title, notes, file_url, file_name, file_type, file_size, creator_row_id, creator_user_id, created_at, hook_id, ${CONTENT_STATS_SELECT}`;
 
-export function formatCompactStat(n: number | null | undefined, lang: "en" | "fr" = "fr"): string {
+export function formatCompactStat(n: number | null | undefined, lang: "en" | "fr" = "en"): string {
   if (n == null || !Number.isFinite(n)) return "0";
   const fmt = (value: number, suffix: string) => {
     const raw = value >= 100 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");

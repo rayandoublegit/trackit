@@ -175,7 +175,7 @@ function formatCampaignDate(value: unknown): string {
   if (!value) return "—";
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function parseCampaignDate(value: string | undefined): Date | null {
@@ -4503,7 +4503,7 @@ function PayoutsTab({
           const fromCampaign = creatorMap.get(creatorId) ?? payoutCreatorMap[creatorId];
           const dueRaw = p.paid_at || p.created_at;
           const dueDate = dueRaw
-            ? new Date(String(dueRaw)).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+            ? new Date(String(dueRaw)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
             : "—";
           nextRows.push({
             id: String(p.id),
@@ -4624,7 +4624,7 @@ function PayoutsTab({
             avatar_url: paidRow?.avatar_url,
             amount,
             status: "paid",
-            dueDate: new Date().toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+            dueDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             kind: "history",
           };
           return [historyRow, ...withoutPending];

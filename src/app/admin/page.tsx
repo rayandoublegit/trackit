@@ -14,8 +14,8 @@ export default function AdminOverviewPage() {
   return (
     <>
       <PageHead
-        title="Vue d’ensemble"
-        lead={data ? `Mis à jour le ${dateFr(data.generatedAt, true)}. Inscriptions, activité, argent et points à traiter.` : "Inscriptions, activité, argent et points à traiter."}
+        title="Overview"
+        lead={data ? `Updated ${dateFr(data.generatedAt, true)}. Signups, activity, money and things to handle.` : "Signups, activity, money and things to handle."}
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
@@ -23,37 +23,37 @@ export default function AdminOverviewPage() {
         <>
           <Warnings items={data.warnings} />
           <div className="ad-grid ad-grid--kpi">
-            <Kpi label="MRR estimé" value={data.paying.mrrEstimate} format={(n) => eur(n)} tone="accent" sub={<>{num(data.paying.count)} payants</>} />
-            <Kpi label="Utilisateurs" value={data.users.total} delay={60} sub={<>{num(data.users.brands)} marques · {num(data.users.creators)} créateurs</>} />
+            <Kpi label="Estimated MRR" value={data.paying.mrrEstimate} format={(n) => eur(n)} tone="accent" sub={<>{num(data.paying.count)} paying</>} />
+            <Kpi label="Users" value={data.users.total} delay={60} sub={<>{num(data.users.brands)} brands · {num(data.users.creators)} creators</>} />
             <Kpi
-              label="Inscrits (7 j)"
+              label="Signups (7d)"
               value={data.users.new7d}
               delay={120}
               trend={data.users.new7d !== null && data.users.newPrev7d !== null ? pctChange(data.users.new7d, data.users.newPrev7d) : null}
-              sub="vs 7 j précédents"
+              sub="vs previous 7d"
             />
-            <Kpi label="Actifs (7 j)" value={data.active.d7} delay={180} sub={<>{num(data.active.d1)} aujourd’hui · {num(data.active.d30)} sur 30 j</>} />
+            <Kpi label="Active (7d)" value={data.active.d7} delay={180} sub={<>{num(data.active.d1)} today · {num(data.active.d30)} over 30d</>} />
             <Kpi
-              label="CA suivi (30 j)"
+              label="Tracked revenue (30d)"
               value={data.sales.revenue30d}
               format={(n) => eur(n)}
               delay={240}
               tone="good"
               trend={data.sales.revenue30d !== null && data.sales.revenuePrev30d !== null ? pctChange(data.sales.revenue30d, data.sales.revenuePrev30d) : null}
-              sub={<>{num(data.sales.count30d)} ventes</>}
+              sub={<>{num(data.sales.count30d)} sales</>}
             />
-            <Kpi label="Campagnes actives" value={data.campaigns.active} delay={300} sub={<>{num(data.campaigns.total)} au total</>} />
-            <Kpi label="Catalogue créateurs" value={data.catalog.total} format={compact} delay={360} sub="profils indexés" />
-            <Kpi label="Missions gifting" value={data.gifting.missions} delay={420} sub="toutes étapes" />
+            <Kpi label="Active campaigns" value={data.campaigns.active} delay={300} sub={<>{num(data.campaigns.total)} total</>} />
+            <Kpi label="Creator catalog" value={data.catalog.total} format={compact} delay={360} sub="indexed profiles" />
+            <Kpi label="Gifting missions" value={data.gifting.missions} delay={420} sub="all stages" />
           </div>
 
           <div className="ad-grid ad-grid--wide">
-            <Card title="Chiffre d’affaires suivi, 30 jours" aside={<Link className="ad-btn" href="/admin/activity">Détail</Link>} delay={100}>
-              {data.sales.series ? <AreaChart series={data.sales.series} format={(n) => eur(n)} height={210} /> : <Empty>Ventes illisibles.</Empty>}
+            <Card title="Tracked revenue, last 30 days" aside={<Link className="ad-btn" href="/admin/activity">Details</Link>} delay={100}>
+              {data.sales.series ? <AreaChart series={data.sales.series} format={(n) => eur(n)} height={210} /> : <Empty>Sales could not be read.</Empty>}
             </Card>
-            <Card title="À traiter" delay={160}>
+            <Card title="Needs attention" delay={160}>
               {data.attention.length === 0 ? (
-                <Empty>Rien d’urgent. Tout est lu sans erreur.</Empty>
+                <Empty>Nothing urgent. Everything read without errors.</Empty>
               ) : (
                 <ul className="ad-attn">
                   {data.attention.map((a, i) => (
@@ -71,38 +71,38 @@ export default function AdminOverviewPage() {
           </div>
 
           <div className="ad-grid ad-grid--3">
-            <Card title="Inscriptions par jour" delay={200}>
-              {data.users.signups ? <Bars series={data.users.signups} format={(n) => `${num(n)} inscrits`} height={130} /> : <Empty>—</Empty>}
+            <Card title="Signups per day" delay={200}>
+              {data.users.signups ? <Bars series={data.users.signups} format={(n) => `${num(n)} signups`} height={130} /> : <Empty>—</Empty>}
             </Card>
-            <Card title="Abonnés par plan" aside={<Link className="ad-btn" href="/admin/revenue">Revenus</Link>} delay={240}>
+            <Card title="Subscribers by plan" aside={<Link className="ad-btn" href="/admin/revenue">Revenue</Link>} delay={240}>
               {data.paying.byPlan.length > 0 ? (
                 <Donut
                   parts={data.paying.byPlan.map((p) => ({ key: p.key, value: p.count }))}
                   labelOf={(k) => PLAN_LABEL[k] ?? k}
-                  center={{ value: num(data.paying.count), label: "payants" }}
+                  center={{ value: num(data.paying.count), label: "paying" }}
                 />
               ) : (
-                <Empty>Aucun abonné payant.</Empty>
+                <Empty>No paying subscribers.</Empty>
               )}
             </Card>
-            <Card title="Comptes offerts" delay={280}>
+            <Card title="Comped accounts" delay={280}>
               <div className="ad-facts">
                 <div className="ad-fact">
-                  <span>Accès offerts actifs</span>
+                  <span>Active comped access</span>
                   <strong>{num(data.paying.comped)}</strong>
                 </div>
                 <div className="ad-fact">
-                  <span>Part payante</span>
+                  <span>Paying share</span>
                   <strong>
                     {data.users.total && data.paying.count !== null ? pct((data.paying.count / data.users.total) * 100) : "—"}
                   </strong>
                 </div>
                 <div className="ad-fact">
-                  <span>Actifs aujourd’hui</span>
+                  <span>Active today</span>
                   <strong>{num(data.active.d1)}</strong>
                 </div>
                 <div className="ad-fact">
-                  <span>Actifs 30 j</span>
+                  <span>Active 30d</span>
                   <strong>{num(data.active.d30)}</strong>
                 </div>
               </div>

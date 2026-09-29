@@ -324,7 +324,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const text = clamp(body.text, 1000);
   const context = clamp(body.context, 2000);
-  const lang: "fr" | "en" = body.lang === "en" ? "en" : "fr";
+  const lang: "fr" | "en" = body.lang === "fr" ? "fr" : "en";
   const nowLocal = clamp(body.now, 16);
   const weekday = clamp(body.weekday, 20);
   const role: "brand" | "creator" = body.role === "creator" ? "creator" : "brand";

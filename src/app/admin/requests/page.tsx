@@ -6,7 +6,7 @@ import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, Warnings, a
 
 function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null; empty: string; prefix?: string }) {
   const [limit, setLimit] = useState(15);
-  if (rows === null) return <Empty>Table illisible.</Empty>;
+  if (rows === null) return <Empty>Table could not be read.</Empty>;
   if (rows.length === 0) return <Empty>{empty}</Empty>;
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
@@ -14,9 +14,9 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
       <table className="ad-table">
         <thead>
           <tr>
-            <th>Demande</th>
-            <th className="ad-num">Fois</th>
-            <th className="ad-num">Dernière</th>
+            <th>Request</th>
+            <th className="ad-num">Times</th>
+            <th className="ad-num">Last</th>
           </tr>
         </thead>
         <tbody>
@@ -28,7 +28,7 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
                     {prefix}
                     {r.label.replace(/^@/, "")}
                   </span>
-                  {r.count >= 5 ? <Pill tone="warn">forte demande</Pill> : null}
+                  {r.count >= 5 ? <Pill tone="warn">high demand</Pill> : null}
                 </div>
                 <div className="ad-barlist__track" style={{ marginTop: 6 }}>
                   <span style={{ ["--w" as string]: `${(r.count / max) * 100}%` }} />
@@ -43,7 +43,7 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
       {rows.length > limit ? (
         <div style={{ padding: 12, display: "flex", justifyContent: "center" }}>
           <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 30)}>
-            Voir plus ({num(rows.length - limit)})
+            Show more ({num(rows.length - limit)})
           </button>
         </div>
       ) : null}
@@ -58,8 +58,8 @@ export default function AdminRequestsPage() {
   return (
     <>
       <PageHead
-        title="Demandes"
-        lead="Ce que les clients cherchent sans le trouver, sur 6 mois. Les demandes fréquentes disent quoi ajouter au catalogue en priorité."
+        title="Requests"
+        lead="What customers searched for without finding it, over 6 months. Frequent requests show what to add to the catalog first."
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
@@ -67,32 +67,32 @@ export default function AdminRequestsPage() {
         <>
           <Warnings items={data.warnings} />
           <div className="ad-grid ad-grid--kpi">
-            <Kpi label="Niches demandées" value={total(data.niches)} tone="accent" sub={<>{num(data.niches?.length)} niches distinctes</>} />
-            <Kpi label="Créateurs introuvables" value={total(data.lookups)} delay={60} sub={<>{num(data.lookups?.length)} profils distincts</>} />
-            <Kpi label="Liste d’attente v2" value={data.waitlist?.length ?? null} delay={120} />
+            <Kpi label="Requested niches" value={total(data.niches)} tone="accent" sub={<>{num(data.niches?.length)} distinct niches</>} />
+            <Kpi label="Creators not found" value={total(data.lookups)} delay={60} sub={<>{num(data.lookups?.length)} distinct profiles</>} />
+            <Kpi label="v2 waitlist" value={data.waitlist?.length ?? null} delay={120} />
           </div>
           <div className="ad-grid ad-grid--2">
-            <Card title="Niches manquantes" className="ad-card--flush" delay={80}>
-              <GroupTable rows={data.niches} empty="Aucune niche demandée." />
+            <Card title="Missing niches" className="ad-card--flush" delay={80}>
+              <GroupTable rows={data.niches} empty="No niches requested." />
             </Card>
-            <Card title="Créateurs recherchés sans résultat" className="ad-card--flush" delay={120}>
-              <GroupTable rows={data.lookups} empty="Aucune recherche sans résultat." prefix="@" />
+            <Card title="Creator searches with no result" className="ad-card--flush" delay={120}>
+              <GroupTable rows={data.lookups} empty="No searches without results." prefix="@" />
             </Card>
           </div>
-          <Card title="Liste d’attente v2" className="ad-card--flush" delay={160}>
+          <Card title="v2 waitlist" className="ad-card--flush" delay={160}>
             {data.waitlist === null ? (
-              <Empty>Table illisible.</Empty>
+              <Empty>Table could not be read.</Empty>
             ) : data.waitlist.length === 0 ? (
-              <Empty>Personne sur la liste.</Empty>
+              <Empty>Nobody on the list yet.</Empty>
             ) : (
               <div className="ad-table-wrap">
                 <table className="ad-table">
                   <thead>
                     <tr>
-                      <th>Prénom</th>
+                      <th>First name</th>
                       <th>Email</th>
-                      <th>Attentes</th>
-                      <th className="ad-num">Inscrit</th>
+                      <th>Expectations</th>
+                      <th className="ad-num">Joined</th>
                     </tr>
                   </thead>
                   <tbody>

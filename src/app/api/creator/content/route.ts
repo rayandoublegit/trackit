@@ -190,7 +190,7 @@ export async function POST(request: Request) {
       .eq("creator_user_id", userId)
       .eq("creator_row_id", targetCreatorRowId);
     const nextNum = (count ?? 0) + 1;
-    title = `Contenu numéro ${nextNum}`;
+    title = `Content #${nextNum}`;
   }
 
   // File is optional — URL-only posts store the social link as the media ref.
@@ -215,8 +215,8 @@ export async function POST(request: Request) {
       {
         error:
           platform === "instagram"
-            ? "Impossible de récupérer les stats Instagram (ScrapeCreators). Vérifiez l’URL et réessayez."
-            : "Impossible de récupérer les stats TikTok (ScrapeCreators). Vérifiez l’URL et réessayez.",
+            ? "Couldn’t fetch Instagram stats (ScrapeCreators). Check the URL and try again."
+            : "Couldn’t fetch TikTok stats (ScrapeCreators). Check the URL and try again.",
         detail: (e as Error).message,
       },
       { status: 502 },
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
   const hasLikes = stats.likes != null && Number.isFinite(Number(stats.likes));
   if (!hasViews && !(platform === "instagram" && hasLikes)) {
     return NextResponse.json(
-      { error: "ScrapeCreators n’a pas renvoyé de vues pour cette URL." },
+      { error: "ScrapeCreators returned no views for this URL." },
       { status: 502 },
     );
   }

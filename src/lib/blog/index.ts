@@ -4,9 +4,19 @@ import type { BlogPost } from "./types";
 
 export type { BlogBlock, BlogPost } from "./types";
 
-export const BLOG_POSTS: BlogPost[] = [...POSTS_EN, ...POSTS_FR].sort(
+// The site is English only: French posts are no longer listed or rendered.
+// Their URLs redirect to the English version (see englishSlugFor).
+export const BLOG_POSTS: BlogPost[] = [...POSTS_EN].sort(
   (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
 );
+
+/** For a retired French slug: the English post it maps to, if any. */
+export function englishSlugFor(slug: string): string | null | undefined {
+  const fr = POSTS_FR.find((post) => post.slug === slug);
+  if (!fr) return undefined;
+  const alt = fr.alternateSlug && POSTS_EN.some((post) => post.slug === fr.alternateSlug) ? fr.alternateSlug : null;
+  return alt;
+}
 
 export function getBlogPost(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((post) => post.slug === slug);
@@ -14,10 +24,6 @@ export function getBlogPost(slug: string): BlogPost | undefined {
 
 export function getAllBlogSlugs(): string[] {
   return BLOG_POSTS.map((post) => post.slug);
-}
-
-export function getPostsByLocale(locale: "en" | "fr"): BlogPost[] {
-  return BLOG_POSTS.filter((post) => post.locale === locale);
 }
 
 export function getRelatedPosts(post: BlogPost, limit = 3): BlogPost[] {

@@ -196,7 +196,7 @@ export async function GET(request: Request) {
 
     return {
       id: row.id,
-      title: row.title || (row.post_url ? "Vidéo" : "Sans titre"),
+      title: row.title || (row.post_url ? "Video" : "Untitled"),
       brandName: brandName.get(row.brand_id) || "",
       campaignName:
         (linkedCampaignId && campaignNameById.get(linkedCampaignId)) || brandCamp?.name || null,

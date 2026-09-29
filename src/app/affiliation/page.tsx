@@ -644,7 +644,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.phone}
                       onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                      placeholder="+33 6 12 34 56 78"
+                      placeholder="+1 555 123 4567"
                       type="tel"
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />

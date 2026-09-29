@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 function missingTable(error: { message?: string } | null) {
   const msg = error?.message || "";
   if (msg.includes("communities") && (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("Could not find"))) {
-    return "Table communities absente — appliquez supabase/migrations/20260825_000036_communities.sql";
+    return "communities table missing — apply supabase/migrations/20260825_000036_communities.sql";
   }
   return msg || "Unknown error";
 }

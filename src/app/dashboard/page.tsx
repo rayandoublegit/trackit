@@ -3138,7 +3138,7 @@ function SendOutreachPanel({
               type="email"
               value={senderEmail}
               onChange={(e) => setSenderEmail(e.target.value)}
-              placeholder="vous@marque.com"
+              placeholder="you@brand.com"
               style={pageStyles.input}
               autoComplete="email"
             />
@@ -5102,7 +5102,7 @@ function AddAffiliatePanel({
             type="url"
             value={destinationUrl}
             onChange={(e) => { setDestinationUrl(e.target.value); setGenerated(null); }}
-            placeholder="https://votre-boutique.com"
+            placeholder="https://your-store.com"
             style={{ ...affiliateInputStyle, marginBottom: 20 }}
           />
 

@@ -410,7 +410,7 @@ export function CampaignLinksTab({
                 type="url"
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
-                placeholder="https://votre-boutique.com"
+                placeholder="https://your-store.com"
                 style={fieldInput}
               />
             </div>

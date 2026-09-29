@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
     ["creator_lookup_requests", lookups],
     ["v2_waitlist", waitlist],
   ] as const) {
-    if (r.missing) warnings.push(`${name} : table absente`);
-    else if (r.error) warnings.push(`${name} : ${r.error}`);
+    if (r.missing) warnings.push(`${name}: table missing`);
+    else if (r.error) warnings.push(`${name}: ${r.error}`);
   }
 
   const data: RequestsData = {

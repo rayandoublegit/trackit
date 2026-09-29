@@ -7,7 +7,6 @@ import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./Pay
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import {
-  applyAppLocale,
   clearUserSessionStorage,
   dispatchProfileUpdated,
   getAppTimezone,
@@ -596,18 +595,6 @@ function GeneralSettings({
           ? "Ce nom apparaît en haut du dashboard (comme un espace ClickUp)."
           : "This name appears at the top of the dashboard (like a ClickUp space)."}
       </p>
-      <Field label={lang === "fr" ? "Langue par défaut" : "Default language"}>
-        <SegmentedToggle
-          options={["EN", "FR"]}
-          value={lang === "fr" ? "FR" : "EN"}
-          onChange={(v) => {
-            const next = v === "FR" ? "fr" : "en";
-            if (next === lang) return;
-            applyAppLocale(next);
-            window.location.reload();
-          }}
-        />
-      </Field>
       <Field label={lang === "fr" ? "Fuseau horaire" : "Timezone"}>
         <select
           value={timezone}

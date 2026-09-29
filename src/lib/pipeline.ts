@@ -36,19 +36,19 @@ const STAGE_LABELS: Record<"en" | "fr", Record<PipelineStage, string>> = {
   },
 };
 
-export function pipelineStages(lang: "en" | "fr" = "fr"): StageDef[] {
+export function pipelineStages(lang: "en" | "fr" = "en"): StageDef[] {
   return STAGE_META.map((s) => ({ ...s, label: STAGE_LABELS[lang][s.key] }));
 }
 
 /** @deprecated Prefer pipelineStages(lang) in UI code. */
-export const PIPELINE_STAGES: StageDef[] = pipelineStages("fr");
+export const PIPELINE_STAGES: StageDef[] = pipelineStages("en");
 
 export const STAGE_KEYS: PipelineStage[] = STAGE_META.map((s) => s.key);
 
-const MAP_FR = new Map<string, StageDef>(pipelineStages("fr").map((s) => [s.key, s]));
+const MAP_EN = new Map<string, StageDef>(pipelineStages("en").map((s) => [s.key, s]));
 
-export function stageLabel(key: string, lang: "en" | "fr" = "fr"): string {
-  return STAGE_LABELS[lang][key as PipelineStage] ?? MAP_FR.get(key)?.label ?? key;
+export function stageLabel(key: string, lang: "en" | "fr" = "en"): string {
+  return STAGE_LABELS[lang][key as PipelineStage] ?? MAP_EN.get(key)?.label ?? key;
 }
 
 const META_MAP = new Map<string, Omit<StageDef, "label">>(STAGE_META.map((s) => [s.key, s]));

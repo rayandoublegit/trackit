@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { getAuthedUserId } from "@/lib/api-auth";
 import { buildFeedPage } from "@/lib/discovery-feed";
 
 export const dynamic = "force-dynamic";
@@ -118,6 +119,10 @@ function systemPrompt(lang: "fr" | "en", role: "brand" | "creator") {
 }
 
 export async function POST(request: Request) {
+  // Signed-in users only: every call spends AI credits.
+  const userId = await getAuthedUserId(request);
+  if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = (await request.json()) as {
       messages?: ChatMessage[];
@@ -125,7 +130,7 @@ export async function POST(request: Request) {
       role?: "brand" | "creator";
     };
     const messages = Array.isArray(body.messages) ? body.messages.slice(-16) : [];
-    const lang = body.lang === "en" ? "en" : "fr";
+    const lang = body.lang === "fr" ? "fr" : "en";
     const role = body.role === "creator" ? "creator" : "brand";
     const last = messages.filter((m) => m.role === "user").at(-1)?.content?.trim();
     if (!last) {

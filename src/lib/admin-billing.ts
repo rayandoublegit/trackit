@@ -26,14 +26,14 @@ export function billingOf(user: BillingProfile, now = Date.now()): { source: Bil
   return { source: "free", plan: "free", until: null };
 }
 
-export const PLAN_LABELS: Record<PlanTier, string> = { free: "Gratuit", basic: "Growth", pro: "Pro", scale: "Scale" };
+export const PLAN_LABELS: Record<PlanTier, string> = { free: "Free", basic: "Growth", pro: "Pro", scale: "Scale" };
 
 export const BILLING_LABELS: Record<BillingSource, string> = {
   stripe: "Stripe",
   whop: "Whop",
-  comped: "Offert (permanent)",
-  gifted: "Offert (temporaire)",
-  free: "Gratuit",
+  comped: "Comped (permanent)",
+  gifted: "Comped (temporary)",
+  free: "Free",
 };
 
 export function isPaying(source: BillingSource): boolean {

@@ -27,28 +27,28 @@ function Icon({ d }: { d: ReactNode }) {
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
-    section: "Pilotage",
+    section: "Overview",
     items: [
-      { href: "/admin", label: "Vue d’ensemble", icon: <Icon d={I.overview} />, exact: true },
-      { href: "/admin/revenue", label: "Revenus", icon: <Icon d={I.revenue} /> },
-      { href: "/admin/activity", label: "Activité", icon: <Icon d={I.activity} /> },
+      { href: "/admin", label: "Overview", icon: <Icon d={I.overview} />, exact: true },
+      { href: "/admin/revenue", label: "Revenue", icon: <Icon d={I.revenue} /> },
+      { href: "/admin/activity", label: "Activity", icon: <Icon d={I.activity} /> },
     ],
   },
   {
-    section: "Comptes",
-    items: [{ href: "/admin/users", label: "Utilisateurs", icon: <Icon d={I.users} /> }],
+    section: "Accounts",
+    items: [{ href: "/admin/users", label: "Users", icon: <Icon d={I.users} /> }],
   },
   {
-    section: "Produit",
+    section: "Product",
     items: [
-      { href: "/admin/catalog", label: "Catalogue créateurs", icon: <Icon d={I.catalog} /> },
-      { href: "/admin/add", label: "Ajouter un créateur", icon: <Icon d={I.add} /> },
-      { href: "/admin/requests", label: "Demandes", icon: <Icon d={I.requests} /> },
+      { href: "/admin/catalog", label: "Creator catalog", icon: <Icon d={I.catalog} /> },
+      { href: "/admin/add", label: "Add a creator", icon: <Icon d={I.add} /> },
+      { href: "/admin/requests", label: "Requests", icon: <Icon d={I.requests} /> },
     ],
   },
   {
-    section: "Technique",
-    items: [{ href: "/admin/system", label: "Système & audit", icon: <Icon d={I.system} /> }],
+    section: "Technical",
+    items: [{ href: "/admin/system", label: "System & audit", icon: <Icon d={I.system} /> }],
   },
 ];
 
@@ -79,7 +79,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (me === null) {
     return (
       <div className="ad-gate">
-        <span className="ad-gate__spinner" aria-label="Vérification de l’accès" />
+        <span className="ad-gate__spinner" aria-label="Checking access" />
       </div>
     );
   }
@@ -94,10 +94,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <path d="M8 11V7a4 4 0 118 0v4" />
             </svg>
           </span>
-          <h1>Console staff</h1>
-          <p>Cet espace est réservé à l’équipe Trackit. Connectez-vous avec un compte staff.</p>
+          <h1>Staff console</h1>
+          <p>This area is reserved for the Trackit team. Sign in with a staff account.</p>
           <Link className="ad-btn ad-btn--primary" href="/auth?redirectTo=/admin">
-            Se connecter
+            Sign in
           </Link>
         </div>
       </div>
@@ -114,7 +114,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <span className="ad-brand__mark">T</span>
           <span>
             <strong>Trackit</strong>
-            <small>Console staff</small>
+            <small>Staff console</small>
           </span>
         </Link>
         <nav aria-label="Admin">
@@ -133,18 +133,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="ad-side__foot">
           <Link href="/dashboard" className="ad-nav__link">
             <Icon d={<path d="M15 18l-6-6 6-6" />} />
-            <span>Retour au SaaS</span>
+            <span>Back to the app</span>
           </Link>
           <div className="ad-me">
             <span className="ad-me__dot" />
             <span>
               <strong>{me.email}</strong>
-              <small>{me.role === "user" ? "admin (liste)" : me.role}</small>
+              <small>{me.role === "user" ? "admin (list)" : me.role}</small>
             </span>
           </div>
         </div>
       </aside>
-      {menuOpen ? <button type="button" className="ad-backdrop" aria-label="Fermer le menu" onClick={() => setMenuOpen(false)} /> : null}
+      {menuOpen ? <button type="button" className="ad-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} /> : null}
       <div className="ad-main">
         <div className="ad-topbar">
           <button type="button" className="ad-burger" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
