@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NICHE_TREE } from "@/lib/niche-tree";
 import { PlatformLogo } from "@/components/PlatformLogo";
+import type { VideoFilters } from "./VideoLibrary";
 import "./catalog-bar.css";
 
 // Creators > Search, laid out like a market-research tool: title and search,
 // ready-made views (Weekly gems, Top scaling…), platform tabs, then every
 // filter in one card, and the sort.
 
-export type CatalogSortKey = "followers" | "engagement" | "views" | "reach" | "recent";
+export type CatalogSortKey = "followers" | "engagement" | "views" | "reach" | "recent" | "growth";
 export type CatalogMode = "creators" | "videos";
 
 export type CatalogFilters = {
@@ -80,15 +81,15 @@ export const CATALOG_PRESETS: CatalogPreset[] = [
   {
     id: "scaling",
     label: "Top scaling",
-    hint: "Videos reach more people than follow the account",
+    hint: "Fastest follower growth and views gained; reach decides until history builds up",
     icon: (
       <Svg>
         <path d="M22 7 13.5 15.5 8.5 10.5 2 17" />
         <path d="M16 7h6v6" />
       </Svg>
     ),
-    patch: { reach: "1" },
-    sort: "reach",
+    patch: {},
+    sort: "growth",
   },
   {
     id: "viral",
@@ -198,6 +199,7 @@ const ACTIVITY: Option[] = [
 ];
 const SORTS: { value: CatalogSortKey; label: string }[] = [
   { value: "followers", label: "Most followers" },
+  { value: "growth", label: "Fastest growing" },
   { value: "views", label: "Most average views" },
   { value: "engagement", label: "Best engagement" },
   { value: "reach", label: "Best reach" },
@@ -205,6 +207,44 @@ const SORTS: { value: CatalogSortKey; label: string }[] = [
 ];
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+type VideoPreset = { id: string; label: string; hint: string; patch: Partial<VideoFilters> };
+const VIDEO_PRESETS: VideoPreset[] = [
+  { id: "all", label: "All videos", hint: "Every tracked video", patch: { sort: "views" } },
+  { id: "trending", label: "Trending now", hint: "Most views gained over the last 7 days", patch: { sort: "gained" } },
+  { id: "viral-week", label: "Viral this week", hint: "Posted in the last 7 days, most viewed", patch: { postedWithin: "7", sort: "views" } },
+  { id: "newest", label: "Newest", hint: "Latest posts first", patch: { sort: "recent" } },
+  { id: "product", label: "With product link", hint: "Videos that link a product", patch: { hasProduct: true, sort: "views" } },
+  { id: "engaging", label: "Most engaging", hint: "Best likes, comments and shares per view", patch: { sort: "engagement", minViews: "10k" } },
+];
+const VIDEO_VIEWS: Option[] = [
+  { value: "10k", label: "10K+" },
+  { value: "100k", label: "100K+" },
+  { value: "500k", label: "500K+" },
+  { value: "1m", label: "1M+" },
+  { value: "10m", label: "10M+" },
+];
+const VIDEO_POSTED: Option[] = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+  { value: "365", label: "Last 12 months" },
+];
+const VIDEO_FORMAT: Option[] = [
+  { value: "video", label: "Video" },
+  { value: "photo", label: "Photo post" },
+];
+const VIDEO_LENGTH: Option[] = [
+  { value: "short", label: "Under 15s" },
+  { value: "medium", label: "15s – 60s" },
+  { value: "long", label: "Over 60s" },
+];
+const VIDEO_SORTS: Option[] = [
+  { value: "views", label: "Most viewed" },
+  { value: "gained", label: "Fastest growing this week" },
+  { value: "recent", label: "Newest" },
+  { value: "engagement", label: "Best engagement" },
+];
 
 const ICONS: Record<string, ReactNode> = {
   niche: (
@@ -254,6 +294,17 @@ const ICONS: Record<string, ReactNode> = {
     <Svg>
       <circle cx="12" cy="12" r="10" />
       <path d="M12 6v6l4 2" />
+    </Svg>
+  ),
+  format: (
+    <Svg>
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M10 8.5v7l5.5-3.5z" />
+    </Svg>
+  ),
+  length: (
+    <Svg>
+      <path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2" />
     </Svg>
   ),
 };
@@ -389,6 +440,11 @@ export function CatalogFilterBar({
   onLocked,
   onOpenLists,
   onOpenOutreach,
+  videoFilters,
+  videoPreset,
+  onVideoChange,
+  videoCount,
+  videoLoading,
 }: {
   filters: CatalogFilters;
   sort: CatalogSortKey;
@@ -406,6 +462,11 @@ export function CatalogFilterBar({
   onLocked: () => void;
   onOpenLists: () => void;
   onOpenOutreach: () => void;
+  videoFilters: VideoFilters;
+  videoPreset: string;
+  onVideoChange: (patch: Partial<VideoFilters>, preset?: string) => void;
+  videoCount: number;
+  videoLoading: boolean;
 }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -438,8 +499,10 @@ export function CatalogFilterBar({
         <div className="cf-top__title">
           <h1>Creators</h1>
           <span className="cf-count" aria-live="polite">
-            {loading ? <i className="cf-bar__dot" aria-hidden /> : null}
-            {loading ? "Searching" : count.toLocaleString("en-US")}
+            {(mode === "videos" ? videoLoading : loading) ? <i className="cf-bar__dot" aria-hidden /> : null}
+            {(mode === "videos" ? videoLoading : loading)
+              ? "Searching"
+              : `${(mode === "videos" ? videoCount : count).toLocaleString("en-US")} ${mode === "videos" ? "videos" : "creators"}`}
           </span>
         </div>
         <label className={`cf-search${searchLocked ? " is-locked" : ""}`}>
@@ -458,7 +521,13 @@ export function CatalogFilterBar({
               if (searchLocked) return onLocked();
               onChange({ search: e.target.value });
             }}
-            placeholder={instagram ? "Search Instagram live: a niche, a name or @handle" : "Search creators, @handles, emails…"}
+            placeholder={
+              mode === "videos"
+                ? "Search video captions, hashtags…"
+                : instagram
+                  ? "Search Instagram live: a niche, a name or @handle"
+                  : "Search creators, @handles, emails…"
+            }
             aria-label="Search creators"
           />
           {filters.search ? (
@@ -485,7 +554,24 @@ export function CatalogFilterBar({
 
       <div className="cf-presets-row">
         <div className="cf-presets" role="tablist" aria-label="Ready-made views">
-          {CATALOG_PRESETS.map((p) => {
+          {mode === "videos"
+            ? VIDEO_PRESETS.map((p) => {
+                const on = (videoPreset || "all") === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    title={p.hint}
+                    className={`cf-preset${on ? " is-on" : ""}`}
+                    onClick={() => onVideoChange(p.patch, p.id)}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })
+            : CATALOG_PRESETS.map((p) => {
             const on = (filters.preset || "all") === p.id && (p.id !== "all" || !filters.preset);
             return (
               <button
@@ -526,7 +612,10 @@ export function CatalogFilterBar({
           })}
         </div>
       </div>
-      {filters.preset && filters.preset !== "all" ? <p className="cf-preset-hint">{preset.hint}</p> : null}
+      {mode === "creators" && filters.preset && filters.preset !== "all" ? <p className="cf-preset-hint">{preset.hint}</p> : null}
+      {mode === "videos" && videoPreset && videoPreset !== "all" ? (
+        <p className="cf-preset-hint">{VIDEO_PRESETS.find((p) => p.id === videoPreset)?.hint}</p>
+      ) : null}
 
       <div className="cf-card">
         <div className="cf-card__head">
@@ -546,7 +635,7 @@ export function CatalogFilterBar({
               Videos
             </button>
           </div>
-          {activeCount > 0 ? (
+          {mode === "creators" && activeCount > 0 ? (
             <button type="button" className="cf-reset" onClick={onReset}>
               Reset filters ({activeCount})
             </button>
@@ -562,7 +651,28 @@ export function CatalogFilterBar({
             </svg>
           </button>
         </div>
-        {filtersOpen ? (
+        {filtersOpen && mode === "videos" ? (
+          <div className="cf-card__pills">
+            <FilterPill id="niche" label="Niche" value={videoFilters.niche} options={Object.keys(NICHE_TREE).map((n) => ({ value: n, label: cap(n) }))} onChange={(v) => onVideoChange({ niche: v })} />
+            <FilterPill id="views" label="Views" value={videoFilters.minViews} options={VIDEO_VIEWS} onChange={(v) => onVideoChange({ minViews: v })} />
+            <FilterPill id="activity" label="Posted" value={videoFilters.postedWithin} options={VIDEO_POSTED} onChange={(v) => onVideoChange({ postedWithin: v })} />
+            <FilterPill id="format" label="Format" value={videoFilters.mediaType} options={VIDEO_FORMAT} onChange={(v) => onVideoChange({ mediaType: v })} />
+            <FilterPill id="length" label="Length" value={videoFilters.duration} options={VIDEO_LENGTH} onChange={(v) => onVideoChange({ duration: v })} />
+            <FilterPill id="country" label="Creator country" value={videoFilters.country} options={COUNTRIES} onChange={(v) => onVideoChange({ country: v })} />
+            <FilterPill id="language" label="Language" value={videoFilters.language} options={LANGUAGES} onChange={(v) => onVideoChange({ language: v })} />
+            <Toggle
+              label="With product link"
+              on={videoFilters.hasProduct}
+              onClick={() => onVideoChange({ hasProduct: !videoFilters.hasProduct })}
+              icon={
+                <Svg size={11}>
+                  <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />
+                </Svg>
+              }
+            />
+          </div>
+        ) : null}
+        {filtersOpen && mode === "creators" ? (
           <div className="cf-card__pills">
             <FilterPill id="niche" label="Niche" value={filters.niche} options={Object.keys(NICHE_TREE).map((n) => ({ value: n, label: cap(n) }))} onChange={(v) => change({ niche: v })} />
             <FilterPill id="followers" label="Followers" value={filters.followersRange} options={FOLLOWERS} onChange={(v) => change({ followersRange: v })} />
@@ -623,13 +733,23 @@ export function CatalogFilterBar({
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
             <path d="M12 5v14M5 12l7 7 7-7" />
           </svg>
-          <select value={sort} onChange={(e) => onSort(e.target.value as CatalogSortKey)} aria-label="Sort creators">
-            {SORTS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          {mode === "videos" ? (
+            <select value={videoFilters.sort} onChange={(e) => onVideoChange({ sort: e.target.value })} aria-label="Sort videos">
+              {VIDEO_SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select value={sort} onChange={(e) => onSort(e.target.value as CatalogSortKey)} aria-label="Sort creators">
+              {SORTS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          )}
         </label>
         {notice ? <p className="cf-notice">{notice}</p> : null}
         {instagram && !filters.search.trim() && !filters.niche ? (

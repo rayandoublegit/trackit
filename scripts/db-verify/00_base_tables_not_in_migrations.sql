@@ -42,3 +42,5 @@ create table if not exists public.creators_index (
 );
 create table if not exists public.scripts (id uuid primary key default gen_random_uuid(), brand_id uuid, created_at timestamptz default now());
 create table if not exists public.shopify_stores (id uuid primary key default gen_random_uuid(), user_id uuid, created_at timestamptz default now());
+create table if not exists public.affiliate_applications (id uuid primary key default gen_random_uuid(), created_at timestamptz default now());
+alter table public.affiliate_applications enable row level security;

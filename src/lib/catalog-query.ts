@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 import {
   catalogRowToFeedCreator,
+  CREATOR_GROWTH_COLUMNS,
   CREATOR_LIST_COLUMNS,
   creatorMatchesGeoFilter,
   creatorMatchesNicheFilter,
@@ -19,7 +20,7 @@ import { imgProxyUrl } from "@/lib/client-image-url";
 // catalog does not hold yet (Instagram today).
 
 export type CatalogPlatform = "TikTok" | "Instagram" | "YouTube";
-export type CatalogSort = "followers" | "engagement" | "views" | "reach" | "recent";
+export type CatalogSort = "followers" | "engagement" | "views" | "reach" | "recent" | "growth";
 
 export type CatalogQuery = {
   search?: string;
@@ -37,6 +38,8 @@ export type CatalogQuery = {
   /** Average views as a share of followers (1 = videos reach as many people as follow). */
   minReach?: number;
   minLikes?: number;
+  /** Follower growth over 30 days, in percent (needs tracked history). */
+  minGrowthPct30d?: number;
   platform?: CatalogPlatform;
   sort?: CatalogSort;
   offset?: number;
@@ -51,7 +54,13 @@ const SORT_COLUMN: Record<CatalogSort, string> = {
   views: "avg_views",
   reach: "views_per_follower",
   recent: "last_post_at",
+  growth: "growth_score",
 };
+
+// The growth columns exist once the creator-intelligence migration is applied.
+// Until then (or if it's ever rolled back) the catalog quietly uses the base set.
+let growthColumns: boolean | null = null;
+const isMissingColumn = (message: string) => /column .* does not exist|could not find the .* column/i.test(message);
 
 export function parsePlatform(raw: string | null | undefined): CatalogPlatform | undefined {
   const v = (raw || "").trim().toLowerCase();
@@ -86,14 +95,27 @@ export function catalogQueryFromParams(p: URLSearchParams): CatalogQuery {
     verified: p.get("verified") === "1" || p.get("verified") === "true",
     minReach: Number(p.get("minReach")) > 0 ? Number(p.get("minReach")) : undefined,
     minLikes: nonNegInt(p.get("minLikes")),
+    minGrowthPct30d: Number(p.get("minGrowth")) > 0 ? Number(p.get("minGrowth")) : undefined,
     platform: parsePlatform(p.get("platform")),
-    sort: sort === "engagement" || sort === "views" || sort === "reach" || sort === "recent" ? sort : "followers",
+    sort: sort === "engagement" || sort === "views" || sort === "reach" || sort === "recent" || sort === "growth" ? sort : "followers",
     offset: Math.max(0, Number(p.get("offset")) || 0),
     limit: Number(p.get("limit")) || undefined,
   };
 }
 
 export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
+  if (growthColumns !== false) {
+    const withGrowth = await runCatalogQuery(q, true);
+    if (!withGrowth.error || !isMissingColumn(withGrowth.error)) {
+      growthColumns = true;
+      return withGrowth;
+    }
+    growthColumns = false;
+  }
+  return runCatalogQuery(q, false);
+}
+
+async function runCatalogQuery(q: CatalogQuery, withGrowth: boolean): Promise<CatalogResult> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { creators: [], hasMore: false, error: "no db" };
@@ -103,7 +125,10 @@ export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
   const maxLimit = q.search || q.niche ? 50 : 100;
   const defaultLimit = q.search ? 30 : q.niche ? 25 : 48;
   const limit = Math.min(maxLimit, Math.max(1, q.limit || defaultLimit));
-  const sortColumn = SORT_COLUMN[q.sort ?? "followers"];
+  const COLUMNS = withGrowth ? `${CREATOR_LIST_COLUMNS},${CREATOR_GROWTH_COLUMNS}` : CREATOR_LIST_COLUMNS;
+  // Without tracked history, "growth" falls back to reach (views vs followers).
+  const sortKey = q.sort === "growth" && !withGrowth ? "reach" : q.sort ?? "followers";
+  const sortColumn = SORT_COLUMN[sortKey];
   const followerBounds = { min: q.minFollowers, max: q.maxFollowers };
 
   const applyFilters = (query: any) => {
@@ -119,6 +144,7 @@ export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
     if (q.verified) out = out.gte("authenticity_score", 60);
     if (q.minReach) out = out.gte("views_per_follower", q.minReach);
     if (q.minLikes) out = out.gte("avg_likes", q.minLikes);
+    if (q.minGrowthPct30d && withGrowth) out = out.gte("followers_growth_pct_30d", q.minGrowthPct30d);
     if (q.activeWithinDays) {
       const since = new Date(Date.now() - q.activeWithinDays * 86_400_000).toISOString();
       out = out.gte("last_post_at", since);
@@ -138,7 +164,7 @@ export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
       const pattern = `%${q.search}%`;
       let sq = admin
         .from("creators_index")
-        .select(CREATOR_LIST_COLUMNS)
+        .select(COLUMNS)
         .or(`username.ilike.${pattern},display_name.ilike.${pattern},email.ilike.${pattern}`)
         .order(sortColumn, { ascending: false, nullsFirst: false })
         .range(offset, offset + limit);
@@ -153,17 +179,19 @@ export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
     const fetchTo = q.niche ? offset + limit * 3 : offset + limit;
     let mq = admin
       .from("creators_index")
-      .select(CREATOR_LIST_COLUMNS)
+      .select(COLUMNS)
       .order(sortColumn, { ascending: false, nullsFirst: false })
       .range(offset, fetchTo);
     mq = applyFilters(mq);
+    // Creators without history yet rank after the tracked ones, by reach.
+    if (sortKey === "growth") mq = mq.order("views_per_follower", { ascending: false, nullsFirst: false });
 
     // Curated picks lead the first page, still inside the filters.
     let curated: Record<string, unknown>[] = [];
     if (offset === 0) {
       let cq = admin
         .from("creators_index")
-        .select(CREATOR_LIST_COLUMNS)
+        .select(COLUMNS)
         .eq("is_curated", true)
         .order(sortColumn, { ascending: false, nullsFirst: false })
         .limit(20);

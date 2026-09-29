@@ -31,7 +31,73 @@ export interface FeedCreator extends DiscoveryCreatorResult {
   topVideos?: FeedVideo[];
   /** Hand-picked creator — pinned first in feed results. */
   isCurated?: boolean;
+  /** Tracked history (creator intelligence tables); absent until the scraper has run. */
+  growth?: CreatorGrowth;
 }
+
+export type CreatorGrowth = {
+  followersGrowth7d: number | null;
+  followersGrowthPct7d: number | null;
+  followersGrowth30d: number | null;
+  followersGrowthPct30d: number | null;
+  views30d: number | null;
+  posts30d: number | null;
+  avgViews30d: number | null;
+  viewsGained7d: number | null;
+  growthScore: number | null;
+  historyDays: number;
+  following: number | null;
+  totalLikes: number | null;
+  videoCount: number | null;
+  bioLink: string | null;
+  firstSeenAt: string | null;
+  lastScrapedAt: string | null;
+};
+
+const numOrNull = (v: unknown): number | null => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+
+function rowGrowth(c: Record<string, unknown>): CreatorGrowth | undefined {
+  if (!("history_days" in c)) return undefined;
+  return {
+    followersGrowth7d: numOrNull(c.followers_growth_7d),
+    followersGrowthPct7d: numOrNull(c.followers_growth_pct_7d),
+    followersGrowth30d: numOrNull(c.followers_growth_30d),
+    followersGrowthPct30d: numOrNull(c.followers_growth_pct_30d),
+    views30d: numOrNull(c.views_30d),
+    posts30d: numOrNull(c.posts_30d),
+    avgViews30d: numOrNull(c.avg_views_30d),
+    viewsGained7d: numOrNull(c.views_gained_7d),
+    growthScore: numOrNull(c.growth_score),
+    historyDays: Number(c.history_days ?? 0),
+    following: numOrNull(c.following),
+    totalLikes: numOrNull(c.total_likes),
+    videoCount: numOrNull(c.video_count),
+    bioLink: (c.bio_link as string) ?? null,
+    firstSeenAt: (c.first_seen_at as string) ?? null,
+    lastScrapedAt: (c.last_scraped_at as string) ?? null,
+  };
+}
+
+/** Columns added by the creator-intelligence migration (history, growth, identity). */
+export const CREATOR_GROWTH_COLUMNS = [
+  "following",
+  "total_likes",
+  "video_count",
+  "is_verified",
+  "bio_link",
+  "first_seen_at",
+  "last_scraped_at",
+  "followers_growth_7d",
+  "followers_growth_pct_7d",
+  "followers_growth_30d",
+  "followers_growth_pct_30d",
+  "views_30d",
+  "posts_30d",
+  "avg_views_30d",
+  "views_gained_7d",
+  "growth_score",
+  "history_days",
+].join(",");
 
 export function isCuratedFeedCreator(c: Pick<FeedCreator, "isCurated" | "niches">): boolean {
   if (c.isCurated) return true;
@@ -387,6 +453,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
     valueTier: valueTier(base.followersCount),
     topVideos,
     isCurated: readIsCurated(c),
+    growth: rowGrowth(c),
   };
 }
 

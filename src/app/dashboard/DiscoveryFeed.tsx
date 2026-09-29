@@ -22,7 +22,8 @@ import {
   creatorMatchesFollowerRange,
   followerRangeBounds,
 } from "@/lib/discovery-follower-ranges";
-import { CreatorDetailDrawer } from "@/app/dashboard/CreatorDetailDrawer";
+import { CreatorProfilePage } from "@/app/dashboard/CreatorProfilePage";
+import { EMPTY_VIDEO_FILTERS, VideoLibrary, type VideoFilters } from "@/app/dashboard/VideoLibrary";
 import { CreatorAvatar } from "@/app/dashboard/CreatorAvatar";
 import { listSaved, listFolders, type FolderRow, type FolderItem } from "@/lib/workspace-client";
 import { SaveCreatorDropdown } from "@/app/dashboard/SaveCreatorDropdown";
@@ -497,7 +498,15 @@ function FeedListRow({
         {c.email ? <span className="cf-tag is-mail">Email</span> : null}
       </div>
       <div className="cf-stat">
-        <b>{fmt(c.followersCount)}</b>
+        <b>
+          {fmt(c.followersCount)}
+          {c.growth?.followersGrowthPct30d != null ? (
+            <span className={`cf-growth${c.growth.followersGrowthPct30d >= 0 ? " is-up" : " is-down"}`} title="Follower growth over 30 days">
+              {c.growth.followersGrowthPct30d >= 0 ? "+" : ""}
+              {c.growth.followersGrowthPct30d.toFixed(1)}%
+            </span>
+          ) : null}
+        </b>
         <small className={c.engagementRate >= 6 ? "is-hot" : ""}>{c.engagementRate ? `${c.engagementRate.toFixed(1)}% engagement` : "followers"}</small>
       </div>
       <div className="cf-stat is-views">
@@ -529,54 +538,6 @@ function FeedListRow({
           {t.view}
         </button>
       </div>
-    </div>
-  );
-}
-
-/** "Filter by: Videos": the analyzed videos of the listed creators, most viewed first. */
-function VideoGrid({ creators, onOpen }: { creators: FeedCreator[]; onOpen: (c: FeedCreator) => void }) {
-  const videos = useMemo(() => {
-    const out: (RowVideo & { creator: FeedCreator })[] = [];
-    for (const c of creators) for (const v of rowVideos(c)) out.push({ ...v, creator: c });
-    return out.sort((a, b) => b.views - a.views).slice(0, 120);
-  }, [creators]);
-  if (!videos.length) return null;
-  return (
-    <div className="cf-vgrid">
-      {videos.map((v, i) => (
-        <a
-          key={`${v.creator.username}-${v.cover}-${i}`}
-          className="cf-vcard"
-          style={{ ["--i" as string]: i }}
-          href={v.url || undefined}
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => {
-            if (!v.url) {
-              e.preventDefault();
-              onOpen(v.creator);
-            }
-          }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="cf-vcard__cover" src={v.cover} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
-          <span className="cf-vcard__shade" aria-hidden />
-          <span className="cf-vcard__views">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
-            {fmt(v.views)}
-          </span>
-          <span className="cf-vcard__play" aria-hidden>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
-          </span>
-          <span className="cf-vcard__who">
-            <CreatorAvatar username={v.creator.username} src={v.creator.avatarUrl} displayName={v.creator.displayName} size={28} />
-            <span>
-              <strong>{v.creator.displayName || v.creator.username}</strong>
-              <small>{fmt(v.creator.followersCount)} followers</small>
-            </span>
-          </span>
-        </a>
-      ))}
     </div>
   );
 }
@@ -742,6 +703,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
     setSelected(creator);
     navigate({ view: "discovery", creator: creator.username });
   };
+  // The creator page follows navigation, so Back (in-app or browser) closes it.
+  const profileHandle = navState.view === "discovery" && navState.creator ? navState.creator.replace(/^@/, "") : null;
 
   useEffect(() => {
     const refreshHidden = () => setHiddenUsernames(loadHiddenCreators());
@@ -762,6 +725,24 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   }, [navState.view, navState.creator, creators]);
   const [sort, setSort] = useState<CatalogSortKey>("followers");
   const [mode, setMode] = useState<CatalogMode>("creators");
+  const [videoFilters, setVideoFilters] = useState<VideoFilters>(EMPTY_VIDEO_FILTERS);
+  const [videoPreset, setVideoPreset] = useState("all");
+  const [videoCount, setVideoCount] = useState(0);
+  const [videoLoading, setVideoLoading] = useState(true);
+  const onVideoCount = useCallback((n: number, isLoading: boolean) => {
+    setVideoCount(n);
+    setVideoLoading(isLoading);
+  }, []);
+  const onVideoChange = (patch: Partial<VideoFilters>, preset?: string) => {
+    if (preset) {
+      setVideoFilters({ ...EMPTY_VIDEO_FILTERS, ...patch });
+      setVideoPreset(preset);
+      return;
+    }
+    setVideoFilters((prev) => ({ ...prev, ...patch }));
+    setVideoPreset("");
+  };
+  const openCreatorByHandle = (username: string) => navigate({ view: "discovery", creator: username });
   const applyPreset = (p: CatalogPreset) => {
     setFilters((prev) => ({ ...EMPTY_FILTERS, platform: prev.platform, search: prev.search, preset: p.id === "all" ? "" : p.id, ...p.patch }));
     setSort(p.sort);
@@ -1192,6 +1173,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       <div
         ref={mainRef}
         style={{
+          display: profileHandle ? "none" : undefined,
           flex: isMobile ? "0 0 auto" : 1,
           minWidth: 0,
           minHeight: isMobile ? undefined : 0,
@@ -1220,10 +1202,15 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           onLocked={() => setFilterPaywall(true)}
           onOpenLists={() => navigate({ view: "my-creators" })}
           onOpenOutreach={() => navigate({ view: "outreach" })}
+          videoFilters={videoFilters}
+          videoPreset={videoPreset}
+          onVideoChange={onVideoChange}
+          videoCount={videoCount}
+          videoLoading={videoLoading}
         />
         <div style={{ padding: isMobile ? "12px 16px 32px 52px" : "14px 28px 40px" }}>
 
-          {error && (
+          {mode === "creators" && error && (
             <div className="gv-alert" role="alert" style={{ marginBottom: 12 }}>
               <div>
                 <strong>{t.catalogDownTitle}</strong>
@@ -1234,7 +1221,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               </button>
             </div>
           )}
-          {loading && !discoveryGateActive && items.length === 0 && !error ? (
+          {mode === "creators" && loading && !discoveryGateActive && items.length === 0 && !error ? (
             <div className="df-skeleton" aria-hidden>
               {Array.from({ length: 6 }, (_, i) => (
                 <div key={i} className="df-skeleton__row" style={{ animationDelay: `${i * 0.08}s` }}>
@@ -1249,7 +1236,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               ))}
             </div>
           ) : null}
-          {!loading && !error && isCreatorSearchMiss && (
+          {mode === "creators" && !loading && !error && isCreatorSearchMiss && (
             <div
               style={{
                 background: "var(--ws-surface)",
@@ -1289,7 +1276,7 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
               </p>
             </div>
           )}
-          {!loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && (
+          {mode === "creators" && !loading && !error && filtered.length === 0 && !discoveryGateActive && !isCreatorSearchMiss && (
             <div className="sp-empty">
               <div className="df-empty__orbit" aria-hidden>
                 <span /><span /><span />
@@ -1304,7 +1291,15 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
             </div>
           )}
 
-          {mode === "videos" && items.length > 0 ? <VideoGrid creators={items} onOpen={openCreator} /> : null}
+          {mode === "videos" ? (
+            <VideoLibrary
+              filters={videoFilters}
+              search={filters.search}
+              platform={filters.platform}
+              onCount={onVideoCount}
+              onOpenCreator={openCreatorByHandle}
+            />
+          ) : null}
           <div
             className="cf-results"
             style={{
@@ -1370,6 +1365,33 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
         </div>
       </div>
 
+      {profileHandle ? (
+        <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          <CreatorProfilePage
+            key={profileHandle}
+            username={profileHandle}
+            preview={selected && selected.username.toLowerCase() === profileHandle.toLowerCase() ? selected : null}
+            onBack={goBack}
+            onOpenCreator={openCreator}
+            onReachOut={onReachOut}
+            saveSlot={(c) => (
+              <SaveCreatorDropdown
+                lang={lang}
+                creator={c}
+                saved={savedUsernames.has(c.username)}
+                inFolders={folderIdsFor(c.username)}
+                folders={folders}
+                isPaid={isPaid}
+                onUpgrade={onUpgrade}
+                onWorkspaceChange={() => void refreshWorkspace()}
+                onSavedOptimistic={onSavedOptimistic}
+                onFoldersOptimistic={onFoldersOptimistic}
+              />
+            )}
+          />
+        </div>
+      ) : null}
+
       {filterPaywall && (
         <UpgradeModal
           lang={lang}
@@ -1388,17 +1410,6 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           onClose={() => setGatePaywall(false)}
         />
       )}
-
-      <CreatorDetailDrawer
-        creator={selected}
-        plan={plan}
-        lang={lang}
-        userId={workspaceUserId}
-        onClose={goBack}
-        onUpgrade={onUpgrade}
-        onWorkspaceChange={() => void refreshWorkspace()}
-        onHiddenChange={() => setHiddenUsernames(loadHiddenCreators())}
-      />
     </div>
   );
 }

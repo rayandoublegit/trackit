@@ -8,6 +8,9 @@
     },
     "src/app/api/cron/enrich-creators/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/scrape/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -22,10 +25,6 @@
     {
       "path": "/api/cron/seed-niches",
       "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/enrich-creators",
-      "schedule": "0 4 * * *"
     }
   ]
 }

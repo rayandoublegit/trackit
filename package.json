@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:db": "tsx scripts/db-verify/gifting-e2e.mts",
+    "test:db": "tsx scripts/db-verify/gifting-e2e.mts && tsx scripts/db-verify/creator-intel.mts",
     "test:watch": "vitest",
     "check:stripe": "tsx scripts/check-stripe-prices.ts",
     "db:creator-content": "tsx scripts/apply-creator-content-migration.ts",

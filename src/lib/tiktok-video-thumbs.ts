@@ -24,7 +24,7 @@ function extensionForContentType(contentType: string): string {
   return "jpg";
 }
 
-async function storeVideoCoverBuffer(
+export async function storeVideoCoverBuffer(
   admin: SupabaseClient,
   buf: Buffer,
   contentType: string,

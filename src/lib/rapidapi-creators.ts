@@ -264,6 +264,17 @@ export function rapidApiTikTokAvailable(): boolean {
   return Boolean(process.env.RAPIDAPI_KEY) && process.env.RAPIDAPI_HOST === TIKTOK_HOST && allowed(TIKTOK_HOST);
 }
 
+/** Raw call to the RapidAPI TikTok scraper (tiktok-scraper7). Null when not configured or on error. */
+export async function rapidApiTikTokRaw(
+  path: "/user/info" | "/user/posts" | "/user/search",
+  params: Record<string, string>,
+): Promise<unknown> {
+  if (!rapidApiTikTokAvailable()) return null;
+  const url = new URL(`https://${TIKTOK_HOST}${path}`);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+  return rapidGet(url, TIKTOK_HOST);
+}
+
 /** A creator's latest TikTok videos (cover, views, link, date) through RapidAPI. */
 export async function fetchRapidApiTikTokVideos(username: string, count = 12): Promise<RichVideo[]> {
   if (!rapidApiTikTokAvailable()) return [];
