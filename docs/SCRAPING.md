@@ -57,7 +57,7 @@ the queue, the snapshots, the rollup math and that browsers can't read any of it
 
 ## Running it
 
-1. Apply the migration once (Supabase SQL editor or `supabase db push`).
+1. Apply the migration once (Supabase SQL editor or `supabase db push`). Done in production on 2026-09-30.
 2. Call the cron with the secret:
 
    ```
