@@ -63,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ))}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{localStorage.setItem("trackit_lang","en");document.documentElement.lang="en"}catch(e){}})();`,
+            __html: `(function(){try{var p=location.pathname,fr=p==="/fr"||p.indexOf("/fr/")===0,b=fr?p.slice(3):p,app=["/dashboard","/onboarding","/settings","/admin","/invite","/auth/callback","/auth/confirm","/auth/reset","/l/"].some(function(x){return b===x||b.indexOf(x.slice(-1)==="/"?x:x+"/")===0}),l=fr?"fr":app&&localStorage.getItem("trackit_lang")==="fr"?"fr":"en";localStorage.setItem("trackit_lang",l);document.documentElement.lang=l}catch(e){}})();`,
           }}
         />
       </head>

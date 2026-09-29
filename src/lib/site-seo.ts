@@ -38,11 +38,13 @@ export function buildOpenGraph(opts: {
   type?: "website" | "article";
   publishedTime?: string;
   modifiedTime?: string;
+  lang?: "en" | "fr";
 }): Metadata["openGraph"] {
+  const fr = opts.lang === "fr";
   return {
     type: opts.type ?? "website",
-    locale: "en_US",
-    alternateLocale: ["fr_FR"],
+    locale: fr ? "fr_FR" : "en_US",
+    alternateLocale: [fr ? "en_US" : "fr_FR"],
     url: absoluteUrl(opts.path ?? "/"),
     siteName: SITE_NAME,
     title: opts.title,
@@ -52,7 +54,7 @@ export function buildOpenGraph(opts: {
         url: absoluteUrl("/images/dash.png"),
         width: 1200,
         height: 630,
-        alt: "Trackit — creator affiliate dashboard",
+        alt: fr ? "Trackit — tableau de bord d'affiliation créateurs" : "Trackit — creator affiliate dashboard",
       },
     ],
     ...(opts.publishedTime ? { publishedTime: opts.publishedTime } : {}),
@@ -80,8 +82,15 @@ export function buildPageMetadata(opts: {
   type?: "website" | "article";
   publishedTime?: string;
   modifiedTime?: string;
+  /** Language of this page; defaults to English. */
+  lang?: "en" | "fr";
+  /** The same page in each language, when the paths are not simply /x and /fr/x. */
+  languages?: { en: string; fr: string };
 }): Metadata {
   const canonical = absoluteUrl(opts.path ?? "/");
+  const path = opts.path ?? "/";
+  const enPath = opts.languages?.en ?? (path === "/fr" ? "/" : path.startsWith("/fr/") ? path.slice(3) : path);
+  const frPath = opts.languages?.fr ?? (enPath === "/" ? "/fr" : `/fr${enPath}`);
   const title = opts.title.includes("Trackit") ? opts.title : `${opts.title} | Trackit`;
 
   return {
@@ -92,7 +101,10 @@ export function buildPageMetadata(opts: {
     creator: SITE_NAME,
     publisher: SITE_NAME,
     metadataBase: new URL(SITE_URL),
-    alternates: { canonical },
+    alternates: {
+      canonical,
+      languages: { en: absoluteUrl(enPath), fr: absoluteUrl(frPath), "x-default": absoluteUrl(enPath) },
+    },
     robots: opts.noIndex
       ? { index: false, follow: false }
       : {
@@ -107,6 +119,7 @@ export function buildPageMetadata(opts: {
       type: opts.type,
       publishedTime: opts.publishedTime,
       modifiedTime: opts.modifiedTime,
+      lang: opts.lang,
     }),
     twitter: buildTwitterCard(title, opts.description),
   };

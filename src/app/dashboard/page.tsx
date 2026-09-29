@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CreatorApp } from "./creator/CreatorApp";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSavedCreators, saveOutreach } from "@/lib/db";
@@ -969,6 +970,19 @@ function DashboardPageContent() {
     clearUserSessionStorage();
     router.replace("/auth");
   };
+
+  // Creators get their own simple, mobile-first app.
+  if (isCreator) {
+    return (
+      <CreatorApp
+        userId={user?.id}
+        name={profile?.full_name || ""}
+        username={profile?.username || ""}
+        avatarUrl={profile?.avatar_url ?? null}
+        onSignOut={() => void handleWorkspaceSignOut()}
+      />
+    );
+  }
 
   return (
     <DashboardNavigationProvider value={navigation}>

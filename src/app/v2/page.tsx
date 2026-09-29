@@ -323,7 +323,7 @@ export default function V2Page() {
           expectations: formData.note,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!data.ok) {
         console.error("waitlist error:", data.error);
         return;

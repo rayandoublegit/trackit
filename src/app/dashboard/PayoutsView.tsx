@@ -2494,7 +2494,7 @@ export function PayoutsView({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId, creatorId, amount, method }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (data.ok) {
       notifyCreatorPaid(lang, name, amount, userId);
       setCreators((list) =>
@@ -2625,7 +2625,7 @@ export function PayoutsView({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ userId, creatorId: activeCreator.id, amount }),
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (data.success) {
             notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
             const r = await fetch(`/api/creators-list?userId=${userId}`);
@@ -2651,7 +2651,7 @@ export function PayoutsView({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ creatorId: activeCreator.id, email: activeCreator.email }),
           });
-          const data = await res.json();
+          const data = await res.json().catch(() => ({}));
           if (data.url) window.open(data.url, "_blank");
           else alert(data.error || "Could not start bank connection");
         } catch {
@@ -3657,7 +3657,7 @@ export function BalanceView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, email }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.url) window.location.href = data.url;
       else {
         alert(data.error || (lang === "fr" ? "Impossible de démarrer Stripe" : "Could not start Stripe onboarding"));

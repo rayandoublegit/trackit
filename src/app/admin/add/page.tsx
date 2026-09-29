@@ -55,7 +55,7 @@ export default function AddCreatorPage() {
       const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(h)}`, {
         method: "DELETE",
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!data.ok) { setLoadMsg(data.error || "delete failed"); return; }
       setLoadMsg(`deleted @${data.deleted}`);
       setRows([emptyRow()]);
@@ -71,7 +71,7 @@ export default function AddCreatorPage() {
     try {
       const res = await fetch(`/api/admin/add-creator?handle=${encodeURIComponent(loadHandle)}`, {
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!data.ok) { setLoadMsg(data.error || "not found"); return; }
       const c = data.creator;
       const vids = Array.isArray(c.video_thumbnails) ? c.video_thumbnails : [];
@@ -122,7 +122,7 @@ export default function AddCreatorPage() {
             platform,
           }),
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (data.ok) {
           savedIds.push(r.id);
           newLog.push(`✅ @${data.username}${data.avatar_stored ? " · pfp ✓" : ""}`);

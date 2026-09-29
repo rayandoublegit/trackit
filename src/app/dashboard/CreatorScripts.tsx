@@ -32,7 +32,7 @@ export function CreatorScripts({ userId, isMobile }: { userId?: string; isMobile
     }
     try {
       const res = await fetch(`/api/creator/scripts?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data?.ok) setScripts(data.scripts || []);
     } finally {
       setLoading(false);

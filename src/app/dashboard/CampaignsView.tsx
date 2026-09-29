@@ -4610,7 +4610,7 @@ function PayoutsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: resolvedUserId, creatorId, amount, method }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.ok) {
         notifyCreatorPaid(lang, name, amount, resolvedUserId);
         setRows((prev) => {

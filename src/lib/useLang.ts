@@ -1,8 +1,9 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { createContext, createElement, useCallback, useContext, useSyncExternalStore, type ReactNode } from "react";
 import {
   getAppLang,
+  localizeHref,
   LOCALE_UPDATED_EVENT,
   TRACKIT_LANG_KEY,
   type AppLang,
@@ -22,11 +23,23 @@ function subscribe(onChange: () => void): () => void {
   };
 }
 
-/**
- * The app language. The server always renders English, so hydration uses "en"
- * and React switches to the stored language right after — no hydration mismatch
- * for French visitors. Client-side renders read the stored language directly.
- */
+// Pages under /fr render in French on the server too (no English flash, and
+// search engines read French). Everywhere else the address and stored choice
+// decide on the client.
+const LangContext = createContext<Lang | null>(null);
+
+export function LangProvider({ lang, children }: { lang: Lang; children: ReactNode }) {
+  return createElement(LangContext.Provider, { value: lang }, children);
+}
+
 export function useLang(): Lang {
-  return useSyncExternalStore(subscribe, getAppLang, () => "en");
+  const forced = useContext(LangContext);
+  const current = useSyncExternalStore(subscribe, getAppLang, () => forced ?? "en");
+  return forced ?? current;
+}
+
+/** Internal links that stay in the current language (/pricing → /fr/pricing). */
+export function useLocaleHref(): (href: string) => string {
+  const lang = useLang();
+  return useCallback((href: string) => localizeHref(href, lang), [lang]);
 }

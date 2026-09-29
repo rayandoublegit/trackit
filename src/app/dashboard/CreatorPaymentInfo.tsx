@@ -75,7 +75,7 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
       if (!userId) { setLoading(false); return; }
       try {
         const res = await fetch(`/api/creator/payment?userId=${userId}`);
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
         if (!cancelled && data?.ok) {
           // Determine la methode active selon ce qui est rempli en DB.
           if (data.paypal) { setMethod("paypal"); setValue(displayValue("paypal", data.paypal)); }

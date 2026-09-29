@@ -925,7 +925,7 @@ function OutreachModal({
           platform,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Generation failed");
       setMessage(data.message);
     } catch {

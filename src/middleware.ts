@@ -31,7 +31,9 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const pathname = request.nextUrl.pathname;
+  const fr = request.nextUrl.pathname === "/fr" || request.nextUrl.pathname.startsWith("/fr/");
+  const pathname = fr ? request.nextUrl.pathname.slice(3) || "/" : request.nextUrl.pathname;
+  const home = (path: string) => new URL(fr ? `/fr${path}` : path, request.url);
 
   const requiresAuth =
     pathname.startsWith("/dashboard") ||
@@ -39,12 +41,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/onboarding");
 
   if (requiresAuth && !user) {
-    const redirectTo = new URL("/auth", request.url);
-    return NextResponse.redirect(redirectTo);
+    return NextResponse.redirect(home("/auth"));
   }
 
   if (user && pathname === "/auth") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(home("/dashboard"));
   }
 
   return response;
@@ -56,5 +57,9 @@ export const config = {
     "/settings/:path*",
     "/onboarding",
     "/auth",
+    "/fr/dashboard/:path*",
+    "/fr/settings/:path*",
+    "/fr/onboarding",
+    "/fr/auth",
   ],
 };

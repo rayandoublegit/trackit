@@ -242,7 +242,7 @@ function FollowUpPanel({
           lang,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Generation failed");
       setMessage(data.message);
     } catch {
@@ -659,7 +659,7 @@ function OutreachAIGeneratePanel({
           lang,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Failed");
       setMessage(data.message);
       setEmailSubject(typeof data.subject === "string" ? data.subject : "");
@@ -1510,7 +1510,7 @@ export function OutreachHistorySection({
         lang,
       }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (data.followUp || data.message) {
       await navigator.clipboard.writeText(data.followUp || data.message);
       alert(lang === "fr" ? "Outreach de relance copié ✓" : "Follow-up outreach copied to clipboard ✓");

@@ -54,9 +54,48 @@ export function detectAppLangFromBrowser(): AppLang {
   return detectAppLangFromLocation();
 }
 
-/** The whole product is English. */
+/** French lives under /fr; the unprefixed site is English. */
+export function isFrPath(pathname: string): boolean {
+  return pathname === "/fr" || pathname.startsWith("/fr/");
+}
+
+// The app (signed-in areas and auth hand-offs) has no /fr twin for every
+// screen: it follows the language the visitor last chose on the site.
+const APP_PATH_PREFIXES = ["/dashboard", "/onboarding", "/settings", "/admin", "/invite", "/auth/callback", "/auth/confirm", "/auth/reset", "/l/"];
+
+export function isAppPath(pathname: string): boolean {
+  const path = isFrPath(pathname) ? pathname.slice(3) || "/" : pathname;
+  return APP_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`) || path.startsWith(`${prefix}?`));
+}
+
+/** Language implied by the address: /fr → French, public English pages → English, app → stored choice. */
 export function detectAppLangFromLocation(): AppLang {
-  return "en";
+  if (typeof window === "undefined") return "en";
+  const path = window.location.pathname;
+  if (isFrPath(path)) return "fr";
+  if (!isAppPath(path)) return "en";
+  try {
+    return localStorage.getItem(TRACKIT_LANG_KEY) === "fr" ? "fr" : "en";
+  } catch {
+    return "en";
+  }
+}
+
+/**
+ * Prefix an internal link with /fr for French pages. External links, anchors,
+ * API routes and files are left alone.
+ */
+export function localizeHref(href: string, lang: AppLang): string {
+  if (lang !== "fr" || !href.startsWith("/") || href.startsWith("//")) return href;
+  if (isFrPath(href.split(/[?#]/)[0])) return href;
+  if (/^\/(api|_next)(\/|$)/.test(href) || /\.[a-z0-9]+($|[?#])/i.test(href.split(/[?#]/)[0])) return href;
+  return href === "/" ? "/fr" : href.startsWith("/?") || href.startsWith("/#") ? `/fr${href.slice(1)}` : `/fr${href}`;
+}
+
+/** The same page in the other language. */
+export function alternateLangPath(pathname: string, target: AppLang): string {
+  const bare = isFrPath(pathname) ? pathname.slice(3) || "/" : pathname;
+  return target === "fr" ? localizeHref(bare, "fr") : bare;
 }
 
 function syncDocumentLang(lang: AppLang) {
@@ -64,29 +103,28 @@ function syncDocumentLang(lang: AppLang) {
   document.documentElement.lang = lang;
 }
 
-/**
- * The site is English only, everywhere (landing, auth, dashboard, admin).
- * A French choice stored by an older version is overwritten.
- */
+/** Current app language; remembers it so the signed-in app keeps it. */
 export function getAppLang(): AppLang {
   if (typeof window === "undefined") return "en";
+  const lang = detectAppLangFromLocation();
   try {
-    if (localStorage.getItem(TRACKIT_LANG_KEY) !== "en") localStorage.setItem(TRACKIT_LANG_KEY, "en");
+    if (localStorage.getItem(TRACKIT_LANG_KEY) !== lang) localStorage.setItem(TRACKIT_LANG_KEY, lang);
   } catch {
-    // storage blocked: English anyway
+    // storage blocked: the address still decides
   }
-  syncDocumentLang("en");
-  return "en";
+  syncDocumentLang(lang);
+  return lang;
 }
 
-export function setAppLang(_lang: AppLang): void {
+/** Explicit choice (settings, language switch): stored, and applied on app pages. */
+export function setAppLang(lang: AppLang): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(TRACKIT_LANG_KEY, "en");
+    localStorage.setItem(TRACKIT_LANG_KEY, lang);
   } catch {
     // storage blocked
   }
-  syncDocumentLang("en");
+  syncDocumentLang(lang);
   notifyLocaleUpdated();
 }
 

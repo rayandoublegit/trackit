@@ -109,7 +109,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     }
     try {
       const res = await fetch(`/api/creators/pending-review?brandId=${brandId}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data?.ok && Array.isArray(data.creators)) setQueue(data.creators);
     } catch {
       /* ignore */

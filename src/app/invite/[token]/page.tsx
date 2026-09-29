@@ -71,7 +71,7 @@ export default function InvitePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, creatorId: userId, fullName: fullName.trim(), socialHandle: cleanHandle }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!data.ok) { setFormError(data.error || "Could not link your account"); setSubmitting(false); return; }
 
       setDone(true);
