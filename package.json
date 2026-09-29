@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:db": "tsx scripts/db-verify/gifting-e2e.mts",
     "test:watch": "vitest",
     "check:stripe": "tsx scripts/check-stripe-prices.ts",
     "db:creator-content": "tsx scripts/apply-creator-content-migration.ts",
@@ -30,6 +31,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/eslintrc": "^3.3.5",
     "@types/node": "^20",
     "@types/react": "^19",
