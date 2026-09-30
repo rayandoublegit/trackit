@@ -12,7 +12,7 @@ export function adminDevPreview(): boolean {
 // sinon on retombe sur l'email proprietaire par defaut. La verite finale reste
 // la colonne profiles.role: un email doit ETRE dans la liste OU avoir role admin/staff.
 function allowedEmails(): string[] {
-  const raw = process.env.ADMIN_EMAILS ?? "hello@thentrack.it,theo.lcx.lecurieux@gmail.com";
+  const raw = process.env.ADMIN_EMAILS ?? "hello@thentrack.it,theo.lcx.lecurieux@gmail.com,rayan.vincentsully@gmail.com";
   return raw
     .split(",")
     .map((e) => e.trim().toLowerCase())

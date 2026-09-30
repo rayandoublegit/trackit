@@ -18,6 +18,8 @@ export type LibraryVideo = {
   caption: string;
   hashtags: string[];
   mediaType: "video" | "photo" | "carousel";
+  /** short (TikTok, Reels, YouTube Shorts), long (YouTube videos over 3 min), photo, carousel. */
+  format: "short" | "long" | "photo" | "carousel";
   durationSeconds: number | null;
   postedAt: string | null;
   views: number;
@@ -26,7 +28,12 @@ export type LibraryVideo = {
   shares: number;
   saves: number;
   viewsGained7d: number | null;
+  /** The video links a product (TikTok Shop anchor or a stored product URL). */
   hasProductLink: boolean;
+  /** The product link itself, when the source exposes it. */
+  productUrl: string | null;
+  /** Views >= max(100K, 5x the creator's median views) — lib/viral.ts. Null when unknown. */
+  isViral: boolean | null;
 };
 
 export type CreatorProfileData = {
@@ -35,9 +42,15 @@ export type CreatorProfileData = {
   videos: LibraryVideo[];
   similar: FeedCreator[];
   hashtags: { tag: string; count: number }[];
-  mix: { videos: number; photos: number; avgDurationSeconds: number | null; productLinkShare: number | null };
+  mix: { videos: number; photos: number; avgDurationSeconds: number | null; productLinkShare: number | null; viralVideos: number | null };
   /** "tracked": videos and history come from the scraper; "snapshot": only the stored top videos. */
   depth: "tracked" | "snapshot";
 };
 
-export type VideoLibraryResult = { videos: LibraryVideo[]; hasMore: boolean; source: "tracked" | "snapshot" };
+export type VideoLibraryResult = {
+  videos: LibraryVideo[];
+  hasMore: boolean;
+  source: "tracked" | "snapshot";
+  /** No tracked video yet, and a filter needs data only tracked videos have (format, length, product). */
+  needsTracking?: boolean;
+};

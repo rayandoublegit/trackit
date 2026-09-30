@@ -1,9 +1,16 @@
 // Shapes shared by every scraping source. A source only fetches and parses;
-// storing, history and ranking live in ingest.ts so any provider can be swapped.
+// storing, history and ranking live in ingest.ts so any provider can be swapped
+// without touching stored creators: every provider of a platform must return
+// exactly these shapes, keyed by the public handle (never a provider id).
 
 export type ScrapePlatform = "tiktok" | "instagram" | "youtube";
+export const SCRAPE_PLATFORMS: readonly ScrapePlatform[] = ["tiktok", "instagram", "youtube"];
+
+/** Provider behind a source. Only ScrapeCreators covers Instagram and YouTube today. */
+export type ScrapeProvider = "scrapecreators" | "rapidapi";
 
 export type ScrapedProfile = {
+  /** Public handle, lowercase, no "@". */
   username: string;
   displayName: string;
   avatarUrl: string;
@@ -16,6 +23,12 @@ export type ScrapedProfile = {
   verified: boolean;
 };
 
+/**
+ * short: TikTok videos, Instagram reels/videos, YouTube Shorts.
+ * long: YouTube videos (not Shorts).
+ */
+export type VideoFormat = "short" | "long" | "photo" | "carousel";
+
 export type ScrapedVideo = {
   id: string;
   postedAt: string | null;
@@ -23,11 +36,14 @@ export type ScrapedVideo = {
   hashtags: string[];
   durationSeconds: number | null;
   mediaType: "video" | "photo" | "carousel";
+  format: VideoFormat;
   coverUrl: string;
   shareUrl: string;
   musicTitle: string | null;
   isAd: boolean;
   hasProductLink: boolean;
+  /** The product / shop page the post links to, when the source exposes it. */
+  productUrl: string | null;
   views: number;
   likes: number;
   comments: number;
@@ -35,15 +51,39 @@ export type ScrapedVideo = {
   saves: number;
 };
 
-export type ScrapedSearchHit = { username: string; displayName: string; followers: number; avatarUrl: string };
+/** followers is null when the search result does not say (the hit is then skipped). */
+export type ScrapedSearchHit = { username: string; displayName: string; followers: number | null; avatarUrl: string };
+
+/** Counts every external call (and credits when the provider reports them). */
+export class CallMeter {
+  calls = 0;
+  credits = 0;
+  readonly byProvider: Record<string, number> = {};
+
+  record(provider: string, credits = 1): void {
+    this.calls += 1;
+    this.credits += credits;
+    this.byProvider[provider] = (this.byProvider[provider] ?? 0) + 1;
+  }
+
+  merge(other: CallMeter): void {
+    this.calls += other.calls;
+    this.credits += other.credits;
+    for (const [k, v] of Object.entries(other.byProvider)) this.byProvider[k] = (this.byProvider[k] ?? 0) + v;
+  }
+}
 
 export interface CreatorSource {
+  /** e.g. "scrapecreators-tiktok"; a fallback chain is "scrapecreators-tiktok>rapidapi-tiktok". */
   readonly name: string;
   readonly platform: ScrapePlatform;
+  /** API calls one refresh (profile + recent videos) costs with this source. */
+  readonly callsPerRefresh: number;
   available(): boolean;
-  profile(username: string): Promise<ScrapedProfile | null>;
-  videos(username: string, count: number): Promise<ScrapedVideo[]>;
-  search(keyword: string, count: number): Promise<ScrapedSearchHit[]>;
+  /** Null when the account does not exist (renamed, deleted, private). */
+  profile(handle: string, meter?: CallMeter): Promise<ScrapedProfile | null>;
+  videos(handle: string, count: number, meter?: CallMeter): Promise<ScrapedVideo[]>;
+  search(keyword: string, count: number, meter?: CallMeter): Promise<ScrapedSearchHit[]>;
 }
 
 export function hashtagsOf(caption: string): string[] {

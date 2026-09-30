@@ -202,7 +202,8 @@ export async function POST(request: NextRequest) {
   const location = String(body.location || "").trim();
   const avatarInput = String(body.avatarUrl || "").trim();
   const platformRaw = String(body.platform || "TikTok").trim().toLowerCase();
-  const platform = platformRaw === "instagram" ? "Instagram" : "TikTok";
+  // Stored lowercase ("tiktok" / "instagram"): the database refuses any other spelling.
+  const platform = platformRaw === "instagram" ? "instagram" : "tiktok";
   // niches: map typed sub-niches to canonical parent niches (+ keep originals + "curated")
   const nicheRaw = String(body.niches || "").trim();
   const niches = normalizeNiches(nicheRaw);

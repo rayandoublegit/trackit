@@ -167,6 +167,7 @@ function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
           {fmt(v.views, lang)}
         </span>
         {v.viewsGained7d ? <span className="cp-video__gain">+{fmt(v.viewsGained7d, lang)} {lang === "fr" ? "7 j" : "7d"}</span> : null}
+        {v.isViral ? <span className="cp-video__viral">{lang === "fr" ? "Virale" : "Viral"}</span> : null}
       </span>
       <span className="cp-video__meta">
         {v.caption ? <span className="cp-video__caption">{v.caption}</span> : null}
@@ -184,6 +185,12 @@ function VideoCard({ v, rank }: { v: LibraryVideo; rank?: number }) {
             </span>
           ) : null}
           {v.postedAt ? <span>{ago(v.postedAt, lang)}</span> : null}
+          {v.hasProductLink ? (
+            <span className="cp-video__shop" title={v.productUrl ?? undefined}>
+              <Icon d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" size={11} />
+              {lang === "fr" ? "Produit" : "Product"}
+            </span>
+          ) : null}
         </span>
       </span>
     </a>
@@ -389,7 +396,7 @@ export function CreatorProfilePage({
               <button type="button" role="tab" aria-selected={tab === "top"} className={tab === "top" ? "is-on" : ""} onClick={() => setTab("top")}>
                 {fr ? "Les plus vues" : "Most viewed"}
               </button>
-              <button type="button" role="tab" aria-selected={tab === "latest"} className={tab === "latest" ? "is-on" : ""} onClick={() => setTab("latest")} disabled={!tracked}>
+              <button type="button" role="tab" aria-selected={tab === "latest"} className={tab === "latest" ? "is-on" : ""} onClick={() => setTab("latest")} disabled={!data?.videos.some((v) => v.postedAt)}>
                 {fr ? "Récentes" : "Latest"}
               </button>
             </div>
@@ -425,6 +432,7 @@ export function CreatorProfilePage({
               <div><dt>{fr ? "Publications photo" : "Photo posts"}</dt><dd>{data?.mix.photos ?? "—"}</dd></div>
               <div><dt>{fr ? "Durée moy." : "Avg length"}</dt><dd>{data?.mix.avgDurationSeconds ? `${data.mix.avgDurationSeconds}s` : "—"}</dd></div>
               <div><dt>{fr ? "Avec lien produit" : "With product link"}</dt><dd>{data?.mix.productLinkShare != null ? (fr ? `${data.mix.productLinkShare} %` : `${data.mix.productLinkShare}%`) : "—"}</dd></div>
+              <div title={fr ? "Au moins 5x les vues habituelles du créateur, 100k minimum" : "At least 5x the creator's usual views, 100K minimum"}><dt>{fr ? "Vidéos virales" : "Viral videos"}</dt><dd>{data?.mix.viralVideos ?? "—"}</dd></div>
             </dl>
             {data?.hashtags.length ? (
               <div className="cp-tags">

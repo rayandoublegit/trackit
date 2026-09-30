@@ -5,6 +5,7 @@ import type { LibraryVideo, VideoLibraryResult } from "@/lib/creator-intel-types
 import { PlatformLogo } from "@/components/PlatformLogo";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { useLang, type Lang } from "@/lib/useLang";
+import { videoFiltersToParams } from "@/lib/catalog-filter-params";
 import "./video-library.css";
 
 // Creators > Videos: every tracked video, like an ad library. Filters come from
@@ -16,9 +17,14 @@ export type VideoFilters = {
   language: string;
   minViews: string;
   postedWithin: string;
+  /** YYYY-MM-DD, custom published-date range (inclusive). */
+  postedFrom: string;
+  postedTo: string;
+  /** video | short | long | photo | carousel */
   mediaType: string;
   duration: string;
   hasProduct: boolean;
+  viral: boolean;
   sort: string;
 };
 
@@ -28,13 +34,23 @@ export const EMPTY_VIDEO_FILTERS: VideoFilters = {
   language: "",
   minViews: "",
   postedWithin: "",
+  postedFrom: "",
+  postedTo: "",
   mediaType: "",
   duration: "",
   hasProduct: false,
+  viral: false,
   sort: "views",
 };
 
-const MIN_VIEWS: Record<string, number> = { "10k": 10_000, "100k": 100_000, "500k": 500_000, "1m": 1_000_000, "10m": 10_000_000 };
+/** "shop.example.com" from a product link, for the card. */
+function linkHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
 
 function fmt(n: number | null | undefined, lang: Lang = "en"): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -110,14 +126,33 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
           {fmt(v.views, lang)}
         </span>
         {v.viewsGained7d ? <span className="vl-card__gain">+{fmt(v.viewsGained7d, lang)} {fr ? "cette semaine" : "this week"}</span> : null}
-        {v.mediaType !== "video" ? <span className="vl-card__type">Photo</span> : v.durationSeconds ? <span className="vl-card__type">{v.durationSeconds}s</span> : null}
+        {v.isViral ? (
+          <span className="vl-card__viral" title={fr ? "Au moins 5x les vues habituelles du créateur" : "At least 5x the creator's usual views"}>
+            {fr ? "Virale" : "Viral"}
+          </span>
+        ) : null}
+        {v.mediaType === "carousel" ? (
+          <span className="vl-card__type">{fr ? "Carrousel" : "Carousel"}</span>
+        ) : v.mediaType !== "video" ? (
+          <span className="vl-card__type">Photo</span>
+        ) : v.durationSeconds ? (
+          <span className="vl-card__type">{v.durationSeconds >= 60 ? `${Math.floor(v.durationSeconds / 60)}:${String(v.durationSeconds % 60).padStart(2, "0")}` : `${v.durationSeconds}s`}</span>
+        ) : null}
       </a>
       <div className="vl-card__stats">
         <span><I d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" />{fmt(v.likes, lang)}</span>
         <span><I d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />{fmt(v.comments, lang)}</span>
         <span><I d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />{fmt(v.shares, lang)}</span>
-        {v.hasProductLink ? <span className="vl-card__shop"><I d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />{fr ? "Produit" : "Product"}</span> : null}
+        {v.hasProductLink && !v.productUrl ? <span className="vl-card__shop"><I d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />{fr ? "Produit" : "Product"}</span> : null}
       </div>
+      {v.productUrl ? (
+        <a className="vl-card__product" href={v.productUrl} target="_blank" rel="noreferrer nofollow" title={v.productUrl}>
+          <I d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />
+          <span>{fr ? "Lien produit" : "Product link"}</span>
+          <small>{linkHost(v.productUrl)}</small>
+          <I d="M7 17L17 7M9 7h8v8" />
+        </a>
+      ) : null}
       {v.hashtags.length ? (
         <div className="vl-card__tags">
           {v.hashtags.slice(0, 4).map((t) => (
@@ -155,25 +190,10 @@ export function VideoLibrary({
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(false);
+  const [needsTracking, setNeedsTracking] = useState(false);
   const gen = useRef(0);
 
-  const params = useCallback(
-    (offset: number) => {
-      const p = new URLSearchParams({ sort: filters.sort || "views", offset: String(offset), limit: "48" });
-      if (platform) p.set("platform", platform);
-      if (search.trim().length >= 2) p.set("q", search.trim());
-      if (filters.niche) p.set("niche", filters.niche);
-      if (filters.country) p.set("country", filters.country);
-      if (filters.language) p.set("language", filters.language);
-      if (MIN_VIEWS[filters.minViews]) p.set("minViews", String(MIN_VIEWS[filters.minViews]));
-      if (filters.postedWithin) p.set("postedWithin", filters.postedWithin);
-      if (filters.mediaType) p.set("mediaType", filters.mediaType);
-      if (filters.duration) p.set("duration", filters.duration);
-      if (filters.hasProduct) p.set("hasProduct", "1");
-      return p.toString();
-    },
-    [filters, search, platform],
-  );
+  const params = useCallback((offset: number) => videoFiltersToParams(filters, search, platform, offset), [filters, search, platform]);
 
   useEffect(() => {
     const my = ++gen.current;
@@ -187,6 +207,7 @@ export function VideoLibrary({
           setVideos(d.videos);
           setHasMore(d.hasMore);
           setSource(d.source);
+          setNeedsTracking(Boolean(d.needsTracking));
         })
         .catch(() => my === gen.current && setError(true))
         .finally(() => my === gen.current && setLoading(false));
@@ -221,7 +242,19 @@ export function VideoLibrary({
     );
   }
   if (error) return <p className="vl-empty">{fr ? "La bibliothèque de vidéos ne répond pas. Réessayez dans un instant." : "The video library is not responding. Try again in a moment."}</p>;
-  if (!videos.length) return <p className="vl-empty">{fr ? "Aucune vidéo ne correspond encore à ces filtres." : "No video matches these filters yet."}</p>;
+  if (!videos.length) {
+    return (
+      <p className="vl-empty">
+        {needsTracking
+          ? fr
+            ? "Aucune vidéo suivie ne correspond encore. Le format, la durée et le lien produit ne sont connus que pour les vidéos suivies, et de nouvelles vidéos sont ajoutées chaque jour."
+            : "No tracked video matches yet. Format, length and product links are only known for tracked videos, and new videos are added every day."
+          : fr
+            ? "Aucune vidéo ne correspond encore à ces filtres."
+            : "No video matches these filters yet."}
+      </p>
+    );
+  }
 
   return (
     <>

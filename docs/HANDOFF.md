@@ -88,7 +88,7 @@ Billing: Whop (webhook `src/app/api/whop/webhook`) plus legacy Stripe price ids 
 | Database | Supabase `tokpuhzjhysqxwjkxfya` |
 
 `/api/ai-chat` uses OpenAI when `OPENAI_API_KEY` is set, otherwise Anthropic.
-The scraper uses ScrapeCreators when its key is set, otherwise RapidAPI.
+The scraper uses ScrapeCreators first (TikTok, Instagram, YouTube) and falls back to RapidAPI for TikTok (`SCRAPER_PROVIDER_TIKTOK` swaps the order).
 
 The separate `partnerads` Vercel project (partnerads.vercel.app) was deleted on
 2026-09-29; thentrack.it is the only deployment, so crons run once.
@@ -176,9 +176,11 @@ Don't commit Next's auto-generated `AGENTS.md` / `CLAUDE.md` or `supabase/.temp`
 - `discovery_saved`, `discovery_folders`, `discovery_folder_items` (saved creators).
 - `admin_audit_log`, `user_sessions`, `affiliate_applications`.
 - **Creator catalog and intelligence:**
-  - `creators_index`: one row per creator (17,636 TikTok creators on 2026-09-30),
-    current stats and precomputed growth. Unique on `username`; Instagram rows use an
-    `ig_` prefix.
+  - `creators_index`: one row per creator (~17,800 TikTok creators on 2026-09-30),
+    current stats and precomputed growth. Unique on `username`, which is the storage
+    key: the handle for TikTok, `ig_` + handle for Instagram, `yt_` + handle for
+    YouTube. `platform` is lowercase only (`tiktok`, `instagram`, `youtube`) once
+    migration 000046 is applied.
   - `creator_snapshots`, `creator_videos`, `creator_video_snapshots`,
     `scrape_jobs`, `scrape_runs`. See SCRAPING.md.
 
@@ -194,17 +196,26 @@ were created by hand before migrations existed; `scripts/db-verify/00_*.sql` and
 Full details in [SCRAPING.md](SCRAPING.md).
 
 - The app only reads stored data. Only the scraper calls external APIs.
-- `/api/cron/scrape` drains a queue: each creator refresh = 2 API calls
-  (profile + 30 latest videos), stores covers and avatars permanently, writes daily
-  snapshots, updates the creator row and recomputes growth
-  (`refresh_creator_rollup`). Keyword discovery adds new creators.
-- Refresh rhythm by priority: fast growers daily, big accounts every 2–3 days,
-  small ones every 4, inactive ones weekly; failures back off.
-- **Status (2026-09-30):** migration applied in production; schedule live on
-  thentrack.it: hourly pass of 25 jobs (`5 * * * *`) and a daily discovery pass on
-  3 rotating niches (`35 4 * * *`). Growth figures appear after 7 days of snapshots.
-- Scaling it up: raise `budget` in `vercel.json` (or `SCRAPE_BATCH`) according to
-  the ScrapeCreators / RapidAPI plan. ~0.7 API call per creator per day at steady state.
+- Weekly rhythm: every Monday `/api/cron/scrape/weekly-refresh` queues every creator
+  and `/api/cron/scrape/weekly-discovery` queues this week's keyword searches
+  (niche tree, TikTok + Instagram + YouTube); `/api/cron/scrape` (every 10 minutes)
+  drains the queue and costs nothing when it is empty.
+- A refresh = 2 API calls (TikTok, Instagram) or 3 (YouTube): profile + latest
+  videos; covers and avatars stored permanently, daily snapshots, creator row,
+  growth (`refresh_creator_rollup`). Creators brands work with get a second refresh
+  each week. Failures back off 1, 2, 4, 8 weeks; "not found" keeps the history.
+- Providers: ScrapeCreators (all platforms), RapidAPI (TikTok) as automatic fallback;
+  `SCRAPER_PROVIDER_TIKTOK` picks the first. Identity is `(platform, handle)`,
+  never a provider id.
+- Hard weekly caps: `SCRAPE_WEEKLY_MAX_CREATORS` (20,000),
+  `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` (150), `SCRAPE_WEEKLY_MAX_NEW_CREATORS` (2,500).
+  Cost today: ~35,750 calls/week (~155,500/month); 50k creators on 3 platforms:
+  ~108,000/week (~470,000/month). Details in SCRAPING.md.
+- **Status (2026-10-01):** migration 000044 applied in production. Migration
+  `20261001_000046_creator_platform_normalize.sql` (lowercase platforms, merge of
+  duplicate creators, weekly queue functions) is written and tested but **not
+  applied yet**: apply it, then deploy the new `vercel.json`. The code works before
+  it is applied (it falls back to the older queue function and skips the new columns).
 
 ---
 
@@ -214,12 +225,12 @@ Full details in [SCRAPING.md](SCRAPING.md).
 | --- | --- | --- |
 | `/api/weekly-reminder` | Mondays 09:00 | weekly reminder emails |
 | `/api/cron/monthly-payouts` | 1st of month 09:00 | disabled in code (no real transfers) |
-| `/api/cron/seed-niches` | daily 03:00 | old niche seeding (ScrapeCreators) |
-| `/api/cron/scrape?budget=25` | hourly at :05 | creator refresh pass |
-| `/api/cron/scrape?budget=10&seedNiches=3` | daily 04:35 | discovery pass |
+| `/api/cron/scrape/weekly-discovery` | Mondays 00:05 | queues the week's keyword searches (no API call) |
+| `/api/cron/scrape/weekly-refresh` | Mondays 00:15 | queues every creator due this week (no API call) |
+| `/api/cron/scrape?budget=60` | every 10 minutes | queue worker: runs jobs within the weekly caps; idle = no API call |
 
-`/api/cron/enrich-creators` still exists but is no longer scheduled; the new
-scraper replaces it.
+`/api/cron/seed-niches` (daily niche seeding) and `/api/cron/enrich-creators` still
+exist but are no longer scheduled; the weekly discovery and the worker replace them.
 
 ---
 
@@ -252,11 +263,13 @@ npx eslint src    # 8 known errors remain in older files
    (Supabase queries), to draft and send outreach with confirmation, and to create
    campaigns. Today it chats, searches creators and opens pages; tasks and meetings
    it creates live only in the browser.
-2. **Scraper scale-up**: watch `scrape_runs` for a few days, then raise the budget.
-   Consider ordering the first passes by followers or curated creators.
-3. **Instagram and YouTube**: add sources in `src/lib/scraper/sources.ts`
-   (Instagram via RapidAPI or ScrapeCreators; YouTube via the YouTube Data API,
-   needs a Google API key). The catalog UI already has the tabs (YouTube shows "Soon").
+2. **Scraper**: apply migration 000046 in production, deploy, then watch
+   `scrape_runs` (calls per provider, credits) for the first weeks and raise
+   `SCRAPE_WEEKLY_MAX_CREATORS` as the base grows.
+3. **Instagram and YouTube in the app**: the scraper now fills them (ScrapeCreators);
+   the catalog UI still shows YouTube as "Soon". The creator page lookup
+   (`src/lib/creator-intel-read.ts`) tries `username` and `ig_` + username; it should
+   also try `yt_` + username for YouTube creators.
 4. **Live search on thentrack.it**: Mino's live top-up and Instagram live search use
    RapidAPI, which thentrack.it doesn't have. Add a ScrapeCreators search fallback
    in `src/lib/catalog-query.ts` (`liveCreatorSearch`).

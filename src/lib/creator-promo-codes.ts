@@ -67,7 +67,7 @@ export async function ensureCreatorForHandle(
     user_id: userId,
     handle: normalized,
     full_name: extras?.full_name || normalized,
-    platform: extras?.platform || "TikTok",
+    platform: String(extras?.platform || "tiktok").trim().toLowerCase(),
   };
   if (workspaceId) row.workspace_id = workspaceId;
 

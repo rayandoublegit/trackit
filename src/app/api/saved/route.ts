@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
   const row: Record<string, unknown> = {
     user_id: userId,
     creator_username: username,
-    platform: String(c?.platform ?? "tiktok"),
+    platform: String(c?.platform || "tiktok").trim().toLowerCase(),
     display_name: String(c?.displayName ?? username),
     avatar_url: String(c?.avatarUrl ?? ""),
     followers: Number(c?.followersCount ?? 0) || 0,

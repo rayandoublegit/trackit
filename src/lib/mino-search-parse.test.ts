@@ -26,6 +26,35 @@ describe("parseCreatorSearch", () => {
     expect(under).toMatchObject({ niche: "gaming", maxFollowers: 1_500_000, country: "US" });
   });
 
+  it("reads views, engagement, viral and growth without taking them for followers or niche", () => {
+    expect(parseCreatorSearch("Find fitness creators with 100k+ views and 5% engagement")).toMatchObject({
+      niche: "fitness",
+      minViews: 100_000,
+      minEngagement: 5,
+      minFollowers: undefined,
+    });
+    expect(parseCreatorSearch("beauty tiktokers over 50k followers with engagement above 8%")).toMatchObject({
+      niche: "beauty",
+      minFollowers: 50_000,
+      minEngagement: 8,
+    });
+    expect(parseCreatorSearch("Trouve des créatrices skincare avec plus de 20k vues et un taux d'engagement de 6,5 %")).toMatchObject({
+      niche: "skincare",
+      minViews: 20_000,
+      minEngagement: 6.5,
+    });
+    expect(parseCreatorSearch("fast growing gaming creators with viral videos")).toMatchObject({ niche: "gaming", viral: true, sort: "growth" });
+    expect(parseCreatorSearch("créateurs food en forte croissance avec un fort engagement")).toMatchObject({ niche: "food", sort: "growth", minEngagement: 6 });
+    expect(parseCreatorSearch("Find skincare creators")).toMatchObject({ minViews: undefined, minEngagement: undefined, viral: undefined, sort: undefined });
+  });
+
+  it("describes performance filters", () => {
+    expect(describeSearch({ niche: "fitness", minViews: 100_000, minEngagement: 5, viral: true, sort: "growth" })).toBe(
+      "fitness · 100K+ views · 5%+ engagement · viral video · fast growing",
+    );
+    expect(describeSearch({ niche: "fitness", minEngagement: 6.5 }, "fr")).toBe("fitness · 6,5 %+ d'engagement");
+  });
+
   it("describes a search in one line", () => {
     expect(describeSearch({ niche: "skincare", platform: "TikTok", minFollowers: 50_000, country: "FR", hasEmail: true })).toBe(
       "skincare · TikTok · 50K+ · FR · with email",

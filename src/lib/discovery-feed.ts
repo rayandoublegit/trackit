@@ -33,7 +33,19 @@ export interface FeedCreator extends DiscoveryCreatorResult {
   isCurated?: boolean;
   /** Tracked history (creator intelligence tables); absent until the scraper has run. */
   growth?: CreatorGrowth;
+  /** Stats from the creator's videos (viral videos, best video); absent before migration 000047. */
+  videoStats?: CreatorVideoStats;
 }
+
+export type CreatorVideoStats = {
+  /** Videos stored in creator_videos; 0 means the stats come from the stored top videos. */
+  videosTracked: number;
+  medianViews: number | null;
+  maxViews: number | null;
+  /** Videos with views >= max(100K, 5x the median). Null when the median is unknown. */
+  viralVideos: number | null;
+  lastViralAt: string | null;
+};
 
 export type CreatorGrowth = {
   followersGrowth7d: number | null;
@@ -76,6 +88,28 @@ function rowGrowth(c: Record<string, unknown>): CreatorGrowth | undefined {
     firstSeenAt: (c.first_seen_at as string) ?? null,
     lastScrapedAt: (c.last_scraped_at as string) ?? null,
   };
+}
+
+function rowVideoStats(c: Record<string, unknown>): CreatorVideoStats | undefined {
+  if (!("viral_videos" in c)) return undefined;
+  return {
+    videosTracked: Number(c.videos_tracked ?? 0),
+    medianViews: numOrNull(c.median_video_views),
+    maxViews: numOrNull(c.max_video_views),
+    viralVideos: numOrNull(c.viral_videos),
+    lastViralAt: (c.last_viral_at as string) ?? null,
+  };
+}
+
+/** Columns added by migration 000047 (stats from the creator's videos). */
+export const CREATOR_VIDEO_STATS_COLUMNS = ["videos_tracked", "median_video_views", "max_video_views", "viral_videos", "last_viral_at"].join(",");
+
+/** Stored platform values vary in case ("tiktok", "TikTok"): one display name each. */
+export function displayPlatform(raw: unknown): "TikTok" | "Instagram" | "YouTube" {
+  const v = String(raw ?? "").toLowerCase();
+  if (v.includes("insta")) return "Instagram";
+  if (v.includes("you")) return "YouTube";
+  return "TikTok";
 }
 
 /** Columns added by the creator-intelligence migration (history, growth, identity). */
@@ -174,7 +208,8 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
   const rawFrequency = Number(c.post_frequency ?? 0);
   const postFrequency = postsAnalyzed >= 2 ? rawFrequency : 0;
   return {
-    username: String(c.platform) === "Instagram" ? String(c.username).replace(/^ig_/, "") : String(c.username), displayName: String(c.display_name ?? c.username),
+    // Instagram and YouTube rows are stored as "ig_"/"yt_" + handle; show the public handle.
+    username: displayPlatform(c.platform) === "Instagram" ? String(c.username).replace(/^ig_/, "") : displayPlatform(c.platform) === "YouTube" ? String(c.username).replace(/^yt_/, "") : String(c.username), displayName: String(c.display_name ?? c.username),
     avatarUrl: feedAvatarUrlForCreator(String(c.username), String(c.avatar_url ?? "")),
     followersCount: Number(c.followers ?? 0),
     engagementRate: Number(c.engagement_rate ?? 0),
@@ -187,7 +222,7 @@ function dbRowToCreator(c: Record<string, unknown>): DiscoveryCreatorResult {
     postsAnalyzed,
     postFrequency,
     lastPostAt: (c.last_post_at as string) ?? null, authenticityScore: Number(c.authenticity_score ?? 0),
-    qualityStatus: String(c.quality_status ?? "ok"), platform: String(c.platform ?? "TikTok"),
+    qualityStatus: String(c.quality_status ?? "ok"), platform: displayPlatform(c.platform),
     bio: String(c.bio ?? ""), email: (c.email as string) ?? null, niche: String(c.primary_niche ?? ""),
     primaryNiche: String(c.primary_niche ?? ""), language: String(c.language ?? "unknown"),
     location: (c.location as string) ?? null, countryCode: (c.country_code as string) ?? null,
@@ -454,6 +489,7 @@ function dbRowToFeedCreator(c: Record<string, unknown>): FeedCreator {
     topVideos,
     isCurated: readIsCurated(c),
     growth: rowGrowth(c),
+    videoStats: rowVideoStats(c),
   };
 }
 
@@ -502,7 +538,8 @@ export async function buildFeedPage(
       .neq("quality_status", "dead");
     // Curated/manual rows often ship with authenticity_score 0/null — don't drop them.
     if (opts.requireAuthenticity) q = q.gte("authenticity_score", 30);
-    if (filters.platform) q = q.eq("platform", filters.platform);
+    // Stored platform values vary in case ("tiktok", "TikTok").
+    if (filters.platform) q = q.ilike("platform", filters.platform);
     // Use != null so minFollowers=0 / exact bucket edges are applied.
     if (filters.minFollowers != null) q = q.gte("followers", filters.minFollowers);
     if (filters.maxFollowers != null) q = q.lte("followers", filters.maxFollowers);

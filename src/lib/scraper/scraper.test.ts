@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseRapidProfile, parseRapidSearch, parseRapidVideos } from "./sources";
 import { hashtagsOf } from "./types";
-import { nextScrapeAt, retryAfterFailure, scrapePriority } from "./schedule";
+import { nextScrapeAt, retryAfterFailure, scrapePriority, trackedIntervalDays } from "./schedule";
+import { remaining, weekIndex, weekStart, weeklyCaps } from "./budget";
+import { weeklyDiscoveryPlan } from "./discovery-plan";
 
 const DAY = 86_400_000;
 const NOW = Date.parse("2026-09-30T12:00:00Z");
@@ -73,26 +75,78 @@ describe("RapidAPI TikTok parsers", () => {
   });
 });
 
-describe("refresh schedule", () => {
+describe("refresh schedule: every creator once a week", () => {
   const base = { followers: 50_000, followersGrowthPct7d: null, growthScore: null, lastPostAt: new Date(NOW - 2 * DAY).toISOString() };
+  afterEach(() => vi.unstubAllEnvs());
 
-  it("refreshes fast-growing creators daily", () => {
+  it("orders the queue: fast growers first, inactive last", () => {
     expect(scrapePriority({ ...base, followersGrowthPct7d: 6 }, NOW)).toBe(1);
     expect(scrapePriority({ ...base, growthScore: 20 }, NOW)).toBe(2);
-    expect(nextScrapeAt(1, NOW)).toBe(new Date(NOW + DAY).toISOString());
-  });
-
-  it("spaces out big stable accounts and inactive ones", () => {
     expect(scrapePriority({ ...base, followers: 2_000_000 }, NOW)).toBe(3);
     expect(scrapePriority({ ...base, followers: 300_000 }, NOW)).toBe(4);
     expect(scrapePriority(base, NOW)).toBe(6);
     expect(scrapePriority({ ...base, lastPostAt: new Date(NOW - 90 * DAY).toISOString() }, NOW)).toBe(8);
-    expect(nextScrapeAt(8, NOW)).toBe(new Date(NOW + 7 * DAY).toISOString());
   });
 
-  it("backs off after failures, capped at two weeks", () => {
-    expect(retryAfterFailure(1, NOW)).toBe(new Date(NOW + DAY).toISOString());
-    expect(retryAfterFailure(3, NOW)).toBe(new Date(NOW + 4 * DAY).toISOString());
-    expect(retryAfterFailure(9, NOW)).toBe(new Date(NOW + 14 * DAY).toISOString());
+  it("comes back 7 days later whatever the priority", () => {
+    for (const p of [1, 3, 6, 8]) expect(nextScrapeAt(p, NOW)).toBe(new Date(NOW + 7 * DAY).toISOString());
+    vi.stubEnv("SCRAPE_REFRESH_INTERVAL_DAYS", "14");
+    expect(nextScrapeAt(1, NOW)).toBe(new Date(NOW + 14 * DAY).toISOString());
+  });
+
+  it("refreshes creators brands work with twice a week (configurable, 0 = off)", () => {
+    expect(trackedIntervalDays()).toBe(3.5);
+    vi.stubEnv("SCRAPE_TRACKED_INTERVAL_DAYS", "0");
+    expect(trackedIntervalDays()).toBe(0);
+  });
+
+  it("backs off after failures: 1, 2, 4 then 8 weeks", () => {
+    expect(retryAfterFailure(1, NOW)).toBe(new Date(NOW + 7 * DAY).toISOString());
+    expect(retryAfterFailure(2, NOW)).toBe(new Date(NOW + 14 * DAY).toISOString());
+    expect(retryAfterFailure(3, NOW)).toBe(new Date(NOW + 28 * DAY).toISOString());
+    expect(retryAfterFailure(9, NOW)).toBe(new Date(NOW + 56 * DAY).toISOString());
+  });
+});
+
+describe("weekly budget", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("weeks start on Monday 00:00 UTC", () => {
+    expect(weekStart(Date.parse("2026-09-30T12:00:00Z")).toISOString()).toBe("2026-09-28T00:00:00.000Z");
+    expect(weekStart(Date.parse("2026-10-05T00:00:00Z")).toISOString()).toBe("2026-10-05T00:00:00.000Z");
+    expect(weekIndex(Date.parse("2026-10-05T00:00:00Z")) - weekIndex(Date.parse("2026-10-04T23:59:59Z"))).toBe(1);
+  });
+
+  it("reads the caps from the environment", () => {
+    expect(weeklyCaps()).toEqual({ refreshes: 20_000, discoveryKeywords: 150, newCreators: 2_500 });
+    vi.stubEnv("SCRAPE_WEEKLY_MAX_CREATORS", "50000");
+    vi.stubEnv("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", "0");
+    expect(weeklyCaps()).toMatchObject({ refreshes: 50_000, discoveryKeywords: 0 });
+    expect(remaining(weeklyCaps(), { refreshJobs: 50_010, discoverJobs: 3, newCreators: 0, apiCalls: 0 })).toMatchObject({ refreshes: 0, discoveryKeywords: 0 });
+  });
+});
+
+describe("weekly discovery plan", () => {
+  const queries = ["a", "b", "c", "d", "e"];
+
+  it("splits the searches across platforms and rotates every week", () => {
+    const w0 = weeklyDiscoveryPlan({ platforms: ["tiktok", "instagram", "youtube"], maxKeywords: 7, weekIndex: 0, queries });
+    expect(w0.map((i) => `${i.platform}:${i.keyword}`)).toEqual(["tiktok:a", "tiktok:b", "tiktok:c", "instagram:a", "instagram:b", "youtube:a", "youtube:b"]);
+    const w1 = weeklyDiscoveryPlan({ platforms: ["tiktok"], maxKeywords: 2, weekIndex: 1, queries });
+    expect(w1.map((i) => i.keyword)).toEqual(["c", "d"]);
+    const w2 = weeklyDiscoveryPlan({ platforms: ["tiktok"], maxKeywords: 2, weekIndex: 2, queries });
+    expect(w2.map((i) => i.keyword)).toEqual(["e", "a"]);
+  });
+
+  it("puts hand-typed keywords first and never exceeds the cap", () => {
+    const plan = weeklyDiscoveryPlan({ platforms: ["tiktok", "youtube"], maxKeywords: 3, weekIndex: 0, extra: ["Protein Bars"], queries });
+    expect(plan.map((i) => `${i.platform}:${i.keyword}`)).toEqual(["tiktok:protein bars", "youtube:protein bars", "tiktok:a"]);
+    expect(weeklyDiscoveryPlan({ platforms: ["tiktok"], maxKeywords: 0, weekIndex: 0, queries })).toEqual([]);
+  });
+
+  it("uses the niche tree by default", () => {
+    const plan = weeklyDiscoveryPlan({ platforms: ["tiktok"], maxKeywords: 10, weekIndex: 3 });
+    expect(plan).toHaveLength(10);
+    expect(new Set(plan.map((i) => i.keyword)).size).toBe(10);
   });
 });

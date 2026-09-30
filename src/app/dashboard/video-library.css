@@ -26,6 +26,10 @@
 .vl-card__stats svg { color: var(--ws-text-dim); }
 .vl-card__shop { color: #b45309; }
 .vl-card__shop svg { color: #b45309 !important; }
+.vl-card__viral { position: absolute; right: 10px; bottom: 10px; padding: 3px 8px; border-radius: 8px; background: #ef4444; color: #fff; font-size: 11.5px; font-weight: 700; }
+.vl-card__product { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 7px 10px; border-radius: 10px; background: rgba(180, 83, 9, .08); color: #b45309; font-size: 12.5px; font-weight: 650; text-decoration: none; }
+.vl-card__product:hover { background: rgba(180, 83, 9, .14); }
+.vl-card__product small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; opacity: .8; }
 .vl-card__tags { display: flex; flex-wrap: wrap; gap: 5px; }
 .vl-card__tags span { padding: 2px 7px; border-radius: 6px; background: var(--ws-accent-soft); color: var(--ws-accent); font-size: 11.5px; font-weight: 600; }
 .vl-card__foot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

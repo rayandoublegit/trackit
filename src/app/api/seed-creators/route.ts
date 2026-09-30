@@ -154,10 +154,10 @@ async function seedNiche(niche: string): Promise<number> {
       const avatarUrls = p.avatar_thumb?.url_list || p.avatar_medium?.url_list || [];
 
       return {
-        username: p.unique_id,
+        username: String(p.unique_id).trim().replace(/^@/, "").toLowerCase(),
         display_name: p.nickname || p.unique_id,
         avatar_url: avatarUrls[0] || "",
-        platform: "TikTok",
+        platform: "tiktok",
         followers,
         engagement_rate: Math.min(engRate, 99.99),
         avg_views: Math.floor(followers * 0.08),

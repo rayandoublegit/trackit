@@ -29,7 +29,8 @@ export async function GET(request: Request) {
   let sel = supabaseAdmin
     .from("creators_index")
     .select("username")
-    .eq("platform", "tiktok")
+    // Case-insensitive until migration 000046 (lowercase platforms) is applied everywhere.
+    .ilike("platform", "tiktok")
     .neq("enrichment_status", "failed");
   // Optional FR-priority pass: only creators already tagged French (e.g. curated
   // picks awaiting enrichment). Lets us fill the FR discovery feed in one run.

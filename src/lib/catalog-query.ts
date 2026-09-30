@@ -1,11 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DiscoveryCreatorResult } from "@/lib/discovery-live";
 import {
   catalogRowToFeedCreator,
   CREATOR_GROWTH_COLUMNS,
   CREATOR_LIST_COLUMNS,
-  creatorMatchesGeoFilter,
-  creatorMatchesNicheFilter,
+  CREATOR_VIDEO_STATS_COLUMNS,
   nicheOrClause,
   type FeedCreator,
 } from "@/lib/discovery-feed";
@@ -14,13 +13,27 @@ import { estimatedCostPerPost, estimatedCpm, valueScore, valueTier } from "@/lib
 import { searchRapidApiCreators } from "@/lib/rapidapi-creators";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { imgProxyUrl } from "@/lib/client-image-url";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // One query for the creator catalog (creators_index), shared by /api/catalog
 // and Mino's creator search, plus a live search through RapidAPI for what the
 // catalog does not hold yet (Instagram today).
+//
+// What each filter reads (all in SQL, nothing re-filtered afterwards):
+//   followers              followers
+//   avg views              avg_views (median views of the latest posts), only when
+//                          posts_analyzed > 0: seeded rows carry estimates, not measures
+//   engagement             engagement_rate, in percent: (likes + comments + shares) / views
+//   reach                  views_per_follower = avg views / followers (1 = 100%)
+//   likes/comments/shares  avg_likes / avg_comments / avg_shares (medians per post)
+//   viral video            viral_videos > 0 (rule in lib/viral.ts), migration 000047
+//   growth                 followers_growth_pct_30d, migration 000044
+// A filter on a value a creator does not have yet excludes that creator; any
+// other filter keeps it. Platform is compared without case ("TikTok" = "tiktok").
 
 export type CatalogPlatform = "TikTok" | "Instagram" | "YouTube";
-export type CatalogSort = "followers" | "engagement" | "views" | "reach" | "recent" | "growth";
+export type CatalogSort = "followers" | "engagement" | "views" | "reach" | "recent" | "growth" | "viral";
+export const CATALOG_SORTS: readonly CatalogSort[] = ["followers", "engagement", "views", "reach", "recent", "growth", "viral"];
 
 export type CatalogQuery = {
   search?: string;
@@ -29,6 +42,7 @@ export type CatalogQuery = {
   country?: string;
   minFollowers?: number;
   maxFollowers?: number;
+  /** Percent, e.g. 6 = 6%. */
   minEngagement?: number;
   minViews?: number;
   maxViews?: number;
@@ -38,6 +52,10 @@ export type CatalogQuery = {
   /** Average views as a share of followers (1 = videos reach as many people as follow). */
   minReach?: number;
   minLikes?: number;
+  minComments?: number;
+  minShares?: number;
+  /** At least one viral video (lib/viral.ts). */
+  viral?: boolean;
   /** Follower growth over 30 days, in percent (needs tracked history). */
   minGrowthPct30d?: number;
   platform?: CatalogPlatform;
@@ -55,12 +73,53 @@ const SORT_COLUMN: Record<CatalogSort, string> = {
   reach: "views_per_follower",
   recent: "last_post_at",
   growth: "growth_score",
+  viral: "max_video_views",
 };
 
-// The growth columns exist once the creator-intelligence migration is applied.
-// Until then (or if it's ever rolled back) the catalog quietly uses the base set.
-let growthColumns: boolean | null = null;
-const isMissingColumn = (message: string) => /column .* does not exist|could not find the .* column/i.test(message);
+// Which optional columns exist: 0 = base, 1 = + growth (migration 000044),
+// 2 = + video stats (migration 000047). Detected once, then cached; until a
+// migration is applied the catalog keeps working without what it adds.
+type SchemaLevel = 0 | 1 | 2;
+let schemaLevel: SchemaLevel | null = null;
+
+/** Tests only: forget the detected schema. */
+export function resetCatalogSchemaCache() {
+  schemaLevel = null;
+}
+
+function columnsFor(level: SchemaLevel): string {
+  return [CREATOR_LIST_COLUMNS, level >= 1 ? CREATOR_GROWTH_COLUMNS : "", level >= 2 ? CREATOR_VIDEO_STATS_COLUMNS : ""].filter(Boolean).join(",");
+}
+
+export const isMissingColumn = (message: string) => /column .* does not exist|could not find the .* column/i.test(message);
+
+// Creators with no known country count for a country when their content is in
+// that country's language. English is shared by too many countries to infer one.
+const COUNTRY_LANGUAGE: Record<string, string> = { FR: "fr", DE: "de", IT: "it", ES: "es", PT: "pt", BR: "pt" };
+
+/** PostgREST `or` clause for a country filter (see COUNTRY_LANGUAGE). */
+export function countryOrClause(
+  country: string,
+  cols: { country: string; language: string } = { country: "country_code", language: "language" },
+): string | null {
+  const cc = country.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+  if (cc.length !== 2) return null;
+  const lang = COUNTRY_LANGUAGE[cc];
+  const exact = `${cols.country}.ilike.${cc}`;
+  return lang ? `${exact},and(${cols.country}.is.null,${cols.language}.ilike.${lang})` : exact;
+}
+
+/**
+ * Niche clause: the niche's own tags, or, for a free-text niche from Mino
+ * ("vegan food"), the tags of each of its words.
+ */
+export function nicheClause(niche: string): string | null {
+  const exact = nicheOrClause(niche);
+  if (exact) return exact;
+  const words = niche.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  const items = new Set(words.flatMap((w) => (nicheOrClause(w) ?? "").split(",")).filter(Boolean));
+  return items.size ? [...items].join(",") : null;
+}
 
 export function parsePlatform(raw: string | null | undefined): CatalogPlatform | undefined {
   const v = (raw || "").trim().toLowerCase();
@@ -70,173 +129,144 @@ export function parsePlatform(raw: string | null | undefined): CatalogPlatform |
   return undefined;
 }
 
-function nonNegInt(raw: string | null): number | undefined {
-  if (raw == null || raw === "") return undefined;
+function nonNeg(raw: string | null): number | undefined {
+  if (raw == null || raw.trim() === "") return undefined;
   const v = Number(raw);
   return Number.isFinite(v) && v >= 0 ? v : undefined;
 }
+const positive = (raw: string | null) => {
+  const v = nonNeg(raw);
+  return v ? v : undefined;
+};
+const flag = (raw: string | null) => raw === "1" || raw === "true";
+/** Characters with a meaning in PostgREST filters are dropped from a free-text search. */
+export const cleanSearch = (raw: string) =>
+  raw
+    .trim()
+    .replace(/^@/, "")
+    .replace(/[%_,()*"\\]/g, "")
+    .trim();
 
 /** Reads a CatalogQuery from URL search params (the /api/catalog contract). */
 export function catalogQueryFromParams(p: URLSearchParams): CatalogQuery {
-  const searchRaw = (p.get("search") || p.get("q") || "").trim().replace(/^@/, "");
-  const sort = p.get("sort");
+  const searchRaw = cleanSearch(p.get("search") || p.get("q") || "");
+  const sort = p.get("sort") as CatalogSort | null;
   return {
-    search: searchRaw.length >= 2 ? searchRaw.replace(/[%_,()]/g, "") : undefined,
+    search: searchRaw.length >= 2 ? searchRaw : undefined,
     niche: p.get("niche") || undefined,
-    language: p.get("language") || undefined,
+    language: (p.get("language") || "").trim().toLowerCase() || undefined,
     country: (p.get("country") || "").trim().toUpperCase() || undefined,
-    minFollowers: nonNegInt(p.get("minFollowers")),
-    maxFollowers: nonNegInt(p.get("maxFollowers")),
-    minEngagement: nonNegInt(p.get("minEngagement")),
-    minViews: nonNegInt(p.get("minViews")),
-    maxViews: nonNegInt(p.get("maxViews")),
-    hasEmail: p.get("hasEmail") === "1" || p.get("hasEmail") === "true",
-    activeWithinDays: nonNegInt(p.get("activeWithinDays")),
-    verified: p.get("verified") === "1" || p.get("verified") === "true",
-    minReach: Number(p.get("minReach")) > 0 ? Number(p.get("minReach")) : undefined,
-    minLikes: nonNegInt(p.get("minLikes")),
-    minGrowthPct30d: Number(p.get("minGrowth")) > 0 ? Number(p.get("minGrowth")) : undefined,
+    minFollowers: nonNeg(p.get("minFollowers")),
+    maxFollowers: nonNeg(p.get("maxFollowers")),
+    minEngagement: positive(p.get("minEngagement")),
+    minViews: positive(p.get("minViews")),
+    maxViews: positive(p.get("maxViews")),
+    hasEmail: flag(p.get("hasEmail")),
+    activeWithinDays: positive(p.get("activeWithinDays")),
+    verified: flag(p.get("verified")),
+    minReach: positive(p.get("minReach")),
+    minLikes: positive(p.get("minLikes")),
+    minComments: positive(p.get("minComments")),
+    minShares: positive(p.get("minShares")),
+    viral: flag(p.get("viral")),
+    minGrowthPct30d: positive(p.get("minGrowth")),
     platform: parsePlatform(p.get("platform")),
-    sort: sort === "engagement" || sort === "views" || sort === "reach" || sort === "recent" || sort === "growth" ? sort : "followers",
-    offset: Math.max(0, Number(p.get("offset")) || 0),
+    sort: sort && CATALOG_SORTS.includes(sort) ? sort : "followers",
+    offset: Math.max(0, Math.floor(Number(p.get("offset")) || 0)),
     limit: Number(p.get("limit")) || undefined,
   };
 }
 
-export async function queryCatalog(q: CatalogQuery): Promise<CatalogResult> {
-  if (growthColumns !== false) {
-    const withGrowth = await runCatalogQuery(q, true);
-    if (!withGrowth.error || !isMissingColumn(withGrowth.error)) {
-      growthColumns = true;
-      return withGrowth;
+/**
+ * The catalog query. `client` defaults to the service-role client; the DB
+ * tests pass one bound to a local Postgres.
+ */
+export async function queryCatalog(q: CatalogQuery, client?: SupabaseClient | null): Promise<CatalogResult> {
+  const admin = client ?? getSupabaseAdmin();
+  if (!admin) return { creators: [], hasMore: false, error: "no db" };
+  let level: SchemaLevel = schemaLevel ?? 2;
+  for (;;) {
+    const result = await runCatalogQuery(admin, q, level);
+    if (result.error && isMissingColumn(result.error) && level > 0) {
+      level = (level - 1) as SchemaLevel;
+      continue;
     }
-    growthColumns = false;
+    if (!result.error) schemaLevel = level;
+    return result;
   }
-  return runCatalogQuery(q, false);
 }
 
-async function runCatalogQuery(q: CatalogQuery, withGrowth: boolean): Promise<CatalogResult> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return { creators: [], hasMore: false, error: "no db" };
-  const admin = createClient(url, key);
+async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: SchemaLevel): Promise<CatalogResult> {
+  // A filter on a value this database does not hold yet matches nobody.
+  if ((q.viral && level < 2) || (q.minGrowthPct30d && level < 1)) return { creators: [], hasMore: false };
 
+  const search = q.search ? cleanSearch(q.search) : "";
   const offset = Math.max(0, q.offset ?? 0);
-  const maxLimit = q.search || q.niche ? 50 : 100;
-  const defaultLimit = q.search ? 30 : q.niche ? 25 : 48;
+  const maxLimit = search || q.niche ? 50 : 100;
+  const defaultLimit = search ? 30 : q.niche ? 25 : 48;
   const limit = Math.min(maxLimit, Math.max(1, q.limit || defaultLimit));
-  const COLUMNS = withGrowth ? `${CREATOR_LIST_COLUMNS},${CREATOR_GROWTH_COLUMNS}` : CREATOR_LIST_COLUMNS;
-  // Without tracked history, "growth" falls back to reach (views vs followers).
-  const sortKey = q.sort === "growth" && !withGrowth ? "reach" : q.sort ?? "followers";
-  const sortColumn = SORT_COLUMN[sortKey];
-  const followerBounds = { min: q.minFollowers, max: q.maxFollowers };
+  let sortKey: CatalogSort = q.sort ?? "followers";
+  // Without tracked history, "growth" ranks by reach (views vs followers).
+  if (sortKey === "growth" && level < 1) sortKey = "reach";
+  if (sortKey === "viral" && level < 2) sortKey = "views";
 
-  const applyFilters = (query: any) => {
-    let out = query;
-    // Stored platform values vary in case ("tiktok", "TikTok"): match without case.
-    if (q.platform) out = out.ilike("platform", q.platform);
-    if (q.minFollowers != null) out = out.gte("followers", q.minFollowers);
-    if (q.maxFollowers != null) out = out.lte("followers", q.maxFollowers);
-    if (q.minEngagement) out = out.gte("engagement_rate", q.minEngagement);
-    if (q.minViews) out = out.gte("avg_views", q.minViews);
-    if (q.maxViews) out = out.lte("avg_views", q.maxViews);
-    if (q.hasEmail) out = out.not("email", "is", null).neq("email", "");
-    if (q.verified) out = out.gte("authenticity_score", 60);
-    if (q.minReach) out = out.gte("views_per_follower", q.minReach);
-    if (q.minLikes) out = out.gte("avg_likes", q.minLikes);
-    if (q.minGrowthPct30d && withGrowth) out = out.gte("followers_growth_pct_30d", q.minGrowthPct30d);
-    if (q.activeWithinDays) {
-      const since = new Date(Date.now() - q.activeWithinDays * 86_400_000).toISOString();
-      out = out.gte("last_post_at", since);
+  let query: any = admin.from("creators_index").select(columnsFor(level));
+  const orGroups: string[] = [];
+
+  // Stored platform values vary in case: ilike without wildcards = equality without case.
+  if (q.platform) query = query.ilike("platform", q.platform);
+  if (q.minFollowers != null) query = query.gte("followers", q.minFollowers);
+  if (q.maxFollowers != null) query = query.lte("followers", q.maxFollowers);
+  if (q.minEngagement) query = query.gte("engagement_rate", q.minEngagement);
+  if (q.minViews || q.maxViews) query = query.gt("posts_analyzed", 0);
+  if (q.minViews) query = query.gte("avg_views", q.minViews);
+  if (q.maxViews) query = query.lte("avg_views", q.maxViews);
+  if (q.minReach) query = query.gte("views_per_follower", q.minReach);
+  if (q.minLikes) query = query.gte("avg_likes", q.minLikes);
+  if (q.minComments) query = query.gte("avg_comments", q.minComments);
+  if (q.minShares) query = query.gte("avg_shares", q.minShares);
+  if (q.viral) query = query.gt("viral_videos", 0);
+  if (q.minGrowthPct30d) query = query.gte("followers_growth_pct_30d", q.minGrowthPct30d);
+  if (q.hasEmail) query = query.not("email", "is", null).neq("email", "");
+  if (q.verified) query = query.gte("authenticity_score", 60);
+  if (q.activeWithinDays) {
+    const since = new Date(Date.now() - q.activeWithinDays * 86_400_000).toISOString();
+    query = query.gte("last_post_at", since);
+  }
+  if (search) {
+    // A name search is global: it ignores niche, country and language.
+    const pattern = `%${search}%`;
+    orGroups.push(`username.ilike.${pattern},display_name.ilike.${pattern},email.ilike.${pattern}`);
+  } else {
+    if (q.language) query = query.ilike("language", q.language);
+    if (q.country) {
+      const or = countryOrClause(q.country);
+      if (or) orGroups.push(or);
     }
-    if (q.search) return out; // a name search ignores the audience filters below
-    if (q.language) out = out.eq("language", q.language);
-    if (q.country) out = out.or(`country_code.eq.${q.country},country_code.is.null`);
     if (q.niche) {
-      const or = nicheOrClause(q.niche);
-      if (or) out = out.or(or);
+      const or = nicheClause(q.niche);
+      // A niche we have no tag for matches nobody (Mino then tries names and handles).
+      if (!or) return { creators: [], hasMore: false };
+      orGroups.push(or);
     }
-    return out;
-  };
+  }
+  // One `or` parameter holding every group, so no group can replace another.
+  if (orGroups.length === 1) query = query.or(orGroups[0]);
+  else if (orGroups.length > 1) query = query.or(`and(${orGroups.map((g) => `or(${g})`).join(",")})`);
+
+  // Hand-picked creators lead the default browse; any other sort is a pure ranking.
+  if (sortKey === "followers" && !search) query = query.order("is_curated", { ascending: false, nullsFirst: false });
+  query = query.order(SORT_COLUMN[sortKey], { ascending: false, nullsFirst: false });
+  // Creators without history yet rank after the tracked ones, by reach.
+  if (sortKey === "growth") query = query.order("views_per_follower", { ascending: false, nullsFirst: false });
+  if (sortKey !== "followers") query = query.order("followers", { ascending: false, nullsFirst: false });
+  // A unique last key keeps pages stable: page 2 starts exactly where page 1 ended.
+  query = query.order("username", { ascending: true }).range(offset, offset + limit);
 
   try {
-    if (q.search) {
-      const pattern = `%${q.search}%`;
-      let sq = admin
-        .from("creators_index")
-        .select(COLUMNS)
-        .or(`username.ilike.${pattern},display_name.ilike.${pattern},email.ilike.${pattern}`)
-        .order(sortColumn, { ascending: false, nullsFirst: false })
-        .range(offset, offset + limit);
-      sq = applyFilters(sq);
-      const { data, error } = await sq;
-      if (error) return { creators: [], hasMore: false, error: error.message };
-      const rows = (data ?? []) as unknown as Record<string, unknown>[];
-      return { creators: rows.slice(0, limit).map(catalogRowToFeedCreator), hasMore: rows.length > limit };
-    }
-
-    // Oversample when the niche safety net may drop rows after SQL.
-    const fetchTo = q.niche ? offset + limit * 3 : offset + limit;
-    let mq = admin
-      .from("creators_index")
-      .select(COLUMNS)
-      .order(sortColumn, { ascending: false, nullsFirst: false })
-      .range(offset, fetchTo);
-    mq = applyFilters(mq);
-    // Creators without history yet rank after the tracked ones, by reach.
-    if (sortKey === "growth") mq = mq.order("views_per_follower", { ascending: false, nullsFirst: false });
-
-    // Curated picks lead the first page, still inside the filters.
-    let curated: Record<string, unknown>[] = [];
-    if (offset === 0) {
-      let cq = admin
-        .from("creators_index")
-        .select(COLUMNS)
-        .eq("is_curated", true)
-        .order(sortColumn, { ascending: false, nullsFirst: false })
-        .limit(20);
-      cq = applyFilters(cq);
-      const cr = await cq;
-      curated = ((cr.data ?? []) as unknown as Record<string, unknown>[]).filter((row) =>
-        creatorMatchesFollowerRange(Number(row.followers ?? 0), followerBounds),
-      );
-    }
-
-    const { data, error } = await mq;
+    const { data, error } = await query;
     if (error) return { creators: [], hasMore: false, error: error.message };
-
-    let rows = (data ?? []) as unknown as Record<string, unknown>[];
-    if (curated.length) {
-      const seen = new Set(curated.map((r) => String(r.username || "").toLowerCase()));
-      rows = [...curated, ...rows.filter((r) => !seen.has(String(r.username || "").toLowerCase()))];
-    }
-    const nicheFilter = q.niche;
-    if (nicheFilter) {
-      rows = rows.filter((row) =>
-        creatorMatchesNicheFilter(
-          {
-            primaryNiche: typeof row.primary_niche === "string" ? row.primary_niche : "",
-            niche: typeof row.primary_niche === "string" ? row.primary_niche : "",
-            niches: Array.isArray(row.niches) ? (row.niches as string[]) : [],
-          },
-          nicheFilter,
-        ),
-      );
-    }
-    if (q.country || q.language) {
-      rows = rows.filter((row) =>
-        creatorMatchesGeoFilter(
-          {
-            countryCode: typeof row.country_code === "string" ? row.country_code : null,
-            language: typeof row.language === "string" ? row.language : "",
-          },
-          { country: q.country, language: q.language },
-        ),
-      );
-    }
-    if (q.minFollowers != null || q.maxFollowers != null) {
-      rows = rows.filter((row) => creatorMatchesFollowerRange(Number(row.followers ?? 0), followerBounds));
-    }
+    const rows = (data ?? []) as Record<string, unknown>[];
     return { creators: rows.slice(0, limit).map(catalogRowToFeedCreator), hasMore: rows.length > limit };
   } catch (e) {
     return { creators: [], hasMore: false, error: e instanceof Error ? e.message : "catalog failed" };

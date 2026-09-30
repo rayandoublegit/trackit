@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     handle: username,
     full_name: String(body.display_name ?? username),
     avatar_url: String(body.avatar_url ?? ""),
-    platform: String(body.platform ?? "TikTok"),
+    platform: String(body.platform || "tiktok").trim().toLowerCase(),
     followers: Number(body.followers_count ?? 0) || 0,
     engagement_rate: Number(body.engagement_rate ?? 0) || 0,
     niche: String(body.niche ?? ""),

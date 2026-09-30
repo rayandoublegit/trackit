@@ -71,6 +71,8 @@
 .cp-video__rank { position: absolute; top: 8px; right: 8px; padding: 2px 7px; border-radius: 7px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 11px; font-weight: 700; }
 .cp-video__views { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: rgba(0, 0, 0, .6); color: #fff; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .cp-video__gain { position: absolute; left: 8px; top: 8px; padding: 2px 7px; border-radius: 7px; background: #10b981; color: #fff; font-size: 11px; font-weight: 700; }
+.cp-video__viral { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px; border-radius: 7px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; }
+.cp-video__shop { color: #b45309; font-weight: 600; }
 .cp-video__meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .cp-video__caption { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12.5px; line-height: 1.35; color: var(--ws-text); }
 .cp-video__stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11.5px; color: var(--ws-text-dim); }

@@ -31,7 +31,10 @@ export async function runCreatorSearch(search: MinoCreatorSearch, limit = 12): P
     maxFollowers: search.maxFollowers,
     country: search.country,
     hasEmail: search.hasEmail,
-    sort: "engagement",
+    minEngagement: search.minEngagement,
+    minViews: search.minViews,
+    viral: search.viral,
+    sort: search.sort === "growth" ? "growth" : search.viral ? "viral" : "engagement",
     limit,
   };
 

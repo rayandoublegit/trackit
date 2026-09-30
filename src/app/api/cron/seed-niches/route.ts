@@ -81,7 +81,7 @@ async function seedTarget(query: string, tags: string[], pages: number) {
       const upserts = await Promise.all(
         filtered.map(async u => {
           const followers = Number(u.follower_count || 0);
-          const username = String(u.unique_id);
+          const username = String(u.unique_id).trim().replace(/^@/, "").toLowerCase();
           const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(String(u.nickname || u.unique_id))}&background=e5e5e5&color=9a9a9a&size=200&bold=true&rounded=true`;
           const remote = u.avatar_medium?.url_list?.[0] || u.avatar_168x168?.url_list?.[0] || "";
           // Store the avatar permanently; fall back to remote URL, then ui-avatars.
@@ -90,7 +90,7 @@ async function seedTarget(query: string, tags: string[], pages: number) {
             username,
             display_name: String(u.nickname || u.unique_id),
             avatar_url: stored || remote || fallback,
-            platform: "TikTok",
+            platform: "tiktok",
             followers,
             bio: String(u.signature || ""),
             // GARDE-FOU: le seeder ne doit JAMAIS poser le tag "curated" (reserve a l'ajout manuel).

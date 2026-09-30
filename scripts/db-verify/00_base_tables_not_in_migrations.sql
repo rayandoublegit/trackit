@@ -38,6 +38,11 @@ create table if not exists public.creators_index (
   avatar_url text,
   bio text,
   avg_views bigint,
+  -- Read by the catalog in production, added by hand before migrations existed.
+  language text,
+  location text,
+  video_thumbnails jsonb,
+  is_curated boolean default false,
   created_at timestamptz not null default now()
 );
 create table if not exists public.scripts (id uuid primary key default gen_random_uuid(), brand_id uuid, created_at timestamptz default now());

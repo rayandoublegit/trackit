@@ -9,6 +9,14 @@ export type MinoCreatorSearch = {
   maxFollowers?: number;
   country?: string;
   hasEmail?: boolean;
+  /** Percent: "5% engagement" = 5. */
+  minEngagement?: number;
+  /** Average views per video. */
+  minViews?: number;
+  /** At least one viral video (lib/viral.ts). */
+  viral?: boolean;
+  /** "growing fast" ranks by growth. */
+  sort?: "growth";
 };
 
 const INTENT = /\b(influenc\w*|cr[ée]at\w*|creators?|ugc|tiktokers?|instagrammers?|youtubers?|cherche\w*|trouve\w*|recherche\w*|profils?|find|search|look(?:ing)? for|list|liste|niche)\b/i;
@@ -45,7 +53,10 @@ const STOP = new Set(
     "italie italien italienne italiens italiennes portugais portugaise canadien canadienne canadiens canadiennes " +
     "brésil brésilien brésilienne brésiliens brésiliennes sur tiktokeurs tiktokeuses instagrameurs youtubeurs youtubeuses " +
     "quel quelle quels quelles on aujourd’hui aujourd'hui mes mon ma nos notre ces cet cette ceux celles très " +
-    "meilleur meilleure meilleurs meilleures bons bonnes comptes compte"
+    "meilleur meilleure meilleurs meilleures bons bonnes comptes compte " +
+    // Performance words (read as filters, never as a niche)
+    "views vues vue engagement engagements engaging engageant engageants engageante engageantes rate taux high fort forte bon bonne " +
+    "viral virale virales viraux buzz video videos vidéo vidéos growing grow fast scaling rising croissance rapide montent monte percent pourcent"
   ).split(" "),
 );
 
@@ -65,6 +76,16 @@ function amount(raw: string, unit?: string): number {
   return Math.round(u === "m" ? n * 1_000_000 : u === "k" ? n * 1_000 : n);
 }
 
+const HIGH_ENGAGEMENT = 6;
+// "100k views", "plus de 50k vues", "at least 1m views"
+const VIEWS_RE = /(?:(?:over|above|more than|plus de|au moins|at least|min(?:imum)?)\s*)?(\d+(?:[.,]\d+)?)\s*(k|m)?\s*\+?\s*(?:views|vues?)\b/;
+// "5% engagement", "engagement above 5%", "taux d'engagement de 8 %"
+const ER_BEFORE = /(\d+(?:[.,]\d+)?)\s*%\s*\+?\s*(?:of\s+|d\s+)?(?:engagement|eng)\b/;
+const ER_AFTER = /engagement\s*(?:rate\s*)?(?:of|de|over|above|plus de|sup[ée]rieur\s*[àa]|au[- ]dessus\s*de|>|≥|at least|au moins)?\s*(\d+(?:[.,]\d+)?)\s*%/;
+const ER_HIGH = /\b(?:high|strong|great|good|fort|forte|bon|bonne|excellent|excellente)\s+engagement\b|\bengagement\s+(?:[ée]lev[ée]|fort)\b|\b(?:tr[eè]s\s+)?engag(?:ing|eants?|eantes?)\b/;
+const VIRAL_RE = /\b(?:vira(?:l|le|les|ux)|buzz)\b/;
+const GROWTH_RE = /\b(?:fast[- ]growing|growing fast|growing|scaling|rising|en (?:forte |pleine )?croissance|qui (?:montent|monte|grandissent)|[àa] forte croissance)\b/;
+
 /** Null when the text is not a creator search. */
 export function parseCreatorSearch(text: string): MinoCreatorSearch | null {
   if (!INTENT.test(text)) return null;
@@ -74,6 +95,28 @@ export function parseCreatorSearch(text: string): MinoCreatorSearch | null {
   for (const [re, tag] of FR_PHRASES) t = t.replace(re, tag);
   // "micro-créateurs", "nano-influenceuses": the tier and the noun are two words.
   t = t.replace(/\b(nano|micro|macro|mega)-(?=cr|infl)/g, "$1 ");
+
+  // Performance asks first, so their numbers are not read as follower counts.
+  let minViews: number | undefined;
+  const views = t.match(VIEWS_RE);
+  if (views) {
+    minViews = amount(views[1], views[2]) || undefined;
+    t = t.replace(VIEWS_RE, " ");
+  }
+  let minEngagement: number | undefined;
+  const erBefore = t.match(ER_BEFORE);
+  const erAfter = erBefore ? null : t.match(ER_AFTER);
+  const er = erBefore ?? erAfter;
+  if (er) {
+    const pct = Number(er[1].replace(",", "."));
+    if (pct > 0 && pct < 100) minEngagement = pct;
+    t = t.replace(erBefore ? ER_BEFORE : ER_AFTER, " ");
+  } else if (ER_HIGH.test(t)) {
+    minEngagement = HIGH_ENGAGEMENT;
+  }
+  const viral = VIRAL_RE.test(t) || undefined;
+  const sort = GROWTH_RE.test(t) ? ("growth" as const) : undefined;
+  t = t.replace(GROWTH_RE, " ");
 
   let platform: CatalogPlatform | undefined;
   if (/\b(instagram|insta|ig|reels?)\b/.test(t)) platform = "Instagram";
@@ -103,7 +146,7 @@ export function parseCreatorSearch(text: string): MinoCreatorSearch | null {
   const hasEmail = /\b(e-?mails?|contact|mails?|courriels?|joignables?)\b/.test(t) || undefined;
 
   const niche = t
-    .replace(/[?.!,;:()"“”«»]/g, " ")
+    .replace(/[?.!,;:()"“”«»%+]/g, " ")
     .replace(/\d+(?:[.,]\d+)?\s*(k|m)?\+?/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 1 && !STOP.has(w))
@@ -111,7 +154,7 @@ export function parseCreatorSearch(text: string): MinoCreatorSearch | null {
     .trim()
     .slice(0, 48);
 
-  return { niche, platform, minFollowers, maxFollowers, country, hasEmail };
+  return { niche, platform, minFollowers, maxFollowers, country, hasEmail, minEngagement, minViews, viral, sort };
 }
 
 /** Short human label of what was searched, e.g. "skincare · TikTok · 50K+ · FR". */
@@ -124,6 +167,10 @@ export function describeSearch(s: MinoCreatorSearch, lang: "en" | "fr" = "en"): 
   else if (s.minFollowers) parts.push(`${k(s.minFollowers)}+`);
   else if (s.maxFollowers) parts.push(fr ? `moins de ${k(s.maxFollowers)}` : `under ${k(s.maxFollowers)}`);
   if (s.country) parts.push(s.country);
+  if (s.minViews) parts.push(fr ? `${k(s.minViews)}+ vues` : `${k(s.minViews)}+ views`);
+  if (s.minEngagement) parts.push(fr ? `${String(s.minEngagement).replace(".", ",")} %+ d'engagement` : `${s.minEngagement}%+ engagement`);
+  if (s.viral) parts.push(fr ? "vidéo virale" : "viral video");
+  if (s.sort === "growth") parts.push(fr ? "en forte croissance" : "fast growing");
   if (s.hasEmail) parts.push(fr ? "avec email" : "with email");
   return parts.join(" · ");
 }

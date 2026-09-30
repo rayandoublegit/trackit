@@ -11,7 +11,7 @@ import "./catalog-bar.css";
 // ready-made views (Weekly gems, Top scaling…), platform tabs, then every
 // filter in one card, and the sort.
 
-export type CatalogSortKey = "followers" | "engagement" | "views" | "reach" | "recent" | "growth";
+export type CatalogSortKey = "followers" | "engagement" | "views" | "reach" | "recent" | "growth" | "viral";
 export type CatalogMode = "creators" | "videos";
 
 export type CatalogFilters = {
@@ -24,6 +24,9 @@ export type CatalogFilters = {
   engagement: string;
   reach: string;
   likes: string;
+  comments: string;
+  shares: string;
+  viral: boolean;
   country: string;
   language: string;
   activity: string;
@@ -95,14 +98,14 @@ export const CATALOG_PRESETS: CatalogPreset[] = [
   {
     id: "viral",
     label: "Viral videos",
-    hint: "500K+ average views",
+    hint: "Creators with at least one video at 5x their usual views (100K minimum), biggest video first",
     icon: (
       <Svg>
         <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.1 1.6 1.2 2.7 2.5 2.7z" />
       </Svg>
     ),
-    patch: { viewsFrom: "500k" },
-    sort: "views",
+    patch: { viral: true },
+    sort: "viral",
   },
   {
     id: "leaders",
@@ -174,6 +177,16 @@ const LIKES: Option[] = [
   { value: "10k", label: "10K+" },
   { value: "100k", label: "100K+" },
 ];
+const COMMENTS: Option[] = [
+  { value: "100", label: "100+" },
+  { value: "1k", label: "1K+" },
+  { value: "10k", label: "10K+" },
+];
+const SHARES: Option[] = [
+  { value: "100", label: "100+" },
+  { value: "1k", label: "1K+" },
+  { value: "10k", label: "10K+" },
+];
 const COUNTRIES: Option[] = [
   { value: "US", label: "United States" },
   { value: "GB", label: "United Kingdom" },
@@ -204,6 +217,7 @@ const SORTS: { value: CatalogSortKey; label: string }[] = [
   { value: "views", label: "Most average views" },
   { value: "engagement", label: "Best engagement" },
   { value: "reach", label: "Best reach" },
+  { value: "viral", label: "Biggest video" },
   { value: "recent", label: "Latest post" },
 ];
 
@@ -211,7 +225,7 @@ type VideoPreset = { id: string; label: string; hint: string; patch: Partial<Vid
 const VIDEO_PRESETS: VideoPreset[] = [
   { id: "all", label: "All videos", hint: "Every tracked video", patch: { sort: "views" } },
   { id: "trending", label: "Trending now", hint: "Most views gained over the last 7 days", patch: { sort: "gained" } },
-  { id: "viral-week", label: "Viral this week", hint: "Posted in the last 7 days, most viewed", patch: { postedWithin: "7", sort: "views" } },
+  { id: "viral-week", label: "Viral this week", hint: "Posted in the last 7 days, at 5x the creator's usual views (100K minimum)", patch: { postedWithin: "7", viral: true, sort: "views" } },
   { id: "newest", label: "Newest", hint: "Latest posts first", patch: { sort: "recent" } },
   { id: "product", label: "With product link", hint: "Videos that link a product", patch: { hasProduct: true, sort: "views" } },
   { id: "engaging", label: "Most engaging", hint: "Best likes, comments and shares per view", patch: { sort: "engagement", minViews: "10k" } },
@@ -231,7 +245,10 @@ const VIDEO_POSTED: Option[] = [
 ];
 const VIDEO_FORMAT: Option[] = [
   { value: "video", label: "Video" },
+  { value: "short", label: "Short video" },
+  { value: "long", label: "Long video (3 min+)" },
   { value: "photo", label: "Photo post" },
+  { value: "carousel", label: "Carousel" },
 ];
 const VIDEO_LENGTH: Option[] = [
   { value: "short", label: "Under 15s" },
@@ -251,7 +268,7 @@ const PRESET_FR: Record<string, { label: string; hint: string }> = {
   all: { label: "Tous les créateurs", hint: "Tout le catalogue" },
   gems: { label: "Pépites de la semaine", hint: "10k–100k abonnés, 9 %+ d'engagement, publication dans les 7 derniers jours" },
   scaling: { label: "En forte croissance", hint: "Croissance d'abonnés et vues gagnées les plus rapides ; la portée départage tant que l'historique se construit" },
-  viral: { label: "Vidéos virales", hint: "500k+ vues en moyenne" },
+  viral: { label: "Vidéos virales", hint: "Créateurs avec au moins une vidéo à 5x leurs vues habituelles (100k minimum), plus grosse vidéo d'abord" },
   leaders: { label: "Leaders du marché", hint: "500k+ abonnés" },
   contact: { label: "Prêts à contacter", hint: "Créateurs avec un e-mail connu" },
   fresh: { label: "Publié cette semaine", hint: "Actifs dans les 7 derniers jours, les plus récents d'abord" },
@@ -259,7 +276,7 @@ const PRESET_FR: Record<string, { label: string; hint: string }> = {
 const VIDEO_PRESET_FR: Record<string, { label: string; hint: string }> = {
   all: { label: "Toutes les vidéos", hint: "Toutes les vidéos suivies" },
   trending: { label: "Tendances", hint: "Le plus de vues gagnées sur les 7 derniers jours" },
-  "viral-week": { label: "Virales cette semaine", hint: "Publiées dans les 7 derniers jours, les plus vues" },
+  "viral-week": { label: "Virales cette semaine", hint: "Publiées dans les 7 derniers jours, à 5x les vues habituelles du créateur (100k minimum)" },
   newest: { label: "Plus récentes", hint: "Les dernières publications d'abord" },
   product: { label: "Avec lien produit", hint: "Vidéos qui renvoient vers un produit" },
   engaging: { label: "Les plus engageantes", hint: "Meilleurs likes, commentaires et partages par vue" },
@@ -269,6 +286,7 @@ const OPTION_FR: Record<string, string> = {
   "10K – 100K": "10k – 100k",
   "100K – 500K": "100k – 500k",
   "500K+": "500k+",
+  "100+": "100+",
   "1K+": "1k+",
   "10K+": "10k+",
   "50K+": "50k+",
@@ -307,9 +325,13 @@ const OPTION_FR: Record<string, string> = {
   "Most average views": "Plus de vues en moyenne",
   "Best engagement": "Meilleur engagement",
   "Best reach": "Meilleure portée",
+  "Biggest video": "Vidéo la plus vue",
   "Latest post": "Publication la plus récente",
   Video: "Vidéo",
+  "Short video": "Vidéo courte",
+  "Long video (3 min+)": "Vidéo longue (3 min+)",
   "Photo post": "Publication photo",
+  Carousel: "Carrousel",
   "Under 15s": "Moins de 15 s",
   "15s – 60s": "15 s – 60 s",
   "Over 60s": "Plus de 60 s",
@@ -361,6 +383,16 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M7 10v12M15 5.9 14 10h5.8a2 2 0 0 1 1.9 2.6l-2.3 7a2 2 0 0 1-1.9 1.4H7V10l4-8a2.5 2.5 0 0 1 4 3.9z" />
     </Svg>
   ),
+  comments: (
+    <Svg>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </Svg>
+  ),
+  shares: (
+    <Svg>
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />
+    </Svg>
+  ),
   country: (
     <Svg>
       <circle cx="12" cy="12" r="10" />
@@ -397,17 +429,27 @@ function FilterPill({
   value,
   options,
   onChange,
+  hint,
+  customLabel,
+  children,
 }: {
   id: string;
   label: string;
   value: string;
   options: Option[];
   onChange: (v: string) => void;
+  /** One line under the title saying what the filter measures. */
+  hint?: string;
+  /** Label when the value is set outside the options (e.g. a date range). */
+  customLabel?: string;
+  /** Extra controls under the options (e.g. date inputs). */
+  children?: ReactNode;
 }) {
   const lang = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const current = options.find((o) => o.value === value);
+  const option = options.find((o) => o.value === value);
+  const current = option ?? (customLabel ? { value: "custom", label: customLabel } : undefined);
 
   useEffect(() => {
     if (!open) return;
@@ -465,7 +507,8 @@ function FilterPill({
       {open ? (
         <div className="cf-pop" role="listbox" aria-label={label}>
           <div className="cf-pop__title">{label}</div>
-          <button type="button" role="option" aria-selected={!value} className={`cf-pop__opt${!value ? " is-on" : ""}`} onClick={() => { onChange(""); setOpen(false); }}>
+          {hint ? <p className="cf-pop__hint">{hint}</p> : null}
+          <button type="button" role="option" aria-selected={!current} className={`cf-pop__opt${!current ? " is-on" : ""}`} onClick={() => { onChange(""); setOpen(false); }}>
             {lang === "fr" ? "Tous" : "Any"}
           </button>
           {options.map((o) => (
@@ -483,15 +526,28 @@ function FilterPill({
               {o.label}
             </button>
           ))}
+          {children}
         </div>
       ) : null}
     </div>
   );
 }
 
-function Toggle({ label, on, onClick, icon }: { label: string; on: boolean; onClick: () => void; icon: ReactNode }) {
+const ymd = (iso: string, lang: Lang) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", timeZone: "UTC" });
+
+/** "1 Sep – 30 Sep", "since 1 Sep", "until 30 Sep" for a custom published-date range. */
+function rangeLabel(from: string, to: string, lang: Lang): string | undefined {
+  const fr = lang === "fr";
+  if (from && to) return `${ymd(from, lang)} – ${ymd(to, lang)}`;
+  if (from) return fr ? `depuis le ${ymd(from, lang)}` : `since ${ymd(from, lang)}`;
+  if (to) return fr ? `jusqu'au ${ymd(to, lang)}` : `until ${ymd(to, lang)}`;
+  return undefined;
+}
+
+function Toggle({ label, on, onClick, icon, title }: { label: string; on: boolean; onClick: () => void; icon: ReactNode; title?: string }) {
   return (
-    <button type="button" className={`cf-toggle${on ? " is-on" : ""}`} aria-pressed={on} onClick={onClick}>
+    <button type="button" className={`cf-toggle${on ? " is-on" : ""}`} aria-pressed={on} onClick={onClick} title={title}>
       <span className="cf-toggle__box" aria-hidden>
         {on ? (
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
@@ -559,10 +615,18 @@ export function CatalogFilterBar({
   const [filtersOpen, setFiltersOpen] = useState(true);
   const searchLocked = !isPaid;
   const activeCount =
-    [filters.niche, filters.followersRange, filters.viewsFrom, filters.engagement, filters.reach, filters.likes, filters.country, filters.language, filters.activity].filter(Boolean).length +
-    [filters.hasEmail, filters.verified, filters.hideSaved, filters.showHidden].filter(Boolean).length;
+    [filters.niche, filters.followersRange, filters.viewsFrom, filters.engagement, filters.reach, filters.likes, filters.comments, filters.shares, filters.country, filters.language, filters.activity].filter(Boolean).length +
+    [filters.viral, filters.hasEmail, filters.verified, filters.hideSaved, filters.showHidden].filter(Boolean).length;
   const instagram = filters.platform === "instagram";
   const preset = CATALOG_PRESETS.find((p) => p.id === filters.preset) ?? CATALOG_PRESETS[0];
+  const viralHint = fr
+    ? "Une vidéo virale atteint au moins 5x les vues habituelles du créateur (médiane), avec 100k vues minimum."
+    : "A viral video reaches at least 5x the creator's usual (median) views, with 100K views minimum.";
+  const flameIcon = (
+    <Svg size={11}>
+      <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.2.1 1.6 1.2 2.7 2.5 2.7z" />
+    </Svg>
+  );
 
   // Any manual change leaves the ready-made view.
   const change = (patch: Partial<CatalogFilters>) => onChange({ preset: "", ...patch });
@@ -756,11 +820,47 @@ export function CatalogFilterBar({
           <div className="cf-card__pills">
             <FilterPill id="niche" label="Niche" value={videoFilters.niche} options={nicheOptions} onChange={(v) => onVideoChange({ niche: v })} />
             <FilterPill id="views" label={fr ? "Vues" : "Views"} value={videoFilters.minViews} options={L(VIDEO_VIEWS)} onChange={(v) => onVideoChange({ minViews: v })} />
-            <FilterPill id="activity" label={fr ? "Publiée" : "Posted"} value={videoFilters.postedWithin} options={L(VIDEO_POSTED)} onChange={(v) => onVideoChange({ postedWithin: v })} />
+            <FilterPill
+              id="activity"
+              label={fr ? "Publiée" : "Posted"}
+              value={videoFilters.postedWithin}
+              options={L(VIDEO_POSTED)}
+              onChange={(v) => onVideoChange({ postedWithin: v, postedFrom: "", postedTo: "" })}
+              customLabel={rangeLabel(videoFilters.postedFrom, videoFilters.postedTo, lang)}
+            >
+              <div className="cf-pop__range">
+                <span className="cf-pop__sub">{fr ? "Dates précises" : "Custom dates"}</span>
+                <label>
+                  {fr ? "Du" : "From"}
+                  <input
+                    type="date"
+                    value={videoFilters.postedFrom}
+                    max={videoFilters.postedTo || undefined}
+                    onChange={(e) => onVideoChange({ postedFrom: e.target.value, postedWithin: "" })}
+                  />
+                </label>
+                <label>
+                  {fr ? "Au" : "To"}
+                  <input
+                    type="date"
+                    value={videoFilters.postedTo}
+                    min={videoFilters.postedFrom || undefined}
+                    onChange={(e) => onVideoChange({ postedTo: e.target.value, postedWithin: "" })}
+                  />
+                </label>
+              </div>
+            </FilterPill>
             <FilterPill id="format" label="Format" value={videoFilters.mediaType} options={L(VIDEO_FORMAT)} onChange={(v) => onVideoChange({ mediaType: v })} />
             <FilterPill id="length" label={fr ? "Durée" : "Length"} value={videoFilters.duration} options={L(VIDEO_LENGTH)} onChange={(v) => onVideoChange({ duration: v })} />
             <FilterPill id="country" label={fr ? "Pays du créateur" : "Creator country"} value={videoFilters.country} options={L(COUNTRIES)} onChange={(v) => onVideoChange({ country: v })} />
             <FilterPill id="language" label={fr ? "Langue" : "Language"} value={videoFilters.language} options={L(LANGUAGES)} onChange={(v) => onVideoChange({ language: v })} />
+            <Toggle
+              label={fr ? "Virales" : "Viral"}
+              title={viralHint}
+              on={videoFilters.viral}
+              onClick={() => onVideoChange({ viral: !videoFilters.viral })}
+              icon={flameIcon}
+            />
             <Toggle
               label={fr ? "Avec lien produit" : "With product link"}
               on={videoFilters.hasProduct}
@@ -777,13 +877,37 @@ export function CatalogFilterBar({
           <div className="cf-card__pills">
             <FilterPill id="niche" label="Niche" value={filters.niche} options={nicheOptions} onChange={(v) => change({ niche: v })} />
             <FilterPill id="followers" label={fr ? "Abonnés" : "Followers"} value={filters.followersRange} options={L(FOLLOWERS)} onChange={(v) => change({ followersRange: v })} />
-            <FilterPill id="views" label={fr ? "Vues moy." : "Avg views"} value={filters.viewsFrom} options={L(VIEWS)} onChange={(v) => change({ viewsFrom: v })} />
-            <FilterPill id="engagement" label="Engagement" value={filters.engagement} options={L(ENGAGEMENT)} onChange={(v) => change({ engagement: v })} />
-            <FilterPill id="reach" label={fr ? "Portée" : "Reach"} value={filters.reach} options={L(REACH)} onChange={(v) => change({ reach: v })} />
+            <FilterPill
+              id="views"
+              label={fr ? "Vues moy." : "Avg views"}
+              hint={fr ? "Vues médianes des dernières publications analysées." : "Median views of the latest analyzed posts."}
+              value={filters.viewsFrom}
+              options={L(VIEWS)}
+              onChange={(v) => change({ viewsFrom: v })}
+            />
+            <FilterPill
+              id="engagement"
+              label="Engagement"
+              hint={fr ? "(Likes + commentaires + partages) / vues, médiane des dernières publications." : "(Likes + comments + shares) / views, median of the latest posts."}
+              value={filters.engagement}
+              options={L(ENGAGEMENT)}
+              onChange={(v) => change({ engagement: v })}
+            />
+            <FilterPill
+              id="reach"
+              label={fr ? "Portée" : "Reach"}
+              hint={fr ? "Vues moyennes rapportées au nombre d'abonnés." : "Average views as a share of followers."}
+              value={filters.reach}
+              options={L(REACH)}
+              onChange={(v) => change({ reach: v })}
+            />
             <FilterPill id="likes" label={fr ? "Likes moy." : "Avg likes"} value={filters.likes} options={L(LIKES)} onChange={(v) => change({ likes: v })} />
+            <FilterPill id="comments" label={fr ? "Commentaires moy." : "Avg comments"} value={filters.comments} options={L(COMMENTS)} onChange={(v) => change({ comments: v })} />
+            <FilterPill id="shares" label={fr ? "Partages moy." : "Avg shares"} value={filters.shares} options={L(SHARES)} onChange={(v) => change({ shares: v })} />
             <FilterPill id="country" label={fr ? "Pays" : "Country"} value={filters.country} options={L(COUNTRIES)} onChange={(v) => change({ country: v })} />
             <FilterPill id="language" label={fr ? "Langue" : "Language"} value={filters.language} options={L(LANGUAGES)} onChange={(v) => change({ language: v })} />
             <FilterPill id="activity" label={fr ? "Dernière publication" : "Last post"} value={filters.activity} options={L(ACTIVITY)} onChange={(v) => change({ activity: v })} />
+            <Toggle label={fr ? "Vidéo virale" : "Viral video"} title={viralHint} on={filters.viral} onClick={() => change({ viral: !filters.viral })} icon={flameIcon} />
             <Toggle
               label={fr ? "Avec e-mail" : "With email"}
               on={filters.hasEmail}

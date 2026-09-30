@@ -41,6 +41,7 @@ import {
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
 import { UpgradeModal } from "./UpgradeModal";
 import { CatalogFilterBar, type CatalogMode, type CatalogPreset, type CatalogSortKey } from "./CatalogFilterBar";
+import { COUNT_VAL, ENGAGEMENT_VAL, VIEWS_VAL, creatorFiltersToParams } from "@/lib/catalog-filter-params";
 import { PlatformLogo, platformKey } from "@/components/PlatformLogo";
 import { isStablePublicImageUrl } from "@/lib/client-image-url";
 
@@ -97,6 +98,9 @@ type FilterState = {
   preset: string;
   reach: string;
   likes: string;
+  comments: string;
+  shares: string;
+  viral: boolean;
 };
 
 const EMPTY_FILTERS: FilterState = {
@@ -118,9 +122,10 @@ const EMPTY_FILTERS: FilterState = {
   preset: "",
   reach: "",
   likes: "",
+  comments: "",
+  shares: "",
+  viral: false,
 };
-
-const LIKES_VAL: Record<string, number> = { "1k": 1_000, "10k": 10_000, "100k": 100_000 };
 
 /** Catalogue sans niche choisie : pas de cap plan ni quota decouverte. */
 function isAllNichesBrowse(f: FilterState): boolean {
@@ -150,44 +155,8 @@ function languageFromCountry(country: string): string | null {
   return map[country] ?? null;
 }
 
-const VIEWS_VAL: Record<string, number> = {
-  "10k": 10_000,
-  "50k": 50_000,
-  "100k": 100_000,
-  "500k": 500_000,
-  "1m": 1_000_000,
-};
-
 function toParams(f: FilterState, debouncedSearch = "", sort: CatalogSortKey = "followers"): Record<string, string> {
-  const q = debouncedSearch.trim().replace(/^@/, "");
-  const p: Record<string, string> = { platform: f.platform || "tiktok", sort };
-  if (f.hasEmail) p.hasEmail = "1";
-  if (f.verified) p.verified = "1";
-  if (f.activity) p.activeWithinDays = f.activity;
-  if (Number(f.reach) > 0) p.minReach = f.reach;
-  if (LIKES_VAL[f.likes]) p.minLikes = String(LIKES_VAL[f.likes]);
-  if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) p.minViews = String(VIEWS_VAL[f.viewsFrom]);
-  if (f.viewsTo && VIEWS_VAL[f.viewsTo]) p.maxViews = String(VIEWS_VAL[f.viewsTo]);
-  if (q.length >= 2) {
-    p.search = q;
-    return p;
-  }
-
-  if (f.niche) p.niche = f.niche;
-  const followers = followerRangeBounds(f.followersRange);
-  if (followers.min != null) p.minFollowers = String(followers.min);
-  if (followers.max != null) p.maxFollowers = String(followers.max);
-  if (f.engagement === "3+") p.minEngagement = "3";
-  else if (f.engagement === "12+") p.minEngagement = "12";
-  else if (f.engagement === "6+") p.minEngagement = "6";
-  else if (f.engagement === "9+") p.minEngagement = "9";
-  const C: Record<string, string> = {
-    FR: "FR", US: "US", GB: "GB", DE: "DE", BR: "BR", ES: "ES", IT: "IT", PT: "PT", CA: "CA",
-  };
-  if (C[f.country]) p.country = C[f.country];
-  const L: Record<string, string> = { fr: "fr", en: "en", es: "es", de: "de", pt: "pt", it: "it" };
-  if (L[f.language]) p.language = L[f.language];
-  return p;
+  return creatorFiltersToParams(f, debouncedSearch, sort);
 }
 
 function applyClientFilters(
@@ -226,10 +195,8 @@ function applyClientFilters(
       out = out.filter((c) => creatorMatchesFollowerRange(c.followersCount, followers));
     }
 
-    if (f.engagement === "3+") out = out.filter((c) => c.engagementRate >= 3);
-    else if (f.engagement === "6+") out = out.filter((c) => c.engagementRate >= 6);
-    else if (f.engagement === "9+") out = out.filter((c) => c.engagementRate >= 9);
-    else if (f.engagement === "12+") out = out.filter((c) => c.engagementRate >= 12);
+    // Same rules as the SQL (lib/catalog-query), for rows the server did not filter (live search).
+    if (ENGAGEMENT_VAL[f.engagement]) out = out.filter((c) => c.engagementRate >= ENGAGEMENT_VAL[f.engagement]);
 
     if (!isGlobalSearch) {
       const q = f.search.trim().toLowerCase().replace(/^@/, "");
@@ -245,10 +212,13 @@ function applyClientFilters(
     if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
     if (f.verified) out = out.filter((c) => c.authenticityScore >= 60);
     if (Number(f.reach) > 0) out = out.filter((c) => (c.viewsPerFollower ?? 0) >= Number(f.reach));
-    if (LIKES_VAL[f.likes]) out = out.filter((c) => (c.avgLikes ?? 0) >= LIKES_VAL[f.likes]);
+    if (COUNT_VAL[f.likes]) out = out.filter((c) => (c.avgLikes ?? 0) >= COUNT_VAL[f.likes]);
+    if (COUNT_VAL[f.comments]) out = out.filter((c) => (c.avgComments ?? 0) >= COUNT_VAL[f.comments]);
+    if (COUNT_VAL[f.shares]) out = out.filter((c) => (c.avgShares ?? 0) >= COUNT_VAL[f.shares]);
+    if (f.viral) out = out.filter((c) => (c.videoStats?.viralVideos ?? 0) > 0);
     if (f.activity) {
       const since = Date.now() - Number(f.activity) * 86_400_000;
-      out = out.filter((c) => !c.lastPostAt || new Date(c.lastPostAt).getTime() >= since);
+      out = out.filter((c) => Boolean(c.lastPostAt) && new Date(c.lastPostAt!).getTime() >= since);
     }
     if (f.hideSaved) out = out.filter((c) => !saved.has(c.username));
     if (f.showHidden) {
@@ -256,8 +226,9 @@ function applyClientFilters(
     } else {
       out = out.filter((c) => !hidden.has(c.username.toLowerCase()));
     }
-    if (f.viewsFrom && VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => c.avgViews >= VIEWS_VAL[f.viewsFrom]);
-    if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => c.avgViews <= VIEWS_VAL[f.viewsTo]);
+    // Views filters read measured views only (posts analyzed), like the SQL.
+    if (VIEWS_VAL[f.viewsFrom]) out = out.filter((c) => (c.postsAnalyzed ?? 0) > 0 && c.avgViews >= VIEWS_VAL[f.viewsFrom]);
+    if (f.viewsTo && VIEWS_VAL[f.viewsTo]) out = out.filter((c) => (c.postsAnalyzed ?? 0) > 0 && c.avgViews <= VIEWS_VAL[f.viewsTo]);
     return out;
   };
 
@@ -1082,12 +1053,19 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       showDiscoveryGate && clientFiltered.length === 0
         ? (creators.length > 0 ? creators : gatedTeaserRef.current)
         : clientFiltered;
-    const curated = base.filter((c) => isCuratedFeedCreator(c));
-    const regular = base.filter((c) => !isCuratedFeedCreator(c));
+    // Hand-picked creators lead the default browse only; other sorts are pure rankings (as on the server).
+    const curatedFirst = sort === "followers";
+    const curated = curatedFirst ? base.filter((c) => isCuratedFeedCreator(c)) : [];
+    const regular = curatedFirst ? base.filter((c) => !isCuratedFeedCreator(c)) : base;
     const shouldPreserveBatchOrder = !isPaid && Boolean(filters.niche.trim()) && !isGlobalSearch;
+    const growthRank = (c: FeedCreator) => c.growth?.growthScore ?? Number.NEGATIVE_INFINITY;
     const sortedRegular = shouldPreserveBatchOrder
       ? regular
-      : sort === "engagement"
+      : sort === "growth"
+        ? [...regular].sort((a, b) => growthRank(b) - growthRank(a) || (b.viewsPerFollower ?? 0) - (a.viewsPerFollower ?? 0))
+        : sort === "viral"
+          ? [...regular].sort((a, b) => (b.videoStats?.maxViews ?? -1) - (a.videoStats?.maxViews ?? -1) || b.avgViews - a.avgViews)
+          : sort === "engagement"
         ? [...regular].sort((a, b) => b.engagementRate - a.engagementRate)
         : sort === "views"
           ? [...regular].sort((a, b) => b.avgViews - a.avgViews)
