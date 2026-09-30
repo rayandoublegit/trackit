@@ -4,6 +4,7 @@ import Link from "next/link";
 import { pctChange } from "@/lib/admin-aggregate";
 import type { AttentionItem, OverviewData } from "@/lib/admin-types";
 import { useLang } from "@/lib/useLang";
+import { AcquisitionSection } from "./_components/acquisition";
 import { AreaChart, Bars, Donut } from "./_components/charts";
 import { Card, Empty, Kpi, LoadState, PageHead, RefreshButton, Warnings, useAdminData, useAdminFormat, useT } from "./_components/ui";
 
@@ -15,6 +16,7 @@ function attentionLabelFr(a: AttentionItem): string {
   if (a.kind === "requests") return "Niches demandées cette semaine";
   if (a.kind === "lookups") return "Créateurs introuvables cette semaine";
   if (a.kind === "error") return "Lectures en échec";
+  if (a.label === "Demo data still in real accounts") return "Données de démo encore dans les comptes";
   const missing = /^(.+) table missing$/.exec(a.label);
   return missing ? `Table ${missing[1]} absente` : a.label;
 }
@@ -74,6 +76,8 @@ export default function AdminOverviewPage() {
             <Kpi label={t("Creator catalog", "Catalogue créateurs")} value={data.catalog.total} format={compact} delay={360} sub={t("indexed profiles", "profils indexés")} />
             <Kpi label={t("Gifting missions", "Missions gifting")} value={data.gifting.missions} delay={420} sub={t("all stages", "toutes étapes")} />
           </div>
+
+          <AcquisitionSection acquisition={data.acquisition} />
 
           <div className="ad-grid ad-grid--wide">
             <Card

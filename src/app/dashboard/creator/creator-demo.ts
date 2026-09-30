@@ -1,4 +1,4 @@
-// Local preview only (NEXT_PUBLIC_DEV_BYPASS_PLAN): fictional data so the
+// Local preview only (NEXT_PUBLIC_DEV_BYPASS_PLAN, never in a production build): fictional data so the
 // creator app can be seen without a database. Never used in production.
 // Three brands: commission + gifting, RPM, gifting only.
 

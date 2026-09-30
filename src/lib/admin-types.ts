@@ -1,5 +1,6 @@
 // Shapes returned by the staff console API, shared by routes and pages.
 import type { Bucket, DayPoint } from "@/lib/admin-aggregate";
+import type { AcquisitionFunnel } from "@/lib/admin-acquisition";
 
 export type { Bucket, DayPoint };
 
@@ -27,6 +28,8 @@ export type OverviewData = {
   sales: { count30d: number | null; revenue30d: number | null; revenuePrev30d: number | null; series: DayPoint[] | null };
   catalog: { total: number | null };
   gifting: { missions: number | null };
+  /** Brand accounts only (creators join through invites). Null when the columns can't be read. */
+  acquisition: { all: AcquisitionFunnel; d30: AcquisitionFunnel } | null;
   attention: AttentionItem[];
   warnings: string[];
 };

@@ -9,7 +9,9 @@ import type { MissionStage, SlotStatus } from "./creator-copy";
 // Everything the creator app reads, per brand. A brand works with the creator
 // in commission, RPM and/or gifting; money is shown only where it exists.
 
-export const PREVIEW = Boolean(DEV_BYPASS_PLAN);
+// Demo data (creator-demo.ts) only in local dev with the plan bypass: a stray
+// NEXT_PUBLIC_DEV_BYPASS_PLAN in a production build must never show it.
+export const PREVIEW = Boolean(DEV_BYPASS_PLAN) && process.env.NODE_ENV !== "production";
 
 export type Model = "commission" | "rpm" | "gifting";
 

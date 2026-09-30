@@ -3,7 +3,8 @@
 // Supabase auth and renders as that plan — handy to preview gated features.
 // Default empty string -> normal auth everywhere (prod included).
 // Set e.g. NEXT_PUBLIC_DEV_BYPASS_PLAN=pro in .env.local, then restart dev.
-export const DEV_BYPASS_PLAN = process.env.NEXT_PUBLIC_DEV_BYPASS_PLAN || "";
+// Never active in a production build, even if the variable is set on the host.
+export const DEV_BYPASS_PLAN = process.env.NODE_ENV !== "production" ? process.env.NEXT_PUBLIC_DEV_BYPASS_PLAN || "" : "";
 
 // The user id used by API routes when the bypass is on. Set
 // NEXT_PUBLIC_DEV_BYPASS_USER_ID to a real auth.users id in .env.local to make

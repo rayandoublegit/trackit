@@ -2,6 +2,7 @@
 // `adminDevPreview()` is true (next dev + NEXT_PUBLIC_DEV_BYPASS_PLAN, no database).
 // Every person, email and amount here is fictional.
 import type { AdminContext } from "@/lib/admin-auth";
+import { acquisitionFunnel, type AcqProfile } from "@/lib/admin-acquisition";
 import { countBy, emptyDays, type DayPoint } from "@/lib/admin-aggregate";
 import type { ActivityData, AuditData, OverviewData, RequestsData, SystemCheck, SystemData } from "@/lib/admin-types";
 
@@ -46,6 +47,37 @@ export function devUsers() {
   }));
 }
 
+// Synthetic brand signups: [source, signups, onboarded, paying, of which in the last 30 days].
+const DEV_SOURCES: [string, number, number, number, number][] = [
+  ["tiktok", 168, 121, 38, 31],
+  ["instagram", 112, 79, 24, 22],
+  ["google", 46, 35, 11, 6],
+  ["friend", 31, 26, 9, 4],
+  ["youtube", 18, 12, 3, 5],
+  ["twitter", 11, 6, 1, 2],
+  ["other", 9, 5, 1, 1],
+  ["", 17, 4, 0, 0],
+];
+
+function devAcquisitionRows(): AcqProfile[] {
+  const rows: AcqProfile[] = [];
+  for (const [source, signups, onboarded, paying, recent] of DEV_SOURCES) {
+    for (let i = 0; i < signups; i += 1) {
+      const pays = i < paying;
+      rows.push({
+        referral_source: source || null,
+        onboarding_completed: i < onboarded,
+        plan: pays ? "pro" : "free",
+        subscription_active: pays,
+        subscription_status: pays ? "active" : "inactive",
+        stripe_subscription_id: pays ? `sub_demo_${source}_${i}` : null,
+        created_at: daysAgo(i >= signups - recent ? 3 + (i % 25) : 45 + i),
+      });
+    }
+  }
+  return rows;
+}
+
 export function devOverview(): OverviewData {
   const signups = wave(30, 6, 3, 0.15, 2);
   const sales = wave(30, 900, 380, 18, 1);
@@ -68,6 +100,10 @@ export function devOverview(): OverviewData {
     sales: { count30d: 1_931, revenue30d: sales.reduce((s, p) => s + p.value, 0), revenuePrev30d: 31_480, series: sales },
     catalog: { total: 48_612 },
     gifting: { missions: 64 },
+    acquisition: {
+      all: acquisitionFunnel(devAcquisitionRows()),
+      d30: acquisitionFunnel(devAcquisitionRows(), { sinceMs: Date.now() - 30 * 86_400_000 }),
+    },
     attention: [
       { kind: "billing", label: "Unpaid invoices", count: 3, href: "/admin/revenue" },
       { kind: "requests", label: "Niches requested this week", count: 12, href: "/admin/requests" },

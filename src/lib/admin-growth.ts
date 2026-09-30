@@ -1,5 +1,6 @@
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { billingOf, isPaying, type BillingProfile } from "@/lib/admin-billing";
 
 function monthKey(ts: number): string {
   const d = new Date(ts * 1000);
@@ -103,16 +104,17 @@ export async function computeGrowth(
   const churnFraction = Math.max(churnRatePct / 100, 0.01);
   const ltv = arpu / churnFraction;
 
-  // Funnel depuis profiles (etat applicatif)
+  // Funnel depuis profiles (etat applicatif). Payant = Stripe ou Whop (billingOf),
+  // jamais un acces offert; un payant compte toujours comme onboarde.
   const { data: profs } = await db
     .from("profiles")
-    .select("onboarding_completed, plan, subscription_active");
-  const rows = profs ?? [];
+    .select("onboarding_completed, plan, subscription_active, subscription_status, stripe_subscription_id")
+    .range(0, 49_999);
+  const rows = (profs ?? []) as (BillingProfile & { onboarding_completed: boolean | null })[];
   const signups = rows.length;
-  const onboarded = rows.filter((r) => r.onboarding_completed === true).length;
-  const paying = rows.filter(
-    (r) => r.subscription_active === true || (r.plan && String(r.plan).toLowerCase() !== "free")
-  ).length;
+  const payingRows = rows.map((r) => isPaying(billingOf(r).source));
+  const paying = payingRows.filter(Boolean).length;
+  const onboarded = rows.filter((r, i) => r.onboarding_completed === true || payingRows[i]).length;
 
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const funnel: FunnelData = {

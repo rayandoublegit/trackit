@@ -21,11 +21,10 @@ import {
   giftStatusLabel,
   isGiftSetupError,
 } from "@/lib/gifting-board";
-import { SAMPLE_CAMPAIGN_DETAILS } from "@/lib/sample-campaign-preview";
 import { useLang } from "@/lib/useLang";
 import { takeCreatorForGift } from "@/lib/creator-handoff";
-import { GiftPipeline } from "./SampleCampaignPreview";
-import { CountUp, SampleAvatar } from "./sample-motion";
+import { CreatorAvatar } from "./CreatorAvatar";
+import { CountUp } from "./sample-motion";
 import "./sample-preview.css";
 import "./gifting-view.css";
 
@@ -252,9 +251,6 @@ export function GiftingView({
     })),
   );
   const setupMissing = Boolean(loadError) && isGiftSetupError(loadError);
-  const showSample = loaded && missions.length === 0 && (campaigns.length === 0 || setupMissing);
-  const sample = SAMPLE_CAMPAIGN_DETAILS["sample-summer"];
-  const sampleById = new Map(sample.creators.map((c) => [c.id, c]));
   const campaignTitle = (id: string) => campaigns.find((c) => c.id === id)?.name ?? "";
 
   return (
@@ -524,28 +520,6 @@ export function GiftingView({
         </section>
       ) : null}
 
-      {showSample ? (
-        <section className="gv-sample">
-          <div className="gv-sample__head">
-            <div>
-              <span className="sp-sample-tag" style={{ marginLeft: 0 }}>{fr ? "Exemple" : "Sample"}</span>
-              <h2>{fr ? "Voici à quoi ressemble une campagne en cours" : "This is what a running campaign looks like"}</h2>
-              <p>
-                {fr
-                  ? "Créateurs fictifs. Chaque carte avance d’une colonne à chaque étape : signature, expédition, livraison, contenus, validation."
-                  : "Fictional creators. Each card moves one column per step: signature, shipping, delivery, contents, approval."}
-              </p>
-            </div>
-            {!isCreator && !loadError ? (
-              <button type="button" className="es-primary" onClick={() => setCreating(true)}>
-                {fr ? "Créer la mienne" : "Create mine"}
-              </button>
-            ) : null}
-          </div>
-          <GiftPipeline lang={lang} detail={sample} byId={sampleById} />
-        </section>
-      ) : null}
-
       {missions.length > 0 ? (
         <section className="gv-card">
           <div className="gv-card__head">
@@ -574,7 +548,7 @@ export function GiftingView({
                       onClick={() => setOpenId(openId === mission.id ? null : mission.id)}
                     >
                       <span className="sp-who sp-who--small">
-                        <SampleAvatar name={mission.creator_handle} hue={hueOf(mission.creator_handle)} size={22} />
+                        <CreatorAvatar username={mission.creator_handle} size={22} />
                         <strong>@{mission.creator_handle}</strong>
                       </span>
                       <small>{campaignTitle(mission.campaign_id) || giftStatusLabel(mission.status, lang)}</small>
@@ -615,16 +589,20 @@ export function GiftingView({
             />
           )}
         </section>
-      ) : loaded && !showSample && !loadError ? (
+      ) : loaded && !loadError ? (
         <section className="gv-card gv-empty">
           <p>
             {isCreator
               ? fr
                 ? "Aucune mission pour le moment. Quand une marque vous en envoie une, elle apparaît ici."
                 : "No mission yet. When a brand sends you one, it shows up here."
-              : fr
-                ? "Aucune mission envoyée. Entrez le pseudo d’un créateur relié à votre marque sur une campagne ci-dessus."
-                : "No mission sent yet. Enter the handle of a creator connected to your brand on a campaign above."}
+              : campaigns.length === 0
+                ? fr
+                  ? "Aucune campagne cadeau pour le moment. Créez-en une, puis envoyez la mission à un créateur : elle apparaît ici."
+                  : "No gift campaign yet. Create one, then send the mission to a creator: it shows up here."
+                : fr
+                  ? "Aucune mission envoyée. Entrez le pseudo d’un créateur relié à votre marque sur une campagne ci-dessus."
+                  : "No mission sent yet. Enter the handle of a creator connected to your brand on a campaign above."}
           </p>
         </section>
       ) : null}
@@ -671,7 +649,7 @@ export function GiftingView({
                       {listItems.length === 0 ? <span className="gv-muted">{fr ? "Liste vide" : "Empty list"}</span> : null}
                       {listItems.map((item) => (
                         <span key={item.id} className="gv-chip">
-                          <SampleAvatar name={item.handle} hue={hueOf(item.handle)} size={16} /> @{item.handle}
+                          <CreatorAvatar username={item.handle} size={16} /> @{item.handle}
                         </span>
                       ))}
                     </div>
@@ -750,12 +728,6 @@ function ContentCount({ mission, contents, expected, lang }: { mission: Mission;
       {waiting ? ` · ${progress.pending} ${lang === "fr" ? "à valider" : "to review"}` : ""}
     </em>
   );
-}
-
-function hueOf(text: string): number {
-  let h = 0;
-  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) % 360;
-  return h;
 }
 
 /** Deadlines are calendar dates (YYYY-MM-DD): format them in UTC so no timezone shifts the day. */
@@ -853,7 +825,7 @@ function MissionPanel({
       <div className="gv-panel__head">
         <div>
           <span className="sp-who">
-            <SampleAvatar name={mission.creator_handle} hue={hueOf(mission.creator_handle)} size={36} />
+            <CreatorAvatar username={mission.creator_handle} size={36} alt={`@${mission.creator_handle}`} />
             <span>
               <strong>@{mission.creator_handle}</strong>
               <small>{campaignName}</small>

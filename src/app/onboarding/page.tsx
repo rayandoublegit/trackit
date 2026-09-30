@@ -41,7 +41,6 @@ const TRACKIT_LOGO_URL = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
 type Step = 1 | 2 | 3 | 4;
 type BusinessType = "ecommerce" | "infopreneur" | "agency" | "other";
-type Revenue = "starting" | "1k-10k" | "10k-50k" | "50k+";
 type Source = ReferralSource;
 
 const STEPS = [
@@ -79,13 +78,6 @@ const BUSINESS_TYPES = [
   { key: "other" as const, label: "Other", labelFr: "Autre", desc: "Something else", descFr: "Autre chose" },
 ];
 
-const REVENUES = [
-  { key: "starting" as const, label: "Just starting", labelFr: "Je débute" },
-  { key: "1k-10k" as const, label: "$1K – $10K", labelFr: "1K€ – 10K€" },
-  { key: "10k-50k" as const, label: "$10K – $50K", labelFr: "10K€ – 50K€" },
-  { key: "50k+" as const, label: "$50K+", labelFr: "50K€+" },
-];
-
 const SOURCES = [
   { key: "tiktok" as const, label: "TikTok", labelFr: "TikTok" },
   { key: "instagram" as const, label: "Instagram", labelFr: "Instagram" },
@@ -115,7 +107,6 @@ export default function OnboardingPage() {
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState<BusinessType | null>(null);
   const [niche, setNiche] = useState("");
-  const [revenue, setRevenue] = useState<Revenue | null>(null);
 
   const [source, setSource] = useState<Source | null>(null);
   const [sourceHandle, setSourceHandle] = useState("");
@@ -135,7 +126,6 @@ export default function OnboardingPage() {
     setBusinessName(draft.businessName);
     setBusinessType(draft.businessType);
     setNiche(draft.niche);
-    setRevenue(draft.revenue);
     setSource(draft.source);
     setSourceHandle(draft.sourceHandle);
     setSourceDetails(draft.sourceDetails);
@@ -154,7 +144,7 @@ export default function OnboardingPage() {
         businessName,
         businessType,
         niche,
-        revenue,
+        revenue: null,
         source,
         sourceHandle,
         sourceDetails,
@@ -170,7 +160,6 @@ export default function OnboardingPage() {
       businessName,
       businessType,
       niche,
-      revenue,
       source,
       sourceHandle,
       sourceDetails,
@@ -281,7 +270,7 @@ export default function OnboardingPage() {
       if (!username.trim()) { setError(lang === "fr" ? "Choisissez un nom d'utilisateur" : "Please choose a username"); return; }
     }
     if (step === 2) {
-      if (!businessName.trim() || !businessType || !niche.trim() || !revenue) { setError(lang === "fr" ? "Veuillez remplir tous les champs" : "Please complete all fields"); return; }
+      if (!businessName.trim() || !businessType || !niche.trim()) { setError(lang === "fr" ? "Veuillez remplir tous les champs" : "Please complete all fields"); return; }
     }
     if (step === 3) {
       if (!source) { setError(lang === "fr" ? "Veuillez choisir une option" : "Please pick one"); return; }
@@ -311,7 +300,7 @@ export default function OnboardingPage() {
       avatarUrl = await uploadAvatar();
       if (!avatarUrl) return null;
     }
-    if (!businessType || !revenue || !source) {
+    if (!businessType || !source) {
       setError(lang === "fr" ? "Profil incomplet" : "Incomplete profile");
       return null;
     }
@@ -322,7 +311,7 @@ export default function OnboardingPage() {
       businessName: businessName.trim(),
       businessType,
       niche: niche.trim(),
-      revenueRange: revenue,
+      revenueRange: null,
       referralSource: source,
       referralSocialHandle: isSocialReferralSource(source) ? normalizeSocialHandle(sourceHandle) : null,
       referralDetails: !isSocialReferralSource(source) ? sourceDetails.trim() || null : null,
@@ -500,15 +489,6 @@ export default function OnboardingPage() {
                   value={niche}
                   onChange={setNiche}
                   placeholder={lang === "fr" ? "Mode, fitness, beauté, tech..." : "Fashion, fitness, beauty, tech..."}
-                />
-                <p className="ob-label">{lang === "fr" ? "Revenu mensuel" : "Monthly revenue"}</p>
-                <ChoiceList
-                  items={REVENUES.map((opt) => ({
-                    key: opt.key,
-                    title: lang === "fr" ? opt.labelFr : opt.label,
-                  }))}
-                  value={revenue}
-                  onChange={setRevenue}
                 />
               </>
             )}

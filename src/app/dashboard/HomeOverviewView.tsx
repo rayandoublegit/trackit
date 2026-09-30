@@ -4,12 +4,10 @@ import { useLang } from "@/lib/useLang";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import type { DashboardView } from "@/lib/dashboard-view-storage";
-import { SAMPLE_CAMPAIGN_DETAILS, sampleDailyRevenue } from "@/lib/sample-campaign-preview";
-import { ActivityFeed, RevenueChart } from "./SampleCampaignPreview";
 import { CountUp } from "./sample-motion";
-import { samplesHidden } from "@/lib/sample-workspace";
 import { HOME_STEP_ORDER, homeStepById, homeStepDone, nextHomeStep, type HomeStep } from "@/lib/home-next-step";
 import { MinoHomeHero } from "./MinoHomeHero";
+import "./sample-preview.css";
 
 const BLUE = "#0047FF";
 
@@ -240,12 +238,6 @@ function BrandHomeOverview({
   };
   const nextStep = nextHomeStep(progress);
   const setupDone = HOME_STEP_ORDER.filter((id) => homeStepDone(id, progress)).length;
-  const programEmpty =
-    gettingStarted.countsLoaded === true &&
-    !samplesHidden(userId) &&
-    gettingStarted.creatorsCount === 0 &&
-    gettingStarted.salesCount === 0 &&
-    activeCampaigns === 0;
   const setupTotal = HOME_STEP_ORDER.length;
 
   const firstName = (displayName || "").trim().split(/\s+/)[0] || "";
@@ -311,7 +303,6 @@ function BrandHomeOverview({
           />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: isMobile || !programEmpty ? "1fr" : "minmax(0,1fr) minmax(0,1.25fr)", gap: 16, alignItems: "start" }}>
         {setupDone < setupTotal && (
           <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? 20 : 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
@@ -375,8 +366,6 @@ function BrandHomeOverview({
             ))}
           </div>
         )}
-        {programEmpty ? <ProgramPreview lang={lang} onOpen={() => onNavigate("campaigns")} /> : null}
-        </div>
       </div>
     </>
   );
@@ -426,29 +415,6 @@ function NextStepCard({
         {step.cta[lang]}
         <span aria-hidden>→</span>
       </button>
-    </section>
-  );
-}
-
-function ProgramPreview({ lang, onOpen }: { lang: "en" | "fr"; onOpen: () => void }) {
-  const fr = lang === "fr";
-  const sample = SAMPLE_CAMPAIGN_DETAILS["sample-summer"];
-  const byId = new Map(sample.creators.map((c) => [c.id, c]));
-  return (
-    <section className="sp-card" style={{ padding: 20 }}>
-      <div className="sp-card__head">
-        <div>
-          <span className="sp-sample-tag" style={{ marginLeft: 0 }}>{fr ? "Exemple" : "Sample"}</span>
-          <h2 style={{ marginTop: 8 }}>{fr ? "Ce que vous verrez ici, une fois lancé" : "What you will see here once live"}</h2>
-        </div>
-        <button type="button" className="sample-clear" onClick={onOpen}>
-          {fr ? "Ouvrir l’exemple" : "Open the sample"}
-        </button>
-      </div>
-      <RevenueChart lang={lang} days={sampleDailyRevenue(sample)} />
-      <div style={{ marginTop: 14 }}>
-        <ActivityFeed lang={lang} detail={sample} byId={byId} />
-      </div>
     </section>
   );
 }

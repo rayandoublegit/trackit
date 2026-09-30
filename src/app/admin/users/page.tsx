@@ -224,7 +224,7 @@ function UserDrawer({
   const { data: detail, loading, error, reload } = useAdminData<UserDetail>(`/api/admin/console/user/detail?userId=${encodeURIComponent(user.id)}`);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
-  const [plan, setPlan] = useState<string>(user.plan && user.plan !== "free" ? user.plan : "pro");
+  const [plan, setPlan] = useState<string>(billingOf(user).plan);
   const [role, setRole] = useState<string>(user.role ?? "user");
   const billing = billingOf(user);
   const { ago, dateFr, eur, num } = useAdminFormat();
@@ -259,7 +259,8 @@ function UserDrawer({
         setToast(body.error || t(`Refused (${res.status})`, `Refusé (${res.status})`));
         return;
       }
-      setToast(t("Change saved.", "Modification enregistrée."));
+      const canceled = Array.isArray(body.canceled) && body.canceled.length > 0 ? ` (${body.canceled.join(", ")})` : "";
+      setToast(t(`Change saved${canceled ? `, canceled${canceled}` : ""}. The account sees it on its next page load.`, `Modification enregistrée${canceled ? `, résilié${canceled}` : ""}. Le compte la voit dès son prochain chargement.`));
       onChanged();
       reload();
     } catch {
@@ -346,8 +347,8 @@ function UserDrawer({
                     plan,
                     plan === "free"
                       ? t(
-                          "Move this account to Free? Any Stripe subscription will be canceled immediately.",
-                          "Passer ce compte en Gratuit ? Tout abonnement Stripe sera résilié immédiatement.",
+                          "Move this account to Free? Every Stripe subscription and Whop membership of this account is canceled immediately, so the paywall applies right away.",
+                          "Passer ce compte en Gratuit ? Tous ses abonnements Stripe et Whop sont résiliés immédiatement : la paywall s’applique tout de suite.",
                         )
                       : t(
                           `Apply the ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} plan? Without a Stripe subscription, access is comped.`,
@@ -368,6 +369,15 @@ function UserDrawer({
                   {t("Gift 1 month", "Offrir 1 mois")}
                 </button>
               ) : null}
+              <button
+                type="button"
+                className="ad-btn"
+                disabled={busy}
+                title={t("Free plan discovery allowance back to zero, to test the paywall again.", "Remet à zéro les découvertes gratuites utilisées, pour retester la paywall.")}
+                onClick={() => void act("resetQuota", undefined, t("Reset this account's free usage quota?", "Remettre à zéro le quota gratuit de ce compte ?"))}
+              >
+                {t("Reset free quota", "Réinitialiser le quota gratuit")}
+              </button>
               {isOffered(billing.source) ? (
                 <button
                   type="button"

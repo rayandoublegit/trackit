@@ -443,67 +443,37 @@ function DashboardPageContent() {
     });
   }, []);
 
-    // One-shot Trackit demo preset — deferred so first paint/nav stays instant
+  // Plan changes made elsewhere (staff console, another tab) reach an open
+  // dashboard when the tab regains focus, so the paywall applies without a reload.
   useEffect(() => {
-    if (!user?.id || loading || isCreator || DEV_BYPASS_PLAN) return;
-    if (typeof window === "undefined") return;
-    const key = `trackit_demo_preset_v7_${user.id}`;
-    const lockKey = `${key}_lock`;
-    if (sessionStorage.getItem(key) === "1") return;
-    if (sessionStorage.getItem(lockKey) === "1") return;
-
+    if (!user?.id || loading || DEV_BYPASS_PLAN) return;
+    const userId = user.id;
+    let last = Date.now();
     let cancelled = false;
-    const run = () => {
-      if (cancelled) return;
-      if (sessionStorage.getItem(key) === "1" || sessionStorage.getItem(lockKey) === "1") return;
-      sessionStorage.setItem(lockKey, "1");
-      void (async () => {
-        try {
-          const res = await fetch("/api/demo-preset", { method: "POST", credentials: "include" });
-          const data = (await res.json().catch(() => ({}))) as {
-            ok?: boolean;
-            seeded?: boolean;
-            affiliates?: StoredAffiliate[];
-          };
-          if (cancelled) return;
-          if (data.ok) {
-            sessionStorage.setItem(key, "1");
-            // Strip previously injected demo affiliate rows from localStorage.
-            const existing = loadAffiliates(user.id);
-            const cleaned = existing.filter((row) => {
-              const dest = String(row.destinationUrl || row.link || "").toLowerCase();
-              return !dest.includes("demo.trackit.shop") && !dest.includes("trackit-demo");
-            });
-            if (cleaned.length !== existing.length) {
-              saveAffiliates(user.id, cleaned);
-            }
-            if (data.seeded) {
-              dispatchCampaignsUpdated();
-              dispatchSalesUpdated();
-              dispatchPayoutsUpdated();
-              window.dispatchEvent(new CustomEvent("trackit:creators-saved"));
-              void loadSidebarCounts(user.id);
-            }
-          } else {
-            sessionStorage.removeItem(lockKey);
-          }
-        } catch {
-          sessionStorage.removeItem(lockKey);
-        }
-      })();
+    const refresh = async () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 10_000) return;
+      last = Date.now();
+      try {
+        const res = await fetch("/api/workspace/context", { credentials: "include", cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { ownerProfile?: { plan?: string | null; subscription_status?: string | null } | null };
+        if (cancelled || !body.ownerProfile) return;
+        const nextPlan = planFromProfile(body.ownerProfile.plan, body.ownerProfile.subscription_status);
+        setProfile((prev) => (prev && prev.plan !== nextPlan ? { ...prev, plan: nextPlan } : prev));
+        patchDashboardBootstrap(userId, { plan: nextPlan });
+      } catch {
+        /* next focus retries */
+      }
     };
-
-    const hasIdle = typeof window.requestIdleCallback === "function";
-    const idleId = hasIdle
-      ? window.requestIdleCallback(run, { timeout: 2500 })
-      : setTimeout(run, 1200);
-
+    const onVisible = () => void refresh();
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
-      if (hasIdle) window.cancelIdleCallback(idleId as number);
-      else clearTimeout(idleId as ReturnType<typeof setTimeout>);
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [user?.id, loading, isCreator, loadSidebarCounts]);
+  }, [user?.id, loading]);
 
   useEffect(() => {
     if (!user?.id) return;

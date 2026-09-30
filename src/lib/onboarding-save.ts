@@ -17,7 +17,7 @@ export type OnboardingSavePayload = {
   businessName: string;
   businessType: string;
   niche: string;
-  revenueRange: string;
+  revenueRange?: string | null;
   referralSource?: ReferralSource | null;
   referralSocialHandle?: string | null;
   referralDetails?: string | null;
@@ -46,7 +46,7 @@ export async function saveOnboardingProfileAdmin(
     business_name: payload.businessName.trim(),
     business_type: payload.businessType,
     niche: payload.niche.trim(),
-    revenue_range: payload.revenueRange,
+    revenue_range: payload.revenueRange ?? null,
     referral_source: payload.referralSource ?? null,
     shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
     onboarding_completed: markComplete,
@@ -69,7 +69,7 @@ export async function saveOnboardingProfileAdmin(
         business_name: payload.businessName.trim(),
         business_type: payload.businessType,
         niche: payload.niche.trim(),
-        revenue_range: payload.revenueRange,
+        revenue_range: payload.revenueRange ?? null,
         referral_source: payload.referralSource ?? null,
         shopify_store_url: payload.shopifyStoreUrl?.trim() || null,
       },

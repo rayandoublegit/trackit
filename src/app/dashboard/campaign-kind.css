@@ -27,15 +27,3 @@
 @keyframes ck-rise{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(-130px);opacity:0}}
 @keyframes ck-ship{0%,10%{left:18px}60%,100%{left:calc(100% - 58px)}}
 @media (prefers-reduced-motion:reduce){.ck-page *{animation:none!important;transition:none!important}}
-
-/* RPM empty-state mockup */
-.rpm-mock{display:flex;flex-direction:column;align-items:center;gap:14px;margin:0 auto 22px;max-width:560px;padding:18px;border-radius:16px;border:1px solid var(--ws-border);background:radial-gradient(120% 90% at 85% 0%,color-mix(in srgb,var(--ws-accent) 10%,transparent),transparent 60%),var(--ws-surface-2);animation:sp-rise .5s ease both}
-.rpm-mock__row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
-.rpm-mock__cell{display:flex;flex-direction:column;gap:2px;min-width:120px;padding:10px 12px;border-radius:12px;background:var(--ws-surface);border:1px solid var(--ws-border)}
-.rpm-mock__cell small{font-size:11.5px;color:var(--ws-text-muted)}
-.rpm-mock__cell strong{font-size:18px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-.rpm-mock__cell.is-total{border-color:color-mix(in srgb,var(--ws-accent) 40%,var(--ws-border))}
-.rpm-mock__cell.is-total strong{color:var(--ws-accent)}
-.rpm-mock__op{font-size:18px;font-weight:700;color:var(--ws-text-dim)}
-.rpm-mock__bar{width:100%;height:6px;border-radius:99px;background:var(--ws-pill);overflow:hidden}
-.rpm-mock__bar span{display:block;height:100%;width:100%;background:linear-gradient(90deg,color-mix(in srgb,var(--ws-accent) 50%,var(--ws-surface)),var(--ws-accent));transform-origin:left;animation:sp-play 4s ease-in-out infinite}

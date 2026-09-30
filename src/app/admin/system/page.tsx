@@ -2,6 +2,7 @@
 
 import type { AuditData, SystemCheck, SystemData } from "@/lib/admin-types";
 import { useLang } from "@/lib/useLang";
+import { DemoPurgeCard } from "../_components/demo-purge";
 import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, useAdminData, useAdminFormat, useT } from "../_components/ui";
 
 const ACTION_LABEL: Record<string, string> = {
@@ -12,6 +13,8 @@ const ACTION_LABEL: Record<string, string> = {
   "user.revokeComp": "Comped access revoked",
   "user.cancel": "Subscription canceled (end of period)",
   "user.cancelNow": "Subscription canceled (immediately)",
+  "user.resetQuota": "Free quota reset",
+  "demo.purge": "Demo data deleted",
 };
 
 const ACTION_LABEL_FR: Record<string, string> = {
@@ -22,6 +25,8 @@ const ACTION_LABEL_FR: Record<string, string> = {
   "user.revokeComp": "Accès offert révoqué",
   "user.cancel": "Abonnement résilié (fin de période)",
   "user.cancelNow": "Abonnement résilié (immédiatement)",
+  "user.resetQuota": "Quota gratuit réinitialisé",
+  "demo.purge": "Données de démo supprimées",
 };
 
 // Service checks come from the API in English; keyed labels for the French console.
@@ -206,6 +211,7 @@ export default function AdminSystemPage() {
           </div>
         )}
       </Card>
+      <DemoPurgeCard />
     </>
   );
 }

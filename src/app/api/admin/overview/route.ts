@@ -1,7 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { adminDevPreview, requireAdmin } from "@/lib/admin-auth";
+import { acquisitionFunnel, type AcqProfile } from "@/lib/admin-acquisition";
 import { activeUsers, countBy, dailySeries, sumSeries } from "@/lib/admin-aggregate";
 import { countRows, fetchRows, isoDaysAgo } from "@/lib/admin-data";
+import { DEMO_CAMPAIGN_MARKER, DEMO_CAMPAIGN_NAME, isDemoPresetSaleOrderId } from "@/lib/demo-preset-data";
 import { devOverview } from "@/lib/admin-dev-fixtures";
 import type { AttentionItem, OverviewData } from "@/lib/admin-types";
 import { compAccess } from "@/lib/comp-plan";
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
   const warnings: string[] = [];
   const attention: AttentionItem[] = [];
 
-  const [profiles, sessions, sales, campaignsTotal, campaignsActive, catalog, missions, niches7d, lookups7d] = await Promise.all([
+  const [profiles, sessions, sales, campaignsTotal, campaignsActive, catalog, missions, niches7d, lookups7d, acqRows, attributions, demoCampaigns, demoActive] = await Promise.all([
     fetchRows<ProfileLite>(
       db,
       "profiles",
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
     fetchRows<{ user_id: string; last_active_at: string | null }>(db, "user_sessions", "user_id, last_active_at", {
       since: { column: "last_active_at", iso: isoDaysAgo(30, now) },
     }),
-    fetchRows<{ order_amount: number | string | null; created_at: string | null }>(db, "sales", "order_amount, created_at", {
+    fetchRows<{ order_amount: number | string | null; created_at: string | null; shopify_order_id: string | null }>(db, "sales", "order_amount, created_at, shopify_order_id", {
       since: { column: "created_at", iso: isoDaysAgo(60, now) },
     }),
     countRows(db, "campaigns"),
@@ -60,6 +62,19 @@ export async function GET(req: NextRequest) {
     countRows(db, "gift_missions"),
     countRows(db, "niche_requests", (q) => q.gte("created_at", isoDaysAgo(7, now))),
     countRows(db, "creator_lookup_requests", (q) => q.gte("created_at", isoDaysAgo(7, now))),
+    // Separate read: if these columns are missing, only the acquisition block goes blank.
+    fetchRows<AcqProfile & { id: string; account_type: string | null }>(
+      db,
+      "profiles",
+      "id, account_type, plan, subscription_active, subscription_status, stripe_subscription_id, referral_source, onboarding_completed, created_at",
+      { maxRows: 50_000 },
+    ),
+    fetchRows<{ user_id: string; source: string | null; details: string | null }>(db, "user_referral_attributions", "user_id, source, details", {
+      maxRows: 50_000,
+    }),
+    // Rows the old demo preset seeded: left out of the totals until purged.
+    countRows(db, "campaigns", (q) => q.eq("name", DEMO_CAMPAIGN_NAME).ilike("description", `%${DEMO_CAMPAIGN_MARKER}%`)),
+    countRows(db, "campaigns", (q) => q.eq("name", DEMO_CAMPAIGN_NAME).ilike("description", `%${DEMO_CAMPAIGN_MARKER}%`).in("status", ["active", "Active"])),
   ]);
 
   // Users
@@ -111,9 +126,10 @@ export async function GET(req: NextRequest) {
   if (sales.error) {
     warnings.push(`sales: ${sales.error}`);
   } else {
+    const realSales = sales.rows.filter((r) => !isDemoPresetSaleOrderId(r.shopify_order_id));
     const amount = (r: { order_amount: number | string | null }) => Number(r.order_amount) || 0;
-    const sixty = dailySeries(sales.rows, (r) => r.created_at, 60, now, amount);
-    const counts = dailySeries(sales.rows, (r) => r.created_at, 30, now);
+    const sixty = dailySeries(realSales, (r) => r.created_at, 60, now, amount);
+    const counts = dailySeries(realSales, (r) => r.created_at, 30, now);
     salesBlock = {
       count30d: sumSeries(counts),
       revenue30d: Math.round(sumSeries(sixty, 30) * 100) / 100,
@@ -133,6 +149,9 @@ export async function GET(req: NextRequest) {
       warnings.push(`${name}: ${result.error}`);
     }
   }
+  if ((demoCampaigns.count ?? 0) > 0) {
+    attention.push({ kind: "schema", label: "Demo data still in real accounts", count: demoCampaigns.count ?? 0, href: "/admin/system" });
+  }
   if ((niches7d.count ?? 0) > 0) {
     attention.push({ kind: "requests", label: "Niches requested this week", count: niches7d.count ?? 0, href: "/admin/requests" });
   }
@@ -143,16 +162,38 @@ export async function GET(req: NextRequest) {
     attention.push({ kind: "error", label: "Failed reads", count: warnings.length, href: "/admin/system" });
   }
 
+  // Acquisition: brands only, the onboarding answer refined by its details.
+  let acquisition: OverviewData["acquisition"] = null;
+  if (acqRows.error) {
+    warnings.push(`profiles (acquisition): ${acqRows.error}`);
+  } else {
+    const byUser = new Map((attributions.error ? [] : attributions.rows).map((a) => [a.user_id, a]));
+    const brands = acqRows.rows
+      .filter((r) => (r.account_type ?? "").toLowerCase() !== "creator")
+      .map((r) => {
+        const a = byUser.get(r.id);
+        return { ...r, referral_source: r.referral_source || a?.source || null, details: a?.details ?? null };
+      });
+    acquisition = {
+      all: acquisitionFunnel(brands, { now: now.getTime() }),
+      d30: acquisitionFunnel(brands, { now: now.getTime(), sinceMs: now.getTime() - 30 * 86_400_000 }),
+    };
+  }
+
   const data: OverviewData = {
     ok: true,
     generatedAt: now.toISOString(),
     users,
     active,
     paying,
-    campaigns: { total: campaignsTotal.count, active: campaignsActive.count },
+    campaigns: {
+      total: campaignsTotal.count === null ? null : Math.max(0, campaignsTotal.count - (demoCampaigns.count ?? 0)),
+      active: campaignsActive.count === null ? null : Math.max(0, campaignsActive.count - (demoActive.count ?? 0)),
+    },
     sales: salesBlock,
     catalog: { total: catalog.count },
     gifting: { missions: missions.count },
+    acquisition,
     attention,
     warnings,
   };

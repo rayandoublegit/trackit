@@ -6,11 +6,8 @@ import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignKindChooser } from "./CampaignKindChooser";
 import { EmptyStage } from "./EmptyStage";
-import { hideSamples, sampleCampaignsFor, samplesHidden } from "@/lib/sample-workspace";
 import { GiftingView } from "./GiftingView";
-import { SampleCampaignPreview } from "./SampleCampaignPreview";
 import "./discovery-motion.css";
-import { getSampleCampaignDetail } from "@/lib/sample-campaign-preview";
 import { takeCampaignsTab, takeCreatorForCampaign } from "@/lib/creator-handoff";
 import { RpmView } from "./RpmView";
 import { AnalyticsPeriodDropdown } from "./AnalyticsPeriodDropdown";
@@ -1327,12 +1324,9 @@ export function CampaignsView({
   const lang = useLang();
   const { navState, navigate, goBack } = useDashboardNavigation();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [samplesOff, setSamplesOff] = useState(false);
-  const [samplePreviewId, setSamplePreviewId] = useState<string | null>(null);
-  // The sample preview is local state: any navigation (sidebar, back, another view) closes it.
+  // Any navigation (sidebar, back, another view) picks up a pending tab handoff.
   const navKey = JSON.stringify(navState);
   useEffect(() => {
-    setSamplePreviewId(null);
     if (takeCampaignsTab() === "gifting") setBoardTab("gifting");
   }, [navKey]);
   const [sales, setSales] = useState<SaleRow[]>([]);
@@ -1418,10 +1412,6 @@ export function CampaignsView({
     return () => {
       cancelled = true;
     };
-  }, [userId]);
-
-  useEffect(() => {
-    setSamplesOff(samplesHidden(userId));
   }, [userId]);
 
   useEffect(() => {
@@ -1795,10 +1785,6 @@ export function CampaignsView({
   };
 
   const openCampaign = (id: string, tab: DetailTab = "analytics") => {
-    if (id.startsWith("sample-")) {
-      if (getSampleCampaignDetail(id)) setSamplePreviewId(id);
-      return;
-    }
     const campaign = campaigns.find((c) => c.id === id);
     if (campaign?.status === "Draft") {
       openEditCampaign(id);
@@ -1990,44 +1976,12 @@ export function CampaignsView({
     );
   }
 
-  const samplePreview = samplePreviewId && campaigns.length === 0 && !samplesOff ? getSampleCampaignDetail(samplePreviewId) : null;
-  const samplePreviewCampaign = samplePreview ? sampleCampaignsFor(lang).find((c) => c.id === samplePreview.id) : null;
-  if (samplePreview && samplePreviewCampaign) {
-    return (
-      <SampleCampaignPreview
-        lang={lang}
-        isMobile={isMobile}
-        detail={samplePreview}
-        name={samplePreviewCampaign.name}
-        isDraft={samplePreviewCampaign.status === "Draft"}
-        onBack={() => setSamplePreviewId(null)}
-        onCreate={() => {
-          setSamplePreviewId(null);
-          tryOpenNewCampaign();
-        }}
-        onDismiss={() => {
-          hideSamples(userId);
-          setSamplesOff(true);
-          setSamplePreviewId(null);
-        }}
-      />
-    );
-  }
-
   return (
     <>
       <CampaignsBoard
         lang={lang}
         isMobile={isMobile}
-        campaigns={campaigns.length === 0 && !samplesOff ? sampleCampaignsFor(lang) : campaigns}
-        onDismissSamples={
-          campaigns.length === 0 && !samplesOff
-            ? () => {
-                hideSamples(userId);
-                setSamplesOff(true);
-              }
-            : undefined
-        }
+        campaigns={campaigns}
         kpiStats={kpiStats}
         plan={plan}
         billableActiveCampaigns={activeCampaignCount}
@@ -2181,7 +2135,6 @@ function CampaignsBoard({
   setSearch,
   onOpenCampaign,
   onCreate,
-  onDismissSamples,
   onDeleteAll,
   onUpgrade,
 }: {
@@ -2199,7 +2152,6 @@ function CampaignsBoard({
   setSearch: (s: string) => void;
   onOpenCampaign: (id: string) => void;
   onCreate: () => void;
-  onDismissSamples?: () => void;
   onDeleteAll: () => void;
   onUpgrade?: () => void;
 }) {
@@ -2218,7 +2170,6 @@ function CampaignsBoard({
   const creatorsInCampaigns = useMemo(() => {
     const ids = new Set<string>();
     for (const c of campaigns) {
-      if (c.id.startsWith("sample-")) continue;
       for (const id of c.creatorIds ?? []) ids.add(id);
     }
     return ids.size;
@@ -2295,11 +2246,6 @@ function CampaignsBoard({
               : "Manage your campaigns and track creator performance and commissions."}
           </p>
           </div>
-          {onDismissSamples ? (
-            <button type="button" className="sample-clear" onClick={onDismissSamples}>
-              {fr ? "Supprimer l’exemple" : "Remove sample"}
-            </button>
-          ) : null}
         </div>
 
         <div
@@ -2479,7 +2425,6 @@ function CampaignsBoard({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 16 }}>
                     <div style={{ fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
                       {campaign.name}
-                      {campaign.id.startsWith("sample-") ? <span className="sp-sample-tag">{fr ? "Exemple" : "Sample"}</span> : null}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       {campaign.status === "Draft" && (
