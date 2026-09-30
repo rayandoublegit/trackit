@@ -24,8 +24,12 @@ export function AdminGate({ status, email }: { status: Status; email?: string })
   return (
     <div className="ad-gate">
       <div className="ad-gate__box">
-        <span className="ad-gate__mark" aria-hidden>T</span>
-        <p className="ad-eyebrow">{fr ? "Console interne Trackit" : "Trackit staff console"}</p>
+        <span className="ad-gate__lock" aria-hidden>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 118 0v4" />
+          </svg>
+        </span>
 
         {status === "signed-out" ? (
           <>

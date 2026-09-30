@@ -118,7 +118,7 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
             <span>{fr ? "Retour à l’app" : "Back to the app"}</span>
           </Link>
           <div className="ad-me">
-            <span className="ad-me__avatar" aria-hidden>{me.email.slice(0, 1).toUpperCase()}</span>
+            <span className="ad-me__dot" />
             <span>
               <strong>{me.email}</strong>
               <small>{me.role === "user" ? (fr ? "admin (liste)" : "admin (list)") : me.role}</small>
@@ -135,7 +135,7 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
             </svg>
           </button>
           <span className="ad-crumb">
-            Console <b>/</b> <strong>{current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}</strong>
+            Console <b>/</b> {current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}
           </span>
           <LangToggle />
         </div>

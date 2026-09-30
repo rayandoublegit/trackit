@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { checkAdmin, type AdminCheck } from "@/lib/admin-auth";
 import { AdminGate } from "./_components/AdminGate";
+import { AdminProbe } from "./_components/AdminProbe";
 import { AdminShell } from "./_components/AdminShell";
 import "./admin.css";
 
@@ -23,7 +24,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   }
 
   if (check.status !== "admin") {
-    return <AdminGate status={check.status} email={check.status === "denied" ? check.email : undefined} />;
+    return (
+      <>
+        <AdminGate status={check.status} email={check.status === "denied" ? check.email : undefined} />
+        <AdminProbe />
+      </>
+    );
   }
-  return <AdminShell me={{ email: check.admin.email, role: check.admin.role }}>{children}</AdminShell>;
+  return (
+    <>
+      <AdminShell me={{ email: check.admin.email, role: check.admin.role }}>{children}</AdminShell>
+      <AdminProbe />
+    </>
+  );
 }
