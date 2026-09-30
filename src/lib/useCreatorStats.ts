@@ -24,7 +24,22 @@ export type CreatorStatsData = {
     discountCode?: string | null;
     status?: string | null;
     brandName?: string | null;
+    brandId?: string | null;
   }[];
+  /** Commission figures per brand (see /api/creator/stats). */
+  byBrand?: CreatorStatsBrand[];
+};
+
+export type CreatorStatsBrand = {
+  brandId: string;
+  brandName: string;
+  model: "commission" | "rpm";
+  commissionRate: number | null;
+  totalSales: number;
+  totalCommissions: number;
+  balance: number;
+  totalEarned: number;
+  salesCount: number;
 };
 
 export function useCreatorStats(userId?: string) {

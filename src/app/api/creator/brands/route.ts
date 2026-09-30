@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
-import { listCreatorBrandMemberships } from "@/lib/creator-account";
+import { listCreatorBrandSummaries } from "@/lib/creator-account";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
-/** Marques auxquelles le créateur est rattaché (via invitation / pseudo). */
+/**
+ * Marques auxquelles le créateur est rattaché (via invitation / pseudo, ou via une mission gifting).
+ * One entry per brand: models (commission / rpm / gifting), terms, logo and affiliate link,
+ * plus the legacy membership fields (creatorRowId, creatorHandle, linkStatus, handleMatched).
+ */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const access = await requireActorAccess(request, searchParams.get("userId"));
@@ -16,7 +20,7 @@ export async function GET(request: Request) {
   const admin = getSupabaseAdmin();
   if (!admin) return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
 
-  const { profile, brands } = await listCreatorBrandMemberships(admin, userId);
+  const { profile, brands } = await listCreatorBrandSummaries(admin, userId);
 
   return NextResponse.json({
     ok: true,

@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireActorAccess } from "@/lib/api-auth";
-import { findCreatorRowsForProfile } from "@/lib/creator-account";
-import { isRpmCampaign, resolveRpmRate, rpmGrossAmount } from "@/lib/rpm";
+import {
+  aggregateRpmByBrand,
+  findCreatorRowsForProfile,
+  loadCreatorCampaignContext,
+  loadCreatorRowPayoutTerms,
+  resolveBrandRpmRate,
+  resolveCreatorBrandTerms,
+} from "@/lib/creator-account";
+import { rpmGrossAmount } from "@/lib/rpm";
 import { fetchPostStatsByUrl, isSupportedPostUrl } from "@/lib/scrapecreators";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
@@ -32,6 +39,7 @@ export async function GET(request: Request) {
       linked: false,
       totals: { views: 0, accrued: 0, pending: 0, videos: 0, rpmRate: 0 },
       videos: [],
+      byBrand: [],
     });
   }
 
@@ -109,30 +117,41 @@ export async function GET(request: Request) {
     }
   }
 
-  // Brand RPM campaigns → rate (€ / 1k views). Default €1 when an RPM campaign exists.
-  const { data: campaigns } = await admin
-    .from("campaigns")
-    .select("id, name, user_id, rpm_rate, commission_type, description, status")
-    .in("user_id", brandIds);
+  // Brand campaigns + the creator's campaign memberships + per-creator payout terms.
+  const [{ campaigns, links: campaignLinks }, payoutTerms] = await Promise.all([
+    loadCreatorCampaignContext(admin, rows),
+    loadCreatorRowPayoutTerms(admin, creatorRowIds),
+  ]);
+  const brandTerms = resolveCreatorBrandTerms({ rows, payoutTerms, campaigns, campaignLinks });
+  const isRpmBrand = new Set(brandTerms.filter((t) => t.models.includes("rpm")).map((t) => t.brandId));
 
-  const rpmRateByBrand = new Map<string, number>();
-  const rpmCampaignByBrand = new Map<string, { id: string; name: string }>();
-  for (const c of campaigns || []) {
-    if (!isRpmCampaign(c)) continue;
-    const status = String(c.status || "").toLowerCase();
-    if (status === "ended" || status === "archived") continue;
-    const brandId = String(c.user_id);
-    const rate = resolveRpmRate(c) || DEFAULT_RPM_RATE;
-    const prev = rpmRateByBrand.get(brandId);
-    if (prev == null || rate >= prev) {
-      rpmRateByBrand.set(brandId, rate);
-      rpmCampaignByBrand.set(brandId, { id: String(c.id), name: String(c.name || "") });
-    }
+  // Best active RPM campaign per brand (shown as the video's campaign when not linked to one).
+  const rpmCampaignByBrand = new Map<string, { id: string; name: string; rate: number }>();
+  for (const c of campaigns) {
+    if (!c.isRpm || !c.active) continue;
+    const rate = c.rpmRate || DEFAULT_RPM_RATE;
+    const prev = rpmCampaignByBrand.get(c.brandId);
+    if (!prev || rate >= prev.rate) rpmCampaignByBrand.set(c.brandId, { id: c.id, name: c.name, rate });
   }
 
-  // Default: €1 / 1,000 views for every linked brand (overridden by campaign rpm_rate above).
+  // Rate (€ / 1k views) per brand: creator's own rpm_rate → RPM campaign the creator is on →
+  // best active RPM campaign of the brand → default €1 / 1,000 views.
+  const rpmRateByBrand = new Map<string, number>();
+  const rpmTermsById = new Map(payoutTerms.map((t) => [t.id, t]));
   for (const brandId of brandIds) {
-    if (!rpmRateByBrand.has(brandId)) rpmRateByBrand.set(brandId, DEFAULT_RPM_RATE);
+    const brandRowIds = new Set(rows.filter((r) => r.user_id === brandId).map((r) => r.id));
+    const linkedCampaignIds = new Set(
+      campaignLinks.filter((l) => brandRowIds.has(l.creatorRowId)).map((l) => l.campaignId),
+    );
+    const activeRpm = campaigns.filter((c) => c.brandId === brandId && c.isRpm && c.active);
+    rpmRateByBrand.set(
+      brandId,
+      resolveBrandRpmRate({
+        rowRpmRates: [...brandRowIds].map((id) => rpmTermsById.get(id)?.rpm_rate ?? null),
+        linkedCampaignRates: activeRpm.filter((c) => linkedCampaignIds.has(c.id)).map((c) => c.rpmRate),
+        brandCampaignRates: activeRpm.map((c) => c.rpmRate || DEFAULT_RPM_RATE),
+      }),
+    );
   }
 
   const { data: brands } = await admin
@@ -147,8 +166,8 @@ export async function GET(request: Request) {
   );
 
   const campaignNameById = new Map<string, string>();
-  for (const c of campaigns || []) {
-    campaignNameById.set(String(c.id), String(c.name || ""));
+  for (const c of campaigns) {
+    campaignNameById.set(c.id, c.name);
   }
 
   // Outstanding balance = money credited but not yet paid out (versement).
@@ -197,6 +216,7 @@ export async function GET(request: Request) {
     return {
       id: row.id,
       title: row.title || (row.post_url ? "Video" : "Untitled"),
+      brandId,
       brandName: brandName.get(row.brand_id) || "",
       campaignName:
         (linkedCampaignId && campaignNameById.get(linkedCampaignId)) || brandCamp?.name || null,
@@ -235,6 +255,17 @@ export async function GET(request: Request) {
   // Prefer highest views first in the table
   videos.sort((a, b) => b.views - a.views);
 
+  // Same figures split per brand (isRpm tells which brands actually pay per view).
+  const byBrand = aggregateRpmByBrand({
+    brands: brandIds.map((brandId) => ({
+      brandId,
+      brandName: brandName.get(brandId) || "",
+      rpmRate: rpmRateByBrand.get(brandId) ?? 0,
+      isRpm: isRpmBrand.has(brandId),
+    })),
+    videos,
+  });
+
   return NextResponse.json({
     ok: true,
     linked: true,
@@ -248,5 +279,6 @@ export async function GET(request: Request) {
       paidOut,
     },
     videos,
+    byBrand,
   });
 }
