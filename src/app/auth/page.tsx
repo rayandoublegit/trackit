@@ -197,15 +197,12 @@ function AuthPageContent() {
 
   const handleOAuth = async () => {
     if (!supabase) return;
-    const callbackParams = new URLSearchParams();
-    if (isCreatorLogin) callbackParams.set("role", "creator");
-    if (lang === "fr") callbackParams.set("lang", "fr");
-    const callbackQs = callbackParams.toString();
-    const callbackQuery = callbackQs ? `?${callbackQs}` : "";
+    // Same callback address as before (Supabase allow-list): the app pages
+    // after it follow the language stored while browsing /fr.
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
+        redirectTo: `${window.location.origin}/auth/callback${isCreatorLogin ? "?role=creator" : ""}`,
       },
     });
   };
