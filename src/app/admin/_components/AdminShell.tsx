@@ -71,29 +71,13 @@ function LangToggle() {
   );
 }
 
-type Me = { ok: boolean; email?: string; role?: string };
+type Me = { email: string; role: string };
 
-export function AdminShell({ children }: { children: ReactNode }) {
+export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
   const pathname = usePathname() || "/admin";
-  const [me, setMe] = useState<Me | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const lang = useLang();
   const fr = lang === "fr";
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/admin/me", { cache: "no-store" })
-      .then(async (res) => {
-        const body = (await res.json().catch(() => ({ ok: false }))) as Me;
-        if (!cancelled) setMe(res.ok ? body : { ok: false });
-      })
-      .catch(() => {
-        if (!cancelled) setMe({ ok: false });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -101,34 +85,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.title = fr ? "Console interne · Trackit" : "Staff console · Trackit";
   }, [fr, pathname]);
-
-  if (me === null) {
-    return (
-      <div className="ad-gate">
-        <span className="ad-gate__spinner" aria-label={fr ? "Vérification de l’accès" : "Checking access"} />
-      </div>
-    );
-  }
-
-  if (!me.ok) {
-    return (
-      <div className="ad-gate">
-        <div className="ad-gate__box">
-          <span className="ad-gate__lock" aria-hidden>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <rect x="5" y="11" width="14" height="10" rx="2" />
-              <path d="M8 11V7a4 4 0 118 0v4" />
-            </svg>
-          </span>
-          <h1>{fr ? "Console interne" : "Staff console"}</h1>
-          <p>{fr ? "Cet espace est réservé à l’équipe Trackit. Connectez-vous avec un compte de l’équipe." : "This area is reserved for the Trackit team. Sign in with a staff account."}</p>
-          <Link className="ad-btn ad-btn--primary" href="/auth?redirectTo=/admin">
-            {fr ? "Se connecter" : "Sign in"}
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const isActive = (item: NavItem) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`));
   const current = NAV.flatMap((s) => s.items).find(isActive);
@@ -162,7 +118,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <span>{fr ? "Retour à l’app" : "Back to the app"}</span>
           </Link>
           <div className="ad-me">
-            <span className="ad-me__dot" />
+            <span className="ad-me__avatar" aria-hidden>{me.email.slice(0, 1).toUpperCase()}</span>
             <span>
               <strong>{me.email}</strong>
               <small>{me.role === "user" ? (fr ? "admin (liste)" : "admin (list)") : me.role}</small>
@@ -179,11 +135,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <span className="ad-crumb">
-            Console <b>/</b> {current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}
+            Console <b>/</b> <strong>{current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}</strong>
           </span>
           <LangToggle />
         </div>
-        <main className="ad-content" key={pathname}>
+        <main className="ad-content">
           {children}
         </main>
       </div>

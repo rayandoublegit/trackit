@@ -25,22 +25,30 @@ export type AdminContext = {
   role: string;
 };
 
+/** Who is asking: an admin, a signed-in account that is not staff, or nobody. */
+export type AdminCheck =
+  | { status: "admin"; admin: AdminContext }
+  | { status: "denied"; email: string }
+  | { status: "signed-out" }
+  | { status: "unavailable" };
+
+type CookieList = { name: string; value: string }[];
+
 /**
- * Verifie que la requete vient d'un admin connecte.
  * Double controle: email dans la allowlist ENV ET/OU role admin|staff en base.
- * Retourne le contexte admin si autorise, sinon null.
+ * Shared by the API routes (request cookies) and the /admin layout (next/headers).
  */
-export async function requireAdmin(req: NextRequest): Promise<AdminContext | null> {
+export async function checkAdmin(cookieList: CookieList): Promise<AdminCheck> {
   // Local preview only (never in a production build): the console opens with sample data.
-  if (adminDevPreview()) return { userId: DEV_BYPASS_USER_ID, email: "dev@localhost", role: "admin" };
+  if (adminDevPreview()) return { status: "admin", admin: { userId: DEV_BYPASS_USER_ID, email: "dev@localhost", role: "admin" } };
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return null;
+  if (!supabaseUrl || !supabaseAnonKey) return { status: "unavailable" };
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return req.cookies.getAll();
+        return cookieList;
       },
       setAll() {},
     },
@@ -49,11 +57,11 @@ export async function requireAdmin(req: NextRequest): Promise<AdminContext | nul
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user?.email) return null;
+  if (!user?.email) return { status: "signed-out" };
 
   const email = user.email.toLowerCase();
   const admin = getSupabaseAdmin();
-  if (!admin) return null;
+  if (!admin) return { status: "unavailable" };
 
   const { data: profile } = await admin
     .from("profiles")
@@ -68,7 +76,16 @@ export async function requireAdmin(req: NextRequest): Promise<AdminContext | nul
   // Il faut au moins une des deux conditions. En pratique on veut les deux
   // alignees, mais accepter l'une OU l'autre evite de te verrouiller dehors
   // si l'ENV n'est pas encore poussee sur Vercel.
-  if (!inAllowlist && !hasStaffRole) return null;
+  if (!inAllowlist && !hasStaffRole) return { status: "denied", email };
 
-  return { userId: user.id, email, role };
+  return { status: "admin", admin: { userId: user.id, email, role } };
+}
+
+/**
+ * Verifie que la requete vient d'un admin connecte.
+ * Retourne le contexte admin si autorise, sinon null.
+ */
+export async function requireAdmin(req: NextRequest): Promise<AdminContext | null> {
+  const check = await checkAdmin(req.cookies.getAll());
+  return check.status === "admin" ? check.admin : null;
 }
