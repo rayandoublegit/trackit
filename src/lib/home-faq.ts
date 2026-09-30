@@ -19,7 +19,7 @@ export const HOME_FAQ_EN: FaqItem[] = [
   {
     question: "Is Trackit free to start?",
     answer:
-      "Yes. Trackit offers a free plan so you can test creator discovery, run a mini campaign, and record manual sales before upgrading to Starter, Pro, or Business as your program grows.",
+      "Yes. Trackit offers a free plan so you can test creator discovery, run a mini campaign, and record manual sales before upgrading to Growth, Pro, or Scale as your program grows.",
   },
   {
     question: "How is Trackit different from spreadsheets?",
@@ -52,7 +52,7 @@ export const HOME_FAQ_FR: FaqItem[] = [
   {
     question: "Trackit est-il gratuit pour commencer ?",
     answer:
-      "Oui. Trackit propose un plan gratuit pour tester la découverte de créateurs, lancer une mini-campagne et enregistrer des ventes manuelles, avant de passer à Starter, Pro ou Business à mesure que votre programme se développe.",
+      "Oui. Trackit propose un plan gratuit pour tester la découverte de créateurs, lancer une mini-campagne et enregistrer des ventes manuelles, avant de passer à Growth, Pro ou Scale à mesure que votre programme se développe.",
   },
   {
     question: "En quoi Trackit est-il différent d’un tableur ?",

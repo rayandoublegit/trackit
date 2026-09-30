@@ -42,8 +42,8 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Tracked affiliate links require Starter or above.",
-        errorFr: "Les liens d'affiliation trackés nécessitent le plan Starter ou supérieur.",
+        error: "Tracked affiliate links require Growth or above.",
+        errorFr: "Les liens d'affiliation trackés nécessitent le plan Growth ou supérieur.",
         code: "plan_gate",
       },
       { status: 402 },

@@ -379,7 +379,7 @@ const COPY = {
     searchPlaceholder: "Search creators, campaigns…",
     noResults: "No results",
     profile: "Profile",
-    planOnline: "Business plan · Online",
+    planOnline: "Scale plan · Online",
     settings: "Settings",
     themes: "Themes",
     light: "Light",
@@ -637,7 +637,7 @@ const COPY = {
     searchPlaceholder: "Rechercher créateurs, campagnes…",
     noResults: "Aucun résultat",
     profile: "Profil",
-    planOnline: "Plan Business · En ligne",
+    planOnline: "Plan Scale · En ligne",
     settings: "Paramètres",
     themes: "Thèmes",
     light: "Clair",
@@ -3222,7 +3222,7 @@ export function PremiumWorkspaceDemo() {
           >
             <Photo id={current.photo} w={22} h={22} className="ws-workspace-mark is-photo" />
             <span className="label">{current.name}</span>
-            <span className="pd-plan">Business</span>
+            <span className="pd-plan">Scale</span>
             <WsIcon name="chevron" size={14} />
           </button>
           {brandOpen ? (

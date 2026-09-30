@@ -69,7 +69,7 @@ function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): stri
       if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
       return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
     case "includes-starter":
-      return fr ? "Tout Starter, et en plus :" : "Everything in Starter, plus";
+      return fr ? "Tout Growth, et en plus :" : "Everything in Growth, plus";
     case "includes-pro":
       return fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus";
     case "ai":

@@ -5,7 +5,7 @@ export const BASIC_MONTHLY_DISCOVERIES = 30;
 export const PRO_MONTHLY_DISCOVERIES = 100;
 
 export const FREE_RESULTS_PER_SEARCH = 10;
-/** Same results-per-search quota for all paid plans (Starter / Pro / Scale). */
+/** Same results-per-search quota for all paid plans (Growth / Pro / Scale). */
 export const PAID_RESULTS_PER_SEARCH = 20;
 /** @deprecated Use PAID_RESULTS_PER_SEARCH — kept for older imports. */
 export const BASIC_RESULTS_PER_SEARCH = PAID_RESULTS_PER_SEARCH;
@@ -120,10 +120,10 @@ export function hasReachedManualSalesLimit(plan: PlanTier, manualSalesCount: num
   return manualSalesCount >= max;
 }
 
-/** @deprecated No monthly AI quota — Pro / Business only. */
+/** @deprecated No monthly AI quota — Pro / Scale only. */
 export const BASIC_MONTHLY_AI_MESSAGES = 0;
 
-/** AI outreach: Pro + Business (scale) only — no message quota. */
+/** AI outreach: Pro + Scale (scale) only — no message quota. */
 export function canUseAIOutreach(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
@@ -135,7 +135,7 @@ export function canUseUnlimitedAIOutreach(plan: PlanTier): boolean {
 
 /**
  * @deprecated Prefer canUseAIOutreach.
- * `null` = allowed (unlimited), `0` = locked (Free / Starter).
+ * `null` = allowed (unlimited), `0` = locked (Free / Growth).
  */
 export function getMonthlyAIMessageLimit(plan: PlanTier): number | null {
   return canUseAIOutreach(plan) ? null : 0;
@@ -156,7 +156,7 @@ export function incrementAiOutreachUsage(_userId?: string | null): number {
   return 0;
 }
 
-/** Returns true when AI generation is allowed (Pro / Business). */
+/** Returns true when AI generation is allowed (Pro / Scale). */
 export function canGenerateAiOutreach(plan: PlanTier, _userId?: string | null): boolean {
   return canUseAIOutreach(plan);
 }
@@ -222,7 +222,7 @@ export function canUseScripts(plan: PlanTier): boolean {
   return isProOrAbove(plan);
 }
 
-/** Starter+: Shopify integration + per-creator sales tracking. */
+/** Growth+: Shopify integration + per-creator sales tracking. */
 export function canUseShopify(plan: PlanTier): boolean {
   return isGrowthOrAbove(plan);
 }

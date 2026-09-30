@@ -350,8 +350,8 @@ export function CampaignLinksTab({
           >
             <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
-                ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Starter pour générer et mesurer vos liens d’affiliation."
-                : "Tracked links (clicks, sales, revenue) are locked on Free. Upgrade to Starter to generate and measure affiliate links."}
+                ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Growth pour générer et mesurer vos liens d’affiliation."
+                : "Tracked links (clicks, sales, revenue) are locked on Free. Upgrade to Growth to generate and measure affiliate links."}
             </p>
             {onUpgrade ? (
               <button

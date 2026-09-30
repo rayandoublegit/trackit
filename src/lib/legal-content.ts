@@ -82,7 +82,7 @@ export function getTermsContent(lang: AppLang): LegalDocument {
             "« Client » ou « Marque » : la personne morale ou le professionnel qui utilise le Service pour gérer ses programmes créateurs et, le cas échéant, souscrit un Abonnement.",
             "« Créateur » : la personne qui produit du contenu et collabore avec une Marque (gifting, affiliation, contenu sponsorisé) via le Service.",
             "« Utilisateur » : toute personne disposant d'un compte Trackit, Marque ou Créateur.",
-            "« Abonnement » : la formule payante souscrite par le Client (Starter, Pro, Business ou toute autre offre proposée).",
+            "« Abonnement » : la formule payante souscrite par le Client (Growth, Pro, Scale ou toute autre offre proposée).",
           ],
         },
         {
@@ -102,7 +102,7 @@ export function getTermsContent(lang: AppLang): LegalDocument {
         {
           title: "5. Offres et prix",
           paragraphs: [
-            "Trackit propose une offre gratuite (Free) et des Abonnements payants (notamment Starter, Pro et Business). Le contenu, les limites et le prix de chaque offre sont ceux affichés sur la page Tarifs au moment de la souscription ; cette page fait foi.",
+            "Trackit propose une offre gratuite (Free) et des Abonnements payants (notamment Growth, Pro et Scale). Le contenu, les limites et le prix de chaque offre sont ceux affichés sur la page Tarifs au moment de la souscription ; cette page fait foi.",
             "Les prix sont indiqués hors taxes, en euros ou en dollars américains selon votre région. Les taxes applicables (dont la TVA) s'ajoutent selon votre situation et sont indiquées lors du paiement.",
             "Nous pouvons faire évoluer nos prix. Toute hausse applicable à un Abonnement en cours vous est notifiée au moins 30 jours à l'avance et ne s'applique qu'à la période de renouvellement suivante ; vous pouvez résilier avant son entrée en vigueur.",
           ],
@@ -258,7 +258,7 @@ export function getTermsContent(lang: AppLang): LegalDocument {
           "\"Customer\" or \"Brand\": the company or professional that uses the Service to run creator programs and, where applicable, buys a Subscription.",
           "\"Creator\": a person who produces content and works with a Brand (gifting, affiliate, sponsored content) through the Service.",
           "\"User\": anyone with a Trackit account, Brand or Creator.",
-          "\"Subscription\": the paid plan purchased by the Customer (Starter, Pro, Business, or any other plan offered).",
+          "\"Subscription\": the paid plan purchased by the Customer (Growth, Pro, Scale, or any other plan offered).",
         ],
       },
       {
@@ -278,7 +278,7 @@ export function getTermsContent(lang: AppLang): LegalDocument {
       {
         title: "5. Plans and prices",
         paragraphs: [
-          "Trackit offers a free plan (Free) and paid Subscriptions (including Starter, Pro, and Business). The content, limits, and price of each plan are those shown on the Pricing page at the time of purchase; that page prevails.",
+          "Trackit offers a free plan (Free) and paid Subscriptions (including Growth, Pro, and Scale). The content, limits, and price of each plan are those shown on the Pricing page at the time of purchase; that page prevails.",
           "Prices are shown excluding taxes, in US dollars or euros depending on your region. Applicable taxes (including VAT or sales tax) are added based on your situation and shown at checkout.",
           "We may change our prices. Any increase affecting an active Subscription is notified at least 30 days in advance and applies only from the next renewal; you may cancel before it takes effect.",
         ],

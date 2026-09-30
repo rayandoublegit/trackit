@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
   const plan = normalizePlan(profile?.plan);
   if (!canUseAIOutreach(plan)) {
     return NextResponse.json(
-      { error: "AI outreach requires Pro or Business" },
+      { error: "AI outreach requires Pro or Scale" },
       { status: 403 }
     );
   }

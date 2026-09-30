@@ -130,8 +130,8 @@ export function discoveryCopy(lang: Lang) {
     morePlatformsComing: fr ? "Plus de plateformes bientôt" : "More platforms coming soon",
     platformFreeBlocked: (platform: string) =>
       fr
-        ? `${platform} est réservé aux plans payants — passez à Starter pour y accéder.`
-        : `${platform} is available on paid plans — upgrade to Starter to unlock it.`,
+        ? `${platform} est réservé aux plans payants — passez à Growth pour y accéder.`
+        : `${platform} is available on paid plans — upgrade to Growth to unlock it.`,
     freeDiscoveryBannerTitle: fr
       ? `${FREE_LIFETIME_DISCOVERIES} découvertes gratuites — à toi de jouer`
       : `${FREE_LIFETIME_DISCOVERIES} free discoveries — start exploring`,
@@ -154,11 +154,11 @@ export function discoveryCopy(lang: Lang) {
       ? `Passez à Pro pour ${PRO_MONTHLY_DISCOVERIES} découvertes/mois.`
       : `Upgrade to Pro for ${PRO_MONTHLY_DISCOVERIES} discoveries/month.`,
     discoveryLimitSubtitleFree: fr
-      ? `Passez à Starter pour ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois.`
-      : `Upgrade to Starter for ${BASIC_MONTHLY_DISCOVERIES} discoveries/month.`,
+      ? `Passez à Growth pour ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois.`
+      : `Upgrade to Growth for ${BASIC_MONTHLY_DISCOVERIES} discoveries/month.`,
     discoveryLimitSubtitlePro: fr
-      ? "Passez à Business pour des découvertes illimitées."
-      : "Upgrade to Business for unlimited discoveries.",
+      ? "Passez à Scale pour des découvertes illimitées."
+      : "Upgrade to Scale for unlimited discoveries.",
     discoveryResetIn: (countdown: string) =>
       fr ? `Réinitialisation dans ${countdown}` : `Resets in ${countdown}`,
     discoveryUpgradeCta: (planName: string) =>

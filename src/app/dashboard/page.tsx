@@ -3868,8 +3868,8 @@ function IntegrationsView({
     if (!canAddAnotherShopifyStore(plan, storeCount) && !changingStore) {
       setShopError(
         lang === "fr"
-          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Business pour jusqu'à 3 boutiques.`
-          : `Store limit of ${storeLimit} reached. Upgrade to Business for up to 3 stores.`
+          ? `Limite de ${storeLimit} boutique(s) atteinte. Passez à Scale pour jusqu'à 3 boutiques.`
+          : `Store limit of ${storeLimit} reached. Upgrade to Scale for up to 3 stores.`
       );
       if (plan === "pro") void onUpgradeScale?.();
       else if (plan === "basic") void onUpgradePro?.();
@@ -4232,18 +4232,18 @@ function IntegrationsView({
                             )}
                             {plan === "free" ? (
                               <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
-                                {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Starter. " : "Free includes manual sales. Shopify requires the Starter plan. "}
+                                {lang === "fr" ? "Le plan Free inclut les ventes manuelles. Shopify nécessite le plan Growth. " : "Free includes manual sales. Shopify requires the Growth plan. "}
                                 <button type="button" onClick={() => void onUpgrade?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                                  {lang === "fr" ? "Passer à Starter →" : "Upgrade to Starter →"}
+                                  {lang === "fr" ? "Passer à Growth →" : "Upgrade to Growth →"}
                                 </button>
                               </p>
                             ) : (plan === "basic" || plan === "pro") ? (
                               <p style={{ fontSize: 12, color: mutedColor, margin: 0 }}>
                                 {lang === "fr"
-                                  ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Business. `
-                                  : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Business. `}
+                                  ? `Jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques sur Scale. `
+                                  : `Up to ${SCALE_MAX_SHOPIFY_STORES} stores on Scale. `}
                                 <button type="button" onClick={() => void onUpgradeScale?.()} style={{ background: "none", border: "none", color: dark ? "#8AB4FF" : "#0047FF", fontSize: 12, cursor: "pointer", padding: 0, fontFamily: "inherit" }}>
-                                  {lang === "fr" ? "Passer à Business →" : "Upgrade to Business →"}
+                                  {lang === "fr" ? "Passer à Scale →" : "Upgrade to Scale →"}
                                 </button>
                               </p>
                             ) : null}
@@ -4402,8 +4402,8 @@ function AutomationView({
                   : "Build an agent"
                 : workflows
                   ? lang === "fr"
-                    ? "Débloquer l'agent complet (Business)"
-                    : "Unlock full agent (Business)"
+                    ? "Débloquer l'agent complet (Scale)"
+                    : "Unlock full agent (Scale)"
                   : lang === "fr"
                     ? "Créer un agent"
                     : "Build an agent"}
@@ -4695,8 +4695,8 @@ function AffiliatesView({
           title={lang === "fr" ? "Affiliés" : "Affiliates"}
           subtitle={
             lang === "fr"
-              ? "Les liens trackés sont bloqués sur Free — Starter débloque clics, ventes et CA."
-              : "Tracked links are locked on Free — Starter unlocks clicks, sales, and revenue."
+              ? "Les liens trackés sont bloqués sur Free — Growth débloque clics, ventes et CA."
+              : "Tracked links are locked on Free — Growth unlocks clicks, sales, and revenue."
           }
         />
         <div style={{ padding: isMobile ? 16 : 40 }}>
@@ -5469,14 +5469,14 @@ function TrackitTagline({ sidebar, collapsed }: { sidebar?: boolean; collapsed?:
 function planLabel(lang: "en" | "fr", isCreator: boolean, isScale: boolean, isPro: boolean, isBasic: boolean): string {
   if (isCreator) return lang === "fr" ? "Créateur" : "Creator";
   if (lang === "fr") {
-    if (isScale) return "Plan Business";
+    if (isScale) return "Plan Scale";
     if (isPro) return "Plan Pro";
-    if (isBasic) return "Plan Starter";
+    if (isBasic) return "Plan Growth";
     return "Plan gratuit";
   }
-  if (isScale) return "Business Plan";
+  if (isScale) return "Scale Plan";
   if (isPro) return "Pro Plan";
-  if (isBasic) return "Starter Plan";
+  if (isBasic) return "Growth Plan";
   return "Free Plan";
 }
 

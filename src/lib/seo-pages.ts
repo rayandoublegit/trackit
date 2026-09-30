@@ -41,7 +41,7 @@ export const SEO_PAGES: SeoPage[] = [
       {
         question: "How much does Trackit cost?",
         answer:
-          "Trackit offers a free plan to get started. Paid Starter, Pro and Business plans unlock higher limits for growing programs. See trackit pricing at thentrack.it/pricing.",
+          "Trackit offers a free plan to get started. Paid Growth, Pro and Scale plans unlock higher limits for growing programs. See trackit pricing at thentrack.it/pricing.",
       },
     ],
     sections: [
@@ -203,7 +203,7 @@ export const SEO_PAGES_FR: SeoPage[] = [
       {
         question: "Combien coûte Trackit ?",
         answer:
-          "Trackit propose une offre gratuite pour démarrer. Les offres payantes Starter, Pro et Business relèvent les limites à mesure que votre programme grandit. Tous les tarifs sont sur thentrack.it/fr/pricing.",
+          "Trackit propose une offre gratuite pour démarrer. Les offres payantes Growth, Pro et Scale relèvent les limites à mesure que votre programme grandit. Tous les tarifs sont sur thentrack.it/fr/pricing.",
       },
     ],
     sections: [

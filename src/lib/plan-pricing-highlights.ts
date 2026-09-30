@@ -58,17 +58,17 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "blocked-shopify",
         label: "Shopify",
-        value: fr ? "Bloqué (Starter+)" : "Locked (Starter+)",
+        value: fr ? "Bloqué (Growth+)" : "Locked (Growth+)",
       },
       {
         id: "blocked-links",
         label: fr ? "Liens suivis" : "Tracked links",
-        value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
+        value: fr ? "Bloqués (Growth+)" : "Locked (Growth+)",
       },
       {
         id: "blocked-templates",
         label: fr ? "Modèles d’outreach" : "Outreach templates",
-        value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
+        value: fr ? "Bloqués (Growth+)" : "Locked (Growth+)",
       },
     ];
   }
@@ -119,7 +119,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
     return [
       {
         id: "includes-starter",
-        label: fr ? "Tout Starter, et en plus :" : "Everything in Starter, plus",
+        label: fr ? "Tout Growth, et en plus :" : "Everything in Growth, plus",
         value: "",
       },
       {

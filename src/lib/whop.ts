@@ -8,7 +8,7 @@ export const WHOP_ACCOUNT_ID = "biz_kiDPNGwI4cxjKg";
 export const WHOP_PRODUCT_ID = "prod_8y8W4yOTWKExg";
 
 const PLAN_COPY: Record<"basic" | "pro" | "scale", { title: string; monthly: number; annual: number }> = {
-  basic: { title: "Trackit Starter", monthly: PLAN_PRICES.growthMonthly, annual: PLAN_PRICES.growthAnnual },
+  basic: { title: "Trackit Growth", monthly: PLAN_PRICES.growthMonthly, annual: PLAN_PRICES.growthAnnual },
   pro: { title: "Trackit Pro", monthly: PLAN_PRICES.proMonthly, annual: PLAN_PRICES.proAnnual },
   scale: { title: "Trackit Scale", monthly: PLAN_PRICES.scaleMonthly, annual: PLAN_PRICES.scaleAnnual },
 };

@@ -4582,7 +4582,7 @@ function PayoutsTab({
 
   const handlePayCreator = (creator: PayableCreator) => {
     if (!canUseManualPayouts(plan)) {
-      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Starter." : "Manual creator payouts are available on the Starter plan and above.");
+      alert(lang === "fr" ? "Les paiements créateurs manuels sont disponibles à partir du plan Growth." : "Manual creator payouts are available on the Growth plan and above.");
       return;
     }
     const amount = creator.balance;

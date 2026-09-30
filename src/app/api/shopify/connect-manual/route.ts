@@ -32,8 +32,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        error: "Shopify requires Starter or above.",
-        errorFr: "Shopify nécessite le plan Starter ou supérieur.",
+        error: "Shopify requires Growth or above.",
+        errorFr: "Shopify nécessite le plan Growth ou supérieur.",
         code: "plan_gate",
       },
       { status: 402 },

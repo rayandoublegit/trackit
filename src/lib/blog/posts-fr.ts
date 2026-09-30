@@ -304,9 +304,9 @@ export const POSTS_FR: BlogPost[] = [
   },
   {
     slug: "tarifs-trackit-plans-expliques",
-    title: "Tarifs Trackit : les offres Gratuit, Starter, Pro et Business expliquées",
+    title: "Tarifs Trackit : les offres Gratuit, Growth, Pro et Scale expliquées",
     description:
-      "Comparez les offres Trackit Gratuit, Starter, Pro et Business — fonctionnalités, limites et l'offre adaptée à votre programme créateurs.",
+      "Comparez les offres Trackit Gratuit, Growth, Pro et Scale — fonctionnalités, limites et l'offre adaptée à votre programme créateurs.",
     category: "Plateforme",
     locale: "fr",
     publishedAt: "2026-02-22T10:00:00.000Z",
@@ -318,14 +318,14 @@ export const POSTS_FR: BlogPost[] = [
     blocks: [
       {
         type: "p",
-        text: "Trackit propose une offre gratuite pour démarrer, puis les offres Starter, Pro et Business pour les marques qui font tourner un programme créateurs actif. Toutes incluent la découverte et le suivi ; les offres payantes débloquent des limites plus élevées et des fonctionnalités avancées.",
+        text: "Trackit propose une offre gratuite pour démarrer, puis les offres Growth, Pro et Scale pour les marques qui font tourner un programme créateurs actif. Toutes incluent la découverte et le suivi ; les offres payantes débloquent des limites plus élevées et des fonctionnalités avancées.",
       },
       { type: "h2", text: "Trackit Gratuit" },
       {
         type: "p",
         text: "Idéal pour tester le marketing créateurs. Explorez la découverte, lancez une petite campagne et validez le canal avant d'y consacrer un budget.",
       },
-      { type: "h2", text: "Trackit Starter" },
+      { type: "h2", text: "Trackit Growth" },
       {
         type: "p",
         text: "Le point d'entrée pour lancer un vrai programme créateurs : découverte, modèles de messages, paiements manuels et liens d'affiliation suivis.",
@@ -335,7 +335,7 @@ export const POSTS_FR: BlogPost[] = [
         type: "p",
         text: "Pour les marques qui gèrent déjà un vivier de créateurs actif : plus de créateurs, plus de prises de contact et des analyses pour piloter des partenariats dans la durée.",
       },
-      { type: "h2", text: "Trackit Business" },
+      { type: "h2", text: "Trackit Scale" },
       {
         type: "p",
         text: "Pour les équipes qui mènent plusieurs campagnes de front : les limites les plus élevées et tout le contenu de l'offre Pro, pour les programmes à fort volume.",

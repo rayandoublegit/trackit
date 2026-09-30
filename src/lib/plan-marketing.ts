@@ -85,9 +85,9 @@ export function annualFreeMonthsBadge(lang: Lang): string {
 }
 
 export function planDisplayName(tier: PlanTier, lang: Lang): string {
-  if (tier === "scale") return "Business";
+  if (tier === "scale") return "Scale";
   if (tier === "pro") return "Pro";
-  if (tier === "basic") return "Starter";
+  if (tier === "basic") return "Growth";
   return lang === "fr" ? "Gratuit" : "Free";
 }
 
@@ -166,8 +166,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: canUseAffiliates,
     title: { en: "Tracked links", fr: "Liens suivis" },
     description: {
-      en: "Free locks tracked affiliate links. Starter unlocks click, sales, and revenue attribution per creator.",
-      fr: "Le plan Gratuit n’inclut pas les liens d’affiliation suivis. Starter débloque l’attribution des clics, ventes et CA par créateur.",
+      en: "Free locks tracked affiliate links. Growth unlocks click, sales, and revenue attribution per creator.",
+      fr: "Le plan Gratuit n’inclut pas les liens d’affiliation suivis. Growth débloque l’attribution des clics, ventes et CA par créateur.",
     },
   },
   payouts: {
@@ -256,8 +256,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: canUseShopify,
     title: { en: "Shopify", fr: "Shopify" },
     description: {
-      en: `Shopify is locked on Free. Starter connects up to ${BASIC_MAX_SHOPIFY_STORES} store to sync sales and attribute commissions automatically.`,
-      fr: `Shopify n’est pas disponible sur le plan Gratuit. Starter connecte jusqu’à ${BASIC_MAX_SHOPIFY_STORES} boutique pour synchroniser les ventes et attribuer les commissions automatiquement.`,
+      en: `Shopify is locked on Free. Growth connects up to ${BASIC_MAX_SHOPIFY_STORES} store to sync sales and attribute commissions automatically.`,
+      fr: `Shopify n’est pas disponible sur le plan Gratuit. Growth connecte jusqu’à ${BASIC_MAX_SHOPIFY_STORES} boutique pour synchroniser les ventes et attribuer les commissions automatiquement.`,
     },
   },
   outreach: {
@@ -274,8 +274,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: canPersistTemplates,
     title: { en: "Outreach templates", fr: "Modèles d’outreach" },
     description: {
-      en: "Outreach templates are locked on Free. Starter lets you save, import, and reuse your best-performing messages.",
-      fr: "Les modèles d’outreach ne sont pas disponibles sur le plan Gratuit. Starter vous permet d’enregistrer, d’importer et de réutiliser vos messages les plus performants.",
+      en: "Outreach templates are locked on Free. Growth lets you save, import, and reuse your best-performing messages.",
+      fr: "Les modèles d’outreach ne sont pas disponibles sur le plan Gratuit. Growth vous permet d’enregistrer, d’importer et de réutiliser vos messages les plus performants.",
     },
   },
   discovery: {
@@ -283,8 +283,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: (plan) => plan !== "free",
     title: { en: "Discovery", fr: "Découverte" },
     description: {
-      en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries per month on Starter.`,
-      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes par mois avec Starter.`,
+      en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries per month on Growth.`,
+      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes par mois avec Growth.`,
     },
   },
   "ai-outreach": {
@@ -292,8 +292,8 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     check: canUseAIOutreach,
     title: { en: "AI outreach", fr: "Outreach IA" },
     description: {
-      en: "AI outreach is available on Pro and Business — generate personalized messages with no monthly cap.",
-      fr: "L'outreach IA est disponible sur Pro et Business — générez des messages personnalisés sans limite mensuelle.",
+      en: "AI outreach is available on Pro and Scale — generate personalized messages with no monthly cap.",
+      fr: "L'outreach IA est disponible sur Pro et Scale — générez des messages personnalisés sans limite mensuelle.",
     },
   },
   "bulk-import": {

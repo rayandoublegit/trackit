@@ -104,8 +104,8 @@ export default function AffiliationPage() {
       title: lang === "fr" ? "Ils s'inscrivent et paient" : "They sign up and pay",
       desc:
         lang === "fr"
-          ? "Votre audience découvre Trackit. Quand ils passent à Starter ou Pro, la vente vous est attribuée."
-          : "Your audience discovers Trackit. When they upgrade to Starter or Pro, the sale is attributed to you.",
+          ? "Votre audience découvre Trackit. Quand ils passent à Growth ou Pro, la vente vous est attribuée."
+          : "Your audience discovers Trackit. When they upgrade to Growth or Pro, the sale is attributed to you.",
     },
     {
       step: "3" as const,
