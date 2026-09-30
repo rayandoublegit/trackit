@@ -1,12 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { contractGrantsAdUse } from "@/lib/gifting";
-import { uploadGiftVideoResumable } from "@/lib/gift-video-upload";
+import {
+  contractGrantsAdUse,
+  GIFT_CONTENT_ACCEPT,
+  GIFT_MAX_CONTENTS,
+  giftContentProgress,
+  giftContentType,
+  giftExpectedCount,
+  type GiftContentProgress,
+} from "@/lib/gifting";
+import { uploadGiftContentResumable } from "@/lib/gift-video-upload";
 import {
   GIFT_BOARD_COLUMNS,
   friendlyGiftError,
   giftColumnFor,
+  giftContentsLabel,
   giftNextStep,
   giftStats,
   giftStatusLabel,
@@ -29,6 +38,7 @@ type Campaign = {
   product: string;
   brief: string;
   deadline: string;
+  video_count?: number;
   allow_ads: boolean;
   rights_days: number;
   territories: string;
@@ -46,13 +56,31 @@ type Mission = {
   tracking_number: string | null;
   address: { name: string; line: string; postalCode: string; city: string; country: string } | null;
 };
-type Video = { mission_id: string; name: string; status: string; feedback: string };
+/** One content of a mission (gift_videos row): a video or a photo at slot `position`. */
+type Content = {
+  mission_id: string;
+  position?: number;
+  kind?: "video" | "photo";
+  name: string;
+  status: string;
+  feedback: string;
+  approved_at?: string | null;
+};
 
-const VIDEO_STATUS: Record<string, { en: string; fr: string }> = {
+const CONTENT_STATUS: Record<string, { en: string; fr: string }> = {
   pending: { en: "In review", fr: "En revue" },
   changes_requested: { en: "Changes requested", fr: "Modification demandée" },
-  approved: { en: "Approved", fr: "Validée" },
+  approved: { en: "Approved", fr: "Validé" },
 };
+
+/** Content phase of a mission: the badge "2/3" and next-step texts use it. */
+function progressOf(mission: Mission, contents: Content[], expected: number): GiftContentProgress | null {
+  if (!["delivered", "submitted", "approved"].includes(mission.status)) return null;
+  return giftContentProgress(
+    contents.filter((c) => c.mission_id === mission.id),
+    expected,
+  );
+}
 
 export function GiftingView({
   isMobile,
@@ -77,12 +105,12 @@ export function GiftingView({
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [videos, setVideos] = useState<Video[]>([]);
+  const [videos, setVideos] = useState<Content[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [uploadPercent, setUploadPercent] = useState<number | null>(null);
+  const [upload, setUpload] = useState<{ position: number; percent: number } | null>(null);
   const [listName, setListName] = useState("");
   const [handles, setHandles] = useState<Record<string, string>>({});
   const [inviteHandles, setInviteHandles] = useState<Record<string, string>>({});
@@ -90,6 +118,7 @@ export function GiftingView({
   const [product, setProduct] = useState("");
   const [brief, setBrief] = useState("");
   const [deadline, setDeadline] = useState("");
+  const [contentCount, setContentCount] = useState("1");
   const [allowAds, setAllowAds] = useState(true);
   const [rightsDays, setRightsDays] = useState("90");
   const [territories, setTerritories] = useState("France");
@@ -166,36 +195,62 @@ export function GiftingView({
     }
   }
 
-  async function submitVideo(missionId: string, file: File) {
-    const ticket = await send({ op: "upload_url", missionId, contentType: file.type, size: file.size });
+  async function submitContent(missionId: string, position: number, file: File) {
+    const ticket = await send({ op: "upload_url", missionId, position, contentType: file.type, size: file.size });
     if (!ticket.ok || !ticket.path || !ticket.token) return;
     setBusy(true);
-    setUploadPercent(0);
+    setUpload({ position, percent: 0 });
     try {
-      await uploadGiftVideoResumable(file, ticket.path, ticket.token, setUploadPercent);
+      await uploadGiftContentResumable(file, ticket.path, ticket.token, (percent) => setUpload({ position, percent }));
     } catch (cause) {
       if (fr) {
         const detail = cause instanceof Error ? friendlyGiftError(cause.message, lang) : "";
-        setError(detail && cause instanceof Error && detail !== cause.message ? detail : "Envoi de la vidéo impossible. Réessayez.");
+        setError(detail && cause instanceof Error && detail !== cause.message ? detail : "Envoi du fichier impossible. Réessayez.");
       } else {
-        setError(cause instanceof Error ? cause.message : "Video upload failed.");
+        setError(cause instanceof Error ? cause.message : "Upload failed.");
       }
       return;
     } finally {
       setBusy(false);
-      setUploadPercent(null);
+      setUpload(null);
     }
-    await send({ op: "act", missionId, action: { type: "submit", videoName: file.name, storagePath: ticket.path } });
+    await send({
+      op: "act",
+      missionId,
+      action: { type: "submit", position, name: file.name, storagePath: ticket.path, kind: giftContentType(file.type)?.kind ?? "video" },
+    });
   }
 
-  async function openVideo(missionId: string) {
-    const result = await send({ op: "video_url", missionId });
-    if (result.ok && result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+  /** A signed URL valid for about a minute. No reload of the board: nothing changed. */
+  async function contentUrl(missionId: string, position: number): Promise<string | null> {
+    setError("");
+    try {
+      const response = await fetch("/api/gifting", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op: "video_url", missionId, position }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.url) {
+        setError(friendlyGiftError(body.error || (fr ? "Ouverture impossible." : "Could not open."), lang));
+        return null;
+      }
+      return String(body.url);
+    } catch {
+      setError(fr ? "Connexion impossible. Réessayez." : "Connection failed. Please try again.");
+      return null;
+    }
   }
 
+  const expectedFor = (campaignId: string) => giftExpectedCount(campaigns.find((c) => c.id === campaignId)?.video_count);
   const open = missions.find((mission) => mission.id === openId) ?? null;
-  const selectedVideo = videos.find((video) => video.mission_id === open?.id);
-  const stats = giftStats(missions);
+  const openContents = open ? videos.filter((video) => video.mission_id === open.id) : [];
+  const stats = giftStats(
+    missions.map((m) => ({
+      status: m.status,
+      pendingContents: videos.filter((v) => v.mission_id === m.id && v.status === "pending").length,
+    })),
+  );
   const setupMissing = Boolean(loadError) && isGiftSetupError(loadError);
   const showSample = loaded && missions.length === 0 && (campaigns.length === 0 || setupMissing);
   const sample = SAMPLE_CAMPAIGN_DETAILS["sample-summer"];
@@ -210,13 +265,13 @@ export function GiftingView({
           <h1>
             {isCreator
               ? fr ? "Mes missions cadeau" : "My gift missions"
-              : fr ? "Produits offerts, vidéos en retour" : "Gifted products, videos back"}
+              : fr ? "Produits offerts, contenus en retour" : "Gifted products, content back"}
           </h1>
           <p className="gv-lead">
             {isCreator
               ? fr
-                ? "Chaque mission : une proposition, un contrat figé à signer, votre adresse, le colis, puis votre vidéo."
-                : "Each mission: an offer, a frozen contract to sign, your address, the parcel, then your video."
+                ? "Chaque mission : une proposition, un contrat figé à signer, votre adresse, le colis, puis vos contenus (vidéos ou photos)."
+                : "Each mission: an offer, a frozen contract to sign, your address, the parcel, then your contents (videos or photos)."
               : fr
                 ? "Listes, contrat figé, colis et droits publicitaires. Le forfait affiché ne déclenche aucun paiement."
                 : "Lists, a frozen contract, the parcel and ad rights. A shown fee never triggers a payment."}
@@ -233,7 +288,7 @@ export function GiftingView({
         {[
           { label: fr ? "En cours" : "In progress", value: stats.active, hot: false },
           { label: fr ? "Colis en route" : "Parcels on the way", value: stats.shipping, hot: false },
-          { label: fr ? "Vidéos à valider" : "Videos to review", value: stats.toReview, hot: stats.toReview > 0 },
+          { label: fr ? "Contenus à valider" : "Contents to review", value: stats.toReview, hot: stats.toReview > 0 },
           { label: fr ? "Validées" : "Approved", value: stats.approved, hot: false },
         ].map((k, i) => (
           <div key={k.label} className={`gv-stat${k.hot ? " is-hot" : ""}`} style={{ animationDelay: `${i * 60}ms` }}>
@@ -317,6 +372,7 @@ export function GiftingView({
                 product,
                 brief,
                 deadline,
+                videoCount: giftExpectedCount(contentCount),
                 allowAds,
                 rightsDays: allowAds ? Number(rightsDays) : 0,
                 territories: allowAds ? territories : "",
@@ -326,6 +382,7 @@ export function GiftingView({
                   setCampaignName("");
                   setProduct("");
                   setBrief("");
+                  setContentCount("1");
                   setCreating(false);
                 }
               });
@@ -345,10 +402,31 @@ export function GiftingView({
               Brief
               <textarea className="gv-field" aria-label="Brief" required value={brief} onChange={(event) => setBrief(event.target.value)} placeholder={fr ? "Ce que le créateur doit montrer." : "What the creator should show."} style={{ minHeight: 96 }} />
             </label>
-            <label>
-              {fr ? "Échéance" : "Deadline"}
-              <input className="gv-field" aria-label={fr ? "Échéance" : "Deadline"} type="date" required value={deadline} onChange={(event) => setDeadline(event.target.value)} />
-            </label>
+            <div className="gv-row2">
+              <label>
+                {fr ? "Échéance" : "Deadline"}
+                <input className="gv-field" aria-label={fr ? "Échéance" : "Deadline"} type="date" required value={deadline} onChange={(event) => setDeadline(event.target.value)} />
+              </label>
+              <label>
+                {fr ? "Contenus attendus" : "Contents expected"}
+                <input
+                  className="gv-field"
+                  aria-label={fr ? "Nombre de contenus attendus" : "Number of contents expected"}
+                  type="number"
+                  min="1"
+                  max={GIFT_MAX_CONTENTS}
+                  step="1"
+                  required
+                  value={contentCount}
+                  onChange={(event) => setContentCount(event.target.value)}
+                />
+                <small className="gv-muted">
+                  {fr
+                    ? "Vidéos ou photos, de 1 à 20. Ce nombre est écrit dans le contrat."
+                    : "Videos or photos, 1 to 20. This number is written into the contract."}
+                </small>
+              </label>
+            </div>
             <div className="gift-ads">
               <p>{fr ? "Usage publicitaire" : "Advertising use"}</p>
               <div>
@@ -394,6 +472,7 @@ export function GiftingView({
                     <p>
                       {campaign.product}
                       {campaign.deadline ? ` · ${fr ? "avant le" : "by"} ${formatDay(campaign.deadline, lang)}` : ""}
+                      {` · ${contentsExpectedLabel(giftExpectedCount(campaign.video_count), lang)}`}
                     </p>
                   </div>
                   <span className={`gv-rights${campaign.allow_ads ? " is-yes" : ""}`}>
@@ -453,8 +532,8 @@ export function GiftingView({
               <h2>{fr ? "Voici à quoi ressemble une campagne en cours" : "This is what a running campaign looks like"}</h2>
               <p>
                 {fr
-                  ? "Créateurs fictifs. Chaque carte avance d’une colonne à chaque étape : signature, expédition, livraison, vidéo, validation."
-                  : "Fictional creators. Each card moves one column per step: signature, shipping, delivery, video, approval."}
+                  ? "Créateurs fictifs. Chaque carte avance d’une colonne à chaque étape : signature, expédition, livraison, contenus, validation."
+                  : "Fictional creators. Each card moves one column per step: signature, shipping, delivery, contents, approval."}
               </p>
             </div>
             {!isCreator && !loadError ? (
@@ -500,6 +579,7 @@ export function GiftingView({
                       </span>
                       <small>{campaignTitle(mission.campaign_id) || giftStatusLabel(mission.status, lang)}</small>
                       {mission.status === "accepted" ? <em className="gv-chip">{giftStatusLabel("accepted", lang)}</em> : null}
+                      <ContentCount mission={mission} contents={videos} expected={expectedFor(mission.campaign_id)} lang={lang} />
                     </button>
                   ))}
                 </section>
@@ -523,14 +603,15 @@ export function GiftingView({
               lang={lang}
               mission={open}
               campaignName={campaignTitle(open.campaign_id)}
-              video={selectedVideo}
+              contents={openContents}
+              expected={expectedFor(open.campaign_id)}
               isCreator={!!isCreator}
               busy={busy}
-              uploadPercent={uploadPercent}
+              upload={upload}
               onClose={() => setOpenId(null)}
               onAct={(action) => send({ op: "act", missionId: open.id, action })}
-              onSubmitVideo={(file) => submitVideo(open.id, file)}
-              onOpenVideo={() => openVideo(open.id)}
+              onSubmitContent={(position, file) => submitContent(open.id, position, file)}
+              onContentUrl={(position) => contentUrl(open.id, position)}
             />
           )}
         </section>
@@ -652,6 +733,25 @@ export function GiftingView({
   );
 }
 
+function contentsExpectedLabel(count: number, lang: Lang): string {
+  if (lang === "fr") return `${count} ${count > 1 ? "contenus attendus" : "contenu attendu"}`;
+  return `${count} ${count === 1 ? "content" : "contents"} expected`;
+}
+
+/** Board badge: "2/3" contents sent (or approved), and how many wait for the brand. */
+function ContentCount({ mission, contents, expected, lang }: { mission: Mission; contents: Content[]; expected: number; lang: Lang }) {
+  const progress = progressOf(mission, contents, expected);
+  if (!progress) return null;
+  const approved = mission.status === "approved";
+  const waiting = !approved && progress.pending > 0;
+  return (
+    <em className={`gv-chip gv-count${waiting ? " is-hot" : ""}`} title={giftContentsLabel(progress, lang, approved ? "approved" : "sent")}>
+      {approved ? progress.approved : progress.sent}/{progress.expected}
+      {waiting ? ` · ${progress.pending} ${lang === "fr" ? "à valider" : "to review"}` : ""}
+    </em>
+  );
+}
+
 function hueOf(text: string): number {
   let h = 0;
   for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) % 360;
@@ -683,7 +783,7 @@ function ContractSheet({
       <p className="gift-contract__kicker">{fr ? "Contrat" : "Contract"}</p>
       <h3>{fr ? "Accord de gifting" : "Gifting agreement"}</h3>
       <div className={`gift-contract__ads${granted ? " is-yes" : " is-no"}`}>
-        <span>{fr ? "Autorisation d’utiliser les vidéos en publicité" : "Authorization to use the videos in ads"}</span>
+        <span>{fr ? "Autorisation d’utiliser les contenus en publicité" : "Authorization to use the content in ads"}</span>
         <strong>{granted ? (fr ? "Accordée" : "Granted") : (fr ? "Refusée" : "Not granted")}</strong>
       </div>
       {lines.map((line, index) => (
@@ -710,26 +810,28 @@ function MissionPanel({
   lang,
   mission,
   campaignName,
-  video,
+  contents,
+  expected,
   isCreator,
   busy,
-  uploadPercent,
+  upload,
   onClose,
   onAct,
-  onSubmitVideo,
-  onOpenVideo,
+  onSubmitContent,
+  onContentUrl,
 }: {
   lang: Lang;
   mission: Mission;
   campaignName: string;
-  video?: Video;
+  contents: Content[];
+  expected: number;
   isCreator: boolean;
   busy: boolean;
-  uploadPercent: number | null;
+  upload: { position: number; percent: number } | null;
   onClose: () => void;
   onAct: (action: Record<string, unknown>) => void;
-  onSubmitVideo: (file: File) => void;
-  onOpenVideo: () => void;
+  onSubmitContent: (position: number, file: File) => void;
+  onContentUrl: (position: number) => Promise<string | null>;
 }) {
   const fr = lang === "fr";
   const [name, setName] = useState("");
@@ -740,10 +842,11 @@ function MissionPanel({
   const [consent, setConsent] = useState(false);
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [feedback, setFeedback] = useState("");
   const column = giftColumnFor(mission.status);
   const reached = column ? TIMELINE.indexOf(column as (typeof TIMELINE)[number]) : -1;
+  const progress = progressOf(mission, contents, expected);
+  const contentPhase = progress !== null;
+  const slots = Array.from({ length: expected }, (_, i) => i + 1);
 
   return (
     <div className="gv-panel">
@@ -773,7 +876,35 @@ function MissionPanel({
         </ol>
       ) : null}
 
-      <p className="gv-next">{giftNextStep(mission.status, isCreator, lang)}</p>
+      <p className="gv-next">{giftNextStep(mission.status, isCreator, lang, progress ?? undefined)}</p>
+
+      {contentPhase ? (
+        <section className="gv-slots" aria-label={fr ? "Contenus" : "Contents"}>
+          <header className="gv-slots__head">
+            <h3>{fr ? "Contenus" : "Contents"}</h3>
+            <span className="gv-muted">
+              {giftContentsLabel(progress, lang, "sent")} · {giftContentsLabel(progress, lang, "approved")}
+            </span>
+          </header>
+          <ol className="gv-slots__list">
+            {slots.map((position) => (
+              <ContentSlot
+                key={position}
+                lang={lang}
+                position={position}
+                content={contents.find((c) => (c.position ?? 1) === position)}
+                missionStatus={mission.status}
+                isCreator={isCreator}
+                busy={busy}
+                uploadPercent={upload?.position === position ? upload.percent : null}
+                onAct={onAct}
+                onSubmit={(file) => onSubmitContent(position, file)}
+                onUrl={() => onContentUrl(position)}
+              />
+            ))}
+          </ol>
+        </section>
+      ) : null}
 
       <div className="gv-panel__grid">
         <ContractSheet
@@ -799,18 +930,6 @@ function MissionPanel({
                 {mission.carrier} · {mission.tracking_number}
               </strong>
               <small>{fr ? "Suivi déclaré manuellement : ce n’est pas une preuve du transporteur." : "Tracking entered by hand, not carrier proof."}</small>
-            </div>
-          )}
-          {video && (
-            <div className="gv-fact">
-              <span>{fr ? "Vidéo" : "Video"}</span>
-              <strong>{video.name}</strong>
-              <small>
-                {(VIDEO_STATUS[video.status]?.[lang] ?? video.status) + (video.feedback ? ` · ${video.feedback}` : "")}
-              </small>
-              <button type="button" className="gv-btn" disabled={busy} onClick={onOpenVideo}>
-                {fr ? "Voir la vidéo" : "Open video"}
-              </button>
             </div>
           )}
 
@@ -875,50 +994,176 @@ function MissionPanel({
               {fr ? "Marquer comme livré" : "Mark received"}
             </button>
           )}
-          {isCreator && (mission.status === "delivered" || mission.status === "submitted") && (
-            <form
-              className="gv-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (videoFile) onSubmitVideo(videoFile);
-              }}
-            >
-              <label className="gv-drop">
-                <input aria-label={fr ? "Fichier vidéo" : "Video file"} type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)} />
-                <strong>{videoFile ? videoFile.name : fr ? "Choisir la vidéo" : "Choose the video"}</strong>
-                <small>MP4, MOV, WebM · 500 Mo max</small>
-              </label>
-              {uploadPercent !== null ? (
-                <div className="gv-progress" aria-label={`${uploadPercent} %`}>
-                  <span style={{ width: `${uploadPercent}%` }} />
-                </div>
-              ) : null}
-              <button className="es-primary" disabled={busy || !videoFile}>
-                {uploadPercent === null ? (fr ? "Déposer" : "Submit") : `${uploadPercent} %`}
-              </button>
-            </form>
-          )}
-          {!isCreator && mission.status === "submitted" && (
-            <div className="gv-form">
-              <button className="es-primary" disabled={busy} onClick={() => onAct({ type: "approve" })}>
-                {fr ? "Valider la vidéo" : "Approve the video"}
-              </button>
-              <form
-                className="gv-inline"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  onAct({ type: "request_changes", feedback });
-                }}
-              >
-                <input className="gv-field" aria-label={fr ? "Retour à transmettre" : "Feedback"} required value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder={fr ? "Ce qu’il faut changer" : "What should change"} />
-                <button className="gv-btn" disabled={busy}>
-                  {fr ? "Demander une modification" : "Request changes"}
-                </button>
-              </form>
-            </div>
-          )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** One expected content (slot 1..N): status, preview, and the brand's or creator's action on it. */
+function ContentSlot({
+  lang,
+  position,
+  content,
+  missionStatus,
+  isCreator,
+  busy,
+  uploadPercent,
+  onAct,
+  onSubmit,
+  onUrl,
+}: {
+  lang: Lang;
+  position: number;
+  content?: Content;
+  missionStatus: string;
+  isCreator: boolean;
+  busy: boolean;
+  uploadPercent: number | null;
+  onAct: (action: Record<string, unknown>) => void;
+  onSubmit: (file: File) => void;
+  onUrl: () => Promise<string | null>;
+}) {
+  const fr = lang === "fr";
+  const [preview, setPreview] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const reviewing = missionStatus === "delivered" || missionStatus === "submitted";
+  const status = content?.status ?? "empty";
+  const isPhoto = content?.kind === "photo";
+  const canReview = !isCreator && reviewing && content && content.status !== "approved";
+  const canUpload = isCreator && reviewing && content?.status !== "approved";
+
+  async function show() {
+    if (preview) {
+      setPreview(null);
+      return;
+    }
+    const url = await onUrl();
+    if (url) setPreview(url);
+  }
+
+  async function openTab() {
+    const url = await onUrl();
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <li className={`gv-slot is-${status}`}>
+      <div className="gv-slot__top">
+        <span className="gv-slot__num" aria-hidden>
+          {status === "approved" ? "✓" : position}
+        </span>
+        <div className="gv-slot__meta">
+          <strong>
+            {fr ? `Contenu ${position}` : `Content ${position}`}
+            {content ? <span className="gv-slot__kind">{isPhoto ? (fr ? "Photo" : "Photo") : fr ? "Vidéo" : "Video"}</span> : null}
+          </strong>
+          <small>{content ? content.name : fr ? "Pas encore envoyé" : "Not sent yet"}</small>
+        </div>
+        <em className={`gv-slot__status is-${status}`}>
+          {content ? CONTENT_STATUS[content.status]?.[lang] ?? content.status : fr ? "En attente" : "Waiting"}
+        </em>
+      </div>
+
+      {content?.feedback && content.status === "changes_requested" ? (
+        <p className="gv-slot__feedback">
+          <span>{fr ? "Retour de la marque" : "Brand feedback"}</span>
+          {content.feedback}
+        </p>
+      ) : null}
+
+      {preview ? (
+        <div className="gv-slot__preview">
+          {isPhoto ? (
+            // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL, not a static asset
+            <img src={preview} alt={content?.name ?? ""} />
+          ) : (
+            <video src={preview} controls playsInline preload="metadata" />
+          )}
+        </div>
+      ) : null}
+
+      {content || canReview || canUpload ? (
+        <div className="gv-slot__actions">
+          {content ? (
+            <>
+              <button type="button" className="gv-btn" disabled={busy} onClick={() => void show()}>
+                {preview ? (fr ? "Masquer" : "Hide") : fr ? "Aperçu" : "Preview"}
+              </button>
+              <button type="button" className="gv-btn" disabled={busy} onClick={() => void openTab()}>
+                {fr ? "Ouvrir" : "Open"}
+              </button>
+            </>
+          ) : null}
+          {canReview ? (
+            <>
+              <button type="button" className="es-primary" disabled={busy} onClick={() => onAct({ type: "approve", position })}>
+                {fr ? "Valider" : "Approve"}
+              </button>
+              {content.status === "pending" ? (
+                <button type="button" className="gv-btn" disabled={busy} onClick={() => setAsking((v) => !v)}>
+                  {fr ? "Demander une modification" : "Request changes"}
+                </button>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {canReview && asking ? (
+        <form
+          className="gv-inline"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onAct({ type: "request_changes", position, feedback });
+            setAsking(false);
+            setFeedback("");
+          }}
+        >
+          <input
+            className="gv-field"
+            aria-label={fr ? `Retour sur le contenu ${position}` : `Feedback on content ${position}`}
+            required
+            value={feedback}
+            onChange={(event) => setFeedback(event.target.value)}
+            placeholder={fr ? "Ce qu’il faut changer" : "What should change"}
+          />
+          <button className="gv-btn" disabled={busy}>
+            {fr ? "Envoyer" : "Send"}
+          </button>
+        </form>
+      ) : null}
+
+      {canUpload ? (
+        <form
+          className="gv-slot__upload"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (file) onSubmit(file);
+          }}
+        >
+          <label className="gv-drop gv-drop--small">
+            <input
+              aria-label={fr ? `Fichier du contenu ${position}` : `File for content ${position}`}
+              type="file"
+              accept={GIFT_CONTENT_ACCEPT}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            <strong>{file ? file.name : content ? (fr ? "Remplacer le fichier" : "Replace the file") : fr ? "Choisir une vidéo ou une photo" : "Choose a video or a photo"}</strong>
+            <small>{fr ? "Vidéo MP4, MOV, WebM · 500 Mo max · Photo JPEG, PNG, WebP · 25 Mo max" : "Video MP4, MOV, WebM · 500 MB max · Photo JPEG, PNG, WebP · 25 MB max"}</small>
+          </label>
+          {uploadPercent !== null ? (
+            <div className="gv-progress" aria-label={`${uploadPercent} %`}>
+              <span style={{ width: `${uploadPercent}%` }} />
+            </div>
+          ) : null}
+          <button className="es-primary" disabled={busy || !file}>
+            {uploadPercent === null ? (fr ? "Envoyer" : "Send") : `${uploadPercent} %`}
+          </button>
+        </form>
+      ) : null}
+    </li>
   );
 }

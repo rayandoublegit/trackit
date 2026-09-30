@@ -28,11 +28,13 @@ const tables: Record<string, Record<string, unknown>[]> = {
   creator_links: [],
 };
 
+let fileInfo = { size: 1024, contentType: "video/mp4" };
+const signedUrlFor = vi.fn(async (path: string) => ({ data: { signedUrl: `https://storage.example/${path}` }, error: null }));
 const storage = {
   from: vi.fn(() => ({
     createSignedUploadUrl: vi.fn(async () => ({ data: { token: "short-lived-token" }, error: null })),
-    createSignedUrl: vi.fn(async () => ({ data: { signedUrl: "https://storage.example/private" }, error: null })),
-    info: vi.fn(async () => ({ data: { size: 1024, contentType: "video/mp4" }, error: null })),
+    createSignedUrl: signedUrlFor,
+    info: vi.fn(async () => ({ data: fileInfo, error: null })),
   })),
 };
 const commit = vi.fn(async () => ({ data: true, error: null }));
@@ -78,6 +80,8 @@ describe("gift mission privacy", () => {
   beforeEach(() => {
     storage.from.mockClear();
     commit.mockClear();
+    fileInfo = { size: 1024, contentType: "video/mp4" };
+    tables.gift_campaigns = [{ id: unclaimedMission.campaign_id, name: "Private campaign" }];
     tables.profiles = [{ id: actorId, account_type: "creator", username: "shared" }];
     tables.gift_missions = [unclaimedMission];
     tables.gift_videos = [];
@@ -184,7 +188,7 @@ describe("gift mission privacy", () => {
     expect(response.status).toBe(200);
     expect(commit).toHaveBeenCalledWith("gift_commit_mission_action", expect.objectContaining({
       p_expected_revision: 7,
-      p_video: expect.objectContaining({ storage_path: storagePath }),
+      p_video: expect.objectContaining({ storage_path: storagePath, position: 1, kind: "video" }),
     }));
   });
 
@@ -199,5 +203,180 @@ describe("gift mission privacy", () => {
     }));
     expect(response.status).toBe(400);
     expect(commit).not.toHaveBeenCalled();
+  });
+});
+
+describe("several contents per mission", () => {
+  const brandId = "77777777-7777-4777-8777-777777777777";
+  const spaceId = "55555555-5555-4555-8555-555555555555";
+  const uuid = (n: number) => {
+    const d = String(n);
+    return `${d.repeat(8)}-${d.repeat(4)}-4${d.repeat(3)}-8${d.repeat(3)}-${d.repeat(12)}`;
+  };
+  const path = (n: number, ext: string) => `${unclaimedMission.id}/${uuid(n)}.${ext}`;
+  const post = (body: Record<string, unknown>) =>
+    POST(new NextRequest("http://localhost/api/gifting", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+  const asBrand = () => {
+    vi.mocked(requireBrandSpace).mockResolvedValue({ ownerId: brandId, spaceId });
+    tables.profiles = [{ id: actorId, account_type: "brand" }];
+  };
+
+  beforeEach(() => {
+    storage.from.mockClear();
+    commit.mockClear();
+    signedUrlFor.mockClear();
+    fileInfo = { size: 1024, contentType: "video/mp4" };
+    tables.profiles = [
+      { id: actorId, account_type: "creator", username: "lea" },
+      { id: brandId, account_type: "brand", business_name: "Maison Bloom", full_name: "Jeanne Bloom" },
+    ];
+    tables.gift_campaigns = [{
+      id: unclaimedMission.campaign_id,
+      user_id: brandId,
+      name: "Routine",
+      product: "Sérum",
+      deadline: "2026-10-23",
+      video_count: 3,
+      brief: "Trois contenus.",
+    }];
+    tables.gift_missions = [{
+      ...unclaimedMission,
+      user_id: brandId,
+      workspace_id: spaceId,
+      creator_user_id: actorId,
+      status: "delivered",
+      revision: 4,
+    }];
+    tables.gift_videos = [];
+    vi.mocked(requireBrandSpace).mockResolvedValue({ error: new Response(null, { status: 403 }) } as never);
+  });
+
+  it("gives the creator the brand name and every content sorted by slot", async () => {
+    tables.gift_videos = [
+      { mission_id: unclaimedMission.id, position: 3, kind: "photo", name: "c.jpg", status: "pending", feedback: "", storage_path: path(3, "jpg") },
+      { mission_id: unclaimedMission.id, position: 1, kind: "video", name: "a.mp4", status: "approved", feedback: "", storage_path: path(1, "mp4") },
+    ];
+    const response = await GET(new NextRequest("http://localhost/api/gifting"));
+    const body = await response.json();
+    expect(body.role).toBe("creator");
+    expect(body.campaigns).toEqual([
+      expect.objectContaining({ id: unclaimedMission.campaign_id, video_count: 3, brand_id: brandId, brand_name: "Maison Bloom" }),
+    ]);
+    expect(body.campaigns[0]).not.toHaveProperty("user_id");
+    expect(body.videos.map((v: { position: number; kind: string }) => [v.position, v.kind])).toEqual([[1, "video"], [3, "photo"]]);
+  });
+
+  it("hands out an upload slot for a photo, within the expected count and the 25 MB photo limit", async () => {
+    const ok = await post({ op: "upload_url", missionId: unclaimedMission.id, position: 2, contentType: "image/png", size: 2048 });
+    expect(ok.status).toBe(200);
+    const ticket = await ok.json();
+    expect(ticket).toMatchObject({ position: 2, kind: "photo", token: "short-lived-token" });
+    expect(ticket.path).toMatch(new RegExp(`^${unclaimedMission.id}/[0-9a-f-]{36}\\.png$`));
+
+    const big = await post({ op: "upload_url", missionId: unclaimedMission.id, position: 2, contentType: "image/jpeg", size: 26 * 1024 * 1024 });
+    expect(big.status).toBe(400);
+    const tooFar = await post({ op: "upload_url", missionId: unclaimedMission.id, position: 4, contentType: "video/mp4", size: 1024 });
+    expect(tooFar.status).toBe(400);
+    const gif = await post({ op: "upload_url", missionId: unclaimedMission.id, position: 1, contentType: "image/gif", size: 1024 });
+    expect(gif.status).toBe(400);
+  });
+
+  it("refuses to replace an approved content", async () => {
+    tables.gift_videos = [
+      { mission_id: unclaimedMission.id, position: 1, kind: "video", name: "a.mp4", status: "approved", feedback: "", storage_path: path(1, "mp4") },
+    ];
+    const response = await post({ op: "upload_url", missionId: unclaimedMission.id, position: 1, contentType: "video/mp4", size: 1024 });
+    expect(response.status).toBe(409);
+  });
+
+  it("submits slot 2 as a photo (kind from the stored file) and keeps the mission delivered until all 3 are in", async () => {
+    fileInfo = { size: 4096, contentType: "image/png" };
+    const response = await post({
+      op: "act",
+      missionId: unclaimedMission.id,
+      action: { type: "submit", position: 2, name: "look.png", kind: "video", storagePath: path(2, "png") },
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toMatchObject({ ok: true, status: "delivered", position: 2, progress: { expected: 3, sent: 1 } });
+    expect(commit).toHaveBeenCalledWith("gift_commit_mission_action", expect.objectContaining({
+      p_expected_revision: 4,
+      p_mission: expect.objectContaining({ status: "delivered", approved_at: null }),
+      p_video: expect.objectContaining({ position: 2, kind: "photo", name: "look.png", status: "pending", storage_path: path(2, "png") }),
+    }));
+  });
+
+  it("refuses a photo over 25 MB even if the bucket accepted it", async () => {
+    fileInfo = { size: 30 * 1024 * 1024, contentType: "image/jpeg" };
+    const response = await post({
+      op: "act",
+      missionId: unclaimedMission.id,
+      action: { type: "submit", position: 1, name: "huge.jpg", storagePath: path(1, "jpg") },
+    });
+    expect(response.status).toBe(400);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("lets the brand approve one slot and approves the mission when the last one is approved", async () => {
+    asBrand();
+    tables.gift_missions = [{ ...tables.gift_missions[0], status: "submitted" }];
+    tables.gift_videos = [1, 2, 3].map((n) => ({
+      mission_id: unclaimedMission.id,
+      position: n,
+      kind: "video",
+      name: `${n}.mp4`,
+      status: n === 2 ? "pending" : "approved",
+      feedback: "",
+      approved_at: n === 2 ? null : "2026-10-01T00:00:00.000Z",
+      storage_path: path(n, "mp4"),
+    }));
+    const response = await post({ op: "act", missionId: unclaimedMission.id, action: { type: "approve", position: 2 } });
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("approved");
+    const call = commit.mock.calls[0] as unknown as [string, { p_mission: { approved_at: string | null }; p_video: Record<string, unknown> }];
+    expect(call[1].p_video).toMatchObject({ position: 2, status: "approved", storage_path: null });
+    expect(call[1].p_mission.approved_at).toEqual(expect.any(String));
+  });
+
+  it("does not approve an empty slot", async () => {
+    asBrand();
+    const response = await post({ op: "act", missionId: unclaimedMission.id, action: { type: "approve", position: 2 } });
+    expect(response.status).toBe(400);
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("asks for changes on one slot only, with the feedback from the brand", async () => {
+    asBrand();
+    tables.gift_videos = [
+      { mission_id: unclaimedMission.id, position: 3, kind: "photo", name: "c.jpg", status: "pending", feedback: "", storage_path: path(3, "jpg") },
+    ];
+    const response = await post({
+      op: "act",
+      missionId: unclaimedMission.id,
+      action: { type: "request_changes", position: 3, feedback: "Cadrage plus serré" },
+    });
+    expect(response.status).toBe(200);
+    expect(commit).toHaveBeenCalledWith("gift_commit_mission_action", expect.objectContaining({
+      p_video: expect.objectContaining({ position: 3, status: "changes_requested", feedback: "Cadrage plus serré" }),
+    }));
+  });
+
+  it("opens the content of the requested slot (slot 1 by default)", async () => {
+    tables.gift_videos = [
+      { mission_id: unclaimedMission.id, position: 1, kind: "video", name: "a.mp4", status: "pending", feedback: "", storage_path: path(1, "mp4") },
+      { mission_id: unclaimedMission.id, position: 2, kind: "photo", name: "b.webp", status: "pending", feedback: "", storage_path: path(2, "webp") },
+    ];
+    const second = await (await post({ op: "video_url", missionId: unclaimedMission.id, position: 2 })).json();
+    expect(second).toEqual({ url: `https://storage.example/${path(2, "webp")}`, position: 2, kind: "photo" });
+    const first = await (await post({ op: "video_url", missionId: unclaimedMission.id })).json();
+    expect(first).toMatchObject({ position: 1, kind: "video" });
+    const empty = await post({ op: "video_url", missionId: unclaimedMission.id, position: 3 });
+    expect(empty.status).toBe(404);
+    const bad = await post({ op: "video_url", missionId: unclaimedMission.id, position: 0 });
+    expect(bad.status).toBe(400);
   });
 });

@@ -20,6 +20,20 @@ export function giftResumableEndpoint(supabaseUrl: string) {
   return url.toString();
 }
 
+/**
+ * Resumable upload of one mission content (video or photo) to the private
+ * gift-videos bucket, at the path and token returned by POST /api/gifting
+ * `{ op: "upload_url", missionId, position, contentType, size }`.
+ */
+export async function uploadGiftContentResumable(
+  file: File,
+  path: string,
+  signedToken: string,
+  onProgress: (percent: number) => void,
+) {
+  return uploadGiftVideoResumable(file, path, signedToken, onProgress);
+}
+
 export async function uploadGiftVideoResumable(
   file: File,
   path: string,

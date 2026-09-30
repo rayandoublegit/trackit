@@ -1,4 +1,4 @@
-import type { GiftStatus } from "@/lib/gifting";
+import type { GiftContentProgress, GiftStatus } from "@/lib/gifting";
 
 type Lang = "en" | "fr";
 
@@ -9,7 +9,7 @@ export const GIFT_STATUS_LABELS: Record<GiftStatus, { en: string; fr: string }> 
   signed: { en: "Contract signed", fr: "Contrat signé" },
   shipped: { en: "Shipped", fr: "Expédié" },
   delivered: { en: "Delivered", fr: "Livré" },
-  submitted: { en: "Video in review", fr: "Vidéo en revue" },
+  submitted: { en: "Contents in review", fr: "Contenus en revue" },
   approved: { en: "Approved", fr: "Validé" },
 };
 
@@ -34,21 +34,80 @@ export function giftColumnFor(status: string): string | null {
 
 export type GiftStats = { active: number; shipping: number; toReview: number; approved: number; declined: number };
 
-export function giftStats(missions: { status: string }[]): GiftStats {
+/**
+ * `pendingContents` (optional) is how many contents of the mission wait for the brand:
+ * a brand can review each content as it arrives, before every slot is filled.
+ */
+export function giftStats(missions: { status: string; pendingContents?: number }[]): GiftStats {
   const stats: GiftStats = { active: 0, shipping: 0, toReview: 0, approved: 0, declined: 0 };
   for (const mission of missions) {
     if (mission.status === "declined") stats.declined += 1;
     else if (mission.status === "approved") stats.approved += 1;
     else stats.active += 1;
     if (mission.status === "shipped") stats.shipping += 1;
-    if (mission.status === "submitted") stats.toReview += 1;
+    if (mission.status === "submitted" || (mission.status === "delivered" && (mission.pendingContents ?? 0) > 0)) {
+      stats.toReview += 1;
+    }
   }
   return stats;
 }
 
-/** What the viewer should do next on a mission, or what they are waiting for. */
-export function giftNextStep(status: string, isCreator: boolean, lang: Lang): string {
+type Progress = Pick<GiftContentProgress, "expected" | "sent" | "approved"> & Partial<GiftContentProgress>;
+
+/** "2/3 contents sent" / "2/3 contenus envoyés" (and "approved" once the brand has validated some). */
+export function giftContentsLabel(progress: Progress, lang: Lang, what: "sent" | "approved" = "sent"): string {
   const fr = lang === "fr";
+  const count = what === "approved" ? progress.approved : progress.sent;
+  const plural = fr ? count > 1 : progress.expected !== 1;
+  if (what === "approved") {
+    return fr
+      ? `${count}/${progress.expected} ${plural ? "contenus validés" : "contenu validé"}`
+      : `${count}/${progress.expected} ${plural ? "contents" : "content"} approved`;
+  }
+  return fr
+    ? `${count}/${progress.expected} ${plural ? "contenus envoyés" : "contenu envoyé"}`
+    : `${count}/${progress.expected} ${plural ? "contents" : "content"} sent`;
+}
+
+/**
+ * What the viewer should do next on a mission, or what they are waiting for.
+ * Pass `progress` (from giftContentProgress) to get "2/3 contents sent" style texts.
+ */
+export function giftNextStep(status: string, isCreator: boolean, lang: Lang, progress?: Progress): string {
+  const fr = lang === "fr";
+  if (progress && (status === "delivered" || status === "submitted")) {
+    const sent = giftContentsLabel(progress, lang, "sent");
+    const approved = giftContentsLabel(progress, lang, "approved");
+    const toFix = progress.changesRequested ?? 0;
+    const waiting = progress.pending ?? 0;
+    const many = progress.expected > 1;
+    if (isCreator) {
+      if (toFix > 0) {
+        return fr
+          ? `${sent}. La marque demande une modification : renvoyez le contenu concerné.`
+          : `${sent}. The brand asked for changes: send that content again.`;
+      }
+      if (progress.sent < progress.expected) {
+        return fr
+          ? `${sent}. Déposez ${many ? "les contenus restants" : "votre contenu"} (vidéo ou photo).`
+          : `${sent}. Upload ${many ? "the remaining contents" : "your content"} (video or photo).`;
+      }
+      return fr
+        ? `${sent}, ${approved}. La marque examine le reste.`
+        : `${sent}, ${approved}. The brand is reviewing the rest.`;
+    }
+    if (waiting > 0) {
+      return fr
+        ? `${sent}, ${approved}. Ouvrez chaque contenu, puis validez-le ou demandez une modification.`
+        : `${sent}, ${approved}. Open each content, then approve it or ask for changes.`;
+    }
+    if (progress.sent < progress.expected) {
+      return fr ? `Colis livré. ${sent}. En attente du créateur.` : `Parcel received. ${sent}. Waiting for the creator.`;
+    }
+    return fr
+      ? `${sent}, ${approved}. En attente des contenus modifiés.`
+      : `${sent}, ${approved}. Waiting for the changed contents.`;
+  }
   switch (status) {
     case "invited":
       return isCreator
@@ -66,12 +125,12 @@ export function giftNextStep(status: string, isCreator: boolean, lang: Lang): st
       return fr ? "Colis en route. Marquez-le comme livré à sa réception." : "Parcel on its way. Mark it received on delivery.";
     case "delivered":
       return isCreator
-        ? fr ? "Tournez la vidéo et déposez-la ici." : "Film the video and upload it here."
-        : fr ? "Colis livré. En attente de la vidéo." : "Parcel received. Waiting for the video.";
+        ? fr ? "Réalisez vos contenus et déposez-les ici." : "Create your contents and upload them here."
+        : fr ? "Colis livré. En attente des contenus." : "Parcel received. Waiting for the contents.";
     case "submitted":
       return isCreator
-        ? fr ? "Vidéo envoyée. La marque l’examine." : "Video sent. The brand is reviewing it."
-        : fr ? "Regardez la vidéo, puis validez-la ou demandez une modification." : "Watch the video, then approve it or ask for changes.";
+        ? fr ? "Contenus envoyés. La marque les examine." : "Contents sent. The brand is reviewing them."
+        : fr ? "Ouvrez chaque contenu, puis validez-le ou demandez une modification." : "Open each content, then approve it or ask for changes.";
     case "approved":
       return fr ? "Mission terminée. La durée des droits publicitaires court à compter de la validation." : "Mission complete. Ad rights run from the approval date.";
     case "declined":
@@ -97,6 +156,7 @@ const FIELD_LABELS_FR: Record<string, { noun: string; feminine?: boolean; plural
   carrier: { noun: "Le transporteur" },
   "tracking number": { noun: "Le numéro de suivi" },
   "video name": { noun: "Le nom de la vidéo" },
+  "content name": { noun: "Le nom du contenu" },
   feedback: { noun: "Le retour" },
 };
 
@@ -157,6 +217,17 @@ const KNOWN_ERRORS: { match: RegExp; en: ErrorText; fr: ErrorText }[] = [
   },
   { match: /^no video is waiting for approval\.$/i, en: "No video is waiting for approval.", fr: "Aucune vidéo n’est en attente de validation." },
   { match: /^no video is waiting for feedback\.$/i, en: "No video is waiting for feedback.", fr: "Aucune vidéo n’est en attente de retour." },
+  { match: /^invalid content position\.$/i, en: "Invalid content position.", fr: "Emplacement de contenu invalide." },
+  {
+    match: /^this campaign does not expect that many contents\.$/i,
+    en: "This campaign does not expect that many contents.",
+    fr: "Cette campagne n’attend pas autant de contenus.",
+  },
+  {
+    match: /^this content is already approved\.$/i,
+    en: "This content is already approved.",
+    fr: "Ce contenu est déjà validé.",
+  },
   { match: /^unknown action\.$/i, en: "Unknown action.", fr: "Action inconnue." },
   {
     match: /^(.+) is required\.$/i,
@@ -207,6 +278,22 @@ const KNOWN_ERRORS: { match: RegExp; en: ErrorText; fr: ErrorText }[] = [
     match: /^upload an mp4, mov or webm video up to 500 mb\.$/i,
     en: "Upload an MP4, MOV or WebM video up to 500 MB.",
     fr: "Déposez une vidéo MP4, MOV ou WebM de 500 Mo maximum.",
+  },
+  {
+    match: /^upload an mp4, mov or webm video up to 500 mb, or a jpeg, png or webp photo up to 25 mb\.$/i,
+    en: "Upload an MP4, MOV or WebM video up to 500 MB, or a JPEG, PNG or WebP photo up to 25 MB.",
+    fr: "Déposez une vidéo MP4, MOV ou WebM de 500 Mo maximum, ou une photo JPEG, PNG ou WebP de 25 Mo maximum.",
+  },
+  {
+    match: /^upload a supported file before submitting\.$/i,
+    en: "Upload a supported file before submitting.",
+    fr: "Déposez un fichier dans un format pris en charge avant de l’envoyer.",
+  },
+  { match: /^no uploaded content\.$/i, en: "No uploaded content.", fr: "Aucun contenu déposé à cet emplacement." },
+  {
+    match: /^a real uploaded file is required for approval\.$/i,
+    en: "The content has to be uploaded before it can be approved.",
+    fr: "Le contenu doit être déposé avant d’être validé.",
   },
   { match: /^could not start upload\.$/i, en: "Could not start upload.", fr: "Impossible de démarrer l’envoi de la vidéo." },
   {

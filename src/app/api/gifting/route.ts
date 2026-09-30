@@ -4,10 +4,16 @@ import { requireBrandSpace } from "@/lib/brand-workspace-server";
 import {
   applyGiftAction,
   buildGiftContract,
+  giftActionPosition,
+  giftContentProgress,
+  giftContentType,
+  giftExpectedCount,
   GiftRuleError,
   normalizeHandle,
   parseGiftCampaignRights,
   type GiftAction,
+  type GiftContentKind,
+  type GiftContentStatus,
   type GiftMission,
   type ShippingAddress,
 } from "@/lib/gifting";
@@ -33,18 +39,23 @@ type MissionRow = {
   tracking_number: string | null;
   shipped_at: string | null;
   delivered_at: string | null;
+  approved_at?: string | null;
 };
 
-type VideoRow = {
+/** A row of gift_videos: one content (video or photo) at a slot of a mission. */
+type ContentRow = {
   mission_id: string;
+  /** Missing only on a database without the multi-content migration: slot 1. */
+  position?: number | null;
+  kind?: GiftContentKind | null;
   name: string;
   storage_path: string | null;
-  status: "pending" | "changes_requested" | "approved";
+  status: GiftContentStatus;
   feedback: string;
   approved_at: string | null;
 };
 
-function toMission(row: MissionRow, video: VideoRow | undefined): GiftMission {
+function toMission(row: MissionRow, contents: ContentRow[], expectedCount: unknown): GiftMission {
   return {
     status: row.status,
     contractText: row.contract_text,
@@ -55,15 +66,43 @@ function toMission(row: MissionRow, video: VideoRow | undefined): GiftMission {
     trackingNumber: row.tracking_number,
     shippedAt: row.shipped_at,
     deliveredAt: row.delivered_at,
-    video: video
-      ? {
-          name: video.name,
-          status: video.status,
-          feedback: video.feedback,
-          approvedAt: video.approved_at,
-        }
-      : null,
+    expectedCount: giftExpectedCount(expectedCount),
+    approvedAt: row.approved_at ?? null,
+    contents: contents.map((item) => ({
+      position: item.position ?? 1,
+      name: item.name,
+      kind: item.kind === "photo" ? "photo" : "video",
+      status: item.status,
+      feedback: item.feedback ?? "",
+      approvedAt: item.approved_at,
+      storagePath: item.storage_path,
+    })),
   };
+}
+
+/** Content rows in a stable order: by mission, then slot. Rows from an old schema get position 1 and kind video. */
+function sortContents<T extends { mission_id: string; position?: number | null; kind?: string | null }>(rows: T[]) {
+  return rows
+    .map((row) => ({ ...row, position: row.position ?? 1, kind: row.kind ?? "video" }))
+    .sort((a, b) => (a.mission_id === b.mission_id ? a.position - b.position : a.mission_id < b.mission_id ? -1 : 1));
+}
+
+/** business_name, else full_name, per brand id. A missing column never breaks the listing. */
+async function brandNames(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>, ids: string[]) {
+  const names = new Map<string, string>();
+  if (!ids.length) return names;
+  let rows: { id: string; business_name?: string | null; full_name?: string | null }[] = [];
+  const full = await admin.from("profiles").select("id, business_name, full_name").in("id", ids);
+  if (!full.error) rows = full.data ?? [];
+  else {
+    const fallback = await admin.from("profiles").select("id, full_name").in("id", ids);
+    rows = fallback.error ? [] : fallback.data ?? [];
+  }
+  for (const row of rows) {
+    const name = row.business_name?.trim() || row.full_name?.trim();
+    if (name) names.set(row.id, name);
+  }
+  return names;
 }
 
 const BRAND_ACTIONS = new Set(["ship", "deliver", "approve", "request_changes"]);
@@ -95,19 +134,34 @@ export async function GET(request: NextRequest) {
       campaignIds.length
         ? admin
             .from("gift_campaigns")
-            .select("id, name, product, deadline, video_count, brief")
+            .select("id, user_id, name, product, deadline, video_count, brief")
             .in("id", campaignIds)
         : Promise.resolve({ data: [], error: null }),
     ]);
     if (videos.error) return NextResponse.json({ error: videos.error.message }, { status: 500 });
     if (campaigns.error) return NextResponse.json({ error: campaigns.error.message }, { status: 500 });
+    const campaignRows = (campaigns.data ?? []) as {
+      id: string;
+      user_id: string;
+      name: string;
+      product: string;
+      deadline: string;
+      video_count: number;
+      brief: string;
+    }[];
+    const names = await brandNames(admin, [...new Set(campaignRows.map((c) => c.user_id))]);
     return NextResponse.json({
       role: "creator",
       wishlists: [],
       items: [],
-      campaigns: campaigns.data ?? [],
+      campaigns: campaignRows.map(({ user_id, ...campaign }) => ({
+        ...campaign,
+        video_count: giftExpectedCount(campaign.video_count),
+        brand_id: user_id,
+        brand_name: names.get(user_id) ?? null,
+      })),
       missions,
-      videos: videos.data ?? [],
+      videos: sortContents((videos.data ?? []) as ContentRow[]),
     });
   }
 
@@ -139,7 +193,7 @@ export async function GET(request: NextRequest) {
     items: items.data ?? [],
     campaigns: campaigns.data ?? [],
     missions: missions.data ?? [],
-    videos: videos.data ?? [],
+    videos: sortContents((videos.data ?? []) as ContentRow[]),
   });
 }
 
@@ -231,7 +285,7 @@ export async function POST(request: NextRequest) {
           product,
           brief,
           deadline,
-          video_count: Math.min(20, Math.max(1, Number(body.videoCount) || 1)),
+          video_count: giftExpectedCount(body.videoCount ?? body.contentCount),
           fixed_fee_cents: Math.max(0, Math.round(Number(body.fixedFeeCents) || 0)),
           allow_ads: rights.allowAds,
           rights_days: rights.rightsDays,
@@ -346,33 +400,71 @@ async function actOnMission(
     .maybeSingle();
   const isBrand = await brandOwns(request, mission.user_id, mission.workspace_id);
   const isCreator = profile?.account_type === "creator" && mission.creator_user_id === actorId;
-  const action = body.action as GiftAction | undefined;
-  if (!action || typeof action !== "object" || !("type" in action)) {
+  const raw = body.action as (GiftAction & Record<string, unknown>) | undefined;
+  if (!raw || typeof raw !== "object" || !("type" in raw)) {
     return NextResponse.json({ error: "Action manquante." }, { status: 400 });
   }
-  if (action.type === "deliver") {
+  if (raw.type === "deliver") {
     if (!isBrand && !isCreator) {
       return NextResponse.json({ error: "Access denied." }, { status: 403 });
     }
-  } else if (BRAND_ACTIONS.has(action.type) && !isBrand) {
+  } else if (BRAND_ACTIONS.has(raw.type) && !isBrand) {
     return NextResponse.json({ error: "Brands only." }, { status: 403 });
-  } else if (CREATOR_ACTIONS.has(action.type) && !isCreator) {
+  } else if (CREATOR_ACTIONS.has(raw.type) && !isCreator) {
     return NextResponse.json({ error: "Invited creator only." }, { status: 403 });
   }
 
-  const { data: video } = await admin
-    .from("gift_videos")
-    .select("*")
-    .eq("mission_id", mission.id)
-    .maybeSingle();
+  const [contentsResult, campaignResult] = await Promise.all([
+    admin.from("gift_videos").select("*").eq("mission_id", mission.id),
+    admin.from("gift_campaigns").select("video_count").eq("id", mission.campaign_id).maybeSingle(),
+  ]);
+  if (contentsResult.error) return NextResponse.json({ error: contentsResult.error.message }, { status: 500 });
+  const contents = sortContents((contentsResult.data ?? []) as ContentRow[]);
+  const expectedCount = giftExpectedCount(campaignResult.data?.video_count);
 
-  if (action.type === "approve" && (!video?.storage_path || !isGiftVideoPath(mission.id, video.storage_path))) {
-    return NextResponse.json({ error: "A real uploaded video is required for approval." }, { status: 400 });
+  const isContentAction = raw.type === "submit" || raw.type === "approve" || raw.type === "request_changes";
+  let position = 1;
+  try {
+    if (isContentAction) position = giftActionPosition(raw);
+  } catch (error) {
+    if (error instanceof GiftRuleError) return NextResponse.json({ error: error.message }, { status: 400 });
+    throw error;
+  }
+  const slot = contents.find((item) => item.position === position);
+
+  let action: GiftAction = raw;
+  let submittedPath: string | null = null;
+  if (raw.type === "approve") {
+    if (!slot?.storage_path || !isGiftContentPath(mission.id, slot.storage_path)) {
+      return NextResponse.json({ error: "A real uploaded video is required for approval." }, { status: 400 });
+    }
+    action = { type: "approve", position };
+  } else if (raw.type === "request_changes") {
+    action = { type: "request_changes", position, feedback: String(raw.feedback ?? "") };
+  } else if (raw.type === "submit") {
+    submittedPath = String(raw.storagePath ?? "");
+    if (!isGiftContentPath(mission.id, submittedPath)) {
+      return NextResponse.json({ error: "Invalid gift video path." }, { status: 400 });
+    }
+    const file = await admin.storage.from("gift-videos").info(submittedPath);
+    const type = file.data ? giftContentType(file.data.contentType ?? "") : null;
+    const size = file.data?.size;
+    if (file.error || !type || typeof size !== "number" || size <= 0 || size > type.maxBytes) {
+      return NextResponse.json({ error: "Upload a supported file before submitting." }, { status: 400 });
+    }
+    // The stored file decides the kind, not what the browser claims.
+    action = {
+      type: "submit",
+      position,
+      name: String(raw.name ?? raw.videoName ?? ""),
+      storagePath: submittedPath,
+      kind: type.kind,
+    };
   }
 
   let next: GiftMission;
   try {
-    next = applyGiftAction(toMission(mission, video ? (video as VideoRow) : undefined), action, new Date().toISOString());
+    next = applyGiftAction(toMission(mission, contents, expectedCount), action, new Date().toISOString());
   } catch (error) {
     if (error instanceof GiftRuleError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -380,18 +472,7 @@ async function actOnMission(
     throw error;
   }
 
-  let submittedPath: string | null = null;
-  if (action.type === "submit") {
-    submittedPath = String(action.storagePath ?? "");
-    if (!isGiftVideoPath(mission.id, submittedPath)) {
-      return NextResponse.json({ error: "Invalid gift video path." }, { status: 400 });
-    }
-    const file = await admin.storage.from("gift-videos").info(submittedPath);
-    if (file.error || !file.data || !isGiftVideoFile(file.data)) {
-      return NextResponse.json({ error: "Upload a supported video before submitting." }, { status: 400 });
-    }
-  }
-
+  const changed = isContentAction ? next.contents.find((item) => item.position === position) : undefined;
   const committed = await admin.rpc("gift_commit_mission_action", {
     p_mission_id: mission.id,
     p_expected_revision: mission.revision,
@@ -404,19 +485,29 @@ async function actOnMission(
       tracking_number: next.trackingNumber,
       shipped_at: next.shippedAt,
       delivered_at: next.deliveredAt,
+      approved_at: next.approvedAt,
     },
-    p_video: next.video ? {
-      name: next.video.name,
-      status: next.video.status,
-      feedback: next.video.feedback,
-      approved_at: next.video.approvedAt,
-      storage_path: submittedPath,
-    } : null,
+    p_video: changed
+      ? {
+          position: changed.position,
+          kind: changed.kind,
+          name: changed.name,
+          status: changed.status,
+          feedback: changed.feedback,
+          approved_at: changed.approvedAt,
+          storage_path: submittedPath,
+        }
+      : null,
   });
   if (committed.error) return NextResponse.json({ error: committed.error.message }, { status: 500 });
   if (!committed.data) return NextResponse.json({ error: "Mission changed. Refresh and try again." }, { status: 409 });
 
-  return NextResponse.json({ ok: true, status: next.status });
+  return NextResponse.json({
+    ok: true,
+    status: next.status,
+    ...(isContentAction ? { position } : {}),
+    progress: giftContentProgress(next.contents, next.expectedCount),
+  });
 }
 
 async function brandOwns(request: NextRequest, ownerId: string, spaceId: string | null) {
@@ -425,16 +516,10 @@ async function brandOwns(request: NextRequest, ownerId: string, spaceId: string 
   return access.ownerId === ownerId && access.spaceId === spaceId;
 }
 
-const GIFT_VIDEO_MIMES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
-const GIFT_VIDEO_LIMIT = 500 * 1024 * 1024;
-
-function isGiftVideoPath(missionId: string, path: string) {
-  return path.startsWith(`${missionId}/`) && /^[0-9a-f-]{36}\.(mp4|mov|webm)$/.test(path.slice(missionId.length + 1));
-}
-
-function isGiftVideoFile(file: { size?: number; contentType?: string }) {
-  return typeof file.size === "number" && file.size > 0 && file.size <= GIFT_VIDEO_LIMIT
-    && GIFT_VIDEO_MIMES.has(file.contentType ?? "");
+/** `<missionId>/<uuid>.<ext>`: the only shape upload_url ever hands out. */
+function isGiftContentPath(missionId: string, path: string) {
+  return path.startsWith(`${missionId}/`)
+    && /^[0-9a-f-]{36}\.(mp4|mov|webm|jpg|png|webp)$/.test(path.slice(missionId.length + 1));
 }
 
 async function mediaOnMission(
@@ -445,7 +530,7 @@ async function mediaOnMission(
   op: "upload_url" | "video_url",
 ) {
   const { data: mission, error } = await admin.from("gift_missions")
-    .select("id, user_id, workspace_id, creator_user_id, status")
+    .select("id, campaign_id, user_id, workspace_id, creator_user_id, status")
     .eq("id", String(body.missionId ?? "")).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!mission) return NextResponse.json({ error: "Mission not found." }, { status: 404 });
@@ -456,34 +541,55 @@ async function mediaOnMission(
     && access.ownerId === mission.user_id
     && access.spaceId === mission.workspace_id;
 
+  let position: number;
+  try {
+    position = giftActionPosition(body);
+  } catch (cause) {
+    if (cause instanceof GiftRuleError) return NextResponse.json({ error: cause.message }, { status: 400 });
+    throw cause;
+  }
+
   if (op === "upload_url") {
     if (!isCreator || !["delivered", "submitted"].includes(mission.status)) {
       return NextResponse.json({ error: "Creator cannot upload to this mission." }, { status: 403 });
     }
     const contentType = String(body.contentType ?? "");
     const size = Number(body.size);
-    if (!GIFT_VIDEO_MIMES.has(contentType) || !Number.isSafeInteger(size) || size < 1 || size > GIFT_VIDEO_LIMIT) {
-      return NextResponse.json({ error: "Upload an MP4, MOV or WebM video up to 500 MB." }, { status: 400 });
+    const type = giftContentType(contentType);
+    if (!type || !Number.isSafeInteger(size) || size < 1 || size > type.maxBytes) {
+      return NextResponse.json(
+        { error: "Upload an MP4, MOV or WebM video up to 500 MB, or a JPEG, PNG or WebP photo up to 25 MB." },
+        { status: 400 },
+      );
     }
-    const extension = contentType === "video/mp4" ? "mp4" : contentType === "video/quicktime" ? "mov" : "webm";
-    const path = `${mission.id}/${crypto.randomUUID()}.${extension}`;
+    const [campaign, existing] = await Promise.all([
+      admin.from("gift_campaigns").select("video_count").eq("id", mission.campaign_id).maybeSingle(),
+      admin.from("gift_videos").select("status").eq("mission_id", mission.id).eq("position", position).maybeSingle(),
+    ]);
+    if (position > giftExpectedCount(campaign.data?.video_count)) {
+      return NextResponse.json({ error: "This campaign does not expect that many contents." }, { status: 400 });
+    }
+    if (existing.data?.status === "approved") {
+      return NextResponse.json({ error: "This content is already approved." }, { status: 409 });
+    }
+    const path = `${mission.id}/${crypto.randomUUID()}.${type.extension}`;
     const signed = await admin.storage.from("gift-videos").createSignedUploadUrl(path);
     if (signed.error || !signed.data) {
       return NextResponse.json({ error: signed.error?.message ?? "Could not start upload." }, { status: 500 });
     }
-    return NextResponse.json({ path, token: signed.data.token });
+    return NextResponse.json({ path, token: signed.data.token, position, kind: type.kind });
   }
 
   if (!isCreator && !isBrand) return NextResponse.json({ error: "Access denied." }, { status: 403 });
-  const { data: video, error: videoError } = await admin.from("gift_videos")
-    .select("storage_path").eq("mission_id", mission.id).maybeSingle();
-  if (videoError) return NextResponse.json({ error: videoError.message }, { status: 500 });
-  if (!video?.storage_path || !isGiftVideoPath(mission.id, video.storage_path)) {
-    return NextResponse.json({ error: "No uploaded video." }, { status: 404 });
+  const { data: content, error: contentError } = await admin.from("gift_videos")
+    .select("storage_path, kind").eq("mission_id", mission.id).eq("position", position).maybeSingle();
+  if (contentError) return NextResponse.json({ error: contentError.message }, { status: 500 });
+  if (!content?.storage_path || !isGiftContentPath(mission.id, content.storage_path)) {
+    return NextResponse.json({ error: "No uploaded content." }, { status: 404 });
   }
-  const signed = await admin.storage.from("gift-videos").createSignedUrl(video.storage_path, 60);
+  const signed = await admin.storage.from("gift-videos").createSignedUrl(content.storage_path, 60);
   if (signed.error || !signed.data) {
     return NextResponse.json({ error: signed.error?.message ?? "Could not open video." }, { status: 500 });
   }
-  return NextResponse.json({ url: signed.data.signedUrl });
+  return NextResponse.json({ url: signed.data.signedUrl, position, kind: content.kind === "photo" ? "photo" : "video" });
 }
