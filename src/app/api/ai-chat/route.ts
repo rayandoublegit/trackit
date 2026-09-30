@@ -34,9 +34,16 @@ function searchBrief(result: MinoSearchResult, lang: Lang): string {
   ].join("\n");
 }
 
-/** Keeps stored chats light: only what the cards render and saving needs. */
+/** Keeps stored chats light: only what the profile cards render (3 videos) and saving needs. */
 function cardCreator(c: FeedCreator): FeedCreator {
-  return { ...c, bio: (c.bio || "").slice(0, 160), videoThumbnails: [], topVideos: (c.topVideos ?? []).slice(0, 3) };
+  const topVideos = (c.topVideos ?? []).filter((v) => v.cover || v.shareUrl).slice(0, 3);
+  return {
+    ...c,
+    bio: (c.bio || "").slice(0, 160),
+    // Live search results carry thumbnails but no top videos: keep a few to play.
+    videoThumbnails: topVideos.length ? [] : (c.videoThumbnails ?? []).filter((v) => v.thumbnail).slice(0, 3),
+    topVideos,
+  };
 }
 
 function fallbackReply(result: MinoSearchResult | null, lang: Lang): string {

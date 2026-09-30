@@ -22,8 +22,13 @@ import {
 } from "@/lib/mino-chats-storage";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { describeSearch, parseCreatorSearch } from "@/lib/mino-search-parse";
+import { describeRevenueAsk, looksLikeAction, parseRevenueAsk, type MinoRevenueAsk } from "@/lib/mino-revenue-parse";
+import { loadRevenueSnapshot, type MinoRevenueSnapshot, type MinoWidget } from "@/lib/mino-widgets";
+import type { DashboardNavState } from "@/lib/dashboard-navigation";
 import type { FeedCreator } from "@/lib/discovery-feed";
 import { MinoCreatorResults, MinoSearchMotion } from "./MinoCreatorResults";
+import { MinoActionWidget, MinoErrorWidget, MinoRevenueLoading, MinoRevenueWidget, viewLabel } from "./MinoWidgets";
+import { formatMoney } from "./SampleCampaignPreview";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
 const MINO_TYPE_LINES = {
@@ -120,6 +125,47 @@ function formatWhen(when: string, fr: boolean): string {
   });
 }
 
+/** Mino's sentence above a revenue widget: only the figures of the snapshot. */
+function revenueReply(s: MinoRevenueSnapshot, fr: boolean): string {
+  const lang = fr ? "fr" : "en";
+  const lead =
+    s.ask.days === 1 ? (fr ? "Aujourd’hui" : "Today") : fr ? `Sur les ${s.ask.days} derniers jours` : `Over the last ${s.ask.days} days`;
+  const withWho = s.creator ? (fr ? ` avec ${s.creator.name}` : ` with ${s.creator.name}`) : "";
+  const joined = s.joined?.length ?? 0;
+  const joinedLine =
+    s.ask.focus === "new" && s.joined
+      ? fr
+        ? ` ${joined} nouveau${joined > 1 ? "x" : ""} créateur${joined > 1 ? "s" : ""} sur la période.`
+        : ` ${joined} new creator${joined === 1 ? "" : "s"} in this period.`
+      : "";
+  if (s.status === "unknown_creator") {
+    return fr
+      ? `Je ne trouve pas « ${s.ask.creator} » parmi vos créateurs.`
+      : `I can’t find “${s.ask.creator}” among your creators.`;
+  }
+  if (s.status === "empty") {
+    return (fr ? `${lead}, aucune vente enregistrée${withWho}.` : `${lead}, no sales recorded${withWho}.`) + joinedLine;
+  }
+  const orders = fr
+    ? `${s.orders} commande${s.orders > 1 ? "s" : ""}`
+    : `${s.orders} order${s.orders === 1 ? "" : "s"}`;
+  const topLine =
+    s.ask.focus === "top" && s.top[0]
+      ? fr
+        ? ` En tête : ${s.top[0].name} (${formatMoney(s.top[0].revenue, lang)}).`
+        : ` Leading: ${s.top[0].name} (${formatMoney(s.top[0].revenue, lang)}).`
+      : "";
+  return (
+    (fr
+      ? `${lead}, vous avez généré ${formatMoney(s.revenue, lang)}${withWho}, en ${orders}.`
+      : `${lead}, you generated ${formatMoney(s.revenue, lang)}${withWho} from ${orders}.`) +
+    topLine +
+    joinedLine
+  );
+}
+
+type AssistantAnswer = { content: string; widget?: MinoWidget };
+
 function matchCreator(list: PayableCreator[], query: string): PayableCreator | null {
   const q = query.toLowerCase().replace(/^@/, "").trim();
   if (!q) return null;
@@ -140,12 +186,20 @@ export function AiChatView({
   onNavigate,
   userId,
   isCreator,
+  onReachOut,
+  isPaid,
+  onUpgrade,
 }: {
   isMobile?: boolean;
   onNavigate: (view: DashboardView) => void;
   displayName?: string | null;
   userId?: string;
   isCreator?: boolean;
+  /** Opens Outreach prefilled with this creator. */
+  onReachOut?: (creator: FeedCreator) => void;
+  /** Paid plans can save creators into lists. */
+  isPaid?: boolean;
+  onUpgrade?: () => void;
 }) {
   const lang = useLang();
   const fr = lang === "fr";
@@ -160,12 +214,21 @@ export function AiChatView({
   const [chatMode, setChatMode] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const [messages, setMessages] = useState<MinoChatMessage[]>([]);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const [chats, setChats] = useState<MinoChat[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [searchLabel, setSearchLabel] = useState<string | null>(null);
+  /** What Mino is doing while busy: the search motion, the dashboard skeleton, or "thinking". */
+  const [busyView, setBusyView] = useState<{ kind: "search" | "revenue" | "think"; label: string } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const lastTurnRef = useRef<HTMLDivElement>(null);
   const submitRef = useRef<(raw: string) => Promise<void>>(async () => {});
+
+  const go = (state: DashboardNavState) => {
+    if (dashNav) dashNav.navigate(state);
+    else onNavigate(state.view);
+  };
 
   const activeChat = useMemo(
     () => chats.find((c) => c.id === activeChatId) || null,
@@ -265,6 +328,7 @@ export function AiChatView({
 
     if (fr) {
       chips.push("Trouver des créateurs beauté");
+      chips.push("Combien j’ai généré cette semaine ?");
       chips.push("Paye un créateur");
       chips.push("Crée une tâche : relancer les créateurs");
       if (firstCampaign) chips.push(`Ouvre la campagne « ${firstCampaign} »`);
@@ -272,6 +336,7 @@ export function AiChatView({
       chips.push("Ouvre Inbox");
     } else {
       chips.push("Discover beauty creators");
+      chips.push("How much did I make this week?");
       chips.push("Pay a creator");
       chips.push("Create a task: follow up with creators");
       if (firstCampaign) chips.push(`Open campaign “${firstCampaign}”`);
@@ -284,6 +349,12 @@ export function AiChatView({
 
   useEffect(() => {
     if (!chatMode) return;
+    const last = messages[messages.length - 1];
+    // A built answer (profiles, dashboard) is read from its top, not its bottom.
+    if (!chatBusy && last?.role === "assistant" && (last.widget?.kind === "revenue" || last.creators?.length)) {
+      lastTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chatMode, messages, chatBusy]);
 
@@ -388,16 +459,17 @@ export function AiChatView({
     }
   };
 
-  const runCommand = (cmd: AiCommand, text: string, creators: PayableCreator[]) => {
-    const askMore = (question: string) => {
+  /** Runs an action from /api/ai-command and says what was done, with a card to open it. */
+  const runCommand = (cmd: AiCommand, text: string, creators: PayableCreator[]): AssistantAnswer => {
+    const at = Date.now();
+    const askMore = (question: string): AssistantAnswer => {
       setPendingContext((prev) => `${prev ? `${prev}\n` : ""}User: ${text}\nAssistant: ${question}`);
-      setStatus(question);
+      return { content: question };
     };
 
     switch (cmd.action) {
       case "clarify":
-        askMore(cmd.question);
-        return;
+        return askMore(cmd.question);
 
       case "create_meeting": {
         addMeetingForUser(userId, {
@@ -407,29 +479,51 @@ export function AiChatView({
           notes: text,
         });
         setPendingContext(null);
-        setStatus(
-          cmd.say ||
+        return {
+          content:
+            cmd.say ||
             (fr
               ? `C'est noté — « ${cmd.title} » ajouté ${formatWhen(cmd.when, true)}.`
               : `Done — “${cmd.title}” added ${formatWhen(cmd.when, false)}.`),
-        );
-        return;
+          widget: {
+            kind: "action",
+            action: {
+              kind: "meeting",
+              title: cmd.title,
+              detail: [formatWhen(cmd.when, fr), cmd.withWho].filter(Boolean).join(" · "),
+              view: "planner",
+              at,
+              autoOpen: false,
+            },
+          },
+        };
       }
 
       case "create_task": {
         addTaskForUser(userId, cmd.title, cmd.due);
         setPendingContext(null);
-        setStatus(cmd.say || (fr ? `Tâche ajoutée : ${cmd.title}.` : `Task added: ${cmd.title}.`));
-        window.setTimeout(() => onNavigate("tasks"), 700);
-        return;
+        return {
+          content: cmd.say || (fr ? `Tâche ajoutée : ${cmd.title}.` : `Task added: ${cmd.title}.`),
+          widget: {
+            kind: "action",
+            action: {
+              kind: "task",
+              title: cmd.title,
+              detail: cmd.due ? `${fr ? "Échéance" : "Due"} ${formatWhen(cmd.due, fr)}` : fr ? "Ajoutée à vos tâches" : "Added to your tasks",
+              view: "tasks",
+              at,
+            },
+          },
+        };
       }
 
       case "pay_creator": {
         if (isCreator) {
           setPendingContext(null);
-          setStatus(cmd.say || (fr ? "J'ouvre Pay it." : "Opening Pay it."));
-          window.setTimeout(() => onNavigate("payouts"), 700);
-          return;
+          return {
+            content: cmd.say || (fr ? "J'ouvre Pay it." : "Opening Pay it."),
+            widget: { kind: "action", action: { kind: "navigate", title: "Pay it", view: "payouts", at } },
+          };
         }
         const found = matchCreator(creators, cmd.creator);
         if (!found) {
@@ -438,173 +532,239 @@ export function AiChatView({
             .map((c) => c.name || c.handle)
             .filter(Boolean)
             .join(", ");
-          askMore(
+          return askMore(
             fr
               ? `Je ne trouve pas « ${cmd.creator} ». ${names ? `Vous voulez dire : ${names} ?` : "Quel créateur voulez-vous payer ?"}`
               : `I can't find “${cmd.creator}”. ${names ? `Did you mean: ${names}?` : "Which creator should I pay?"}`,
           );
-          return;
         }
         setPendingContext(null);
         const label = found.name || found.handle;
-        setStatus(
-          cmd.say ||
-            (fr ? `J'ouvre le paiement de ${label}.` : `Opening the payment for ${label}.`),
-        );
-        window.setTimeout(() => {
-          if (dashNav) dashNav.navigate({ view: "payouts", payout: { type: "creator", id: found.id } });
-          else onNavigate("payouts");
-        }, 700);
-        return;
+        return {
+          content: cmd.say || (fr ? `J'ouvre le paiement de ${label}.` : `Opening the payment for ${label}.`),
+          widget: {
+            kind: "action",
+            action: {
+              kind: "pay",
+              title: fr ? `Payer ${label}` : `Pay ${label}`,
+              detail: cmd.amount
+                ? formatMoney(cmd.amount, lang, cmd.amount % 1 ? 2 : 0)
+                : fr
+                  ? "Montant à choisir dans Paiements"
+                  : "Pick the amount in Payouts",
+              view: "payouts",
+              payoutCreatorId: found.id,
+              at,
+            },
+          },
+        };
       }
 
       case "create_campaign":
+        setPendingContext(null);
         if (isCreator) {
-          setPendingContext(null);
-          setStatus(cmd.say || (fr ? "J'ouvre Contenu." : "Opening Content."));
-          window.setTimeout(() => onNavigate("content"), 700);
-          return;
+          return {
+            content: cmd.say || (fr ? "J'ouvre Contenu." : "Opening Content."),
+            widget: { kind: "action", action: { kind: "navigate", title: fr ? "Contenu" : "Content", view: "content", at } },
+          };
         }
-        setPendingContext(null);
-        setStatus(cmd.say || (fr ? "J'ouvre la création de campagne." : "Opening campaign creation."));
-        window.setTimeout(() => {
-          if (dashNav) dashNav.navigate({ view: "campaigns", campaign: { type: "new" } });
-          else onNavigate("campaigns");
-        }, 700);
-        return;
+        return {
+          content: cmd.say || (fr ? "J'ouvre la création de campagne." : "Opening campaign creation."),
+          widget: {
+            kind: "action",
+            action: {
+              kind: "campaign",
+              title: fr ? "Nouvelle campagne" : "New campaign",
+              detail: fr ? "Affiliation, RPM ou cadeaux" : "Affiliate, RPM or gifting",
+              view: "campaigns",
+              at,
+            },
+          },
+        };
 
-      case "navigate":
+      case "navigate": {
         setPendingContext(null);
-        setStatus(cmd.say || (fr ? "J'ouvre ça." : "Opening it."));
-        if (isDashboardView(cmd.view)) {
-          const view = cmd.view as DashboardView;
-          window.setTimeout(() => onNavigate(view), 550);
-        }
-        return;
+        const say = cmd.say || (fr ? "J'ouvre ça." : "Opening it.");
+        if (!isDashboardView(cmd.view)) return { content: say };
+        const view = cmd.view as DashboardView;
+        const label = viewLabel(view, lang);
+        return {
+          content: say,
+          widget: {
+            kind: "action",
+            action: {
+              kind: "navigate",
+              title: fr ? `Ouvrir ${label}` : label,
+              detail: fr ? "Mino ouvre la page pour vous" : "Mino is opening the page for you",
+              view,
+              at,
+            },
+          },
+        };
+      }
 
       case "chat":
         setPendingContext(null);
-        setStatus(cmd.reply);
-        return;
+        return { content: cmd.reply };
     }
   };
 
-  const executeAsk = async (text: string) => {
-    setPrompt("");
-    setChatBusy(true);
-    setStatus(fr ? "Mino s'en occupe…" : "Mino is on it…");
-    try {
-      const creators = isCreator ? [] : await ensureCreators();
-      const { now, weekday } = localNowInput();
-      const res = await fetch("/api/ai-command", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          context: pendingContext || "",
-          lang: fr ? "fr" : "en",
-          now,
-          weekday,
-          role: isCreator ? "creator" : "brand",
-          creators: creators.map((c) => c.name || c.handle).filter(Boolean),
-          campaigns: isCreator ? [] : campaignNames,
-        }),
-      });
-      const data = (await res.json()) as { ok?: boolean; command?: AiCommand };
-      if (!res.ok || !data.ok || !data.command) throw new Error("bad response");
-      runCommand(data.command, text, creators);
-    } catch {
-      setStatus(
-        fr
-          ? "Petit souci de mon côté — réessayez dans un instant."
-          : "Small hiccup on my side — try again in a moment.",
-      );
-    } finally {
-      setChatBusy(false);
-    }
+  /** Asks /api/ai-command what to do. Throws on a network or server failure. */
+  const askCommand = async (text: string): Promise<AssistantAnswer> => {
+    const creators = isCreator ? [] : await ensureCreators();
+    const { now, weekday } = localNowInput();
+    const res = await fetch("/api/ai-command", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text,
+        context: pendingContext || "",
+        lang: fr ? "fr" : "en",
+        now,
+        weekday,
+        role: isCreator ? "creator" : "brand",
+        creators: creators.map((c) => c.name || c.handle).filter(Boolean),
+        campaigns: isCreator ? [] : campaignNames,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; command?: AiCommand };
+    if (!res.ok || !data.ok || !data.command) throw new Error("bad response");
+    return runCommand(data.command, text, creators);
   };
 
-  const submit = async (raw: string) => {
+  /** Free conversation and creator searches. Throws on a network or server failure. */
+  const askChat = async (history: MinoChatMessage[]): Promise<AssistantAnswer & Pick<MinoChatMessage, "creators" | "search">> => {
+    const res = await fetch("/api/ai-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // Only the words: widgets and creator cards stay on this side.
+        messages: history.filter((m) => m.widget?.kind !== "error").map((m) => ({ role: m.role, content: m.content })),
+        lang: fr ? "fr" : "en",
+        role: isCreator ? "creator" : "brand",
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      reply?: string;
+      creators?: FeedCreator[];
+      search?: { label: string; sources: string[] };
+    };
+    if (!res.ok || !data.ok || !data.reply) throw new Error(`ai-chat ${res.status}`);
+    return {
+      content: data.reply,
+      ...(data.creators?.length ? { creators: data.creators, search: data.search } : {}),
+    };
+  };
+
+  const askRevenue = async (ask: MinoRevenueAsk): Promise<AssistantAnswer> => {
+    if (!userId) throw new Error("no user");
+    const snapshot = await loadRevenueSnapshot(userId, ask);
+    return { content: revenueReply(snapshot, fr), widget: { kind: "revenue", snapshot } };
+  };
+
+  /**
+   * Every ask lands in the thread. Revenue asks build a dashboard, creator
+   * searches build profiles, actions build a card, the rest is conversation.
+   * `base` replaces the current thread (a retry drops the failed turn first).
+   */
+  const submit = async (raw: string, base?: MinoChatMessage[]) => {
     const text = raw.trim();
     if (!text || chatBusy) return;
 
-    const startingSession = !chatMode && !!activeChatId && messages.length === 0;
-    const creatorSearch = isCreator ? null : parseCreatorSearch(text);
-    if (!chatMode && !startingSession && !creatorSearch) {
-      await executeAsk(text);
-      return;
-    }
-    setChatMode(true);
+    const history = base ?? messages;
+    const startingSession = !chatMode && !!activeChatId && history.length === 0;
+    const revenueAsk = isCreator ? null : parseRevenueAsk(text);
+    const creatorSearch = isCreator || revenueAsk ? null : parseCreatorSearch(text);
+    const route: "revenue" | "search" | "command" | "chat" = revenueAsk
+      ? "revenue"
+      : creatorSearch
+        ? "search"
+        : pendingContext || looksLikeAction(text) || (!chatMode && !startingSession)
+          ? "command"
+          : "chat";
 
     let chatId = activeChatId;
     if (!chatId) {
+      // Creating the chat fires the "active chat" event, which resets the view
+      // to an empty chat: switch to chat mode only after it.
       const created = createMinoChat(userId, fr, text);
       chatId = created.id;
       setActiveChatId(chatId);
       setChats(loadMinoChats(userId));
     }
+    setChatMode(true);
 
-    const nextMessages = [...messages, { role: "user" as const, content: text }];
+    const nextMessages: MinoChatMessage[] = [...history, { role: "user", content: text }];
     setMessages(nextMessages);
     persistMessages(chatId, nextMessages, text);
     setPrompt("");
     setChatBusy(true);
     setStatus("");
-    setSearchLabel(creatorSearch ? describeSearch(creatorSearch, lang) : null);
-    // Let the search motion play in full even when results come back fast.
-    const minShow = new Promise((r) => window.setTimeout(r, creatorSearch ? 2200 : 0));
+    setBusyView(
+      route === "search" && creatorSearch
+        ? { kind: "search", label: describeSearch(creatorSearch, lang) }
+        : route === "revenue" && revenueAsk
+          ? { kind: "revenue", label: describeRevenueAsk(revenueAsk, lang) }
+          : { kind: "think", label: "" },
+    );
+    // Let the motion play in full even when the answer comes back fast.
+    const minShow = new Promise((r) => window.setTimeout(r, route === "search" ? 2200 : route === "revenue" ? 900 : 0));
 
+    let answer: MinoChatMessage;
     try {
-      const res = await fetch("/api/ai-chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextMessages,
-          lang: fr ? "fr" : "en",
-          role: isCreator ? "creator" : "brand",
-        }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        reply?: string;
-        error?: string;
-        creators?: FeedCreator[];
-        search?: { label: string; sources: string[] };
-      };
+      const result =
+        route === "revenue" && revenueAsk
+          ? await askRevenue(revenueAsk)
+          : route === "command"
+            ? await askCommand(text)
+            : await askChat(nextMessages);
       await minShow;
-      const reply =
-        res.ok && data.reply
-          ? data.reply
-          : fr
-            ? "Petit souci côté IA. Réessayez dans un instant."
-            : "AI hiccup. Try again in a moment.";
-      const withReply: MinoChatMessage[] = [
-        ...nextMessages,
-        {
-          role: "assistant" as const,
-          content: reply,
-          ...(res.ok && data.creators?.length ? { creators: data.creators, search: data.search } : {}),
-        },
-      ];
-      setMessages(withReply);
-      persistMessages(chatId, withReply, text);
+      answer = { role: "assistant", ...result };
     } catch {
-      const withReply = [
-        ...nextMessages,
-        {
-          role: "assistant" as const,
-          content: fr ? "Erreur réseau. Réessayez." : "Network error. Try again.",
-        },
-      ];
-      setMessages(withReply);
-      persistMessages(chatId, withReply, text);
-    } finally {
-      setChatBusy(false);
-      setSearchLabel(null);
+      await minShow;
+      answer = {
+        role: "assistant",
+        content: fr ? `Je n’ai pas pu répondre à « ${text} ».` : `I couldn’t answer “${text}”.`,
+        widget: { kind: "error", retryText: text },
+      };
+    }
+    const withReply = [...nextMessages, answer];
+    setMessages(withReply);
+    persistMessages(chatId, withReply, text);
+    setChatBusy(false);
+    setBusyView(null);
+  };
+  submitRef.current = (raw: string) => submit(raw);
+
+  /** Drops the failed turn (question + error) and asks again. */
+  const retry = (errorIndex: number) => {
+    const failed = messages[errorIndex];
+    if (failed?.widget?.kind !== "error") return;
+    const cut = messages[errorIndex - 1]?.role === "user" ? errorIndex - 1 : errorIndex;
+    void submit(failed.widget.retryText, messages.slice(0, cut));
+  };
+
+  /** Re-reads the numbers of a revenue widget in place. */
+  const refreshRevenue = async (index: number) => {
+    const msg = messages[index];
+    if (msg?.widget?.kind !== "revenue" || !userId || !activeChatId) return;
+    const chatId = activeChatId;
+    try {
+      const snapshot = await loadRevenueSnapshot(userId, msg.widget.snapshot.ask);
+      // The thread may have moved on while loading: update that same widget only.
+      const current = messagesRef.current;
+      if (current[index]?.widget !== msg.widget) return;
+      const next = current.map((m, i) =>
+        i === index ? { ...m, content: revenueReply(snapshot, fr), widget: { kind: "revenue" as const, snapshot } } : m,
+      );
+      setMessages(next);
+      persistMessages(chatId, next);
+    } catch {
+      // The widget keeps its last numbers; the refresh button stops spinning.
     }
   };
-  submitRef.current = submit;
 
   // A prompt typed on Home is sent as soon as this view is shown.
   useEffect(() => {
@@ -674,21 +834,43 @@ export function AiChatView({
         {chatMode && messages.length > 0 ? (
           <div className="ai-chat-thread" aria-live="polite">
             {messages.map((m, i) => (
-              <div key={`${m.role}-${i}`} className={`ai-chat-turn ai-chat-turn--${m.role}`}>
-                <div className={`ai-chat-bubble ai-chat-bubble--${m.role}`}>{m.content}</div>
+              <div
+                key={`${m.role}-${i}`}
+                ref={i === messages.length - 1 ? lastTurnRef : undefined}
+                className={`ai-chat-turn ai-chat-turn--${m.role}`}
+              >
+                {m.content ? <div className={`ai-chat-bubble ai-chat-bubble--${m.role}`}>{m.content}</div> : null}
                 {m.role === "assistant" && m.creators?.length ? (
                   <MinoCreatorResults
                     creators={m.creators}
                     label={m.search?.label ?? ""}
                     sources={m.search?.sources ?? []}
-                    onOpenCatalog={() => onNavigate("discovery")}
+                    onOpenCatalog={() => go({ view: "discovery" })}
+                    onOpenProfile={(c) => go({ view: "discovery", creator: c.username })}
+                    onContact={(c) => (onReachOut ? onReachOut(c) : go({ view: "outreach" }))}
+                    isPaid={isPaid}
+                    onUpgrade={onUpgrade}
                   />
+                ) : null}
+                {m.role === "assistant" && m.widget?.kind === "revenue" ? (
+                  <MinoRevenueWidget
+                    snapshot={m.widget.snapshot}
+                    go={go}
+                    onAsk={(q) => void submit(q)}
+                    onRefresh={() => refreshRevenue(i)}
+                  />
+                ) : null}
+                {m.role === "assistant" && m.widget?.kind === "action" ? <MinoActionWidget action={m.widget.action} go={go} /> : null}
+                {m.role === "assistant" && m.widget?.kind === "error" ? (
+                  <MinoErrorWidget onRetry={() => retry(i)} busy={chatBusy} />
                 ) : null}
               </div>
             ))}
             {chatBusy ? (
-              searchLabel ? (
-                <MinoSearchMotion label={searchLabel} />
+              busyView?.kind === "search" ? (
+                <MinoSearchMotion label={busyView.label} />
+              ) : busyView?.kind === "revenue" ? (
+                <MinoRevenueLoading label={busyView.label} />
               ) : (
                 <div className="mino-typing" role="status">
                   <MinoCompanion size={18} />

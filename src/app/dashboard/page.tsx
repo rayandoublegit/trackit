@@ -1366,6 +1366,9 @@ function DashboardPageContent() {
             userId={user?.id}
             isCreator={isCreator}
             displayName={actorProfile?.full_name || profile?.full_name || profile?.username}
+            onReachOut={(creator) => navigateToOutreachSend(creator)}
+            isPaid={!isFree}
+            onUpgrade={openWebsitePricing}
           />
           </KeepAlivePane>
         )}

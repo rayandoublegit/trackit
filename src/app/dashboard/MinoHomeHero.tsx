@@ -15,6 +15,7 @@ const ROTATING = [
   "Beauty creators in France with an email",
   "Skincare creators on Instagram, 50K+",
   "Create a campaign for my new drop",
+  "How much did I make this week?",
   "Pay a creator",
 ];
 
@@ -23,6 +24,7 @@ const ROTATING_FR = [
   "Créatrices beauté en France avec un email",
   "Créateurs skincare sur Instagram, 50K+",
   "Crée une campagne pour mon nouveau drop",
+  "Combien j’ai généré cette semaine ?",
   "Payer un créateur",
 ];
 
@@ -81,6 +83,16 @@ const CHIPS: { text: string; fr: string; icon: ReactNode }[] = [
     ),
   },
   {
+    text: "How much did I make this week?",
+    fr: "Combien j’ai généré cette semaine ?",
+    icon: (
+      <Icon>
+        <path d="M3 3v18h18" />
+        <path d="M7 15l4-4 3 3 6-7" />
+      </Icon>
+    ),
+  },
+  {
     text: "Create a new campaign",
     fr: "Crée une nouvelle campagne",
     icon: (
@@ -122,8 +134,8 @@ export function MinoHomeHero({
   const ask = (raw: string) => {
     const q = raw.trim();
     if (!q) return;
-    // Start fresh: the chat view routes creator searches to the chat and other
-    // asks (pay, open, create) to Mino's actions.
+    // Start fresh: the chat view builds the answer (creator profiles, a sales
+    // dashboard, an action card) in a new thread.
     setActiveMinoChatId(userId, null);
     onNavigate("ai");
     window.setTimeout(() => setPendingMinoPrompt(userId, q), 60);

@@ -97,3 +97,72 @@
 .ai-chat-turn--user { align-items: flex-end; }
 .ai-chat-turn--assistant { align-items: flex-start; }
 .ai-page.is-thread .ai-chat-thread, .ai-page.is-thread .mtg-promptbox { width: min(880px, 100%); }
+
+/* ── Creator profiles (Mino search answer) ─────────────────────────────── */
+.mino-strip { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; padding: 14px 16px; border-radius: 18px; border: 1px solid var(--ws-border); background: linear-gradient(135deg, var(--ws-accent-soft), transparent 60%), var(--ws-surface); animation: mino-rise .45s cubic-bezier(.2, .8, .2, 1) both; }
+.mino-strip__lead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mino-strip__lead > div { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.mino-strip__lead strong { font-size: 16px; letter-spacing: -.02em; color: var(--ws-text); }
+.mino-strip__lead div > span { font-size: 13px; color: var(--ws-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-strip__logos { display: inline-flex; flex-shrink: 0; }
+.mino-strip__logos span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--ws-surface); box-shadow: 0 0 0 2px var(--ws-surface), 0 2px 6px rgba(0, 0, 0, .12); }
+.mino-strip__logos span + span { margin-left: -8px; }
+.mino-strip__stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.mino-strip__stats div { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px; background: var(--ws-surface); border: 1px solid var(--ws-border); min-width: 0; }
+.mino-strip__stats dt { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ws-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mino-strip__stats dd { margin: 0; font-size: 18px; font-weight: 750; letter-spacing: -.03em; color: var(--ws-text); font-variant-numeric: tabular-nums; }
+.mino-strip__stats dd small { font-size: 12px; font-weight: 600; color: var(--ws-text-dim); margin-left: 2px; }
+
+.mino-results__grid:has(.mino-profile) { grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 14px; }
+.mino-profile { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 20px; border: 1px solid var(--ws-border); background: var(--ws-surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .04); animation: mino-drop .6s cubic-bezier(.2, .9, .3, 1.2) both; animation-delay: calc(var(--i) * 80ms); transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.mino-profile:hover { transform: translateY(-3px); border-color: var(--ws-border-strong); box-shadow: var(--ws-shadow); }
+.mino-profile:focus-within, .mino-profile:has([aria-expanded="true"]) { z-index: 20; }
+.mino-profile__head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.mino-profile__head .mino-card__who { flex: 1; }
+.mino-profile__head .mino-card__photo { width: 52px; height: 52px; }
+.mino-profile__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mino-profile__ext { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: var(--ws-text-muted); border: 1px solid var(--ws-border); transition: color .2s ease, border-color .2s ease; }
+.mino-profile__ext:hover { color: var(--ws-text); border-color: var(--ws-border-strong); }
+.mino-profile__videos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.mino-profile__video { position: relative; aspect-ratio: 9 / 14; padding: 0; border: none; border-radius: 12px; overflow: hidden; cursor: pointer; background: linear-gradient(160deg, #1f1f24, #0c0c0f); animation: mino-rise .45s ease both; animation-delay: calc(var(--i) * 80ms + 200ms + var(--v) * 70ms); }
+.mino-profile__video img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+.mino-profile__video::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, .55)); }
+.mino-profile__video:hover img { transform: scale(1.06); }
+.mino-profile__play { position: absolute; left: 50%; top: 50%; z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: rgba(255, 255, 255, .92); color: #111; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); opacity: .9; transform: scale(.9); transition: transform .2s ease, opacity .2s ease; }
+.mino-profile__play svg { margin-left: 2px; }
+.mino-profile__video:hover .mino-profile__play { opacity: 1; transform: scale(1.05); }
+.mino-profile__views { position: absolute; left: 6px; bottom: 6px; z-index: 1; display: inline-flex; align-items: center; gap: 3px; color: #fff; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0, 0, 0, .5); }
+.mino-profile__views svg { width: 9px; height: 9px; }
+.mino-profile__novideo { display: grid; place-items: center; min-height: 54px; padding: 10px; border-radius: 12px; border: 1px dashed var(--ws-border); font-size: 12px; color: var(--ws-text-dim); text-align: center; }
+.mino-profile__actions { display: flex; align-items: center; gap: 6px; margin-top: auto; }
+.mino-profile__btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--ws-border); background: var(--ws-surface); color: var(--ws-text); font: inherit; font-size: 12.5px; font-weight: 650; letter-spacing: -.01em; text-decoration: none; white-space: nowrap; cursor: pointer; transition: border-color .2s ease, transform .15s ease, background .2s ease; }
+.mino-profile__btn:hover { border-color: var(--ws-border-strong); }
+.mino-profile__btn:active { transform: scale(.96); }
+.mino-profile__btn.is-primary { margin-left: auto; border-color: transparent; background: var(--ws-btn); color: var(--ws-btn-text); }
+.mino-profile__btn.is-primary span { transition: transform .2s ease; }
+.mino-profile__btn.is-primary:hover span { transform: translateX(2px); }
+
+.mino-player { position: fixed; inset: 0; z-index: 1400; display: grid; place-items: center; padding: 20px; background: rgba(8, 8, 12, .62); backdrop-filter: blur(6px); animation: mino-fade .2s ease both; }
+.mino-player__panel { display: flex; flex-direction: column; width: min(380px, 100%); max-height: calc(100vh - 40px); border-radius: 22px; overflow: hidden; background: var(--ws-surface, #fff); color: var(--ws-text, #111); box-shadow: 0 24px 64px rgba(0, 0, 0, .4); animation: mino-card-in .4s cubic-bezier(.2, .9, .3, 1.1) both; }
+.mino-player__head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.mino-player__head .mino-card__who { flex: 1; }
+.mino-player__head .mino-card__photo { width: 36px; height: 36px; }
+.mino-player__close { display: grid; place-items: center; width: 32px; height: 32px; border: none; border-radius: 10px; background: var(--ws-pill, #f4f4f5); color: var(--ws-text, #111); cursor: pointer; }
+.mino-player__stage { position: relative; aspect-ratio: 9 / 16; max-height: calc(100vh - 170px); background: #000 center / cover no-repeat; }
+.mino-player__nav { position: absolute; top: 50%; width: 34px; height: 34px; margin-top: -17px; border: none; border-radius: 50%; background: rgba(255, 255, 255, .9); color: #111; font-size: 20px; line-height: 1; cursor: pointer; box-shadow: 0 4px 12px rgba(0, 0, 0, .3); }
+.mino-player__nav:disabled { opacity: .3; cursor: default; }
+.mino-player__nav.is-prev { left: 10px; }
+.mino-player__nav.is-next { right: 10px; }
+.mino-player__foot { display: flex; gap: 8px; padding: 12px 14px; }
+.mino-player__foot .mino-profile__btn { flex: 1; }
+
+@keyframes mino-drop { 0% { opacity: 0; transform: translateY(-22px) scale(.96); filter: blur(4px); } 60% { opacity: 1; filter: none; } 100% { opacity: 1; transform: none; } }
+@keyframes mino-fade { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 640px) {
+  .mino-strip__stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mino-strip__lead { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mino-strip, .mino-profile, .mino-profile__video, .mino-player, .mino-player__panel { animation: none !important; }
+}

@@ -424,6 +424,57 @@ export async function GET(request: NextRequest) {
     tzOffset,
   );
 
+  // Optional focus on one creator (Mino's "how much did I make with @luna"): same
+  // attribution as the table above, with its own daily series.
+  const focusCreatorId = searchParams.get("creator")?.trim() || "";
+  let creatorFocus: {
+    id: string;
+    revenue: number;
+    commission: number;
+    salesCount: number;
+    previousRevenue: number;
+    revenueTimeline: typeof revenueTimeline;
+  } | null = null;
+  if (focusCreatorId) {
+    const own = timelineSales.filter((s) => resolveCreatorId(s) === focusCreatorId);
+    const dayMap = new Map<string, { revenue: number; commission: number; salesCount: number }>();
+    let revenue = 0;
+    let commission = 0;
+    let salesCount = 0;
+    let previousRevenue = 0;
+    for (const sale of own) {
+      const amount = Number(sale.order_amount) || 0;
+      const fee = Number(sale.commission_amount) || 0;
+      if (isWithinPeriod(sale.created_at, start, end, tzOffset)) {
+        revenue += amount;
+        commission += fee;
+        salesCount += 1;
+      } else if (isWithinPeriod(sale.created_at, prevStart, prevEnd, tzOffset)) {
+        previousRevenue += amount;
+      }
+      const day = dayKeyFromIso(String(sale.created_at), tzOffset);
+      if (!day) continue;
+      const agg = dayMap.get(day) || { revenue: 0, commission: 0, salesCount: 0 };
+      agg.revenue += amount;
+      agg.commission += fee;
+      agg.salesCount += 1;
+      dayMap.set(day, agg);
+    }
+    creatorFocus = {
+      id: focusCreatorId,
+      revenue,
+      commission,
+      salesCount,
+      previousRevenue,
+      revenueTimeline: fillTimelineDays(
+        Array.from(dayMap.entries()).map(([date, agg]) => ({ date, ...agg })),
+        prevStart,
+        end,
+        tzOffset,
+      ),
+    };
+  }
+
   const platformSalesMap = new Map<string, { revenue: number; commission: number; count: number }>();
   for (const sale of periodSales) {
     const creatorId = resolveCreatorId(sale);
@@ -530,6 +581,7 @@ export async function GET(request: NextRequest) {
       campaigns: campaignsData || [],
       salesCount: currentSales.count,
       revenueTimeline,
+      ...(creatorFocus ? { creatorFocus } : {}),
       platformBreakdown,
       outreachByPlatform,
       followUpImpact,

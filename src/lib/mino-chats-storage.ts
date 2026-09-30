@@ -1,4 +1,5 @@
 import type { FeedCreator } from "@/lib/discovery-feed";
+import type { MinoWidget } from "@/lib/mino-widgets";
 import { workspaceStorageKey } from "@/lib/workspaces";
 
 export type MinoSearchMeta = { label: string; sources: string[] };
@@ -9,6 +10,8 @@ export type MinoChatMessage = {
   /** Creators found by a Mino search, rendered as cards under the reply. */
   creators?: FeedCreator[];
   search?: MinoSearchMeta;
+  /** UI Mino built for this answer (revenue dashboard, action card, error with retry). */
+  widget?: MinoWidget;
 };
 
 export type MinoChat = {

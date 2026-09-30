@@ -82,7 +82,45 @@ const CREATORS: Creator[] = [
   { id: "nora", name: "Nora Diallo", handle: "norafit", platform: "tiktok", niche: "Fitness", face: "1662850886700-4ec19bd30d11", video: 40246, followers: 694_000, avgViews: 231_000, engagement: 9.4, revenue: 86_310, sales: 1_311, owed: 1_860, method: "PayPal", country: "US" },
   { id: "jade", name: "Jade Moreau", handle: "jadedaily", platform: "instagram", niche: "Lifestyle", face: "1567516364473-233c4b6fcfbe", video: 41181, followers: 358_000, avgViews: 97_000, engagement: 6.4, revenue: 71_980, sales: 1_096, owed: 1_570, method: "Revolut", country: "ES" },
 ];
-const BY_ID = new Map(CREATORS.map((c) => [c.id, c]));
+// Creators Mino can find who do not work with the brand yet (micro and French
+// profiles, so every example prompt has real matches).
+const PROSPECTS: Creator[] = [
+  { id: "amara", name: "Amara Okafor", handle: "amarasweats", platform: "tiktok", niche: "Fitness", face: "1531123897727-8f129e1688ce", video: 23056, followers: 64_300, avgViews: 41_800, engagement: 11.2, revenue: 38_420, sales: 612, owed: 0, method: "PayPal", country: "US" },
+  { id: "leo", name: "Leo Santos", handle: "leolifts", platform: "tiktok", niche: "Fitness", face: "1507003211169-0a1dd7228f2d", video: 40248, followers: 82_100, avgViews: 57_300, engagement: 9.8, revenue: 29_870, sales: 488, owed: 0, method: "Wise", country: "PT" },
+  { id: "tom", name: "Tom Becker", handle: "tombuilds", platform: "instagram", niche: "Fitness", face: "1500648767791-00dcc994a43e", video: 4506, followers: 47_600, avgViews: 22_400, engagement: 7.9, revenue: 17_240, sales: 301, owed: 0, method: "Revolut", country: "DE" },
+  { id: "camille", name: "Camille Laurent", handle: "camilleglow", platform: "instagram", niche: "Beauty", face: "1529626455594-4ff0802cfb7e", video: 52039, followers: 88_400, avgViews: 36_900, engagement: 8.6, revenue: 46_130, sales: 702, owed: 0, method: "Wise", country: "FR" },
+  { id: "lea", name: "Léa Bernard", handle: "leabeaute", platform: "tiktok", niche: "Makeup", face: "1488426862026-3ee34a7d66df", video: 40552, followers: 71_200, avgViews: 64_100, engagement: 12.4, revenue: 33_560, sales: 540, owed: 0, method: "PayPal", country: "FR" },
+  { id: "manon", name: "Manon Petit", handle: "manonskin", platform: "tiktok", niche: "Skincare", face: "1438761681033-6461ffad8d80", video: 52057, followers: 54_800, avgViews: 38_200, engagement: 10.6, revenue: 27_910, sales: 455, owed: 0, method: "Revolut", country: "FR" },
+  { id: "priya", name: "Priya Shah", handle: "priyaglam", platform: "instagram", niche: "Makeup", face: "1534528741775-53994a69daeb", video: 371, followers: 136_000, avgViews: 48_900, engagement: 7.4, revenue: 52_300, sales: 811, owed: 0, method: "Wise", country: "UK" },
+  { id: "emma", name: "Emma Walsh", handle: "emmacooks", platform: "tiktok", niche: "Food", face: "1494790108377-be9c29b29330", video: 42316, followers: 39_500, avgViews: 28_700, engagement: 9.3, revenue: 14_680, sales: 266, owed: 0, method: "PayPal", country: "UK" },
+  { id: "julia", name: "Julia Navarro", handle: "julianavarro", platform: "instagram", niche: "Lifestyle", face: "1524504388940-b1c1722653e1", video: 49647, followers: 92_700, avgViews: 31_500, engagement: 6.8, revenue: 21_050, sales: 344, owed: 0, method: "Revolut", country: "ES" },
+];
+const EVERYONE = [...CREATORS, ...PROSPECTS];
+const BY_ID = new Map(EVERYONE.map((c) => [c.id, c]));
+const IN_PROGRAM = new Set(CREATORS.map((c) => c.id));
+
+/** People who joined the program recently (shown in revenue answers). */
+const NEWCOMERS: { name: string; handle: string; platform: PlatformName; face: string; daysAgo: number; firstSales: number }[] = [
+  { name: "Clara Weiss", handle: "claraweiss", platform: "instagram", face: "1517841905240-472988babdf9", daysAgo: 1, firstSales: 1_240 },
+  { name: "Noah Blake", handle: "noahblake", platform: "tiktok", face: "1539571696357-5a69c17a67c6", daysAgo: 2, firstSales: 860 },
+  { name: "Hannah Lee", handle: "hannahlee", platform: "tiktok", face: "1573496359142-b8d87734a5a2", daysAgo: 4, firstSales: 2_310 },
+  { name: "Sam Rivera", handle: "samrivera", platform: "youtube", face: "1506794778202-cad84cf45f1d", daysAgo: 6, firstSales: 540 },
+  { name: "Grace Miller", handle: "gracemiller", platform: "instagram", face: "1508214751196-bcfd4ca60f91", daysAgo: 11, firstSales: 3_120 },
+  { name: "Lina Haddad", handle: "linahaddad", platform: "tiktok", face: "1531746020798-e6953c6e8e04", daysAgo: 19, firstSales: 4_480 },
+];
+
+const COUNTRY_NAMES: Record<string, [string, string]> = {
+  FR: ["France", "France"],
+  UK: ["United Kingdom", "Royaume-Uni"],
+  US: ["United States", "États-Unis"],
+  CA: ["Canada", "Canada"],
+  IT: ["Italy", "Italie"],
+  ES: ["Spain", "Espagne"],
+  BE: ["Belgium", "Belgique"],
+  DE: ["Germany", "Allemagne"],
+  PT: ["Portugal", "Portugal"],
+};
+const countryName = (code: string, lang: Lang) => COUNTRY_NAMES[code]?.[lang === "fr" ? 1 : 0] ?? code;
 
 type Campaign = {
   id: string;
@@ -115,6 +153,16 @@ const campaignNameById = (id: string, lang: Lang) => {
   const c = CAMPAIGNS.find((x) => x.id === id);
   return c ? campaignName(c, lang) : "";
 };
+
+type ProductId = "serum" | "night" | "spf" | "oil" | "gift" | "bundle";
+const PRODUCTS: { id: ProductId; name: string; nameFr: string; photo: string }[] = [
+  { id: "serum", name: "Glow Serum", nameFr: "Sérum Glow", photo: "1576426863848-c21f53c60b19" },
+  { id: "night", name: "Night Repair cream", nameFr: "Crème Night Repair", photo: "1718490953028-021d352b14fd" },
+  { id: "spf", name: "SPF 50 fluid", nameFr: "Fluide SPF 50", photo: "1623143445418-40c192fa3d11" },
+  { id: "oil", name: "Body oil", nameFr: "Huile pour le corps", photo: "1631729371254-42c2892f0e6e" },
+  { id: "gift", name: "Holiday gift set", nameFr: "Coffret cadeau des fêtes", photo: NEW_CAMPAIGN_COVER },
+  { id: "bundle", name: "Black Friday bundle", nameFr: "Coffret Black Friday", photo: "1631730486572-226d1f595b68" },
+];
 
 const LISTS = [
   { name: "Skincare top 1%", nameFr: "Top 1 % skincare", count: 48, crew: ["luna", "ines", "sarah", "maya"] },
@@ -158,6 +206,8 @@ function makeFormat(lang: Lang) {
     },
     /** Short day like "Sep 2" / "2 sept.". */
     day: (month: number, dayOfMonth: number) => new Date(2026, month - 1, dayOfMonth).toLocaleDateString(locale, { month: "short", day: "numeric" }),
+    /** A day `ago` days before today, like "Sep 24" / "24 sept.". */
+    ago: (ago: number) => new Date(Date.now() - ago * 86_400_000).toLocaleDateString(locale, { month: "short", day: "numeric" }),
   };
 }
 const FORMAT = { en: makeFormat("en"), fr: makeFormat("fr") };
@@ -205,19 +255,22 @@ const COPY = {
     payoutSent: (n: number) => <>Payout sent to <b>{n} creators</b></>,
     rotating: [
       "Find micro fitness creators on TikTok",
+      "How much did I generate with Luna this week?",
       "Skincare creators who already sell, 100K+",
       "Who drove the most sales this week?",
       "Pay every creator owed this month",
       "Create a campaign for the holiday drop",
     ],
-    chips: ["Find micro fitness creators on TikTok", "Find beauty creators on Instagram", "Create a new campaign", "Pay every creator owed"],
+    chips: [
+      "Find micro fitness creators on TikTok",
+      "How much did I generate with Luna?",
+      "Beauty creators in France",
+      "Who drove the most sales this week?",
+      "Create a campaign for the holiday drop",
+      "Pay every creator owed",
+    ],
     minoSteps: ["Reading your request", "Scanning 1,284,302 creators", "Ranking by real sales and views"],
     scanning: (n: string) => `Scanning ${n} creators`,
-    minoAnswer: (n: number, total: string) => (
-      <>
-        Found <b>{n} creators</b> who already sell in this niche. Together they drove <b>{total}</b> for brands like yours.
-      </>
-    ),
     followersLower: "followers",
     engShort: "eng.",
     sold: "sold",
@@ -336,6 +389,119 @@ const COPY = {
     thisMonth: "This month",
     goal: "78% of your $3.6M goal",
     newSale: "New sale",
+    // Mino thread
+    revenueSteps: ["Reading your request", "Matching Shopify orders to creators", "Building your dashboard"],
+    matching: (n: string) => `Matching ${n} Shopify orders`,
+    paySteps: ["Checking commissions owed", "Verifying payout details", "Preparing payments"],
+    campaignSteps: ["Reading your brief", "Picking product and commission", "Drafting the campaign"],
+    helpSteps: ["Reading your request"],
+    found: (n: number, what: ReactNode, total: string) => (
+      <>
+        Found <b>{n === 1 ? "1 creator" : `${n} creators`}</b>
+        {what ? <> for {what}</> : null}. {n === 1 ? "They drove" : "Together they drove"} <b>{total}</b> in sales.
+      </>
+    ),
+    noExact: (what: ReactNode) => <>No exact match for {what} yet. Here are the closest creators.</>,
+    profileAnswer: (name: string, followers: string, sold: string) => (
+      <>
+        Here is <b>{name}</b>: {followers} followers and <b>{sold}</b> in sales driven.
+      </>
+    ),
+    understood: "Mino understood",
+    micro: "Micro · 10K–100K",
+    mid: "Mid · 100K–1M",
+    macro: "Macro · 1M+",
+    minFollowers: (n: string) => `${n}+ followers`,
+    bestMatches: "Best matches",
+    closeMatches: "Close to your request",
+    inProgram: "In your program",
+    newTag: "New",
+    contact: "Contact",
+    contacted: "Contacted",
+    profileShort: "Profile",
+    viewProfile: "View profile",
+    saved: "Saved",
+    savedOne: "Saved to “Ready to sign”",
+    removedOne: "Removed from “Ready to sign”",
+    periodTag: (d: number) => `Last ${d} days`,
+    periodPhrase: (d: number) => `over the last ${d} days`,
+    creatorRevenue: (name: string, total: string, period: string, orders: string, growth: string) => (
+      <>
+        With <b>{name}</b> you generated <b>{total}</b> {period}, from <b>{orders} orders</b>. That is <b className="pd-up">▲ {growth}</b> vs the period before.
+      </>
+    ),
+    programRevenue: (who: string, total: string, period: string, orders: string, leader: string, leaderValue: string) => (
+      <>
+        {who} generated <b>{total}</b> {period}, from <b>{orders} orders</b>. <b>{leader}</b> leads with <b>{leaderValue}</b>.
+      </>
+    ),
+    yourCreators: "Your creators",
+    yourGroup: (label: string) => `Your ${label} creators`,
+    commission: "Commission",
+    ofRevenue: (p: string) => `${p} of revenue`,
+    avgBasket: (v: string) => `${v} avg basket`,
+    vsPrev: (p: string) => `▲ ${p} vs period before`,
+    newCreatorsTitle: "New creators",
+    joinedCount: (n: number) => `+${n} joined`,
+    joinedAgo: (n: number) => (n <= 1 ? "joined yesterday" : `joined ${n} days ago`),
+    firstSales: "first sales",
+    dailyRevenue: "Daily revenue",
+    bestDay: (d: string, v: string) => `Best day ${d} · ${v}`,
+    topCreatorsShort: "Top creators",
+    bestVideo: "Best video",
+    recentSales: "Recent sales",
+    byCampaign: "By campaign",
+    openCampaigns: "Open Campaigns",
+    openPayouts: "Open Payouts",
+    payName: (name: string, amount: string) => `Pay ${name} · ${amount}`,
+    paidName: (name: string) => `${name} is paid`,
+    payAnswer: (n: number, amount: string) => (
+      <>
+        <b>{n} creators</b> are owed <b>{amount}</b>. Payout details are verified, you can pay them from here.
+      </>
+    ),
+    paySingle: (name: string, amount: string) => (
+      <>
+        You owe <b>{amount}</b> to <b>{name}</b>. Payout details are verified.
+      </>
+    ),
+    allPaid: "Everyone is paid. Nothing is owed right now.",
+    paying: "Paying…",
+    showMore: (n: number) => `Show ${n} more`,
+    campaignAnswer: "Here is your draft. Check it and launch when you are ready.",
+    campaignNameLabel: "Campaign name",
+    product: "Product",
+    creatorsToInvite: "Creators to invite",
+    launch: "Launch campaign",
+    saveDraft: "Save as draft",
+    launched: "Campaign is live",
+    draftSaved: "Saved in drafts",
+    viewInCampaigns: "View in Campaigns",
+    helpAnswer: "I can find creators, build a sales dashboard, pay your creators or draft a campaign. Try one of these:",
+    helpChips: ["Find micro fitness creators on TikTok", "How much did I generate with Luna this week?", "Pay every creator owed"],
+    followUps: ["Top creators this month", "How much did I generate with Maya?", "Skincare creators in France"],
+    askFollowUp: "Ask Mino a follow-up…",
+    minoWelcome: "What should Mino do?",
+    minoWelcomeSub: "Ask for creators, sales, payouts or a new campaign. Mino builds the answer for you.",
+    // Contact and profile
+    newMessage: "New message",
+    to: "To",
+    subject: "Subject",
+    viaGmail: "via Gmail",
+    contactSubject: (brand: string) => `Paid collab with ${brand}`,
+    contactBody: (first: string, brand: string, niche: string, product: string) =>
+      `Hi ${first},\n\nI’m Sofia from ${brand}. We love your ${niche} content and think our ${product} would be a great fit for your audience.\n\nWe pay 15% on every sale you drive, plus a free kit. Want me to send you the details?\n\nSofia`,
+    fromLine: (email: string) => `From ${email}`,
+    send: "Send",
+    sending: "Sending…",
+    sent: "Sent",
+    close: "Close",
+    avgViews: "Avg views",
+    soldForBrands: "Sold for similar brands",
+    audience: "Audience",
+    audienceRows: ["Women 18–34", "Men 18–34", "35 and over"],
+    topCountry: (c: string) => `Top country: ${c}`,
+    notInProgram: "Not in your program yet",
   },
   fr: {
     verified: "Vérifié",
@@ -347,19 +513,22 @@ const COPY = {
     payoutSent: (n: number) => <>Paiement envoyé à <b>{n} créateurs</b></>,
     rotating: [
       "Trouver des micro-créateurs fitness sur TikTok",
+      "Combien j’ai généré avec Luna cette semaine ?",
       "Créatrices skincare qui vendent déjà, 100 k+",
       "Qui a généré le plus de ventes cette semaine ?",
       "Payer tous les créateurs à régler ce mois-ci",
       "Créer une campagne pour le drop des fêtes",
     ],
-    chips: ["Trouver des micro-créateurs fitness sur TikTok", "Trouver des créatrices beauté sur Instagram", "Créer une nouvelle campagne", "Payer tous les créateurs en attente"],
+    chips: [
+      "Trouver des micro-créateurs fitness sur TikTok",
+      "Combien j’ai généré avec Luna ?",
+      "Créatrices beauté en France",
+      "Qui a généré le plus de ventes cette semaine ?",
+      "Créer une campagne pour le drop des fêtes",
+      "Payer tous les créateurs en attente",
+    ],
     minoSteps: ["Lecture de votre demande", "Analyse de 1 284 302 créateurs", "Classement par ventes et vues réelles"],
     scanning: (n: string) => `Analyse de ${n} créateurs`,
-    minoAnswer: (n: number, total: string) => (
-      <>
-        <b>{n} créateurs</b> trouvés, qui vendent déjà dans cette niche. Ensemble, ils ont généré <b>{total}</b> pour des marques comme la vôtre.
-      </>
-    ),
     followersLower: "abonnés",
     engShort: "eng.",
     sold: "vendus",
@@ -478,6 +647,118 @@ const COPY = {
     thisMonth: "Ce mois-ci",
     goal: "78 % de votre objectif de 3,6 M€",
     newSale: "Nouvelle vente",
+    // Mino thread
+    revenueSteps: ["Lecture de votre demande", "Rapprochement des commandes Shopify", "Construction de votre tableau de bord"],
+    matching: (n: string) => `Rapprochement de ${n} commandes Shopify`,
+    paySteps: ["Vérification des commissions dues", "Contrôle des moyens de paiement", "Préparation des paiements"],
+    campaignSteps: ["Lecture de votre brief", "Choix du produit et de la commission", "Rédaction de la campagne"],
+    helpSteps: ["Lecture de votre demande"],
+    found: (n: number, what: ReactNode, total: string) => (
+      <>
+        <b>{n === 1 ? "1 créateur" : `${n} créateurs`}</b> {n === 1 ? "trouvé" : "trouvés"}{what ? <> pour {what}</> : null}. {n === 1 ? "Ce profil a" : "Ensemble, ils ont"} généré <b>{total}</b> de ventes.
+      </>
+    ),
+    noExact: (what: ReactNode) => <>Pas encore de correspondance exacte pour {what}. Voici les créateurs les plus proches.</>,
+    profileAnswer: (name: string, followers: string, sold: string) => (
+      <>
+        Voici <b>{name}</b> : {followers} abonnés et <b>{sold}</b> de ventes générées.
+      </>
+    ),
+    understood: "Mino a compris",
+    micro: "Micro · 10 k–100 k",
+    mid: "Moyen · 100 k–1 M",
+    macro: "Macro · 1 M+",
+    minFollowers: (n: string) => `${n}+ abonnés`,
+    bestMatches: "Meilleurs résultats",
+    closeMatches: "Proches de votre demande",
+    inProgram: "Dans votre programme",
+    newTag: "Nouveau",
+    contact: "Contacter",
+    contacted: "Contacté",
+    profileShort: "Profil",
+    viewProfile: "Voir le profil",
+    saved: "Enregistré",
+    savedOne: "Enregistré dans « Prêts à signer »",
+    removedOne: "Retiré de « Prêts à signer »",
+    periodTag: (d: number) => `${d} derniers jours`,
+    periodPhrase: (d: number) => `sur les ${d} derniers jours`,
+    creatorRevenue: (name: string, total: string, period: string, orders: string, growth: string) => (
+      <>
+        Avec <b>{name}</b>, vous avez généré <b>{total}</b> {period}, sur <b>{orders} commandes</b>. Soit <b className="pd-up">▲ {growth}</b> par rapport à la période précédente.
+      </>
+    ),
+    programRevenue: (who: string, total: string, period: string, orders: string, leader: string, leaderValue: string) => (
+      <>
+        {who} ont généré <b>{total}</b> {period}, sur <b>{orders} commandes</b>. <b>{leader}</b> arrive en tête avec <b>{leaderValue}</b>.
+      </>
+    ),
+    yourCreators: "Vos créateurs",
+    yourGroup: (label: string) => `Vos créateurs ${label}`,
+    commission: "Commission",
+    ofRevenue: (p: string) => `${p} du CA`,
+    avgBasket: (v: string) => `Panier moyen ${v}`,
+    vsPrev: (p: string) => `▲ ${p} vs période précédente`,
+    newCreatorsTitle: "Nouveaux créateurs",
+    joinedCount: (n: number) => `+${n} arrivés`,
+    joinedAgo: (n: number) => (n <= 1 ? "arrivé hier" : `arrivé il y a ${n} jours`),
+    firstSales: "premières ventes",
+    dailyRevenue: "CA par jour",
+    bestDay: (d: string, v: string) => `Meilleur jour : ${d} · ${v}`,
+    topCreatorsShort: "Top créateurs",
+    bestVideo: "Meilleure vidéo",
+    recentSales: "Ventes récentes",
+    byCampaign: "Par campagne",
+    openCampaigns: "Ouvrir Campagnes",
+    openPayouts: "Ouvrir Paiements",
+    payName: (name: string, amount: string) => `Payer ${name} · ${amount}`,
+    paidName: (name: string) => `Paiement envoyé à ${name}`,
+    payAnswer: (n: number, amount: string) => (
+      <>
+        <b>{n} créateurs</b> attendent <b>{amount}</b>. Les moyens de paiement sont vérifiés, vous pouvez les payer d’ici.
+      </>
+    ),
+    paySingle: (name: string, amount: string) => (
+      <>
+        Vous devez <b>{amount}</b> à <b>{name}</b>. Son moyen de paiement est vérifié.
+      </>
+    ),
+    allPaid: "Tout le monde est payé. Rien n’est dû pour l’instant.",
+    paying: "Paiement…",
+    showMore: (n: number) => `Voir ${n} de plus`,
+    campaignAnswer: "Voici votre brouillon. Vérifiez-le et lancez-le quand vous êtes prêt.",
+    campaignNameLabel: "Nom de la campagne",
+    product: "Produit",
+    creatorsToInvite: "Créateurs à inviter",
+    launch: "Lancer la campagne",
+    saveDraft: "Enregistrer en brouillon",
+    launched: "Campagne lancée",
+    draftSaved: "Enregistrée dans les brouillons",
+    viewInCampaigns: "Voir dans Campagnes",
+    helpAnswer: "Je peux trouver des créateurs, construire un tableau de vos ventes, payer vos créateurs ou préparer une campagne. Essayez par exemple :",
+    helpChips: ["Trouver des micro-créateurs fitness sur TikTok", "Combien j’ai généré avec Luna cette semaine ?", "Payer tous les créateurs en attente"],
+    followUps: ["Top créateurs du mois", "Combien j’ai généré avec Maya ?", "Créatrices skincare en France"],
+    askFollowUp: "Posez une autre question à Mino…",
+    minoWelcome: "Que doit faire Mino ?",
+    minoWelcomeSub: "Demandez des créateurs, vos ventes, vos paiements ou une nouvelle campagne. Mino construit la réponse pour vous.",
+    // Contact and profile
+    newMessage: "Nouveau message",
+    to: "À",
+    subject: "Objet",
+    viaGmail: "via Gmail",
+    contactSubject: (brand: string) => `Collaboration rémunérée avec ${brand}`,
+    contactBody: (first: string, brand: string, niche: string, product: string) =>
+      `Bonjour ${first},\n\nJe suis Sofia, de ${brand}. Nous adorons vos contenus ${niche} et pensons que notre ${product} plairait beaucoup à votre communauté.\n\nNous versons 15 % sur chaque vente générée, avec un kit offert. Je vous envoie les détails ?\n\nSofia`,
+    fromLine: (email: string) => `De ${email}`,
+    send: "Envoyer",
+    sending: "Envoi…",
+    sent: "Envoyé",
+    close: "Fermer",
+    avgViews: "Vues moyennes",
+    soldForBrands: "Vendu pour des marques similaires",
+    audience: "Audience",
+    audienceRows: ["Femmes 18–34 ans", "Hommes 18–34 ans", "35 ans et plus"],
+    topCountry: (c: string) => `Premier pays : ${c}`,
+    notInProgram: "Pas encore dans votre programme",
   },
 } satisfies Record<Lang, unknown>;
 
@@ -682,53 +963,354 @@ function useTypedPlaceholder(active: boolean, phrases: readonly string[]): strin
   return active ? full.slice(0, n) : phrases[0];
 }
 
-const CHIP_ICONS: ReactNode[] = [
-  <PlatformLogo key="tiktok" platform="tiktok" size={15} />,
-  <PlatformLogo key="instagram" platform="instagram" size={15} />,
-  <IconMega key="mega" />,
-  <Svg key="wallet" size={15}>
+const IconWallet = ({ size = 15 }: { size?: number }) => (
+  <Svg size={size}>
     <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5" />
     <circle cx="16.5" cy="14" r="1.2" fill="currentColor" />
-  </Svg>,
+  </Svg>
+);
+const IconChart = () => (
+  <Svg size={15}>
+    <path d="M4 19V5M4 19h16" />
+    <path d="M7 15l4-4 3 3 5-6" />
+  </Svg>
+);
+const IconTrophy = () => (
+  <Svg size={15}>
+    <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" />
+    <path d="M16 6h3a2 2 0 0 1-2 4h-1M8 6H5a2 2 0 0 0 2 4h1M12 13v4M8 20h8" />
+  </Svg>
+);
+const IconPin = () => (
+  <Svg size={15}>
+    <path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z" />
+    <circle cx="12" cy="10" r="2.2" />
+  </Svg>
+);
+const IconClose = () => (
+  <Svg size={16}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </Svg>
+);
+const IconSend = () => (
+  <Svg size={14}>
+    <path d="M21 3L10 14M21 3l-7 18-4-7-7-4 18-7z" />
+  </Svg>
+);
+const IconMail = () => (
+  <Svg size={14}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </Svg>
+);
+const IconUser = () => (
+  <Svg size={14}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </Svg>
+);
+
+const CHIP_ICONS: ReactNode[] = [
+  <PlatformLogo key="tiktok" platform="tiktok" size={15} />,
+  <IconChart key="chart" />,
+  <IconPin key="pin" />,
+  <IconTrophy key="trophy" />,
+  <IconMega key="mega" />,
+  <IconWallet key="wallet" />,
 ];
 
-// Understands the English and French prompts the demo offers.
-function minoMatches(q: string): Creator[] {
-  const s = q.toLowerCase();
-  const pick = (test: (c: Creator) => boolean) => CREATORS.filter(test);
-  let hits: Creator[] = [];
-  if (/fit|gym|sport|muscu/.test(s)) hits = pick((c) => c.niche === "Fitness");
-  else if (/skin|serum|sérum|spf|peau|soin/.test(s)) hits = pick((c) => c.niche === "Skincare");
-  else if (/beaut|makeup|make-up|maquillage/.test(s)) hits = pick((c) => ["Beauty", "Makeup", "Skincare"].includes(c.niche));
-  else if (/food|recipe|cook|cuisine|recette/.test(s)) hits = pick((c) => c.niche === "Food");
-  if (/tiktok/.test(s)) hits = (hits.length ? hits : CREATORS).filter((c) => c.platform === "tiktok");
-  else if (/insta/.test(s)) hits = (hits.length ? hits : CREATORS).filter((c) => c.platform === "instagram");
-  const rest = CREATORS.filter((c) => !hits.includes(c));
-  return [...hits, ...rest].slice(0, 6);
+// ── Mino: reading the ask ─────────────────────────────────────
+// Understands the English and French prompts the demo offers, and close
+// variations: creator searches, revenue questions, payouts and campaigns.
+type NicheKey = "fitness" | "skincare" | "makeup" | "beauty" | "food" | "lifestyle";
+const NICHE_GROUPS: Record<NicheKey, Niche[]> = {
+  fitness: ["Fitness"],
+  skincare: ["Skincare"],
+  makeup: ["Makeup"],
+  beauty: ["Beauty", "Makeup", "Skincare"],
+  food: ["Food"],
+  lifestyle: ["Lifestyle"],
+};
+const NICHE_KEY_LABEL: Record<NicheKey, Niche> = { fitness: "Fitness", skincare: "Skincare", makeup: "Makeup", beauty: "Beauty", food: "Food", lifestyle: "Lifestyle" };
+type Size = "micro" | "mid" | "macro";
+const SIZE_RANGE: Record<Size, [number, number]> = { micro: [10_000, 100_000], mid: [100_000, 1_000_000], macro: [1_000_000, Infinity] };
+type Filters = { niche: NicheKey | null; platform: PlatformName | null; size: Size | null; min: number | null; country: string | null };
+type Scope = { kind: "all" } | { kind: "creator"; id: string } | { kind: "group"; filters: Filters };
+type Intent =
+  | { kind: "search"; filters: Filters; ids: string[] | null }
+  | { kind: "revenue"; days: number; scope: Scope }
+  | { kind: "pay"; id: string | null }
+  | { kind: "campaign"; name: string | null; product: ProductId; commission: number; niche: NicheKey | null }
+  | { kind: "help" };
+type Turn = { id: number; q: string; intent: Intent };
+
+const norm = (q: string) =>
+  q
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[’'`]/g, " ");
+
+function namedCreator(s: string, pool: Creator[]): Creator | null {
+  return pool.find((c) => new RegExp(`\\b(${norm(c.name.split(" ")[0])}|${c.handle})\\b`).test(s)) ?? null;
 }
 
-function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators: () => void }) {
-  const { t: copy, f } = useCopy();
+const COUNTRY_RX: [string, RegExp][] = [
+  ["FR", /\bfrance\b|\bfrench\b|\bfrancais|\bfr\b/],
+  ["UK", /\buk\b|united kingdom|\bbritish|britain|london|londres|royaume|angleterre/],
+  ["US", /\busa\b|united states|\bamerica|americain|etats.unis/],
+  ["CA", /canad/],
+  ["IT", /\bital/],
+  ["ES", /spain|spanish|espagn/],
+  ["BE", /belgi|\bbelge/],
+  ["DE", /german|allemagne|allemand/],
+  ["PT", /portug/],
+];
+
+function parseFilters(s: string): Filters {
+  const niche: NicheKey | null = /\bfit|\bgym|sport|muscu|workout|training/.test(s)
+    ? "fitness"
+    : /make ?-?up|maquill|lipstick|rouge a levres/.test(s)
+      ? "makeup"
+      : /skin|serum|\bspf\b|\bpeau\b|\bsoins?\b/.test(s)
+        ? "skincare"
+        : /beaut/.test(s)
+          ? "beauty"
+          : /\bfood|recipe|\bcook|cuisine|recette/.test(s)
+            ? "food"
+            : /lifestyle|\bvlog|quotidien/.test(s)
+              ? "lifestyle"
+              : null;
+  const platform: PlatformName | null = /tik ?tok/.test(s) ? "tiktok" : /insta|\breels?\b/.test(s) ? "instagram" : /youtube|\byt\b|\bshorts\b/.test(s) ? "youtube" : null;
+  const size: Size | null = /micro|nano/.test(s) ? "micro" : /\bmid\b|mid.tier|\bmoyens?\b/.test(s) ? "mid" : /macro|\bbig\b|\blarge\b|\bmega\b|\bgros/.test(s) ? "macro" : null;
+  const m = s.match(/(\d+(?:[.,]\d+)?)\s*(k|m)\s*\+/) ?? s.match(/(?:more than|over|above|at least|plus de|au moins)\s*(\d+(?:[.,]\d+)?)\s*(k|m)\b/);
+  const min = m ? parseFloat(m[1].replace(",", ".")) * (m[2] === "m" ? 1e6 : 1e3) : null;
+  const country = COUNTRY_RX.find(([, rx]) => rx.test(s))?.[0] ?? null;
+  return { niche, platform, size, min, country };
+}
+const hasFilters = (f: Filters) => Boolean(f.niche || f.platform || f.size || f.min || f.country);
+
+function parseDays(s: string): number | null {
+  const m = s.match(/(\d{1,2})\s*(?:days?|jours?|j\b|d\b)/);
+  if (m) return Math.max(2, Math.min(90, Number(m[1])));
+  if (/two weeks|2 weeks|fortnight|2 semaines|deux semaines|15 jours|quinzaine/.test(s)) return 14;
+  if (/\bweek|semaine|\bhebdo/.test(s)) return 7;
+  if (/quarter|trimestre|3 months|3 mois|trois mois/.test(s)) return 90;
+  if (/\bmonth|\bmois\b|mensuel/.test(s)) return 30;
+  return null;
+}
+
+function parseCampaign(q: string, s: string, filters: Filters): Intent {
+  const pct = s.match(/(\d{1,2})\s*%/);
+  const commission = pct ? Math.max(5, Math.min(40, Number(pct[1]))) : 15;
+  let name: string | null = null;
+  if (/black friday/.test(s)) name = "Black Friday";
+  else {
+    const m = q.match(
+      /(?:campaign|campagne)\s+(?:for|about|called|named|on|around|pour|sur|nommée|nommee|appelée|appelee|autour de)\s+(?:(?:the|a|an|our|my|la|le|les|un|une|notre|nos|mon|ma|mes)\s+|l['’])?([^,.!?%\d]{3,40})/i,
+    );
+    if (m) {
+      const raw = m[1].trim().replace(/\s+(with|avec|at|à|a|and|et)$/i, "");
+      name = raw.charAt(0).toUpperCase() + raw.slice(1);
+    }
+  }
+  const product: ProductId = /black friday/.test(s)
+    ? "bundle"
+    : /gift|holiday|christmas|noel|fetes|coffret/.test(s)
+      ? "gift"
+      : /\bspf\b|\bsun|solaire|summer|\bete\b/.test(s)
+        ? "spf"
+        : /night|nuit/.test(s)
+          ? "night"
+          : /\boil\b|huile/.test(s)
+            ? "oil"
+            : /serum/.test(s) || name
+              ? "serum"
+              : "gift";
+  return { kind: "campaign", name, product, commission, niche: filters.niche };
+}
+
+function parseAsk(q: string): Intent {
+  const s = norm(q);
+  const filters = parseFilters(s);
+  const days = parseDays(s);
+  const member = namedCreator(s, CREATORS);
+  const anyone = member ?? namedCreator(s, PROSPECTS);
+  if (/\bpay|paiement|\bverser\b|\bregler\b|\bowed\b/.test(s)) return { kind: "pay", id: member?.id ?? null };
+  if (/campaign|campagne|\bbrief\b/.test(s)) return parseCampaign(q, s, filters);
+  const money =
+    /how much|combien|generat|genere|revenue|chiffre|\bca\b|\bsales\b|\bventes?\b|\bsold\b|vendu|\bearn|gagne|\bmade\b|rapporte|\bdrove\b|\borders\b|commandes|performance|dashboard|tableau de bord|\bmost\b|le plus|\bbest\b|meilleur|\btop\b/.test(s);
+  const strongMoney = /how much|combien|generat|genere|revenue|chiffre|rapporte|\bearn/.test(s);
+  if (member && (money || days)) return { kind: "revenue", days: days ?? 30, scope: { kind: "creator", id: member.id } };
+  if (anyone && !hasFilters(filters)) return { kind: "search", filters, ids: [anyone.id] };
+  if (hasFilters(filters)) {
+    return strongMoney ? { kind: "revenue", days: days ?? 30, scope: { kind: "group", filters } } : { kind: "search", filters, ids: null };
+  }
+  if (money || days) return { kind: "revenue", days: days ?? 30, scope: { kind: "all" } };
+  if (/\bfind\b|search|look for|discover|show me|trouve|cherche|montre|creat(?:or|eur|rice)|influenc|\bugc\b/.test(s)) return { kind: "search", filters, ids: null };
+  return { kind: "help" };
+}
+
+// ── Mino: answers from the demo data ──────────────────────────
+function fits(c: Creator, f: Filters): boolean {
+  if (f.niche && !NICHE_GROUPS[f.niche].includes(c.niche)) return false;
+  if (f.platform && c.platform !== f.platform) return false;
+  if (f.size && (c.followers < SIZE_RANGE[f.size][0] || c.followers >= SIZE_RANGE[f.size][1])) return false;
+  if (f.min && c.followers < f.min) return false;
+  if (f.country && c.country !== f.country) return false;
+  return true;
+}
+function closeness(c: Creator, f: Filters): number {
+  let s = 0;
+  if (f.niche && NICHE_GROUPS[f.niche].includes(c.niche)) s += 3;
+  if (f.platform && c.platform === f.platform) s += 2;
+  if (f.size && c.followers >= SIZE_RANGE[f.size][0] && c.followers < SIZE_RANGE[f.size][1]) s += 1.5;
+  if (f.min && c.followers >= f.min) s += 1.5;
+  if (f.country && c.country === f.country) s += 2;
+  return s;
+}
+function searchCreators(f: Filters, ids: string[] | null): { best: Creator[]; close: Creator[] } {
+  const byRevenue = (a: Creator, b: Creator) => b.revenue - a.revenue;
+  if (ids) {
+    const best = ids.map((id) => BY_ID.get(id)).filter((c): c is Creator => Boolean(c));
+    const close = EVERYONE.filter((c) => !ids.includes(c.id) && best.some((b) => b.niche === c.niche || (b.niche !== "Fitness" && NICHE_GROUPS.beauty.includes(b.niche) && NICHE_GROUPS.beauty.includes(c.niche))))
+      .sort(byRevenue)
+      .slice(0, 4);
+    return { best, close };
+  }
+  if (!hasFilters(f)) return { best: [...EVERYONE].sort(byRevenue).slice(0, 6), close: [] };
+  const best = EVERYONE.filter((c) => fits(c, f)).sort(byRevenue).slice(0, 6);
+  const close = EVERYONE.filter((c) => !best.includes(c))
+    .map((c) => ({ c, s: closeness(c, f) }))
+    .filter((x) => x.s >= 2)
+    .sort((a, b) => b.s - a.s || b.c.revenue - a.c.revenue)
+    .slice(0, 4)
+    .map((x) => x.c);
+  return { best, close };
+}
+
+const COMMISSION_RATE = PAYOUT_EARNED / TOTAL_REVENUE;
+const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
+/** Program revenue over the last `days`, consistent with the 7/30/90-day tabs on Home. */
+function periodTotal(days: number): number {
+  if (days <= 7) return (PERIODS[0].total * days) / 7;
+  if (days <= 30) return lerp(PERIODS[0].total, PERIODS[1].total, (days - 7) / 23);
+  return lerp(PERIODS[1].total, PERIODS[2].total, (days - 30) / 60);
+}
+function periodGrowth(days: number): number {
+  const g = days <= 7 ? (PERIODS[0].growth * days) / 7 : days <= 30 ? lerp(PERIODS[0].growth, PERIODS[1].growth, (days - 7) / 23) : lerp(PERIODS[1].growth, PERIODS[2].growth, (days - 30) / 60);
+  return Math.round(g * 10) / 10;
+}
+function scopeCreators(scope: Scope): Creator[] {
+  if (scope.kind === "creator") return [BY_ID.get(scope.id) ?? CREATORS[0]];
+  if (scope.kind === "group") {
+    const group = CREATORS.filter((c) => fits(c, { ...scope.filters, size: null, min: null }));
+    return group.length ? group : CREATORS;
+  }
+  return CREATORS;
+}
+function revenueView(days: number, scope: Scope) {
+  const list = scopeCreators(scope);
+  const factor = periodTotal(days) / TOTAL_REVENUE;
+  const whole = scope.kind === "all";
+  const target = whole ? periodTotal(days) : list.reduce((s, c) => s + c.revenue, 0) * factor;
+  const orders = Math.round((whole ? TOTAL_SALES : list.reduce((s, c) => s + c.sales, 0)) * factor);
+  const series = revenueDays(days, target, days + (list[0].id.charCodeAt(0) % 7));
+  const total = series.reduce((s, v) => s + v, 0);
+  const growth = whole ? periodGrowth(days) : Math.round(periodGrowth(days) * (0.55 + list[0].engagement / 20) * 10) / 10;
+  const top = [...list]
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5)
+    .map((c) => ({ c, value: c.revenue * factor }));
+  const bestIndex = series.reduce((bi, v, i) => (v > series[bi] ? i : bi), 0);
+  return { list, total, orders, commission: total * COMMISSION_RATE, growth, series, top, bestIndex };
+}
+
+function recentSales(c: Creator) {
+  const basket = c.revenue / Math.max(1, c.sales);
+  const camps = CAMPAIGNS.filter((x) => x.crew.includes(c.id));
+  return [1.4, 0.9, 2.1, 1.15].map((k, i) => ({
+    amount: Math.round(basket * k),
+    campaign: camps.length ? camps[i % camps.length].id : "serum",
+    mins: [2, 14, 38, 57][i],
+  }));
+}
+
+function filterTags(f: Filters, lang: Lang): { key: string; icon: ReactNode; label: string }[] {
+  const t = COPY[lang];
+  const fm = FORMAT[lang];
+  const tags: { key: string; icon: ReactNode; label: string }[] = [];
+  if (f.niche) tags.push({ key: "niche", icon: <IconHeart />, label: nicheLabel(NICHE_KEY_LABEL[f.niche], lang) });
+  if (f.platform) tags.push({ key: "platform", icon: <PlatformLogo platform={f.platform} size={12} />, label: f.platform === "tiktok" ? "TikTok" : f.platform === "instagram" ? "Instagram" : "YouTube" });
+  if (f.size) tags.push({ key: "size", icon: <IconUser />, label: t[f.size] });
+  if (f.min) tags.push({ key: "min", icon: <IconUser />, label: t.minFollowers(fm.compact(f.min)) });
+  if (f.country) tags.push({ key: "country", icon: <IconPin />, label: countryName(f.country, lang) });
+  return tags;
+}
+
+type DraftInput = { name: string; product: ProductId; commission: number; crew: string[]; live: boolean };
+type MinoActions = {
+  saved: Set<string>;
+  toggleSave: (id: string) => void;
+  saveMany: (ids: string[]) => void;
+  contacted: Set<string>;
+  contact: (id: string) => void;
+  profile: (id: string) => void;
+  paid: Set<string>;
+  pay: (id: string) => void;
+  payMany: (ids: string[]) => void;
+  launch: (turnId: number, draft: DraftInput) => void;
+  launched: Record<number, "live" | "draft">;
+  go: (page: Page) => void;
+};
+
+const STEP_MS = 420;
+
+/** Milliseconds since mount, ticking until `limit` (instantly past it with reduced motion). */
+function useClock(limit: number): number {
   const [t, setT] = useState(() => (prefersReducedMotion() ? 99_999 : 0));
-  const [saved, setSaved] = useState(false);
-  const results = useMemo(() => minoMatches(query), [query]);
   useEffect(() => {
     if (prefersReducedMotion()) return;
     const start = Date.now();
     const id = window.setInterval(() => {
       const elapsed = Date.now() - start;
       setT(elapsed);
-      if (elapsed > 4200) window.clearInterval(id);
+      if (elapsed > limit) window.clearInterval(id);
     }, 40);
     return () => window.clearInterval(id);
-  }, []);
-  const steps = copy.minoSteps;
-  const scanned = Math.min(1_284_302, Math.round((t / 1500) * 1_284_302));
-  const showResults = t > 1650;
+  }, [limit]);
+  return t;
+}
+
+function stepsFor(intent: Intent, lang: Lang): readonly string[] {
+  const t = COPY[lang];
+  switch (intent.kind) {
+    case "search":
+      return t.minoSteps;
+    case "revenue":
+      return t.revenueSteps;
+    case "pay":
+      return t.paySteps;
+    case "campaign":
+      return t.campaignSteps;
+    default:
+      return t.helpSteps;
+  }
+}
+
+function MinoTurn({ turn, actions, onAsk }: { turn: Turn; actions: MinoActions; onAsk: (q: string) => void }) {
+  const { lang, t: copy, f } = useCopy();
+  const steps = stepsFor(turn.intent, lang);
+  const doneAt = steps.length * STEP_MS + 180;
+  const t = useClock(doneAt + 100);
+  const intent = turn.intent;
+  const orders = useMemo(() => (intent.kind === "revenue" ? revenueView(intent.days, intent.scope).orders : 0), [intent]);
+  const counter =
+    intent.kind === "search" ? { total: 1_284_302, label: copy.scanning } : intent.kind === "revenue" ? { total: orders, label: copy.matching } : null;
   return (
-    <div className="pd-page pd-mino">
+    <section className="pd-turn">
       <div className="pd-mino__me">
-        <span>{query}</span>
+        <span>{turn.q}</span>
         <Face id={OWNER.face} size={28} />
       </div>
       <div className="pd-mino__bot">
@@ -736,71 +1318,896 @@ function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators:
           <MinoCompanion size={26} />
         </span>
         <div className="pd-mino__body">
-          <ul className="pd-mino__steps">
+          <ul className={`pd-mino__steps${t > doneAt ? " is-finished" : ""}`}>
             {steps.map((s, i) => {
-              const done = t > 450 + i * 450;
+              const done = t > STEP_MS + i * STEP_MS;
+              const shown = i === 1 && counter && !done ? counter.label(f.int(Math.min(counter.total, Math.round((t / (2 * STEP_MS)) * counter.total)))) : s;
               return (
-                <li key={s} className={done ? "is-done" : t > i * 450 ? "is-active" : ""}>
+                <li key={s} className={done ? "is-done" : t > i * STEP_MS ? "is-active" : ""}>
                   <span className="pd-mino__tick">{done ? <IconCheck size={11} /> : null}</span>
-                  {i === 1 && !done ? copy.scanning(f.int(scanned)) : s}
+                  {shown}
                 </li>
               );
             })}
           </ul>
-          {showResults ? (
-            <>
-              <p className="pd-mino__answer">{copy.minoAnswer(results.length, f.money(results.reduce((s, c) => s + c.revenue, 0)))}</p>
-              <div className="pd-mino__grid">
-                {results.map((c, i) => (
-                  <article key={c.id} className="pd-mcard" style={{ animationDelay: `${i * 110}ms` }}>
-                    <div className="pd-mcard__media">
-                      <Clip id={c.video} />
-                      <span className="pd-mcard__views">
-                        <IconPlay /> {f.compact(c.avgViews)}
-                      </span>
-                    </div>
-                    <div className="pd-mcard__who">
-                      <Face id={c.face} size={30} />
-                      <span>
-                        <strong>
-                          {c.name} <Verified />
-                        </strong>
-                        <small>
-                          <PlatformLogo platform={c.platform} size={11} /> @{c.handle}
-                        </small>
-                      </span>
-                    </div>
-                    <div className="pd-mcard__stats">
-                      <span>
-                        <b>{f.compact(c.followers)}</b> {copy.followersLower}
-                      </span>
-                      <span>
-                        <b>{f.pct(c.engagement)}</b> {copy.engShort}
-                      </span>
-                      <span className="is-money">
-                        <b>{f.compact(c.revenue, true)}</b> {copy.sold}
-                      </span>
-                    </div>
-                  </article>
-                ))}
-              </div>
-              <div className="pd-mino__actions">
-                <button type="button" className={`pd-btn is-primary${saved ? " is-done" : ""}`} onClick={() => setSaved(true)}>
-                  {saved ? (
-                    <>
-                      <IconCheck /> {copy.savedToList}
-                    </>
-                  ) : (
-                    copy.saveAll(results.length)
-                  )}
-                </button>
-                <button type="button" className="pd-btn" onClick={onOpenCreators}>
-                  {copy.openInCreators}
-                </button>
-              </div>
-            </>
+          {t > doneAt ? (
+            <div className="pd-answer">
+              {intent.kind === "search" ? <SearchAnswer intent={intent} actions={actions} /> : null}
+              {intent.kind === "revenue" ? <RevenueAnswer intent={intent} actions={actions} /> : null}
+              {intent.kind === "pay" ? <PayAnswer intent={intent} actions={actions} /> : null}
+              {intent.kind === "campaign" ? <CampaignAnswer turnId={turn.id} intent={intent} actions={actions} /> : null}
+              {intent.kind === "help" ? <HelpAnswer onAsk={onAsk} /> : null}
+            </div>
           ) : null}
         </div>
+      </div>
+    </section>
+  );
+}
+
+// Creator search: profiles with playing videos, save / contact / profile.
+function SearchAnswer({ intent, actions }: { intent: Extract<Intent, { kind: "search" }>; actions: MinoActions }) {
+  const { lang, t, f } = useCopy();
+  const { best, close } = useMemo(() => searchCreators(intent.filters, intent.ids), [intent]);
+  const tags = filterTags(intent.filters, lang);
+  const [flash, setFlash] = useState<{ id: string; on: boolean; key: number } | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    const timer = window.setTimeout(() => setFlash(null), 1900);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
+  const save = (id: string) => {
+    setFlash({ id, on: !actions.saved.has(id), key: Date.now() });
+    actions.toggleSave(id);
+  };
+  const main = best.length ? best : close;
+  const others = best.length ? close : [];
+  const what = tags.length ? <b>{tags.map((x) => x.label).join(" · ")}</b> : null;
+  const allSaved = main.every((c) => actions.saved.has(c.id));
+  const single = intent.ids && best[0];
+
+  return (
+    <>
+      <p className="pd-mino__answer">
+        {single
+          ? t.profileAnswer(best[0].name, f.compact(best[0].followers), f.compact(best[0].revenue, true))
+          : best.length
+            ? t.found(best.length, what, f.money(best.reduce((s, c) => s + c.revenue, 0)))
+            : t.noExact(what)}
+      </p>
+      {tags.length ? (
+        <div className="pd-understood">
+          <span>{t.understood}</span>
+          {tags.map((x, i) => (
+            <span key={x.key} className="pd-tag" style={{ animationDelay: `${i * 70}ms` }}>
+              {x.icon}
+              {x.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="pd-sec-head">
+        <strong>{t.bestMatches}</strong>
+        <span>{main.length}</span>
+      </div>
+      <div className="pd-rgrid">
+        {main.map((c, i) => {
+          const isSaved = actions.saved.has(c.id);
+          const isContacted = actions.contacted.has(c.id);
+          return (
+            <article key={c.id} className="pd-rcard" style={{ animationDelay: `${i * 110}ms` }}>
+              <button type="button" className="pd-rcard__media" onClick={() => actions.profile(c.id)} aria-label={`${t.viewProfile} · ${c.name}`}>
+                <Clip id={c.video} />
+                <span className={`pd-rcard__badge${IN_PROGRAM.has(c.id) ? " is-member" : ""}`}>{IN_PROGRAM.has(c.id) ? t.inProgram : t.newTag}</span>
+                <span className="pd-mcard__views">
+                  <IconPlay /> {f.compact(c.avgViews)}
+                </span>
+              </button>
+              <div className="pd-rcard__who">
+                <Face id={c.face} size={40} ring />
+                <span>
+                  <strong>
+                    {c.name} <Verified />
+                  </strong>
+                  <small>
+                    <PlatformLogo platform={c.platform} size={11} /> @{c.handle} · {nicheLabel(c.niche, lang)} · {c.country}
+                  </small>
+                </span>
+              </div>
+              <div className="pd-ccard__stats pd-rcard__stats">
+                <span>
+                  <b>{f.compact(c.followers)}</b>
+                  <small>{t.followers}</small>
+                </span>
+                <span>
+                  <b>{f.pct(c.engagement)}</b>
+                  <small>{t.engagement}</small>
+                </span>
+                <span className="is-money">
+                  <b>{f.compact(c.revenue, true)}</b>
+                  <small>{t.salesDriven}</small>
+                </span>
+              </div>
+              <div className="pd-rcard__actions">
+                <button type="button" className={`pd-btn is-icon${isSaved ? " is-saved" : ""}`} aria-pressed={isSaved} aria-label={isSaved ? t.saved : t.save} onClick={() => save(c.id)}>
+                  <IconHeart />
+                </button>
+                <button type="button" className={`pd-btn is-primary is-grow${isContacted ? " is-done" : ""}`} onClick={() => actions.contact(c.id)}>
+                  {isContacted ? (
+                    <>
+                      <IconCheck /> {t.contacted}
+                    </>
+                  ) : (
+                    <>
+                      <IconMail /> {t.contact}
+                    </>
+                  )}
+                </button>
+                <button type="button" className="pd-btn" onClick={() => actions.profile(c.id)}>
+                  {t.profileShort}
+                </button>
+              </div>
+              {flash?.id === c.id ? (
+                <span key={flash.key} className={`pd-flash${flash.on ? "" : " is-off"}`} role="status">
+                  {flash.on ? <IconCheck size={12} /> : null} {flash.on ? t.savedOne : t.removedOne}
+                </span>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+      {others.length ? (
+        <>
+          <div className="pd-sec-head">
+            <strong>{t.closeMatches}</strong>
+            <span>{others.length}</span>
+          </div>
+          <div className="pd-rrows">
+            {others.map((c, i) => {
+              const isSaved = actions.saved.has(c.id);
+              return (
+                <div key={c.id} className="pd-rrow" style={{ animationDelay: `${300 + i * 80}ms` }}>
+                  <button type="button" className="pd-rrow__who" onClick={() => actions.profile(c.id)}>
+                    <Face id={c.face} size={34} />
+                    <span>
+                      <strong>{c.name}</strong>
+                      <small>
+                        <PlatformLogo platform={c.platform} size={10} /> @{c.handle} · {nicheLabel(c.niche, lang)} · {c.country}
+                      </small>
+                    </span>
+                  </button>
+                  <span className="pd-rrow__num">
+                    <b>{f.compact(c.followers)}</b>
+                    <small>{t.followersLower}</small>
+                  </span>
+                  <span className="pd-rrow__num is-money">
+                    <b>{f.compact(c.revenue, true)}</b>
+                    <small>{t.sold}</small>
+                  </span>
+                  <button type="button" className={`pd-btn is-icon is-sm${isSaved ? " is-saved" : ""}`} aria-pressed={isSaved} aria-label={isSaved ? t.saved : t.save} onClick={() => save(c.id)}>
+                    <IconHeart />
+                  </button>
+                  <button type="button" className="pd-btn is-sm" onClick={() => actions.contact(c.id)}>
+                    {actions.contacted.has(c.id) ? <IconCheck size={12} /> : <IconMail />}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+      <div className="pd-mino__actions">
+        <button type="button" className={`pd-btn is-primary${allSaved ? " is-done" : ""}`} onClick={() => actions.saveMany(main.map((c) => c.id))}>
+          {allSaved ? (
+            <>
+              <IconCheck /> {t.savedToList}
+            </>
+          ) : (
+            t.saveAll(main.length)
+          )}
+        </button>
+        <button type="button" className="pd-btn" onClick={() => actions.go("discovery")}>
+          {t.openInCreators}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// Revenue: a small animated dashboard, for the program, a niche or one creator.
+function RevenueAnswer({ intent, actions }: { intent: Extract<Intent, { kind: "revenue" }>; actions: MinoActions }) {
+  const { lang, t, f } = useCopy();
+  const v = useMemo(() => revenueView(intent.days, intent.scope), [intent]);
+  const days = intent.days;
+  const creator = intent.scope.kind === "creator" ? v.list[0] : null;
+  const leader = v.top[0];
+  const period = t.periodPhrase(days);
+  const groupLabel = intent.scope.kind === "group" ? filterTags({ ...intent.scope.filters, size: null, min: null }, lang).map((x) => x.label).join(" · ") : "";
+  const who = intent.scope.kind === "group" && groupLabel ? t.yourGroup(groupLabel) : t.yourCreators;
+  const newcomers = NEWCOMERS.filter((n) => n.daysAgo < days);
+  const newCount = Math.max(newcomers.length, Math.round((86 * days) / 30));
+  const featured = creator ?? leader.c;
+  const camps = creator ? CAMPAIGNS.filter((c) => c.crew.includes(creator.id)) : [];
+  const campWeight = camps.reduce((s, c) => s + c.revenue, 0) || 1;
+  const owed = creator && !actions.paid.has(creator.id) ? creator.owed : 0;
+  const first = (c: Creator) => c.name.split(" ")[0];
+
+  return (
+    <>
+      <p className="pd-mino__answer">
+        {creator
+          ? t.creatorRevenue(creator.name, f.money(v.total), period, f.int(v.orders), f.pct(v.growth))
+          : t.programRevenue(who, f.money(v.total), period, f.int(v.orders), leader.c.name, f.money(leader.value))}
+      </p>
+      <div className="pd-dash">
+        <header className="pd-dash__head">
+          {creator ? (
+            <button type="button" className="pd-dash__who" onClick={() => actions.profile(creator.id)}>
+              <Face id={creator.face} size={40} ring />
+              <span>
+                <strong>
+                  {creator.name} <Verified />
+                </strong>
+                <small>
+                  <PlatformLogo platform={creator.platform} size={11} /> @{creator.handle} · {nicheLabel(creator.niche, lang)}
+                </small>
+              </span>
+            </button>
+          ) : (
+            <span className="pd-dash__who">
+              <Stack ids={v.top.slice(0, 4).map((x) => x.c.id)} size={30} />
+              <span>
+                <strong>{who}</strong>
+                <small>{t.creatorsCount(f.int(intent.scope.kind === "all" ? 1_284 : v.list.length))}</small>
+              </span>
+            </span>
+          )}
+          <span className="pd-dash__period">
+            <i className="pd-live-dot" aria-hidden /> {t.periodTag(days)}
+          </span>
+        </header>
+
+        <div className="pd-kpis">
+          <div className="pd-kpi is-accent" style={{ animationDelay: "0ms" }}>
+            <span>{t.revenue}</span>
+            <b>
+              <CountUp value={v.total} format={f.money} />
+            </b>
+            <small>{t.vsPrev(f.pct(v.growth))}</small>
+          </div>
+          <div className="pd-kpi" style={{ animationDelay: "80ms" }}>
+            <span>{t.ordersTitle}</span>
+            <b>
+              <CountUp value={v.orders} format={f.int} delayMs={120} />
+            </b>
+            <small>{t.avgBasket(f.money(v.total / Math.max(1, v.orders)))}</small>
+          </div>
+          <div className="pd-kpi" style={{ animationDelay: "160ms" }}>
+            <span>{t.commission}</span>
+            <b>
+              <CountUp value={v.commission} format={f.money} delayMs={240} />
+            </b>
+            <small>{t.ofRevenue(f.pct(Math.round(COMMISSION_RATE * 1000) / 10))}</small>
+          </div>
+          {creator ? (
+            <div className="pd-kpi" style={{ animationDelay: "240ms" }}>
+              <span>{t.engagement}</span>
+              <b>
+                <CountUp value={creator.engagement} format={(n) => f.pct(Math.round(n * 10) / 10)} delayMs={360} />
+              </b>
+              <small>
+                {f.compact(creator.avgViews)} {t.views}
+              </small>
+            </div>
+          ) : (
+            <div className="pd-kpi" style={{ animationDelay: "240ms" }}>
+              <span>{t.newCreatorsTitle}</span>
+              <b>
+                <CountUp value={newCount} format={(n) => `+${f.int(n)}`} delayMs={360} />
+              </b>
+              <span className="pd-stack">
+                {newcomers.slice(0, 4).map((n) => (
+                  <Face key={n.handle} id={n.face} size={20} ring />
+                ))}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <section className="pd-dash__chart">
+          <header>
+            <span>{t.dailyRevenue}</span>
+            <small>{t.bestDay(f.ago(days - 1 - v.bestIndex), f.money(v.series[v.bestIndex]))}</small>
+          </header>
+          <RevenueChart lang={lang} days={v.series} />
+        </section>
+
+        <div className="pd-dash__grid">
+          <section className="pd-dash__card">
+            <header>{creator ? t.byCampaign : t.topCreatorsShort}</header>
+            {creator ? (
+              <ol className="pd-rank">
+                {camps.map((c, i) => {
+                  const value = (v.total * c.revenue) / campWeight;
+                  return (
+                    <li key={c.id} style={{ animationDelay: `${200 + i * 90}ms` }}>
+                      <Photo id={c.cover} w={30} h={30} className="pd-rank__cover" />
+                      <span className="pd-rank__who">
+                        <strong>{campaignName(c, lang)}</strong>
+                        <span className="pd-bar">
+                          <i style={{ ["--w" as string]: `${(c.revenue / campWeight) * 100}%`, animationDelay: `${400 + i * 90}ms` }} />
+                        </span>
+                      </span>
+                      <b>{f.compact(value, true)}</b>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <ol className="pd-rank">
+                {v.top.map(({ c, value }, i) => (
+                  <li key={c.id} style={{ animationDelay: `${200 + i * 90}ms` }}>
+                    <button type="button" className="pd-rank__btn" onClick={() => actions.profile(c.id)}>
+                      <span className="pd-rank__n">{i + 1}</span>
+                      <Face id={c.face} size={30} />
+                      <span className="pd-rank__who">
+                        <strong>
+                          {c.name} <PlatformLogo platform={c.platform} size={10} />
+                        </strong>
+                        <span className="pd-bar">
+                          <i style={{ ["--w" as string]: `${(value / v.top[0].value) * 100}%`, animationDelay: `${400 + i * 90}ms` }} />
+                        </span>
+                      </span>
+                      <b>{f.compact(value, true)}</b>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          {creator || intent.scope.kind === "group" ? (
+            <section className="pd-dash__card pd-dash__video">
+              <header>{t.bestVideo}</header>
+              <button type="button" className="pd-reel pd-dash__reel" onClick={() => actions.profile(featured.id)}>
+                <Clip id={featured.video} />
+                <span className="pd-reel__top">
+                  <IconPlay /> {f.compact(featured.avgViews * 2.4)}
+                </span>
+                <span className="pd-reel__who">
+                  <Face id={featured.face} size={22} ring />@{featured.handle}
+                </span>
+              </button>
+              <ul className="pd-sales">
+                {recentSales(featured)
+                  .slice(0, 3)
+                  .map((s, i) => (
+                    <li key={i} style={{ animationDelay: `${500 + i * 120}ms` }}>
+                      <span>
+                        <b>+{f.money(s.amount)}</b>
+                        <small>{campaignNameById(s.campaign, lang)}</small>
+                      </span>
+                      <small>{t.minAgo(s.mins)}</small>
+                    </li>
+                  ))}
+              </ul>
+            </section>
+          ) : (
+            <section className="pd-dash__card">
+              <header>
+                {t.newCreatorsTitle} <span className="pd-up">{t.joinedCount(newCount)}</span>
+              </header>
+              <ul className="pd-newbies">
+                {newcomers.map((n, i) => (
+                  <li key={n.handle} style={{ animationDelay: `${300 + i * 90}ms` }}>
+                    <Face id={n.face} size={30} />
+                    <span>
+                      <strong>
+                        {n.name} <PlatformLogo platform={n.platform} size={10} />
+                      </strong>
+                      <small>{t.joinedAgo(n.daysAgo)}</small>
+                    </span>
+                    <b>+{f.money(n.firstSales)}</b>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
+      <div className="pd-mino__actions">
+        {creator ? (
+          <>
+            <button type="button" className="pd-btn is-primary" onClick={() => actions.profile(creator.id)}>
+              {t.viewProfile}
+            </button>
+            {creator.owed ? (
+              <button type="button" className={`pd-btn${owed ? "" : " is-done"}`} disabled={!owed} onClick={() => actions.pay(creator.id)}>
+                {owed ? (
+                  <>
+                    <IconWallet size={14} /> {t.payName(first(creator), f.money(owed))}
+                  </>
+                ) : (
+                  <>
+                    <IconCheck /> {t.paidName(first(creator))}
+                  </>
+                )}
+              </button>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <button type="button" className="pd-btn is-primary" onClick={() => actions.go("campaigns")}>
+              {t.openCampaigns}
+            </button>
+            <button type="button" className="pd-btn" onClick={() => actions.go("payouts")}>
+              {t.openPayouts}
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+// Payouts: who is owed, with a working "Pay all".
+function PayAnswer({ intent, actions }: { intent: Extract<Intent, { kind: "pay" }>; actions: MinoActions }) {
+  const { t, f } = useCopy();
+  const rows = useMemo(() => (intent.id ? CREATORS.filter((c) => c.id === intent.id) : [...CREATORS].sort((a, b) => b.owed - a.owed)), [intent.id]);
+  const [more, setMore] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const due = rows.filter((c) => !actions.paid.has(c.id));
+  const owed = due.reduce((s, c) => s + c.owed, 0);
+  const shown = more ? rows : rows.slice(0, 5);
+  const payAll = () => {
+    setPaying(true);
+    window.setTimeout(() => {
+      actions.payMany(due.map((c) => c.id));
+      setPaying(false);
+    }, 900);
+  };
+  return (
+    <>
+      <p className="pd-mino__answer">{owed === 0 ? t.allPaid : intent.id ? t.paySingle(rows[0].name, f.money(owed)) : t.payAnswer(due.length, f.money(owed))}</p>
+      <div className="pd-paylist">
+        {shown.map((c, i) => {
+          const done = actions.paid.has(c.id);
+          return (
+            <div key={c.id} className={`pd-prow${done ? " is-paid" : ""}`} style={{ animationDelay: `${i * 70}ms`, transitionDelay: paying ? "0ms" : `${i * 60}ms` }}>
+              <button type="button" className="pd-who" onClick={() => actions.profile(c.id)}>
+                <Face id={c.face} size={32} />
+                <span>
+                  <strong>{c.name}</strong>
+                  <small>
+                    @{c.handle} · <span className="pd-method">{c.method}</span>
+                  </small>
+                </span>
+              </button>
+              <span className="pd-num">{f.money(done ? 0 : c.owed)}</span>
+              <button type="button" className={`pd-btn is-sm${done ? " is-done" : " is-primary"}`} disabled={done || paying} onClick={() => actions.pay(c.id)}>
+                {done ? (
+                  <>
+                    <IconCheck size={12} /> {t.paid}
+                  </>
+                ) : (
+                  t.pay
+                )}
+              </button>
+            </div>
+          );
+        })}
+        {rows.length > 5 && !more ? (
+          <button type="button" className="pd-paylist__more" onClick={() => setMore(true)}>
+            <Stack ids={rows.slice(5, 9).map((c) => c.id)} size={20} /> {t.showMore(rows.length - 5)}
+          </button>
+        ) : null}
+      </div>
+      <div className="pd-mino__actions">
+        <button type="button" className={`pd-btn is-primary${owed === 0 ? " is-done" : ""}`} disabled={owed === 0 || paying} onClick={payAll}>
+          {owed === 0 ? (
+            <>
+              <IconCheck /> {t.everyonePaid}
+            </>
+          ) : paying ? (
+            <>
+              <span className="pd-spinner" aria-hidden /> {t.paying}
+            </>
+          ) : (
+            <>
+              <IconWallet size={14} /> {t.payAll(f.money(owed))}
+            </>
+          )}
+        </button>
+        <button type="button" className="pd-btn" onClick={() => actions.go("payouts")}>
+          {t.openPayouts}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// Campaign: a draft filled from the text, launchable from the thread.
+function CampaignAnswer({ turnId, intent, actions }: { turnId: number; intent: Extract<Intent, { kind: "campaign" }>; actions: MinoActions }) {
+  const { lang, t, f } = useCopy();
+  const [name, setName] = useState(intent.name ?? (lang === "fr" ? PRODUCTS.find((p) => p.id === intent.product)?.nameFr : PRODUCTS.find((p) => p.id === intent.product)?.name) ?? t.newCampaignName);
+  const [product, setProduct] = useState<ProductId>(intent.product);
+  const [commission, setCommission] = useState(intent.commission);
+  const status = actions.launched[turnId];
+  const p = PRODUCTS.find((x) => x.id === product) ?? PRODUCTS[0];
+  const pool = intent.niche ? CREATORS.filter((c) => NICHE_GROUPS[intent.niche as NicheKey].includes(c.niche)) : [];
+  const crew = (pool.length >= 2 ? pool : CREATORS).slice(0, 4).map((c) => c.id);
+  const launch = (live: boolean) => actions.launch(turnId, { name: name.trim() || t.newCampaignName, product, commission, crew, live });
+  return (
+    <>
+      <p className="pd-mino__answer">{t.campaignAnswer}</p>
+      <div className={`pd-draft${status ? " is-sent" : ""}`}>
+        <div className="pd-draft__cover">
+          <Photo id={p.photo} w={200} h={240} />
+          <span className={`pd-pill is-${status === "live" ? "live" : "draft"}`}>{status === "live" ? t.statusLive : t.statusDraft}</span>
+        </div>
+        <div className="pd-draft__form">
+          <label>
+            <span>{t.campaignNameLabel}</span>
+            <input value={name} onChange={(e) => setName(e.target.value)} disabled={Boolean(status)} />
+          </label>
+          <label>
+            <span>{t.product}</span>
+            <select value={product} onChange={(e) => setProduct(e.target.value as ProductId)} disabled={Boolean(status)}>
+              {PRODUCTS.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {lang === "fr" ? x.nameFr : x.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="pd-draft__row">
+            <div>
+              <span>{t.commission}</span>
+              <div className="pd-stepper">
+                <button type="button" onClick={() => setCommission((c) => Math.max(5, c - 1))} disabled={Boolean(status)} aria-label="-">
+                  −
+                </button>
+                <b>{f.pct(commission)}</b>
+                <button type="button" onClick={() => setCommission((c) => Math.min(40, c + 1))} disabled={Boolean(status)} aria-label="+">
+                  +
+                </button>
+              </div>
+            </div>
+            <div>
+              <span>{t.creatorsToInvite}</span>
+              <Stack ids={crew} size={26} more={`+${f.int(crew.length * 9)}`} />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="pd-mino__actions">
+        {status ? (
+          <>
+            <span className="pd-btn is-done">
+              <IconCheck /> {status === "live" ? t.launched : t.draftSaved}
+            </span>
+            <button type="button" className="pd-btn" onClick={() => actions.go("campaigns")}>
+              {t.viewInCampaigns}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="pd-btn is-primary" onClick={() => launch(true)}>
+              <IconMega /> {t.launch}
+            </button>
+            <button type="button" className="pd-btn" onClick={() => launch(false)}>
+              {t.saveDraft}
+            </button>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+function HelpAnswer({ onAsk }: { onAsk: (q: string) => void }) {
+  const { t } = useCopy();
+  return (
+    <>
+      <p className="pd-mino__answer">{t.helpAnswer}</p>
+      <div className="pd-suggest">
+        {t.helpChips.map((chip, i) => (
+          <button key={chip} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => onAsk(chip)}>
+            <span className="hm-chip__icon">{[CHIP_ICONS[0], CHIP_ICONS[1], CHIP_ICONS[5]][i]}</span>
+            {chip}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function MinoDock({ onAsk, focusKey }: { onAsk: (q: string) => void; focusKey: number }) {
+  const { t } = useCopy();
+  const [text, setText] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusKey) ref.current?.focus({ preventScroll: true });
+  }, [focusKey]);
+  return (
+    <div className="pd-dock">
+      <div className="pd-dock__chips">
+        {t.followUps.map((q) => (
+          <button key={q} type="button" onClick={() => onAsk(q)}>
+            <WsIcon name="sparkle" size={12} /> {q}
+          </button>
+        ))}
+      </div>
+      <form
+        className="mtg-promptbox pd-dock__box"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!text.trim()) return;
+          onAsk(text.trim());
+          setText("");
+        }}
+      >
+        <div className="mtg-promptbox__led" aria-hidden>
+          <span className="mtg-promptbox__led-spin" />
+        </div>
+        <div className="hm-hero__field">
+          <MinoCompanion size={20} />
+          <input ref={ref} value={text} onChange={(e) => setText(e.target.value)} placeholder={t.askFollowUp} aria-label={t.askMino} />
+          <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label={t.sendToMino}>
+            <IconArrowUp />
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function MinoPage({ thread, actions, onAsk, focusKey }: { thread: Turn[]; actions: MinoActions; onAsk: (q: string) => void; focusKey: number }) {
+  const { t } = useCopy();
+  const hostRef = useRef<HTMLDivElement>(null);
+  // A follow-up scrolls the thread (never the landing page) to the new question.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || thread.length < 2) return;
+    const scroller = host.closest(".ws-content") as HTMLElement | null;
+    const turns = host.querySelectorAll<HTMLElement>(".pd-turn");
+    const last = turns[turns.length - 1];
+    if (!scroller || !last) return;
+    // The newest turn gets at least a screen of room, so its question can sit
+    // at the top while the answer builds below it.
+    const dock = host.querySelector<HTMLElement>(".pd-dock");
+    turns.forEach((el) => (el.style.minHeight = ""));
+    last.style.minHeight = `${Math.max(0, scroller.clientHeight - (dock?.offsetHeight ?? 0) - 40)}px`;
+    const box = scroller.getBoundingClientRect();
+    const scale = box.height / (scroller.offsetHeight || 1) || 1;
+    const top = scroller.scrollTop + (last.getBoundingClientRect().top - box.top) / scale - 14;
+    scroller.scrollTo({ top, behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  }, [thread.length]);
+  return (
+    <div className="pd-page pd-mino-page" ref={hostRef}>
+      <div className="pd-mino">
+        {thread.length === 0 ? (
+          <div className="pd-welcome">
+            <div className="hm-hero__mino" aria-hidden>
+              <MinoCompanion size={52} />
+            </div>
+            <h2>{t.minoWelcome}</h2>
+            <p>{t.minoWelcomeSub}</p>
+            <div className="pd-suggest is-center">
+              {t.chips.slice(0, 4).map((chip, i) => (
+                <button key={chip} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => onAsk(chip)}>
+                  <span className="hm-chip__icon">{CHIP_ICONS[i]}</span>
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          thread.map((turn) => <MinoTurn key={turn.id} turn={turn} actions={actions} onAsk={onAsk} />)
+        )}
+      </div>
+      <MinoDock onAsk={onAsk} focusKey={focusKey} />
+    </div>
+  );
+}
+
+// ── Creator profile and contact (overlays inside the demo) ────
+function ProfileDrawer({ id, actions, onClose }: { id: string; actions: MinoActions; onClose: () => void }) {
+  const { lang, t, f } = useCopy();
+  const c = BY_ID.get(id);
+  if (!c) return null;
+  const member = IN_PROGRAM.has(c.id);
+  const isSaved = actions.saved.has(c.id);
+  const women = c.niche === "Fitness" ? 46 + (c.followers % 9) : 66 + (c.followers % 17);
+  const men = Math.round((100 - women) * 0.7);
+  const audience = [women, men, 100 - women - men];
+  const camps = CAMPAIGNS.filter((x) => x.crew.includes(c.id));
+  return (
+    <div className="pd-overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <aside className="pd-drawer" role="dialog" aria-label={c.name}>
+        <button type="button" className="pd-drawer__close" onClick={onClose} aria-label={t.close}>
+          <IconClose />
+        </button>
+        <div className="pd-drawer__hero">
+          <Clip id={c.video} />
+          <span className="pd-reel__top">
+            <IconPlay /> {f.compact(c.avgViews * 2.4)}
+          </span>
+          <div className="pd-drawer__id">
+            <Face id={c.face} size={54} ring />
+            <span>
+              <strong>
+                {c.name} <Verified />
+              </strong>
+              <small>
+                <PlatformLogo platform={c.platform} size={12} /> @{c.handle}
+              </small>
+            </span>
+          </div>
+        </div>
+        <div className="pd-drawer__body">
+          <div className="pd-drawer__tags">
+            <span className="pd-tag">{nicheLabel(c.niche, lang)}</span>
+            <span className="pd-tag">
+              <IconPin /> {countryName(c.country, lang)}
+            </span>
+            <span className={`pd-tag${member ? " is-member" : ""}`}>{member ? t.inProgram : t.notInProgram}</span>
+          </div>
+          <div className="pd-drawer__stats">
+            <span>
+              <b>
+                <CountUp value={c.followers} format={(n) => f.compact(n)} />
+              </b>
+              <small>{t.followers}</small>
+            </span>
+            <span>
+              <b>
+                <CountUp value={c.avgViews} format={(n) => f.compact(n)} />
+              </b>
+              <small>{t.avgViews}</small>
+            </span>
+            <span>
+              <b>{f.pct(c.engagement)}</b>
+              <small>{t.engagement}</small>
+            </span>
+            <span className="is-money">
+              <b>
+                <CountUp value={c.revenue} format={(n) => f.compact(n, true)} />
+              </b>
+              <small>{member ? t.salesDriven : t.soldForBrands}</small>
+            </span>
+          </div>
+          {member ? (
+            <section>
+              <h4>{t.recentSales}</h4>
+              <ul className="pd-sales">
+                {recentSales(c).map((s, i) => (
+                  <li key={i} style={{ animationDelay: `${150 + i * 90}ms` }}>
+                    <span>
+                      <b>+{f.money(s.amount)}</b>
+                      <small>{campaignNameById(s.campaign, lang)}</small>
+                    </span>
+                    <small>{t.minAgo(s.mins)}</small>
+                  </li>
+                ))}
+              </ul>
+              {camps.length ? (
+                <div className="pd-drawer__camps">
+                  {camps.map((x) => (
+                    <span key={x.id} className="pd-tag">
+                      <Photo id={x.cover} w={16} h={16} className="pd-tag__img" /> {campaignName(x, lang)}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+          <section>
+            <h4>{t.audience}</h4>
+            <ul className="pd-audience">
+              {t.audienceRows.map((label, i) => (
+                <li key={label}>
+                  <span>{label}</span>
+                  <span className="pd-bar">
+                    <i style={{ ["--w" as string]: `${audience[i]}%`, animationDelay: `${200 + i * 100}ms` }} />
+                  </span>
+                  <b>{f.pct(audience[i])}</b>
+                </li>
+              ))}
+            </ul>
+            <small className="pd-muted">{t.topCountry(`${countryName(c.country, lang)} · ${f.pct(58 + (c.followers % 21))}`)}</small>
+          </section>
+        </div>
+        <footer className="pd-drawer__foot">
+          <button type="button" className={`pd-btn${isSaved ? " is-saved-text" : ""}`} aria-pressed={isSaved} onClick={() => actions.toggleSave(c.id)}>
+            <IconHeart /> {isSaved ? t.saved : t.save}
+          </button>
+          <button type="button" className={`pd-btn is-primary is-grow${actions.contacted.has(c.id) ? " is-done" : ""}`} onClick={() => actions.contact(c.id)}>
+            {actions.contacted.has(c.id) ? (
+              <>
+                <IconCheck /> {t.contacted}
+              </>
+            ) : (
+              <>
+                <IconMail /> {t.contact}
+              </>
+            )}
+          </button>
+        </footer>
+      </aside>
+    </div>
+  );
+}
+
+function ContactModal({ id, brand, onClose, onSent }: { id: string; brand: string; onClose: () => void; onSent: (id: string) => void }) {
+  const { lang, t } = useCopy();
+  const c = BY_ID.get(id);
+  const product = lang === "fr" ? PRODUCTS[0].nameFr : PRODUCTS[0].name;
+  const [subject, setSubject] = useState(() => t.contactSubject(brand));
+  const [body, setBody] = useState(() => (c ? t.contactBody(c.name.split(" ")[0], brand, nicheLabel(c.niche, lang).toLowerCase(), product) : ""));
+  const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
+  // The shell re-renders on every live sale: keep the timers off its callbacks.
+  const done = useRef({ onSent, onClose });
+  done.current = { onSent, onClose };
+  useEffect(() => {
+    if (state === "sending") {
+      const timer = window.setTimeout(() => setState("sent"), 850);
+      return () => window.clearTimeout(timer);
+    }
+    if (state === "sent") {
+      const timer = window.setTimeout(() => {
+        done.current.onSent(id);
+        done.current.onClose();
+      }, 1100);
+      return () => window.clearTimeout(timer);
+    }
+  }, [state, id]);
+  if (!c) return null;
+  return (
+    <div className="pd-overlay is-center" onMouseDown={(e) => e.target === e.currentTarget && state === "idle" && onClose()}>
+      <div className={`pd-compose${state === "sent" ? " is-sent" : ""}`} role="dialog" aria-label={t.newMessage}>
+        <header>
+          <strong>
+            <IconMail /> {t.newMessage}
+          </strong>
+          <button type="button" className="pd-drawer__close is-inline" onClick={onClose} aria-label={t.close}>
+            <IconClose />
+          </button>
+        </header>
+        <div className="pd-compose__to">
+          <span>{t.to}</span>
+          <Face id={c.face} size={24} />
+          <strong>{c.name}</strong>
+          <small>
+            <PlatformLogo platform={c.platform} size={10} /> @{c.handle} · {t.viaGmail}
+          </small>
+        </div>
+        <label className="pd-compose__subject">
+          <span>{t.subject}</span>
+          <input value={subject} onChange={(e) => setSubject(e.target.value)} disabled={state !== "idle"} />
+        </label>
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} disabled={state !== "idle"} aria-label={t.newMessage} />
+        <footer>
+          <small>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/gmail-logo.svg" alt="" width={14} height={14} /> {t.fromLine("sofia@lumiereskin.com")}
+          </small>
+          <button type="button" className={`pd-btn is-primary${state === "sent" ? " is-done" : ""}`} disabled={state !== "idle"} onClick={() => setState("sending")}>
+            {state === "idle" ? (
+              <>
+                <IconSend /> {t.send}
+              </>
+            ) : state === "sending" ? (
+              <>
+                <span className="pd-spinner" aria-hidden /> {t.sending}
+              </>
+            ) : (
+              <>
+                <IconCheck /> {t.sent}
+              </>
+            )}
+          </button>
+        </footer>
       </div>
     </div>
   );
@@ -1056,17 +2463,16 @@ function HomePage({
 // ── Creators ──────────────────────────────────────────────────
 const PRESET_IDS = ["all", "sellers", "viral", "gems", "ready"] as const;
 
-function DiscoveryPage() {
+function DiscoveryPage({ saved, onToggleSave, onProfile }: { saved: Set<string>; onToggleSave: (id: string) => void; onProfile: (id: string) => void }) {
   const { lang, t, f } = useCopy();
   const [q, setQ] = useState("");
   const [preset, setPreset] = useState<(typeof PRESET_IDS)[number]>("all");
   const [platform, setPlatform] = useState<PlatformName | "all">("all");
   const [mode, setMode] = useState<"creators" | "videos">("creators");
-  const [saved, setSaved] = useState<Set<string>>(() => new Set(["luna"]));
   const [invited, setInvited] = useState<Set<string>>(() => new Set());
 
   const list = useMemo(() => {
-    let l = CREATORS.filter((c) => platform === "all" || c.platform === platform);
+    let l = EVERYONE.filter((c) => platform === "all" || c.platform === platform);
     const s = q.trim().toLowerCase();
     if (s) l = l.filter((c) => `${c.name} ${c.handle} ${c.niche} ${nicheLabel(c.niche, lang)} ${c.country}`.toLowerCase().includes(s));
     if (preset === "sellers") l = [...l].sort((a, b) => b.revenue - a.revenue);
@@ -1141,7 +2547,7 @@ function DiscoveryPage() {
         <div className="pd-cgrid" key={`${preset}-${platform}`}>
           {list.map((c, i) => (
             <article key={c.id} className="pd-ccard" style={{ animationDelay: `${i * 60}ms` }}>
-              <div className="pd-ccard__media">
+              <div className="pd-ccard__media" onClick={() => onProfile(c.id)}>
                 <Clip id={c.video} />
                 <span className="pd-ccard__niche">{nicheLabel(c.niche, lang)}</span>
                 <span className="pd-ccard__views">
@@ -1174,7 +2580,7 @@ function DiscoveryPage() {
                 </span>
               </div>
               <div className="pd-ccard__actions">
-                <button type="button" className={`pd-btn is-icon${saved.has(c.id) ? " is-saved" : ""}`} aria-pressed={saved.has(c.id)} aria-label={t.save} onClick={() => setSaved((s) => toggle(s, c.id))}>
+                <button type="button" className={`pd-btn is-icon${saved.has(c.id) ? " is-saved" : ""}`} aria-pressed={saved.has(c.id)} aria-label={t.save} onClick={() => onToggleSave(c.id)}>
                   <IconHeart />
                 </button>
                 <button type="button" className={`pd-btn is-primary is-grow${invited.has(c.id) ? " is-done" : ""}`} onClick={() => setInvited((s) => toggle(s, c.id))}>
@@ -1235,7 +2641,7 @@ function ListsPage({ onOpen }: { onOpen: () => void }) {
 // ── Campaigns ─────────────────────────────────────────────────
 function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; onCreate: () => void; fresh: string | null }) {
   const { lang, t, f } = useCopy();
-  const [tab, setTab] = useState<"active" | "gifting" | "drafts">("active");
+  const [tab, setTab] = useState<"active" | "gifting" | "drafts">(() => (campaigns.find((c) => c.id === fresh)?.status === "draft" ? "drafts" : "active"));
   const [open, setOpen] = useState<string | null>("serum");
   const shown = campaigns.filter((c) => (tab === "active" ? c.status === "live" : tab === "gifting" ? c.status === "gifting" : c.status === "draft"));
   const live = campaigns.filter((c) => c.status !== "draft");
@@ -1592,8 +2998,16 @@ export function PremiumWorkspaceDemo() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [minoQuery, setMinoQuery] = useState(t.chats[0]);
-  const [minoKey, setMinoKey] = useState(0);
+  const [thread, setThread] = useState<Turn[]>([]);
+  const [threadKey, setThreadKey] = useState(0);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [dockFocus, setDockFocus] = useState(0);
+  const turnSeq = useRef(0);
+  const [saved, setSaved] = useState<Set<string>>(() => new Set(["luna"]));
+  const [contacted, setContacted] = useState<Set<string>>(() => new Set());
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [contactId, setContactId] = useState<string | null>(null);
+  const [launched, setLaunched] = useState<Record<number, "live" | "draft">>({});
   const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS);
   const [fresh, setFresh] = useState<string | null>(null);
   const [paid, setPaid] = useState<Set<string>>(() => new Set());
@@ -1606,17 +3020,73 @@ export function PremiumWorkspaceDemo() {
 
   const go = (next: Page) => {
     lastPage.current[PAGE_RAIL[next]] = next;
+    const scroller = rootRef.current?.querySelector<HTMLElement>(".ws-content");
+    if (scroller) scroller.scrollTop = 0;
     setPage(next);
     setSearchOpen(false);
   };
 
-  const ask = (q: string) => {
-    const s = q.toLowerCase();
-    if (/\bpay\b|payout|\bpayer\b|paiement/.test(s)) return go("payouts");
-    if (/campaign|campagne/.test(s)) return createCampaign();
-    setMinoQuery(q);
-    setMinoKey((k) => k + 1);
+  /** Starts a new Mino chat, or continues the open one when `followUp`. */
+  const ask = (q: string, followUp = false) => {
+    const text = q.trim();
+    if (!text) return;
+    turnSeq.current += 1;
+    const turn: Turn = { id: turnSeq.current, q: text, intent: parseAsk(text) };
+    setProfileId(null);
+    setContactId(null);
+    if (followUp && page === "mino" && thread.length) {
+      setThread((list) => [...list, turn]);
+      return;
+    }
+    setThread([turn]);
+    setThreadKey((k) => k + 1);
+    if (!COPY.en.chats.includes(text) && !COPY.fr.chats.includes(text)) setRecent((r) => [text, ...r.filter((x) => x !== text)].slice(0, 3));
     go("mino");
+  };
+  const followUp = (q: string) => ask(q, true);
+
+  const newChat = () => {
+    setThread([]);
+    setThreadKey((k) => k + 1);
+    setDockFocus((n) => n + 1);
+    go("mino");
+  };
+
+  const launchCampaign = (turnId: number, d: DraftInput) => {
+    const id = `new-${Date.now()}`;
+    const now = new Date();
+    const p = PRODUCTS.find((x) => x.id === d.product) ?? PRODUCTS[0];
+    setCampaigns((list) => [
+      { id, name: d.name, nameFr: d.name, cover: p.photo, status: d.live ? "live" : "draft", started: d.live ? [now.getMonth() + 1, now.getDate()] : null, revenue: 0, sales: 0, creators: d.crew.length, conversion: 0, crew: d.crew, trend: [] },
+      ...list,
+    ]);
+    setFresh(id);
+    setLaunched((m) => ({ ...m, [turnId]: d.live ? "live" : "draft" }));
+  };
+
+  const toggle = (set: Set<string>, id: string) => {
+    const next = new Set(set);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  };
+
+  const actions: MinoActions = {
+    saved,
+    toggleSave: (id) => setSaved((s) => toggle(s, id)),
+    saveMany: (ids) => setSaved((s) => new Set([...s, ...ids])),
+    contacted,
+    contact: (id) => setContactId(id),
+    profile: (id) => setProfileId(id),
+    paid,
+    pay: (id) => setPaid((s) => new Set(s).add(id)),
+    payMany: (ids) => setPaid((s) => new Set([...s, ...ids])),
+    launch: launchCampaign,
+    launched,
+    go: (p) => {
+      setProfileId(null);
+      go(p);
+    },
   };
 
   const createCampaign = () => {
@@ -1674,6 +3144,8 @@ export function PremiumWorkspaceDemo() {
         setBrandOpen(false);
         setProfileOpen(false);
         setSearchOpen(false);
+        setProfileId(null);
+        setContactId(null);
       }
     };
     document.addEventListener("mousedown", onDoc);
@@ -1789,9 +3261,28 @@ export function PremiumWorkspaceDemo() {
               onFocus={() => {
                 if (search.trim()) setSearchOpen(true);
               }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || !search.trim()) return;
+                e.preventDefault();
+                const q = search.trim();
+                setSearch("");
+                setSearchOpen(false);
+                ask(q);
+              }}
             />
             <span className="ws-search-kbd">⌘K</span>
-            <button type="button" className="ws-ai-pill" onClick={() => go("home")}>
+            <button
+              type="button"
+              className="ws-ai-pill"
+              onClick={() => {
+                const q = search.trim();
+                setSearch("");
+                setSearchOpen(false);
+                if (q) return ask(q);
+                setDockFocus((n) => n + 1);
+                go("mino");
+              }}
+            >
               <WsIcon name="sparkle" size={16} />
               <span>Ask Mino</span>
             </button>
@@ -1893,17 +3384,17 @@ export function PremiumWorkspaceDemo() {
               <div className="ws-sidebar__body">
                 {rail === "home" ? (
                   <>
-                    <button type="button" className="ws-sidebar__link ws-spaces-new" onClick={() => go("home")}>
+                    <button type="button" className="ws-sidebar__link ws-spaces-new" onClick={newChat}>
                       <WsIcon name="plus" size={15} />
                       <span>{t.newChat}</span>
                     </button>
                     <div className="ws-sidebar__section">
                       <div className="ws-sidebar__section-label">{t.chatsLabel}</div>
-                      {t.chats.map((c) => (
+                      {[...recent, ...t.chats].slice(0, 6).map((c) => (
                         <button
                           key={c}
                           type="button"
-                          className={`ws-sidebar__link${page === "mino" && minoQuery === c ? " is-active" : ""}`}
+                          className={`ws-sidebar__link${page === "mino" && thread[0]?.q === c ? " is-active" : ""}`}
                           onClick={() => ask(c)}
                         >
                           <WsIcon name="sparkle" size={15} />
@@ -1944,10 +3435,10 @@ export function PremiumWorkspaceDemo() {
 
             <div className="ws-main">
               <div className="ws-content pd-content">
-                <div className="pd-view" key={page === "mino" ? `mino-${minoKey}` : page}>
+                <div className={`pd-view${page === "mino" ? " is-mino" : ""}`} key={page === "mino" ? `mino-${threadKey}` : page}>
                   {page === "home" ? <HomePage revenue={live.revenue} sales={live.sales} onAsk={ask} onGo={go} typing={inView} /> : null}
-                  {page === "mino" ? <MinoResults query={minoQuery} onOpenCreators={() => go("discovery")} /> : null}
-                  {page === "discovery" ? <DiscoveryPage /> : null}
+                  {page === "mino" ? <MinoPage thread={thread} actions={actions} onAsk={followUp} focusKey={dockFocus} /> : null}
+                  {page === "discovery" ? <DiscoveryPage saved={saved} onToggleSave={actions.toggleSave} onProfile={actions.profile} /> : null}
                   {page === "lists" ? <ListsPage onOpen={() => go("discovery")} /> : null}
                   {page === "campaigns" ? <CampaignsPage campaigns={campaigns} onCreate={createCampaign} fresh={fresh} /> : null}
                   {page === "content" ? <ContentPage /> : null}
@@ -1978,6 +3469,10 @@ export function PremiumWorkspaceDemo() {
                     <img src="/shopify-logo.svg" alt="" width={16} height={16} />
                   </span>
                 </div>
+              ) : null}
+              {profileId ? <ProfileDrawer key={`profile-${profileId}`} id={profileId} actions={actions} onClose={() => setProfileId(null)} /> : null}
+              {contactId ? (
+                <ContactModal key={`contact-${contactId}`} id={contactId} brand={current.name} onClose={() => setContactId(null)} onSent={(id) => setContacted((s) => new Set(s).add(id))} />
               ) : null}
             </div>
           </div>
