@@ -262,8 +262,8 @@ html:has(.hp-page) {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 640px;
-  max-width: 640px;
+  width: auto;
+  max-width: 100%;
 }
 
 .hp-points li {
@@ -828,6 +828,41 @@ html:has(.hp-page) {
 
 .hp-wb__note.is-green {
   background: #86efac;
+}
+
+/* Tablets and small laptops: the side column is too narrow for the
+   dashboard, so the copy sits on top and the dashboard gets the full width. */
+@media (min-width: 721px) and (max-width: 1279px) {
+  .hp-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 40px 40px 0;
+    min-height: auto;
+  }
+
+  .hp-copy {
+    width: auto;
+    max-width: 640px;
+    padding-right: 0;
+  }
+
+  .hp-copy h1 {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .hp-stage {
+    min-height: 520px;
+    height: 66vh;
+    margin-right: -40px;
+  }
+
+  .hp-frame {
+    top: 0;
+    left: 0;
+    right: -24px;
+    bottom: 64px;
+  }
 }
 
 @media (max-width: 720px) {

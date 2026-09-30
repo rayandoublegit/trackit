@@ -1556,7 +1556,7 @@ body:has(.ob-page) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 40px 80px;
-  margin-top: -80px;
+  margin-top: 56px;
   text-align: left;
   max-width: 900px;
   margin-left: auto;

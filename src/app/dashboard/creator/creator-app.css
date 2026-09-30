@@ -15,7 +15,7 @@
   color: var(--ca-text);
   font-family: "InterDisplay", "Inter", system-ui, sans-serif;
   letter-spacing: -.01em;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: calc(132px + env(safe-area-inset-bottom));
 }
 .ca button { font: inherit; color: inherit; cursor: pointer; }
 .ca button:disabled { cursor: default; opacity: .55; }
