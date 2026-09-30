@@ -580,8 +580,8 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
         { id: "draw" as const, label: fr ? "Dessin" : "Draw", shortcut: "D" },
         { id: "shape" as const, label: fr ? "Forme" : "Shape", shortcut: "R" },
         { id: "connector" as const, label: fr ? "Flèche" : "Arrow", shortcut: "A" },
-        { id: "sticky" as const, label: "Sticky", shortcut: "N" },
-        { id: "text" as const, label: "Text", shortcut: "T" },
+        { id: "sticky" as const, label: fr ? "Post-it" : "Sticky", shortcut: "N" },
+        { id: "text" as const, label: fr ? "Texte" : "Text", shortcut: "T" },
       ] as const,
     [fr],
   );
@@ -712,7 +712,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
               {!isMobile ? (
                 <div className="wb-top__hint">
                   {fr
-                    ? "Glisse pour naviguer · molette pour zoomer · espace = main"
+                    ? "Glissez pour naviguer · molette pour zoomer · espace = main"
                     : "Drag to pan · scroll to zoom · space = hand"}
                 </div>
               ) : null}
@@ -809,7 +809,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
             </h3>
             <p>
               {fr
-                ? "Tous les éléments (dessins, notes, formes, texte) seront effacés. Cette action peut être annulée avec Undo."
+                ? "Tous les éléments (dessins, notes, formes, texte) seront effacés. Vous pourrez revenir en arrière avec Annuler."
                 : "All items (drawings, notes, shapes, text) will be cleared. You can undo this with Undo."}
             </p>
             <button type="button" className="wb-reset-modal__primary" onClick={resetBoard}>
@@ -936,7 +936,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
                         placeholder={fr ? "Note…" : "Note…"}
                       />
                     ) : (
-                      <p>{item.text || (fr ? "Double-clique pour écrire" : "Double-click to write")}</p>
+                      <p>{item.text || (fr ? "Double-cliquez pour écrire" : "Double-click to write")}</p>
                     )}
                   </div>
                 );
@@ -977,7 +977,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
                     />
                   ) : (
                     <p style={{ whiteSpace: "pre-wrap", fontFamily }}>
-                      {item.text || (fr ? "Double-clique pour écrire" : "Double-click to write")}
+                      {item.text || (fr ? "Double-cliquez pour écrire" : "Double-click to write")}
                     </p>
                   )}
                 </div>
@@ -1145,7 +1145,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
         ) : null}
 
         {!toolbarCollapsed ? (
-          <div className="wb-toolbar" role="toolbar" aria-label="Whiteboard tools">
+          <div className="wb-toolbar" role="toolbar" aria-label={fr ? "Outils du whiteboard" : "Whiteboard tools"}>
             {tools.map((t) => (
               <button
                 key={t.id}
@@ -1159,11 +1159,11 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
               </button>
             ))}
             <span className="wb-toolbar__sep" />
-            <button type="button" title="Undo" onClick={undo} disabled={history.length === 0}>
+            <button type="button" title={fr ? "Annuler" : "Undo"} onClick={undo} disabled={history.length === 0}>
               <span className="wb-toolbar__key">⌘Z</span>
               <ToolIcon name="undo" size={22} />
             </button>
-            <button type="button" title="Redo" onClick={redo} disabled={future.length === 0}>
+            <button type="button" title={fr ? "Rétablir" : "Redo"} onClick={redo} disabled={future.length === 0}>
               <ToolIcon name="redo" size={22} />
             </button>
             <button type="button" title={fr ? "Supprimer" : "Delete"} onClick={deleteSelected} disabled={!selectedId}>
@@ -1182,7 +1182,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
           +
         </button>
         <button type="button" onClick={() => setCamera({ x: 0, y: 0, zoom: 1 })}>
-          {fr ? "Reset" : "Reset"}
+          {fr ? "Réinitialiser" : "Reset"}
         </button>
       </div>
     </div>

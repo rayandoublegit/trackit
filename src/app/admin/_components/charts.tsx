@@ -2,12 +2,13 @@
 
 import { useId, useState } from "react";
 import type { DayPoint } from "@/lib/admin-aggregate";
+import { useLang, type Lang } from "@/lib/useLang";
 
 // Small dependency-free SVG charts for the staff console.
 
-function dayLabel(day: string): string {
+function dayLabel(day: string, lang: Lang = "en"): string {
   const d = new Date(`${day}T00:00:00Z`);
-  return d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { day: "numeric", month: "short", timeZone: "UTC" });
 }
 
 export function AreaChart({
@@ -21,6 +22,7 @@ export function AreaChart({
   height?: number;
   color?: string;
 }) {
+  const lang = useLang();
   const gid = `ad-area-${useId().replace(/:/g, "")}`;
   const [hover, setHover] = useState<number | null>(null);
   const w = 600;
@@ -47,7 +49,7 @@ export function AreaChart({
             setHover(Math.max(0, Math.min(series.length - 1, Math.round((x - pad) / (step || 1)))));
           }}
           role="img"
-          aria-label="Daily trend"
+          aria-label={lang === "fr" ? "Tendance quotidienne" : "Daily trend"}
         >
           <defs>
             <linearGradient id={gid} x1="0" x2="0" y1="0" y2="1">
@@ -70,28 +72,29 @@ export function AreaChart({
         ) : null}
         {hover !== null ? (
           <div className="ad-chart__tip" style={{ left: `${(pts[hover][0] / w) * 100}%` }}>
-            <span>{dayLabel(series[hover].day)}</span>
+            <span>{dayLabel(series[hover].day, lang)}</span>
             <strong>{format(series[hover].value)}</strong>
           </div>
         ) : null}
       </div>
       <div className="ad-chart__axis">
-        <span>{dayLabel(series[0].day)}</span>
-        <span>{dayLabel(series[Math.floor(series.length / 2)].day)}</span>
-        <span>{dayLabel(series[series.length - 1].day)}</span>
+        <span>{dayLabel(series[0].day, lang)}</span>
+        <span>{dayLabel(series[Math.floor(series.length / 2)].day, lang)}</span>
+        <span>{dayLabel(series[series.length - 1].day, lang)}</span>
       </div>
     </div>
   );
 }
 
 export function Bars({ series, format, height = 120 }: { series: DayPoint[]; format: (n: number) => string; height?: number }) {
+  const lang = useLang();
   const max = Math.max(1, ...series.map((p) => p.value));
   return (
     <div className="ad-bars" style={{ height }}>
       {series.map((p, i) => (
         <span
           key={p.day}
-          title={`${dayLabel(p.day)} · ${format(p.value)}`}
+          title={`${dayLabel(p.day, lang)} · ${format(p.value)}`}
           style={{ ["--h" as string]: `${Math.max(2, (p.value / max) * 100)}%`, animationDelay: `${i * 18}ms` }}
         />
       ))}
@@ -138,6 +141,7 @@ export function Donut({
   center?: { value: string; label: string };
   labelOf?: (key: string) => string;
 }) {
+  const fr = useLang() === "fr";
   const total = parts.reduce((s, p) => s + p.value, 0);
   const r = 42;
   const c = 2 * Math.PI * r;
@@ -180,7 +184,7 @@ export function Donut({
           <li key={p.key}>
             <i style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
             <span>{labelOf(p.key)}</span>
-            <strong>{total > 0 ? `${Math.round((p.value / total) * 100)}%` : "—"}</strong>
+            <strong>{total > 0 ? `${Math.round((p.value / total) * 100)}${fr ? " %" : "%"}` : "—"}</strong>
           </li>
         ))}
       </ul>
@@ -189,6 +193,7 @@ export function Donut({
 }
 
 export function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
+  const fr = useLang() === "fr";
   const top = Math.max(1, steps[0]?.value ?? 1);
   return (
     <ol className="ad-funnel">
@@ -196,9 +201,9 @@ export function Funnel({ steps }: { steps: { label: string; value: number }[] })
         <li key={s.label} style={{ animationDelay: `${i * 90}ms` }}>
           <div className="ad-funnel__bar" style={{ ["--w" as string]: `${Math.max(4, (s.value / top) * 100)}%` }}>
             <span>{s.label}</span>
-            <strong>{new Intl.NumberFormat("en-US").format(s.value)}</strong>
+            <strong>{new Intl.NumberFormat(fr ? "fr-FR" : "en-US").format(s.value)}</strong>
           </div>
-          {i > 0 ? <small>{steps[i - 1].value > 0 ? `${Math.round((s.value / steps[i - 1].value) * 100)}% of previous step` : "—"}</small> : null}
+          {i > 0 ? <small>{steps[i - 1].value > 0 ? fr ? `${Math.round((s.value / steps[i - 1].value) * 100)} % de l’étape précédente` : `${Math.round((s.value / steps[i - 1].value) * 100)}% of previous step` : "—"}</small> : null}
         </li>
       ))}
     </ol>

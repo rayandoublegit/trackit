@@ -1,0 +1,150 @@
+/* Cookie consent banner — both choices share one style (CNIL: equal prominence). */
+.cc-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  width: min(420px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 18px 18px 16px;
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid #e7e7e7;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(17, 17, 17, 0.14), 0 2px 6px rgba(17, 17, 17, 0.06);
+  font-family: "InstrumentSans", "Inter", system-ui, -apple-system, sans-serif;
+  letter-spacing: -0.01em;
+  animation: cc-in 220ms ease-out;
+}
+
+@keyframes cc-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-banner {
+    animation: none;
+  }
+}
+
+.cc-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.cc-title {
+  margin: 0;
+  font-family: "InterDisplay", "Inter", system-ui, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.cc-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -4px 0 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #7a7a7a;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cc-close:hover {
+  background: #f3f3f3;
+  color: #1a1a1a;
+}
+
+.cc-body {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #4b5563;
+}
+
+.cc-more {
+  color: #0047ff;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cc-current {
+  margin: -6px 0 14px;
+  font-size: 12.5px;
+  color: #7a7a7a;
+}
+
+.cc-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.cc-btn {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #1a1a1a;
+  border-radius: 10px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.cc-btn:hover {
+  background: #333333;
+  border-color: #333333;
+}
+
+.cc-btn:focus-visible,
+.cc-close:focus-visible,
+.cc-more:focus-visible,
+.cc-manage-link:focus-visible {
+  outline: 2px solid #0047ff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .cc-banner {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+  }
+}
+
+/* Footer link that reopens the banner: looks like the surrounding links. */
+.cc-manage-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: inherit;
+  cursor: pointer;
+}
+
+.cc-manage-link:hover {
+  text-decoration: underline;
+}

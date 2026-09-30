@@ -5,16 +5,18 @@ import type { FeedCreator } from "@/lib/discovery-feed";
 import { saveCreator } from "@/lib/workspace-client";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { PlatformLogo, platformKey, platformProfileUrl, PLATFORM_LABEL } from "@/components/PlatformLogo";
+import { useLang } from "@/lib/useLang";
 import { CreatorAvatar } from "./CreatorAvatar";
 import "./mino-search.css";
 
 // Mino's creator search, in two parts: the motion shown while it searches,
 // then the creators as cards that drop in one by one.
 
-function compact(n: number): string {
+function compact(n: number, fr = false): string {
   if (!n) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 100_000 ? 0 : 1)}K`;
+  const dec = (s: string) => (fr ? s.replace(".", ",") : s);
+  if (n >= 1_000_000) return `${dec((n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1))}M`;
+  if (n >= 1_000) return `${dec((n / 1_000).toFixed(n >= 100_000 ? 0 : 1))}K`;
   return String(Math.round(n));
 }
 
@@ -25,7 +27,16 @@ const SEARCH_STEPS = [
   "Ranking the best matches",
 ];
 
+const SEARCH_STEPS_FR = [
+  "Lecture de votre brief",
+  "Parcours du catalogue de créateurs",
+  "Vérification de l’engagement et des vues",
+  "Classement des meilleurs profils",
+];
+
 export function MinoSearchMotion({ label }: { label: string }) {
+  const fr = useLang() === "fr";
+  const steps = fr ? SEARCH_STEPS_FR : SEARCH_STEPS;
   const [step, setStep] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => setStep((s) => Math.min(s + 1, SEARCH_STEPS.length - 1)), 1100);
@@ -39,7 +50,7 @@ export function MinoSearchMotion({ label }: { label: string }) {
           <MinoCompanion size={30} />
         </span>
         <div className="mino-search__title">
-          <strong>Searching creators</strong>
+          <strong>{fr ? "Recherche de créateurs" : "Searching creators"}</strong>
           <span>{label}</span>
         </div>
       </div>
@@ -55,7 +66,7 @@ export function MinoSearchMotion({ label }: { label: string }) {
         ))}
       </div>
       <ol className="mino-search__steps">
-        {SEARCH_STEPS.map((s, i) => (
+        {steps.map((s, i) => (
           <li key={s} className={i < step ? "is-done" : i === step ? "is-on" : ""}>
             <span className="mino-search__tick" aria-hidden />
             {s}
@@ -100,6 +111,7 @@ function CreatorPhoto({ creator, size }: { creator: FeedCreator; size: number })
 type SaveState = "idle" | "saving" | "saved" | "limit" | "error";
 
 function CreatorCard({ creator, index }: { creator: FeedCreator; index: number }) {
+  const fr = useLang() === "fr";
   const [save, setSave] = useState<SaveState>("idle");
   const p = platformKey(creator.platform);
   const verified = creator.authenticityScore >= 60;
@@ -125,7 +137,7 @@ function CreatorCard({ creator, index }: { creator: FeedCreator; index: number }
           <strong>
             {creator.displayName || creator.username}
             {verified ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-label="Verified">
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-label={fr ? "Vérifié" : "Verified"}>
                 <path fill="#0047ff" d="M12 2l2.4 2.1 3.2-.3.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.3L12 22l-2.4-2.1-3.2.3-.9-3.1-2.8-1.6 1-3-1-3 2.8-1.6.9-3.1 3.2.3z" />
                 <path d="M8.5 12.2l2.3 2.3 4.7-4.8" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -149,17 +161,21 @@ function CreatorCard({ creator, index }: { creator: FeedCreator; index: number }
       </div>
       <dl className="mino-card__stats">
         <div>
-          <dt>Followers</dt>
-          <dd>{compact(creator.followersCount)}</dd>
+          <dt>{fr ? "Abonnés" : "Followers"}</dt>
+          <dd>{compact(creator.followersCount, fr)}</dd>
         </div>
         <div>
-          <dt>Avg views</dt>
-          <dd>{compact(creator.avgViews)}</dd>
+          <dt>{fr ? "Vues moy." : "Avg views"}</dt>
+          <dd>{compact(creator.avgViews, fr)}</dd>
         </div>
         <div>
           <dt>Engagement</dt>
           <dd className={creator.engagementRate >= 6 ? "is-hot" : ""}>
-            {creator.engagementRate ? `${creator.engagementRate.toFixed(1)}%` : "—"}
+            {creator.engagementRate
+              ? fr
+                ? `${creator.engagementRate.toFixed(1).replace(".", ",")} %`
+                : `${creator.engagementRate.toFixed(1)}%`
+              : "—"}
           </dd>
         </div>
       </dl>
@@ -170,10 +186,20 @@ function CreatorCard({ creator, index }: { creator: FeedCreator; index: number }
           onClick={() => void onSave()}
           disabled={save === "saving" || save === "saved"}
         >
-          {save === "saved" ? "Saved" : save === "saving" ? "Saving…" : save === "limit" ? "Upgrade to save" : save === "error" ? "Retry" : "Save"}
+          {fr
+            ? save === "saved"
+              ? "Enregistré"
+              : save === "saving"
+                ? "Enregistrement…"
+                : save === "limit"
+                  ? "Passez à l’offre supérieure"
+                  : save === "error"
+                    ? "Réessayer"
+                    : "Enregistrer"
+            : save === "saved" ? "Saved" : save === "saving" ? "Saving…" : save === "limit" ? "Upgrade to save" : save === "error" ? "Retry" : "Save"}
         </button>
         <a className="mino-card__link" href={platformProfileUrl(creator.platform, creator.username)} target="_blank" rel="noreferrer">
-          Profile
+          {fr ? "Profil" : "Profile"}
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden>
             <path d="M7 17L17 7M9 7h8v8" />
           </svg>
@@ -194,20 +220,29 @@ export function MinoCreatorResults({
   sources: string[];
   onOpenCatalog?: () => void;
 }) {
+  const fr = useLang() === "fr";
   if (!creators.length) return null;
   const live = sources.includes("live");
   return (
-    <section className="mino-results" aria-label={`Creators for ${label}`}>
+    <section className="mino-results" aria-label={fr ? `Créateurs pour ${label}` : `Creators for ${label}`}>
       <header className="mino-results__head">
         <div>
           <strong>
-            {creators.length} creator{creators.length > 1 ? "s" : ""}
+            {fr
+              ? `${creators.length} créateur${creators.length > 1 ? "s" : ""}`
+              : <>{creators.length} creator{creators.length > 1 ? "s" : ""}</>}
           </strong>
           <span>{label}</span>
         </div>
         <span className={`mino-results__source${live ? " is-live" : ""}`}>
           <i aria-hidden />
-          {live && sources.includes("catalog") ? "Catalog + live search" : live ? "Live search" : "Trackit catalog"}
+          {fr
+            ? live && sources.includes("catalog")
+              ? "Catalogue + recherche en direct"
+              : live
+                ? "Recherche en direct"
+                : "Catalogue Trackit"
+            : live && sources.includes("catalog") ? "Catalog + live search" : live ? "Live search" : "Trackit catalog"}
         </span>
       </header>
       <div className="mino-results__grid">
@@ -217,7 +252,7 @@ export function MinoCreatorResults({
       </div>
       {onOpenCatalog ? (
         <button type="button" className="mino-results__more" onClick={onOpenCatalog}>
-          Refine in the catalog
+          {fr ? "Affiner dans le catalogue" : "Refine in the catalog"}
           <span aria-hidden>→</span>
         </button>
       ) : null}

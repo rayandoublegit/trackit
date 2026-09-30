@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { NICHE_TREE } from "@/lib/niche-tree";
+import { NICHE_TREE, nicheLabel } from "@/lib/niche-tree";
+import { useLang, type Lang } from "@/lib/useLang";
 import { PlatformLogo } from "@/components/PlatformLogo";
 import type { VideoFilters } from "./VideoLibrary";
 import "./catalog-bar.css";
@@ -206,8 +207,6 @@ const SORTS: { value: CatalogSortKey; label: string }[] = [
   { value: "recent", label: "Latest post" },
 ];
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 type VideoPreset = { id: string; label: string; hint: string; patch: Partial<VideoFilters> };
 const VIDEO_PRESETS: VideoPreset[] = [
   { id: "all", label: "All videos", hint: "Every tracked video", patch: { sort: "views" } },
@@ -245,6 +244,89 @@ const VIDEO_SORTS: Option[] = [
   { value: "recent", label: "Newest" },
   { value: "engagement", label: "Best engagement" },
 ];
+
+// French wording for the option lists above. Values stay the same; only the
+// labels change. Anything missing here falls back to the English label.
+const PRESET_FR: Record<string, { label: string; hint: string }> = {
+  all: { label: "Tous les créateurs", hint: "Tout le catalogue" },
+  gems: { label: "Pépites de la semaine", hint: "10k–100k abonnés, 9 %+ d'engagement, publication dans les 7 derniers jours" },
+  scaling: { label: "En forte croissance", hint: "Croissance d'abonnés et vues gagnées les plus rapides ; la portée départage tant que l'historique se construit" },
+  viral: { label: "Vidéos virales", hint: "500k+ vues en moyenne" },
+  leaders: { label: "Leaders du marché", hint: "500k+ abonnés" },
+  contact: { label: "Prêts à contacter", hint: "Créateurs avec un e-mail connu" },
+  fresh: { label: "Publié cette semaine", hint: "Actifs dans les 7 derniers jours, les plus récents d'abord" },
+};
+const VIDEO_PRESET_FR: Record<string, { label: string; hint: string }> = {
+  all: { label: "Toutes les vidéos", hint: "Toutes les vidéos suivies" },
+  trending: { label: "Tendances", hint: "Le plus de vues gagnées sur les 7 derniers jours" },
+  "viral-week": { label: "Virales cette semaine", hint: "Publiées dans les 7 derniers jours, les plus vues" },
+  newest: { label: "Plus récentes", hint: "Les dernières publications d'abord" },
+  product: { label: "Avec lien produit", hint: "Vidéos qui renvoient vers un produit" },
+  engaging: { label: "Les plus engageantes", hint: "Meilleurs likes, commentaires et partages par vue" },
+};
+const OPTION_FR: Record<string, string> = {
+  "1K – 10K": "1k – 10k",
+  "10K – 100K": "10k – 100k",
+  "100K – 500K": "100k – 500k",
+  "500K+": "500k+",
+  "1K+": "1k+",
+  "10K+": "10k+",
+  "50K+": "50k+",
+  "100K+": "100k+",
+  "1M+": "1 M+",
+  "10M+": "10 M+",
+  "3%+": "3 %+",
+  "6%+": "6 %+",
+  "9%+": "9 %+",
+  "12%+": "12 %+",
+  "25%+ of followers": "25 %+ des abonnés",
+  "50%+ of followers": "50 %+ des abonnés",
+  "100%+ of followers": "100 %+ des abonnés",
+  "200%+ of followers": "200 %+ des abonnés",
+  "United States": "États-Unis",
+  "United Kingdom": "Royaume-Uni",
+  France: "France",
+  Canada: "Canada",
+  Germany: "Allemagne",
+  Spain: "Espagne",
+  Italy: "Italie",
+  Portugal: "Portugal",
+  Brazil: "Brésil",
+  English: "Anglais",
+  French: "Français",
+  Spanish: "Espagnol",
+  German: "Allemand",
+  Italian: "Italien",
+  Portuguese: "Portugais",
+  "Last 7 days": "7 derniers jours",
+  "Last 30 days": "30 derniers jours",
+  "Last 90 days": "90 derniers jours",
+  "Last 12 months": "12 derniers mois",
+  "Most followers": "Plus d'abonnés",
+  "Fastest growing": "Croissance la plus rapide",
+  "Most average views": "Plus de vues en moyenne",
+  "Best engagement": "Meilleur engagement",
+  "Best reach": "Meilleure portée",
+  "Latest post": "Publication la plus récente",
+  Video: "Vidéo",
+  "Photo post": "Publication photo",
+  "Under 15s": "Moins de 15 s",
+  "15s – 60s": "15 s – 60 s",
+  "Over 60s": "Plus de 60 s",
+  "Most viewed": "Les plus vues",
+  "Fastest growing this week": "Croissance la plus rapide cette semaine",
+  Newest: "Plus récentes",
+};
+
+function localizeOptions<T extends { label: string }>(options: T[], lang: Lang): T[] {
+  if (lang !== "fr") return options;
+  return options.map((o) => ({ ...o, label: OPTION_FR[o.label] ?? o.label }));
+}
+
+/** Preset name and hint in the current language. */
+export function catalogPresetText(preset: { id: string; label: string; hint: string }, lang: Lang): { label: string; hint: string } {
+  return lang === "fr" ? PRESET_FR[preset.id] ?? preset : preset;
+}
 
 const ICONS: Record<string, ReactNode> = {
   niche: (
@@ -322,6 +404,7 @@ function FilterPill({
   options: Option[];
   onChange: (v: string) => void;
 }) {
+  const lang = useLang();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = options.find((o) => o.value === value);
@@ -352,13 +435,13 @@ function FilterPill({
         aria-expanded={open}
       >
         <span className="cf-pill__icon">{ICONS[id]}</span>
-        <span className="cf-pill__label">{current ? `${label}: ${current.label}` : label}</span>
+        <span className="cf-pill__label">{current ? `${label}${lang === "fr" ? " : " : ": "}${current.label}` : label}</span>
         {current ? (
           <span
             className="cf-pill__clear"
             role="button"
             tabIndex={0}
-            aria-label={`Clear ${label}`}
+            aria-label={lang === "fr" ? `Effacer ${label}` : `Clear ${label}`}
             onClick={(e) => {
               e.stopPropagation();
               onChange("");
@@ -383,7 +466,7 @@ function FilterPill({
         <div className="cf-pop" role="listbox" aria-label={label}>
           <div className="cf-pop__title">{label}</div>
           <button type="button" role="option" aria-selected={!value} className={`cf-pop__opt${!value ? " is-on" : ""}`} onClick={() => { onChange(""); setOpen(false); }}>
-            Any
+            {lang === "fr" ? "Tous" : "Any"}
           </button>
           {options.map((o) => (
             <button
@@ -468,6 +551,10 @@ export function CatalogFilterBar({
   videoCount: number;
   videoLoading: boolean;
 }) {
+  const lang = useLang();
+  const fr = lang === "fr";
+  const L = <T extends { label: string }>(options: T[]) => localizeOptions(options, lang);
+  const nicheOptions = Object.keys(NICHE_TREE).map((n) => ({ value: n, label: nicheLabel(n, lang) }));
   const [notice, setNotice] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const searchLocked = !isPaid;
@@ -482,7 +569,7 @@ export function CatalogFilterBar({
 
   const pickPlatform = (id: string) => {
     if (id === "youtube") {
-      setNotice("YouTube search is coming soon. TikTok and Instagram are live.");
+      setNotice(fr ? "La recherche YouTube arrive bientôt. TikTok et Instagram sont disponibles." : "YouTube search is coming soon. TikTok and Instagram are live.");
       return;
     }
     if (id === "instagram" && isFree) {
@@ -497,12 +584,20 @@ export function CatalogFilterBar({
     <div className={`cf-bar${isMobile ? " is-mobile" : ""}`}>
       <div className="cf-top">
         <div className="cf-top__title">
-          <h1>Creators</h1>
+          <h1>{fr ? "Créateurs" : "Creators"}</h1>
           <span className="cf-count" aria-live="polite">
             {(mode === "videos" ? videoLoading : loading) ? <i className="cf-bar__dot" aria-hidden /> : null}
             {(mode === "videos" ? videoLoading : loading)
-              ? "Searching"
-              : `${(mode === "videos" ? videoCount : count).toLocaleString("en-US")} ${mode === "videos" ? "videos" : "creators"}`}
+              ? fr
+                ? "Recherche"
+                : "Searching"
+              : fr
+                ? (() => {
+                    const n = mode === "videos" ? videoCount : count;
+                    const noun = mode === "videos" ? (n > 1 ? "vidéos" : "vidéo") : n > 1 ? "créateurs" : "créateur";
+                    return `${n.toLocaleString("fr-FR")} ${noun}`;
+                  })()
+                : `${(mode === "videos" ? videoCount : count).toLocaleString("en-US")} ${mode === "videos" ? "videos" : "creators"}`}
           </span>
         </div>
         <label className={`cf-search${searchLocked ? " is-locked" : ""}`}>
@@ -523,15 +618,21 @@ export function CatalogFilterBar({
             }}
             placeholder={
               mode === "videos"
-                ? "Search video captions, hashtags…"
+                ? fr
+                  ? "Rechercher dans les légendes, hashtags…"
+                  : "Search video captions, hashtags…"
                 : instagram
-                  ? "Search Instagram live: a niche, a name or @handle"
-                  : "Search creators, @handles, emails…"
+                  ? fr
+                    ? "Recherche Instagram en direct : une niche, un nom ou un @pseudo"
+                    : "Search Instagram live: a niche, a name or @handle"
+                  : fr
+                    ? "Rechercher des créateurs, @pseudos, e-mails…"
+                    : "Search creators, @handles, emails…"
             }
-            aria-label="Search creators"
+            aria-label={fr ? "Rechercher des créateurs" : "Search creators"}
           />
           {filters.search ? (
-            <button type="button" className="cf-search__clear" onClick={() => onChange({ search: "" })} aria-label="Clear search">
+            <button type="button" className="cf-search__clear" onClick={() => onChange({ search: "" })} aria-label={fr ? "Effacer la recherche" : "Clear search"}>
               ×
             </button>
           ) : null}
@@ -541,19 +642,19 @@ export function CatalogFilterBar({
             <Svg>
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
             </Svg>
-            My lists
+            {fr ? "Mes listes" : "My lists"}
           </button>
           <button type="button" className="cf-link" onClick={onOpenOutreach}>
             <Svg>
               <path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" />
             </Svg>
-            Outreach
+            {fr ? "Prospection" : "Outreach"}
           </button>
         </div>
       </div>
 
       <div className="cf-presets-row">
-        <div className="cf-presets" role="tablist" aria-label="Ready-made views">
+        <div className="cf-presets" role="tablist" aria-label={fr ? "Vues prêtes à l’emploi" : "Ready-made views"}>
           {mode === "videos"
             ? VIDEO_PRESETS.map((p) => {
                 const on = (videoPreset || "all") === p.id;
@@ -563,11 +664,11 @@ export function CatalogFilterBar({
                     type="button"
                     role="tab"
                     aria-selected={on}
-                    title={p.hint}
+                    title={fr ? VIDEO_PRESET_FR[p.id]?.hint ?? p.hint : p.hint}
                     className={`cf-preset${on ? " is-on" : ""}`}
                     onClick={() => onVideoChange(p.patch, p.id)}
                   >
-                    {p.label}
+                    {fr ? VIDEO_PRESET_FR[p.id]?.label ?? p.label : p.label}
                   </button>
                 );
               })
@@ -579,17 +680,17 @@ export function CatalogFilterBar({
                 type="button"
                 role="tab"
                 aria-selected={on}
-                title={p.hint}
+                title={catalogPresetText(p, lang).hint}
                 className={`cf-preset${on ? " is-on" : ""}`}
                 onClick={() => onPreset(p)}
               >
                 <span className="cf-preset__icon">{p.icon}</span>
-                {p.label}
+                {catalogPresetText(p, lang).label}
               </button>
             );
           })}
         </div>
-        <div className="cf-tabs" role="tablist" aria-label="Platform">
+        <div className="cf-tabs" role="tablist" aria-label={fr ? "Plateforme" : "Platform"}>
           {(["tiktok", "instagram", "youtube"] as const).map((id) => {
             const active = filters.platform === id;
             const soon = id === "youtube";
@@ -605,46 +706,46 @@ export function CatalogFilterBar({
               >
                 <PlatformLogo platform={id} size={16} />
                 {id === "tiktok" ? "TikTok" : id === "instagram" ? "Instagram" : "YouTube"}
-                {soon ? <span className="cf-tab__badge">Soon</span> : null}
+                {soon ? <span className="cf-tab__badge">{fr ? "Bientôt" : "Soon"}</span> : null}
                 {locked ? <span className="cf-tab__badge">Pro</span> : null}
               </button>
             );
           })}
         </div>
       </div>
-      {mode === "creators" && filters.preset && filters.preset !== "all" ? <p className="cf-preset-hint">{preset.hint}</p> : null}
+      {mode === "creators" && filters.preset && filters.preset !== "all" ? <p className="cf-preset-hint">{catalogPresetText(preset, lang).hint}</p> : null}
       {mode === "videos" && videoPreset && videoPreset !== "all" ? (
-        <p className="cf-preset-hint">{VIDEO_PRESETS.find((p) => p.id === videoPreset)?.hint}</p>
+        <p className="cf-preset-hint">{(fr ? VIDEO_PRESET_FR[videoPreset]?.hint : undefined) ?? VIDEO_PRESETS.find((p) => p.id === videoPreset)?.hint}</p>
       ) : null}
 
       <div className="cf-card">
         <div className="cf-card__head">
-          <span className="cf-card__by">Filter by:</span>
-          <div className="cf-mode" role="tablist" aria-label="Show">
+          <span className="cf-card__by">{fr ? "Filtrer par :" : "Filter by:"}</span>
+          <div className="cf-mode" role="tablist" aria-label={fr ? "Afficher" : "Show"}>
             <button type="button" role="tab" aria-selected={mode === "creators"} className={`cf-mode__btn${mode === "creators" ? " is-on" : ""}`} onClick={() => onMode("creators")}>
               <Svg>
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8" />
               </Svg>
-              Creators
+              {fr ? "Créateurs" : "Creators"}
             </button>
             <button type="button" role="tab" aria-selected={mode === "videos"} className={`cf-mode__btn${mode === "videos" ? " is-on" : ""}`} onClick={() => onMode("videos")}>
               <Svg>
                 <rect x="2" y="4" width="20" height="16" rx="3" />
                 <path d="M10 9v6l5-3z" fill="currentColor" />
               </Svg>
-              Videos
+              {fr ? "Vidéos" : "Videos"}
             </button>
           </div>
           {mode === "creators" && activeCount > 0 ? (
             <button type="button" className="cf-reset" onClick={onReset}>
-              Reset filters ({activeCount})
+              {fr ? "Réinitialiser les filtres" : "Reset filters"} ({activeCount})
             </button>
           ) : null}
           <button
             type="button"
             className={`cf-card__fold${filtersOpen ? "" : " is-closed"}`}
             onClick={() => setFiltersOpen((v) => !v)}
-            aria-label={filtersOpen ? "Hide filters" : "Show filters"}
+            aria-label={filtersOpen ? (fr ? "Masquer les filtres" : "Hide filters") : fr ? "Afficher les filtres" : "Show filters"}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>
               <path d="M6 15l6-6 6 6" />
@@ -653,15 +754,15 @@ export function CatalogFilterBar({
         </div>
         {filtersOpen && mode === "videos" ? (
           <div className="cf-card__pills">
-            <FilterPill id="niche" label="Niche" value={videoFilters.niche} options={Object.keys(NICHE_TREE).map((n) => ({ value: n, label: cap(n) }))} onChange={(v) => onVideoChange({ niche: v })} />
-            <FilterPill id="views" label="Views" value={videoFilters.minViews} options={VIDEO_VIEWS} onChange={(v) => onVideoChange({ minViews: v })} />
-            <FilterPill id="activity" label="Posted" value={videoFilters.postedWithin} options={VIDEO_POSTED} onChange={(v) => onVideoChange({ postedWithin: v })} />
-            <FilterPill id="format" label="Format" value={videoFilters.mediaType} options={VIDEO_FORMAT} onChange={(v) => onVideoChange({ mediaType: v })} />
-            <FilterPill id="length" label="Length" value={videoFilters.duration} options={VIDEO_LENGTH} onChange={(v) => onVideoChange({ duration: v })} />
-            <FilterPill id="country" label="Creator country" value={videoFilters.country} options={COUNTRIES} onChange={(v) => onVideoChange({ country: v })} />
-            <FilterPill id="language" label="Language" value={videoFilters.language} options={LANGUAGES} onChange={(v) => onVideoChange({ language: v })} />
+            <FilterPill id="niche" label="Niche" value={videoFilters.niche} options={nicheOptions} onChange={(v) => onVideoChange({ niche: v })} />
+            <FilterPill id="views" label={fr ? "Vues" : "Views"} value={videoFilters.minViews} options={L(VIDEO_VIEWS)} onChange={(v) => onVideoChange({ minViews: v })} />
+            <FilterPill id="activity" label={fr ? "Publiée" : "Posted"} value={videoFilters.postedWithin} options={L(VIDEO_POSTED)} onChange={(v) => onVideoChange({ postedWithin: v })} />
+            <FilterPill id="format" label="Format" value={videoFilters.mediaType} options={L(VIDEO_FORMAT)} onChange={(v) => onVideoChange({ mediaType: v })} />
+            <FilterPill id="length" label={fr ? "Durée" : "Length"} value={videoFilters.duration} options={L(VIDEO_LENGTH)} onChange={(v) => onVideoChange({ duration: v })} />
+            <FilterPill id="country" label={fr ? "Pays du créateur" : "Creator country"} value={videoFilters.country} options={L(COUNTRIES)} onChange={(v) => onVideoChange({ country: v })} />
+            <FilterPill id="language" label={fr ? "Langue" : "Language"} value={videoFilters.language} options={L(LANGUAGES)} onChange={(v) => onVideoChange({ language: v })} />
             <Toggle
-              label="With product link"
+              label={fr ? "Avec lien produit" : "With product link"}
               on={videoFilters.hasProduct}
               onClick={() => onVideoChange({ hasProduct: !videoFilters.hasProduct })}
               icon={
@@ -674,17 +775,17 @@ export function CatalogFilterBar({
         ) : null}
         {filtersOpen && mode === "creators" ? (
           <div className="cf-card__pills">
-            <FilterPill id="niche" label="Niche" value={filters.niche} options={Object.keys(NICHE_TREE).map((n) => ({ value: n, label: cap(n) }))} onChange={(v) => change({ niche: v })} />
-            <FilterPill id="followers" label="Followers" value={filters.followersRange} options={FOLLOWERS} onChange={(v) => change({ followersRange: v })} />
-            <FilterPill id="views" label="Avg views" value={filters.viewsFrom} options={VIEWS} onChange={(v) => change({ viewsFrom: v })} />
-            <FilterPill id="engagement" label="Engagement" value={filters.engagement} options={ENGAGEMENT} onChange={(v) => change({ engagement: v })} />
-            <FilterPill id="reach" label="Reach" value={filters.reach} options={REACH} onChange={(v) => change({ reach: v })} />
-            <FilterPill id="likes" label="Avg likes" value={filters.likes} options={LIKES} onChange={(v) => change({ likes: v })} />
-            <FilterPill id="country" label="Country" value={filters.country} options={COUNTRIES} onChange={(v) => change({ country: v })} />
-            <FilterPill id="language" label="Language" value={filters.language} options={LANGUAGES} onChange={(v) => change({ language: v })} />
-            <FilterPill id="activity" label="Last post" value={filters.activity} options={ACTIVITY} onChange={(v) => change({ activity: v })} />
+            <FilterPill id="niche" label="Niche" value={filters.niche} options={nicheOptions} onChange={(v) => change({ niche: v })} />
+            <FilterPill id="followers" label={fr ? "Abonnés" : "Followers"} value={filters.followersRange} options={L(FOLLOWERS)} onChange={(v) => change({ followersRange: v })} />
+            <FilterPill id="views" label={fr ? "Vues moy." : "Avg views"} value={filters.viewsFrom} options={L(VIEWS)} onChange={(v) => change({ viewsFrom: v })} />
+            <FilterPill id="engagement" label="Engagement" value={filters.engagement} options={L(ENGAGEMENT)} onChange={(v) => change({ engagement: v })} />
+            <FilterPill id="reach" label={fr ? "Portée" : "Reach"} value={filters.reach} options={L(REACH)} onChange={(v) => change({ reach: v })} />
+            <FilterPill id="likes" label={fr ? "Likes moy." : "Avg likes"} value={filters.likes} options={L(LIKES)} onChange={(v) => change({ likes: v })} />
+            <FilterPill id="country" label={fr ? "Pays" : "Country"} value={filters.country} options={L(COUNTRIES)} onChange={(v) => change({ country: v })} />
+            <FilterPill id="language" label={fr ? "Langue" : "Language"} value={filters.language} options={L(LANGUAGES)} onChange={(v) => change({ language: v })} />
+            <FilterPill id="activity" label={fr ? "Dernière publication" : "Last post"} value={filters.activity} options={L(ACTIVITY)} onChange={(v) => change({ activity: v })} />
             <Toggle
-              label="With email"
+              label={fr ? "Avec e-mail" : "With email"}
               on={filters.hasEmail}
               onClick={() => change({ hasEmail: !filters.hasEmail })}
               icon={
@@ -695,7 +796,7 @@ export function CatalogFilterBar({
               }
             />
             <Toggle
-              label="Verified"
+              label={fr ? "Vérifiés" : "Verified"}
               on={filters.verified}
               onClick={() => change({ verified: !filters.verified })}
               icon={
@@ -705,7 +806,7 @@ export function CatalogFilterBar({
               }
             />
             <Toggle
-              label="Hide saved"
+              label={fr ? "Masquer les sauvegardés" : "Hide saved"}
               on={filters.hideSaved}
               onClick={() => change({ hideSaved: !filters.hideSaved })}
               icon={
@@ -715,7 +816,7 @@ export function CatalogFilterBar({
               }
             />
             <Toggle
-              label="Hidden only"
+              label={fr ? "Masqués uniquement" : "Hidden only"}
               on={filters.showHidden}
               onClick={() => change({ showHidden: !filters.showHidden })}
               icon={
@@ -734,16 +835,16 @@ export function CatalogFilterBar({
             <path d="M12 5v14M5 12l7 7 7-7" />
           </svg>
           {mode === "videos" ? (
-            <select value={videoFilters.sort} onChange={(e) => onVideoChange({ sort: e.target.value })} aria-label="Sort videos">
-              {VIDEO_SORTS.map((s) => (
+            <select value={videoFilters.sort} onChange={(e) => onVideoChange({ sort: e.target.value })} aria-label={fr ? "Trier les vidéos" : "Sort videos"}>
+              {L(VIDEO_SORTS).map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
               ))}
             </select>
           ) : (
-            <select value={sort} onChange={(e) => onSort(e.target.value as CatalogSortKey)} aria-label="Sort creators">
-              {SORTS.map((s) => (
+            <select value={sort} onChange={(e) => onSort(e.target.value as CatalogSortKey)} aria-label={fr ? "Trier les créateurs" : "Sort creators"}>
+              {L(SORTS).map((s) => (
                 <option key={s.value} value={s.value}>
                   {s.label}
                 </option>
@@ -753,7 +854,7 @@ export function CatalogFilterBar({
         </label>
         {notice ? <p className="cf-notice">{notice}</p> : null}
         {instagram && !filters.search.trim() && !filters.niche ? (
-          <p className="cf-notice">Instagram is searched live: pick a niche or type a keyword to start.</p>
+          <p className="cf-notice">{fr ? "Instagram est recherché en direct : choisissez une niche ou tapez un mot-clé pour commencer." : "Instagram is searched live: pick a niche or type a keyword to start."}</p>
         ) : null}
       </div>
     </div>

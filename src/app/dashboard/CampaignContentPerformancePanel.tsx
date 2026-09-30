@@ -36,9 +36,10 @@ function formatPostDate(iso: string | null | undefined, lang: Lang): string {
   }
 }
 
-function formatEngagement(row: PerfRow): string {
+function formatEngagement(row: PerfRow, lang: Lang): string {
   const rate = calcEngagementRate(row.views, row.likes, row.comments, row.shares);
   if (rate == null) return "—";
+  if (lang === "fr") return `${rate.toFixed(1).replace(".", ",")} %`;
   return `${rate.toFixed(1)}%`;
 }
 
@@ -198,7 +199,7 @@ export function CampaignContentPerformancePanel({
           ),
         );
       } else if (data.pending) {
-        showToast(lang === "fr" ? "Stats indisponibles pour le moment" : "Stats unavailable for now");
+        showToast(lang === "fr" ? "Statistiques indisponibles pour le moment" : "Stats unavailable for now");
       }
     } finally {
       setRefreshingId(null);
@@ -234,7 +235,7 @@ export function CampaignContentPerformancePanel({
         title={lang === "fr" ? "Performance par contenu" : "Performance by content"}
         info={
           lang === "fr"
-            ? "Statistiques TikTok des posts liés par les créateurs (vues, likes, engagement)."
+            ? "Statistiques TikTok des publications liées par les créateurs (vues, j’aime, engagement)."
             : "TikTok stats for posts linked by creators (views, likes, engagement)."
         }
         lang={lang}
@@ -254,7 +255,7 @@ export function CampaignContentPerformancePanel({
         ) : empty ? (
           <p style={{ margin: 0, fontSize: 14, color: "#6B7280", lineHeight: 1.5 }}>
             {lang === "fr"
-              ? "Aucun contenu avec URL TikTok pour l'instant. Ajoutez une URL lors de l'envoi de contenu ou demandez aux créateurs de le faire."
+              ? "Aucun contenu avec URL TikTok pour l’instant. Ajoutez une URL lors de l’envoi de contenu ou demandez aux créateurs de le faire."
               : "No content with a TikTok URL yet. Add a URL when uploading content or ask creators to include one."}
           </p>
         ) : (
@@ -264,9 +265,9 @@ export function CampaignContentPerformancePanel({
                 <tr>
                   <th style={thStyle}>{lang === "fr" ? "Contenu" : "Content"}</th>
                   <th style={thStyle}>{lang === "fr" ? "Vues" : "Views"}</th>
-                  <th style={thStyle}>Likes</th>
+                  <th style={thStyle}>{lang === "fr" ? "J’aime" : "Likes"}</th>
                   <th style={thStyle}>{lang === "fr" ? "Engagement" : "Engagement"}</th>
-                  <th style={thStyle}>{lang === "fr" ? "Date du post" : "Post date"}</th>
+                  <th style={thStyle}>{lang === "fr" ? "Date de publication" : "Post date"}</th>
                   <th style={thStyle} />
                 </tr>
               </thead>
@@ -348,7 +349,7 @@ export function CampaignContentPerformancePanel({
                         {pending ? "—" : formatCompactStat(row.views, lang)}
                       </td>
                       <td style={tdStyle}>{pending ? "—" : formatCompactStat(row.likes, lang)}</td>
-                      <td style={tdStyle}>{pending ? "—" : formatEngagement(row)}</td>
+                      <td style={tdStyle}>{pending ? "—" : formatEngagement(row, lang)}</td>
                       <td style={tdStyle}>{pending ? "—" : formatPostDate(row.posted_at, lang)}</td>
                       <td style={{ ...tdStyle, textAlign: "right" }}>
                         <button

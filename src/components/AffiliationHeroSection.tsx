@@ -43,7 +43,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
       ? [
           "50 % à vie sur chaque abonnement.",
           "70 % sur les ventes le premier mois.",
-          "Cookie 90 jours — vente attribuée.",
+          "Cookie de 90 jours : vente attribuée.",
         ]
       : [
           "50% lifetime on every subscription.",

@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import type { RequestGroup, RequestsData } from "@/lib/admin-types";
-import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, Warnings, ago, dateFr, num, useAdminData } from "../_components/ui";
+import { Card, Empty, Kpi, LoadState, PageHead, Pill, RefreshButton, Warnings, useAdminData, useAdminFormat, useT } from "../_components/ui";
 
 function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null; empty: string; prefix?: string }) {
   const [limit, setLimit] = useState(15);
-  if (rows === null) return <Empty>Table could not be read.</Empty>;
+  const { ago, num } = useAdminFormat();
+  const t = useT();
+  if (rows === null) return <Empty>{t("Table could not be read.", "La table n’a pas pu être lue.")}</Empty>;
   if (rows.length === 0) return <Empty>{empty}</Empty>;
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
@@ -14,9 +16,9 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
       <table className="ad-table">
         <thead>
           <tr>
-            <th>Request</th>
-            <th className="ad-num">Times</th>
-            <th className="ad-num">Last</th>
+            <th>{t("Request", "Demande")}</th>
+            <th className="ad-num">{t("Times", "Fois")}</th>
+            <th className="ad-num">{t("Last", "Dernière")}</th>
           </tr>
         </thead>
         <tbody>
@@ -28,7 +30,7 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
                     {prefix}
                     {r.label.replace(/^@/, "")}
                   </span>
-                  {r.count >= 5 ? <Pill tone="warn">high demand</Pill> : null}
+                  {r.count >= 5 ? <Pill tone="warn">{t("high demand", "forte demande")}</Pill> : null}
                 </div>
                 <div className="ad-barlist__track" style={{ marginTop: 6 }}>
                   <span style={{ ["--w" as string]: `${(r.count / max) * 100}%` }} />
@@ -43,7 +45,7 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
       {rows.length > limit ? (
         <div style={{ padding: 12, display: "flex", justifyContent: "center" }}>
           <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 30)}>
-            Show more ({num(rows.length - limit)})
+            {t("Show more", "Voir plus")} ({num(rows.length - limit)})
           </button>
         </div>
       ) : null}
@@ -54,12 +56,17 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
 export default function AdminRequestsPage() {
   const { data, error, loading, reload } = useAdminData<RequestsData>("/api/admin/requests");
   const total = (rows: RequestGroup[] | null) => (rows ? rows.reduce((s, r) => s + r.count, 0) : null);
+  const { dateFr, num } = useAdminFormat();
+  const t = useT();
 
   return (
     <>
       <PageHead
-        title="Requests"
-        lead="What customers searched for without finding it, over 6 months. Frequent requests show what to add to the catalog first."
+        title={t("Requests", "Demandes")}
+        lead={t(
+          "What customers searched for without finding it, over 6 months. Frequent requests show what to add to the catalog first.",
+          "Ce que les clients ont cherché sans le trouver, sur 6 mois. Les demandes fréquentes montrent quoi ajouter au catalogue en priorité.",
+        )}
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
@@ -67,32 +74,42 @@ export default function AdminRequestsPage() {
         <>
           <Warnings items={data.warnings} />
           <div className="ad-grid ad-grid--kpi">
-            <Kpi label="Requested niches" value={total(data.niches)} tone="accent" sub={<>{num(data.niches?.length)} distinct niches</>} />
-            <Kpi label="Creators not found" value={total(data.lookups)} delay={60} sub={<>{num(data.lookups?.length)} distinct profiles</>} />
-            <Kpi label="v2 waitlist" value={data.waitlist?.length ?? null} delay={120} />
+            <Kpi
+              label={t("Requested niches", "Niches demandées")}
+              value={total(data.niches)}
+              tone="accent"
+              sub={<>{num(data.niches?.length)} {t("distinct niches", "niches distinctes")}</>}
+            />
+            <Kpi
+              label={t("Creators not found", "Créateurs introuvables")}
+              value={total(data.lookups)}
+              delay={60}
+              sub={<>{num(data.lookups?.length)} {t("distinct profiles", "profils distincts")}</>}
+            />
+            <Kpi label={t("v2 waitlist", "Liste d’attente v2")} value={data.waitlist?.length ?? null} delay={120} />
           </div>
           <div className="ad-grid ad-grid--2">
-            <Card title="Missing niches" className="ad-card--flush" delay={80}>
-              <GroupTable rows={data.niches} empty="No niches requested." />
+            <Card title={t("Missing niches", "Niches manquantes")} className="ad-card--flush" delay={80}>
+              <GroupTable rows={data.niches} empty={t("No niches requested.", "Aucune niche demandée.")} />
             </Card>
-            <Card title="Creator searches with no result" className="ad-card--flush" delay={120}>
-              <GroupTable rows={data.lookups} empty="No searches without results." prefix="@" />
+            <Card title={t("Creator searches with no result", "Recherches de créateurs sans résultat")} className="ad-card--flush" delay={120}>
+              <GroupTable rows={data.lookups} empty={t("No searches without results.", "Aucune recherche sans résultat.")} prefix="@" />
             </Card>
           </div>
-          <Card title="v2 waitlist" className="ad-card--flush" delay={160}>
+          <Card title={t("v2 waitlist", "Liste d’attente v2")} className="ad-card--flush" delay={160}>
             {data.waitlist === null ? (
-              <Empty>Table could not be read.</Empty>
+              <Empty>{t("Table could not be read.", "La table n’a pas pu être lue.")}</Empty>
             ) : data.waitlist.length === 0 ? (
-              <Empty>Nobody on the list yet.</Empty>
+              <Empty>{t("Nobody on the list yet.", "Personne sur la liste pour l’instant.")}</Empty>
             ) : (
               <div className="ad-table-wrap">
                 <table className="ad-table">
                   <thead>
                     <tr>
-                      <th>First name</th>
-                      <th>Email</th>
-                      <th>Expectations</th>
-                      <th className="ad-num">Joined</th>
+                      <th>{t("First name", "Prénom")}</th>
+                      <th>{t("Email", "E-mail")}</th>
+                      <th>{t("Expectations", "Attentes")}</th>
+                      <th className="ad-num">{t("Joined", "Inscription")}</th>
                     </tr>
                   </thead>
                   <tbody>

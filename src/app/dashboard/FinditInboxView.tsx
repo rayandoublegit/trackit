@@ -93,7 +93,7 @@ export function FinditInboxView({
         setCampaigns(
           (rows || []).map((r) => ({
             id: String((r as { id: string }).id),
-            name: String((r as { name?: string }).name || "Campaign"),
+            name: String((r as { name?: string }).name || (fr ? "Campagne" : "Campaign")),
           })),
         );
       } catch {
@@ -176,7 +176,7 @@ export function FinditInboxView({
                   <h2>{notifyLabel(selected, fr)}</h2>
                   <p>{formatWhen(selected.created_at, fr)}</p>
                 </div>
-                <button type="button" className="fi-inbox-panel__close" onClick={() => setPanelOpen(false)} aria-label="Close">
+                <button type="button" className="fi-inbox-panel__close" onClick={() => setPanelOpen(false)} aria-label={fr ? "Fermer" : "Close"}>
                   ×
                 </button>
               </div>
@@ -240,7 +240,7 @@ export function FinditInboxView({
   return (
     <div className={`fi-inbox${isMobile ? " is-mobile" : ""}`}>
       <header className="fi-inbox__head">
-        <h1>Inbox</h1>
+        <h1>{fr ? "Boîte de réception" : "Inbox"}</h1>
         <p>
           {fr
             ? "Contenu et envois des créateurs — cliquez une notification pour prévisualiser."
@@ -263,7 +263,7 @@ export function FinditInboxView({
           </div>
           <p>
             {fr
-              ? "Il semblerait que votre inbox Discover soit encore calme — dès qu’un créateur envoie du contenu, il apparaîtra ici."
+              ? "Il semblerait que votre boîte de réception Discover soit encore calme — dès qu’un créateur envoie du contenu, il apparaîtra ici."
               : "Looks like your Discover inbox is still quiet — as soon as a creator sends content, it’ll show up here."}
           </p>
         </div>

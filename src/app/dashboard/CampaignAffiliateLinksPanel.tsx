@@ -27,7 +27,8 @@ type LinkTotals = {
   commission: number;
 };
 
-function formatConvRate(value: number): string {
+function formatConvRate(value: number, lang: Lang): string {
+  if (lang === "fr") return `${(Number.isFinite(value) ? value.toFixed(1) : "0.0").replace(".", ",")} %`;
   return `${Number.isFinite(value) ? value.toFixed(1) : "0.0"}%`;
 }
 
@@ -186,10 +187,10 @@ export function CampaignAffiliateLinksPanel({
   return (
     <section style={{ marginBottom: 28 }}>
       <AnalyticsSectionHeader
-        title={lang === "fr" ? "Liens d'affiliation" : "Affiliate links"}
+        title={lang === "fr" ? "Liens d’affiliation" : "Affiliate links"}
         info={
           lang === "fr"
-            ? "Clics, ventes, chiffre d'affaires et visiteurs uniques sur vos liens d'affiliation (générés à partir de l'URL de destination) pour cette campagne."
+            ? "Clics, ventes, chiffre d’affaires et visiteurs uniques sur vos liens d’affiliation (générés à partir de l’URL de destination) pour cette campagne."
             : "Clicks, sales, revenue and unique visitors on your affiliate links (built from the destination URL) for this campaign."
         }
         lang={lang}
@@ -298,7 +299,7 @@ export function CampaignAffiliateLinksPanel({
           <div style={{ padding: "40px 16px", textAlign: "center" }}>
             <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
-                ? "Générez votre premier lien d'affiliation depuis votre campagne."
+                ? "Générez votre premier lien d’affiliation depuis votre campagne."
                 : "Generate your first affiliate link from your campaign."}
             </p>
             {onGoToLinksTab ? (
@@ -316,7 +317,7 @@ export function CampaignAffiliateLinksPanel({
                   letterSpacing: "-0.02em",
                 }}
               >
-                {lang === "fr" ? "Aller à l'onglet Liens →" : "Go to Links tab →"}
+                {lang === "fr" ? "Aller à l’onglet Liens →" : "Go to Links tab →"}
               </button>
             ) : null}
           </div>
@@ -336,7 +337,7 @@ export function CampaignAffiliateLinksPanel({
                   points={chartPoints}
                   formatValue={(v) =>
                     lang === "fr"
-                      ? `${Math.round(v)} clic${Math.round(v) === 1 ? "" : "s"}`
+                      ? `${Math.round(v)} clic${Math.round(v) <= 1 ? "" : "s"}`
                       : `${Math.round(v)} click${Math.round(v) === 1 ? "" : "s"}`
                   }
                   height={160}
@@ -416,7 +417,7 @@ export function CampaignAffiliateLinksPanel({
                         <td style={tdStyle}>{link.metrics?.sales ?? 0}</td>
                         <td style={tdStyle}>{formatCurrency(link.metrics?.revenue ?? 0, lang)}</td>
                         <td style={tdStyle}>{formatCurrency(link.metrics?.commission ?? 0, lang)}</td>
-                        <td style={tdStyle}>{formatConvRate(link.metrics?.conversionRate ?? 0)}</td>
+                        <td style={tdStyle}>{formatConvRate(link.metrics?.conversionRate ?? 0, lang)}</td>
                         <td style={tdStyle}>{topSource}</td>
                         <td style={tdStyle}>{topDevice}</td>
                       </tr>

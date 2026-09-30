@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { Lang } from "@/lib/useLang";
+import { getAppLang } from "@/lib/locale-preferences";
 import {
   annualPriceIds,
   getGrowthPriceId,
@@ -67,6 +68,13 @@ export function getPriceIdForUpgrade(
 
 export type PaidPlanTier = Exclude<PlanTier, "free">;
 
+// Server errors are written in English; French visitors get a French message instead.
+function checkoutErrorMessage(serverError: string | undefined, fallbackEn: string, fallbackFr: string, lang?: Lang): string {
+  const current = lang ?? (typeof window !== "undefined" ? getAppLang() : "en");
+  if (current === "fr") return fallbackFr;
+  return serverError ?? fallbackEn;
+}
+
 function checkoutCurrencyFromLang(lang: Lang): "usd" | "eur" {
   return lang === "fr" ? "eur" : "usd";
 }
@@ -117,7 +125,9 @@ export async function upgradeToPlanTier(
     return;
   }
 
-  throw new Error(payload.error ?? "Could not change plan");
+  throw new Error(
+    checkoutErrorMessage(payload.error, "Could not change plan", "Impossible de changer de plan. Réessayez.", lang),
+  );
 }
 
 export async function checkoutPlanTier(tier: PaidPlanTier, lang: Lang, annual = false): Promise<void> {
@@ -154,7 +164,9 @@ export async function handleUpgrade(
       return;
     }
     if (!whopPayload.fallback && whop.status !== 401) {
-      throw new Error(whopPayload.error ?? "Could not start checkout");
+      throw new Error(
+        checkoutErrorMessage(whopPayload.error, "Could not start checkout", "Impossible de lancer le paiement. Réessayez."),
+      );
     }
   }
   assertNonEmptyStripePriceId(priceId, envVarCandidates);
@@ -177,7 +189,11 @@ export async function handleUpgrade(
     }),
   });
   const payload = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
-  if (!res.ok) throw new Error(payload.error ?? "Could not start checkout.");
+  if (!res.ok) {
+    throw new Error(
+      checkoutErrorMessage(payload.error, "Could not start checkout.", "Impossible de lancer le paiement. Réessayez."),
+    );
+  }
   if (payload.url) window.location.href = payload.url;
 }
 

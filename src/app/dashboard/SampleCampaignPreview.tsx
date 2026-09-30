@@ -14,6 +14,7 @@ import {
   type SampleCreator,
   type SampleGiftStage,
 } from "@/lib/sample-campaign-preview";
+import { sampleCampaignsFor } from "@/lib/sample-workspace";
 import "./sample-preview.css";
 
 type Lang = "en" | "fr";
@@ -74,6 +75,8 @@ export function SampleCampaignPreview({
   const totals = useMemo(() => sampleCampaignTotals(detail), [detail]);
   const [tab, setTab] = useState<Tab>(isDraft ? "gifting" : "overview");
   const byId = useMemo(() => new Map(detail.creators.map((c) => [c.id, c])), [detail]);
+  // The caller may pass the English sample name: show the French one when it exists.
+  const title = fr ? (sampleCampaignsFor("fr").find((c) => c.id === detail.id)?.name ?? name) : name;
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "overview", label: fr ? "Vue d’ensemble" : "Overview" },
@@ -124,7 +127,7 @@ export function SampleCampaignPreview({
               {detail.kind === "gifting" ? "Gifting" : `${fr ? "Affiliation" : "Affiliate"} · ${detail.commissionRate} %`}
             </span>
           </div>
-          <h1>{name}</h1>
+          <h1>{title}</h1>
           <p className="sp-head__product">{detail.product[lang]}</p>
         </div>
         <div className="sp-stack" aria-hidden>
@@ -192,9 +195,9 @@ function Overview({
           : fr ? `${trend >= 0 ? "+" : ""}${trend} % sur 7 jours` : `${trend >= 0 ? "+" : ""}${trend}% over 7 days`,
       up: trend !== null && trend >= 0,
     },
-    { label: fr ? "Commandes" : "Orders", value: totals.orders, format: (n: number) => formatCount(n, lang), sub: fr ? `${totals.creators} créateurs actifs` : `${totals.creators} active creators` },
-    { label: fr ? "Vues cumulées" : "Total views", value: totals.views, format: (n: number) => formatCount(n, lang), sub: fr ? `${totals.videos} vidéos publiées` : `${totals.videos} videos published` },
-    { label: fr ? "Retour sur commission" : "Return on commission", value: totals.roi ?? 0, format: (n: number) => `×${n.toFixed(1)}`, sub: fr ? `${formatMoney(totals.commission, lang)} de commissions` : `${formatMoney(totals.commission, lang)} in commissions` },
+    { label: fr ? "Commandes" : "Orders", value: totals.orders, format: (n: number) => formatCount(n, lang), sub: fr ? `${totals.creators} ${totals.creators > 1 ? "créateurs actifs" : "créateur actif"}` : `${totals.creators} active creators` },
+    { label: fr ? "Vues cumulées" : "Total views", value: totals.views, format: (n: number) => formatCount(n, lang), sub: fr ? `${totals.videos} ${totals.videos > 1 ? "vidéos publiées" : "vidéo publiée"}` : `${totals.videos} videos published` },
+    { label: fr ? "Retour sur commission" : "Return on commission", value: totals.roi ?? 0, format: (n: number) => (fr ? `×${n.toFixed(1).replace(".", ",")}` : `×${n.toFixed(1)}`), sub: fr ? `${formatMoney(totals.commission, lang)} de commissions` : `${formatMoney(totals.commission, lang)} in commissions` },
   ];
   const leaders = [...detail.creators].filter((c) => c.status !== "shortlisted").sort((a, b) => b.revenue - a.revenue);
   const best = leaders[0]?.revenue ?? 1;
@@ -624,7 +627,7 @@ function Payouts({
                 <SampleAvatar name={c.name} hue={c.hue} size={30} />
                 <span>
                   <strong>{c.name}</strong>
-                  <small>{c.orders} {fr ? "ventes" : "sales"} · {detail.commissionRate} %</small>
+                  <small>{c.orders} {fr ? (c.orders > 1 ? "ventes" : "vente") : "sales"} · {detail.commissionRate} %</small>
                 </span>
               </span>
               <div className="sp-payrow__meter" aria-hidden>

@@ -182,7 +182,7 @@ export function WorkspaceShell({
           .filter((r: { commission_type?: string }) => String(r.commission_type || "").toLowerCase() !== "rpm")
           .map((r: { id?: string; name?: string; status?: string }) => ({
             id: String(r.id || ""),
-            name: String(r.name || "Campaign"),
+            name: String(r.name || (lang === "fr" ? "Campagne" : "Campaign")),
             status: String(r.status || ""),
           }))
           .filter((r) => {
@@ -200,7 +200,7 @@ export function WorkspaceShell({
       cancelled = true;
       window.removeEventListener(CAMPAIGNS_UPDATED_EVENT, load);
     };
-  }, [userId, isCreator]);
+  }, [userId, isCreator, lang]);
 
   useEffect(() => {
     if (!userId) return;
@@ -557,7 +557,7 @@ export function WorkspaceShell({
           },
         ];
       case "analytics":
-        return [{ id: "analytics", label: "Analytics", view: "analytics", icon: "analytics" }];
+        return [{ id: "analytics", label: lang === "fr" ? "Analytiques" : "Analytics", view: "analytics", icon: "analytics" }];
       case "ai":
         return [{ id: "ai", label: "Mino", view: "ai", icon: "ai" }];
       case "scripts":
@@ -702,21 +702,21 @@ export function WorkspaceShell({
     brandSpaces.find((space) => space.id === (activeSpaceId || userId))?.avatar_url || "";
 
   const tabWorkspaceName = (() => {
-    if (isCreator) return "Dashboard";
+    if (isCreator) return lang === "fr" ? "Tableau de bord" : "Dashboard";
     const active = brandSpaces.find((space) => space.id === (activeSpaceId || userId));
     const named = (active?.name || "").trim();
     if (named) return named;
-    if (brandSpaces.length > 0) return (brandSpaces[0]?.name || "").trim() || "Dashboard";
+    if (brandSpaces.length > 0) return (brandSpaces[0]?.name || "").trim() || (lang === "fr" ? "Tableau de bord" : "Dashboard");
     return "";
   })();
 
   useEffect(() => {
     if (isCreator) {
-      applyDashboardTabTitle("Dashboard");
+      applyDashboardTabTitle(lang === "fr" ? "Tableau de bord" : "Dashboard");
       return;
     }
     if (tabWorkspaceName) applyDashboardTabTitle(tabWorkspaceName);
-  }, [isCreator, tabWorkspaceName]);
+  }, [isCreator, tabWorkspaceName, lang]);
 
   // Non-delegated (creators / owners): prefer live `profile` so Settings edits apply immediately.
   // Delegated admins: show the actor's own identity, not the workspace owner's.
@@ -726,7 +726,7 @@ export function WorkspaceShell({
   const displayName =
     accountProfile?.full_name ||
     accountProfile?.username ||
-    "You";
+    (lang === "fr" ? "Vous" : "You");
 
   const avatarUrl = !avatarBroken ? accountProfile?.avatar_url || "" : "";
 
@@ -853,7 +853,7 @@ export function WorkspaceShell({
             type="button"
             className="ws-icon-btn ws-mobile-toggle"
             onClick={() => setSidebarOpen((v) => !v)}
-            aria-label="Toggle sidebar"
+            aria-label={lang === "fr" ? "Afficher ou masquer le menu" : "Toggle sidebar"}
           >
             <WsIcon name="list" size={18} />
           </button>
@@ -987,8 +987,8 @@ export function WorkspaceShell({
             <button
               type="button"
               className="ws-icon-btn ws-top-actions__desk"
-              data-tip="Analytics"
-              aria-label="Analytics"
+              data-tip={lang === "fr" ? "Analytiques" : "Analytics"}
+              aria-label={lang === "fr" ? "Analytiques" : "Analytics"}
               onClick={openRecentCampaignAnalytics}
             >
               <WsIcon name="analytics" size={17} />
@@ -1050,7 +1050,9 @@ export function WorkspaceShell({
                           ? lang === "fr"
                             ? "Admin workspace"
                             : "Workspace admin"
-                          : "Online"}
+                          : lang === "fr"
+                            ? "En ligne"
+                            : "Online"}
                       </div>
                     </div>
                   </div>
@@ -1066,11 +1068,11 @@ export function WorkspaceShell({
                   >
                     <WsIcon name="theme" size={16} />
                     {lang === "fr" ? "Thème" : "Themes"}
-                    <span className="muted">{theme === "dark" ? "Dark" : "Light"}</span>
+                    <span className="muted">{theme === "dark" ? (lang === "fr" ? "Sombre" : "Dark") : lang === "fr" ? "Clair" : "Light"}</span>
                   </button>
                   <button type="button" className="ws-menu__item" onClick={() => { onNavigate("help"); setProfileOpen(false); }}>
                     <WsIcon name="help" size={16} />
-                    Help
+                    {lang === "fr" ? "Aide" : "Help"}
                   </button>
                   <div className="ws-menu__sep" />
                   <div className="ws-menu__label">{lang === "fr" ? "Outils" : "Personal Tools"}</div>
@@ -1114,7 +1116,7 @@ export function WorkspaceShell({
       ) : null}
 
       <div className="ws-shell__body">
-        <aside className="ws-rail" aria-label="Primary">
+        <aside className="ws-rail" aria-label={lang === "fr" ? "Principal" : "Primary"}>
           <div className="ws-rail__items">
             {railItems.map((item) => (
               <button
@@ -1151,7 +1153,7 @@ export function WorkspaceShell({
 
         <div className="ws-stage">
           <div className={`ws-stage__body${view === "discovery" && !isCreator ? " is-full" : ""}`}>
-            <aside className="ws-sidebar" aria-label="Secondary">
+            <aside className="ws-sidebar" aria-label={lang === "fr" ? "Secondaire" : "Secondary"}>
               <div className="ws-sidebar__head">
                 <h2 className="ws-sidebar__title">{sideTitle}</h2>
               </div>
@@ -1432,12 +1434,12 @@ export function WorkspaceShell({
                       [
                         {
                           id: "planify",
-                          label: "Planify",
+                          label: lang === "fr" ? "Planifier" : "Planify",
                           linkIds: ["planner"] as const,
                         },
                         {
                           id: "take-notes",
-                          label: "Take Notes",
+                          label: lang === "fr" ? "Prendre des notes" : "Take Notes",
                           linkIds: ["planner-notes"] as const,
                         },
                       ] as const

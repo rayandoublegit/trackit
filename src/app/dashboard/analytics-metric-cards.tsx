@@ -333,19 +333,23 @@ function niceAxisTicks(min: number, max: number, targetCount = 5): number[] {
 }
 
 /** Compact axis labels: 1000 → 1k, 1_000_000 → 1M */
-function formatAxisTick(n: number): string {
+function formatAxisTick(n: number, lang: "en" | "fr" = "en"): string {
   const abs = Math.abs(n);
+  const fmt = (v: number) => {
+    const s = String(Number.isInteger(v) ? v : v.toFixed(1));
+    return lang === "fr" ? s.replace(".", ",") : s;
+  };
   if (abs >= 1_000_000_000) {
     const v = n / 1_000_000_000;
-    return `${Number.isInteger(v) ? v : v.toFixed(1)}B`;
+    return `${fmt(v)}${lang === "fr" ? "Md" : "B"}`;
   }
   if (abs >= 1_000_000) {
     const v = n / 1_000_000;
-    return `${Number.isInteger(v) ? v : v.toFixed(1)}M`;
+    return `${fmt(v)}M`;
   }
   if (abs >= 1_000) {
     const v = n / 1_000;
-    return `${Number.isInteger(v) ? v : v.toFixed(1)}k`;
+    return `${fmt(v)}k`;
   }
   return String(Math.round(n));
 }
@@ -599,7 +603,7 @@ export function HeroMetricChart({
                   fontSize={11}
                   fontFamily="inherit"
                 >
-                  {formatAxisTick(tick)}
+                  {formatAxisTick(tick, lang)}
                 </text>
               </g>
             );

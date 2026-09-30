@@ -75,15 +75,15 @@ export function MeetingsView({
 
   const firstName =
     (displayName || "").trim().split(/\s+/)[0] ||
-    (fr ? "toi" : "there");
+    (fr ? "" : "there");
 
   const suggestions = useMemo(
     () =>
       fr
         ? [
-            "Meeting demain à 14:00, appelle-le Brief campagne",
-            "Call cuisine aujourd’hui à 16:30 avec @lena",
-            "Follow-up payouts UI vendredi à 11:00",
+            "Rendez-vous demain à 14h, appelle-le Brief campagne",
+            "Call cuisine aujourd’hui à 16h30 avec @lena",
+            "Point paiements vendredi à 11h",
           ]
         : [
             "Meeting tomorrow at 2pm, call it Campaign brief",
@@ -139,7 +139,7 @@ export function MeetingsView({
         meeting?: { title: string; when: string; withWho: string; notes: string };
       };
       if (!res.ok || !data.ok || !data.meeting) {
-        setError(data.error || (fr ? "Impossible de comprendre le meeting" : "Couldn’t parse the meeting"));
+        setError(data.error || (fr ? "Impossible de comprendre le rendez-vous" : "Couldn’t parse the meeting"));
         return;
       }
       addMeeting({
@@ -223,7 +223,9 @@ export function MeetingsView({
         <div className="mtg-hero">
           <h1 className="mtg-hero__greet">
             {fr
-              ? `Hey ${firstName} ! Prêt à plonger dans tes meetings ?`
+              ? firstName
+                ? `Bonjour ${firstName} ! Prêt à plonger dans vos rendez-vous ?`
+                : "Bonjour ! Prêt à plonger dans vos rendez-vous ?"
               : `Hey ${firstName}! Ready to dive into your meetings?`}
           </h1>
 
@@ -246,7 +248,9 @@ export function MeetingsView({
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={
                     fr
-                      ? `Hey ${firstName}… décris ton meeting`
+                      ? firstName
+                        ? `${firstName}… décrivez votre rendez-vous`
+                        : "Décrivez votre rendez-vous…"
                       : `Hey ${firstName}… describe your meeting`
                   }
                   rows={isMobile ? 3 : 2}
@@ -268,7 +272,7 @@ export function MeetingsView({
                   className="mtg-promptbox__send"
                   disabled={!prompt.trim() || parsing}
                   onClick={() => void parsePrompt()}
-                  aria-label={fr ? "Ajouter le meeting" : "Add meeting"}
+                  aria-label={fr ? "Ajouter le rendez-vous" : "Add meeting"}
                 >
                   {parsing ? (
                     "…"
@@ -312,7 +316,7 @@ export function MeetingsView({
             {upcoming.length === 0 ? (
               <p className="mtg-upcoming__empty">
                 {fr
-                  ? "Il semblerait que vous n’ayez pas de meeting pour l’instant — le calendrier attend sa première entrée."
+                  ? "Il semblerait que vous n’ayez pas encore de rendez-vous — le calendrier attend sa première entrée."
                   : "Looks like you don’t have any meetings yet — your calendar is waiting for its first one."}
               </p>
             ) : (
@@ -335,7 +339,7 @@ export function MeetingsView({
                     <button
                       type="button"
                       onClick={() => persist(meetings.filter((x) => x.id !== m.id))}
-                      aria-label="Delete"
+                      aria-label={fr ? "Supprimer" : "Delete"}
                     >
                       ×
                     </button>
@@ -351,7 +355,7 @@ export function MeetingsView({
             <h1>{fr ? "Calendrier" : "Calendar"}</h1>
             <p>
               {fr
-                ? "Place tes meetings comme sur Google Calendar — clique un jour ou un créneau."
+                ? "Placez vos rendez-vous comme sur Google Agenda — cliquez sur un jour ou un créneau."
                 : "Place meetings like Google Calendar — click a day or a time slot."}
             </p>
           </div>
@@ -467,7 +471,7 @@ export function MeetingsView({
       {draftOpen ? (
         <div className="mtg-draft" role="dialog" aria-modal="true">
           <div className="mtg-draft__card">
-            <h3>{fr ? "Nouveau meeting" : "New meeting"}</h3>
+            <h3>{fr ? "Nouveau rendez-vous" : "New meeting"}</h3>
             <input
               value={draftTitle}
               onChange={(e) => setDraftTitle(e.target.value)}

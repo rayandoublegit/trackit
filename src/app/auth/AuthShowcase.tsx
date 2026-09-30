@@ -14,11 +14,11 @@ const SCENE_MS = 5600;
 const COPY: Record<SceneId, { en: { kicker: string; title: string; text: string }; fr: { kicker: string; title: string; text: string } }> = {
   discover: {
     en: { kicker: "Find it", title: "Find the creators who already sell your niche.", text: "Search by niche, tier and views. Save the good ones in one click." },
-    fr: { kicker: "Find it", title: "Trouvez les créateurs qui vendent déjà dans votre niche.", text: "Recherche par niche, palier et vues. Sauvegardez les bons en un clic." },
+    fr: { kicker: "Trouvez", title: "Trouvez les créateurs qui vendent déjà dans votre niche.", text: "Recherche par niche, palier et vues. Sauvegardez les bons en un clic." },
   },
   campaign: {
     en: { kicker: "Track it", title: "Every sale, tied to the creator who drove it.", text: "Codes, links and orders roll up into one live campaign view." },
-    fr: { kicker: "Track it", title: "Chaque vente, rattachée au créateur qui l’a générée.", text: "Codes, liens et commandes remontent dans une vue de campagne en direct." },
+    fr: { kicker: "Suivez", title: "Chaque vente, rattachée au créateur qui l’a générée.", text: "Codes, liens et commandes remontent dans une vue de campagne en direct." },
   },
   gifting: {
     en: { kicker: "Gifting", title: "Send a product, get the video back.", text: "A frozen contract, the parcel, the upload and the ad rights, in one flow." },
@@ -26,7 +26,7 @@ const COPY: Record<SceneId, { en: { kicker: string; title: string; text: string 
   },
   payout: {
     en: { kicker: "Pay it", title: "Commissions calculated. Creators paid.", text: "Each order splits what the creator is owed. You pay in a click." },
-    fr: { kicker: "Pay it", title: "Commissions calculées. Créateurs payés.", text: "Chaque commande calcule ce qui est dû au créateur. Vous payez en un clic." },
+    fr: { kicker: "Payez", title: "Commissions calculées. Créateurs payés.", text: "Chaque commande calcule ce qui est dû au créateur. Vous payez en un clic." },
   },
 };
 

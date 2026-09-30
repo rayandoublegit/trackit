@@ -323,7 +323,7 @@ function CreatorHooksView({ userId, isMobile }: { userId?: string; isMobile?: bo
         <button
           type="button"
           className="tsk-check"
-          aria-label={opts?.done ? "Undo" : "Done"}
+          aria-label={opts?.done ? (fr ? "Annuler" : "Undo") : fr ? "Marquer comme utilisé" : "Done"}
           onClick={() => void toggleDone(hook)}
         />
         <div className="tsk-row__body">

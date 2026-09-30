@@ -1,10 +1,38 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useLang } from "@/lib/useLang";
 
 export type EmptyScene = "campaign" | "pay" | "analytics";
 
 type Step = { title: string; body: string };
+
+const SCENES_FR: Record<EmptyScene, { nodes: [string, string][] }> = {
+  campaign: {
+    nodes: [
+      ["01", "Brief"],
+      ["02", "Créateurs"],
+      ["03", "Ventes"],
+      ["04", "Paiement"],
+    ],
+  },
+  pay: {
+    nodes: [
+      ["01", "Vente"],
+      ["02", "Partage"],
+      ["03", "Dû"],
+      ["04", "Payé"],
+    ],
+  },
+  analytics: {
+    nodes: [
+      ["01", "Suivre"],
+      ["02", "Comparer"],
+      ["03", "Repérer"],
+      ["04", "Agir"],
+    ],
+  },
+};
 
 const SCENES: Record<EmptyScene, { nodes: [string, string][] }> = {
   campaign: {
@@ -34,7 +62,9 @@ const SCENES: Record<EmptyScene, { nodes: [string, string][] }> = {
 };
 
 function Scene({ scene }: { scene: EmptyScene }) {
-  const nodes = SCENES[scene].nodes;
+  const lang = useLang();
+  const fr = lang === "fr";
+  const nodes = (fr ? SCENES_FR : SCENES)[scene].nodes;
   return (
     <div className={`es-scene es-scene--${scene}`} aria-hidden>
       <div className="es-scene__glow" />
@@ -53,7 +83,7 @@ function Scene({ scene }: { scene: EmptyScene }) {
       {scene === "campaign" ? (
         <div className="es-card es-card--campaign">
           <div className="es-card__top">
-            <span>Summer drop</span>
+            <span>{fr ? "Collection été" : "Summer drop"}</span>
             <em>12%</em>
           </div>
           <div className="es-avatars">
@@ -62,7 +92,7 @@ function Scene({ scene }: { scene: EmptyScene }) {
           <div className="es-meter"><span /></div>
           <div className="es-card__row">
             <span>Commission</span>
-            <strong>$1,240</strong>
+            <strong>{fr ? "1 240 €" : "$1,240"}</strong>
           </div>
         </div>
       ) : null}
@@ -70,14 +100,14 @@ function Scene({ scene }: { scene: EmptyScene }) {
       {scene === "pay" ? (
         <div className="es-pay">
           <div className="es-pay__sale">
-            <span>Order</span>
-            <strong>$86.00</strong>
+            <span>{fr ? "Commande" : "Order"}</span>
+            <strong>{fr ? "86,00 €" : "$86.00"}</strong>
           </div>
           <div className="es-pay__split">
-            <span>Creator <b>$12.90</b></span>
-            <span>You <b>$73.10</b></span>
+            <span>{fr ? "Créateur" : "Creator"} <b>{fr ? "12,90 €" : "$12.90"}</b></span>
+            <span>{fr ? "Vous" : "You"} <b>{fr ? "73,10 €" : "$73.10"}</b></span>
           </div>
-          <div className="es-pay__sent">Paid · just now</div>
+          <div className="es-pay__sent">{fr ? "Payé · à l’instant" : "Paid · just now"}</div>
         </div>
       ) : null}
 

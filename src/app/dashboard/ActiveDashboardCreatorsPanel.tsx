@@ -179,7 +179,11 @@ export function ActiveDashboardCreatorsPanel({
                         </span>
                       </td>
                       <td style={{ padding: "14px 20px", fontSize: 14, borderBottom: "1px solid var(--ws-border)", verticalAlign: "middle", whiteSpace: "nowrap" }}>
-                        {creator.commission_rate != null ? `${creator.commission_rate}%` : "—"}
+                        {creator.commission_rate != null
+                          ? lang === "fr"
+                            ? `${creator.commission_rate.toLocaleString("fr-FR")} %`
+                            : `${creator.commission_rate}%`
+                          : "—"}
                       </td>
                       <td style={{ padding: "14px 20px", fontSize: 14, borderBottom: "1px solid var(--ws-border)", verticalAlign: "middle" }}>
                         {creator.discount_code ? (

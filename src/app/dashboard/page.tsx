@@ -516,7 +516,7 @@ function DashboardPageContent() {
       setIsCreator(asCreator);
       setUser({ id: "00000000-0000-0000-0000-000000000000" } as User);
       setProfile({
-        full_name: asCreator ? "Creator" : "Preview",
+        full_name: asCreator ? (lang === "fr" ? "Créateur" : "Creator") : lang === "fr" ? "Aperçu" : "Preview",
         username: asCreator ? "creator" : "preview",
         avatar_url: null,
         business_name: null,
@@ -817,9 +817,9 @@ function DashboardPageContent() {
         currency: checkoutCurrency,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not start checkout");
+      alert(e instanceof Error ? e.message : lang === "fr" ? "Impossible de lancer le paiement" : "Could not start checkout");
     }
-  }, [checkoutCurrency]);
+  }, [checkoutCurrency, lang]);
 
   const handleUpgradePro = useCallback(async () => {
     try {
@@ -828,9 +828,9 @@ function DashboardPageContent() {
         currency: checkoutCurrency,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not start checkout");
+      alert(e instanceof Error ? e.message : lang === "fr" ? "Impossible de lancer le paiement" : "Could not start checkout");
     }
-  }, [checkoutCurrency]);
+  }, [checkoutCurrency, lang]);
 
   const handleUpgradeScale = useCallback(async () => {
     try {
@@ -839,9 +839,9 @@ function DashboardPageContent() {
         currency: checkoutCurrency,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Could not start checkout");
+      alert(e instanceof Error ? e.message : lang === "fr" ? "Impossible de lancer le paiement" : "Could not start checkout");
     }
-  }, [checkoutCurrency]);
+  }, [checkoutCurrency, lang]);
 
   const openWebsitePricing = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -1507,7 +1507,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
       });
       const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shopName?: string };
       if (!res.ok || !payload.ok) {
-        setShopError(payload.error || (lang === "fr" ? "Connexion echouee" : "Connection failed"));
+        setShopError(payload.error || (lang === "fr" ? "Connexion échouée" : "Connection failed"));
         setLoading(false);
         return;
       }
@@ -1515,7 +1515,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
       setLoading(false);
       setTimeout(() => { window.location.reload(); }, 1200);
     } catch {
-      setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
+      setShopError(lang === "fr" ? "Erreur réseau" : "Network error");
       setLoading(false);
     }
   };
@@ -1531,20 +1531,20 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
       >
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
           <img src="/shopify-logo.svg" alt="Shopify" width={44} height={50} style={{ display: "block" }} />
-          <button type="button" onClick={onClose} aria-label="Close" style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "#7A7A7A", lineHeight: 1 }}>×</button>
+          <button type="button" onClick={onClose} aria-label={lang === "fr" ? "Fermer" : "Close"} style={{ background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit", fontSize: 18, color: "#7A7A7A", lineHeight: 1 }}>×</button>
           </div>
         <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
           {lang === "fr" ? "Connecter Shopify" : "Connect Shopify"}
         </h3>
         <p style={{ fontSize: 14, color: "#7A7A7A", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
           {lang === "fr"
-            ? "Creez une app personnalisee dans Shopify Admin (Parametres - Applications et canaux de vente - Developper des apps), activez l'API Admin avec read_orders, et collez le domaine + le token ci-dessous."
+            ? "Créez une app personnalisée dans l’admin Shopify (Paramètres - Applications et canaux de vente - Développer des applications), activez l’API Admin avec read_orders, puis collez le domaine et le token ci-dessous."
             : "Create a custom app in Shopify Admin (Settings - Apps and sales channels - Develop apps), enable the Admin API with read_orders, then paste the domain + token below."}
         </p>
         {done ? (
           <div style={{ background: "#F0FDF4", border: "1px solid #BBF7D0", borderRadius: 10, padding: 16, textAlign: "center" }}>
             <p style={{ fontSize: 14, color: "#15803D", margin: 0, fontWeight: 600 }}>
-              {lang === "fr" ? `Connecte a ${done}` : `Connected to ${done}`}
+              {lang === "fr" ? `Connecté à ${done}` : `Connected to ${done}`}
             </p>
           </div>
         ) : (
@@ -1574,7 +1574,7 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
             {shopError && <p style={{ color: "#dc2626", fontSize: 12, margin: "0 0 12px" }}>{shopError}</p>}
             <button type="button" className="hero-cta-shopify-dark" onClick={handleConnect} disabled={loading} style={{ width: "100%", justifyContent: "center", opacity: loading ? 0.6 : 1 }}>
             <img src="/shopify-logo.svg" alt="" width={20} height={23} style={{ display: "block", flexShrink: 0 }} />
-              {loading ? (lang === "fr" ? "Verification..." : "Verifying...") : (lang === "fr" ? "Connecter Shopify" : "Connect Shopify")}
+              {loading ? (lang === "fr" ? "Vérification…" : "Verifying...") : (lang === "fr" ? "Connecter Shopify" : "Connect Shopify")}
           </button>
           </>
         )}
@@ -1635,9 +1635,9 @@ function defaultEmailOutreachFields(lang: "en" | "fr"): OutreachMessageFields {
   };
 }
 
-function emailBodyFromFields(fields: OutreachMessageFields, name = "there") {
+function emailBodyFromFields(fields: OutreachMessageFields, name = "there", lang: "en" | "fr" = "en") {
   const main = messageFromTemplate(fields);
-  return buildOutreachPreview(main, fields.cta, name);
+  return buildOutreachPreview(main, fields.cta, name, lang);
 }
 
 function outreachProfileUrl(
@@ -1683,13 +1683,14 @@ function templateHasStructuredFields(fields: OutreachMessageFields) {
   return !!(fields.subject.trim() || fields.cta.trim() || (fields.opening.trim() && fields.body.trim()));
 }
 
-function previewFromFields(fields: OutreachMessageFields, name = "there") {
+function previewFromFields(fields: OutreachMessageFields, name = "there", lang: "en" | "fr" = "en") {
   const main = messageFromTemplate(fields);
-  return buildOutreachPreview(main, fields.cta, name);
+  return buildOutreachPreview(main, fields.cta, name, lang);
 }
 
-function buildOutreachPreview(message: string, cta: string, name = "there") {
-  const personalized = (text: string) => personalizeOutreachText(text, name).replace(/\{\{brand\}\}/gi, "your brand");
+function buildOutreachPreview(message: string, cta: string, name = "there", lang: "en" | "fr" = "en") {
+  const personalized = (text: string) =>
+    personalizeOutreachText(text, name).replace(/\{\{brand\}\}/gi, lang === "fr" ? "votre marque" : "your brand");
   return [personalized(message.trim()), personalized(cta.trim())].filter(Boolean).join("\n\n");
 }
 
@@ -1757,7 +1758,7 @@ function OutreachMessageEditor({
       return;
     }
     const body = value.body.trim();
-    const opening = value.opening.trim() || (body ? body.split("\n\n")[0] ?? "" : "Hey {{name}},");
+    const opening = value.opening.trim() || (body ? body.split("\n\n")[0] ?? "" : lang === "fr" ? "Bonjour {{name}}," : "Hey {{name}},");
     const rest = value.opening.trim()
       ? body
       : body.includes("\n\n")
@@ -1774,7 +1775,7 @@ function OutreachMessageEditor({
   return (
     <div style={{ marginBottom: layout === "page" ? styles.sectionGap : 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: layout === "page" ? 10 : 6 }}>
-        <label style={{ ...styles.fieldLabel, margin: 0 }}>{lang === "fr" ? "Outreach" : "Outreach"}</label>
+        <label style={{ ...styles.fieldLabel, margin: 0 }}>{lang === "fr" ? "Message" : "Outreach"}</label>
         <button
           type="button"
           className={layout === "page" ? "hero-cta-shopify-light hero-cta-compact" : "hero-cta-shopify-light hero-cta-compact-sm"}
@@ -1823,7 +1824,7 @@ function OutreachMessageEditor({
               value={display.opening}
               onChange={(e) => setField("opening", e.target.value)}
               rows={3}
-              placeholder="Hey {{name}},"
+              placeholder={lang === "fr" ? "Bonjour {{name}}," : "Hey {{name}},"}
               style={{ ...styles.input, resize: "vertical", lineHeight: 1.5 }}
             />
         </div>
@@ -2017,6 +2018,7 @@ function OutreachPanelShell({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  const lang = useLang();
   return (
     <>
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000 }} onClick={onClose} aria-hidden />
@@ -2041,7 +2043,7 @@ function OutreachPanelShell({
             <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{title}</h2>
             <p style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em", margin: 0, lineHeight: 1.45 }}>{subtitle}</p>
           </div>
-          <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label="Close">
+          <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label={lang === "fr" ? "Fermer" : "Close"}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
           </div>
@@ -2097,7 +2099,7 @@ function OutreachHeaderActions({
           ),
         },
         {
-          label: lang === "fr" ? "Import CSV" : "Import CSV",
+          label: lang === "fr" ? "Importer un CSV" : "Import CSV",
           onClick: onImportCsv,
           icon: (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -2199,7 +2201,7 @@ function OutreachView({
     <div className="ou-page">
       <div className={`ou-page__head${isMobile ? " is-mobile" : ""}`}>
         <div>
-          <h1 className="ou-page__title">Outreach</h1>
+          <h1 className="ou-page__title">{lang === "fr" ? "Prospection" : "Outreach"}</h1>
           <p className="ou-page__sub">
             {lang === "fr"
               ? "Messages envoyés, réponses et relances — tout au même endroit."
@@ -2262,7 +2264,7 @@ function OutreachView({
           onClose={closePanel}
           onImport={(t) => {
             addTemplate({ ...t, imported: true });
-            showToast(`Imported template "${t.name}"`);
+            showToast(lang === "fr" ? `Modèle « ${t.name} » importé` : `Imported template "${t.name}"`);
             closePanel();
           }}
         />
@@ -2282,7 +2284,7 @@ function OutreachView({
           onClose={closePanel}
           onSave={(t) => {
             addTemplate(t);
-            showToast(`Template "${t.name}" saved`);
+            showToast(lang === "fr" ? `Modèle « ${t.name} » enregistré` : `Template "${t.name}" saved`);
             closePanel();
           }}
         />
@@ -2309,7 +2311,7 @@ function OutreachView({
           setHistoryRefreshKey((k) => k + 1);
           closePanel();
           showToast(
-            lang === "fr" ? "Outreach enregistré dans l'historique" : "Outreach saved to history",
+            lang === "fr" ? "Message enregistré dans l’historique" : "Outreach saved to history",
           );
         }}
       />
@@ -2337,15 +2339,15 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
     try {
       const text = await navigator.clipboard.readText();
       if (!text.trim()) {
-        setPasteHint("Clipboard is empty");
+        setPasteHint(lang === "fr" ? "Le presse-papiers est vide" : "Clipboard is empty");
         setTimeout(() => setPasteHint(null), 2500);
         return;
       }
       setRaw(text);
-      setPasteHint("Pasted from clipboard");
+      setPasteHint(lang === "fr" ? "Collé depuis le presse-papiers" : "Pasted from clipboard");
       setTimeout(() => setPasteHint(null), 2500);
     } catch {
-      setPasteHint("Allow clipboard access to paste");
+      setPasteHint(lang === "fr" ? "Autorisez l’accès au presse-papiers pour coller" : "Allow clipboard access to paste");
       setTimeout(() => setPasteHint(null), 2500);
     }
   };
@@ -2370,7 +2372,7 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
       body = "";
     }
     const firstLine = trimmed.split("\n").find((l) => l.trim() && !/^Subject:/i.test(l))?.trim() ?? trimmed.split("\n")[0]?.trim();
-    const name = (subject || firstLine || "Imported template").slice(0, 48);
+    const name = (subject || firstLine || (lang === "fr" ? "Modèle importé" : "Imported template")).slice(0, 48);
     onImport({ name, subject, opening, body, cta });
   };
 
@@ -2387,17 +2389,17 @@ function ImportTemplatePanel({ onClose, onImport }: { onClose: () => void; onImp
       }
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Outreach" : "Outreach"}</label>
+        <label style={{ fontSize: 12, fontWeight: 500, color: "#9A9A9A" }}>{lang === "fr" ? "Message" : "Outreach"}</label>
         <button type="button" onClick={() => void handlePaste()} style={{ ...btnSecondary, padding: "6px 14px", fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="currentColor" strokeWidth="1.7"/></svg>
           {lang === "fr" ? "Coller" : "Paste"}
         </button>
       </div>
-      {pasteHint && <div style={{ fontSize: 11, color: pasteHint.includes("Pasted") ? "#1FB567" : "#7A7A7A", marginBottom: 8 }}>{pasteHint}</div>}
+      {pasteHint && <div style={{ fontSize: 11, color: pasteHint.includes("Pasted") || pasteHint.startsWith("Collé") ? "#1FB567" : "#7A7A7A", marginBottom: 8 }}>{pasteHint}</div>}
       <textarea
         value={raw}
         onChange={(e) => setRaw(e.target.value)}
-        placeholder="Click Paste to add your template from the clipboard…"
+        placeholder={lang === "fr" ? "Cliquez sur Coller pour ajouter votre modèle depuis le presse-papiers…" : "Click Paste to add your template from the clipboard…"}
         rows={16}
         readOnly={!raw}
         style={{ ...panelInputStyle, resize: "vertical", minHeight: 280, lineHeight: 1.5, background: raw ? "#FFFFFF" : "#FAFAFA" }}
@@ -2435,7 +2437,7 @@ function BulkImportTemplatesPanel({
       const opening = openingI >= 0 ? cols[openingI] : "";
       const body = bodyI >= 0 ? cols[bodyI] : "";
       const cta = ctaI >= 0 ? cols[ctaI] : "";
-      const fallbackName = name || subject || opening || body.slice(0, 40) || "Imported template";
+      const fallbackName = name || subject || opening || body.slice(0, 40) || (lang === "fr" ? "Modèle importé" : "Imported template");
       return { name: fallbackName.slice(0, 48), subject, opening, body, cta };
     }).filter((t) => t.opening.trim() || t.body.trim());
   };
@@ -2478,7 +2480,7 @@ function BulkImportTemplatesPanel({
         </label>
         {fileName && <p style={{ fontSize: 12, color: "#7A7A7A", marginTop: 12 }}>{fileName}</p>}
         </div>
-      <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>Columns: name, subject, opening, body, cta</p>
+      <p style={{ fontSize: 12, color: "#9A9A9A", margin: 0 }}>{lang === "fr" ? "Colonnes : name, subject, opening, body, cta" : "Columns: name, subject, opening, body, cta"}</p>
       {error && <p style={{ fontSize: 12, color: "#DC2626", marginTop: 8 }}>{error}</p>}
     </OutreachPanelShell>
   );
@@ -2487,7 +2489,7 @@ function BulkImportTemplatesPanel({
 function CreateTemplatePanel({ onClose, onSave }: { onClose: () => void; onSave: (t: Omit<OutreachTemplate, "id" | "imported">) => void }) {
   const lang = useLang();
   const [name, setName] = useState("");
-  const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage("Hey {{name}},\n\n"));
+  const [fields, setFields] = useState<OutreachMessageFields>(outreachFieldsFromMessage(lang === "fr" ? "Bonjour {{name}},\n\n" : "Hey {{name}},\n\n"));
   const hasMessage = !!(fields.opening.trim() || fields.body.trim() || fields.subject.trim());
 
   return (
@@ -2555,7 +2557,7 @@ function SeeTemplatesPanel({
                 <button type="button" style={{ ...btnPrimary, padding: "6px 12px", fontSize: 12 }} onClick={() => onUse(t.id)}>{lang === "fr" ? "Utiliser" : "Use"}</button>
             </div>
               <div style={{ fontSize: 12, color: "#7A7A7A", lineHeight: 1.45, maxHeight: 72, overflow: "hidden", whiteSpace: "pre-wrap" }}>
-                {buildOutreachPreview(messageFromTemplate(t), t.cta)}
+                {buildOutreachPreview(messageFromTemplate(t), t.cta, lang === "fr" ? "à vous" : "there", lang)}
           </div>
               </div>
             ))}
@@ -2760,7 +2762,7 @@ function TemplateSelect({
       </select>
       {onCreateNew && (
         <button type="button" style={{ fontSize: 12, color: "#0047FF", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }} onClick={onCreateNew}>
-          + Create new template
+          {lang === "fr" ? "+ Créer un modèle" : "+ Create new template"}
         </button>
       )}
           </div>
@@ -2918,12 +2920,13 @@ function SendOutreachPanel({
 
   const isBatchEmail = resolvedRecipients.length > 1;
   const creatorName = isBatchEmail ? "" : outreachCreatorName(selectedInfluencers[0]);
-  const previewName = isBatchEmail ? "there" : creatorName || "there";
+  const genericName = lang === "fr" ? "à vous" : "there";
+  const previewName = isBatchEmail ? genericName : creatorName || genericName;
   const emailSubjectPreview =
     personalizeOutreachText(fields.subject, previewName).trim() ||
     (lang === "fr" ? "Partenariat" : "Partnership");
-  const emailBodyPreview = emailBodyFromFields(fields, previewName);
-  const fullPreview = isEmail ? emailBodyPreview : previewFromFields(fields, previewName);
+  const emailBodyPreview = emailBodyFromFields(fields, previewName, lang);
+  const fullPreview = isEmail ? emailBodyPreview : previewFromFields(fields, previewName, lang);
 
   const persistOutreachHistory = async () => {
     let userId: string | null = null;
@@ -2939,8 +2942,8 @@ function SendOutreachPanel({
     for (const influencerHandle of selectedInfluencers) {
       const name = outreachCreatorName(influencerHandle);
       const copiedMessage = isEmail
-        ? `${lang === "fr" ? "Objet" : "Subject"}: ${personalizeOutreachText(fields.subject, name || "there").trim() || emailSubjectPreview}\n\n${emailBodyFromFields(fields, name || "there")}`
-        : previewFromFields(fields, name || "there");
+        ? `${lang === "fr" ? "Objet" : "Subject"}: ${personalizeOutreachText(fields.subject, name || genericName).trim() || emailSubjectPreview}\n\n${emailBodyFromFields(fields, name || genericName, lang)}`
+        : previewFromFields(fields, name || genericName, lang);
       const handleClean = influencerHandle.replace(/^@/, "");
       const payload = {
         creator_username: name || handleClean,
@@ -3100,11 +3103,11 @@ function SendOutreachPanel({
             letterSpacing: "-0.02em",
           }}
         >
-          ← {lang === "fr" ? "Retourner sur outreach" : "Back to outreach"}
+          ← {lang === "fr" ? "Retour à la prospection" : "Back to outreach"}
         </button>
 
         <h1 style={{ fontSize: isMobile ? 24 : 26, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px", letterSpacing: "-0.03em" }}>
-          {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : lang === "fr" ? "Envoyer un outreach" : "Send outreach"}
+          {isEmail ? (lang === "fr" ? "Envoyer un email" : "Send email") : lang === "fr" ? "Envoyer un message" : "Send outreach"}
         </h1>
         <p style={{ ...pageStyles.sectionHint, marginBottom: 36 }}>
           {isEmail
@@ -3152,7 +3155,7 @@ function SendOutreachPanel({
               type="email"
               value={senderEmail}
               onChange={(e) => setSenderEmail(e.target.value)}
-              placeholder="you@brand.com"
+              placeholder={lang === "fr" ? "vous@marque.com" : "you@brand.com"}
               style={pageStyles.input}
               autoComplete="email"
             />
@@ -3280,7 +3283,7 @@ function SendOutreachPanel({
         {isBatchEmail && isEmail && (
           <p style={{ fontSize: 13, color: "#6B7280", margin: "0 0 16px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Mode lot : le message utilise une formule générique ({{name}} → there) pour tous les destinataires."
+              ? "Mode groupé : le message utilise une formule générique ({{name}} → à vous) pour tous les destinataires."
               : "Batch mode: the message uses a generic greeting ({{name}} → there) for all recipients."}
           </p>
         )}
@@ -3895,7 +3898,7 @@ function IntegrationsView({
         });
         const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shop?: string; shopName?: string };
         if (!res.ok || !payload.ok) {
-          setShopError(payload.error || (lang === "fr" ? "Connexion echouee" : "Connection failed"));
+          setShopError(payload.error || (lang === "fr" ? "Connexion échouée" : "Connection failed"));
           setConnecting(false);
           return;
         }
@@ -3919,7 +3922,7 @@ function IntegrationsView({
           })
           .catch(() => { /* backfill optionnel */ });
       } catch {
-        setShopError(lang === "fr" ? "Erreur reseau" : "Network error");
+        setShopError(lang === "fr" ? "Erreur réseau" : "Network error");
         setConnecting(false);
       }
     })();
@@ -3977,7 +3980,7 @@ function IntegrationsView({
       <PageHeader isMobile={isMobile} title={lang === "fr" ? "Intégrations" : "Integrations"} subtitle={lang === "fr" ? "Connectez Trackit aux outils que vous utilisez déjà" : "Connect Trackit to the tools you already use"} />
       {connectedShop && (
         <div style={{ margin: isMobile ? "0 16px 16px" : "0 40px 16px", padding: "12px 16px", background: dark ? "rgba(34,197,94,0.12)" : "#f0fdf4", border: dark ? "1px solid rgba(34,197,94,0.28)" : "1px solid #bbf7d0", borderRadius: 10, color: dark ? "#86efac" : "#15803d", fontSize: 14, fontWeight: 500 }}>
-          ✓ {connectedShop} connected successfully
+          ✓ {connectedShop} {lang === "fr" ? "connecté avec succès" : "connected successfully"}
         </div>
       )}
       {stripeNotice === "connected" && (
@@ -4076,11 +4079,11 @@ function IntegrationsView({
                                   const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
                                   if (!res.ok || !payload.ok) {
                                     setSyncEnabled(!next);
-                                    setSyncMsg(payload.error || (lang === "fr" ? "Echec de la mise a jour" : "Update failed"));
+                                    setSyncMsg(payload.error || (lang === "fr" ? "Échec de la mise à jour" : "Update failed"));
                                   }
                                 } catch {
                                   setSyncEnabled(!next);
-                                  setSyncMsg(lang === "fr" ? "Erreur reseau" : "Network error");
+                                  setSyncMsg(lang === "fr" ? "Erreur réseau" : "Network error");
                                 } finally {
                                   setTogglingSync(false);
                                 }
@@ -4168,7 +4171,7 @@ function IntegrationsView({
                                     }
                                   }
                                 } catch {
-                                  setSyncMsg(lang === "fr" ? "Erreur reseau" : "Network error");
+                                  setSyncMsg(lang === "fr" ? "Erreur réseau" : "Network error");
                                 } finally {
                                   setSyncing(false);
                                 }
@@ -4439,8 +4442,8 @@ function AutomationView({
             <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em", marginBottom: 2 }}>{lang === "fr" ? "Importer depuis le code" : "Import from code"}</div>
             <div style={{ fontSize: 13, color: "#7A7A7A", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Collez une URL webhook ou importez une automatisation depuis JSON" : "Paste a webhook URL or import an automation from JSON"}</div>
           </div>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Import</button>
-          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>Test</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Importer" : "Import"}</button>
+          <button type="button" className="hero-cta-shopify-light hero-cta-compact" onClick={() => alert(lang === "fr" ? "Bientôt disponible" : "Coming soon")}>{lang === "fr" ? "Tester" : "Test"}</button>
         </div>
       </div>
     </>
@@ -4448,6 +4451,7 @@ function AutomationView({
 }
 
 function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: string; isMobile?: boolean }) {
+  const lang = useLang();
   return (
     <>
       <PageHeader isMobile={isMobile} title={title} subtitle={subtitle} />
@@ -4456,9 +4460,9 @@ function LockedView({ title, subtitle, isMobile }: { title: string; subtitle: st
           <div style={{ width: 64, height: 64, borderRadius: 16, background: "#F5F5F5", margin: "0 auto 18px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke="#9A9A9A" strokeWidth="1.8"/><path d="M8 11V8a4 4 0 018 0v3" stroke="#9A9A9A" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </div>
-          <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>Coming soon</h3>
-          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>This area is not created yet. You&apos;ll be notified when it&apos;s ready.</p>
-          <button type="button" style={btnPrimary}>Notify me</button>
+          <h3 style={{ fontSize: 20, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.03em", margin: 0, marginBottom: 6 }}>{lang === "fr" ? "Bientôt disponible" : "Coming soon"}</h3>
+          <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0, marginBottom: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>{lang === "fr" ? "Cet espace n’existe pas encore. Vous serez prévenu dès qu’il sera prêt." : <>This area is not created yet. You&apos;ll be notified when it&apos;s ready.</>}</p>
+          <button type="button" style={btnPrimary}>{lang === "fr" ? "Me prévenir" : "Notify me"}</button>
         </div>
       </div>
     </>
@@ -5015,7 +5019,7 @@ function AddAffiliatePanel({
                 : "Pick a saved creator or enter a handle, then generate their link and discount code."}
             </p>
           </div>
-          <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label="Close">
+          <button type="button" onClick={onClose} style={{ ...iconBtn, flexShrink: 0 }} aria-label={lang === "fr" ? "Fermer" : "Close"}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round"/></svg>
           </button>
         </div>
@@ -5098,7 +5102,7 @@ function AddAffiliatePanel({
             style={{ ...affiliateInputStyle, marginBottom: 16, cursor: "pointer" }}
           >
             {["Instagram", "TikTok", "YouTube", "Twitter", "Other"].map((p) => (
-              <option key={p} value={p}>{p}</option>
+              <option key={p} value={p}>{p === "Other" && lang === "fr" ? "Autre" : p}</option>
             ))}
           </select>
 
@@ -5117,7 +5121,7 @@ function AddAffiliatePanel({
             type="url"
             value={destinationUrl}
             onChange={(e) => { setDestinationUrl(e.target.value); setGenerated(null); }}
-            placeholder="https://your-store.com"
+            placeholder={lang === "fr" ? "https://votre-boutique.com" : "https://your-store.com"}
             style={{ ...affiliateInputStyle, marginBottom: 20 }}
           />
 
@@ -5140,7 +5144,7 @@ function AddAffiliatePanel({
 
           {generated && (
             <div style={{ marginTop: 24, padding: 16, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>Generated</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 14 }}>{lang === "fr" ? "Généré" : "Generated"}</div>
 
               <div style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Lien généré" : "Generated link"}</div>
@@ -5148,24 +5152,24 @@ function AddAffiliatePanel({
                   <div style={{ fontSize: 12, color: "#0047FF", fontFamily: "'InterDisplay', 'Inter Display', sans-serif", letterSpacing: "-0.02em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.link}
                   </div>
-                  <button type="button" style={iconBtn} title="Copy link" onClick={() => void copyText(generated.link, "link")}>
+                  <button type="button" style={iconBtn} title={lang === "fr" ? "Copier le lien" : "Copy link"} onClick={() => void copyText(generated.link, "link")}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg>
                   </button>
                 </div>
-                {copied === "link" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>Copied</div>}
+                {copied === "link" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>{lang === "fr" ? "Copié" : "Copied"}</div>}
               </div>
 
               <div>
-                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Discount code</div>
+                <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Code promo" : "Discount code"}</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#1A1A1A", fontFamily: "monospace", background: "#FFFFFF", border: "1px solid #E5E5E5", borderRadius: 8, padding: "10px 12px" }}>
                     {generated.code}
                   </div>
-                  <button type="button" style={iconBtn} title="Copy code" onClick={() => void copyText(generated.code, "code")}>
+                  <button type="button" style={iconBtn} title={lang === "fr" ? "Copier le code" : "Copy code"} onClick={() => void copyText(generated.code, "code")}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="#7A7A7A" strokeWidth="1.7"/><path d="M5 15V5a2 2 0 012-2h10" stroke="#7A7A7A" strokeWidth="1.7"/></svg>
                   </button>
                 </div>
-                {copied === "code" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>Copied</div>}
+                {copied === "code" && <div style={{ fontSize: 11, color: "#1FB567", marginTop: 4 }}>{lang === "fr" ? "Copié" : "Copied"}</div>}
               </div>
             </div>
           )}
@@ -5265,7 +5269,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "gifting",
-      label: "Gifting",
+      label: lang === "fr" ? "Cadeaux" : "Gifting",
       view: "gifting",
       section: "main",
       iconKey: "campaigns",
@@ -5273,7 +5277,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "content",
-      label: "Content",
+      label: lang === "fr" ? "Contenu" : "Content",
       view: "content",
       section: "main",
       iconKey: "content",
@@ -5281,7 +5285,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "payouts",
-      label: "Pay it",
+      label: lang === "fr" ? "Paiements" : "Pay it",
       view: "payouts",
       section: "main",
       iconKey: "payouts",
@@ -5289,7 +5293,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "whiteboard",
-      label: "Board",
+      label: lang === "fr" ? "Tableau" : "Board",
       view: "whiteboard",
       section: "main",
       iconKey: "notes",
@@ -5297,7 +5301,7 @@ function buildCreatorSidebarNavEntries(lang: "en" | "fr"): SidebarNavEntry[] {
     },
     {
       id: "ai",
-      label: "Ask Mino",
+      label: lang === "fr" ? "Demander à Mino" : "Ask Mino",
       view: "ai",
       section: "main",
       iconKey: "ai",
@@ -5321,7 +5325,7 @@ function buildSidebarNavEntries(
   return [
     {
       id: "discovery",
-      label: "Find it",
+      label: lang === "fr" ? "Créateurs" : "Find it",
       view: "discovery",
       section: "main",
       iconKey: "search",
@@ -5337,7 +5341,7 @@ function buildSidebarNavEntries(
     },
     {
       id: "campaigns",
-      label: "Track it",
+      label: lang === "fr" ? "Campagnes" : "Track it",
       view: "campaigns",
       section: "main",
       iconKey: "campaigns",
@@ -5345,7 +5349,7 @@ function buildSidebarNavEntries(
       children: [
         {
           id: "gifting",
-          label: "Gifting",
+          label: lang === "fr" ? "Cadeaux" : "Gifting",
           view: "gifting",
           keywords: ["gifting", "gift", "colis", "contrat", "wishlist", "ads", "expédition"],
         },
@@ -5361,7 +5365,7 @@ function buildSidebarNavEntries(
     // { id: "outreach", label: "Outreach", view: "outreach", section: "main", iconKey: "outreach", keywords: ["outreach", "dm", "email", "follow up"] },
     {
       id: "payouts",
-      label: "Pay it",
+      label: lang === "fr" ? "Paiements" : "Pay it",
       view: "payouts",
       section: "main",
       iconKey: "payouts",
@@ -5877,6 +5881,7 @@ function SidebarNavGroup({
   onToggleExpand: () => void;
   onChildClick: (view: View) => void;
 }) {
+  const lang = useLang();
   if (collapsed) {
     return (
       <SidebarItem collapsed icon={icon} label={label} active={active} badge={badge} onClick={onParentClick} />
@@ -5917,7 +5922,7 @@ function SidebarNavGroup({
           type="button"
           onClick={onToggleExpand}
           aria-expanded={expanded}
-          aria-label={expanded ? "Collapse" : "Expand"}
+          aria-label={expanded ? (lang === "fr" ? "Replier" : "Collapse") : lang === "fr" ? "Déplier" : "Expand"}
           style={{
             display: "flex",
             alignItems: "center",

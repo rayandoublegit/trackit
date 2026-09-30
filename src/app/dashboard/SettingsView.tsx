@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { selectProfileRow, updateProfileRow } from "@/lib/profile-row";
 import { BillingPaymentMethodSummary, PaymentMethodsBillingSection } from "./PayoutsView";
 import type { User } from "@supabase/supabase-js";
 import { useLang, type Lang } from "@/lib/useLang";
 import {
+  alternateLangPath,
   clearUserSessionStorage,
+  defaultDisplayCurrency,
   dispatchProfileUpdated,
   getAppTimezone,
+  isFrPath,
+  localizeHref,
+  setAppLang,
   setAppTimezone,
+  setDisplayCurrency,
   PROFILE_UPDATED_EVENT,
   type AppTimezone,
   type ProfileUpdatedDetail,
@@ -327,7 +334,7 @@ export function SettingsView({
 
       <div style={{ padding: isMobile ? "16px 16px 16px" : "40px", background: "var(--ws-bg)", minHeight: "100%", color: "var(--ws-text)" }}>
         {loading ? (
-          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>Loading settings...</p>
+          <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.01em" }}>{lang === "fr" ? "Chargement des paramètres..." : "Loading settings..."}</p>
         ) : (
           <>
             {tab === "general" && user && profile && (
@@ -486,6 +493,7 @@ function GeneralSettings({
   onSaved: (patch: Partial<ProfileRow>) => void;
 }) {
   const lang = useLang();
+  const router = useRouter();
   const [storeName, setStoreName] = useState(initialBusinessName);
   const [websiteUrl, setWebsiteUrl] = useState(initialShopifyUrl);
   const [niche, setNiche] = useState(initialNiche);
@@ -509,7 +517,18 @@ function GeneralSettings({
     setSigningOut(true);
     await supabase.auth.signOut({ scope: "global" });
     clearUserSessionStorage();
-    window.location.href = "/auth";
+    window.location.href = localizeHref("/auth", lang);
+  };
+
+  // Applies at once. /fr pages are French by address, so switching to English leaves them.
+  const changeLanguage = (next: Lang) => {
+    if (next === lang) return;
+    setAppLang(next);
+    setDisplayCurrency(defaultDisplayCurrency(next));
+    const path = window.location.pathname;
+    if (next === "en" && isFrPath(path)) {
+      router.replace(`${alternateLangPath(path, "en")}${window.location.search}${window.location.hash}`);
+    }
   };
 
   const persistGeneral = async () => {
@@ -535,7 +554,7 @@ function GeneralSettings({
     }
     setSaving(false);
     if (!saved.ok) {
-      setMessage({ text: saved.error, type: "error" });
+      setMessage({ text: lang === "fr" ? "Impossible d’enregistrer les modifications." : saved.error, type: "error" });
       return;
     }
     // Keep the active brand-workspace name in sync with Settings.
@@ -608,6 +627,46 @@ function GeneralSettings({
           <option value="UTC">UTC</option>
         </select>
       </Field>
+      <Field label={lang === "fr" ? "Langue / Language" : "Language / Langue"}>
+        <div role="radiogroup" aria-label={lang === "fr" ? "Langue" : "Language"} style={{ display: "inline-flex", background: "var(--ws-bg)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: 3, gap: 2 }}>
+          {([
+            { id: "fr", label: "Français" },
+            { id: "en", label: "English" },
+          ] as const).map((opt) => {
+            const on = lang === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                lang={opt.id}
+                onClick={() => changeLanguage(opt.id)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  border: "none",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                  fontWeight: on ? 600 : 400,
+                  cursor: "pointer",
+                  background: on ? "var(--ws-surface)" : "transparent",
+                  color: on ? "var(--ws-text)" : "var(--ws-text-muted)",
+                  boxShadow: on ? "0 1px 2px rgba(0,0,0,0.06)" : "none",
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+      <p style={{ margin: "-4px 0 14px", fontSize: 12, color: "var(--ws-text-muted)", lineHeight: 1.45 }}>
+        {lang === "fr"
+          ? "S’applique immédiatement à tout votre tableau de bord."
+          : "Applies right away across your whole dashboard."}
+      </p>
       {message && (
         <p style={{ fontSize: 13, color: message.type === "error" ? "#DC2626" : "#2E7D32", margin: "0 0 12px 0" }}>{message.text}</p>
       )}
@@ -631,7 +690,7 @@ function GeneralSettings({
             opacity: signingOut ? 0.6 : 1,
           }}
         >
-          {signingOut ? "Disconnecting..." : lang === "fr" ? "Déconnecter" : "Disconnect"}
+          {signingOut ? (lang === "fr" ? "Déconnexion..." : "Disconnecting...") : lang === "fr" ? "Déconnecter" : "Disconnect"}
         </button>
       </div>
     </Card>
@@ -763,7 +822,7 @@ function ProfileSettings({
         .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
       if (uploadError) {
         setSaving(false);
-        setMessage({ text: uploadError.message, type: "error" });
+        setMessage({ text: lang === "fr" ? "Impossible d’envoyer la photo. Réessayez." : uploadError.message, type: "error" });
         return;
       }
       const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -798,7 +857,7 @@ function ProfileSettings({
         .eq("id", userId);
       if (directErr) {
         setSaving(false);
-        setMessage({ text: directErr.message, type: "error" });
+        setMessage({ text: lang === "fr" ? "Impossible d’enregistrer le profil." : directErr.message, type: "error" });
         return;
       }
     } else if (!profileRes.ok) {
@@ -806,7 +865,9 @@ function ProfileSettings({
       setMessage({
         text: profileRes.status === 409
           ? profileUsernameTakenMessage(lang)
-          : (profileData.error || (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile.")),
+          : lang === "fr"
+            ? "Impossible d'enregistrer le profil."
+            : (profileData.error || "Could not save profile."),
         type: "error",
       });
       return;
@@ -880,7 +941,7 @@ function ProfileSettings({
         </div>
       </Field>
       <Field label={lang === "fr" ? "Nom complet" : "Full name"}>
-        <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Jane Smith" style={inputStyle} />
+        <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={lang === "fr" ? "Jean Dupont" : "Jane Smith"} style={inputStyle} />
       </Field>
       <Field label={lang === "fr" ? "Email" : "Email"}>
         <input type="email" value={email} disabled style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }} />
@@ -895,7 +956,7 @@ function ProfileSettings({
               setUsername(e.target.value.replace(/^@/, "").toLowerCase());
               setMessage(null);
             }}
-            placeholder="yourname"
+            placeholder={lang === "fr" ? "votrenom" : "yourname"}
             style={{ ...inputStyle, paddingLeft: 28 }}
           />
         </div>
@@ -1034,7 +1095,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
           window.location.href = data.url;
           return;
         }
-        alert(data.error ?? (lang === "fr" ? "Impossible d'ouvrir Whop." : "Could not open Whop billing."));
+        alert(lang === "fr" ? "Impossible d'ouvrir Whop." : data.error ?? "Could not open Whop billing.");
       } catch (err) {
         console.error("Whop portal error:", err);
         alert(lang === "fr" ? "Impossible d'ouvrir Whop." : "Could not open Whop billing.");
@@ -1091,7 +1152,13 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
       });
     } catch (err) {
       console.error("Checkout error:", err);
-      alert(err instanceof Error ? err.message : "Could not start checkout");
+      alert(
+        err instanceof Error
+          ? err.message
+          : lang === "fr"
+            ? "Impossible de lancer le paiement."
+            : "Could not start checkout",
+      );
     } finally {
       setLoading(null);
     }
@@ -1292,7 +1359,7 @@ function BillingSettings({ isMobile }: { isMobile?: boolean }) {
           </p>
         ) : invoicesError ? (
           <p style={{ fontSize: 13, color: "#C62828", margin: 0, letterSpacing: "-0.01em" }}>
-            {invoicesError}
+            {lang === "fr" ? "Impossible de charger les factures." : invoicesError}
           </p>
         ) : invoices.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, letterSpacing: "-0.01em" }}>
@@ -1407,11 +1474,12 @@ function NotificationsSettings({ userId }: { userId: string }) {
 }
 
 function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: () => void }) {
+  const lang = useLang();
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--ws-border)" }}>
       <span style={{ fontSize: 14, color: "var(--ws-text)", letterSpacing: "-0.02em", paddingRight: 16 }}>{label}</span>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
-        <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>{on ? "On" : "Off"}</span>
+        <span style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em" }}>{on ? (lang === "fr" ? "Activé" : "On") : lang === "fr" ? "Désactivé" : "Off"}</span>
         <SettingsToggle on={on} onToggle={onToggle} />
       </div>
     </div>
@@ -1499,7 +1567,7 @@ function TeamSettings({
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@company.com"
+                placeholder={lang === "fr" ? "collegue@entreprise.com" : "colleague@company.com"}
                 style={inputStyle}
                 disabled={!teamInvitesEnabled}
               />
@@ -1593,7 +1661,7 @@ function TeamSettings({
                       </div>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)" }}>
-                          {m.isYou ? "You" : m.name}
+                          {m.isYou ? (lang === "fr" ? "Vous" : "You") : m.name}
                           {m.isYou && (
                             <span style={{ marginLeft: 6, fontSize: 11, color: "var(--ws-text-dim)", fontWeight: 400 }}>({lang === "fr" ? "propriétaire du compte" : "account owner"})</span>
                           )}
@@ -1707,15 +1775,20 @@ function SecuritySettings({ onDeleteAccount }: { onDeleteAccount: () => void }) 
 }
 
 function DeleteAccountModal({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
+  const fr = useLang() === "fr";
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }}>
       <div style={{ background: "var(--ws-surface)", borderRadius: 16, padding: 28, maxWidth: 420, width: "100%", boxShadow: "0 24px 48px rgba(0,0,0,0.12)" }}>
-        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>Delete account?</h3>
-        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: "0 0 24px 0", lineHeight: 1.5 }}>This will permanently delete your account, stores, creators, and billing history. Type DELETE to confirm.</p>
-        <input type="text" placeholder="DELETE" style={{ ...inputStyle, marginBottom: 20 }} />
+        <h3 style={{ fontSize: 18, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.03em", margin: "0 0 8px 0" }}>{fr ? "Supprimer le compte ?" : "Delete account?"}</h3>
+        <p style={{ fontSize: 14, color: "var(--ws-text-muted)", letterSpacing: "-0.02em", margin: "0 0 24px 0", lineHeight: 1.5 }}>
+          {fr
+            ? "Cela supprimera définitivement votre compte, vos boutiques, vos créateurs et votre historique de facturation. Tapez SUPPRIMER pour confirmer."
+            : "This will permanently delete your account, stores, creators, and billing history. Type DELETE to confirm."}
+        </p>
+        <input type="text" placeholder={fr ? "SUPPRIMER" : "DELETE"} style={{ ...inputStyle, marginBottom: 20 }} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button type="button" onClick={onCancel} style={btnSecondary}>Cancel</button>
-          <button type="button" onClick={onConfirm} style={{ ...btnPrimary, background: "#DC2626" }}>Delete account</button>
+          <button type="button" onClick={onCancel} style={btnSecondary}>{fr ? "Annuler" : "Cancel"}</button>
+          <button type="button" onClick={onConfirm} style={{ ...btnPrimary, background: "#DC2626" }}>{fr ? "Supprimer le compte" : "Delete account"}</button>
         </div>
       </div>
     </div>

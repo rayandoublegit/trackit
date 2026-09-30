@@ -7,6 +7,7 @@ import { PlatformLogo, type PlatformName } from "@/components/PlatformLogo";
 import { PayoutsPulse, type PulseBucket } from "@/app/dashboard/PayoutsPulse";
 import { RevenueChart } from "@/app/dashboard/SampleCampaignPreview";
 import { CountUp, prefersReducedMotion, useLiveFeed } from "@/app/dashboard/sample-motion";
+import { useLang, type Lang } from "@/lib/useLang";
 import "@/app/dashboard/home-mino.css";
 import "./premium-demo.css";
 
@@ -14,6 +15,7 @@ import "./premium-demo.css";
 // thousands of creators, millions in tracked sales. Same shell, rail and views
 // as the real dashboard. People and brands are fictional; faces and products
 // are free Unsplash photos, videos are free Mixkit clips, all hotlinked.
+// French visitors get French copy and the same numbers in euros.
 
 type IconName = Parameters<typeof WsIcon>[0]["name"];
 type Rail = "home" | "findit" | "trackit" | "payit" | "integrations";
@@ -39,12 +41,23 @@ const BRANDS = [
   { id: "atelier", name: "Atelier Hair", photo: "1623143445418-40c192fa3d11" },
 ];
 
+type Niche = "Skincare" | "Beauty" | "Makeup" | "Fitness" | "Lifestyle" | "Food";
+const NICHE_FR: Record<Niche, string> = {
+  Skincare: "Skincare",
+  Beauty: "Beauté",
+  Makeup: "Maquillage",
+  Fitness: "Fitness",
+  Lifestyle: "Lifestyle",
+  Food: "Cuisine",
+};
+const nicheLabel = (niche: Niche, lang: Lang) => (lang === "fr" ? NICHE_FR[niche] : niche);
+
 type Creator = {
   id: string;
   name: string;
   handle: string;
   platform: PlatformName;
-  niche: string;
+  niche: Niche;
   face: string;
   video: number;
   followers: number;
@@ -74,9 +87,11 @@ const BY_ID = new Map(CREATORS.map((c) => [c.id, c]));
 type Campaign = {
   id: string;
   name: string;
+  nameFr: string;
   cover: string;
   status: "live" | "gifting" | "draft";
-  started: string;
+  /** Launch date as [month, day]; null while still a draft. */
+  started: [number, number] | null;
   revenue: number;
   sales: number;
   creators: number;
@@ -86,48 +101,66 @@ type Campaign = {
 };
 
 const CAMPAIGNS: Campaign[] = [
-  { id: "serum", name: "Glow Serum launch", cover: "1576426863848-c21f53c60b19", status: "live", started: "Sep 2", revenue: 1_184_320, sales: 18_402, creators: 342, conversion: 4.8, crew: ["luna", "sarah", "maya", "zoe"], trend: [4, 6, 5, 8, 9, 12, 14, 13, 17, 21] },
-  { id: "bf", name: "Black Friday bundle", cover: "1631730486572-226d1f595b68", status: "live", started: "Sep 14", revenue: 742_610, sales: 11_290, creators: 268, conversion: 5.6, crew: ["sarah", "ines", "chloe", "ava"], trend: [2, 3, 3, 5, 7, 8, 11, 15, 19, 24] },
-  { id: "spf", name: "Summer SPF drop", cover: "1623143445418-40c192fa3d11", status: "live", started: "Aug 21", revenue: 486_930, sales: 7_604, creators: 191, conversion: 3.9, crew: ["zoe", "nora", "jade", "luna"], trend: [9, 11, 10, 12, 11, 13, 12, 14, 13, 15] },
-  { id: "night", name: "Night Repair gifting", cover: "1718490953028-021d352b14fd", status: "gifting", started: "Sep 9", revenue: 263_480, sales: 4_122, creators: 124, conversion: 4.2, crew: ["maya", "chloe", "ines", "mike"], trend: [1, 2, 4, 4, 6, 7, 7, 9, 10, 12] },
-  { id: "oil", name: "Body oil UGC", cover: "1631729371254-42c2892f0e6e", status: "live", started: "Aug 30", revenue: 170_050, sales: 2_689, creators: 88, conversion: 3.4, crew: ["ava", "jade", "nora", "mike"], trend: [3, 4, 4, 5, 6, 6, 7, 8, 8, 9] },
+  { id: "serum", name: "Glow Serum launch", nameFr: "Lancement Glow Serum", cover: "1576426863848-c21f53c60b19", status: "live", started: [9, 2], revenue: 1_184_320, sales: 18_402, creators: 342, conversion: 4.8, crew: ["luna", "sarah", "maya", "zoe"], trend: [4, 6, 5, 8, 9, 12, 14, 13, 17, 21] },
+  { id: "bf", name: "Black Friday bundle", nameFr: "Coffret Black Friday", cover: "1631730486572-226d1f595b68", status: "live", started: [9, 14], revenue: 742_610, sales: 11_290, creators: 268, conversion: 5.6, crew: ["sarah", "ines", "chloe", "ava"], trend: [2, 3, 3, 5, 7, 8, 11, 15, 19, 24] },
+  { id: "spf", name: "Summer SPF drop", nameFr: "Drop SPF de l’été", cover: "1623143445418-40c192fa3d11", status: "live", started: [8, 21], revenue: 486_930, sales: 7_604, creators: 191, conversion: 3.9, crew: ["zoe", "nora", "jade", "luna"], trend: [9, 11, 10, 12, 11, 13, 12, 14, 13, 15] },
+  { id: "night", name: "Night Repair gifting", nameFr: "Gifting Night Repair", cover: "1718490953028-021d352b14fd", status: "gifting", started: [9, 9], revenue: 263_480, sales: 4_122, creators: 124, conversion: 4.2, crew: ["maya", "chloe", "ines", "mike"], trend: [1, 2, 4, 4, 6, 7, 7, 9, 10, 12] },
+  { id: "oil", name: "Body oil UGC", nameFr: "UGC huile pour le corps", cover: "1631729371254-42c2892f0e6e", status: "live", started: [8, 30], revenue: 170_050, sales: 2_689, creators: 88, conversion: 3.4, crew: ["ava", "jade", "nora", "mike"], trend: [3, 4, 4, 5, 6, 6, 7, 8, 8, 9] },
 ];
 const TOTAL_REVENUE = CAMPAIGNS.reduce((s, c) => s + c.revenue, 0);
 const TOTAL_SALES = 48_217;
 const NEW_CAMPAIGN_COVER = "1741896135512-084b251887f7";
+const campaignName = (c: Pick<Campaign, "name" | "nameFr">, lang: Lang) => (lang === "fr" ? c.nameFr : c.name);
+const campaignNameById = (id: string, lang: Lang) => {
+  const c = CAMPAIGNS.find((x) => x.id === id);
+  return c ? campaignName(c, lang) : "";
+};
 
 const LISTS = [
-  { name: "Skincare top 1%", count: 48, crew: ["luna", "ines", "sarah", "maya"] },
-  { name: "Q4 gifting wave", count: 126, crew: ["chloe", "maya", "zoe", "ava"] },
-  { name: "Fitness closers", count: 37, crew: ["mike", "nora", "jade", "zoe"] },
-  { name: "Ready to sign", count: 212, crew: ["sarah", "ava", "luna", "chloe"] },
+  { name: "Skincare top 1%", nameFr: "Top 1 % skincare", count: 48, crew: ["luna", "ines", "sarah", "maya"] },
+  { name: "Q4 gifting wave", nameFr: "Vague de gifting Q4", count: 126, crew: ["chloe", "maya", "zoe", "ava"] },
+  { name: "Fitness closers", nameFr: "Fitness : ceux qui convertissent", count: 37, crew: ["mike", "nora", "jade", "zoe"] },
+  { name: "Ready to sign", nameFr: "Prêts à signer", count: 212, crew: ["sarah", "ava", "luna", "chloe"] },
 ];
 
 const INTEGRATIONS = [
-  { name: "Shopify", logo: "/shopify-logo.svg", note: "Orders and discount codes synced live", on: true },
-  { name: "TikTok", logo: "/tiktok-logo.svg", note: "Creator stats and videos", on: true },
-  { name: "Instagram", logo: "/instagram-logo.svg", note: "Profiles, reels and reach", on: true },
-  { name: "Gmail", logo: "/gmail-logo.svg", note: "Outreach from your own inbox", on: true },
-  { name: "Stripe", logo: "/stripe-logo.svg", note: "Commission payouts", on: true },
-  { name: "Notion", logo: "/notion-logo.svg", note: "Briefs and scripts", on: false },
-  { name: "Google Drive", logo: "/google-drive-logo.svg", note: "Raw creator footage", on: true },
-  { name: "Zapier", logo: "/zapier-logo.svg", note: "Automate anything", on: false },
-  { name: "Make", logo: "/make-logo.svg", note: "Visual workflows", on: false },
+  { name: "Shopify", logo: "/shopify-logo.svg", note: "Orders and discount codes synced live", noteFr: "Commandes et codes promo synchronisés en direct", on: true },
+  { name: "TikTok", logo: "/tiktok-logo.svg", note: "Creator stats and videos", noteFr: "Statistiques et vidéos des créateurs", on: true },
+  { name: "Instagram", logo: "/instagram-logo.svg", note: "Profiles, reels and reach", noteFr: "Profils, reels et portée", on: true },
+  { name: "Gmail", logo: "/gmail-logo.svg", note: "Outreach from your own inbox", noteFr: "Outreach depuis votre propre boîte mail", on: true },
+  { name: "Stripe", logo: "/stripe-logo.svg", note: "Commission payouts", noteFr: "Paiement des commissions", on: true },
+  { name: "Notion", logo: "/notion-logo.svg", note: "Briefs and scripts", noteFr: "Briefs et scripts", on: false },
+  { name: "Google Drive", logo: "/google-drive-logo.svg", note: "Raw creator footage", noteFr: "Rushs des créateurs", on: true },
+  { name: "Zapier", logo: "/zapier-logo.svg", note: "Automate anything", noteFr: "Automatisez tout", on: false },
+  { name: "Make", logo: "/make-logo.svg", note: "Visual workflows", noteFr: "Workflows visuels", on: false },
 ];
 
 // ── Numbers ───────────────────────────────────────────────────
-const usd0 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const usd2 = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const money = (n: number) => usd0.format(Math.round(n));
-const cents = (n: number) => usd2.format(n);
-const int = (n: number) => Math.round(n).toLocaleString("en-US");
-function compact(n: number, prefix = ""): string {
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${prefix}${(n / 1e6).toFixed(2)}M`;
-  if (a >= 1e4) return `${prefix}${Math.round(n / 1e3)}K`;
-  if (a >= 1e3) return `${prefix}${(n / 1e3).toFixed(1)}K`;
-  return `${prefix}${Math.round(n)}`;
+// English shows dollars (en-US), French shows euros (fr-FR). Same figures.
+function makeFormat(lang: Lang) {
+  const fr = lang === "fr";
+  const locale = fr ? "fr-FR" : "en-US";
+  const currency0 = new Intl.NumberFormat(locale, { style: "currency", currency: fr ? "EUR" : "USD", maximumFractionDigits: 0 });
+  const decimal = (n: number, digits: number) => (fr ? n.toFixed(digits).replace(".", ",") : n.toFixed(digits));
+  return {
+    money: (n: number) => currency0.format(Math.round(n)),
+    int: (n: number) => Math.round(n).toLocaleString(locale),
+    pct: (n: number) => (fr ? `${String(n).replace(".", ",")} %` : `${n}%`),
+    compact(n: number, cash = false): string {
+      const a = Math.abs(n);
+      const [body, suffix] =
+        a >= 1e6 ? [decimal(n / 1e6, 2), "M"] : a >= 1e4 ? [String(Math.round(n / 1e3)), "K"] : a >= 1e3 ? [decimal(n / 1e3, 1), "K"] : [String(Math.round(n)), ""];
+      if (!fr) return `${cash ? "$" : ""}${body}${suffix}`;
+      const unit = suffix === "K" ? "k" : suffix;
+      const num = unit ? `${body} ${unit}` : body;
+      if (!cash) return num;
+      return unit ? `${num}€` : `${num} €`;
+    },
+    /** Short day like "Sep 2" / "2 sept.". */
+    day: (month: number, dayOfMonth: number) => new Date(2026, month - 1, dayOfMonth).toLocaleDateString(locale, { month: "short", day: "numeric" }),
+  };
 }
+const FORMAT = { en: makeFormat("en"), fr: makeFormat("fr") };
 
 /** Deterministic rising revenue curve that sums to `total`. */
 function revenueDays(count: number, total: number, seed: number): number[] {
@@ -141,9 +174,9 @@ function revenueDays(count: number, total: number, seed: number): number[] {
 }
 
 const PERIODS = [
-  { id: "7d", label: "7D", days: 7, total: 842_610 },
-  { id: "30d", label: "30D", days: 30, total: TOTAL_REVENUE },
-  { id: "90d", label: "90D", days: 90, total: 6_912_480 },
+  { id: "7d", label: "7D", labelFr: "7 j", days: 7, total: 842_610, growth: 12.9 },
+  { id: "30d", label: "30D", labelFr: "30 j", days: 30, total: TOTAL_REVENUE, growth: 38.4 },
+  { id: "90d", label: "90D", labelFr: "90 j", days: 90, total: 6_912_480, growth: 71.2 },
 ] as const;
 
 const PAYOUT_EARNED = 384_920;
@@ -160,6 +193,300 @@ function payoutBuckets(): PulseBucket[] {
   });
 }
 
+// ── Copy ──────────────────────────────────────────────────────
+const COPY = {
+  en: {
+    verified: "Verified",
+    sale: "drove a sale",
+    video: "posted a video",
+    views: "views",
+    signed: "signed the contract",
+    joined: "joined your program",
+    payoutSent: (n: number) => <>Payout sent to <b>{n} creators</b></>,
+    rotating: [
+      "Find micro fitness creators on TikTok",
+      "Skincare creators who already sell, 100K+",
+      "Who drove the most sales this week?",
+      "Pay every creator owed this month",
+      "Create a campaign for the holiday drop",
+    ],
+    chips: ["Find micro fitness creators on TikTok", "Find beauty creators on Instagram", "Create a new campaign", "Pay every creator owed"],
+    minoSteps: ["Reading your request", "Scanning 1,284,302 creators", "Ranking by real sales and views"],
+    scanning: (n: string) => `Scanning ${n} creators`,
+    minoAnswer: (n: number, total: string) => (
+      <>
+        Found <b>{n} creators</b> who already sell in this niche. Together they drove <b>{total}</b> for brands like yours.
+      </>
+    ),
+    followersLower: "followers",
+    engShort: "eng.",
+    sold: "sold",
+    savedToList: "Saved to “Ready to sign”",
+    saveAll: (n: number) => `Save all ${n} to a list`,
+    openInCreators: "Open in Creators",
+    greeting: (name: string) => `Hi ${name}, what should Mino do?`,
+    homeSub: "Mino finds creators across TikTok and Instagram, starts campaigns and pays everyone owed.",
+    askMino: "Ask Mino",
+    sendToMino: "Send to Mino",
+    yourProgram: "Your program",
+    liveUpdated: "Live · updated just now",
+    revenue: "Revenue",
+    creators: "Creators",
+    newCreators: (n: number) => `+${n} new`,
+    sales: "Sales",
+    paidOut: "Paid out",
+    liveCampaigns: (n: number) => `${n} live campaigns`,
+    revenueFromCreators: "Revenue from creators",
+    period: "Period",
+    liveActivity: "Live activity",
+    orders: (n: string) => `${n} orders`,
+    justNow: "just now",
+    minAgo: (n: number) => `${n} min ago`,
+    topCreators: "Top creators this month",
+    seeAll: "See all",
+    freshContent: "Fresh content",
+    library: "Library",
+    presets: { all: "All creators", sellers: "Top sellers", viral: "Viral videos", gems: "Weekly gems", ready: "Ready to contact" },
+    filters: ["Niche", "Followers", "Avg views", "Engagement", "Country", "With email", "Verified"],
+    creatorsCount: (n: string) => `${n} creators`,
+    searchCreatorsPlaceholder: "Search creators, @handles, niches…",
+    searchCreators: "Search creators",
+    myLists: "My lists",
+    outreach: "Outreach",
+    videos: "Videos",
+    avg: "avg",
+    followers: "Followers",
+    engagement: "Engagement",
+    salesDriven: "Sales driven",
+    save: "Save",
+    invited: "Invited",
+    inviteToCampaign: "Invite to campaign",
+    noMatch: (q: string) => `No creator matches “${q}”. Try another niche.`,
+    campaigns: "Campaigns",
+    campaignsSub: "Manage your campaigns and track creator performance and commissions.",
+    createCampaign: "Create a campaign",
+    vsLastMonth: (p: string) => `▲ ${p} vs last month`,
+    creatorsOnCampaigns: "Creators on campaigns",
+    ordersTitle: "Orders",
+    avgConversion: (p: string) => `${p} avg conversion`,
+    tabActive: (n: number) => `Active (${n})`,
+    tabGifting: (n: number) => `Gifting (${n})`,
+    tabDrafts: (n: number) => `Drafts (${n})`,
+    draftNotLaunched: "Draft · not launched",
+    started: (d: string) => `Started ${d}`,
+    statusLive: "Live",
+    statusGifting: "Gifting",
+    statusDraft: "Draft",
+    noOrdersYet: "No orders yet",
+    nothingYet: "Nothing here yet.",
+    content: "Content",
+    videosCount: (n: string) => `${n} videos`,
+    contentSub: "Every video your creators delivered, with ad rights attached.",
+    approved: "Approved",
+    toReview: "To review",
+    approve: "Approve",
+    overview: "Overview",
+    everyonePaid: "Everyone is paid",
+    payAll: (amount: string) => `Pay all · ${amount}`,
+    commissionsEarned: "Commissions earned",
+    salesInPeriod: (n: string) => `${n} sales in period`,
+    last30Days: "Last 30 days",
+    creatorsPending: (n: number) => `${n} creators pending`,
+    paidInPeriod: "Paid in period",
+    paymentsInPeriod: "Payments in period",
+    creator: "Creator",
+    amountOwed: "Amount owed",
+    payment: "Payment",
+    totalEarned: "Total earned",
+    paid: "Paid",
+    pay: "Pay",
+    payments: "Payments",
+    paidLast30: (amount: string) => `${amount} paid to creators in the last 30 days.`,
+    amount: "Amount",
+    method: "Method",
+    date: "Date",
+    status: "Status",
+    integrations: "Integrations",
+    integrationsSub: "Connect your store and tools. Sales, codes and payouts stay in sync.",
+    connection: (name: string) => `${name} connection`,
+    rail: { home: "Home", findit: "Creators", trackit: "Campaigns", payit: "Payouts", integrations: "Integrations" },
+    chats: ["Top skincare creators in France", "Black Friday brief", "Who to pay this week"],
+    searchMeta: { discovery: "Search", campaigns: "Track", payouts: "Pay", content: "Videos", integrations: "Shopify, TikTok…" },
+    discover: "Discover",
+    search: "Search",
+    manage: "Manage",
+    track: "Track",
+    payIt: "Pay it",
+    toPay: "To pay",
+    paymentsLink: "Payments",
+    connected: "Connected",
+    home: "Home",
+    newCampaignName: "Holiday gift set",
+    workspaces: "Workspaces",
+    searchPlaceholder: "Search creators, campaigns…",
+    noResults: "No results",
+    profile: "Profile",
+    planOnline: "Business plan · Online",
+    settings: "Settings",
+    themes: "Themes",
+    light: "Light",
+    help: "Help",
+    newChat: "New chat",
+    chatsLabel: "Chats",
+    thisMonth: "This month",
+    goal: "78% of your $3.6M goal",
+    newSale: "New sale",
+  },
+  fr: {
+    verified: "Vérifié",
+    sale: "a généré une vente",
+    video: "a publié une vidéo",
+    views: "vues",
+    signed: "a signé le contrat",
+    joined: "a rejoint votre programme",
+    payoutSent: (n: number) => <>Paiement envoyé à <b>{n} créateurs</b></>,
+    rotating: [
+      "Trouver des micro-créateurs fitness sur TikTok",
+      "Créatrices skincare qui vendent déjà, 100 k+",
+      "Qui a généré le plus de ventes cette semaine ?",
+      "Payer tous les créateurs à régler ce mois-ci",
+      "Créer une campagne pour le drop des fêtes",
+    ],
+    chips: ["Trouver des micro-créateurs fitness sur TikTok", "Trouver des créatrices beauté sur Instagram", "Créer une nouvelle campagne", "Payer tous les créateurs en attente"],
+    minoSteps: ["Lecture de votre demande", "Analyse de 1 284 302 créateurs", "Classement par ventes et vues réelles"],
+    scanning: (n: string) => `Analyse de ${n} créateurs`,
+    minoAnswer: (n: number, total: string) => (
+      <>
+        <b>{n} créateurs</b> trouvés, qui vendent déjà dans cette niche. Ensemble, ils ont généré <b>{total}</b> pour des marques comme la vôtre.
+      </>
+    ),
+    followersLower: "abonnés",
+    engShort: "eng.",
+    sold: "vendus",
+    savedToList: "Enregistrés dans « Prêts à signer »",
+    saveAll: (n: number) => `Enregistrer les ${n} dans une liste`,
+    openInCreators: "Ouvrir dans Créateurs",
+    greeting: (name: string) => `Bonjour ${name}, que doit faire Mino ?`,
+    homeSub: "Mino trouve des créateurs sur TikTok et Instagram, lance des campagnes et paie tout ce qui est dû.",
+    askMino: "Demandez à Mino",
+    sendToMino: "Envoyer à Mino",
+    yourProgram: "Votre programme",
+    liveUpdated: "En direct · mis à jour à l’instant",
+    revenue: "Chiffre d’affaires",
+    creators: "Créateurs",
+    newCreators: (n: number) => `+${n} nouveaux`,
+    sales: "Ventes",
+    paidOut: "Versé",
+    liveCampaigns: (n: number) => `${n} campagnes en cours`,
+    revenueFromCreators: "CA généré par les créateurs",
+    period: "Période",
+    liveActivity: "Activité en direct",
+    orders: (n: string) => `${n} commandes`,
+    justNow: "à l’instant",
+    minAgo: (n: number) => `il y a ${n} min`,
+    topCreators: "Top créateurs du mois",
+    seeAll: "Tout voir",
+    freshContent: "Nouveaux contenus",
+    library: "Bibliothèque",
+    presets: { all: "Tous les créateurs", sellers: "Meilleures ventes", viral: "Vidéos virales", gems: "Pépites de la semaine", ready: "Prêts à contacter" },
+    filters: ["Niche", "Abonnés", "Vues moy.", "Engagement", "Pays", "Avec e-mail", "Vérifié"],
+    creatorsCount: (n: string) => `${n} créateurs`,
+    searchCreatorsPlaceholder: "Rechercher créateurs, @comptes, niches…",
+    searchCreators: "Rechercher des créateurs",
+    myLists: "Mes listes",
+    outreach: "Outreach",
+    videos: "Vidéos",
+    avg: "en moy.",
+    followers: "Abonnés",
+    engagement: "Engagement",
+    salesDriven: "Ventes générées",
+    save: "Enregistrer",
+    invited: "Invité",
+    inviteToCampaign: "Inviter à une campagne",
+    noMatch: (q: string) => `Aucun créateur ne correspond à « ${q} ». Essayez une autre niche.`,
+    campaigns: "Campagnes",
+    campaignsSub: "Gérez vos campagnes et suivez les performances et commissions de vos créateurs.",
+    createCampaign: "Créer une campagne",
+    vsLastMonth: (p: string) => `▲ ${p} vs mois dernier`,
+    creatorsOnCampaigns: "Créateurs en campagne",
+    ordersTitle: "Commandes",
+    avgConversion: (p: string) => `${p} de conversion moyenne`,
+    tabActive: (n: number) => `En cours (${n})`,
+    tabGifting: (n: number) => `Gifting (${n})`,
+    tabDrafts: (n: number) => `Brouillons (${n})`,
+    draftNotLaunched: "Brouillon · pas encore lancée",
+    started: (d: string) => `Lancée le ${d}`,
+    statusLive: "En cours",
+    statusGifting: "Gifting",
+    statusDraft: "Brouillon",
+    noOrdersYet: "Aucune commande pour l’instant",
+    nothingYet: "Rien ici pour l’instant.",
+    content: "Contenus",
+    videosCount: (n: string) => `${n} vidéos`,
+    contentSub: "Toutes les vidéos livrées par vos créateurs, droits publicitaires inclus.",
+    approved: "Validée",
+    toReview: "À valider",
+    approve: "Valider",
+    overview: "Vue d’ensemble",
+    everyonePaid: "Tout le monde est payé",
+    payAll: (amount: string) => `Tout payer · ${amount}`,
+    commissionsEarned: "Commissions générées",
+    salesInPeriod: (n: string) => `${n} ventes sur la période`,
+    last30Days: "30 derniers jours",
+    creatorsPending: (n: number) => `${n} créateurs en attente`,
+    paidInPeriod: "Versé sur la période",
+    paymentsInPeriod: "Paiements sur la période",
+    creator: "Créateur",
+    amountOwed: "Montant dû",
+    payment: "Paiement",
+    totalEarned: "Total gagné",
+    paid: "Payé",
+    pay: "Payer",
+    payments: "Historique des paiements",
+    paidLast30: (amount: string) => `${amount} versés aux créateurs ces 30 derniers jours.`,
+    amount: "Montant",
+    method: "Moyen",
+    date: "Date",
+    status: "Statut",
+    integrations: "Intégrations",
+    integrationsSub: "Connectez votre boutique et vos outils. Ventes, codes et paiements restent synchronisés.",
+    connection: (name: string) => `Connexion ${name}`,
+    rail: { home: "Accueil", findit: "Créateurs", trackit: "Campagnes", payit: "Paiements", integrations: "Intégrations" },
+    chats: ["Top créatrices skincare en France", "Brief Black Friday", "Qui payer cette semaine"],
+    searchMeta: { discovery: "Recherche", campaigns: "Suivi", payouts: "Paiement", content: "Vidéos", integrations: "Shopify, TikTok…" },
+    discover: "Découvrir",
+    search: "Recherche",
+    manage: "Gérer",
+    track: "Suivi",
+    payIt: "Payer",
+    toPay: "À payer",
+    paymentsLink: "Historique",
+    connected: "Connectées",
+    home: "Accueil",
+    newCampaignName: "Coffret cadeau des fêtes",
+    workspaces: "Workspaces",
+    searchPlaceholder: "Rechercher créateurs, campagnes…",
+    noResults: "Aucun résultat",
+    profile: "Profil",
+    planOnline: "Plan Business · En ligne",
+    settings: "Paramètres",
+    themes: "Thèmes",
+    light: "Clair",
+    help: "Aide",
+    newChat: "Nouvelle conversation",
+    chatsLabel: "Conversations",
+    thisMonth: "Ce mois-ci",
+    goal: "78 % de votre objectif de 3,6 M€",
+    newSale: "Nouvelle vente",
+  },
+} satisfies Record<Lang, unknown>;
+
+/** Copy and number formats for the page language. */
+function useCopy() {
+  const lang = useLang();
+  return { lang, t: COPY[lang], f: FORMAT[lang] };
+}
+
 // ── Live events ───────────────────────────────────────────────
 type LiveEvent =
   | { type: "sale"; who: string; amount: number; campaign: string }
@@ -168,18 +495,19 @@ type LiveEvent =
   | { type: "joined"; who: string }
   | { type: "paid"; count: number; amount: number };
 
+// `campaign` is a campaign id, named in the page language when shown.
 const EVENTS: LiveEvent[] = [
-  { type: "sale", who: "luna", amount: 184, campaign: "Glow Serum launch" },
+  { type: "sale", who: "luna", amount: 184, campaign: "serum" },
   { type: "video", who: "zoe", views: 1_240_000 },
-  { type: "sale", who: "sarah", amount: 312, campaign: "Black Friday bundle" },
+  { type: "sale", who: "sarah", amount: 312, campaign: "bf" },
   { type: "signed", who: "maya" },
-  { type: "sale", who: "mike", amount: 96, campaign: "Summer SPF drop" },
+  { type: "sale", who: "mike", amount: 96, campaign: "spf" },
   { type: "paid", count: 38, amount: 24_860 },
-  { type: "sale", who: "ines", amount: 148, campaign: "Glow Serum launch" },
+  { type: "sale", who: "ines", amount: 148, campaign: "serum" },
   { type: "joined", who: "chloe" },
-  { type: "sale", who: "ava", amount: 226, campaign: "Body oil UGC" },
+  { type: "sale", who: "ava", amount: 226, campaign: "oil" },
   { type: "video", who: "luna", views: 684_000 },
-  { type: "sale", who: "nora", amount: 132, campaign: "Black Friday bundle" },
+  { type: "sale", who: "nora", amount: 132, campaign: "bf" },
 ];
 const SALES = EVENTS.filter((e): e is Extract<LiveEvent, { type: "sale" }> => e.type === "sale");
 
@@ -261,8 +589,9 @@ function Spark({ values, tone = "blue" }: { values: number[]; tone?: "blue" | "w
 }
 
 function Verified() {
+  const { t } = useCopy();
   return (
-    <svg className="pd-verified" width="13" height="13" viewBox="0 0 24 24" aria-label="Verified">
+    <svg className="pd-verified" width="13" height="13" viewBox="0 0 24 24" aria-label={t.verified}>
       <path d="M12 2l2.4 2.1 3.2-.4.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.4L12 22l-2.4-2.1-3.2.4-.9-3.1L2.7 15.6l1-3-1-3 2.8-1.6.9-3.1 3.2.4z" fill="#0047ff" />
       <path d="M8.2 12.3l2.5 2.4 5.1-5.2" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -309,36 +638,30 @@ const IconArrowUp = () => (
   </svg>
 );
 
-function eventLine(e: LiveEvent): { face?: string; text: ReactNode; value?: string; tone: string } {
+function eventLine(e: LiveEvent, lang: Lang): { face?: string; text: ReactNode; value?: string; tone: string } {
+  const t = COPY[lang];
+  const f = FORMAT[lang];
   const first = (id: string) => BY_ID.get(id)?.name.split(" ")[0] ?? "";
   switch (e.type) {
     case "sale":
-      return { face: e.who, tone: "sale", text: <><b>{first(e.who)}</b> drove a sale · {e.campaign}</>, value: `+${money(e.amount)}` };
+      return { face: e.who, tone: "sale", text: <><b>{first(e.who)}</b> {t.sale} · {campaignNameById(e.campaign, lang)}</>, value: `+${f.money(e.amount)}` };
     case "video":
-      return { face: e.who, tone: "video", text: <><b>{first(e.who)}</b> posted a video</>, value: `${compact(e.views)} views` };
+      return { face: e.who, tone: "video", text: <><b>{first(e.who)}</b> {t.video}</>, value: `${f.compact(e.views)} ${t.views}` };
     case "signed":
-      return { face: e.who, tone: "signed", text: <><b>{first(e.who)}</b> signed the contract</> };
+      return { face: e.who, tone: "signed", text: <><b>{first(e.who)}</b> {t.signed}</> };
     case "joined":
-      return { face: e.who, tone: "joined", text: <><b>{first(e.who)}</b> joined your program</> };
+      return { face: e.who, tone: "joined", text: <><b>{first(e.who)}</b> {t.joined}</> };
     case "paid":
-      return { tone: "paid", text: <>Payout sent to <b>{e.count} creators</b></>, value: money(e.amount) };
+      return { tone: "paid", text: t.payoutSent(e.count), value: f.money(e.amount) };
   }
 }
 
 // ── Mino ──────────────────────────────────────────────────────
-const ROTATING = [
-  "Find micro fitness creators on TikTok",
-  "Skincare creators who already sell, 100K+",
-  "Who drove the most sales this week?",
-  "Pay every creator owed this month",
-  "Create a campaign for the holiday drop",
-];
-
-function useTypedPlaceholder(active: boolean): string {
+function useTypedPlaceholder(active: boolean, phrases: readonly string[]): string {
   const [i, setI] = useState(0);
   const [n, setN] = useState(0);
   const [back, setBack] = useState(false);
-  const full = ROTATING[i];
+  const full = phrases[i % phrases.length];
   useEffect(() => {
     if (!active) return;
     const done = back ? n === 0 : n >= full.length;
@@ -347,7 +670,7 @@ function useTypedPlaceholder(active: boolean): string {
         if (!back && n >= full.length) return setBack(true);
         if (back && n === 0) {
           setBack(false);
-          setI((x) => (x + 1) % ROTATING.length);
+          setI((x) => (x + 1) % phrases.length);
           return;
         }
         setN((x) => x + (back ? -1 : 1));
@@ -355,33 +678,29 @@ function useTypedPlaceholder(active: boolean): string {
       done ? (back ? 300 : 2000) : back ? 20 : 50,
     );
     return () => window.clearTimeout(t);
-  }, [n, back, full.length, active]);
-  return active ? full.slice(0, n) : ROTATING[0];
+  }, [n, back, full.length, active, phrases.length]);
+  return active ? full.slice(0, n) : phrases[0];
 }
 
-const HOME_CHIPS: { text: string; icon: ReactNode }[] = [
-  { text: "Find micro fitness creators on TikTok", icon: <PlatformLogo platform="tiktok" size={15} /> },
-  { text: "Find beauty creators on Instagram", icon: <PlatformLogo platform="instagram" size={15} /> },
-  { text: "Create a new campaign", icon: <IconMega /> },
-  {
-    text: "Pay every creator owed",
-    icon: (
-      <Svg size={15}>
-        <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5" />
-        <circle cx="16.5" cy="14" r="1.2" fill="currentColor" />
-      </Svg>
-    ),
-  },
+const CHIP_ICONS: ReactNode[] = [
+  <PlatformLogo key="tiktok" platform="tiktok" size={15} />,
+  <PlatformLogo key="instagram" platform="instagram" size={15} />,
+  <IconMega key="mega" />,
+  <Svg key="wallet" size={15}>
+    <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5" />
+    <circle cx="16.5" cy="14" r="1.2" fill="currentColor" />
+  </Svg>,
 ];
 
+// Understands the English and French prompts the demo offers.
 function minoMatches(q: string): Creator[] {
   const s = q.toLowerCase();
   const pick = (test: (c: Creator) => boolean) => CREATORS.filter(test);
   let hits: Creator[] = [];
-  if (/fit|gym|sport/.test(s)) hits = pick((c) => c.niche === "Fitness");
-  else if (/skin|serum|spf/.test(s)) hits = pick((c) => c.niche === "Skincare");
-  else if (/beaut|makeup|make-up/.test(s)) hits = pick((c) => ["Beauty", "Makeup", "Skincare"].includes(c.niche));
-  else if (/food|recipe|cook/.test(s)) hits = pick((c) => c.niche === "Food");
+  if (/fit|gym|sport|muscu/.test(s)) hits = pick((c) => c.niche === "Fitness");
+  else if (/skin|serum|sérum|spf|peau|soin/.test(s)) hits = pick((c) => c.niche === "Skincare");
+  else if (/beaut|makeup|make-up|maquillage/.test(s)) hits = pick((c) => ["Beauty", "Makeup", "Skincare"].includes(c.niche));
+  else if (/food|recipe|cook|cuisine|recette/.test(s)) hits = pick((c) => c.niche === "Food");
   if (/tiktok/.test(s)) hits = (hits.length ? hits : CREATORS).filter((c) => c.platform === "tiktok");
   else if (/insta/.test(s)) hits = (hits.length ? hits : CREATORS).filter((c) => c.platform === "instagram");
   const rest = CREATORS.filter((c) => !hits.includes(c));
@@ -389,6 +708,7 @@ function minoMatches(q: string): Creator[] {
 }
 
 function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators: () => void }) {
+  const { t: copy, f } = useCopy();
   const [t, setT] = useState(() => (prefersReducedMotion() ? 99_999 : 0));
   const [saved, setSaved] = useState(false);
   const results = useMemo(() => minoMatches(query), [query]);
@@ -402,7 +722,7 @@ function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators:
     }, 40);
     return () => window.clearInterval(id);
   }, []);
-  const steps = ["Reading your request", "Scanning 1,284,302 creators", "Ranking by real sales and views"];
+  const steps = copy.minoSteps;
   const scanned = Math.min(1_284_302, Math.round((t / 1500) * 1_284_302));
   const showResults = t > 1650;
   return (
@@ -422,24 +742,21 @@ function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators:
               return (
                 <li key={s} className={done ? "is-done" : t > i * 450 ? "is-active" : ""}>
                   <span className="pd-mino__tick">{done ? <IconCheck size={11} /> : null}</span>
-                  {i === 1 && !done ? `Scanning ${int(scanned)} creators` : s}
+                  {i === 1 && !done ? copy.scanning(f.int(scanned)) : s}
                 </li>
               );
             })}
           </ul>
           {showResults ? (
             <>
-              <p className="pd-mino__answer">
-                Found <b>{results.length} creators</b> who already sell in this niche. Together they drove{" "}
-                <b>{money(results.reduce((s, c) => s + c.revenue, 0))}</b> for brands like yours.
-              </p>
+              <p className="pd-mino__answer">{copy.minoAnswer(results.length, f.money(results.reduce((s, c) => s + c.revenue, 0)))}</p>
               <div className="pd-mino__grid">
                 {results.map((c, i) => (
                   <article key={c.id} className="pd-mcard" style={{ animationDelay: `${i * 110}ms` }}>
                     <div className="pd-mcard__media">
                       <Clip id={c.video} />
                       <span className="pd-mcard__views">
-                        <IconPlay /> {compact(c.avgViews)}
+                        <IconPlay /> {f.compact(c.avgViews)}
                       </span>
                     </div>
                     <div className="pd-mcard__who">
@@ -455,13 +772,13 @@ function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators:
                     </div>
                     <div className="pd-mcard__stats">
                       <span>
-                        <b>{compact(c.followers)}</b> followers
+                        <b>{f.compact(c.followers)}</b> {copy.followersLower}
                       </span>
                       <span>
-                        <b>{c.engagement}%</b> eng.
+                        <b>{f.pct(c.engagement)}</b> {copy.engShort}
                       </span>
                       <span className="is-money">
-                        <b>{compact(c.revenue, "$")}</b> sold
+                        <b>{f.compact(c.revenue, true)}</b> {copy.sold}
                       </span>
                     </div>
                   </article>
@@ -471,14 +788,14 @@ function MinoResults({ query, onOpenCreators }: { query: string; onOpenCreators:
                 <button type="button" className={`pd-btn is-primary${saved ? " is-done" : ""}`} onClick={() => setSaved(true)}>
                   {saved ? (
                     <>
-                      <IconCheck /> Saved to “Ready to sign”
+                      <IconCheck /> {copy.savedToList}
                     </>
                   ) : (
-                    `Save all ${results.length} to a list`
+                    copy.saveAll(results.length)
                   )}
                 </button>
                 <button type="button" className="pd-btn" onClick={onOpenCreators}>
-                  Open in Creators
+                  {copy.openInCreators}
                 </button>
               </div>
             </>
@@ -503,9 +820,10 @@ function HomePage({
   onGo: (page: Page) => void;
   typing: boolean;
 }) {
+  const { lang, t, f } = useCopy();
   const [text, setText] = useState("");
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["id"]>("30d");
-  const placeholder = useTypedPlaceholder(typing && !text);
+  const placeholder = useTypedPlaceholder(typing && !text, t.rotating);
   const p = PERIODS.find((x) => x.id === period) ?? PERIODS[1];
   const days = useMemo(() => revenueDays(p.days, p.total, p.days), [p.days, p.total]);
   const feedHost = useRef<HTMLUListElement>(null);
@@ -525,8 +843,8 @@ function HomePage({
         <div className="hm-hero__mino" aria-hidden>
           <MinoCompanion size={56} />
         </div>
-        <h1 className="hm-hero__title">Hi {OWNER.first}, what should Mino do?</h1>
-        <p className="hm-hero__sub">Mino finds creators across TikTok and Instagram, starts campaigns and pays everyone owed.</p>
+        <h1 className="hm-hero__title">{t.greeting(OWNER.first)}</h1>
+        <p className="hm-hero__sub">{t.homeSub}</p>
         <form
           className="mtg-promptbox hm-hero__box"
           onSubmit={(e) => {
@@ -542,17 +860,17 @@ function HomePage({
           </div>
           <div className="hm-hero__field">
             <MinoCompanion size={20} />
-            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder || "Ask Mino"} aria-label="Ask Mino" />
-            <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label="Send to Mino">
+            <input value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder || t.askMino} aria-label={t.askMino} />
+            <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label={t.sendToMino}>
               <IconArrowUp />
             </button>
           </div>
         </form>
         <div className="hm-hero__chips">
-          {HOME_CHIPS.map((c, i) => (
-            <button key={c.text} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => onAsk(c.text)}>
-              <span className="hm-chip__icon">{c.icon}</span>
-              {c.text}
+          {t.chips.map((chip, i) => (
+            <button key={chip} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => onAsk(chip)}>
+              <span className="hm-chip__icon">{CHIP_ICONS[i]}</span>
+              {chip}
             </button>
           ))}
         </div>
@@ -560,69 +878,69 @@ function HomePage({
 
       <div className="pd-home__body">
         <div className="hm-section-title">
-          <h2>Your program</h2>
+          <h2>{t.yourProgram}</h2>
           <span>
-            <i className="pd-live-dot" aria-hidden /> Live · updated just now
+            <i className="pd-live-dot" aria-hidden /> {t.liveUpdated}
           </span>
         </div>
         <div className="hm-metrics pd-metrics">
           <button type="button" className="hm-metric is-accent pd-metric" style={{ ["--i" as string]: 0 }} onClick={() => onGo("campaigns")}>
             <div className="hm-metric__top">
-              <span className="hm-metric__label">Revenue</span>
+              <span className="hm-metric__label">{t.revenue}</span>
               <span className="hm-metric__icon">
                 <IconBag />
               </span>
             </div>
             <div className="hm-metric__value">
-              <CountUp value={revenue} format={(n) => compact(n, "$")} />
+              <CountUp value={revenue} format={(n) => f.compact(n, true)} />
             </div>
             <div className="pd-metric__foot">
-              <span className="pd-up is-light">▲ 38.4%</span>
+              <span className="pd-up is-light">▲ {f.pct(38.4)}</span>
               <Spark values={[3, 4, 4, 6, 7, 9, 8, 11, 13, 16]} tone="white" />
             </div>
           </button>
           <button type="button" className="hm-metric pd-metric" style={{ ["--i" as string]: 1 }} onClick={() => onGo("discovery")}>
             <div className="hm-metric__top">
-              <span className="hm-metric__label">Creators</span>
+              <span className="hm-metric__label">{t.creators}</span>
               <span className="hm-metric__icon">
                 <WsIcon name="users" size={16} />
               </span>
             </div>
             <div className="hm-metric__value">
-              <CountUp value={1_284} format={int} />
+              <CountUp value={1_284} format={f.int} />
             </div>
             <div className="pd-metric__foot">
               <Stack ids={["luna", "sarah", "maya", "zoe"]} size={20} />
-              <span className="pd-up">+86 new</span>
+              <span className="pd-up">{t.newCreators(86)}</span>
             </div>
           </button>
           <button type="button" className="hm-metric pd-metric" style={{ ["--i" as string]: 2 }} onClick={() => onGo("campaigns")}>
             <div className="hm-metric__top">
-              <span className="hm-metric__label">Sales</span>
+              <span className="hm-metric__label">{t.sales}</span>
               <span className="hm-metric__icon">
                 <WsIcon name="billing" size={16} />
               </span>
             </div>
             <div className="hm-metric__value">
-              <CountUp value={sales} format={int} />
+              <CountUp value={sales} format={f.int} />
             </div>
             <div className="pd-metric__foot">
-              <span className="pd-up">▲ 21.7%</span>
+              <span className="pd-up">▲ {f.pct(21.7)}</span>
               <Spark values={[5, 6, 5, 7, 8, 8, 10, 11, 12, 14]} />
             </div>
           </button>
           <button type="button" className="hm-metric pd-metric" style={{ ["--i" as string]: 3 }} onClick={() => onGo("payouts")}>
             <div className="hm-metric__top">
-              <span className="hm-metric__label">Paid out</span>
+              <span className="hm-metric__label">{t.paidOut}</span>
               <span className="hm-metric__icon">
                 <WsIcon name="payit" size={16} />
               </span>
             </div>
             <div className="hm-metric__value">
-              <CountUp value={PAID_START} format={(n) => compact(n, "$")} />
+              <CountUp value={PAID_START} format={(n) => f.compact(n, true)} />
             </div>
             <div className="pd-metric__foot">
-              <span className="pd-up">14 live campaigns</span>
+              <span className="pd-up">{t.liveCampaigns(14)}</span>
             </div>
           </button>
         </div>
@@ -631,33 +949,33 @@ function HomePage({
           <section className="pd-card pd-revenue">
             <header className="pd-card__head">
               <div>
-                <span className="pd-card__label">Revenue from creators</span>
+                <span className="pd-card__label">{t.revenueFromCreators}</span>
                 <div className="pd-revenue__total">
-                  <CountUp value={p.total + (period === "30d" ? bonus : 0)} format={money} />
-                  <span className="pd-up">▲ {period === "7d" ? "12.9" : period === "30d" ? "38.4" : "71.2"}%</span>
+                  <CountUp value={p.total + (period === "30d" ? bonus : 0)} format={f.money} />
+                  <span className="pd-up">▲ {f.pct(p.growth)}</span>
                 </div>
               </div>
-              <div className="pd-seg" role="tablist" aria-label="Period">
+              <div className="pd-seg" role="tablist" aria-label={t.period}>
                 {PERIODS.map((x) => (
                   <button key={x.id} type="button" role="tab" aria-selected={period === x.id} className={period === x.id ? "is-active" : ""} onClick={() => setPeriod(x.id)}>
-                    {x.label}
+                    {lang === "fr" ? x.labelFr : x.label}
                   </button>
                 ))}
               </div>
             </header>
-            <RevenueChart key={period} lang="en" days={days} />
+            <RevenueChart key={period} lang={lang} days={days} />
           </section>
 
           <section className="pd-card pd-feed">
             <header className="pd-card__head">
               <span className="pd-card__title">
-                <i className="pd-live-dot" aria-hidden /> Live activity
+                <i className="pd-live-dot" aria-hidden /> {t.liveActivity}
               </span>
-              <span className="pd-card__meta">{int(sales)} orders</span>
+              <span className="pd-card__meta">{t.orders(f.int(sales))}</span>
             </header>
             <ul className="pd-feed__list" ref={feedHost}>
               {feed.map(({ item, key }, i) => {
-                const line = eventLine(item);
+                const line = eventLine(item, lang);
                 return (
                   <li key={key} className={`pd-feed__item is-${line.tone}`}>
                     {line.face ? (
@@ -669,7 +987,7 @@ function HomePage({
                     )}
                     <div>
                       <p>{line.text}</p>
-                      <small>{i === 0 ? "just now" : `${i * 3} min ago`}</small>
+                      <small>{i === 0 ? t.justNow : t.minAgo(i * 3)}</small>
                     </div>
                     {line.value ? <strong>{line.value}</strong> : null}
                   </li>
@@ -682,9 +1000,9 @@ function HomePage({
         <div className="pd-row pd-row--even">
           <section className="pd-card">
             <header className="pd-card__head">
-              <span className="pd-card__title">Top creators this month</span>
+              <span className="pd-card__title">{t.topCreators}</span>
               <button type="button" className="pd-link" onClick={() => onGo("discovery")}>
-                See all
+                {t.seeAll}
               </button>
             </header>
             <ol className="pd-leaders">
@@ -700,16 +1018,16 @@ function HomePage({
                       <i style={{ ["--w" as string]: `${(c.revenue / maxTop) * 100}%`, animationDelay: `${300 + i * 90}ms` }} />
                     </span>
                   </div>
-                  <b className="pd-leaders__value">{compact(c.revenue, "$")}</b>
+                  <b className="pd-leaders__value">{f.compact(c.revenue, true)}</b>
                 </li>
               ))}
             </ol>
           </section>
           <section className="pd-card">
             <header className="pd-card__head">
-              <span className="pd-card__title">Fresh content</span>
+              <span className="pd-card__title">{t.freshContent}</span>
               <button type="button" className="pd-link" onClick={() => onGo("content")}>
-                Library
+                {t.library}
               </button>
             </header>
             <div className="pd-reels">
@@ -719,7 +1037,7 @@ function HomePage({
                   <button key={id} type="button" className="pd-reel" onClick={() => onGo("content")}>
                     <Clip id={c.video} />
                     <span className="pd-reel__top">
-                      <IconPlay /> {compact(c.avgViews * 1.8)}
+                      <IconPlay /> {f.compact(c.avgViews * 1.8)}
                     </span>
                     <span className="pd-reel__who">
                       <Face id={c.face} size={22} ring />@{c.handle}
@@ -736,18 +1054,12 @@ function HomePage({
 }
 
 // ── Creators ──────────────────────────────────────────────────
-const PRESETS = [
-  { id: "all", label: "All creators" },
-  { id: "sellers", label: "Top sellers" },
-  { id: "viral", label: "Viral videos" },
-  { id: "gems", label: "Weekly gems" },
-  { id: "ready", label: "Ready to contact" },
-] as const;
-const FILTERS = ["Niche", "Followers", "Avg views", "Engagement", "Country", "With email", "Verified"];
+const PRESET_IDS = ["all", "sellers", "viral", "gems", "ready"] as const;
 
 function DiscoveryPage() {
+  const { lang, t, f } = useCopy();
   const [q, setQ] = useState("");
-  const [preset, setPreset] = useState<(typeof PRESETS)[number]["id"]>("all");
+  const [preset, setPreset] = useState<(typeof PRESET_IDS)[number]>("all");
   const [platform, setPlatform] = useState<PlatformName | "all">("all");
   const [mode, setMode] = useState<"creators" | "videos">("creators");
   const [saved, setSaved] = useState<Set<string>>(() => new Set(["luna"]));
@@ -756,13 +1068,13 @@ function DiscoveryPage() {
   const list = useMemo(() => {
     let l = CREATORS.filter((c) => platform === "all" || c.platform === platform);
     const s = q.trim().toLowerCase();
-    if (s) l = l.filter((c) => `${c.name} ${c.handle} ${c.niche} ${c.country}`.toLowerCase().includes(s));
+    if (s) l = l.filter((c) => `${c.name} ${c.handle} ${c.niche} ${nicheLabel(c.niche, lang)} ${c.country}`.toLowerCase().includes(s));
     if (preset === "sellers") l = [...l].sort((a, b) => b.revenue - a.revenue);
     if (preset === "viral") l = [...l].sort((a, b) => b.avgViews - a.avgViews);
     if (preset === "gems") l = [...l].sort((a, b) => b.engagement - a.engagement);
     if (preset === "ready") l = l.filter((c) => !invited.has(c.id));
     return l;
-  }, [q, preset, platform, invited]);
+  }, [q, preset, platform, invited, lang]);
 
   const toggle = (set: Set<string>, id: string) => {
     const next = new Set(set);
@@ -775,27 +1087,27 @@ function DiscoveryPage() {
     <div className="pd-page pd-pad">
       <div className="pd-head">
         <h1>
-          Creators <span className="pd-badge">1,284,302 creators</span>
+          {t.creators} <span className="pd-badge">{t.creatorsCount(f.int(1_284_302))}</span>
         </h1>
         <label className="pd-search">
           <WsIcon name="search" size={15} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search creators, @handles, niches…" aria-label="Search creators" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchCreatorsPlaceholder} aria-label={t.searchCreators} />
         </label>
         <div className="pd-head__actions">
           <span className="pd-chip-btn">
-            <WsIcon name="list" size={14} /> My lists
+            <WsIcon name="list" size={14} /> {t.myLists}
           </span>
           <span className="pd-chip-btn is-dark">
-            <WsIcon name="invite" size={14} /> Outreach
+            <WsIcon name="invite" size={14} /> {t.outreach}
           </span>
         </div>
       </div>
 
       <div className="pd-tabs">
         <div className="pd-tabs__left">
-          {PRESETS.map((x) => (
-            <button key={x.id} type="button" className={preset === x.id ? "is-active" : ""} onClick={() => setPreset(x.id)}>
-              {x.label}
+          {PRESET_IDS.map((id) => (
+            <button key={id} type="button" className={preset === id ? "is-active" : ""} onClick={() => setPreset(id)}>
+              {t.presets[id]}
             </button>
           ))}
         </div>
@@ -811,15 +1123,15 @@ function DiscoveryPage() {
       <div className="pd-filters">
         <div className="pd-seg">
           <button type="button" className={mode === "creators" ? "is-active" : ""} onClick={() => setMode("creators")}>
-            <WsIcon name="users" size={13} /> Creators
+            <WsIcon name="users" size={13} /> {t.creators}
           </button>
           <button type="button" className={mode === "videos" ? "is-active" : ""} onClick={() => setMode("videos")}>
-            <WsIcon name="camera" size={13} /> Videos
+            <WsIcon name="camera" size={13} /> {t.videos}
           </button>
         </div>
-        {FILTERS.map((f) => (
-          <span key={f} className="pd-filter">
-            {f}
+        {t.filters.map((label) => (
+          <span key={label} className="pd-filter">
+            {label}
             <WsIcon name="chevron" size={11} />
           </span>
         ))}
@@ -831,9 +1143,9 @@ function DiscoveryPage() {
             <article key={c.id} className="pd-ccard" style={{ animationDelay: `${i * 60}ms` }}>
               <div className="pd-ccard__media">
                 <Clip id={c.video} />
-                <span className="pd-ccard__niche">{c.niche}</span>
+                <span className="pd-ccard__niche">{nicheLabel(c.niche, lang)}</span>
                 <span className="pd-ccard__views">
-                  <IconPlay /> {compact(c.avgViews)} avg
+                  <IconPlay /> {f.compact(c.avgViews)} {t.avg}
                 </span>
               </div>
               <div className="pd-ccard__who">
@@ -849,35 +1161,35 @@ function DiscoveryPage() {
               </div>
               <div className="pd-ccard__stats">
                 <span>
-                  <b>{compact(c.followers)}</b>
-                  <small>Followers</small>
+                  <b>{f.compact(c.followers)}</b>
+                  <small>{t.followers}</small>
                 </span>
                 <span>
-                  <b>{c.engagement}%</b>
-                  <small>Engagement</small>
+                  <b>{f.pct(c.engagement)}</b>
+                  <small>{t.engagement}</small>
                 </span>
                 <span className="is-money">
-                  <b>{compact(c.revenue, "$")}</b>
-                  <small>Sales driven</small>
+                  <b>{f.compact(c.revenue, true)}</b>
+                  <small>{t.salesDriven}</small>
                 </span>
               </div>
               <div className="pd-ccard__actions">
-                <button type="button" className={`pd-btn is-icon${saved.has(c.id) ? " is-saved" : ""}`} aria-pressed={saved.has(c.id)} aria-label="Save" onClick={() => setSaved((s) => toggle(s, c.id))}>
+                <button type="button" className={`pd-btn is-icon${saved.has(c.id) ? " is-saved" : ""}`} aria-pressed={saved.has(c.id)} aria-label={t.save} onClick={() => setSaved((s) => toggle(s, c.id))}>
                   <IconHeart />
                 </button>
                 <button type="button" className={`pd-btn is-primary is-grow${invited.has(c.id) ? " is-done" : ""}`} onClick={() => setInvited((s) => toggle(s, c.id))}>
                   {invited.has(c.id) ? (
                     <>
-                      <IconCheck /> Invited
+                      <IconCheck /> {t.invited}
                     </>
                   ) : (
-                    "Invite to campaign"
+                    t.inviteToCampaign
                   )}
                 </button>
               </div>
             </article>
           ))}
-          {list.length === 0 ? <p className="pd-empty">No creator matches “{q}”. Try another niche.</p> : null}
+          {list.length === 0 ? <p className="pd-empty">{t.noMatch(q)}</p> : null}
         </div>
       ) : (
         <div className="pd-vgrid">
@@ -885,12 +1197,12 @@ function DiscoveryPage() {
             <article key={c.id} className="pd-vcard" style={{ animationDelay: `${i * 60}ms` }}>
               <Clip id={c.video} />
               <span className="pd-vcard__top">
-                <IconPlay /> {compact(c.avgViews * 2.3)}
+                <IconPlay /> {f.compact(c.avgViews * 2.3)}
               </span>
               <div className="pd-vcard__foot">
                 <Face id={c.face} size={22} ring />
                 <span>@{c.handle}</span>
-                <b>{compact(c.revenue / 6, "$")}</b>
+                <b>{f.compact(c.revenue / 6, true)}</b>
               </div>
             </article>
           ))}
@@ -901,17 +1213,18 @@ function DiscoveryPage() {
 }
 
 function ListsPage({ onOpen }: { onOpen: () => void }) {
+  const { lang, t, f } = useCopy();
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
-        <h1>My lists</h1>
+        <h1>{t.myLists}</h1>
       </div>
       <div className="pd-lists">
         {LISTS.map((l, i) => (
           <button key={l.name} type="button" className="pd-list" style={{ animationDelay: `${i * 70}ms` }} onClick={onOpen}>
             <Stack ids={l.crew} size={34} more={`+${l.count - l.crew.length}`} />
-            <strong>{l.name}</strong>
-            <span>{l.count} creators</span>
+            <strong>{lang === "fr" ? l.nameFr : l.name}</strong>
+            <span>{t.creatorsCount(f.int(l.count))}</span>
           </button>
         ))}
       </div>
@@ -921,6 +1234,7 @@ function ListsPage({ onOpen }: { onOpen: () => void }) {
 
 // ── Campaigns ─────────────────────────────────────────────────
 function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; onCreate: () => void; fresh: string | null }) {
+  const { lang, t, f } = useCopy();
   const [tab, setTab] = useState<"active" | "gifting" | "drafts">("active");
   const [open, setOpen] = useState<string | null>("serum");
   const shown = campaigns.filter((c) => (tab === "active" ? c.status === "live" : tab === "gifting" ? c.status === "gifting" : c.status === "draft"));
@@ -928,8 +1242,8 @@ function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; 
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
-        <h1>Campaigns</h1>
-        <p className="pd-head__sub">Manage your campaigns and track creator performance and commissions.</p>
+        <h1>{t.campaigns}</h1>
+        <p className="pd-head__sub">{t.campaignsSub}</p>
         <div className="pd-head__actions">
           <button
             type="button"
@@ -939,41 +1253,41 @@ function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; 
               setTab("drafts");
             }}
           >
-            <WsIcon name="plus" size={14} /> Create a campaign
+            <WsIcon name="plus" size={14} /> {t.createCampaign}
           </button>
         </div>
       </div>
 
       <div className="pd-tiles">
         <div className="pd-tile" style={{ animationDelay: "0ms" }}>
-          <span>Revenue</span>
+          <span>{t.revenue}</span>
           <b>
-            <CountUp value={live.reduce((s, c) => s + c.revenue, 0)} format={money} />
+            <CountUp value={live.reduce((s, c) => s + c.revenue, 0)} format={f.money} />
           </b>
-          <small className="pd-up">▲ 38.4% vs last month</small>
+          <small className="pd-up">{t.vsLastMonth(f.pct(38.4))}</small>
         </div>
         <div className="pd-tile" style={{ animationDelay: "70ms" }}>
-          <span>Creators on campaigns</span>
+          <span>{t.creatorsOnCampaigns}</span>
           <b>
-            <CountUp value={live.reduce((s, c) => s + c.creators, 0)} format={int} />
+            <CountUp value={live.reduce((s, c) => s + c.creators, 0)} format={f.int} />
           </b>
           <Stack ids={["luna", "sarah", "maya", "mike", "zoe"]} size={20} />
         </div>
         <div className="pd-tile" style={{ animationDelay: "140ms" }}>
-          <span>Orders</span>
+          <span>{t.ordersTitle}</span>
           <b>
-            <CountUp value={live.reduce((s, c) => s + c.sales, 0)} format={int} />
+            <CountUp value={live.reduce((s, c) => s + c.sales, 0)} format={f.int} />
           </b>
-          <small>4.7% avg conversion</small>
+          <small>{t.avgConversion(f.pct(4.7))}</small>
         </div>
       </div>
 
       <div className="pd-subtabs">
         {(
           [
-            ["active", `Active (${campaigns.filter((c) => c.status === "live").length})`],
-            ["gifting", `Gifting (${campaigns.filter((c) => c.status === "gifting").length})`],
-            ["drafts", `Drafts (${campaigns.filter((c) => c.status === "draft").length})`],
+            ["active", t.tabActive(campaigns.filter((c) => c.status === "live").length)],
+            ["gifting", t.tabGifting(campaigns.filter((c) => c.status === "gifting").length)],
+            ["drafts", t.tabDrafts(campaigns.filter((c) => c.status === "draft").length)],
           ] as const
         ).map(([id, label]) => (
           <button key={id} type="button" className={tab === id ? "is-active" : ""} onClick={() => setTab(id)}>
@@ -988,16 +1302,16 @@ function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; 
             <button type="button" className="pd-camp__row" onClick={() => setOpen((o) => (o === c.id ? null : c.id))}>
               <Photo id={c.cover} w={44} h={44} className="pd-camp__cover" />
               <span className="pd-camp__name">
-                <strong>{c.name}</strong>
+                <strong>{campaignName(c, lang)}</strong>
                 <small>
-                  {c.status === "draft" ? "Draft · not launched" : `Started ${c.started}`} · {c.creators} creators
+                  {c.status === "draft" || !c.started ? t.draftNotLaunched : t.started(f.day(c.started[0], c.started[1]))} · {t.creatorsCount(f.int(c.creators))}
                 </small>
               </span>
-              <span className={`pd-pill is-${c.status}`}>{c.status === "live" ? "Live" : c.status === "gifting" ? "Gifting" : "Draft"}</span>
+              <span className={`pd-pill is-${c.status}`}>{c.status === "live" ? t.statusLive : c.status === "gifting" ? t.statusGifting : t.statusDraft}</span>
               <Stack ids={c.crew} size={22} />
               <span className="pd-camp__num">
-                <b>{c.revenue ? money(c.revenue) : "—"}</b>
-                <small>{c.sales ? `${int(c.sales)} orders` : "No orders yet"}</small>
+                <b>{c.revenue ? f.money(c.revenue) : "—"}</b>
+                <small>{c.sales ? t.orders(f.int(c.sales)) : t.noOrdersYet}</small>
               </span>
               {c.trend.length ? <Spark values={c.trend} tone="green" /> : <span className="pd-spark-empty" />}
             </button>
@@ -1015,7 +1329,7 @@ function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; 
                           <PlatformLogo platform={cr.platform} size={10} /> @{cr.handle}
                         </small>
                       </span>
-                      <b>{money(c.revenue * share)}</b>
+                      <b>{f.money(c.revenue * share)}</b>
                     </div>
                   );
                 })}
@@ -1023,21 +1337,22 @@ function CampaignsPage({ campaigns, onCreate, fresh }: { campaigns: Campaign[]; 
             ) : null}
           </article>
         ))}
-        {shown.length === 0 ? <p className="pd-empty">Nothing here yet.</p> : null}
+        {shown.length === 0 ? <p className="pd-empty">{t.nothingYet}</p> : null}
       </div>
     </div>
   );
 }
 
 function ContentPage() {
+  const { t, f } = useCopy();
   const [approved, setApproved] = useState<Set<string>>(() => new Set(["zoe", "luna", "sarah", "mike"]));
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
         <h1>
-          Content <span className="pd-badge">2,318 videos</span>
+          {t.content} <span className="pd-badge">{t.videosCount(f.int(2_318))}</span>
         </h1>
-        <p className="pd-head__sub">Every video your creators delivered, with ad rights attached.</p>
+        <p className="pd-head__sub">{t.contentSub}</p>
       </div>
       <div className="pd-vgrid is-content">
         {CREATORS.map((c, i) => {
@@ -1045,15 +1360,15 @@ function ContentPage() {
           return (
             <article key={c.id} className="pd-vcard" style={{ animationDelay: `${i * 60}ms` }}>
               <Clip id={c.video} />
-              <span className={`pd-vcard__status${ok ? " is-ok" : ""}`}>{ok ? "Approved" : "To review"}</span>
+              <span className={`pd-vcard__status${ok ? " is-ok" : ""}`}>{ok ? t.approved : t.toReview}</span>
               <div className="pd-vcard__foot">
                 <Face id={c.face} size={22} ring />
                 <span>@{c.handle}</span>
                 {ok ? (
-                  <b>{compact(c.avgViews * 1.6)}</b>
+                  <b>{f.compact(c.avgViews * 1.6)}</b>
                 ) : (
                   <button type="button" className="pd-approve" onClick={() => setApproved((s) => new Set(s).add(c.id))}>
-                    <IconCheck size={12} /> Approve
+                    <IconCheck size={12} /> {t.approve}
                   </button>
                 )}
               </div>
@@ -1067,52 +1382,54 @@ function ContentPage() {
 
 // ── Payouts ───────────────────────────────────────────────────
 function PayoutsPage({ paid, onPay, onPayAll }: { paid: Set<string>; onPay: (id: string) => void; onPayAll: () => void }) {
+  const { lang, t, f } = useCopy();
   const buckets = useMemo(payoutBuckets, []);
   const owed = CREATORS.filter((c) => !paid.has(c.id)).reduce((s, c) => s + c.owed, 0);
   const paidNow = PAID_START + (OWED_START - owed);
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
-        <h1>Overview</h1>
+        <h1>{t.overview}</h1>
         <div className="pd-head__actions">
           <button type="button" className={`pd-btn is-primary${owed === 0 ? " is-done" : ""}`} onClick={onPayAll} disabled={owed === 0}>
             {owed === 0 ? (
               <>
-                <IconCheck /> Everyone is paid
+                <IconCheck /> {t.everyonePaid}
               </>
             ) : (
-              <>Pay all · {money(owed)}</>
+              <>{t.payAll(f.money(owed))}</>
             )}
           </button>
         </div>
       </div>
       <PayoutsPulse
-        title="Commissions earned"
+        lang={lang}
+        title={t.commissionsEarned}
         amount={PAYOUT_EARNED}
-        salesLine={`${int(TOTAL_SALES)} sales in period`}
+        salesLine={t.salesInPeriod(f.int(TOTAL_SALES))}
         periodControl={
           <span className="pd-period">
-            Last 30 days <WsIcon name="chevron" size={12} />
+            {t.last30Days} <WsIcon name="chevron" size={12} />
           </span>
         }
         buckets={buckets}
         owed={owed}
-        owedHint={`${CREATORS.filter((c) => !paid.has(c.id)).length} creators pending`}
+        owedHint={t.creatorsPending(CREATORS.filter((c) => !paid.has(c.id)).length)}
         paid={paidNow}
-        paidLabel="Paid in period"
-        paidHint="Payments in period"
+        paidLabel={t.paidInPeriod}
+        paidHint={t.paymentsInPeriod}
         avgPerSale={PAYOUT_EARNED / TOTAL_SALES}
         salesCount={TOTAL_SALES}
-        format={money}
+        format={f.money}
       />
       <section className="pd-card pd-card--flush">
         <div className="pd-table">
           <div className="pd-table__row is-head">
-            <span>Creator</span>
-            <span>Amount owed</span>
-            <span>Payment</span>
-            <span>Total earned</span>
-            <span>Sales</span>
+            <span>{t.creator}</span>
+            <span>{t.amountOwed}</span>
+            <span>{t.payment}</span>
+            <span>{t.totalEarned}</span>
+            <span>{t.sales}</span>
             <span />
           </div>
           {CREATORS.map((c, i) => {
@@ -1126,20 +1443,20 @@ function PayoutsPage({ paid, onPay, onPayAll }: { paid: Set<string>; onPay: (id:
                     <small>@{c.handle}</small>
                   </span>
                 </span>
-                <span className="pd-num">{done ? "$0" : money(c.owed)}</span>
+                <span className="pd-num">{f.money(done ? 0 : c.owed)}</span>
                 <span>
                   <span className="pd-method">{c.method}</span>
                 </span>
-                <span className="pd-num">{money(c.revenue * 0.12 + (done ? c.owed : 0))}</span>
-                <span className="pd-num">{int(c.sales)}</span>
+                <span className="pd-num">{f.money(c.revenue * 0.12 + (done ? c.owed : 0))}</span>
+                <span className="pd-num">{f.int(c.sales)}</span>
                 <span className="pd-right">
                   <button type="button" className={`pd-btn is-sm${done ? " is-done" : " is-primary"}`} disabled={done} onClick={() => onPay(c.id)}>
                     {done ? (
                       <>
-                        <IconCheck size={12} /> Paid
+                        <IconCheck size={12} /> {t.paid}
                       </>
                     ) : (
-                      "Pay"
+                      t.pay
                     )}
                   </button>
                 </span>
@@ -1153,24 +1470,25 @@ function PayoutsPage({ paid, onPay, onPayAll }: { paid: Set<string>; onPay: (id:
 }
 
 function TransactionsPage() {
+  const { t, f } = useCopy();
   const rows = CREATORS.flatMap((c, i) => [
-    { c, amount: Math.round(c.owed * 1.9), date: `Sep ${28 - i}`, ref: `PO-${48213 - i * 7}` },
-    { c, amount: Math.round(c.owed * 1.4), date: `Aug ${29 - i}`, ref: `PO-${46102 - i * 5}` },
+    { c, amount: Math.round(c.owed * 1.9), date: f.day(9, 28 - i), ref: `PO-${48213 - i * 7}` },
+    { c, amount: Math.round(c.owed * 1.4), date: f.day(8, 29 - i), ref: `PO-${46102 - i * 5}` },
   ]).slice(0, 14);
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
-        <h1>Payments</h1>
-        <p className="pd-head__sub">{money(PAID_START)} paid to creators in the last 30 days.</p>
+        <h1>{t.payments}</h1>
+        <p className="pd-head__sub">{t.paidLast30(f.money(PAID_START))}</p>
       </div>
       <section className="pd-card pd-card--flush">
         <div className="pd-table is-tx">
           <div className="pd-table__row is-head">
-            <span>Creator</span>
-            <span>Amount</span>
-            <span>Method</span>
-            <span>Date</span>
-            <span>Status</span>
+            <span>{t.creator}</span>
+            <span>{t.amount}</span>
+            <span>{t.method}</span>
+            <span>{t.date}</span>
+            <span>{t.status}</span>
           </div>
           {rows.map((r, i) => (
             <div key={r.ref} className="pd-table__row" style={{ animationDelay: `${i * 35}ms` }}>
@@ -1181,13 +1499,13 @@ function TransactionsPage() {
                   <small>{r.ref}</small>
                 </span>
               </span>
-              <span className="pd-num">{money(r.amount)}</span>
+              <span className="pd-num">{f.money(r.amount)}</span>
               <span>
                 <span className="pd-method">{r.c.method}</span>
               </span>
               <span className="pd-muted">{r.date}</span>
               <span>
-                <span className="pd-pill is-live">Paid</span>
+                <span className="pd-pill is-live">{t.paid}</span>
               </span>
             </div>
           ))}
@@ -1198,12 +1516,13 @@ function TransactionsPage() {
 }
 
 function IntegrationsPage() {
+  const { lang, t } = useCopy();
   const [on, setOn] = useState(() => new Set(INTEGRATIONS.filter((x) => x.on).map((x) => x.name)));
   return (
     <div className="pd-page pd-pad">
       <div className="pd-head">
-        <h1>Integrations</h1>
-        <p className="pd-head__sub">Connect your store and tools. Sales, codes and payouts stay in sync.</p>
+        <h1>{t.integrations}</h1>
+        <p className="pd-head__sub">{t.integrationsSub}</p>
       </div>
       <div className="pd-integrations">
         {INTEGRATIONS.map((x, i) => {
@@ -1214,13 +1533,13 @@ function IntegrationsPage() {
               <img src={x.logo} alt="" width={30} height={30} />
               <span>
                 <strong>{x.name}</strong>
-                <small>{x.note}</small>
+                <small>{lang === "fr" ? x.noteFr : x.note}</small>
               </span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={active}
-                aria-label={`${x.name} connection`}
+                aria-label={t.connection(x.name)}
                 className={`pd-switch${active ? " is-on" : ""}`}
                 onClick={() =>
                   setOn((s) => {
@@ -1242,12 +1561,12 @@ function IntegrationsPage() {
 }
 
 // ── Shell ─────────────────────────────────────────────────────
-const RAIL: { id: Rail; label: string; icon: IconName; page: Page }[] = [
-  { id: "home", label: "Home", icon: "home", page: "home" },
-  { id: "findit", label: "Creators", icon: "findit", page: "discovery" },
-  { id: "trackit", label: "Campaigns", icon: "trackit", page: "campaigns" },
-  { id: "payit", label: "Payouts", icon: "payit", page: "payouts" },
-  { id: "integrations", label: "Integrations", icon: "integrations", page: "integrations" },
+const RAIL: { id: Rail; icon: IconName; page: Page }[] = [
+  { id: "home", icon: "home", page: "home" },
+  { id: "findit", icon: "findit", page: "discovery" },
+  { id: "trackit", icon: "trackit", page: "campaigns" },
+  { id: "payit", icon: "payit", page: "payouts" },
+  { id: "integrations", icon: "integrations", page: "integrations" },
 ];
 const PAGE_RAIL: Record<Page, Rail> = {
   home: "home",
@@ -1261,18 +1580,10 @@ const PAGE_RAIL: Record<Page, Rail> = {
   integrations: "integrations",
 };
 
-const CHATS = ["Top skincare creators in France", "Black Friday brief", "Who to pay this week"];
-
-const SEARCH_ITEMS: { label: string; meta: string; page: Page; face?: string }[] = [
-  { label: "Creators", meta: "Search", page: "discovery" },
-  { label: "Campaigns", meta: "Track", page: "campaigns" },
-  { label: "Payouts", meta: "Pay", page: "payouts" },
-  { label: "Content", meta: "Videos", page: "content" },
-  { label: "Integrations", meta: "Shopify, TikTok…", page: "integrations" },
-  ...CREATORS.map((c) => ({ label: c.name, meta: `@${c.handle}`, page: "discovery" as Page, face: c.face })),
-];
+const SEARCH_PAGES = ["discovery", "campaigns", "payouts", "content", "integrations"] as const;
 
 export function PremiumWorkspaceDemo() {
+  const { lang, t, f } = useCopy();
   const [page, setPage] = useState<Page>("home");
   const rail = PAGE_RAIL[page];
   const lastPage = useRef<Partial<Record<Rail, Page>>>({});
@@ -1281,7 +1592,7 @@ export function PremiumWorkspaceDemo() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [minoQuery, setMinoQuery] = useState(CHATS[0]);
+  const [minoQuery, setMinoQuery] = useState(t.chats[0]);
   const [minoKey, setMinoKey] = useState(0);
   const [campaigns, setCampaigns] = useState<Campaign[]>(CAMPAIGNS);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -1301,8 +1612,8 @@ export function PremiumWorkspaceDemo() {
 
   const ask = (q: string) => {
     const s = q.toLowerCase();
-    if (/\bpay\b|payout/.test(s)) return go("payouts");
-    if (/campaign/.test(s)) return createCampaign();
+    if (/\bpay\b|payout|\bpayer\b|paiement/.test(s)) return go("payouts");
+    if (/campaign|campagne/.test(s)) return createCampaign();
     setMinoQuery(q);
     setMinoKey((k) => k + 1);
     go("mino");
@@ -1311,7 +1622,7 @@ export function PremiumWorkspaceDemo() {
   const createCampaign = () => {
     const id = `new-${Date.now()}`;
     setCampaigns((list) => [
-      { id, name: "Holiday gift set", cover: NEW_CAMPAIGN_COVER, status: "draft", started: "", revenue: 0, sales: 0, creators: 0, conversion: 0, crew: ["luna", "sarah", "zoe"], trend: [] },
+      { id, name: COPY.en.newCampaignName, nameFr: COPY.fr.newCampaignName, cover: NEW_CAMPAIGN_COVER, status: "draft", started: null, revenue: 0, sales: 0, creators: 0, conversion: 0, crew: ["luna", "sarah", "zoe"], trend: [] },
       ...list,
     ]);
     setFresh(id);
@@ -1347,16 +1658,16 @@ export function PremiumWorkspaceDemo() {
 
   useEffect(() => {
     if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3200);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timer);
   }, [toast]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (!t.closest(".ws-workspace-switcher")) setBrandOpen(false);
-      if (!t.closest(".pd-profile")) setProfileOpen(false);
-      if (!t.closest(".ws-search-wrap")) setSearchOpen(false);
+      const target = e.target as HTMLElement;
+      if (!target.closest(".ws-workspace-switcher")) setBrandOpen(false);
+      if (!target.closest(".pd-profile")) setProfileOpen(false);
+      if (!target.closest(".ws-search-wrap")) setSearchOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -1374,48 +1685,56 @@ export function PremiumWorkspaceDemo() {
   }, []);
 
   const current = BRANDS.find((b) => b.id === brand) ?? BRANDS[0];
-  const hits = search.trim() ? SEARCH_ITEMS.filter((x) => `${x.label} ${x.meta}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 6) : [];
+  const searchItems: { label: string; meta: string; page: Page; face?: string }[] = [
+    ...SEARCH_PAGES.map((p) => ({
+      label: p === "discovery" ? t.creators : p === "campaigns" ? t.campaigns : p === "payouts" ? t.rail.payit : p === "content" ? t.content : t.integrations,
+      meta: t.searchMeta[p],
+      page: p as Page,
+    })),
+    ...CREATORS.map((c) => ({ label: c.name, meta: `@${c.handle}`, page: "discovery" as Page, face: c.face })),
+  ];
+  const hits = search.trim() ? searchItems.filter((x) => `${x.label} ${x.meta}`.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 6) : [];
   const toastCreator = toast ? BY_ID.get(toast.who) : null;
 
   const sidebar: { title: string; action?: { label: string; run: () => void }; sections: { label: string; links: { label: string; icon: IconName; page: Page }[] }[] } =
     rail === "findit"
       ? {
-          title: "Creators",
+          title: t.creators,
           sections: [
-            { label: "Discover", links: [{ label: "Search", icon: "findit", page: "discovery" }] },
-            { label: "Manage", links: [{ label: "My lists", icon: "users", page: "lists" }] },
+            { label: t.discover, links: [{ label: t.search, icon: "findit", page: "discovery" }] },
+            { label: t.manage, links: [{ label: t.myLists, icon: "users", page: "lists" }] },
           ],
         }
       : rail === "trackit"
         ? {
-            title: "Campaigns",
-            action: { label: "Create a campaign", run: createCampaign },
+            title: t.campaigns,
+            action: { label: t.createCampaign, run: createCampaign },
             sections: [
               {
-                label: "Track",
+                label: t.track,
                 links: [
-                  { label: "Campaigns", icon: "grid", page: "campaigns" },
-                  { label: "Content", icon: "camera", page: "content" },
+                  { label: t.campaigns, icon: "grid", page: "campaigns" },
+                  { label: t.content, icon: "camera", page: "content" },
                 ],
               },
             ],
           }
         : rail === "payit"
           ? {
-              title: "Payouts",
+              title: t.rail.payit,
               sections: [
                 {
-                  label: "Pay it",
+                  label: t.payIt,
                   links: [
-                    { label: "To pay", icon: "payit", page: "payouts" },
-                    { label: "Payments", icon: "list", page: "transactions" },
+                    { label: t.toPay, icon: "payit", page: "payouts" },
+                    { label: t.paymentsLink, icon: "list", page: "transactions" },
                   ],
                 },
               ],
             }
           : rail === "integrations"
-            ? { title: "Integrations", sections: [{ label: "Connected", links: [{ label: "Integrations", icon: "integrations", page: "integrations" }] }] }
-            : { title: "Home", sections: [] };
+            ? { title: t.integrations, sections: [{ label: t.connected, links: [{ label: t.integrations, icon: "integrations", page: "integrations" }] }] }
+            : { title: t.home, sections: [] };
 
   return (
     <div className="ws-shell pd-shell" ref={rootRef}>
@@ -1431,12 +1750,12 @@ export function PremiumWorkspaceDemo() {
           >
             <Photo id={current.photo} w={22} h={22} className="ws-workspace-mark is-photo" />
             <span className="label">{current.name}</span>
-            <span className="pd-plan">Scale</span>
+            <span className="pd-plan">Business</span>
             <WsIcon name="chevron" size={14} />
           </button>
           {brandOpen ? (
             <div className="ws-workspace-menu">
-              <div className="ws-workspace-menu__label">Workspaces</div>
+              <div className="ws-workspace-menu__label">{t.workspaces}</div>
               {BRANDS.map((b) => (
                 <button
                   key={b.id}
@@ -1461,8 +1780,8 @@ export function PremiumWorkspaceDemo() {
             <input
               ref={searchRef}
               value={search}
-              placeholder="Search creators, campaigns…"
-              aria-label="Search"
+              placeholder={t.searchPlaceholder}
+              aria-label={t.search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setSearchOpen(e.target.value.trim().length > 0);
@@ -1494,7 +1813,7 @@ export function PremiumWorkspaceDemo() {
                   <span className="ws-search-panel__meta">{item.meta}</span>
                 </button>
               ))}
-              {hits.length === 0 ? <div className="pd-search-empty">No results</div> : null}
+              {hits.length === 0 ? <div className="pd-search-empty">{t.noResults}</div> : null}
             </div>
           ) : null}
         </div>
@@ -1508,7 +1827,7 @@ export function PremiumWorkspaceDemo() {
             <button
               type="button"
               className="ws-avatar-btn"
-              aria-label="Profile"
+              aria-label={t.profile}
               onClick={() => {
                 setProfileOpen((v) => !v);
                 setBrandOpen(false);
@@ -1522,18 +1841,18 @@ export function PremiumWorkspaceDemo() {
                   <Face id={OWNER.face} size={40} />
                   <div>
                     <div className="ws-menu__name">{OWNER.name}</div>
-                    <div className="ws-menu__meta">Scale plan · Online</div>
+                    <div className="ws-menu__meta">{t.planOnline}</div>
                   </div>
                 </div>
                 <div className="ws-menu__sep" />
                 <button type="button" className="ws-menu__item" onClick={() => setProfileOpen(false)}>
                   <WsIcon name="settings" size={16} />
-                  Settings
+                  {t.settings}
                 </button>
                 <button type="button" className="ws-menu__item" onClick={() => setProfileOpen(false)}>
                   <WsIcon name="theme" size={16} />
-                  Themes
-                  <span className="muted">Light</span>
+                  {t.themes}
+                  <span className="muted">{t.light}</span>
                 </button>
               </div>
             ) : null}
@@ -1550,17 +1869,17 @@ export function PremiumWorkspaceDemo() {
                 type="button"
                 className={`ws-rail__item${rail === item.id ? " is-active" : ""}`}
                 onClick={() => go(item.id === "home" ? "home" : (lastPage.current[item.id] ?? item.page))}
-                title={item.label}
+                title={t.rail[item.id]}
               >
                 <WsIcon name={item.icon} size={18} />
-                <span>{item.label}</span>
+                <span>{t.rail[item.id]}</span>
               </button>
             ))}
           </div>
           <div className="ws-rail__foot">
-            <button type="button" className="ws-rail__item" title="Help">
+            <button type="button" className="ws-rail__item" title={t.help}>
               <WsIcon name="help" size={18} />
-              <span>Help</span>
+              <span>{t.help}</span>
             </button>
           </div>
         </aside>
@@ -1576,11 +1895,11 @@ export function PremiumWorkspaceDemo() {
                   <>
                     <button type="button" className="ws-sidebar__link ws-spaces-new" onClick={() => go("home")}>
                       <WsIcon name="plus" size={15} />
-                      <span>New chat</span>
+                      <span>{t.newChat}</span>
                     </button>
                     <div className="ws-sidebar__section">
-                      <div className="ws-sidebar__section-label">Chats</div>
-                      {CHATS.map((c) => (
+                      <div className="ws-sidebar__section-label">{t.chatsLabel}</div>
+                      {t.chats.map((c) => (
                         <button
                           key={c}
                           type="button"
@@ -1612,14 +1931,14 @@ export function PremiumWorkspaceDemo() {
                 ))}
               </div>
               <div className="pd-side-foot">
-                <span className="pd-side-foot__label">This month</span>
+                <span className="pd-side-foot__label">{t.thisMonth}</span>
                 <b>
-                  <CountUp value={live.revenue} format={money} />
+                  <CountUp value={live.revenue} format={f.money} />
                 </b>
                 <span className="pd-bar is-accent">
                   <i style={{ ["--w" as string]: "78%" }} />
                 </span>
-                <small>78% of your $3.6M goal</small>
+                <small>{t.goal}</small>
               </div>
             </aside>
 
@@ -1648,10 +1967,10 @@ export function PremiumWorkspaceDemo() {
                   <Face id={toastCreator.face} size={34} />
                   <span>
                     <strong>
-                      New sale <em>+{money(toast.amount)}</em>
+                      {t.newSale} <em>+{f.money(toast.amount)}</em>
                     </strong>
                     <small>
-                      {toastCreator.name} · {toast.campaign}
+                      {toastCreator.name} · {campaignNameById(toast.campaign, lang)}
                     </small>
                   </span>
                   <span className="pd-toast__shopify">

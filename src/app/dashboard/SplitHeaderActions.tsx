@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useLang } from "@/lib/useLang";
 
 export type SplitMenuItem = {
   label: string;
@@ -30,6 +31,7 @@ export function SplitHeaderActions({
   menuPlacement?: "below" | "above";
   menuOffsetLeft?: number;
 }) {
+  const lang = useLang();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -105,7 +107,7 @@ export function SplitHeaderActions({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={menuAriaLabel ?? "More actions"}
+        aria-label={menuAriaLabel ?? (lang === "fr" ? "Plus d’actions" : "More actions")}
         style={{
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,

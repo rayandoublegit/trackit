@@ -33,7 +33,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         id: "discoveries",
         label: fr ? "Découvertes" : "Discoveries",
         value: fr
-          ? `${FREE_LIFETIME_DISCOVERIES} recherches lifetime`
+          ? `${FREE_LIFETIME_DISCOVERIES} recherches au total`
           : `${FREE_LIFETIME_DISCOVERIES} lifetime searches`,
       },
       {
@@ -47,7 +47,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
         id: "sales",
         label: fr ? "Ventes" : "Sales",
         value: fr
-          ? `Manuel, ${FREE_MAX_MANUAL_SALES} lifetime`
+          ? `Manuelles, ${FREE_MAX_MANUAL_SALES} au total`
           : `Manual, ${FREE_MAX_MANUAL_SALES} lifetime`,
       },
       {
@@ -62,12 +62,12 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       },
       {
         id: "blocked-links",
-        label: fr ? "Liens trackés" : "Tracked links",
+        label: fr ? "Liens suivis" : "Tracked links",
         value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
       },
       {
         id: "blocked-templates",
-        label: fr ? "Outreach templates" : "Outreach templates",
+        label: fr ? "Modèles d’outreach" : "Outreach templates",
         value: fr ? "Bloqués (Starter+)" : "Locked (Starter+)",
       },
     ];
@@ -95,7 +95,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "affiliate",
         label: fr ? "Liens d'affiliation" : "Affiliate links",
-        value: fr ? "Trackés (clics, ventes, CA)" : "Tracked (clicks, sales, revenue)",
+        value: fr ? "Suivis (clics, ventes, CA)" : "Tracked (clicks, sales, revenue)",
       },
       {
         id: "commissions",
@@ -119,7 +119,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
     return [
       {
         id: "includes-starter",
-        label: fr ? "Tout Starter, plus" : "Everything in Starter, plus",
+        label: fr ? "Tout Starter, et en plus :" : "Everything in Starter, plus",
         value: "",
       },
       {
@@ -140,13 +140,13 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
       {
         id: "creator-dashboard",
         label: fr ? "Portail créateur" : "Creator portal",
-        value: fr ? "Dashboard dédié à vos créateurs" : "Dedicated dashboard for your creators",
+        value: fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators",
       },
       {
         id: "creator-content",
         label: fr ? "Contenu" : "Content",
         value: fr
-          ? "Upload + stats de performance (vues, engagement)"
+          ? "Import + statistiques de performance (vues, engagement)"
           : "Upload + performance stats (views, engagement)",
       },
       {
@@ -165,7 +165,7 @@ export function getPlanPricingHighlights(tier: PlanTier, lang: Lang): PricingHig
   return [
     {
       id: "includes-pro",
-      label: fr ? "Tout Pro, plus" : "Everything in Pro, plus",
+      label: fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus",
       value: "",
     },
     {

@@ -14,10 +14,10 @@ export function HeroTrustedTicker({ lang }: { lang: "en" | "fr" }) {
     return () => window.clearInterval(id);
   }, []);
 
-  const prefix = lang === "fr" ? "Fait confiance par plus de " : "Trusted by ";
+  const prefix = lang === "fr" ? "Adopté par " : "Trusted by ";
   const lines =
     lang === "fr"
-      ? ["1k+ boutiques Shopify", "500+ fondateurs SaaS"]
+      ? ["plus de 1 000 boutiques Shopify", "plus de 500 fondateurs SaaS"]
       : ["1k+ Shopify stores", "500+ SaaS owners"];
   return (
     <p className="hero-trusted fade-up fade-up-delay-5">

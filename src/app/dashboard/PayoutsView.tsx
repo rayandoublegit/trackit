@@ -146,7 +146,7 @@ function groupSalesBySection(sales: SaleNotification[]) {
 }
 
 function formatRelativeTime(minutesAgo: number, lang: "en" | "fr") {
-  if (minutesAgo < 1) return "Just now";
+  if (minutesAgo < 1) return lang === "fr" ? "À l'instant" : "Just now";
   if (minutesAgo === 1) return lang === "fr" ? "il y a 1 minute" : "1 minute ago";
   if (minutesAgo < 60) return lang === "fr" ? `il y a ${minutesAgo} minutes` : `${minutesAgo} minutes ago`;
   const hours = Math.floor(minutesAgo / 60);
@@ -617,7 +617,7 @@ function PaymentMethodCardItem({ method }: { method: PaymentMethod }) {
       <CardBrandIcon brand={method.brand} />
       <div style={{ flex: 1, minWidth: 160 }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ws-text)", marginBottom: 4 }}>
-          {formatPaymentLabel(method)}
+          {lang === "fr" ? `${method.brand} se terminant par ${method.last4}` : formatPaymentLabel(method)}
         </div>
         <div style={{ fontSize: 12, color: "var(--ws-text-muted)" }}>
           {lang === "fr" ? "Expire" : "Expires"} {method.expiry}
@@ -953,7 +953,7 @@ function CreatorsPayoutTable({
             </tr>
           ) : (
             sortedCreators.map((creator) => {
-              const name = creator.full_name || creator.handle || creator.username || "Creator";
+              const name = creator.full_name || creator.handle || creator.username || (lang === "fr" ? "Créateur" : "Creator");
               const handle = creator.handle || creator.username || "";
               const balance = Number(creator.balance) || 0;
               const methodLabel = paymentMethodLabel(creator, lang);
@@ -1105,7 +1105,7 @@ function payoutOverviewPeriodLabel(period: PayoutOverviewPeriod, lang: "en" | "f
   if (period === "today") return lang === "fr" ? "Aujourd'hui" : "Today";
   if (period === "7d") return lang === "fr" ? "7 derniers jours" : "Last 7 days";
   if (period === "30d") return lang === "fr" ? "30 derniers jours" : "Last 30 days";
-  return lang === "fr" ? "Globalité" : "All time";
+  return lang === "fr" ? "Depuis le début" : "All time";
 }
 
 function saleDayKey(sale: TrackedSale, tzOffset: number) {
@@ -1477,12 +1477,21 @@ function PayoutsOverviewPanel({
       owed={stats.totalOwed}
       owedHint={`${pendingSub} · ${readySub}`}
       paid={periodPaid}
-      paidLabel={period === "all" ? "Already paid" : "Paid in period"}
+      paidLabel={
+        period === "all"
+          ? lang === "fr"
+            ? "Déjà payé"
+            : "Already paid"
+          : lang === "fr"
+            ? "Payé sur la période"
+            : "Paid in period"
+      }
       paidHint={paidSub}
       avgPerSale={periodSalesCount ? periodCommission / periodSalesCount : 0}
       salesCount={periodSalesCount}
       format={money}
       isMobile={isMobile}
+      lang={lang}
     />
   );
 }
@@ -1624,7 +1633,7 @@ function CreatorPayoutPage({
     setShowPayMethods(false);
   }, [creator.id]);
 
-  const name = creator.full_name || creator.handle || creator.username || "Creator";
+  const name = creator.full_name || creator.handle || creator.username || (lang === "fr" ? "Créateur" : "Creator");
   const handle = creator.handle || creator.username || "";
   const balance = Number(creator.balance) || 0;
   const totalEarned = Number(creator.total_earned) || 0;
@@ -1784,7 +1793,7 @@ function CreatorPayoutPage({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={lang === "fr" ? "Fermer" : "Close"}
             style={{
               width: 32,
               height: 32,
@@ -1863,7 +1872,7 @@ function CreatorPayoutPage({
 
             {email ? (
               <div style={row}>
-                <span style={rowLabel}>Email</span>
+                <span style={rowLabel}>{lang === "fr" ? "E-mail" : "Email"}</span>
                 <span style={{ ...rowValue, fontWeight: 500, fontSize: 12.5, maxWidth: "58%", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</span>
               </div>
             ) : null}
@@ -1931,7 +1940,7 @@ function CreatorPayoutPage({
           {/* Timeline */}
           <div style={panel}>
             <div style={{ fontSize: 14, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em", marginBottom: 14 }}>
-              Timeline
+              {lang === "fr" ? "Suivi" : "Timeline"}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 0, position: "relative", paddingLeft: 4 }}>
               {[
@@ -2446,7 +2455,7 @@ export function PayoutsView({
 
     const payload = {
       creatorId: creator.id,
-      name: creator.full_name || creator.handle || "creator",
+      name: creator.full_name || creator.handle || (lang === "fr" ? "créateur" : "creator"),
       amount,
       method: paypal ? "paypal" : revolut ? "revolut" : "iban",
     };
@@ -2505,7 +2514,7 @@ export function PayoutsView({
       void loadCompletedPayouts();
       dispatchPayoutsUpdated();
     } else {
-      alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
+      alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || (lang === "fr" ? "inconnue" : "unknown")));
     }
   };
 
@@ -2627,7 +2636,7 @@ export function PayoutsView({
           });
           const data = await res.json().catch(() => ({}));
           if (data.success) {
-            notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || "creator", amount, userId);
+            notifyCreatorPaid(lang, activeCreator.full_name || activeCreator.handle || (lang === "fr" ? "créateur" : "creator"), amount, userId);
             const r = await fetch(`/api/creators-list?userId=${userId}`);
             const list = await r.json();
             if (Array.isArray(list)) setCreators(list);
@@ -2635,10 +2644,10 @@ export function PayoutsView({
             dispatchPayoutsUpdated();
             closeCreatorPayout();
           } else {
-            alert(data.error || "Payout failed");
+            alert(data.error || (lang === "fr" ? "Échec du paiement" : "Payout failed"));
           }
         } catch {
-          alert("Payout failed");
+          alert(lang === "fr" ? "Échec du paiement" : "Payout failed");
         } finally {
           setPayingId(null);
         }
@@ -2653,9 +2662,9 @@ export function PayoutsView({
           });
           const data = await res.json().catch(() => ({}));
           if (data.url) window.open(data.url, "_blank");
-          else alert(data.error || "Could not start bank connection");
+          else alert(data.error || (lang === "fr" ? "Impossible de lancer la connexion bancaire" : "Could not start bank connection"));
         } catch {
-          alert("Could not start bank connection");
+          alert(lang === "fr" ? "Impossible de lancer la connexion bancaire" : "Could not start bank connection");
         } finally {
           setRegisteringId(null);
         }
@@ -2864,7 +2873,7 @@ function buildTransactionRows(sales: TrackedSale[], payouts: CompletedPayout[], 
 
   for (const sale of sales) {
     const creator = saleCreatorMeta(sale);
-    const handle = String(creator?.handle || creator?.full_name || "creator").replace(/^@/, "");
+    const handle = String(creator?.handle || creator?.full_name || (lang === "fr" ? "créateur" : "creator")).replace(/^@/, "");
     rows.push({
       id: `sale-${sale.id}`,
       kind: "commission",
@@ -2883,7 +2892,7 @@ function buildTransactionRows(sales: TrackedSale[], payouts: CompletedPayout[], 
       id: `payout-${payout.id}`,
       kind: "payout",
       date: payout.paid_at || payout.created_at || new Date(0).toISOString(),
-      creatorHandle: String(payout.creator?.handle || payout.creator?.full_name || "creator").replace(/^@/, ""),
+      creatorHandle: String(payout.creator?.handle || payout.creator?.full_name || (lang === "fr" ? "créateur" : "creator")).replace(/^@/, ""),
       creatorName: payout.creator?.full_name,
       avatarUrl: payout.creator?.avatar_url,
       platform: payout.creator?.platform,
@@ -3139,7 +3148,7 @@ export function TransactionsView({
       <>
         <PayoutsPageHeader
           isMobile={isMobile}
-          title="Payments"
+          title={lang === "fr" ? "Paiements" : "Payments"}
           subtitle={
             lang === "fr"
               ? "Historique de vos commissions et paiements reçus"
@@ -3196,7 +3205,7 @@ export function TransactionsView({
     <>
       <PayoutsPageHeader
         isMobile={isMobile}
-        title="Payments"
+        title={lang === "fr" ? "Paiements" : "Payments"}
         trailing={
           <button
             type="button"
@@ -3688,14 +3697,17 @@ export function BalanceView({
     [creators],
   );
 
-  const parsedFundAmount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+  // French users type a decimal comma ("12,50"); treat it as the decimal point.
+  const parseFundAmount = (raw: string) =>
+    parseFloat((lang === "fr" ? raw.replace(/,/g, ".") : raw).replace(/[^0-9.]/g, ""));
+  const parsedFundAmount = parseFundAmount(fundAmount);
   const canAddFunds = hasBillingPaymentMethod && parsedFundAmount > 0;
   const chargingLabel = defaultPaymentMethod ? formatPaymentLabelShort(defaultPaymentMethod, lang) : null;
 
   const handleAddFunds = () => {
     if (!userId) return;
     primeNotificationSound();
-    const amount = parseFloat(fundAmount.replace(/[^0-9.]/g, ""));
+    const amount = parseFundAmount(fundAmount);
     if (!amount || amount <= 0) return;
     const nextBalance = round2(walletBalance + amount);
     setWalletBalance(nextBalance);
@@ -4021,7 +4033,7 @@ export function BalanceView({
             ) : (
               <>
                 <p style={{ fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", margin: "0 0 8px 0" }}>
-                  {lang === "fr" ? "Carte enregistrée" : "Saved card"}: {chargingLabel}
+                  {lang === "fr" ? "Carte enregistrée :" : "Saved card:"} {chargingLabel}
                 </p>
                 <label style={{ display: "block", fontSize: 12, color: "var(--ws-text-dim)", letterSpacing: "-0.01em", marginBottom: 6 }}>
                   {lang === "fr" ? "Montant à ajouter" : "Amount to add"}
@@ -4033,7 +4045,7 @@ export function BalanceView({
                     inputMode="decimal"
                     value={fundAmount}
                     onChange={(e) => setFundAmount(e.target.value)}
-                    placeholder="0.00"
+                    placeholder={lang === "fr" ? "0,00" : "0.00"}
                     style={{
                       flex: 1,
                       boxSizing: "border-box",
@@ -4125,7 +4137,9 @@ export function PayoutsWorkspacePaymentCard({ onOpenAddPayment }: { onOpenAddPay
             <CardBrandIcon brand={defaultMethod.brand} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
-                {formatPaymentLabel(defaultMethod)}
+                {lang === "fr"
+                  ? `${defaultMethod.brand} se terminant par ${defaultMethod.last4}`
+                  : formatPaymentLabel(defaultMethod)}
               </div>
               <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 2 }}>
                 {lang === "fr" ? "Expire" : "Expires"} {defaultMethod.expiry}

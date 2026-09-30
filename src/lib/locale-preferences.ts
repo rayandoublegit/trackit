@@ -193,6 +193,8 @@ export function clearUserSessionStorage(): void {
     [TRACKIT_CURRENCY_KEY]: localStorage.getItem(TRACKIT_CURRENCY_KEY),
     [TRACKIT_DISCOVERY_LOCATION_KEY]: localStorage.getItem(TRACKIT_DISCOVERY_LOCATION_KEY),
     [TRACKIT_DISCOVERY_LANGUAGE_KEY]: localStorage.getItem(TRACKIT_DISCOVERY_LANGUAGE_KEY),
+    // Cookie consent outlives the session (asked again after 6 months only).
+    trackit_cookie_consent: localStorage.getItem("trackit_cookie_consent"),
   };
   localStorage.clear();
   sessionStorage.clear();

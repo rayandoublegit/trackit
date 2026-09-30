@@ -76,6 +76,18 @@ export const SAMPLE_CAMPAIGNS = [
   },
 ];
 
+const SAMPLE_CAMPAIGN_FR: Record<string, { name: string; start: string; end: string; description: string }> = {
+  "sample-summer": { name: "Collection été", start: "2 juin", end: "31 août", description: "Campagne exemple" },
+  "sample-launch": { name: "Lancement sérum", start: "4 sept.", end: "4 oct.", description: "Campagne exemple" },
+  "sample-draft": { name: "Cadeaux des fêtes", start: "", end: "", description: "Brouillon exemple" },
+};
+
+/** SAMPLE_CAMPAIGNS with names, dates and descriptions in the visitor's language. */
+export function sampleCampaignsFor(lang: "en" | "fr"): typeof SAMPLE_CAMPAIGNS {
+  if (lang !== "fr") return SAMPLE_CAMPAIGNS;
+  return SAMPLE_CAMPAIGNS.map((c) => ({ ...c, ...(SAMPLE_CAMPAIGN_FR[c.id] ?? {}) }));
+}
+
 export const SAMPLE_PAYOUT_CREATORS = [
   {
     id: "sample-sarah",

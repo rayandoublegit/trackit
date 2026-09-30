@@ -1,5 +1,7 @@
 "use client";
 
+import { useLang } from "@/lib/useLang";
+
 export default function Error({
   error: _error,
   reset,
@@ -7,6 +9,7 @@ export default function Error({
   error: Error;
   reset: () => void;
 }) {
+  const fr = useLang() === "fr";
   return (
     <div
       style={{
@@ -21,7 +24,7 @@ export default function Error({
         gap: "16px",
       }}
     >
-      <div style={{ fontSize: "18px", fontWeight: 600 }}>Something went wrong</div>
+      <div style={{ fontSize: "18px", fontWeight: 600 }}>{fr ? "Une erreur est survenue" : "Something went wrong"}</div>
       <button
         type="button"
         onClick={reset}
@@ -35,7 +38,7 @@ export default function Error({
           fontWeight: 600,
         }}
       >
-        Try again
+        {fr ? "Réessayer" : "Try again"}
       </button>
     </div>
   );

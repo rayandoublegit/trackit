@@ -64,7 +64,8 @@ function navigableForRole(role: "brand" | "creator") {
   return role === "creator" ? CREATOR_NAVIGABLE_VIEWS : BRAND_NAVIGABLE_VIEWS;
 }
 
-function sanitizeAction(raw: unknown, role: "brand" | "creator"): AiCommandAction | null {
+function sanitizeAction(raw: unknown, role: "brand" | "creator", lang: "fr" | "en" = "en"): AiCommandAction | null {
+  const fr = lang === "fr";
   if (!raw || typeof raw !== "object") return null;
   const a = raw as Record<string, unknown>;
   const views = navigableForRole(role);
@@ -74,7 +75,7 @@ function sanitizeAction(raw: unknown, role: "brand" | "creator"): AiCommandActio
       if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return null;
       return {
         action: "create_meeting",
-        title: clamp(a.title, 120) || "Meeting",
+        title: clamp(a.title, 120) || (fr ? "Rendez-vous" : "Meeting"),
         when,
         withWho: clamp(a.withWho, 80),
         say: clamp(a.say, 200),
@@ -93,7 +94,7 @@ function sanitizeAction(raw: unknown, role: "brand" | "creator"): AiCommandActio
         return {
           action: "navigate",
           view: "payouts",
-          say: clamp(a.say, 200) || "Opening Pay it.",
+          say: clamp(a.say, 200) || (fr ? "J'ouvre Pay it." : "Opening Pay it."),
         };
       }
       const creator = clamp(a.creator, 80);
@@ -111,7 +112,7 @@ function sanitizeAction(raw: unknown, role: "brand" | "creator"): AiCommandActio
         return {
           action: "navigate",
           view: "content",
-          say: clamp(a.say, 200) || "Opening Content.",
+          say: clamp(a.say, 200) || (fr ? "J'ouvre Contenu." : "Opening Content."),
         };
       }
       return { action: "create_campaign", say: clamp(a.say, 200) };
@@ -233,7 +234,7 @@ function localFallback(
     }
     return {
       action: "clarify",
-      question: fr ? "Quel créateur veux-tu payer ?" : "Which creator do you want to pay?",
+      question: fr ? "Quel créateur voulez-vous payer ?" : "Which creator do you want to pay?",
     };
   }
 
@@ -243,7 +244,7 @@ function localFallback(
       return {
         action: "clarify",
         question: fr
-          ? "À quelle heure veux-tu ce rendez-vous ?"
+          ? "À quelle heure voulez-vous ce rendez-vous ?"
           : "What time should I set the meeting for?",
       };
     }
@@ -312,7 +313,7 @@ function localFallback(
   return {
     action: "chat",
     reply: fr
-      ? "Je peux ajouter un rendez-vous, créer une tâche, payer un créateur ou ouvrir une page. Dis-moi ce que tu veux faire."
+      ? "Je peux ajouter un rendez-vous, créer une tâche, payer un créateur ou ouvrir une page. Dites-moi ce que vous voulez faire."
       : "I can add a meeting, create a task, pay a creator, or open a page. Tell me what you'd like to do.",
   };
 }
@@ -384,7 +385,7 @@ Do NOT use pay_creator or create_campaign. For money/payout questions, navigate 
 
 ${roleBlurb}
 
-Local now: ${nowLocal || "unknown"}${weekday ? ` (${weekday})` : ""}. User language: ${lang}. Every human-facing string ("say", "question", "reply") must be written in ${lang === "fr" ? "French" : "English"}, short, warm and natural.
+Local now: ${nowLocal || "unknown"}${weekday ? ` (${weekday})` : ""}. User language: ${lang}. Every human-facing string ("say", "question", "reply") must be written in ${lang === "fr" ? "French" : "English"}, short, warm and natural.${lang === "fr" ? (role === "creator" ? " Use « tu » with the creator." : " Use « vous » with the user.") : ""}
 
 Known creators: ${role === "brand" && creators.length ? JSON.stringify(creators) : "n/a"}
 Known campaigns: ${role === "brand" && campaigns.length ? JSON.stringify(campaigns) : "n/a"}
@@ -407,7 +408,7 @@ User request: """${text}"""`,
     const raw = message.content[0]?.type === "text" ? message.content[0].text : "";
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? (JSON.parse(jsonMatch[0]) as unknown) : null;
-    const command = sanitizeAction(parsed, role);
+    const command = sanitizeAction(parsed, role, lang);
     if (!command) throw new Error("unparseable action");
 
     return NextResponse.json({ ok: true, command, source: "claude" });

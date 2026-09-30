@@ -436,7 +436,9 @@ export function BillingView({ isMobile, plan: planProp }: { isMobile?: boolean; 
           {invoicesLoading ? (
             <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0 }}>{lang === "fr" ? "Chargement…" : "Loading…"}</p>
           ) : invoicesError ? (
-            <p style={{ fontSize: 13, color: "#C62828", margin: 0 }}>{invoicesError}</p>
+            <p style={{ fontSize: 13, color: "#C62828", margin: 0 }}>
+              {lang === "fr" ? "Impossible de charger les factures." : invoicesError}
+            </p>
           ) : invoices.length === 0 ? (
             <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: 0, lineHeight: 1.5 }}>
               {lang === "fr"

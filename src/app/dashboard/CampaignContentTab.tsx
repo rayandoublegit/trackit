@@ -144,7 +144,7 @@ export function CampaignContentTab({
         >
           <p style={{ fontSize: 15, color: "#6B7280", lineHeight: 1.5, margin: "0 0 16px" }}>
             {lang === "fr"
-              ? "Aucun contenu pour cette campagne. Ajoutez-en ou attendez qu'un créateur membre en envoie depuis son dashboard."
+              ? "Aucun contenu pour cette campagne. Ajoutez-en ou attendez qu’un créateur membre en envoie depuis son tableau de bord."
               : "No content for this campaign yet. Add some yourself or wait for a member creator to upload from their dashboard."}
           </p>
         </div>

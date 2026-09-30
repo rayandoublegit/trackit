@@ -6,10 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { getAuthRedirectPath } from "@/lib/auth-destination";
 import { recordLoginIp, tryAutoAuth } from "@/lib/auto-auth";
-import { useLang } from "@/lib/useLang";
-import { translateAuthError } from "@/lib/auth-errors";
+import { useLang, useLocaleHref } from "@/lib/useLang";
+import { authErrorMessage } from "@/lib/auth-error-message";
 import { formatCreatorDeactivatedMessage } from "@/lib/creator-deactivation-message";
 import { AuthShowcase } from "./AuthShowcase";
+import "./auth.css";
 import "./auth-showcase.css";
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
@@ -18,6 +19,7 @@ function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const lang = useLang();
+  const href = useLocaleHref();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [checkingSession, setCheckingSession] = useState(true);
   const [email, setEmail] = useState("");
@@ -148,7 +150,7 @@ function AuthPageContent() {
               /* fallback to generic auth error */
             }
           }
-          setError(translateAuthError(signErr.message, lang));
+          setError(authErrorMessage(signErr.message, lang));
         } else {
           await recordLoginIp();
           if (isCreatorLogin) {
@@ -173,7 +175,7 @@ function AuthPageContent() {
           options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
         });
         if (signUpError) {
-          setError(translateAuthError(signUpError.message, lang));
+          setError(authErrorMessage(signUpError.message, lang));
         } else if (data.session) {
           await recordLoginIp();
           try {
@@ -195,10 +197,15 @@ function AuthPageContent() {
 
   const handleOAuth = async () => {
     if (!supabase) return;
+    const callbackParams = new URLSearchParams();
+    if (isCreatorLogin) callbackParams.set("role", "creator");
+    if (lang === "fr") callbackParams.set("lang", "fr");
+    const callbackQs = callbackParams.toString();
+    const callbackQuery = callbackQs ? `?${callbackQs}` : "";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback${isCreatorLogin ? "?role=creator" : ""}`,
+        redirectTo: `${window.location.origin}/auth/callback${callbackQuery}`,
       },
     });
   };
@@ -221,7 +228,7 @@ function AuthPageContent() {
     <AuthShowcase />
     <div className="auth-shell auth-shell--split">
       <div className="auth-card">
-        <Link href="/" className="auth-card__logo">
+        <Link href={href("/")} className="auth-card__logo">
           <img src={TRACKIT_LOGO} alt="Trackit" />
         </Link>
 
@@ -330,7 +337,7 @@ function AuthPageContent() {
               {isCreatorLogin ? (
                 <>
                   {lang === "fr" ? "Pas encore affilié ? " : "Not in the program yet? "}
-                  <Link href="/affiliation">
+                  <Link href={href("/affiliation")}>
                     {lang === "fr" ? "Commencer" : "Get started"}
                   </Link>
                 </>
@@ -396,7 +403,13 @@ function AuthPageContent() {
                   required
                   disabled={!isSupabaseConfigured || loading}
                 />
-                <button type="button" className="auth-eye" onClick={() => setPwVisible((v) => !v)} aria-label="Toggle password">
+                <button type="button" className="auth-eye" onClick={() => setPwVisible((v) => !v)} aria-label={
+                    lang === "fr"
+                      ? pwVisible
+                        ? "Masquer le mot de passe"
+                        : "Afficher le mot de passe"
+                      : "Toggle password"
+                  }>
                   {pwVisible ? (
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22" />
@@ -436,7 +449,7 @@ function AuthPageContent() {
         )}
       </div>
 
-      <Link href="/contact" className="auth-help">
+      <Link href={href("/contact")} className="auth-help">
         {lang === "fr" ? "Besoin d'aide ?" : "Need help?"}
       </Link>
     </div>
@@ -445,11 +458,12 @@ function AuthPageContent() {
 }
 
 export default function AuthPage() {
+  const lang = useLang();
   return (
     <Suspense
       fallback={
         <div className="auth-shell auth-shell--split">
-          <p className="auth-status">Loading...</p>
+          <p className="auth-status">{lang === "fr" ? "Chargement..." : "Loading..."}</p>
         </div>
       }
     >

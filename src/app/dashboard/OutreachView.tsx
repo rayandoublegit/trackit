@@ -101,21 +101,48 @@ const filterPillBtn: React.CSSProperties = {
 type FollowUpTone = "Casual" | "Professional" | "Friendly";
 
 const PLATFORM_DM_OPTIONS = [
-  { value: "tiktok", label: "TikTok DM" },
-  { value: "instagram", label: "Instagram DM" },
-  { value: "email", label: "Email" },
+  { value: "tiktok", label: "TikTok DM", labelFr: "DM TikTok" },
+  { value: "instagram", label: "Instagram DM", labelFr: "DM Instagram" },
+  { value: "email", label: "Email", labelFr: "E-mail" },
 ] as const;
 
-function platformLabel(platform: string) {
+function platformLabel(platform: string, lang: "en" | "fr" = "en") {
   const p = platform.toLowerCase();
-  if (p === "tiktok") return "TikTok DM";
-  if (p === "instagram") return "Instagram DM";
-  if (p === "email") return "Email";
+  if (p === "tiktok") return lang === "fr" ? "DM TikTok" : "TikTok DM";
+  if (p === "instagram") return lang === "fr" ? "DM Instagram" : "Instagram DM";
+  if (p === "email") return lang === "fr" ? "E-mail" : "Email";
   return platform;
 }
 
-function buildFollowUpMessage(creatorName: string, brandName: string) {
+/** Display label for the AI panel platform pills (values stay English). */
+function generatePlatformLabel(p: string, lang: "en" | "fr") {
+  if (lang === "en") return p;
+  if (p === "TikTok DM") return "DM TikTok";
+  if (p === "Instagram DM") return "DM Instagram";
+  if (p === "Email") return "E-mail";
+  return p;
+}
+
+function formatSentDate(iso: string, lang: "en" | "fr") {
+  if (lang !== "fr" || !iso) return iso;
+  const d = new Date(iso + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("fr-FR");
+}
+
+function buildFollowUpMessage(creatorName: string, brandName: string, lang: "en" | "fr" = "en") {
   const firstName = creatorName.split(" ")[0];
+  if (lang === "fr") {
+    return `Bonjour ${firstName} 👋
+
+Je me permets de revenir vers vous suite à mon message d'il y a quelques jours. Je sais que vous êtes très occupé(e) à créer du super contenu !
+
+J'aimerais beaucoup échanger avec vous au sujet d'un partenariat — je pense sincèrement que votre audience apprécierait ce que nous proposons. Je peux vous envoyer plus de détails ou un produit à tester gratuitement.
+
+Au plaisir d'avoir votre retour !
+
+— ${brandName}`;
+  }
   return `Hey ${firstName} 👋
 
 Just wanted to follow up on my message from a few days ago. I know you're busy creating amazing content!
@@ -140,9 +167,9 @@ const inputStyle: React.CSSProperties = {
   background: "#FFFFFF",
 };
 
-function formatFollowUpDate(iso: string) {
+function formatFollowUpDate(iso: string, lang: "en" | "fr" = "en") {
   const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return d.toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric" });
 }
 
 function displayTone(tone: string, lang: "en" | "fr"): string {
@@ -211,7 +238,7 @@ function FollowUpPanel({
   onSend: () => Promise<void> | void;
   onMarkManual: () => void;
 }) {
-  const [message, setMessage] = useState(() => buildFollowUpMessage(entry.creator, "Trackit"));
+  const [message, setMessage] = useState(() => buildFollowUpMessage(entry.creator, "Trackit", lang));
   const [tone, setTone] = useState<FollowUpTone>("Casual");
   const [platform, setPlatform] = useState(entry.platform.toLowerCase());
   const [sending, setSending] = useState(false);
@@ -304,7 +331,7 @@ function FollowUpPanel({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={lang === "fr" ? "Fermer" : "Close"}
             style={{
               position: "absolute",
               top: 16,
@@ -335,18 +362,22 @@ function FollowUpPanel({
               {entry.platform}
             </span>
           </div>
-          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0" }}>Original message sent {entry.sentDate}</p>
+          <p style={{ fontSize: 12, color: "#9A9A9A", margin: "10px 0 0" }}>
+            {lang === "fr" ? `Message initial envoyé le ${formatSentDate(entry.sentDate, lang)}` : <>Original message sent {entry.sentDate}</>}
+          </p>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: 20 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>Follow up message</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>{lang === "fr" ? "Message de relance" : "Follow up message"}</h3>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={12}
             style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
           />
-          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 14 }}>{message.length} characters</div>
+          <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 14 }}>
+            {lang === "fr" ? `${message.length} caractère${message.length > 1 ? "s" : ""}` : <>{message.length} characters</>}
+          </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
             {tones.map((t) => (
               <button
@@ -372,18 +403,26 @@ function FollowUpPanel({
             onClick={() => void handleRegenerate()}
             disabled={regenerating}
           >
-            {regenerating ? (lang === "fr" ? "Génération..." : "Generating...") : "Regenerate with AI →"}
+            {regenerating
+              ? (lang === "fr" ? "Génération..." : "Generating...")
+              : lang === "fr"
+                ? "Régénérer avec l'IA →"
+                : "Regenerate with AI →"}
           </button>
 
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>Review before sending</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 12px" }}>{lang === "fr" ? "Vérifier avant l'envoi" : "Review before sending"}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: showNotOpenedWarning ? 12 : 20 }}>
             <div style={{ fontSize: 13, color: "#1A1A1A", display: "flex", gap: 8 }}>
               <span style={{ color: "#1FB567" }}>✓</span>
-              <span>Message personalized for creator</span>
+              <span>{lang === "fr" ? "Message personnalisé pour le créateur" : "Message personalized for creator"}</span>
             </div>
             <div style={{ fontSize: 13, color: "#1A1A1A", display: "flex", gap: 8 }}>
               <span style={{ color: "#1FB567" }}>✓</span>
-              <span>Follow up timing is appropriate (3 days after initial)</span>
+              <span>
+                {lang === "fr"
+                  ? "Le moment de la relance est adapté (3 jours après le premier message)"
+                  : "Follow up timing is appropriate (3 days after initial)"}
+              </span>
             </div>
           </div>
           {showNotOpenedWarning && (
@@ -394,15 +433,19 @@ function FollowUpPanel({
             </p>
           )}
 
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>Send via</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A", margin: "0 0 8px" }}>{lang === "fr" ? "Envoyer via" : "Send via"}</h3>
           <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={{ ...inputStyle, marginBottom: 0 }}>
             {PLATFORM_DM_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {lang === "fr" ? opt.labelFr : opt.label}
               </option>
             ))}
           </select>
-          <p style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>Original sent on {platformLabel(entry.platform)}</p>
+          <p style={{ fontSize: 11, color: "#9A9A9A", marginTop: 6 }}>
+            {lang === "fr"
+              ? `Message initial envoyé via ${platformLabel(entry.platform, lang)}`
+              : <>Original sent on {platformLabel(entry.platform)}</>}
+          </p>
         </div>
 
         <div style={{ padding: "16px 20px 20px", borderTop: "1px solid #EFEFEF" }}>
@@ -412,7 +455,11 @@ function FollowUpPanel({
             disabled={sending}
             style={{ ...btnBlack, width: "100%", marginBottom: 10, opacity: sending ? 0.7 : 1 }}
           >
-            {sending ? "Sending..." : "Send follow up →"}
+            {sending
+              ? (lang === "fr" ? "Envoi..." : "Sending...")
+              : lang === "fr"
+                ? "Envoyer la relance →"
+                : "Send follow up →"}
           </button>
           <button
             type="button"
@@ -429,7 +476,7 @@ function FollowUpPanel({
               padding: 0,
             }}
           >
-            Mark as sent manually
+            {lang === "fr" ? "Marquer comme envoyé manuellement" : "Mark as sent manually"}
           </button>
         </div>
       </aside>
@@ -513,14 +560,14 @@ function SaveTemplateModal({
     >
       <div style={{ background: "#FFFFFF", borderRadius: 16, padding: 24, maxWidth: 400, width: "100%" }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>{lang === "fr" ? "Sauvegarder comme modèle" : "Save as template"}</h3>
-        <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Template name</label>
+        <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Nom du modèle" : "Template name"}</label>
         <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={{ ...inputStyle, marginBottom: 16 }} />
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" onClick={() => name.trim() && onSave(name.trim())} style={{ ...btnBlack, flex: 1 }} disabled={!name.trim()}>
-            Save
+            {lang === "fr" ? "Enregistrer" : "Save"}
           </button>
           <button type="button" onClick={onClose} style={{ ...btnSecondary, flex: 1 }}>
-            Cancel
+            {lang === "fr" ? "Annuler" : "Cancel"}
           </button>
         </div>
       </div>
@@ -665,7 +712,7 @@ function OutreachAIGeneratePanel({
       setEmailSubject(typeof data.subject === "string" ? data.subject : "");
       setShowSendFlow(false);
     } catch {
-      onToast("Generation failed. Try again.");
+      onToast(lang === "fr" ? "La génération a échoué. Réessayez." : "Generation failed. Try again.");
     } finally {
       setGenerating(false);
     }
@@ -698,7 +745,7 @@ function OutreachAIGeneratePanel({
     if (platform === "Email") {
       const recipient = creatorEmail.trim();
       if (!isValidEmailAddress(senderEmail) || !isValidEmailAddress(recipient)) {
-        onToast(lang === "fr" ? "Renseignez l'email marque et créateur" : "Enter brand and creator emails");
+        onToast(lang === "fr" ? "Renseignez l'e-mail de la marque et celui du créateur" : "Enter brand and creator emails");
         return;
       }
       setSendingEmail(true);
@@ -727,7 +774,7 @@ function OutreachAIGeneratePanel({
         status: "sent",
         followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
       });
-      onToast(lang === "fr" ? "Email envoyé ✓" : "Email sent ✓");
+      onToast(lang === "fr" ? "E-mail envoyé ✓" : "Email sent ✓");
       resetPanel();
       return;
     }
@@ -753,7 +800,7 @@ function OutreachAIGeneratePanel({
     } else if (platform === "TikTok DM") {
       window.open(`https://www.tiktok.com/@${handle}`, "_blank");
     }
-    onToast(lang === "fr" ? "Outreach copié — collez dans le DM ✓" : "Outreach copied — paste in the DM ✓");
+    onToast(lang === "fr" ? "Message copié — collez-le dans le DM ✓" : "Outreach copied — paste in the DM ✓");
     resetPanel();
   };
 
@@ -767,7 +814,7 @@ function OutreachAIGeneratePanel({
           ? "Envoyer via TikTok"
           : "Send via TikTok"
         : lang === "fr"
-          ? "Envoyer via Email"
+          ? "Envoyer par e-mail"
           : "Send via Email";
 
   const handleMarkSentClick = async () => {
@@ -783,7 +830,7 @@ function OutreachAIGeneratePanel({
       status: "sent",
       followUpDate: canUseAutoFollowUp(plan) ? followUpIn3Days() : null,
     });
-    onToast(lang === "fr" ? "Outreach envoyé ✓" : "Outreach sent ✓");
+    onToast(lang === "fr" ? "Prospection envoyée ✓" : "Outreach sent ✓");
     resetPanel();
   };
 
@@ -802,11 +849,11 @@ function OutreachAIGeneratePanel({
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="ou-ai__title">
-                {lang === "fr" ? "Générer un outreach avec l’IA" : "Generate outreach with AI"}
+                {lang === "fr" ? "Générer un message de prospection avec l’IA" : "Generate outreach with AI"}
               </div>
               <div className="ou-ai__sub">
                 {lang === "fr"
-                  ? "Choisis un créateur — l’IA rédige, tu modifies, tu envoies."
+                  ? "Choisissez un créateur — l’IA rédige, vous modifiez, vous envoyez."
                   : "Pick a creator — AI drafts, you edit, you send."}
               </div>
             </div>
@@ -826,12 +873,12 @@ function OutreachAIGeneratePanel({
               }}
             >
               <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1A1A1A", margin: 0, letterSpacing: "-0.02em" }}>
-                {lang === "fr" ? "Générer un outreach avec Trackit IA" : "Generate outreach with Trackit AI"}
+                {lang === "fr" ? "Générer un message de prospection avec Trackit IA" : "Generate outreach with Trackit AI"}
               </h3>
               <button
                 type="button"
                 onClick={resetPanel}
-                aria-label="Close"
+                aria-label={lang === "fr" ? "Fermer" : "Close"}
                 style={{
                   background: "#FAFAFA",
                   border: "1px solid #EFEFEF",
@@ -1007,7 +1054,7 @@ function OutreachAIGeneratePanel({
                             borderColor: pill.borderColor,
                           }}
                         >
-                          {p}
+                          {generatePlatformLabel(p, lang)}
                         </button>
                       );})}
                     </div>
@@ -1021,7 +1068,7 @@ function OutreachAIGeneratePanel({
                 disabled={generating || !selectedCreator || !brand.trim()}
                 style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating || !selectedCreator || !brand.trim() ? 0.5 : 1 }}
               >
-                {generating ? (lang === "fr" ? "Génération..." : "Generating...") : lang === "fr" ? "Générer l'outreach →" : "Generate outreach →"}
+                {generating ? (lang === "fr" ? "Génération..." : "Generating...") : lang === "fr" ? "Générer le message →" : "Generate outreach →"}
               </button>
 
               {message && !generating && (
@@ -1030,26 +1077,26 @@ function OutreachAIGeneratePanel({
                     <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 }}>
                       <div>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>
-                          {lang === "fr" ? "Email de la marque" : "Brand email"}
+                          {lang === "fr" ? "E-mail de la marque" : "Brand email"}
                         </label>
                         <input
                           type="email"
                           value={senderEmail}
                           onChange={(e) => setSenderEmail(e.target.value)}
-                          placeholder="you@brand.com"
+                          placeholder={lang === "fr" ? "vous@marque.com" : "you@brand.com"}
                           style={inputStyle}
                           autoComplete="email"
                         />
                       </div>
                       <div>
                         <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>
-                          {lang === "fr" ? "Email du créateur" : "Creator email"}
+                          {lang === "fr" ? "E-mail du créateur" : "Creator email"}
                         </label>
                         <input
                           type="email"
                           value={creatorEmail}
                           onChange={(e) => setCreatorEmail(e.target.value)}
-                          placeholder="creator@email.com"
+                          placeholder={lang === "fr" ? "createur@email.com" : "creator@email.com"}
                           style={inputStyle}
                           autoComplete="off"
                         />
@@ -1062,7 +1109,7 @@ function OutreachAIGeneratePanel({
                           type="text"
                           value={emailSubject}
                           onChange={(e) => setEmailSubject(e.target.value)}
-                          placeholder={lang === "fr" ? "Objet de l'email" : "Email subject"}
+                          placeholder={lang === "fr" ? "Objet de l'e-mail" : "Email subject"}
                           style={inputStyle}
                         />
                       </div>
@@ -1074,19 +1121,21 @@ function OutreachAIGeneratePanel({
                     rows={10}
                     style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
                   />
-                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 16 }}>{message.length} characters</div>
+                  <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 16 }}>
+                    {lang === "fr" ? `${message.length} caractère${message.length > 1 ? "s" : ""}` : <>{message.length} characters</>}
+                  </div>
                   <p style={{ fontSize: 13, color: "#1A1A1A", margin: "0 0 12px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
                     {platform === "Email"
                       ? lang === "fr"
-                        ? "L'envoi ouvre votre messagerie (Gmail, Outlook ou Mail) — assurez-vous d'être connecté avec l'email de la marque ci-dessus."
+                        ? "L'envoi ouvre votre messagerie (Gmail, Outlook ou Mail) — assurez-vous d'être connecté avec l'e-mail de la marque ci-dessus."
                         : "Send opens your mail app (Gmail, Outlook, or Mail) — make sure you're signed in with the brand email above."
                       : lang === "fr"
-                        ? "L'outreach sera copié automatiquement. Collez-le (Cmd+V) dans le DM et envoyez."
+                        ? "Le message sera copié automatiquement. Collez-le (Cmd+V) dans le DM et envoyez."
                         : "Outreach will be auto-copied. Just paste it (Cmd+V) in the DM and hit send."}
                   </p>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
                     <button type="button" onClick={() => void handleCopy()} style={{ ...btnSecondary, flex: 1, minWidth: 120 }}>
-                      {copied ? (lang === "fr" ? "Copié ✓" : "Copied ✓") : lang === "fr" ? "Copier l'outreach" : "Copy outreach"}
+                      {copied ? (lang === "fr" ? "Copié ✓" : "Copied ✓") : lang === "fr" ? "Copier le message" : "Copy outreach"}
                     </button>
                     <button
                       type="button"
@@ -1125,10 +1174,10 @@ function OutreachAIGeneratePanel({
                             rel="noopener noreferrer"
                             style={{ ...btnSecondary, textAlign: "center", textDecoration: "none" }}
                           >
-                            Open TikTok DMs →
+                            {lang === "fr" ? "Ouvrir les DM TikTok →" : "Open TikTok DMs →"}
                           </a>
                           <button type="button" onClick={() => void handleSend()} style={{ ...btnBlack, marginBottom: 8 }}>
-                            {lang === "fr" ? "Envoyer via Email" : "Send via Email"}
+                            {lang === "fr" ? "Envoyer par e-mail" : "Send via Email"}
                           </button>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
                             {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
@@ -1143,7 +1192,7 @@ function OutreachAIGeneratePanel({
                             rel="noopener noreferrer"
                             style={{ ...btnSecondary, textAlign: "center", textDecoration: "none" }}
                           >
-                            Open Instagram DMs →
+                            {lang === "fr" ? "Ouvrir les DM Instagram →" : "Open Instagram DMs →"}
                           </a>
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
                             {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
@@ -1156,7 +1205,7 @@ function OutreachAIGeneratePanel({
                             type="email"
                             value={creatorEmail}
                             onChange={(e) => setCreatorEmail(e.target.value)}
-                            placeholder="creator@email.com"
+                            placeholder={lang === "fr" ? "createur@email.com" : "creator@email.com"}
                             style={inputStyle}
                           />
                           <button type="button" onClick={() => void handleMarkSentClick()} style={btnPrimary}>
@@ -1176,7 +1225,7 @@ function OutreachAIGeneratePanel({
       {saveTemplateOpen && selectedCreator && (
         <SaveTemplateModal
           lang={lang}
-          defaultName={`Outreach — ${selectedCreator.displayName}`}
+          defaultName={`${lang === "fr" ? "Prospection" : "Outreach"} — ${selectedCreator.displayName}`}
           onClose={() => setSaveTemplateOpen(false)}
           onSave={(name) => {
             setSavedTemplates((list) => [
@@ -1184,7 +1233,7 @@ function OutreachAIGeneratePanel({
               { id: `tpl-${Date.now()}`, name, body: message, platform },
             ]);
             setSaveTemplateOpen(false);
-            onToast("Template saved ✓");
+            onToast(lang === "fr" ? "Modèle enregistré ✓" : "Template saved ✓");
           }}
         />
       )}
@@ -1216,15 +1265,15 @@ function MessageViewModal({ lang, message, creator, onClose }: { lang: "en" | "f
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={lang === "fr" ? "Fermer" : "Close"}
           style={{ position: "absolute", top: 16, right: 16, background: "#FAFAFA", border: "1px solid #EFEFEF", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontFamily: "inherit" }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#7A7A7A" strokeWidth="1.8" strokeLinecap="round" /></svg>
         </button>
-        <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 6px", paddingRight: 32 }}>{lang === "fr" ? `Outreach à ${creator}` : `Outreach to ${creator}`}</h3>
+        <h3 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 6px", paddingRight: 32 }}>{lang === "fr" ? `Prospection auprès de ${creator}` : `Outreach to ${creator}`}</h3>
         <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 16px", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>{message}</p>
         <button type="button" style={btnSecondary} onClick={() => void navigator.clipboard.writeText(message)}>
-          {lang === "fr" ? "Copier l'outreach" : "Copy outreach"}
+          {lang === "fr" ? "Copier le message" : "Copy outreach"}
         </button>
       </div>
     </div>
@@ -1444,7 +1493,7 @@ export function OutreachHistorySection({
     }
     notifyOutreachSent(
       lang,
-      creator.displayName || creator.creator || handle || "creator",
+      creator.displayName || creator.creator || handle || (lang === "fr" ? "créateur" : "creator"),
       user.id
     );
     await loadHistory();
@@ -1457,7 +1506,7 @@ export function OutreachHistorySection({
     if (!user) return;
     const confirmed = window.confirm(
       lang === "fr"
-        ? "Supprimer tout l'historique d'outreach ? Cette action est irréversible."
+        ? "Supprimer tout l'historique de prospection ? Cette action est irréversible."
         : "Delete all outreach history? This cannot be undone."
     );
     if (!confirmed) return;
@@ -1513,7 +1562,7 @@ export function OutreachHistorySection({
     const data = await res.json().catch(() => ({}));
     if (data.followUp || data.message) {
       await navigator.clipboard.writeText(data.followUp || data.message);
-      alert(lang === "fr" ? "Outreach de relance copié ✓" : "Follow-up outreach copied to clipboard ✓");
+      alert(lang === "fr" ? "Message de relance copié dans le presse-papiers ✓" : "Follow-up outreach copied to clipboard ✓");
       const { supabase: sb } = await import("@/lib/supabase");
       if (sb) {
         const { data: { user } } = await sb.auth.getUser();
@@ -1716,7 +1765,7 @@ export function OutreachHistorySection({
             <div className="ou-empty">
               {entries.length === 0
                 ? lang === "fr"
-                  ? "Il semblerait que vous n’ayez encore envoyé aucun outreach — la première conversation commence ici."
+                  ? "Il semblerait que vous n’ayez encore envoyé aucun message de prospection — la première conversation commence ici."
                   : "Looks like you haven’t sent any outreach yet — your first conversation starts here."
                 : lang === "fr"
                   ? "Rien ne correspond à ce filtre — essayez un autre angle."
@@ -1733,7 +1782,7 @@ export function OutreachHistorySection({
                         <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1A1A" }}>{item.creator}</div>
                         <div style={{ fontSize: 12, color: "#0047FF" }}>@{item.handle}</div>
                         <div style={{ fontSize: 11, color: "#9A9A9A", textTransform: "capitalize" }}>
-                          {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString("en-US") : "—"}
+                          {item.platform} · {item.sentDate ? new Date(item.sentDate + "T12:00:00").toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US") : "—"}
                         </div>
                       </div>
                       <div style={{ flexShrink: 0 }}>{outreachStatusBadge(item.status, lang)}</div>
@@ -1746,7 +1795,7 @@ export function OutreachHistorySection({
                     )}
                     {item.followUpDate && (
                       <div style={{ fontSize: 11, color: "#F57F17", marginBottom: 10 }}>
-                        {lang === "fr" ? "Relance :" : "Follow up:"} {formatFollowUpDate(item.followUpDate)}
+                        {lang === "fr" ? "Relance :" : "Follow up:"} {formatFollowUpDate(item.followUpDate, lang)}
                       </div>
                     )}
                     <div style={{ display: "flex", gap: 8 }}>
@@ -1756,7 +1805,7 @@ export function OutreachHistorySection({
                         style={{ flex: 1, width: "100%" }}
                         onClick={() => setManageEntry(item)}
                       >
-                        {lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}
+                        {lang === "fr" ? "Gérer la prospection" : "Manage the outreach"}
                       </button>
                     </div>
                   </div>
@@ -1782,7 +1831,7 @@ export function OutreachHistorySection({
                 {[
                   lang === "fr" ? "Créateur" : "Creator",
                   lang === "fr" ? "Plateforme" : "Platform",
-                  lang === "fr" ? "Aperçu de l'outreach" : "Outreach preview",
+                  lang === "fr" ? "Aperçu du message" : "Outreach preview",
                   lang === "fr" ? "Date d'envoi" : "Sent date",
                   lang === "fr" ? "Statut" : "Status",
                   lang === "fr" ? "Relance" : "Follow up",
@@ -1816,14 +1865,14 @@ export function OutreachHistorySection({
                       {row.message.slice(0, 60)}
                       {row.message.length > 60 ? "…" : ""}
                     </div>
-                    <div style={{ fontSize: 12, color: "#7A7A7A" }}>{row.sentDate}</div>
+                    <div style={{ fontSize: 12, color: "#7A7A7A" }}>{formatSentDate(row.sentDate, lang)}</div>
                     <div>{outreachStatusBadge(row.status, lang)}</div>
                     <div style={{ fontSize: 11, color: "#EA580C" }}>
-                      {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
+                      {row.followUpDate ? `${lang === "fr" ? "Relance :" : "Follow up:"} ${formatFollowUpDate(row.followUpDate, lang)}` : row.status === "replied" || row.status === "converted" ? "—" : "—"}
                     </div>
                     <div>
                       <button type="button" className="hero-cta-shopify-light hero-cta-compact" style={{ width: "100%" }} onClick={() => setManageEntry(row)}>
-                        {lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}
+                        {lang === "fr" ? "Gérer la prospection" : "Manage the outreach"}
                       </button>
                     </div>
                   </div>
@@ -1852,7 +1901,7 @@ export function OutreachHistorySection({
         return (
           <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setManageEntry(null)}>
             <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 420, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{lang === "fr" ? "Gérer l'outreach" : "Manage the outreach"}</div>
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{lang === "fr" ? "Gérer la prospection" : "Manage the outreach"}</div>
               <div style={{ fontSize: 13, color: "#7A7A7A", marginBottom: 20 }}>{manageEntry.creator} · @{manageEntry.handle}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <button
@@ -1863,7 +1912,7 @@ export function OutreachHistorySection({
                     setManageEntry(null);
                   }}
                 >
-                  {lang === "fr" ? "Voir l'outreach" : "View outreach"}
+                  {lang === "fr" ? "Voir le message" : "View outreach"}
                 </button>
                 <button
                   type="button"
@@ -1871,7 +1920,7 @@ export function OutreachHistorySection({
                   style={{ ...btnSecondary, width: "100%", opacity: followUpDisabled ? 0.4 : 1, cursor: followUpDisabled ? "not-allowed" : "pointer" }}
                   onClick={() => void sendFollowUp(manageEntry)}
                 >
-                  {lang === "fr" ? "Envoyer un suivi" : "Send follow up"}
+                  {lang === "fr" ? "Envoyer une relance" : "Send follow up"}
                 </button>
                 {showMarkReplied && (
                   <button type="button" style={{ ...btnPrimary, width: "100%" }} onClick={() => void markAsReplied(manageEntry)}>
@@ -1890,7 +1939,7 @@ export function OutreachHistorySection({
       {viewingMessage && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setViewingMessage(null)}>
           <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 500, width: "100%", position: "relative" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>{lang === "fr" ? "Outreach envoyé" : "Outreach sent"}</div>
+            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>{lang === "fr" ? "Message envoyé" : "Outreach sent"}</div>
             <p style={{ fontSize: 14, lineHeight: 1.6, color: "#1A1A1A", whiteSpace: "pre-wrap" }}>{viewingMessage}</p>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button type="button" onClick={() => { navigator.clipboard.writeText(viewingMessage); }} style={{ flex: 1, padding: "10px", background: "#F5F5F5", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>

@@ -345,7 +345,7 @@ function NotificationList({
                 e.stopPropagation();
                 onDismiss(n.id);
               }}
-              aria-label="Dismiss"
+              aria-label={lang === "fr" ? "Ignorer" : "Dismiss"}
               style={{
                 background: "none",
                 border: "none",

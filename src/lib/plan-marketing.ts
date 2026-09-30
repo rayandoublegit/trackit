@@ -118,16 +118,16 @@ export function getPlanCardDescription(tier: PlanTier, lang: Lang): string {
   }
   if (tier === "basic") {
     return fr
-      ? "Trackez vos premières ventes créateurs."
+      ? "Suivez vos premières ventes créateurs."
       : "Track your first creator sales.";
   }
   if (tier === "pro") {
     return fr
-      ? "Opérez vos campagnes de bout en bout."
+      ? "Gérez vos campagnes de A à Z."
       : "Run your campaigns end to end.";
   }
   return fr
-    ? "Pour les agences et multi-marques."
+    ? "Pour les agences et les équipes multi-marques."
     : "Built for agencies and multi-brand teams.";
 }
 
@@ -164,10 +164,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   affiliates: {
     requiredTier: "basic",
     check: canUseAffiliates,
-    title: { en: "Tracked links", fr: "Liens trackés" },
+    title: { en: "Tracked links", fr: "Liens suivis" },
     description: {
       en: "Free locks tracked affiliate links. Starter unlocks click, sales, and revenue attribution per creator.",
-      fr: "Free bloque les liens d'affiliation trackés. Starter débloque clics, ventes et CA par créateur.",
+      fr: "Le plan Gratuit n’inclut pas les liens d’affiliation suivis. Starter débloque l’attribution des clics, ventes et CA par créateur.",
     },
   },
   payouts: {
@@ -230,7 +230,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     title: { en: "Analytics", fr: "Analytiques" },
     description: {
       en: "Full analytics dashboard with campaign and creator performance.",
-      fr: "Tableau de bord analytique complet : campagnes et performances créateurs.",
+      fr: "Tableau de bord analytique complet : performances des campagnes et des créateurs.",
     },
   },
   automation: {
@@ -248,7 +248,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     title: { en: "Campaigns", fr: "Campagnes" },
     description: {
       en: "Free includes 1 active campaign. Upgrade for more campaigns and higher limits.",
-      fr: "Le plan Free inclut 1 campagne active. Passez au plan supérieur pour plus de campagnes et de limites.",
+      fr: "Le plan Gratuit inclut 1 campagne active. Passez à une offre supérieure pour plus de campagnes et des limites plus élevées.",
     },
   },
   integrations: {
@@ -257,7 +257,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     title: { en: "Shopify", fr: "Shopify" },
     description: {
       en: `Shopify is locked on Free. Starter connects up to ${BASIC_MAX_SHOPIFY_STORES} store to sync sales and attribute commissions automatically.`,
-      fr: `Shopify est bloqué sur Free. Starter connecte jusqu'à ${BASIC_MAX_SHOPIFY_STORES} boutique pour synchroniser les ventes et attribuer les commissions.`,
+      fr: `Shopify n’est pas disponible sur le plan Gratuit. Starter connecte jusqu’à ${BASIC_MAX_SHOPIFY_STORES} boutique pour synchroniser les ventes et attribuer les commissions automatiquement.`,
     },
   },
   outreach: {
@@ -272,10 +272,10 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
   templates: {
     requiredTier: "basic",
     check: canPersistTemplates,
-    title: { en: "Outreach templates", fr: "Outreach templates" },
+    title: { en: "Outreach templates", fr: "Modèles d’outreach" },
     description: {
       en: "Outreach templates are locked on Free. Starter lets you save, import, and reuse your best-performing messages.",
-      fr: "Les templates d'outreach sont bloqués sur Free. Starter permet de sauvegarder, importer et réutiliser vos meilleurs messages.",
+      fr: "Les modèles d’outreach ne sont pas disponibles sur le plan Gratuit. Starter vous permet d’enregistrer, d’importer et de réutiliser vos messages les plus performants.",
     },
   },
   discovery: {
@@ -284,7 +284,7 @@ export const FEATURE_GATES: Record<GateFeatureKey, GateDefinition> = {
     title: { en: "Discovery", fr: "Découverte" },
     description: {
       en: `Unlock ${BASIC_MONTHLY_DISCOVERIES} discoveries per month on Starter.`,
-      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes/mois sur Starter.`,
+      fr: `Débloquez ${BASIC_MONTHLY_DISCOVERIES} découvertes par mois avec Starter.`,
     },
   },
   "ai-outreach": {
@@ -408,14 +408,14 @@ export function getLimitUpgradeModalProps(
     const description =
       currentPlan === "free"
         ? fr
-          ? `Le plan gratuit inclut ${FREE_MAX_CAMPAIGNS} campagne réelle (la démo Trackit ne compte pas). Passez à ${planName} pour jusqu'à ${BASIC_MAX_CAMPAIGNS} campagnes.`
+          ? `Le plan Gratuit inclut ${FREE_MAX_CAMPAIGNS} campagne réelle (la démo Trackit ne compte pas). Passez à ${planName} pour disposer de jusqu’à ${BASIC_MAX_CAMPAIGNS} campagnes.`
           : `Free includes ${FREE_MAX_CAMPAIGNS} real campaign (Trackit demo doesn't count). Upgrade to ${planName} for up to ${BASIC_MAX_CAMPAIGNS} campaigns.`
         : nextMax == null
           ? fr
             ? `Votre plan inclut ${max} campagnes actives. Passez à ${planName} pour des campagnes illimitées.`
             : `Your plan includes ${max} active campaigns. Upgrade to ${planName} for unlimited campaigns.`
           : fr
-            ? `Votre plan inclut ${max} campagnes actives. Passez à ${planName} pour jusqu'à ${nextMax} campagnes.`
+            ? `Votre plan inclut ${max} campagnes actives. Passez à ${planName} pour disposer de jusqu’à ${nextMax} campagnes.`
             : `Your plan includes ${max} active campaigns. Upgrade to ${planName} for up to ${nextMax} campaigns.`;
     return {
       title,
@@ -433,7 +433,7 @@ export function getLimitUpgradeModalProps(
     const description =
       currentPlan === "free"
         ? fr
-          ? `Le plan Free inclut ${max ?? FREE_MAX_MANAGED_CREATORS} créateurs suivis. Passez à ${planName} pour des créateurs illimités.`
+          ? `Le plan Gratuit inclut ${max ?? FREE_MAX_MANAGED_CREATORS} créateurs suivis. Passez à ${planName} pour des créateurs illimités.`
           : `Free includes ${max ?? FREE_MAX_MANAGED_CREATORS} tracked creators. Upgrade to ${planName} for unlimited creators.`
         : fr
           ? `Passez à ${planName} pour des créateurs illimités.`
@@ -465,7 +465,7 @@ export function getLimitUpgradeModalProps(
           ? `Passez à ${planName} pour des découvertes illimitées.`
           : `Upgrade to ${planName} for unlimited discoveries.`
         : fr
-          ? `Passez à ${planName} pour ${nextLimit} découvertes/mois.`
+          ? `Passez à ${planName} pour ${nextLimit} découvertes par mois.`
           : `Upgrade to ${planName} for ${nextLimit} discoveries/month.`;
     return {
       title,
@@ -482,7 +482,7 @@ export function getLimitUpgradeModalProps(
   const description =
     nextTier === "scale"
       ? fr
-        ? `Votre plan inclut ${maxShopifyStores(currentPlan)} boutique${maxShopifyStores(currentPlan) > 1 ? "s" : ""} Shopify. Passez à ${planName} pour jusqu'à ${SCALE_MAX_SHOPIFY_STORES} boutiques.`
+        ? `Votre plan inclut ${maxShopifyStores(currentPlan)} boutique${maxShopifyStores(currentPlan) > 1 ? "s" : ""} Shopify. Passez à ${planName} pour disposer de jusqu’à ${SCALE_MAX_SHOPIFY_STORES} boutiques.`
         : `Your plan includes ${maxShopifyStores(currentPlan)} Shopify store${maxShopifyStores(currentPlan) > 1 ? "s" : ""}. Upgrade to ${planName} for up to ${SCALE_MAX_SHOPIFY_STORES} stores.`
       : fr
         ? `Shopify est disponible à partir du plan ${planName} (${BASIC_MAX_SHOPIFY_STORES} boutique).`
@@ -526,8 +526,12 @@ export function runGateUpgrade(
       else void handlers.onUpgrade?.();
       return;
     }
-    alert(err instanceof Error ? err.message : "Could not start checkout");
+    alert(err instanceof Error ? err.message : checkoutErrorMessage(lang));
   });
+}
+
+function checkoutErrorMessage(lang: Lang): string {
+  return lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout";
 }
 
 // Checkout pulls in the Supabase client: load it when a checkout starts.
@@ -539,6 +543,6 @@ async function startTierCheckout(tier: Exclude<PlanTier, "free">, lang: Lang): P
 export function runTierUpgrade(tier: PlanTier, lang: Lang): void {
   if (tier === "free") return;
   void startTierCheckout(tier, lang).catch((err) => {
-    alert(err instanceof Error ? err.message : "Could not start checkout");
+    alert(err instanceof Error ? err.message : checkoutErrorMessage(lang));
   });
 }

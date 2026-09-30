@@ -64,8 +64,30 @@ describe("gift contract", () => {
     expect(text).toContain("90 jours");
     expect(text).toContain("France");
     expect(text).toContain("Autorisation d’utiliser les vidéos en publicité : oui");
-    expect(text).toContain("ne le réécrit pas");
+    expect(text).toContain("est sans effet sur celui-ci");
+    expect(text).toContain("Date limite : 23/10/2026");
+    expect(text).not.toMatch(/\btu\b/i);
     expect(contractGrantsAdUse(text)).toBe(true);
+  });
+
+  it("formats the French fee the French way", () => {
+    const text = buildGiftContract({
+      lang: "fr",
+      brandName: "Maison Bloom",
+      creatorHandle: "lea.glow",
+      campaignName: "Routine",
+      product: "Sérum",
+      brief: "Routine du matin.",
+      videoCount: 1,
+      deadline: "2026-10-23",
+      fixedFeeCents: 123450,
+      allowAds: false,
+      rightsDays: 0,
+      territories: "",
+    });
+    expect(text).toMatch(/Rémunération forfaitaire : 1\s234,50\s€\./);
+    expect(text).toContain("Autorisation d’utiliser les vidéos en publicité : non.");
+    expect(contractGrantsAdUse(text)).toBe(false);
   });
 
   it("states when the videos cannot be used in ads", () => {

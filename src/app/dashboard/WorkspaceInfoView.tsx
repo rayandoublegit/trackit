@@ -280,7 +280,7 @@ export function WorkspaceInfoView({
       </h1>
       <p style={{ margin: "8px 0 24px", fontSize: 14, color: muted, letterSpacing: "-0.02em" }}>
         {fr
-          ? "Photo, nom et préférences de ce space. Tout se met à jour dans la sidebar."
+          ? "Photo, nom et préférences de cet espace. Les changements apparaissent dans la barre latérale."
           : "Picture, name, and preferences for this space. Updates show in the sidebar."}
       </p>
 

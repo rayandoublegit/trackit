@@ -103,9 +103,11 @@ export function buildGiftContract(input: {
   const territories = input.allowAds ? required(input.territories, "Territories", 200) : "";
   const fee =
     input.fixedFeeCents > 0
-      ? `${(input.fixedFeeCents / 100).toFixed(2)} EUR`
+      ? input.lang === "fr"
+        ? new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(input.fixedFeeCents / 100)
+        : `${(input.fixedFeeCents / 100).toFixed(2)} EUR`
       : input.lang === "fr"
-        ? "aucun forfait"
+        ? "aucune"
         : "no fixed fee";
   const ads = input.allowAds
     ? input.lang === "fr"
@@ -125,14 +127,16 @@ export function buildGiftContract(input: {
       "Accepting freezes this text. A later change to the campaign does not rewrite it.",
     ].join("\n");
   }
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.deadline.trim());
+  const deadline = isoDay ? `${isoDay[3]}/${isoDay[2]}/${isoDay[1]}` : input.deadline;
   return [
-    `${input.brandName} invite @${input.creatorHandle} sur « ${input.campaignName} ».`,
+    `${input.brandName} invite @${input.creatorHandle} à participer à la campagne « ${input.campaignName} ».`,
     `Produit : ${input.product}.`,
     `Brief : ${input.brief}`,
-    `Vidéos : ${input.videoCount}. Échéance : ${input.deadline}. Forfait : ${fee}. Le montant est affiché. Il ne déclenche aucun paiement.`,
-    "Le produit est un cadeau. L’envoi se note à la main. Un numéro de suivi est une note, pas une preuve transporteur.",
+    `Vidéos attendues : ${input.videoCount}. Date limite : ${deadline}. Rémunération forfaitaire : ${fee}. Ce montant est indiqué à titre informatif et ne déclenche aucun paiement.`,
+    "Le produit est remis à titre gracieux. L’expédition est déclarée manuellement par la marque ; le numéro de suivi est indicatif et ne constitue pas une preuve de livraison du transporteur.",
     ads,
-    "L’acceptation fige ce texte. Une modification ultérieure de la campagne ne le réécrit pas.",
+    "L’acceptation du présent contrat en fige le contenu : toute modification ultérieure de la campagne est sans effet sur celui-ci.",
   ].join("\n");
 }
 

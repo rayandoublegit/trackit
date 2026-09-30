@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { setAppLang } from "@/lib/locale-preferences";
+import { useLang } from "@/lib/useLang";
 
-type NavItem = { href: string; label: string; icon: ReactNode; exact?: boolean };
+type NavItem = { href: string; label: string; labelFr: string; icon: ReactNode; exact?: boolean };
 
 const I = {
   overview: <path d="M4 13h6V4H4v9zm0 7h6v-5H4v5zm10 0h6v-9h-6v9zm0-16v5h6V4h-6z" />,
@@ -25,32 +27,49 @@ function Icon({ d }: { d: ReactNode }) {
   );
 }
 
-const NAV: { section: string; items: NavItem[] }[] = [
+const NAV: { section: string; sectionFr: string; items: NavItem[] }[] = [
   {
     section: "Overview",
+    sectionFr: "Vue d’ensemble",
     items: [
-      { href: "/admin", label: "Overview", icon: <Icon d={I.overview} />, exact: true },
-      { href: "/admin/revenue", label: "Revenue", icon: <Icon d={I.revenue} /> },
-      { href: "/admin/activity", label: "Activity", icon: <Icon d={I.activity} /> },
+      { href: "/admin", label: "Overview", labelFr: "Vue d’ensemble", icon: <Icon d={I.overview} />, exact: true },
+      { href: "/admin/revenue", label: "Revenue", labelFr: "Revenus", icon: <Icon d={I.revenue} /> },
+      { href: "/admin/activity", label: "Activity", labelFr: "Activité", icon: <Icon d={I.activity} /> },
     ],
   },
   {
     section: "Accounts",
-    items: [{ href: "/admin/users", label: "Users", icon: <Icon d={I.users} /> }],
+    sectionFr: "Comptes",
+    items: [{ href: "/admin/users", label: "Users", labelFr: "Utilisateurs", icon: <Icon d={I.users} /> }],
   },
   {
     section: "Product",
+    sectionFr: "Produit",
     items: [
-      { href: "/admin/catalog", label: "Creator catalog", icon: <Icon d={I.catalog} /> },
-      { href: "/admin/add", label: "Add a creator", icon: <Icon d={I.add} /> },
-      { href: "/admin/requests", label: "Requests", icon: <Icon d={I.requests} /> },
+      { href: "/admin/catalog", label: "Creator catalog", labelFr: "Catalogue créateurs", icon: <Icon d={I.catalog} /> },
+      { href: "/admin/add", label: "Add a creator", labelFr: "Ajouter un créateur", icon: <Icon d={I.add} /> },
+      { href: "/admin/requests", label: "Requests", labelFr: "Demandes", icon: <Icon d={I.requests} /> },
     ],
   },
   {
     section: "Technical",
-    items: [{ href: "/admin/system", label: "System & audit", icon: <Icon d={I.system} /> }],
+    sectionFr: "Technique",
+    items: [{ href: "/admin/system", label: "System & audit", labelFr: "Système et audit", icon: <Icon d={I.system} /> }],
   },
 ];
+
+function LangToggle() {
+  const lang = useLang();
+  return (
+    <div className="ad-seg" role="group" aria-label={lang === "fr" ? "Langue" : "Language"} style={{ marginLeft: "auto" }}>
+      {(["fr", "en"] as const).map((l) => (
+        <button key={l} type="button" className={lang === l ? "is-on" : ""} aria-pressed={lang === l} onClick={() => setAppLang(l)}>
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 type Me = { ok: boolean; email?: string; role?: string };
 
@@ -58,6 +77,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname() || "/admin";
   const [me, setMe] = useState<Me | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const lang = useLang();
+  const fr = lang === "fr";
 
   useEffect(() => {
     let cancelled = false;
@@ -76,10 +97,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
+  // The layout metadata title is English; follow the console language.
+  useEffect(() => {
+    document.title = fr ? "Console interne · Trackit" : "Staff console · Trackit";
+  }, [fr, pathname]);
+
   if (me === null) {
     return (
       <div className="ad-gate">
-        <span className="ad-gate__spinner" aria-label="Checking access" />
+        <span className="ad-gate__spinner" aria-label={fr ? "Vérification de l’accès" : "Checking access"} />
       </div>
     );
   }
@@ -94,10 +120,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <path d="M8 11V7a4 4 0 118 0v4" />
             </svg>
           </span>
-          <h1>Staff console</h1>
-          <p>This area is reserved for the Trackit team. Sign in with a staff account.</p>
+          <h1>{fr ? "Console interne" : "Staff console"}</h1>
+          <p>{fr ? "Cet espace est réservé à l’équipe Trackit. Connectez-vous avec un compte de l’équipe." : "This area is reserved for the Trackit team. Sign in with a staff account."}</p>
           <Link className="ad-btn ad-btn--primary" href="/auth?redirectTo=/admin">
-            Sign in
+            {fr ? "Se connecter" : "Sign in"}
           </Link>
         </div>
       </div>
@@ -114,17 +140,17 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <span className="ad-brand__mark">T</span>
           <span>
             <strong>Trackit</strong>
-            <small>Staff console</small>
+            <small>{fr ? "Console interne" : "Staff console"}</small>
           </span>
         </Link>
-        <nav aria-label="Admin">
+        <nav aria-label={fr ? "Administration" : "Admin"}>
           {NAV.map((section) => (
             <div key={section.section} className="ad-nav__section">
-              <p>{section.section}</p>
+              <p>{fr ? section.sectionFr : section.section}</p>
               {section.items.map((item) => (
                 <Link key={item.href} href={item.href} className={`ad-nav__link${isActive(item) ? " is-active" : ""}`}>
                   {item.icon}
-                  <span>{item.label}</span>
+                  <span>{fr ? item.labelFr : item.label}</span>
                 </Link>
               ))}
             </div>
@@ -133,18 +159,18 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="ad-side__foot">
           <Link href="/dashboard" className="ad-nav__link">
             <Icon d={<path d="M15 18l-6-6 6-6" />} />
-            <span>Back to the app</span>
+            <span>{fr ? "Retour à l’app" : "Back to the app"}</span>
           </Link>
           <div className="ad-me">
             <span className="ad-me__dot" />
             <span>
               <strong>{me.email}</strong>
-              <small>{me.role === "user" ? "admin (list)" : me.role}</small>
+              <small>{me.role === "user" ? (fr ? "admin (liste)" : "admin (list)") : me.role}</small>
             </span>
           </div>
         </div>
       </aside>
-      {menuOpen ? <button type="button" className="ad-backdrop" aria-label="Close menu" onClick={() => setMenuOpen(false)} /> : null}
+      {menuOpen ? <button type="button" className="ad-backdrop" aria-label={fr ? "Fermer le menu" : "Close menu"} onClick={() => setMenuOpen(false)} /> : null}
       <div className="ad-main">
         <div className="ad-topbar">
           <button type="button" className="ad-burger" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
@@ -153,8 +179,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <span className="ad-crumb">
-            Console <b>/</b> {current?.label ?? "Admin"}
+            Console <b>/</b> {current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}
           </span>
+          <LangToggle />
         </div>
         <main className="ad-content" key={pathname}>
           {children}

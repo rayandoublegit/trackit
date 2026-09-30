@@ -22,7 +22,7 @@ const STAGE_LABELS: Record<"en" | "fr", Record<PipelineStage, string>> = {
     saved: "Sauvegardé",
     contacted: "Contacté",
     in_progress: "En cours",
-    nurturing: "En éducation",
+    nurturing: "En discussion",
     signed: "Signé",
     lost: "Perdu",
   },

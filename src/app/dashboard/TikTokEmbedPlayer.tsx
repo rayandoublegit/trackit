@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { clientVideoUrl } from "@/lib/client-video-url";
 import { extractVideoId } from "@/lib/creator-video";
+import { useLang } from "@/lib/useLang";
 
 type InAppVideoPlayerProps = {
   /** Proxied or raw CDN play URL (preferred). */
@@ -32,10 +33,12 @@ export function InAppVideoPlayer({
   shareUrl,
   username,
   poster,
-  title = "Video",
+  title: titleProp,
   autoPlay = true,
   style,
 }: InAppVideoPlayerProps) {
+  const lang = useLang();
+  const title = titleProp ?? (lang === "fr" ? "Vidéo" : "Video");
   const videoRef = useRef<HTMLVideoElement>(null);
   const [src, setSrc] = useState<string | null>(() => resolveInitialSrc(streamUrl));
   const [error, setError] = useState(false);
@@ -135,7 +138,7 @@ export function InAppVideoPlayer({
           ...style,
         }}
       >
-        Video unavailable
+        {lang === "fr" ? "Vidéo indisponible" : "Video unavailable"}
       </div>
     );
   }
@@ -204,7 +207,7 @@ export function TikTokEmbedModal({
   streamUrl,
   username,
   poster,
-  title = "Video",
+  title,
   onClose,
 }: {
   shareUrl?: string | null;

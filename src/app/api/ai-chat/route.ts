@@ -8,13 +8,14 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type Lang = "en" | "fr";
 
 const compact = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1_000)}K` : String(n);
 
 /** What the model is told about the creators the app shows as cards. */
-function searchBrief(result: MinoSearchResult): string {
-  const label = describeSearch(result.search);
+function searchBrief(result: MinoSearchResult, lang: Lang): string {
+  const label = describeSearch(result.search, lang);
   if (!result.creators.length) {
     return `Creator search for "${label}" found nobody. Say so in one sentence and suggest widening one filter (niche word, follower range or country).`;
   }
@@ -38,14 +39,30 @@ function cardCreator(c: FeedCreator): FeedCreator {
   return { ...c, bio: (c.bio || "").slice(0, 160), videoThumbnails: [], topVideos: (c.topVideos ?? []).slice(0, 3) };
 }
 
-function fallbackReply(result: MinoSearchResult | null): string {
+function fallbackReply(result: MinoSearchResult | null, lang: Lang): string {
+  if (lang === "fr") {
+    if (!result) return "Salut, moi c’est Mino. Donnez-moi une niche et je vous trouve des créateurs.";
+    if (!result.creators.length)
+      return `Personne ne correspond encore à « ${describeSearch(result.search, lang)} ». Essayez une niche plus large ou une fourchette d’abonnés plus grande.`;
+    return `Voici ${result.creators.length} créateurs pour « ${describeSearch(result.search, lang)} ».`;
+  }
   if (!result) return "Hey, I’m Mino. Name a niche and I’ll find creators for it.";
   if (!result.creators.length) return `Nobody matched “${describeSearch(result.search)}” yet. Try a broader niche or a wider follower range.`;
   return `Here are ${result.creators.length} creators for “${describeSearch(result.search)}”.`;
 }
 
 function isDeepAsk(text: string) {
-  return /\b(deep|analy[sz]e|research|strategy|explain in detail|how does|compare|audit|detailed plan|detailed)\b/i.test(text);
+  return (
+    /\b(deep|analy[sz]e|research|strategy|explain in detail|how does|compare|audit|detailed plan|detailed)\b/i.test(text) ||
+    /\b(analyse\w*|strat[ée]gie|explique\w* en d[ée]tail|comment fonctionne|compar\w*|plan d[ée]taill[ée]|d[ée]taill[ée]\w*|en profondeur)/i.test(text)
+  );
+}
+
+/** Tells the model which language to answer in. */
+function languageRule(lang: Lang): string {
+  return lang === "fr"
+    ? "Always reply in French (natural, everyday French), using « vous » with the user, even if earlier messages were in English. Keep product and brand names (Trackit, Mino, TikTok, Instagram, Shopify) as they are."
+    : "";
 }
 
 function systemPrompt(role: "brand" | "creator") {
@@ -88,7 +105,8 @@ export async function POST(request: Request) {
   if (!userId) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
 
   try {
-    const body = (await request.json()) as { messages?: ChatMessage[]; role?: "brand" | "creator" };
+    const body = (await request.json()) as { messages?: ChatMessage[]; role?: "brand" | "creator"; lang?: string };
+    const lang: Lang = body.lang === "fr" ? "fr" : "en";
     const messages = (Array.isArray(body.messages) ? body.messages.slice(-16) : [])
       .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
       .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
@@ -101,12 +119,13 @@ export async function POST(request: Request) {
     const extra = result
       ? {
           creators: result.creators.map(cardCreator),
-          search: { label: describeSearch(result.search), sources: result.sources },
+          search: { label: describeSearch(result.search, lang), sources: result.sources },
         }
       : {};
 
     const deep = isDeepAsk(last);
-    const system = result ? `${systemPrompt(role)}\n\n${searchBrief(result)}` : systemPrompt(role);
+    const base = lang === "fr" ? `${systemPrompt(role)}\n${languageRule(lang)}` : systemPrompt(role);
+    const system = result ? `${base}\n\n${searchBrief(result, lang)}` : base;
     const maxTokens = result ? 160 : deep ? 1200 : 220;
 
     let reply = "";
@@ -138,7 +157,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, reply: reply || fallbackReply(result), ...extra });
+    return NextResponse.json({ ok: true, reply: reply || fallbackReply(result, lang), ...extra });
   } catch (e) {
     console.error("POST /api/ai-chat", e);
     return NextResponse.json({ ok: false, error: "Chat failed" }, { status: 500 });

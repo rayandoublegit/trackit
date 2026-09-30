@@ -69,11 +69,11 @@ export function PlannerView({
 
   return (
     <div className="ws-page" style={{ padding: isMobile ? 16 : undefined }}>
-      <h1>{isMeetings ? "Meetings" : lang === "fr" ? "Planner" : "Planner"}</h1>
+      <h1>{isMeetings ? (lang === "fr" ? "Rendez-vous" : "Meetings") : lang === "fr" ? "Planner" : "Planner"}</h1>
       <p className="lead">
         {isMeetings
           ? lang === "fr"
-            ? "Calls créateurs, briefings et follow-ups — ton agenda affiliation."
+            ? "Calls créateurs, briefings et relances — votre agenda d’affiliation."
             : "Creator calls, briefings, and follow-ups — your affiliation calendar."
           : lang === "fr"
             ? "Planifiez vos calls créateurs, follow-ups et briefings — comme un agenda d’affiliation."
@@ -84,7 +84,7 @@ export function PlannerView({
         <h3 style={{ marginBottom: 12 }}>
           {isMeetings
             ? lang === "fr"
-              ? "Nouveau meeting"
+              ? "Nouveau rendez-vous"
               : "New meeting"
             : lang === "fr"
               ? "Nouveau call"

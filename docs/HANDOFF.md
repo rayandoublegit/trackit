@@ -27,8 +27,13 @@ It absorbed the earlier PartnerAds product. A brand uses it to:
    Chat, creator search with animated result cards, and simple actions
    (create a meeting or a task, open a page, open a creator's payout, start a campaign).
 
-Creators also have accounts (creator dashboard: analytics, content, community,
-brand infos, Pay it / balance).
+Creators also have accounts. They get their own simple, mobile-first app
+(`src/app/dashboard/creator/CreatorApp.tsx`, dark, four tabs): Home (balance,
+code and link, the one gift mission that needs them with a single next-step
+button), Missions (accept, sign with the address, confirm the parcel, send the
+video), Earnings (payout method), Profile (language, legal, sign out). The brand
+workspace (`WorkspaceShell`) is never shown to creators. Local preview:
+`/dashboard?as=creator` with the dev bypass (sample data).
 
 ### Plans
 
@@ -44,8 +49,18 @@ Billing: Whop (webhook `src/app/api/whop/webhook`) plus legacy Stripe price ids 
 
 ### Product rules set by the owner
 
-- **English only, everywhere** (landing, auth, dashboard, admin, emails). `getAppLang()`
-  always returns `"en"`; the `fr` branches left in the code are dead.
+- **Bilingual, nothing hard-coded.** English at `/…`, French at `/fr/…` (every public
+  page, auth and app entry points). Pages under `src/app/fr/` render French on the
+  server via `LangProvider` (`src/lib/useLang.ts`); the signed-in app follows the last
+  language chosen (localStorage `trackit_lang`, set by browsing /fr or in settings).
+  Links: `useLocaleHref()` / `localizeHref()`. Brands are addressed with "vous",
+  creators with "tu". French shows euros and fr-FR formats. Mino and the outreach
+  generators answer in the user's language (`lang` in the request body). Emails and
+  raw server error texts are still English.
+- **Legal:** mentions légales / legal notice, CGU-CGV / terms, privacy, cookies in both
+  languages (`src/lib/legal-content.ts`, links in `src/lib/legal-links.ts`). Company
+  details live in `src/lib/legal-entity.ts`; unknown fields are `null` and hidden.
+  Cookie banner (`src/components/CookieConsent.tsx`): Clarity loads only after consent.
 - **No initials as avatars.** Real photo when there is one, otherwise an icon
   (`src/components/FallbackGlyphs.tsx`, `CreatorAvatar`). Sample people use free
   Unsplash photos (`sample-motion.tsx`).

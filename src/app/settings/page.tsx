@@ -1,10 +1,17 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
+import {
+  alternateLangPath,
+  defaultDisplayCurrency,
+  isFrPath,
+  setAppLang,
+  setDisplayCurrency,
+} from "@/lib/locale-preferences";
 import { normalizePlan, FREE_MAX_MANAGED_CREATORS, type PlanTier } from "@/lib/plan-limits";
 import { formatPricingAmount, getPlanMonthlyPrice, planDisplayName } from "@/lib/plan-marketing";
 import {
@@ -58,6 +65,7 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     update_password: "Update password",
     updating: "Updating...",
     language_title: "Language",
+    language_hint: "Language used across your Trackit dashboard.",
     save_language: "Save language",
     wallpaper_title: "Dashboard Wallpaper",
     solid_colors: "Solid Colors",
@@ -83,6 +91,8 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     loading: "Loading...",
     lang_en: "🇬🇧 English",
     lang_fr: "🇫🇷 Français",
+    wallpaper_preview: "wallpaper preview",
+    username_placeholder: "your_username",
   },
   fr: {
     back: "← Tableau de bord",
@@ -106,6 +116,7 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     update_password: "Mettre à jour le mot de passe",
     updating: "Mise à jour...",
     language_title: "Langue",
+    language_hint: "Langue utilisée dans tout votre tableau de bord Trackit.",
     save_language: "Sauvegarder la langue",
     wallpaper_title: "Fond d'écran du tableau de bord",
     solid_colors: "Couleurs unies",
@@ -118,26 +129,58 @@ const settingsT: Record<SettingsLang, Record<string, string>> = {
     current_plan: "Plan actuel",
     upgrade_plan: "Améliorer le plan →",
     manage_plan: "Gérer le plan →",
-    scale_max: "Tu es sur le plan le plus élevé. 🔥",
+    scale_max: "Vous êtes sur le plan le plus élevé. 🔥",
     analyses_free: `Plan Free · ${FREE_MAX_MANAGED_CREATORS} créateurs suivis`,
     danger_title: "Zone de danger",
     danger_sub: "Ces actions sont permanentes et ne peuvent pas être annulées.",
     sign_out: "Se déconnecter",
     delete_account: "Supprimer le compte",
     delete_confirm:
-      "Es-tu sûr ? Cela supprimera définitivement ton compte et toutes tes données. Cette action est irréversible.",
+      "Êtes-vous sûr ? Cela supprimera définitivement votre compte et toutes vos données. Cette action est irréversible.",
     cancel: "Annuler",
     confirm_delete: "Oui, supprimer mon compte",
     loading: "Chargement...",
     lang_en: "🇬🇧 English",
     lang_fr: "🇫🇷 Français",
+    wallpaper_preview: "aperçu du fond d’écran",
+    username_placeholder: "votre_pseudo",
   },
 };
 
+const SOLID_COLORS = [
+  { value: "#0a0a0a", label: "Default", labelFr: "Par défaut" },
+  { value: "#0f1117", label: "Midnight", labelFr: "Minuit" },
+  { value: "#0a0f0a", label: "Forest", labelFr: "Forêt" },
+  { value: "#0a0a1a", label: "Navy", labelFr: "Marine" },
+  { value: "#1a0a0a", label: "Ember", labelFr: "Braise" },
+  { value: "#0f0a1a", label: "Violet", labelFr: "Violet" },
+];
+
+const GRADIENTS = [
+  { value: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)", label: "Purple Night", labelFr: "Nuit violette" },
+  { value: "linear-gradient(135deg, #0a0a0a 0%, #0a1a0a 100%)", label: "Matrix", labelFr: "Matrix" },
+  { value: "linear-gradient(135deg, #0a0a1a 0%, #001a2e 100%)", label: "Ocean", labelFr: "Océan" },
+  { value: "linear-gradient(135deg, #1a0a0a 0%, #2e0a0a 100%)", label: "Ember", labelFr: "Braise" },
+  { value: "linear-gradient(135deg, #0a0a0a 0%, #1a1a00 100%)", label: "Gold", labelFr: "Or" },
+  { value: "linear-gradient(135deg, #0a0a2e 0%, #2e0a2e 100%)", label: "Cosmos", labelFr: "Cosmos" },
+];
+
+const TEXT_COLORS = [
+  { value: "#ffffff", label: "White", labelFr: "Blanc" },
+  { value: "#000000", label: "Black", labelFr: "Noir" },
+  { value: "#e2e8f0", label: "Silver", labelFr: "Argent" },
+  { value: "#fbbf24", label: "Gold", labelFr: "Or" },
+  { value: "#60a5fa", label: "Blue", labelFr: "Bleu" },
+  { value: "#4ade80", label: "Green", labelFr: "Vert" },
+];
+
 export default function SettingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const lang = useLang();
+  const href = useLocaleHref();
   const [locale, setLocale] = useState<SettingsLang>(lang);
+  const fr = locale === "fr";
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -170,7 +213,7 @@ export default function SettingsPage() {
     if (!isSupabaseConfigured || !supabase) return;
     void (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.replace("/auth"); return; }
+      if (!user) { router.replace(href("/auth")); return; }
       setUser(user);
 
       const { data: profile } = await supabase
@@ -193,6 +236,7 @@ export default function SettingsPage() {
       setTextColor(savedTextColor);
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   const avatarFileRef = React.useRef(avatarFile);
@@ -242,7 +286,7 @@ export default function SettingsPage() {
       console.log("UPLOAD RESULT:", uploadError, "path:", `${user.id}/avatar`);
       console.log("UPLOAD RESULT:", uploadError, "path:", `${user.id}/avatar`);
       if (uploadError) {
-        setMessage({ text: "Failed to upload photo.", type: "error" });
+        setMessage({ text: fr ? "Impossible d’envoyer la photo." : "Failed to upload photo.", type: "error" });
         setSaving(false);
         return;
       }
@@ -259,31 +303,31 @@ export default function SettingsPage() {
     if (error) {
       setMessage({ text: profileUsernameSaveError(error, locale), type: "error" });
     } else {
-      setMessage({ text: "Changes saved successfully.", type: "success" });
+      setMessage({ text: fr ? "Modifications enregistrées." : "Changes saved successfully.", type: "success" });
       setInitialUsername(trimmedUsername);
       setAvatarUrl(newAvatarUrl);
     }
     setSaving(false);
-  }, [supabase, user, username, avatarFile, avatarUrl, usernameStatus, initialUsername, locale]);
+  }, [supabase, user, username, avatarFile, avatarUrl, usernameStatus, initialUsername, locale, fr]);
 
   const changePassword = useCallback(async () => {
     if (!supabase || !user) return;
     setPasswordMessage(null);
 
     if (newPassword.length < 12) {
-      setPasswordMessage({ text: "New password must be at least 12 characters.", type: "error" });
+      setPasswordMessage({ text: fr ? "Le nouveau mot de passe doit contenir au moins 12 caractères." : "New password must be at least 12 characters.", type: "error" });
       return;
     }
     if (!/[A-Z]/.test(newPassword)) {
-      setPasswordMessage({ text: "New password must contain at least one uppercase letter.", type: "error" });
+      setPasswordMessage({ text: fr ? "Le nouveau mot de passe doit contenir au moins une majuscule." : "New password must contain at least one uppercase letter.", type: "error" });
       return;
     }
     if (!/[!@#$%^&*]/.test(newPassword)) {
-      setPasswordMessage({ text: "New password must contain at least one symbol (!@#$%^&*).", type: "error" });
+      setPasswordMessage({ text: fr ? "Le nouveau mot de passe doit contenir au moins un symbole (!@#$%^&*)." : "New password must contain at least one symbol (!@#$%^&*).", type: "error" });
       return;
     }
     if (newPassword !== confirmNewPassword) {
-      setPasswordMessage({ text: "Passwords do not match.", type: "error" });
+      setPasswordMessage({ text: fr ? "Les mots de passe ne correspondent pas." : "Passwords do not match.", type: "error" });
       return;
     }
 
@@ -296,7 +340,7 @@ export default function SettingsPage() {
     });
 
     if (signInError) {
-      setPasswordMessage({ text: "Current password is incorrect.", type: "error" });
+      setPasswordMessage({ text: fr ? "Le mot de passe actuel est incorrect." : "Current password is incorrect.", type: "error" });
       setChangingPassword(false);
       return;
     }
@@ -307,30 +351,30 @@ export default function SettingsPage() {
     });
 
     if (updateError) {
-      setPasswordMessage({ text: "Failed to update password.", type: "error" });
+      setPasswordMessage({ text: fr ? "Impossible de mettre à jour le mot de passe." : "Failed to update password.", type: "error" });
     } else {
-      setPasswordMessage({ text: "Password updated successfully.", type: "success" });
+      setPasswordMessage({ text: fr ? "Mot de passe mis à jour." : "Password updated successfully.", type: "success" });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
     }
 
     setChangingPassword(false);
-  }, [supabase, user, currentPassword, newPassword, confirmNewPassword]);
+  }, [supabase, user, currentPassword, newPassword, confirmNewPassword, fr]);
 
   const saveWallpaper = useCallback((value: string, type: "color" | "gradient" | "image") => {
     localStorage.setItem("klayan_wallpaper", value);
     localStorage.setItem("klayan_wallpaper_type", type);
     setWallpaper(value);
     setWallpaperType(type);
-    setMessage({ text: "Wallpaper saved.", type: "success" });
-  }, []);
+    setMessage({ text: fr ? "Fond d’écran enregistré." : "Wallpaper saved.", type: "success" });
+  }, [fr]);
 
   const applyTextColor = useCallback((color: string) => {
     localStorage.setItem("klayan_text_color", color);
     setTextColor(color);
-    setMessage({ text: "Text color saved.", type: "success" });
-  }, []);
+    setMessage({ text: fr ? "Couleur du texte enregistrée." : "Text color saved.", type: "success" });
+  }, [fr]);
 
   const handleWallpaperImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -353,7 +397,18 @@ export default function SettingsPage() {
   const signOut = async () => {
     if (!supabase) return;
     await supabase.auth.signOut();
-    router.replace("/");
+    router.replace(href("/"));
+  };
+
+  // Applies at once; /fr pages are French by address, so switching to English leaves them.
+  const changeLanguage = (next: SettingsLang) => {
+    setAppLang(next);
+    setDisplayCurrency(defaultDisplayCurrency(next));
+    setLocale(next);
+    if (pathname && isFrPath(pathname) && next === "en") {
+      const query = typeof window !== "undefined" ? window.location.search : "";
+      router.replace(`${alternateLangPath(pathname, next)}${query}`);
+    }
   };
 
   const deleteAccount = async () => {
@@ -407,7 +462,7 @@ export default function SettingsPage() {
 
       {/* Header */}
       <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", padding: "20px 32px", display: "flex", alignItems: "center", gap: 16 }}>
-        <Link href="/dashboard" style={{ color: "rgba(255,255,255,0.4)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
+        <Link href={href("/dashboard")} style={{ color: "rgba(255,255,255,0.4)", textDecoration: "none", fontSize: 13, fontWeight: 500 }}>
           {t.back}
         </Link>
         <div style={{ width: 1, height: 16, background: "rgba(255,255,255,0.1)" }} />
@@ -485,7 +540,7 @@ export default function SettingsPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value.toLowerCase())}
-              placeholder="your_username"
+              placeholder={t.username_placeholder}
               style={inputStyle}
             />
             {usernameStatus !== "idle" && (
@@ -599,6 +654,39 @@ export default function SettingsPage() {
           </button>
         </div>
 
+        {/* Language Section */}
+        <div style={sectionStyle}>
+          <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 8 }}>{t.language_title}</div>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 20 }}>{t.language_hint}</div>
+          <div role="radiogroup" aria-label={fr ? "Langue" : "Language"} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {(["fr", "en"] as const).map((option) => {
+              const on = locale === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  lang={option}
+                  onClick={() => changeLanguage(option)}
+                  style={{
+                    background: on ? "#ffffff" : "rgba(255,255,255,0.04)",
+                    color: on ? "#000" : "rgba(255,255,255,0.7)",
+                    border: on ? "1px solid #ffffff" : "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 10,
+                    padding: "10px 20px",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {option === "fr" ? t.lang_fr : t.lang_en}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Wallpaper Section */}
         <div style={sectionStyle}>
           <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.02em", marginBottom: 20 }}>{t.wallpaper_title}</div>
@@ -607,19 +695,13 @@ export default function SettingsPage() {
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>{t.solid_colors}</label>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[
-                { value: "#0a0a0a", label: "Default" },
-                { value: "#0f1117", label: "Midnight" },
-                { value: "#0a0f0a", label: "Forest" },
-                { value: "#0a0a1a", label: "Navy" },
-                { value: "#1a0a0a", label: "Ember" },
-                { value: "#0f0a1a", label: "Violet" },
-              ].map((c) => (
+              {SOLID_COLORS.map((c) => (
                 <button
                   key={c.value}
                   type="button"
                   onClick={() => saveWallpaper(c.value, "color")}
-                  title={c.label}
+                  title={fr ? c.labelFr : c.label}
+                  aria-label={fr ? c.labelFr : c.label}
                   style={{
                     width: 40,
                     height: 40,
@@ -638,19 +720,13 @@ export default function SettingsPage() {
           <div style={{ marginBottom: 20 }}>
             <label style={labelStyle}>{t.gradients}</label>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[
-                { value: "linear-gradient(135deg, #0a0a0a 0%, #1a0a2e 100%)", label: "Purple Night" },
-                { value: "linear-gradient(135deg, #0a0a0a 0%, #0a1a0a 100%)", label: "Matrix" },
-                { value: "linear-gradient(135deg, #0a0a1a 0%, #001a2e 100%)", label: "Ocean" },
-                { value: "linear-gradient(135deg, #1a0a0a 0%, #2e0a0a 100%)", label: "Ember" },
-                { value: "linear-gradient(135deg, #0a0a0a 0%, #1a1a00 100%)", label: "Gold" },
-                { value: "linear-gradient(135deg, #0a0a2e 0%, #2e0a2e 100%)", label: "Cosmos" },
-              ].map((g) => (
+              {GRADIENTS.map((g) => (
                 <button
                   key={g.value}
                   type="button"
                   onClick={() => saveWallpaper(g.value, "gradient")}
-                  title={g.label}
+                  title={fr ? g.labelFr : g.label}
+                  aria-label={fr ? g.labelFr : g.label}
                   style={{
                     width: 40,
                     height: 40,
@@ -685,7 +761,7 @@ export default function SettingsPage() {
             </label>
             {wallpaperType === "image" && wallpaper ? (
               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
-                <img src={wallpaper} alt="wallpaper preview" style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }} />
+                <img src={wallpaper} alt={t.wallpaper_preview} style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)" }} />
                 <button
                   type="button"
                   onClick={() => saveWallpaper("#0a0a0a", "color")}
@@ -700,19 +776,13 @@ export default function SettingsPage() {
           <div style={{ marginTop: 20, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
             <label style={labelStyle}>{t.text_color}</label>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[
-                { value: "#ffffff", label: "White" },
-                { value: "#000000", label: "Black" },
-                { value: "#e2e8f0", label: "Silver" },
-                { value: "#fbbf24", label: "Gold" },
-                { value: "#60a5fa", label: "Blue" },
-                { value: "#4ade80", label: "Green" },
-              ].map((c) => (
+              {TEXT_COLORS.map((c) => (
                 <button
                   key={c.value}
                   type="button"
                   onClick={() => applyTextColor(c.value)}
-                  title={c.label}
+                  title={fr ? c.labelFr : c.label}
+                  aria-label={fr ? c.labelFr : c.label}
                   style={{
                     width: 40,
                     height: 40,
@@ -761,7 +831,7 @@ export default function SettingsPage() {
 
           {normalizePlan(plan) !== "scale" ? (
             <Link
-              href="/pricing"
+              href={href("/pricing")}
               style={{
                 display: "inline-flex",
                 alignItems: "center",

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { selectProfileRow } from "@/lib/profile-row";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
 import { PricingPlans } from "@/components/PricingPlans";
 import {
   isSocialReferralSource,
@@ -59,7 +59,7 @@ const STEP_COPY = {
     subEn: "Personal info",
   },
   2: {
-    titleFr: "Vous inscrivez-vous en tant que marque ?",
+    titleFr: "Parlez-nous de votre activité",
     titleEn: "Tell us about your business",
     subFr: "Choisissez le type de compte",
     subEn: "Choose account type",
@@ -98,6 +98,7 @@ const SOURCES = [
 
 export default function OnboardingPage() {
   const lang = useLang();
+  const href = useLocaleHref();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -181,7 +182,7 @@ export default function OnboardingPage() {
     const s = supabase;
     if (!s) return;
     void s.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) { router.replace("/auth?mode=signup"); return; }
+      if (!user) { router.replace(href("/auth?mode=signup")); return; }
 
       if (user.user_metadata?.onboarding_completed === true) {
         clearOnboardingDraft();
@@ -206,7 +207,7 @@ export default function OnboardingPage() {
         setStep(resumeStep);
 
         if (urlStep && typeof window !== "undefined") {
-          window.history.replaceState({}, "", "/onboarding");
+          window.history.replaceState({}, "", window.location.pathname);
         }
 
         if (user.user_metadata?.full_name && !draft?.fullName) {
@@ -226,7 +227,7 @@ export default function OnboardingPage() {
         /* non-blocking */
       }
     });
-  }, [router, applyOnboardingDraft]);
+  }, [router, applyOnboardingDraft, href]);
 
   useEffect(() => {
     if (!user || !hydrated) return;
@@ -256,7 +257,7 @@ export default function OnboardingPage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
-    if (f.size > 2 * 1024 * 1024) { setError("Image must be under 2MB"); return; }
+    if (f.size > 2 * 1024 * 1024) { setError(lang === "fr" ? "L’image doit faire moins de 2 Mo" : "Image must be under 2MB"); return; }
     setError(null);
     setAvatarFile(f);
     setAvatarPreview((prev) => { if (prev) URL.revokeObjectURL(prev); return URL.createObjectURL(f); });
@@ -267,7 +268,7 @@ export default function OnboardingPage() {
     const ext = avatarFile.name.split(".").pop() || "jpg";
     const path = `${user.id}/avatar.${ext}`;
     const { error: uploadErr } = await supabase.storage.from("avatars").upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
-    if (uploadErr) { setError(uploadErr.message); return null; }
+    if (uploadErr) { setError(lang === "fr" ? "Impossible d’envoyer la photo. Réessayez." : uploadErr.message); return null; }
     const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
     return pub.publicUrl;
   };
@@ -370,10 +371,10 @@ export default function OnboardingPage() {
   return (
     <div className="ob-page">
       <header className="ob-header">
-        <a href="/" className="ob-logo">
+        <a href={href("/")} className="ob-logo">
           <img src={TRACKIT_LOGO_URL} alt="Trackit" />
         </a>
-        <button type="button" className="ob-avatar" onClick={() => setStep(1)} aria-label="Profile">
+        <button type="button" className="ob-avatar" onClick={() => setStep(1)} aria-label={lang === "fr" ? "Profil" : "Profile"}>
           {avatarPreview ? <img src={avatarPreview} alt="" /> : <span>{initial}</span>}
         </button>
       </header>
@@ -434,7 +435,7 @@ export default function OnboardingPage() {
               userEmail={user.email ?? undefined}
               cancelUrl={
                 typeof window !== "undefined"
-                  ? `${window.location.origin}/onboarding?step=4`
+                  ? `${window.location.origin}${href("/onboarding?step=4")}`
                   : undefined
               }
               onStayFree={() => void handleCompleteFree()}
@@ -614,7 +615,7 @@ function UsernameField({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.toLowerCase())}
-          placeholder={lang === "fr" ? "ton pseudo" : "yourname"}
+          placeholder={lang === "fr" ? "votrenom" : "yourname"}
         />
       </div>
       {message ? <p className="ob-hint" style={{ color }}>{message}</p> : null}

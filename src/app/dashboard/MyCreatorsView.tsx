@@ -17,8 +17,14 @@ import { avatarFromDiscoverySavedRow } from "@/lib/creator-avatar";
 import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { useDashboardNavigation } from "./DashboardNavigationProvider";
+import { nicheLabel } from "@/lib/niche-tree";
 
-function fmt(n: number): string {
+function fmt(n: number, lang: "en" | "fr" = "en"): string {
+  if (lang === "fr") {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",") + " M";
+    if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1).replace(".", ",") + " k";
+    return String(Math.round(n));
+  }
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1) + "K";
   return String(Math.round(n));
@@ -64,8 +70,8 @@ function MiniCard({ lang, r, onOpen, draggable }: { lang: "en" | "fr"; r: SavedR
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: r.value_score >= 70 ? "#15803D" : r.value_score >= 40 ? "#B45309" : "#9A1F1F" }}>{t.valueScore} {r.value_score}</span>
-        <span style={{ fontSize: 10, color: "#7A7A7A" }}>· {fmt(r.followers)} {t.followersAbbr}</span>
-        {r.primary_niche && <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "1px 7px", borderRadius: 20, textTransform: "capitalize" }}>{r.primary_niche}</span>}
+        <span style={{ fontSize: 10, color: "#7A7A7A" }}>· {fmt(r.followers, lang)} {t.followersAbbr}</span>
+        {r.primary_niche && <span style={{ fontSize: 10, color: "#0047FF", background: "#E8EEFC", padding: "1px 7px", borderRadius: 20, textTransform: "capitalize" }}>{lang === "fr" ? nicheLabel(r.primary_niche, lang) : r.primary_niche}</span>}
       </div>
       <span style={{ alignSelf: "flex-start", fontSize: 10, fontWeight: 600, color: sc.color, background: sc.bg, padding: "2px 8px", borderRadius: 20 }}>
         {stageLabel}

@@ -20,6 +20,7 @@ import type { OnboardingSavePayload } from "@/lib/onboarding-save";
 import type { StripePriceMatrix } from "@/lib/stripe-config";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
+import { localizeHref } from "@/lib/locale-preferences";
 
 const disabledPricingCtaStyle: CSSProperties = {
   background: "#E8E8E8",
@@ -59,28 +60,28 @@ function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): stri
       if (leadingNumber) return fr ? `${leadingNumber} boutiques Shopify` : `${leadingNumber} Shopify stores`;
       return item.label;
     case "affiliate":
-      return fr ? "Liens d'affiliation trackés (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
+      return fr ? "Liens d’affiliation suivis (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
     case "commissions":
       return fr ? "Calcul automatique des commissions" : "Automatic commission calculation";
     case "templates":
-      return fr ? "Modèles et historique d'outreach" : "Outreach templates and history";
+      return fr ? "Modèles et historique d’outreach" : "Outreach templates and history";
     case "payout":
       if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
       return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
     case "includes-starter":
-      return fr ? "Tout Starter, plus" : "Everything in Starter, plus";
+      return fr ? "Tout Starter, et en plus :" : "Everything in Starter, plus";
     case "includes-pro":
-      return fr ? "Tout Pro, plus" : "Everything in Pro, plus";
+      return fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus";
     case "ai":
       return fr ? "Outreach IA illimité" : "Unlimited AI outreach";
     case "creator-dashboard":
-      return fr ? "Dashboard dédié à vos créateurs" : "Dedicated dashboard for your creators";
+      return fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators";
     case "creator-content":
-      return fr ? "Upload de contenus et stats de performance" : "Content upload and performance stats";
+      return fr ? "Import de contenus et statistiques de performance" : "Content upload and performance stats";
     case "automation":
       return fr ? "Scripts et briefs inclus" : "Scripts and briefs included";
     case "support":
-      return fr ? "Support dédié, réponse prioritaire" : "Dedicated support, priority response";
+      return fr ? "Support dédié et prioritaire" : "Dedicated support, priority response";
     default:
       if (!item.value.trim()) return item.label;
       if (leadingNumber) return `${leadingNumber} ${item.label}`;
@@ -232,7 +233,7 @@ export function PricingBento({
             priceId,
             userId: resolvedUserId,
             email: resolvedEmail,
-            cancelUrl: cancelUrl ?? `${origin}/pricing`,
+            cancelUrl: cancelUrl ?? `${origin}${localizeHref("/pricing", lang)}`,
             onboarding,
           }),
         });
@@ -321,7 +322,7 @@ export function PricingBento({
           <button
             type="button"
             className={`pb-switch${basicAnnual ? " is-on" : ""}`}
-            aria-label="Toggle billing"
+            aria-label={lang === "fr" ? "Basculer en facturation annuelle" : "Toggle billing"}
             aria-pressed={basicAnnual}
             onClick={() => setBasicAnnual((on) => !on)}
           >
@@ -356,7 +357,7 @@ export function PricingBento({
           <button
             type="button"
             className={`pb-switch${proAnnual ? " is-on" : ""}`}
-            aria-label="Toggle billing"
+            aria-label={lang === "fr" ? "Basculer en facturation annuelle" : "Toggle billing"}
             aria-pressed={proAnnual}
             onClick={() => setProAnnual((on) => !on)}
           >
@@ -365,7 +366,7 @@ export function PricingBento({
         </div>
         <p className="pb-card__headline">
           <span className="is-strong">{lang === "fr" ? "Pour les marques qui" : "For brands ready to"}</span>
-          <span className="is-mute">{lang === "fr" ? "opèrent de bout en bout." : "run campaigns end to end."}</span>
+          <span className="is-mute">{lang === "fr" ? "gèrent leurs campagnes de A à Z." : "run campaigns end to end."}</span>
         </p>
         <div className="pb-card__buy">
           <div className="pb-price">
@@ -393,7 +394,7 @@ export function PricingBento({
           <button
             type="button"
             className={`pb-switch${scaleAnnual ? " is-on" : ""}`}
-            aria-label="Toggle billing"
+            aria-label={lang === "fr" ? "Basculer en facturation annuelle" : "Toggle billing"}
             aria-pressed={scaleAnnual}
             onClick={() => setScaleAnnual((on) => !on)}
           >

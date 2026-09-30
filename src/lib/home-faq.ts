@@ -35,33 +35,33 @@ export const HOME_FAQ_EN: FaqItem[] = [
 
 export const HOME_FAQ_FR: FaqItem[] = [
   {
-    question: "Qu'est-ce que Trackit ?",
+    question: "Qu’est-ce que Trackit ?",
     answer:
-      "Trackit est le Workspace de l'affiliation créateurs. Découvrez des créateurs, envoyez de l'outreach, partagez vos contenus, suivez les liens d'affiliation Trackit sur Shopify et payez les commissions — le tout au même endroit.",
+      "Trackit est le Workspace de l’affiliation créateurs. Découvrez des créateurs, contactez-les, partagez vos contenus, suivez les liens d’affiliation Trackit sur Shopify et payez les commissions, le tout au même endroit.",
   },
   {
-    question: "À qui s'adresse Trackit ?",
+    question: "À qui s’adresse Trackit ?",
     answer:
-      "Trackit est conçu pour les marques Shopify et DTC, les fondateurs solo et les équipes growth qui travaillent avec des créateurs sans vouloir payer des outils enterprise ou gérer des tableurs.",
+      "Trackit est conçu pour les marques Shopify et DTC, les fondateurs solo et les petites équipes growth qui travaillent avec des créateurs sans vouloir payer des tarifs enterprise ni se perdre dans des tableurs.",
   },
   {
-    question: "Comment Trackit suit les ventes des créateurs ?",
+    question: "Comment Trackit suit-il les ventes des créateurs ?",
     answer:
-      "Trackit se connecte à votre boutique Shopify et attribue les commandes aux liens d'affiliation et codes promo des créateurs. Vous voyez le CA, le ROI et les commissions dues par créateur en temps réel.",
+      "Trackit se connecte à votre boutique Shopify et attribue les commandes aux liens d’affiliation et aux codes promo des créateurs. Vous voyez le chiffre d’affaires, le ROI et les commissions dues par créateur en temps réel.",
   },
   {
     question: "Trackit est-il gratuit pour commencer ?",
     answer:
-      "Oui. Trackit propose un plan gratuit pour tester la découverte de créateurs, lancer une mini-campagne et enregistrer des ventes manuelles avant de passer à Starter, Pro ou Business.",
+      "Oui. Trackit propose un plan gratuit pour tester la découverte de créateurs, lancer une mini-campagne et enregistrer des ventes manuelles, avant de passer à Starter, Pro ou Business à mesure que votre programme se développe.",
   },
   {
-    question: "En quoi Trackit est différent d'un tableur ?",
+    question: "En quoi Trackit est-il différent d’un tableur ?",
     answer:
-      "Un tableur ne synchronise pas Shopify, n'enregistre pas l'historique d'outreach et ne calcule pas les commissions automatiquement. Trackit remplace tout ça par une source unique de vérité, du premier DM au paiement.",
+      "Un tableur ne synchronise pas les commandes Shopify, ne garde pas l’historique de vos prises de contact et ne calcule pas les commissions automatiquement. Trackit remplace ce suivi manuel par une source unique de vérité, du premier DM au paiement.",
   },
   {
     question: "Trackit fonctionne-t-il avec Shopify ?",
     answer:
-      "Oui. Trackit s'intègre à Shopify pour synchroniser les ventes et relier chaque lien ou code créateur à un chiffre d'affaires réel dans votre dashboard.",
+      "Oui. Trackit s’intègre à Shopify : les ventes se synchronisent automatiquement et chaque lien ou code créateur est relié à un chiffre d’affaires réel dans votre tableau de bord.",
   },
 ];

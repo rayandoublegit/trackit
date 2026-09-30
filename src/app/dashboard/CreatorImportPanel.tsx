@@ -42,10 +42,15 @@ const IMPORT_EXAMPLE_ROWS: Record<(typeof IMPORT_EXAMPLE_COLUMNS)[number]["key"]
   },
 ];
 
+/** Free-text sample note — localized for display/template; not a parsed value. */
+function exampleNote(value: string, lang: "en" | "fr") {
+  return lang === "fr" && value === "UGC home" ? "UGC maison" : value;
+}
+
 function downloadCsvTemplate(lang: "en" | "fr") {
   const headers = IMPORT_EXAMPLE_COLUMNS.map((c) => c.key).join(",");
   const row1 = "mrbeast,MrBeast,tiktok,128900000,4.2,,contacted,";
-  const row2 = "medina_grillo,Medina Grillo,instagram,1100000,3.1,m.grillo@example.com,saved,UGC home";
+  const row2 = `medina_grillo,Medina Grillo,instagram,1100000,3.1,m.grillo@example.com,saved,${exampleNote("UGC home", lang)}`;
   const blob = new Blob([`${headers}\n${row1}\n${row2}\n`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -117,7 +122,7 @@ function ImportExamplesTable({ lang }: { lang: "en" | "fr" }) {
                       fontFamily: col.key === "username" || col.key === "email" ? "inherit" : "inherit",
                     }}
                   >
-                    {row[col.key]}
+                    {col.key === "notes" ? exampleNote(row[col.key], lang) : row[col.key]}
                   </td>
                 ))}
               </tr>

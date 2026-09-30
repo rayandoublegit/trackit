@@ -6,6 +6,8 @@ import { selectProfileRow } from "@/lib/profile-row";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  // French visitors come back to French pages (the sign-in page passes lang=fr).
+  const prefix = searchParams.get("lang") === "fr" ? "/fr" : "";
 
   if (code) {
     const cookieStore = await cookies();
@@ -39,23 +41,23 @@ export async function GET(request: Request) {
         }>(supabase, user.id, ["onboarding_completed", "account_type"]);
         if (creatorOnly) {
           if (profile?.account_type === "creator") {
-            return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
+            return NextResponse.redirect(`${origin}${prefix}/dashboard?view=analytics`);
           }
           await supabase.auth.signOut();
-          return NextResponse.redirect(`${origin}/auth?mode=login&role=creator&error=not_creator`);
+          return NextResponse.redirect(`${origin}${prefix}/auth?mode=login&role=creator&error=not_creator`);
         }
         if (profile && profile.account_type === "creator") {
-          return NextResponse.redirect(`${origin}/dashboard?view=analytics`);
+          return NextResponse.redirect(`${origin}${prefix}/dashboard?view=analytics`);
         }
         const finished =
           profile?.onboarding_completed === true || user.user_metadata?.onboarding_completed === true;
         if (!finished) {
-          return NextResponse.redirect(`${origin}/onboarding`);
+          return NextResponse.redirect(`${origin}${prefix}/onboarding`);
         }
-        return NextResponse.redirect(`${origin}/dashboard`);
+        return NextResponse.redirect(`${origin}${prefix}/dashboard`);
       }
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth`);
+  return NextResponse.redirect(`${origin}${prefix}/auth`);
 }

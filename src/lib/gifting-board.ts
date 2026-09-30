@@ -4,13 +4,13 @@ type Lang = "en" | "fr";
 
 export const GIFT_STATUS_LABELS: Record<GiftStatus, { en: string; fr: string }> = {
   invited: { en: "Invited", fr: "Invité" },
-  accepted: { en: "Accepted", fr: "Acceptée" },
-  declined: { en: "Declined", fr: "Refusée" },
+  accepted: { en: "Accepted", fr: "Accepté" },
+  declined: { en: "Declined", fr: "Refusé" },
   signed: { en: "Contract signed", fr: "Contrat signé" },
   shipped: { en: "Shipped", fr: "Expédié" },
-  delivered: { en: "Delivered", fr: "Reçu" },
-  submitted: { en: "Video in review", fr: "Vidéo à valider" },
-  approved: { en: "Approved", fr: "Validée" },
+  delivered: { en: "Delivered", fr: "Livré" },
+  submitted: { en: "Video in review", fr: "Vidéo en revue" },
+  approved: { en: "Approved", fr: "Validé" },
 };
 
 export function giftStatusLabel(status: string, lang: Lang): string {
@@ -61,19 +61,19 @@ export function giftNextStep(status: string, isCreator: boolean, lang: Lang): st
     case "signed":
       return isCreator
         ? fr ? "Contrat signé. La marque prépare votre colis." : "Contract signed. The brand is preparing your parcel."
-        : fr ? "Envoyez le colis, puis notez le transporteur et le numéro de suivi." : "Ship the parcel, then add the carrier and tracking number.";
+        : fr ? "Expédiez le colis, puis indiquez le transporteur et le numéro de suivi." : "Ship the parcel, then add the carrier and tracking number.";
     case "shipped":
-      return fr ? "Colis en route. Marquez-le reçu à la livraison." : "Parcel on its way. Mark it received on delivery.";
+      return fr ? "Colis en route. Marquez-le comme livré à sa réception." : "Parcel on its way. Mark it received on delivery.";
     case "delivered":
       return isCreator
         ? fr ? "Tournez la vidéo et déposez-la ici." : "Film the video and upload it here."
-        : fr ? "Colis reçu. En attente de la vidéo." : "Parcel received. Waiting for the video.";
+        : fr ? "Colis livré. En attente de la vidéo." : "Parcel received. Waiting for the video.";
     case "submitted":
       return isCreator
-        ? fr ? "Vidéo envoyée. La marque la relit." : "Video sent. The brand is reviewing it."
-        : fr ? "Regardez la vidéo, validez-la ou demandez une modification." : "Watch the video, then approve it or ask for changes.";
+        ? fr ? "Vidéo envoyée. La marque l’examine." : "Video sent. The brand is reviewing it."
+        : fr ? "Regardez la vidéo, puis validez-la ou demandez une modification." : "Watch the video, then approve it or ask for changes.";
     case "approved":
-      return fr ? "Mission terminée. La durée des droits publicitaires démarre à la validation." : "Mission complete. Ad rights run from the approval date.";
+      return fr ? "Mission terminée. La durée des droits publicitaires court à compter de la validation." : "Mission complete. Ad rights run from the approval date.";
     case "declined":
       return fr ? "Le créateur a refusé cette mission." : "The creator declined this mission.";
     default:
@@ -81,7 +81,34 @@ export function giftNextStep(status: string, isCreator: boolean, lang: Lang): st
   }
 }
 
-const KNOWN_ERRORS: { match: RegExp; en: string; fr: string }[] = [
+/** A fixed sentence, or one built from the match (null means "not handled, keep looking"). */
+type ErrorText = string | ((match: RegExpMatchArray) => string | null);
+
+/** Field labels used by `required(...)` in gifting.ts and the API route. */
+const FIELD_LABELS_FR: Record<string, { noun: string; feminine?: boolean; plural?: boolean }> = {
+  handle: { noun: "Le pseudo" },
+  territories: { noun: "Les territoires", plural: true },
+  name: { noun: "Le nom" },
+  address: { noun: "L’adresse", feminine: true },
+  "postal code": { noun: "Le code postal" },
+  city: { noun: "La ville", feminine: true },
+  country: { noun: "Le pays" },
+  signature: { noun: "La signature", feminine: true },
+  carrier: { noun: "Le transporteur" },
+  "tracking number": { noun: "Le numéro de suivi" },
+  "video name": { noun: "Le nom de la vidéo" },
+  feedback: { noun: "Le retour" },
+};
+
+function fieldErrorFr(label: string, kind: "required" | "too long"): string | null {
+  const field = FIELD_LABELS_FR[label.trim().toLowerCase()];
+  if (!field) return null;
+  if (kind === "required") return `${field.noun} ${field.plural ? "sont obligatoires" : "est obligatoire"}.`;
+  const long = field.feminine ? "longue" : "long";
+  return `${field.noun} ${field.plural ? `sont trop ${long}s` : `est trop ${long}`}.`;
+}
+
+const KNOWN_ERRORS: { match: RegExp; en: ErrorText; fr: ErrorText }[] = [
   {
     // Only errors about the gifting schema itself; a missing admin client or another table is a real failure.
     match: /(relation|column|table|function).*(gift_\w+|creator_links).*(does not exist|not find|schema cache)|could not find the (table|function) .*(gift_\w+|creator_links)/i,
@@ -107,11 +134,98 @@ const KNOWN_ERRORS: { match: RegExp; en: string; fr: string }[] = [
     en: "The video has to be uploaded before it can be approved.",
     fr: "La vidéo doit être déposée avant d’être validée.",
   },
+  // Mission rules (GiftRuleError in gifting.ts): English stays as written, French is translated.
+  { match: /^this mission can no longer be accepted\.$/i, en: "This mission can no longer be accepted.", fr: "Cette mission ne peut plus être acceptée." },
+  { match: /^this mission can no longer be declined\.$/i, en: "This mission can no longer be declined.", fr: "Cette mission ne peut plus être refusée." },
+  { match: /^sign the contract after accepting it\.$/i, en: "Sign the contract after accepting it.", fr: "Acceptez la mission avant de signer le contrat." },
+  { match: /^consent is required\.$/i, en: "Consent is required.", fr: "Cochez la case de consentement pour signer le contrat." },
+  { match: /^the contract is empty\.$/i, en: "The contract is empty.", fr: "Le contrat est vide." },
+  {
+    match: /^ship the parcel after the contract is signed\.$/i,
+    en: "Ship the parcel after the contract is signed.",
+    fr: "Le colis ne peut être expédié qu’une fois le contrat signé.",
+  },
+  {
+    match: /^mark the parcel received after it has shipped\.$/i,
+    en: "Mark the parcel received after it has shipped.",
+    fr: "Le colis ne peut être marqué comme livré qu’après son expédition.",
+  },
+  {
+    match: /^submit the video after the parcel is received\.$/i,
+    en: "Submit the video after the parcel is received.",
+    fr: "La vidéo ne peut être déposée qu’une fois le colis livré.",
+  },
+  { match: /^no video is waiting for approval\.$/i, en: "No video is waiting for approval.", fr: "Aucune vidéo n’est en attente de validation." },
+  { match: /^no video is waiting for feedback\.$/i, en: "No video is waiting for feedback.", fr: "Aucune vidéo n’est en attente de retour." },
+  { match: /^unknown action\.$/i, en: "Unknown action.", fr: "Action inconnue." },
+  {
+    match: /^(.+) is required\.$/i,
+    en: (m) => m[0],
+    fr: (m) => fieldErrorFr(m[1], "required"),
+  },
+  {
+    match: /^(.+) is too long\.$/i,
+    en: (m) => m[0],
+    fr: (m) => fieldErrorFr(m[1], "too long"),
+  },
+  // API route (/api/gifting) messages.
+  { match: /^server misconfigured$/i, en: "Server misconfigured", fr: "Le serveur est mal configuré. Réessayez plus tard." },
+  { match: /^invalid json$/i, en: "Invalid JSON", fr: "Requête invalide. Réessayez." },
+  { match: /^unknown operation\.$/i, en: "Unknown operation.", fr: "Opération inconnue." },
+  { match: /^action manquante\.$/i, en: "Missing action.", fr: "Action manquante." },
+  { match: /^access denied\.$/i, en: "Access denied.", fr: "Accès refusé." },
+  { match: /^wishlist not found\.$/i, en: "Wishlist not found.", fr: "Liste introuvable." },
+  { match: /^campaign not found\.$/i, en: "Campaign not found.", fr: "Campagne introuvable." },
+  { match: /^mission not found\.$/i, en: "Mission not found.", fr: "Mission introuvable." },
+  {
+    match: /^could not verify creator link\.$/i,
+    en: "Could not verify creator link.",
+    fr: "Impossible de vérifier le lien avec le créateur. Réessayez.",
+  },
+  {
+    match: /^upgrade to publish and send the creator link\.$/i,
+    en: "Upgrade to publish and send the creator link.",
+    fr: "Passez à une offre payante pour publier la campagne et envoyer le lien au créateur.",
+  },
+  {
+    match: /^mission changed\. refresh and try again\.$/i,
+    en: "Mission changed. Refresh and try again.",
+    fr: "La mission a été modifiée entre-temps. Actualisez la page et réessayez.",
+  },
+  {
+    match: /^creator cannot upload to this mission\.$/i,
+    en: "Creator cannot upload to this mission.",
+    fr: "Vous ne pouvez pas déposer de vidéo sur cette mission.",
+  },
+  { match: /^invalid gift video path\.$/i, en: "Invalid gift video path.", fr: "Emplacement de la vidéo invalide." },
+  {
+    match: /^upload a supported video before submitting\.$/i,
+    en: "Upload a supported video before submitting.",
+    fr: "Déposez une vidéo dans un format pris en charge avant de l’envoyer.",
+  },
+  {
+    match: /^upload an mp4, mov or webm video up to 500 mb\.$/i,
+    en: "Upload an MP4, MOV or WebM video up to 500 MB.",
+    fr: "Déposez une vidéo MP4, MOV ou WebM de 500 Mo maximum.",
+  },
+  { match: /^could not start upload\.$/i, en: "Could not start upload.", fr: "Impossible de démarrer l’envoi de la vidéo." },
+  {
+    match: /^supabase storage is not configured\.$/i,
+    en: "Supabase storage is not configured.",
+    fr: "Le stockage des vidéos n’est pas configuré.",
+  },
 ];
 
 export function friendlyGiftError(message: string, lang: Lang): string {
-  const known = KNOWN_ERRORS.find((entry) => entry.match.test(message.trim()));
-  return known ? known[lang] : message;
+  const text = message.trim();
+  for (const entry of KNOWN_ERRORS) {
+    const match = text.match(entry.match);
+    if (!match) continue;
+    const value = entry[lang];
+    const friendly = typeof value === "function" ? value(match) : value;
+    if (friendly) return friendly;
+  }
+  return message;
 }
 
 export function isGiftSetupError(message: string): boolean {

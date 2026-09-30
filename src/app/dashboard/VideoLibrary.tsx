@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { LibraryVideo, VideoLibraryResult } from "@/lib/creator-intel-types";
 import { PlatformLogo } from "@/components/PlatformLogo";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { useLang, type Lang } from "@/lib/useLang";
 import "./video-library.css";
 
 // Creators > Videos: every tracked video, like an ad library. Filters come from
@@ -35,18 +36,26 @@ export const EMPTY_VIDEO_FILTERS: VideoFilters = {
 
 const MIN_VIEWS: Record<string, number> = { "10k": 10_000, "100k": 100_000, "500k": 500_000, "1m": 1_000_000, "10m": 10_000_000 };
 
-function fmt(n: number | null | undefined): string {
+function fmt(n: number | null | undefined, lang: Lang = "en"): string {
   if (n == null || !Number.isFinite(n)) return "—";
+  if (lang === "fr") {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",")} M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 100_000 ? 0 : 1).replace(".", ",")} k`;
+    return String(Math.round(n));
+  }
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 100_000 ? 0 : 1)}K`;
   return String(Math.round(n));
 }
 
-function posted(iso: string | null): { ago: string; date: string } | null {
+function posted(iso: string | null, lang: Lang = "en"): { ago: string; date: string } | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const days = Math.max(0, Math.floor((Date.now() - d.getTime()) / 86_400_000));
+  if (lang === "fr") {
+    return { ago: days === 0 ? "aujourd'hui" : `${days} j`, date: d.toLocaleDateString("fr-FR", { month: "short", day: "numeric" }) };
+  }
   return { ago: days === 0 ? "today" : `${days}d`, date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }) };
 }
 
@@ -57,8 +66,10 @@ const I = ({ d }: { d: string }) => (
 );
 
 function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number; onOpenCreator: (username: string) => void }) {
+  const lang = useLang();
+  const fr = lang === "fr";
   const [more, setMore] = useState(false);
-  const p = posted(v.postedAt);
+  const p = posted(v.postedAt, lang);
   return (
     <article className="vl-card" style={{ ["--i" as string]: index % 24 }}>
       <header className="vl-card__head">
@@ -67,7 +78,7 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
           <span>
             <strong>{v.displayName}</strong>
             <small>
-              <PlatformLogo platform={v.platform} size={11} /> {fmt(v.followers)} followers
+              <PlatformLogo platform={v.platform} size={11} /> {fmt(v.followers, lang)} {fr ? (v.followers != null && v.followers < 2 ? "abonné" : "abonnés") : "followers"}
             </small>
           </span>
         </button>
@@ -83,7 +94,7 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
           {v.caption}
           {v.caption.length > 120 ? (
             <button type="button" onClick={() => setMore((x) => !x)}>
-              {more ? "See less" : "See more"}
+              {more ? (fr ? "Voir moins" : "See less") : fr ? "Voir plus" : "See more"}
             </button>
           ) : null}
         </p>
@@ -96,16 +107,16 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
         </span>
         <span className="vl-card__views">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M7 4v16l13-8z" /></svg>
-          {fmt(v.views)}
+          {fmt(v.views, lang)}
         </span>
-        {v.viewsGained7d ? <span className="vl-card__gain">+{fmt(v.viewsGained7d)} this week</span> : null}
+        {v.viewsGained7d ? <span className="vl-card__gain">+{fmt(v.viewsGained7d, lang)} {fr ? "cette semaine" : "this week"}</span> : null}
         {v.mediaType !== "video" ? <span className="vl-card__type">Photo</span> : v.durationSeconds ? <span className="vl-card__type">{v.durationSeconds}s</span> : null}
       </a>
       <div className="vl-card__stats">
-        <span><I d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" />{fmt(v.likes)}</span>
-        <span><I d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />{fmt(v.comments)}</span>
-        <span><I d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />{fmt(v.shares)}</span>
-        {v.hasProductLink ? <span className="vl-card__shop"><I d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />Product</span> : null}
+        <span><I d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z" />{fmt(v.likes, lang)}</span>
+        <span><I d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />{fmt(v.comments, lang)}</span>
+        <span><I d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />{fmt(v.shares, lang)}</span>
+        {v.hasProductLink ? <span className="vl-card__shop"><I d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" />{fr ? "Produit" : "Product"}</span> : null}
       </div>
       {v.hashtags.length ? (
         <div className="vl-card__tags">
@@ -115,9 +126,9 @@ function VideoCard({ v, index, onOpenCreator }: { v: LibraryVideo; index: number
         </div>
       ) : null}
       <footer className="vl-card__foot">
-        <button type="button" onClick={() => onOpenCreator(v.username)}>See creator</button>
+        <button type="button" onClick={() => onOpenCreator(v.username)}>{fr ? "Voir le créateur" : "See creator"}</button>
         <a href={v.shareUrl || undefined} target="_blank" rel="noreferrer">
-          Open video <I d="M7 17L17 7M9 7h8v8" />
+          {fr ? "Ouvrir la vidéo" : "Open video"} <I d="M7 17L17 7M9 7h8v8" />
         </a>
       </footer>
     </article>
@@ -137,6 +148,8 @@ export function VideoLibrary({
   onCount?: (n: number, loading: boolean) => void;
   onOpenCreator: (username: string) => void;
 }) {
+  const lang = useLang();
+  const fr = lang === "fr";
   const [videos, setVideos] = useState<LibraryVideo[]>([]);
   const [source, setSource] = useState<VideoLibraryResult["source"]>("tracked");
   const [loading, setLoading] = useState(true);
@@ -207,13 +220,17 @@ export function VideoLibrary({
       </div>
     );
   }
-  if (error) return <p className="vl-empty">The video library is not responding. Try again in a moment.</p>;
-  if (!videos.length) return <p className="vl-empty">No video matches these filters yet.</p>;
+  if (error) return <p className="vl-empty">{fr ? "La bibliothèque de vidéos ne répond pas. Réessayez dans un instant." : "The video library is not responding. Try again in a moment."}</p>;
+  if (!videos.length) return <p className="vl-empty">{fr ? "Aucune vidéo ne correspond encore à ces filtres." : "No video matches these filters yet."}</p>;
 
   return (
     <>
       {source === "snapshot" ? (
-        <p className="vl-note">Showing each creator&apos;s top videos. Captions, dates and weekly growth fill in as creators get tracked.</p>
+        <p className="vl-note">
+          {fr
+            ? "Affichage des meilleures vidéos de chaque créateur. Légendes, dates et croissance hebdomadaire se complètent à mesure que les créateurs sont suivis."
+            : "Showing each creator's top videos. Captions, dates and weekly growth fill in as creators get tracked."}
+        </p>
       ) : null}
       <div className="vl-grid">
         {videos.map((v, i) => (
@@ -222,7 +239,7 @@ export function VideoLibrary({
       </div>
       {hasMore ? (
         <button type="button" className="vl-more" onClick={() => void loadMore()}>
-          Load more videos
+          {fr ? "Charger plus de vidéos" : "Load more videos"}
         </button>
       ) : null}
     </>

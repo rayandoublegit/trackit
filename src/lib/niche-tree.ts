@@ -110,3 +110,38 @@ export function getDailySlice<T>(items: T[], dayIndex: number, sliceSize: number
 export function dayIndexUTC(nowMs: number = Date.now()): number {
   return Math.floor(nowMs / 86_400_000);
 }
+
+// Display names for the parent niches. Keys stay the canonical (English) tags;
+// only the label shown to users changes with the language.
+const NICHE_LABELS_FR: Record<string, string> = {
+  fitness: "Fitness",
+  food: "Cuisine",
+  beauty: "Beauté",
+  fashion: "Mode",
+  travel: "Voyage",
+  pets: "Animaux",
+  gaming: "Jeux vidéo",
+  lifestyle: "Lifestyle",
+  finance: "Finance",
+  tech: "Tech",
+  home: "Maison",
+  parenting: "Parentalité",
+  wellness: "Bien-être",
+  business: "Business",
+  "e-commerce": "E-commerce",
+  saas: "SaaS",
+  beautytech: "Beauty tech",
+  outdoors: "Plein air",
+  auto: "Auto",
+  art: "Art",
+};
+
+/** User-facing niche name: "Beauty" in English, "Beauté" in French. Unknown niches are capitalized. */
+export function nicheLabel(niche: string, lang: "en" | "fr" = "en"): string {
+  if (!niche) return niche;
+  if (lang === "fr") {
+    const fr = NICHE_LABELS_FR[niche.toLowerCase()];
+    if (fr) return fr;
+  }
+  return niche.charAt(0).toUpperCase() + niche.slice(1);
+}

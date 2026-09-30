@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
 import { ProductFilmHero } from "@/components/ProductFilmHero";
 import { ANNOUNCEMENT_KEY, AnnouncementBar } from "@/components/AnnouncementBar";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
+import { alternateLangPath, setAppLang, type AppLang } from "@/lib/locale-preferences";
 // Below the product film: load the dashboard after the page is interactive.
 const PremiumWorkspaceDemo = dynamic(() => import("./PremiumWorkspaceDemo").then((m) => m.PremiumWorkspaceDemo), {
   ssr: false,
@@ -26,21 +28,21 @@ function heroCopy(lang: "en" | "fr") {
       login: "Connexion",
       signup: "Inscription",
       getStarted: "Commencer",
-      forFree: "Gratuit !!",
-      badge: "Nouveauté : Ask Mino",
-      titleBefore: "Toute l'affiliation dans un seul ",
+      forFree: "C’est gratuit !",
+      badge: "Nouveau : Ask Mino",
+      titleBefore: "Toute votre affiliation dans un seul ",
       titleEm: "Workspace",
       points: [
         {
-          strong: "Trouver des créateurs.",
+          strong: "Découvrez des créateurs.",
           rest: "Trouvez les bons créateurs et invitez-les au même endroit.",
         },
         {
-          strong: "Gérer les affiliés.",
-          rest: "Campagnes, outreach et conversations, ensemble.",
+          strong: "Gérez vos affiliés.",
+          rest: "Campagnes, outreach et conversations, réunis au même endroit.",
         },
         {
-          strong: "Suivre et payer.",
+          strong: "Suivez et payez.",
           rest: "Suivez les ventes et payez les commissions automatiquement.",
         },
       ],
@@ -120,8 +122,42 @@ function heroCopy(lang: "en" | "fr") {
   };
 }
 
+/** Compact "EN / FR" switch: the same page in the other language. */
+export function LangSwitch({ className, style }: { className?: string; style?: CSSProperties }) {
+  const lang = useLang();
+  const pathname = usePathname() || "/";
+  const option = (target: AppLang, label: string, name: string) => (
+    <a
+      href={alternateLangPath(pathname, target)}
+      hrefLang={target}
+      lang={target}
+      aria-label={name}
+      aria-current={lang === target ? "true" : undefined}
+      onClick={() => setAppLang(target)}
+      style={{ color: "inherit", textDecoration: "none", opacity: lang === target ? 1 : 0.5 }}
+    >
+      {label}
+    </a>
+  );
+  return (
+    <span
+      role="group"
+      aria-label={lang === "fr" ? "Langue" : "Language"}
+      className={className}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, letterSpacing: "-0.01em", whiteSpace: "nowrap", ...style }}
+    >
+      {option("en", "EN", "English")}
+      <span aria-hidden style={{ opacity: 0.35 }}>
+        /
+      </span>
+      {option("fr", "FR", "Français")}
+    </span>
+  );
+}
+
 export function HeroPreviewShell() {
   const lang = useLang();
+  const localeHref = useLocaleHref();
   const [navOpen, setNavOpen] = useState(false);
   const [announcement, setAnnouncement] = useState(true);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -184,7 +220,7 @@ export function HeroPreviewShell() {
 
   const t = heroCopy(lang);
   const navLinks = [
-    { label: t.affiliates, href: "/affiliation" },
+    { label: t.affiliates, href: localeHref("/affiliation") },
     { label: t.solutions, href: "#features" },
     { label: t.product, href: "#product" },
     { label: t.pricing, href: "#pricing" },
@@ -195,7 +231,7 @@ export function HeroPreviewShell() {
       <nav className="hp-nav">
         {announcement ? <AnnouncementBar lang={lang} onClose={closeAnnouncement} /> : null}
         <div className="hp-nav__inner">
-          <Link className="hp-nav__brand" href="/">
+          <Link className="hp-nav__brand" href={localeHref("/")}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
           </Link>
@@ -207,10 +243,11 @@ export function HeroPreviewShell() {
             ))}
           </div>
           <div className="hp-nav__actions">
-            <a href="/auth?mode=login" className="hp-nav__login">
+            <LangSwitch style={{ color: "#111", padding: "0 6px" }} />
+            <a href={localeHref("/auth?mode=login")} className="hp-nav__login">
               {t.login}
             </a>
-            <a href="/auth?mode=signup" className="hp-nav__signup">
+            <a href={localeHref("/auth?mode=signup")} className="hp-nav__signup">
               {t.signup}
             </a>
             <button
@@ -244,10 +281,10 @@ export function HeroPreviewShell() {
                 {l.label}
               </a>
             ))}
-            <a href="/auth?mode=login" className="hp-nav__login" onClick={() => setNavOpen(false)}>
+            <a href={localeHref("/auth?mode=login")} className="hp-nav__login" onClick={() => setNavOpen(false)}>
               {t.login}
             </a>
-            <a href="/auth?mode=signup" className="hp-nav__signup" onClick={() => setNavOpen(false)}>
+            <a href={localeHref("/auth?mode=signup")} className="hp-nav__signup" onClick={() => setNavOpen(false)}>
               {t.signup}
             </a>
           </div>
@@ -280,7 +317,7 @@ export function HeroPreviewShell() {
             ))}
           </ul>
           <div className="hp-cta-row">
-            <a href="/auth?mode=signup" className="hp-cta">
+            <a href={localeHref("/auth?mode=signup")} className="hp-cta">
               <span className="hp-cta__swap">
                 <span>{t.getStarted}</span>
                 <span>{t.forFree}</span>

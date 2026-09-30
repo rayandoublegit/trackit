@@ -7,6 +7,7 @@ import { addMeetingForUser, addTaskForUser } from "@/lib/assistant-actions";
 import { isDashboardView, type DashboardView } from "@/lib/dashboard-view-storage";
 import {
   createMinoChat,
+  displayMinoChatTitle,
   getActiveMinoChatId,
   loadMinoChats,
   MINO_ACTIVE_EVENT,
@@ -439,7 +440,7 @@ export function AiChatView({
             .join(", ");
           askMore(
             fr
-              ? `Je ne trouve pas « ${cmd.creator} ». ${names ? `Tu veux dire : ${names} ?` : "Quel créateur veux-tu payer ?"}`
+              ? `Je ne trouve pas « ${cmd.creator} ». ${names ? `Vous voulez dire : ${names} ?` : "Quel créateur voulez-vous payer ?"}`
               : `I can't find “${cmd.creator}”. ${names ? `Did you mean: ${names}?` : "Which creator should I pay?"}`,
           );
           return;
@@ -516,7 +517,7 @@ export function AiChatView({
     } catch {
       setStatus(
         fr
-          ? "Petit souci de mon côté — réessaie dans un instant."
+          ? "Petit souci de mon côté — réessayez dans un instant."
           : "Small hiccup on my side — try again in a moment.",
       );
     } finally {
@@ -550,7 +551,7 @@ export function AiChatView({
     setPrompt("");
     setChatBusy(true);
     setStatus("");
-    setSearchLabel(creatorSearch ? describeSearch(creatorSearch) : null);
+    setSearchLabel(creatorSearch ? describeSearch(creatorSearch, lang) : null);
     // Let the search motion play in full even when results come back fast.
     const minShow = new Promise((r) => window.setTimeout(r, creatorSearch ? 2200 : 0));
 
@@ -576,7 +577,7 @@ export function AiChatView({
         res.ok && data.reply
           ? data.reply
           : fr
-            ? "Petit souci côté IA. Réessaie dans un instant."
+            ? "Petit souci côté IA. Réessayez dans un instant."
             : "AI hiccup. Try again in a moment.";
       const withReply: MinoChatMessage[] = [
         ...nextMessages,
@@ -593,7 +594,7 @@ export function AiChatView({
         ...nextMessages,
         {
           role: "assistant" as const,
-          content: fr ? "Erreur réseau. Réessaie." : "Network error. Try again.",
+          content: fr ? "Erreur réseau. Réessayez." : "Network error. Try again.",
         },
       ];
       setMessages(withReply);
@@ -616,7 +617,7 @@ export function AiChatView({
     return () => window.removeEventListener(MINO_PENDING_EVENT, consume);
   }, [userId]);
 
-  const dropdownLabel = activeChat?.title || "Ask, Build, Create";
+  const dropdownLabel = (activeChat?.title && displayMinoChatTitle(activeChat.title, fr)) || (fr ? "Demander, construire, créer" : "Ask, Build, Create");
 
   return (
     <div className={`ai-page${isMobile ? " is-mobile" : ""}${chatMode ? " is-chat" : ""}${messages.length > 0 ? " is-thread" : ""}`}>
@@ -652,7 +653,7 @@ export function AiChatView({
                     className={`ai-chat-dropdown__item${c.id === activeChatId ? " is-active" : ""}`}
                     onClick={() => openChat(c.id)}
                   >
-                    {c.title}
+                    {displayMinoChatTitle(c.title, fr)}
                   </button>
                 ))
               )}
@@ -691,7 +692,7 @@ export function AiChatView({
               ) : (
                 <div className="mino-typing" role="status">
                   <MinoCompanion size={18} />
-                  Mino is thinking
+                  {fr ? "Mino réfléchit" : "Mino is thinking"}
                   <i />
                   <i />
                   <i />
@@ -722,9 +723,11 @@ export function AiChatView({
                 placeholder={
                   chatMode
                     ? fr
-                      ? "Écris à Mino…"
+                      ? "Écrivez à Mino…"
                       : "Talk to Mino…"
-                    : "Ask, build, create…"
+                    : fr
+                      ? "Demandez, construisez, créez…"
+                      : "Ask, build, create…"
                 }
                 rows={isMobile ? 3 : 2}
                 onKeyDown={(e) => {
@@ -750,7 +753,7 @@ export function AiChatView({
                   className={`mtg-promptbox__chat${chatMode ? " is-active" : ""}`}
                   onClick={toggleChatMode}
                 >
-                  {chatMode ? "Ask" : "Chat"}
+                  {chatMode ? (fr ? "Demander" : "Ask") : fr ? "Discuter" : "Chat"}
                 </button>
                 <button
                   type="button"

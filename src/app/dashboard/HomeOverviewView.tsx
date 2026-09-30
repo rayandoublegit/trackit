@@ -170,6 +170,7 @@ function HomeMetric({
   index: number;
   accent?: boolean;
 }) {
+  const lang = useLang();
   return (
     <div className={`hm-metric${accent ? " is-accent" : ""}`} style={{ ["--i" as string]: index }}>
       <div className="hm-metric__top">
@@ -179,7 +180,7 @@ function HomeMetric({
         </span>
       </div>
       <div className="hm-metric__value">
-        <CountUp value={value} format={(n) => Math.round(n).toLocaleString("en-US")} />
+        <CountUp value={value} format={(n) => Math.round(n).toLocaleString(lang === "fr" ? "fr-FR" : "en-US")} />
       </div>
       {hint ? <div className="hm-metric__hint">{hint}</div> : null}
     </div>
@@ -248,24 +249,25 @@ function BrandHomeOverview({
   const setupTotal = HOME_STEP_ORDER.length;
 
   const firstName = (displayName || "").trim().split(/\s+/)[0] || "";
+  const fr = lang === "fr";
 
   return (
     <>
       <MinoHomeHero firstName={firstName} userId={userId} isMobile={isMobile} onNavigate={onNavigate} />
       <div style={{ padding: isMobile ? 16 : 40, paddingTop: isMobile ? 20 : 32 }}>
         <div className="hm-section-title">
-          <h2>Your program</h2>
-          <span>{businessName ? businessName : "Creators, campaigns and sales"}</span>
+          <h2>{fr ? "Votre programme" : "Your program"}</h2>
+          <span>{businessName ? businessName : fr ? "Créateurs, campagnes et ventes" : "Creators, campaigns and sales"}</span>
         </div>
         <div className="hm-metrics">
-          <HomeMetric index={0} label="Creators" value={gettingStarted.creatorsCount} hint="Managed" icon={GLYPH.creators} />
-          <HomeMetric index={1} label="Outreach" value={gettingStarted.outreachCount} hint="Messages sent" icon={GLYPH.outreach} />
-          <HomeMetric index={2} label="Sales" value={gettingStarted.salesCount} hint="Tracked orders" icon={GLYPH.sales} />
+          <HomeMetric index={0} label={fr ? "Créateurs" : "Creators"} value={gettingStarted.creatorsCount} hint={fr ? "Gérés" : "Managed"} icon={GLYPH.creators} />
+          <HomeMetric index={1} label={fr ? "Prospection" : "Outreach"} value={gettingStarted.outreachCount} hint={fr ? "Messages envoyés" : "Messages sent"} icon={GLYPH.outreach} />
+          <HomeMetric index={2} label={fr ? "Ventes" : "Sales"} value={gettingStarted.salesCount} hint={fr ? "Commandes suivies" : "Tracked orders"} icon={GLYPH.sales} />
           <HomeMetric
             index={3}
-            label="Active campaigns"
+            label={fr ? "Campagnes actives" : "Active campaigns"}
             value={activeCampaigns}
-            hint={activeCampaigns > 0 ? "Running now" : "None running yet"}
+            hint={activeCampaigns > 0 ? (fr ? "En cours" : "Running now") : fr ? "Aucune en cours" : "None running yet"}
             icon={GLYPH.campaigns}
             accent={activeCampaigns > 0}
           />
@@ -276,13 +278,37 @@ function BrandHomeOverview({
         ) : null}
 
         <div className="hm-section-title">
-          <h2>Jump back in</h2>
+          <h2>{fr ? "Reprendre là où vous en étiez" : "Jump back in"}</h2>
         </div>
         <div className="hm-actions">
-          <HomeAction index={0} label="Find creators" description="Search the catalog and save profiles." icon={GLYPH.find} onClick={() => onNavigate("discovery")} />
-          <HomeAction index={1} label="Launch a campaign" description="Codes, links and commissions." icon={GLYPH.campaigns} onClick={() => onNavigate("campaigns")} />
-          <HomeAction index={2} label="Send a gift" description="Contract, parcel and a video back." icon={GLYPH.gift} onClick={() => onNavigate("gifting")} />
-          <HomeAction index={3} label="Pay creators" description="Commissions ready to pay." icon={GLYPH.payouts} onClick={() => onNavigate("payouts")} />
+          <HomeAction
+            index={0}
+            label={fr ? "Trouver des créateurs" : "Find creators"}
+            description={fr ? "Cherchez dans le catalogue et enregistrez des profils." : "Search the catalog and save profiles."}
+            icon={GLYPH.find}
+            onClick={() => onNavigate("discovery")}
+          />
+          <HomeAction
+            index={1}
+            label={fr ? "Lancer une campagne" : "Launch a campaign"}
+            description={fr ? "Codes, liens et commissions." : "Codes, links and commissions."}
+            icon={GLYPH.campaigns}
+            onClick={() => onNavigate("campaigns")}
+          />
+          <HomeAction
+            index={2}
+            label={fr ? "Envoyer un cadeau" : "Send a gift"}
+            description={fr ? "Contrat, colis et une vidéo en retour." : "Contract, parcel and a video back."}
+            icon={GLYPH.gift}
+            onClick={() => onNavigate("gifting")}
+          />
+          <HomeAction
+            index={3}
+            label={fr ? "Payer les créateurs" : "Pay creators"}
+            description={fr ? "Commissions prêtes à être versées." : "Commissions ready to pay."}
+            icon={GLYPH.payouts}
+            onClick={() => onNavigate("payouts")}
+          />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile || !programEmpty ? "1fr" : "minmax(0,1fr) minmax(0,1.25fr)", gap: 16, alignItems: "start" }}>
@@ -472,7 +498,7 @@ function CreatorHomeOverview({
     return (
       <>
         <OverviewHeader isMobile={isMobile} title={lang === "fr" ? "Accueil" : "Home"} subtitle={lang === "fr" ? "Chargement…" : "Loading…"} />
-        <div style={{ padding: isMobile ? 16 : 40, color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement de votre overview…" : "Loading your overview…"}</div>
+        <div style={{ padding: isMobile ? 16 : 40, color: "var(--ws-text-dim)", fontSize: 14 }}>{lang === "fr" ? "Chargement de votre aperçu…" : "Loading your overview…"}</div>
       </>
     );
   }
@@ -511,7 +537,11 @@ function CreatorHomeOverview({
           >
             <span style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>{lang === "fr" ? "Code promo" : "Promo code"}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ws-accent)" }}>{stats.discountCode}</span>
-            {stats.commissionRate != null && <span style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>· {stats.commissionRate}%</span>}
+            {stats.commissionRate != null && (
+              <span style={{ fontSize: 13, color: "var(--ws-text-dim)" }}>
+                · {lang === "fr" ? `${String(stats.commissionRate).replace(".", ",")} %` : <>{stats.commissionRate}%</>}
+              </span>
+            )}
           </div>
         )}
 
@@ -550,7 +580,7 @@ function CreatorHomeOverview({
               onClick={() => onNavigate("scripts")}
             />
             <QuickAction
-              label="Content"
+              label={lang === "fr" ? "Contenu" : "Content"}
               description={lang === "fr" ? "Envoyez vos vidéos et fichiers à la marque." : "Upload your videos and files to the brand."}
               onClick={() => onNavigate("content")}
             />

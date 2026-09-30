@@ -144,7 +144,7 @@ export function InvitationsView({
             </h2>
             <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 20px", lineHeight: 1.5, letterSpacing: "-0.01em" }}>
               {lang === "fr"
-                ? "Partagez ce lien par message, email ou DM. Le créateur pourra créer son compte et rejoindre votre espace."
+                ? "Partagez ce lien par message, e-mail ou DM. Le créateur pourra créer son compte et rejoindre votre espace."
                 : "Share this link via message, email, or DM. The creator can create their account and join your workspace."}
             </p>
 

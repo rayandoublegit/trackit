@@ -31,7 +31,7 @@ import { useLang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { logCreatorLookupRequest } from "@/lib/creator-lookup-requests";
 import { submitNicheRequest } from "@/lib/niche-requests";
-import { NICHE_TREE } from "@/lib/niche-tree";
+import { NICHE_TREE, nicheLabel } from "@/lib/niche-tree";
 import { prefetchCreatorMedia } from "@/lib/avatar-url-cache";
 import { prefetchCreatorDetail } from "@/lib/creator-detail-cache";
 import {
@@ -44,7 +44,12 @@ import { CatalogFilterBar, type CatalogMode, type CatalogPreset, type CatalogSor
 import { PlatformLogo, platformKey } from "@/components/PlatformLogo";
 import { isStablePublicImageUrl } from "@/lib/client-image-url";
 
-function fmt(n: number): string {
+function fmt(n: number, lang: "en" | "fr" = "en"): string {
+  if (lang === "fr") {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",") + " M";
+    if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1).replace(".", ",") + " k";
+    return String(Math.round(n));
+  }
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1) + "K";
   return String(Math.round(n));
@@ -349,10 +354,19 @@ function NicheRequestSection({ lang, product }: { lang: "en" | "fr"; product: st
   );
 }
 
-function ago(iso: string | null): string {
+function ago(iso: string | null, lang: "en" | "fr" = "en"): string {
   if (!iso) return "";
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
   if (!Number.isFinite(days) || days < 0) return "";
+  if (lang === "fr") {
+    if (days === 0) return "aujourd'hui";
+    if (days === 1) return "hier";
+    if (days < 30) return `il y a ${days} jours`;
+    const moisFr = Math.floor(days / 30);
+    if (moisFr < 12) return `il y a ${moisFr} mois`;
+    const ansFr = Math.floor(moisFr / 12);
+    return `il y a ${ansFr} ${ansFr < 2 ? "an" : "ans"}`;
+  }
   if (days === 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 30) return `${days} days ago`;
@@ -437,10 +451,11 @@ function FeedListRow({
 }) {
   const c = creator;
   const t = discoveryCopy(lang);
+  const fr = lang === "fr";
   const instagram = platformKey(c.platform) === "instagram";
   const videos = rowVideos(c);
   const views = (c.videoThumbnails ?? []).map((v) => v.views).filter((v) => v > 0).slice(0, 10);
-  const posted = ago(c.lastPostAt);
+  const posted = ago(c.lastPostAt, lang);
 
   return (
     <div
@@ -473,7 +488,7 @@ function FeedListRow({
           <span>@{c.username}</span>
           <span className="cf-row__meta">
             {c.countryCode ? <span className="cf-geo">{c.countryCode}</span> : null}
-            {posted ? <span>Posted {posted}</span> : null}
+            {posted ? <span>{fr ? "Publié" : "Posted"} {posted}</span> : null}
           </span>
         </span>
       </div>
@@ -486,40 +501,40 @@ function FeedListRow({
               <span className="cf-vid__play" aria-hidden>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>
               </span>
-              <span className="cf-vid__views">{fmt(v.views)}</span>
+              <span className="cf-vid__views">{fmt(v.views, lang)}</span>
             </a>
           ))
         ) : (
-          <span className="cf-vids__none">No videos yet</span>
+          <span className="cf-vids__none">{fr ? "Pas encore de vidéos" : "No videos yet"}</span>
         )}
       </div>
       <div className="cf-row__tags">
-        {c.primaryNiche ? <span className="cf-tag">{c.primaryNiche}</span> : null}
-        {c.email ? <span className="cf-tag is-mail">Email</span> : null}
+        {c.primaryNiche ? <span className="cf-tag">{fr ? nicheLabel(c.primaryNiche, "fr") : c.primaryNiche}</span> : null}
+        {c.email ? <span className="cf-tag is-mail">{fr ? "E-mail" : "Email"}</span> : null}
       </div>
       <div className="cf-stat">
         <b>
-          {fmt(c.followersCount)}
+          {fmt(c.followersCount, lang)}
           {c.growth?.followersGrowthPct30d != null ? (
-            <span className={`cf-growth${c.growth.followersGrowthPct30d >= 0 ? " is-up" : " is-down"}`} title="Follower growth over 30 days">
+            <span className={`cf-growth${c.growth.followersGrowthPct30d >= 0 ? " is-up" : " is-down"}`} title={fr ? "Croissance des abonnés sur 30 jours" : "Follower growth over 30 days"}>
               {c.growth.followersGrowthPct30d >= 0 ? "+" : ""}
-              {c.growth.followersGrowthPct30d.toFixed(1)}%
+              {fr ? `${c.growth.followersGrowthPct30d.toFixed(1).replace(".", ",")} %` : `${c.growth.followersGrowthPct30d.toFixed(1)}%`}
             </span>
           ) : null}
         </b>
-        <small className={c.engagementRate >= 6 ? "is-hot" : ""}>{c.engagementRate ? `${c.engagementRate.toFixed(1)}% engagement` : "followers"}</small>
+        <small className={c.engagementRate >= 6 ? "is-hot" : ""}>{c.engagementRate ? (fr ? `${c.engagementRate.toFixed(1).replace(".", ",")} % d'engagement` : `${c.engagementRate.toFixed(1)}% engagement`) : fr ? "abonnés" : "followers"}</small>
       </div>
       <div className="cf-stat is-views">
-        <b>{c.avgViews ? fmt(c.avgViews) : "—"}</b>
+        <b>{c.avgViews ? fmt(c.avgViews, lang) : "—"}</b>
         <ViewsSpark values={views} />
       </div>
       <div className="cf-inter">
         <span>Likes</span>
-        <b>{c.avgLikes ? fmt(c.avgLikes) : "—"}</b>
-        <span>Comments</span>
-        <b>{c.avgComments ? fmt(c.avgComments) : "—"}</b>
-        <span>Shares</span>
-        <b>{c.avgShares ? fmt(c.avgShares) : "—"}</b>
+        <b>{c.avgLikes ? fmt(c.avgLikes, lang) : "—"}</b>
+        <span>{fr ? "Commentaires" : "Comments"}</span>
+        <b>{c.avgComments ? fmt(c.avgComments, lang) : "—"}</b>
+        <span>{fr ? "Partages" : "Shares"}</span>
+        <b>{c.avgShares ? fmt(c.avgShares, lang) : "—"}</b>
       </div>
       <div className="cf-row__actions">
         <SaveCreatorDropdown
@@ -1310,11 +1325,11 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           >
             {items.length > 0 ? (
               <div className="cf-head" aria-hidden>
-                <span>Creator</span>
-                <span>Top videos</span>
+                <span>{lang === "fr" ? "Créateur" : "Creator"}</span>
+                <span>{lang === "fr" ? "Meilleures vidéos" : "Top videos"}</span>
                 <span>Niche</span>
-                <span>Followers</span>
-                <span>Avg views</span>
+                <span>{lang === "fr" ? "Abonnés" : "Followers"}</span>
+                <span>{lang === "fr" ? "Vues moy." : "Avg views"}</span>
                 <span>Interactions</span>
                 <span />
               </div>

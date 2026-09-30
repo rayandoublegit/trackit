@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BILLING_LABELS, PLAN_LABELS, billingOf, isOffered, isPaying, type BillingSource } from "@/lib/admin-billing";
+import { billingOf, isOffered, isPaying, type BillingSource } from "@/lib/admin-billing";
+import { useLang } from "@/lib/useLang";
 import type { AdminUser, ConsoleData, UserDetail } from "../_components/console-types";
-import { Card, Empty, LoadState, PageHead, Pill, RefreshButton, ago, dateFr, eur, num, useAdminData } from "../_components/ui";
+import { billingLabels, invoiceStatus, planLabels, subscriptionStatus } from "../_components/labels";
+import { Card, Empty, LoadState, PageHead, Pill, RefreshButton, useAdminData, useAdminFormat, useT } from "../_components/ui";
 
 type TypeFilter = "all" | "brand" | "creator";
 type BillingFilter = "all" | "paying" | "offered" | "free";
@@ -51,6 +53,11 @@ export default function AdminUsersPage() {
   const [sort, setSort] = useState<SortKey>("recent");
   const [limit, setLimit] = useState(100);
   const [openId, setOpenId] = useState<string | null>(null);
+  const { dateFr, num } = useAdminFormat();
+  const t = useT();
+  const lang = useLang();
+  const PLAN_LABELS = planLabels(lang);
+  const BILLING_LABELS = billingLabels(lang);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -88,8 +95,8 @@ export default function AdminUsersPage() {
   return (
     <>
       <PageHead
-        title="Users"
-        lead="Every account, its billing and its real usage. Actions are logged."
+        title={t("Users", "Utilisateurs")}
+        lead={t("Every account, its billing and its real usage. Actions are logged.", "Chaque compte, sa facturation et son usage réel. Les actions sont journalisées.")}
         actions={<RefreshButton onClick={reload} loading={loading} />}
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
@@ -98,20 +105,20 @@ export default function AdminUsersPage() {
           <div className="ad-toolbar">
             <input
               className="ad-input"
-              placeholder="Search an email, a name, an ID…"
+              placeholder={t("Search an email, a name, an ID…", "Rechercher un e-mail, un nom, un ID…")}
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
                 setLimit(100);
               }}
-              aria-label="Search users"
+              aria-label={t("Search users", "Rechercher des utilisateurs")}
             />
-            <div className="ad-seg" role="group" aria-label="Account type">
+            <div className="ad-seg" role="group" aria-label={t("Account type", "Type de compte")}>
               {(
                 [
-                  ["all", "All"],
-                  ["brand", "Brands"],
-                  ["creator", "Creators"],
+                  ["all", t("All", "Tous")],
+                  ["brand", t("Brands", "Marques")],
+                  ["creator", t("Creators", "Créateurs")],
                 ] as const
               ).map(([id, label]) => (
                 <button key={id} type="button" className={typeFilter === id ? "is-on" : ""} onClick={() => setTypeFilter(id)}>
@@ -119,13 +126,13 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <div className="ad-seg" role="group" aria-label="Billing">
+            <div className="ad-seg" role="group" aria-label={t("Billing", "Facturation")}>
               {(
                 [
-                  ["all", `All (${num(data.users.length)})`],
-                  ["paying", `Paying (${num(counts.paying)})`],
-                  ["offered", `Comped (${num(counts.offered)})`],
-                  ["free", `Free (${num(counts.free)})`],
+                  ["all", `${t("All", "Tous")} (${num(data.users.length)})`],
+                  ["paying", `${t("Paying", "Payants")} (${num(counts.paying)})`],
+                  ["offered", `${t("Comped", "Offerts")} (${num(counts.offered)})`],
+                  ["free", `${t("Free", "Gratuits")} (${num(counts.free)})`],
                 ] as const
               ).map(([id, label]) => (
                 <button key={id} type="button" className={billingFilter === id ? "is-on" : ""} onClick={() => setBillingFilter(id)}>
@@ -133,22 +140,22 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort">
-              <option value="recent">Most recent</option>
-              <option value="name">Name A-Z</option>
-              <option value="plan">Highest plan</option>
+            <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t("Sort", "Trier")}>
+              <option value="recent">{t("Most recent", "Plus récents")}</option>
+              <option value="name">{t("Name A-Z", "Nom A-Z")}</option>
+              <option value="plan">{t("Highest plan", "Offre la plus haute")}</option>
             </select>
           </div>
           <div className="ad-table-wrap">
             <table className="ad-table">
               <thead>
                 <tr>
-                  <th>Account</th>
-                  <th>Type</th>
-                  <th>Plan</th>
-                  <th>Billing</th>
-                  <th>Role</th>
-                  <th className="ad-num">Joined</th>
+                  <th>{t("Account", "Compte")}</th>
+                  <th>{t("Type", "Type")}</th>
+                  <th>{t("Plan", "Offre")}</th>
+                  <th>{t("Billing", "Facturation")}</th>
+                  <th>{t("Role", "Rôle")}</th>
+                  <th className="ad-num">{t("Joined", "Inscription")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -168,7 +175,7 @@ export default function AdminUsersPage() {
                         </span>
                       </span>
                     </td>
-                    <td>{(user.account_type ?? "").toLowerCase() === "creator" ? <Pill>Creator</Pill> : <Pill tone="accent">Brand</Pill>}</td>
+                    <td>{(user.account_type ?? "").toLowerCase() === "creator" ? <Pill>{t("Creator", "Créateur")}</Pill> : <Pill tone="accent">{t("Brand", "Marque")}</Pill>}</td>
                     <td>{PLAN_LABELS[billing.plan]}</td>
                     <td>
                       <Pill tone={billingTone(billing.source)}>{BILLING_LABELS[billing.source]}</Pill>
@@ -179,11 +186,19 @@ export default function AdminUsersPage() {
                 ))}
               </tbody>
             </table>
-            {rows.length === 0 ? <Empty>No matching accounts.</Empty> : null}
+            {rows.length === 0 ? <Empty>{t("No matching accounts.", "Aucun compte correspondant.")}</Empty> : null}
             {rows.length > limit ? (
               <div style={{ padding: 14, display: "flex", justifyContent: "center" }}>
                 <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 200)}>
-                  Show {Math.min(200, rows.length - limit)} more ({num(rows.length - limit)} remaining)
+                  {lang === "fr" ? (
+                    <>
+                      Afficher {Math.min(200, rows.length - limit)} de plus ({num(rows.length - limit)} restants)
+                    </>
+                  ) : (
+                    <>
+                      Show {Math.min(200, rows.length - limit)} more ({num(rows.length - limit)} remaining)
+                    </>
+                  )}
                 </button>
               </div>
             ) : null}
@@ -212,6 +227,11 @@ function UserDrawer({
   const [plan, setPlan] = useState<string>(user.plan && user.plan !== "free" ? user.plan : "pro");
   const [role, setRole] = useState<string>(user.role ?? "user");
   const billing = billingOf(user);
+  const { ago, dateFr, eur, num } = useAdminFormat();
+  const t = useT();
+  const lang = useLang();
+  const PLAN_LABELS = planLabels(lang);
+  const BILLING_LABELS = billingLabels(lang);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -236,14 +256,14 @@ function UserDrawer({
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setToast(body.error || `Refused (${res.status})`);
+        setToast(body.error || t(`Refused (${res.status})`, `Refusé (${res.status})`));
         return;
       }
-      setToast("Change saved.");
+      setToast(t("Change saved.", "Modification enregistrée."));
       onChanged();
       reload();
     } catch {
-      setToast("Could not connect.");
+      setToast(t("Could not connect.", "Connexion impossible."));
     } finally {
       setBusy(false);
     }
@@ -257,8 +277,8 @@ function UserDrawer({
 
   return (
     <>
-      <button type="button" className="ad-drawer-bg" aria-label="Close" onClick={onClose} />
-      <aside className="ad-drawer" role="dialog" aria-modal="true" aria-label={`Account ${displayName(user)}`}>
+      <button type="button" className="ad-drawer-bg" aria-label={t("Close", "Fermer")} onClick={onClose} />
+      <aside className="ad-drawer" role="dialog" aria-modal="true" aria-label={`${t("Account", "Compte")} ${displayName(user)}`}>
         <div className="ad-drawer__head">
           <span className="ad-who">
             <Avatar name={displayName(user)} />
@@ -268,53 +288,53 @@ function UserDrawer({
             </span>
           </span>
           <button type="button" className="ad-btn" onClick={onClose}>
-            Close
+            {t("Close", "Fermer")}
           </button>
         </div>
 
         <div className="ad-facts">
           <div className="ad-fact">
-            <span>Applied plan</span>
+            <span>{t("Applied plan", "Offre appliquée")}</span>
             <strong>{PLAN_LABELS[billing.plan]}</strong>
           </div>
           <div className="ad-fact">
-            <span>Billing</span>
+            <span>{t("Billing", "Facturation")}</span>
             <strong>
               {BILLING_LABELS[billing.source]}
-              {billing.until ? ` · until ${dateFr(billing.until)}` : ""}
+              {billing.until ? t(` · until ${dateFr(billing.until)}`, ` · jusqu’au ${dateFr(billing.until)}`) : ""}
             </strong>
           </div>
           <div className="ad-fact">
-            <span>Joined</span>
+            <span>{t("Joined", "Inscription")}</span>
             <strong>{dateFr(user.created_at)}</strong>
           </div>
           <div className="ad-fact">
-            <span>Last activity</span>
+            <span>{t("Last activity", "Dernière activité")}</span>
             <strong>{sessions[0] ? ago(sessions[0].last_active_at) : loading ? "…" : "—"}</strong>
           </div>
         </div>
 
         {error ? <LoadState loading={false} error={error} onRetry={reload} /> : null}
 
-        <Card title="Product usage">
+        <Card title={t("Product usage", "Usage du produit")}>
           <div className="ad-facts">
-            <div className="ad-fact"><span>Campaigns</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
-            <div className="ad-fact"><span>Managed creators</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
-            <div className="ad-fact"><span>Tracked sales</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
-            <div className="ad-fact"><span>Tracked revenue</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
-            <div className="ad-fact"><span>Messages sent</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
-            <div className="ad-fact"><span>Gifting missions</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
+            <div className="ad-fact"><span>{t("Campaigns", "Campagnes")}</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
+            <div className="ad-fact"><span>{t("Managed creators", "Créateurs gérés")}</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
+            <div className="ad-fact"><span>{t("Tracked sales", "Ventes suivies")}</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
+            <div className="ad-fact"><span>{t("Tracked revenue", "CA suivi")}</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
+            <div className="ad-fact"><span>{t("Messages sent", "Messages envoyés")}</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
+            <div className="ad-fact"><span>{t("Gifting missions", "Missions gifting")}</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
           </div>
         </Card>
 
-        <Card title="Actions">
+        <Card title={t("Actions", "Actions")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div className="ad-actions">
-              <select className="ad-select" value={plan} onChange={(e) => setPlan(e.target.value)} aria-label="Plan">
+              <select className="ad-select" value={plan} onChange={(e) => setPlan(e.target.value)} aria-label={t("Plan", "Offre")}>
                 <option value="basic">Growth</option>
                 <option value="pro">Pro</option>
                 <option value="scale">Scale</option>
-                <option value="free">Free</option>
+                <option value="free">{t("Free", "Gratuit")}</option>
               </select>
               <button
                 type="button"
@@ -325,65 +345,95 @@ function UserDrawer({
                     "setPlan",
                     plan,
                     plan === "free"
-                      ? "Move this account to Free? Any Stripe subscription will be canceled immediately."
-                      : `Apply the ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} plan? Without a Stripe subscription, access is comped.`,
+                      ? t(
+                          "Move this account to Free? Any Stripe subscription will be canceled immediately.",
+                          "Passer ce compte en Gratuit ? Tout abonnement Stripe sera résilié immédiatement.",
+                        )
+                      : t(
+                          `Apply the ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} plan? Without a Stripe subscription, access is comped.`,
+                          `Appliquer l’offre ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} ? Sans abonnement Stripe, l’accès est offert.`,
+                        ),
                   )
                 }
               >
-                Apply plan
+                {t("Apply plan", "Appliquer l’offre")}
               </button>
               {plan !== "free" ? (
-                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("giftMonth", plan, `Gift 1 month of ${plan}?`)}>
-                  Gift 1 month
+                <button
+                  type="button"
+                  className="ad-btn"
+                  disabled={busy}
+                  onClick={() => void act("giftMonth", plan, t(`Gift 1 month of ${plan}?`, `Offrir 1 mois de ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} ?`))}
+                >
+                  {t("Gift 1 month", "Offrir 1 mois")}
                 </button>
               ) : null}
               {isOffered(billing.source) ? (
-                <button type="button" className="ad-btn ad-btn--danger" disabled={busy} onClick={() => void act("revokeComp", undefined, "Revoke comped access?")}>
-                  Revoke comped access
+                <button
+                  type="button"
+                  className="ad-btn ad-btn--danger"
+                  disabled={busy}
+                  onClick={() => void act("revokeComp", undefined, t("Revoke comped access?", "Révoquer l’accès offert ?"))}
+                >
+                  {t("Revoke comped access", "Révoquer l’accès offert")}
                 </button>
               ) : null}
             </div>
             <div className="ad-actions">
-              <select className="ad-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label="Role">
-                <option value="user">User</option>
-                <option value="staff">Staff</option>
+              <select className="ad-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label={t("Role", "Rôle")}>
+                <option value="user">{t("User", "Utilisateur")}</option>
+                <option value="staff">{t("Staff", "Équipe")}</option>
                 <option value="admin">Admin</option>
               </select>
               <button
                 type="button"
                 className="ad-btn"
                 disabled={busy || role === (user.role ?? "user")}
-                onClick={() => void act("role", role, `Give this account the "${role}" role?`)}
+                onClick={() => void act("role", role, t(`Give this account the "${role}" role?`, `Donner le rôle « ${role} » à ce compte ?`))}
               >
-                Change role
+                {t("Change role", "Changer le rôle")}
               </button>
             </div>
             {user.stripe_subscription_id ? (
               <div className="ad-actions">
-                <button type="button" className="ad-btn" disabled={busy} onClick={() => void act("cancel", undefined, "Cancel the Stripe subscription at the end of the period?")}>
-                  Cancel at period end
+                <button
+                  type="button"
+                  className="ad-btn"
+                  disabled={busy}
+                  onClick={() => void act("cancel", undefined, t("Cancel the Stripe subscription at the end of the period?", "Résilier l’abonnement Stripe à la fin de la période ?"))}
+                >
+                  {t("Cancel at period end", "Résilier en fin de période")}
                 </button>
                 <button
                   type="button"
                   className="ad-btn ad-btn--danger"
                   disabled={busy}
-                  onClick={() => void act("cancelNow", undefined, "Cancel the Stripe subscription immediately? The account goes back to Free.")}
+                  onClick={() =>
+                    void act(
+                      "cancelNow",
+                      undefined,
+                      t(
+                        "Cancel the Stripe subscription immediately? The account goes back to Free.",
+                        "Résilier l’abonnement Stripe immédiatement ? Le compte repasse en Gratuit.",
+                      ),
+                    )
+                  }
                 >
-                  Cancel now
+                  {t("Cancel now", "Résilier maintenant")}
                 </button>
               </div>
             ) : null}
-            {stripeMode === "test" ? <Pill tone="warn">Stripe in test mode</Pill> : null}
+            {stripeMode === "test" ? <Pill tone="warn">{t("Stripe in test mode", "Stripe en mode test")}</Pill> : null}
           </div>
         </Card>
 
         {sub ? (
-          <Card title="Stripe subscription">
+          <Card title={t("Stripe subscription", "Abonnement Stripe")}>
             <div className="ad-facts">
-              <div className="ad-fact"><span>Status</span><strong>{sub.status}{sub.cancelAtPeriodEnd ? " · ending" : ""}</strong></div>
-              <div className="ad-fact"><span>Amount</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? "year" : "month"}</strong></div>
-              <div className="ad-fact"><span>Period end</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
-              <div className="ad-fact"><span>Price</span><strong>{sub.priceId ?? "—"}</strong></div>
+              <div className="ad-fact"><span>{t("Status", "Statut")}</span><strong>{subscriptionStatus(sub.status, lang)}{sub.cancelAtPeriodEnd ? t(" · ending", " · se termine") : ""}</strong></div>
+              <div className="ad-fact"><span>{t("Amount", "Montant")}</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? t("year", "an") : t("month", "mois")}</strong></div>
+              <div className="ad-fact"><span>{t("Period end", "Fin de période")}</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
+              <div className="ad-fact"><span>{t("Price", "Prix")}</span><strong>{sub.priceId ?? "—"}</strong></div>
             </div>
             {detail && detail.invoices.length > 0 ? (
               <table className="ad-table" style={{ marginTop: 12 }}>
@@ -392,7 +442,7 @@ function UserDrawer({
                     <tr key={inv.id}>
                       <td>{dateFr(inv.created)}</td>
                       <td>
-                        <Pill tone={inv.status === "paid" ? "good" : inv.status === "open" ? "warn" : "muted"}>{inv.status ?? "—"}</Pill>
+                        <Pill tone={inv.status === "paid" ? "good" : inv.status === "open" ? "warn" : "muted"}>{inv.status === null ? "—" : invoiceStatus(inv.status, lang)}</Pill>
                       </td>
                       <td className="ad-num">{eur(inv.amountPaid, 2)}</td>
                       <td className="ad-num">
@@ -412,9 +462,9 @@ function UserDrawer({
           </Card>
         ) : null}
 
-        <Card title="Recent sessions">
+        <Card title={t("Recent sessions", "Sessions récentes")}>
           {sessions.length === 0 ? (
-            <Empty>{loading ? "Loading…" : "No sessions recorded."}</Empty>
+            <Empty>{loading ? t("Loading…", "Chargement…") : t("No sessions recorded.", "Aucune session enregistrée.")}</Empty>
           ) : (
             <table className="ad-table">
               <tbody>
@@ -431,7 +481,7 @@ function UserDrawer({
           )}
         </Card>
 
-        <Card title="Technical details">
+        <Card title={t("Technical details", "Détails techniques")}>
           <dl className="ad-kv">
             {shownKeys.map((k) => (
               <div key={k} style={{ display: "contents" }}>

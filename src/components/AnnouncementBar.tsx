@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Lang } from "@/lib/useLang";
+import { localizeHref } from "@/lib/locale-preferences";
 import "./announcement-bar.css";
 
 // Q4 announcement above the landing nav. The countdown is computed after mount
@@ -27,7 +28,7 @@ export function AnnouncementBar({ lang, onClose }: { lang: Lang; onClose: () => 
   return (
     <div className="annc" role="region" aria-label={fr ? "Annonce" : "Announcement"}>
       <span className="annc__shine" aria-hidden />
-      <a className="annc__body" href="/auth?mode=signup">
+      <a className="annc__body" href={localizeHref("/auth?mode=signup", lang)}>
         <span className="annc__tag">Q4</span>
         <span className="annc__text">
           <strong>{fr ? "Le Q4 commence." : "Q4 is here."}</strong>

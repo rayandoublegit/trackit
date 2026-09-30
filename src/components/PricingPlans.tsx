@@ -55,10 +55,10 @@ export function PricingPlans({
   const { prices, loading: loadingPrices } = useStripePrices();
   const plan = normalizePlan(currentPlan);
 
-  const defaultTitle = lang === "fr" ? "Choisis le plan qui te convient" : "Choose the plan that fits";
+  const defaultTitle = lang === "fr" ? "Choisissez l’offre qui vous convient" : "Choose the plan that fits";
   const defaultSubtitle =
     lang === "fr"
-      ? "Même pricing que sur le site, avec les vrais checkouts Stripe."
+      ? "Les mêmes tarifs que sur le site, avec le paiement sécurisé Stripe."
       : "Same pricing as the website, with the live Stripe checkouts.";
   const defaultTagline = lang === "fr" ? "Tarifs" : "Pricing";
   const planDisplayName = marketingPlanDisplayName(plan, lang);
@@ -82,7 +82,7 @@ export function PricingPlans({
         {!loadingPrices && !prices.growth.usd.month && (
           <p style={{ marginTop: 12, fontSize: 14, color: "#B45309", letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Les checkouts payants sont temporairement indisponibles."
+              ? "Le paiement des offres payantes est temporairement indisponible."
               : "Paid checkout is temporarily unavailable."}
           </p>
         )}

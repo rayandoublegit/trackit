@@ -36,7 +36,7 @@ function statusLabel(s: PlannerNoteStatus, fr: boolean) {
 }
 
 function kindLabel(k: PlannerNoteKind, fr: boolean) {
-  if (k === "meeting") return fr ? "Meeting" : "Meeting";
+  if (k === "meeting") return fr ? "Rendez-vous" : "Meeting";
   if (k === "follow_up") return fr ? "Suivi" : "Follow-up";
   return fr ? "Général" : "General";
 }
@@ -91,11 +91,11 @@ function NoteEditor({
 
   return (
     <div className="pn-modal" role="dialog" aria-modal="true">
-      <button type="button" className="pn-modal__backdrop" aria-label="Close" onClick={onClose} />
+      <button type="button" className="pn-modal__backdrop" aria-label={fr ? "Fermer" : "Close"} onClick={onClose} />
       <div className="pn-modal__panel">
         <div className="pn-modal__head">
           <h3>{draft.title.trim() ? (fr ? "Modifier la note" : "Edit note") : fr ? "Nouvelle note" : "New note"}</h3>
-          <button type="button" className="pn-icon-btn" onClick={onClose} aria-label="Close">
+          <button type="button" className="pn-icon-btn" onClick={onClose} aria-label={fr ? "Fermer" : "Close"}>
             ×
           </button>
         </div>
@@ -117,7 +117,7 @@ function NoteEditor({
             rows={4}
             placeholder={
               fr
-                ? "Ce qu’il faut retenir du meeting, prochaines étapes…"
+                ? "Ce qu’il faut retenir du rendez-vous, prochaines étapes…"
                 : "What to remember from the meeting, next steps…"
             }
           />
@@ -157,7 +157,7 @@ function NoteEditor({
           {creators.length === 0 ? (
             <p className="pn-hint">
               {fr
-                ? "Aucun créateur enregistré. Ajoute-en depuis Findit pour les attribuer ici."
+                ? "Aucun créateur enregistré. Ajoutez-en depuis Findit pour les attribuer ici."
                 : "No saved creators yet. Add some from Findit to assign them here."}
             </p>
           ) : (
@@ -340,7 +340,7 @@ export function PlannerNotesView({ userId, isMobile }: { userId?: string; isMobi
         <div className="pn-empty">
           <p>
             {fr
-              ? "Aucune note pour l’instant. Capture tes points de meeting et lie-les à un créateur pour les retrouver après."
+              ? "Aucune note pour l’instant. Notez les points clés de vos rendez-vous et liez-les à un créateur pour les retrouver facilement."
               : "No notes yet. Capture meeting takeaways and link them to a creator for easy follow-up."}
           </p>
           <button type="button" className="pn-add" onClick={openNew}>

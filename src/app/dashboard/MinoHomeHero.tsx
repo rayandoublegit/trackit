@@ -5,6 +5,7 @@ import { MinoCompanion } from "@/components/MinoCompanion";
 import { PlatformLogo } from "@/components/PlatformLogo";
 import { setActiveMinoChatId, setPendingMinoPrompt } from "@/lib/mino-chats-storage";
 import type { DashboardView } from "@/lib/dashboard-view-storage";
+import { useLang, type Lang } from "@/lib/useLang";
 import "./home-mino.css";
 
 // Home opens on Mino: ask anything, and the chat view picks the question up.
@@ -17,11 +18,20 @@ const ROTATING = [
   "Pay a creator",
 ];
 
-function useRotatingPlaceholder(): string {
+const ROTATING_FR = [
+  "Trouve des micro-créateurs fitness sur TikTok",
+  "Créatrices beauté en France avec un email",
+  "Créateurs skincare sur Instagram, 50K+",
+  "Crée une campagne pour mon nouveau drop",
+  "Payer un créateur",
+];
+
+function useRotatingPlaceholder(lang: Lang): string {
   const [i, setI] = useState(0);
   const [n, setN] = useState(0);
   const [back, setBack] = useState(false);
-  const full = ROTATING[i];
+  const list = lang === "fr" ? ROTATING_FR : ROTATING;
+  const full = list[i % list.length];
   useEffect(() => {
     const done = back ? n === 0 : n >= full.length;
     const t = window.setTimeout(
@@ -49,11 +59,20 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-const CHIPS: { text: string; icon: ReactNode }[] = [
-  { text: "Find micro fitness creators on TikTok", icon: <PlatformLogo platform="tiktok" size={15} /> },
-  { text: "Find beauty creators on Instagram in France", icon: <PlatformLogo platform="instagram" size={15} /> },
+const CHIPS: { text: string; fr: string; icon: ReactNode }[] = [
+  {
+    text: "Find micro fitness creators on TikTok",
+    fr: "Trouve des micro-créateurs fitness sur TikTok",
+    icon: <PlatformLogo platform="tiktok" size={15} />,
+  },
+  {
+    text: "Find beauty creators on Instagram in France",
+    fr: "Trouve des créatrices beauté sur Instagram en France",
+    icon: <PlatformLogo platform="instagram" size={15} />,
+  },
   {
     text: "Find skincare creators with an email",
+    fr: "Trouve des créateurs skincare avec un email",
     icon: (
       <Icon>
         <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -63,6 +82,7 @@ const CHIPS: { text: string; icon: ReactNode }[] = [
   },
   {
     text: "Create a new campaign",
+    fr: "Crée une nouvelle campagne",
     icon: (
       <Icon>
         <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" />
@@ -72,6 +92,7 @@ const CHIPS: { text: string; icon: ReactNode }[] = [
   },
   {
     text: "Pay a creator",
+    fr: "Payer un créateur",
     icon: (
       <Icon>
         <path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5" />
@@ -94,7 +115,9 @@ export function MinoHomeHero({
 }) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const placeholder = useRotatingPlaceholder();
+  const lang = useLang();
+  const fr = lang === "fr";
+  const placeholder = useRotatingPlaceholder(lang);
 
   const ask = (raw: string) => {
     const q = raw.trim();
@@ -117,9 +140,19 @@ export function MinoHomeHero({
         <MinoCompanion size={isMobile ? 56 : 68} />
       </div>
       <h1 id="hm-title" className="hm-hero__title">
-        {firstName ? `Hi ${firstName}, what should Mino do?` : "What should Mino do?"}
+        {fr
+          ? firstName
+            ? `Bonjour ${firstName}, que doit faire Mino ?`
+            : "Que doit faire Mino ?"
+          : firstName
+            ? `Hi ${firstName}, what should Mino do?`
+            : "What should Mino do?"}
       </h1>
-      <p className="hm-hero__sub">Mino finds creators across TikTok and Instagram, starts campaigns and opens anything in Trackit.</p>
+      <p className="hm-hero__sub">
+        {fr
+          ? "Mino trouve des créateurs sur TikTok et Instagram, lance des campagnes et ouvre tout ce qu’il faut dans Trackit."
+          : "Mino finds creators across TikTok and Instagram, starts campaigns and opens anything in Trackit."}
+      </p>
 
       <form
         className="mtg-promptbox hm-hero__box"
@@ -140,10 +173,10 @@ export function MinoHomeHero({
             ref={inputRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={placeholder || "Ask Mino"}
-            aria-label="Ask Mino"
+            placeholder={placeholder || (fr ? "Demandez à Mino" : "Ask Mino")}
+            aria-label={fr ? "Demandez à Mino" : "Ask Mino"}
           />
-          <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label="Send to Mino">
+          <button type="submit" className="hm-hero__send" disabled={!text.trim()} aria-label={fr ? "Envoyer à Mino" : "Send to Mino"}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
               <path d="M12 19V5M6.5 10.5 12 5l5.5 5.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -153,9 +186,9 @@ export function MinoHomeHero({
 
       <div className="hm-hero__chips">
         {CHIPS.map((c, i) => (
-          <button key={c.text} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => ask(c.text)}>
+          <button key={c.text} type="button" className="hm-chip" style={{ ["--i" as string]: i }} onClick={() => ask(fr ? c.fr : c.text)}>
             <span className="hm-chip__icon">{c.icon}</span>
-            {c.text}
+            {fr ? c.fr : c.text}
           </button>
         ))}
       </div>

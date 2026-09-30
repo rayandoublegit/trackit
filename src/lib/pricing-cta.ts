@@ -13,17 +13,17 @@ export const PLAN_RANK: Record<PlanTier, number> = {
 
 /** Free-tier CTA on pricing cards when the user is already on free. */
 export function freeStayAnywayCtaLabel(lang: "fr" | "en"): string {
-  return lang === "fr" ? "Quand même rester en free" : "Stay on free anyway";
+  return lang === "fr" ? "Rester sur le plan Gratuit malgré tout" : "Stay on free anyway";
 }
 
 /** Badge above pricing grid when the user is on the free plan. */
 export function freePlanBadgeLabel(lang: "fr" | "en"): string {
-  return lang === "fr" ? "Plan Free" : "Free plan";
+  return lang === "fr" ? "Plan Gratuit" : "Free plan";
 }
 
 /** Free-tier CTA when the user is on a paid plan (downgrade path). */
 export function preferFreeCtaLabel(lang: "fr" | "en"): string {
-  return lang === "fr" ? "Je préfère rester en free" : "I'd rather stay free";
+  return lang === "fr" ? "Je préfère rester sur le plan Gratuit" : "I'd rather stay free";
 }
 
 /** Same rules as dashboard BillingView / PricingPlans. */
@@ -62,7 +62,7 @@ export function planCtaLabel(
 
   const sameTier = PLAN_RANK[currentPlan] === PLAN_RANK[target];
   if (action === "upgrade" && sameTier && viewAnnual && subscriptionInterval === "month") {
-    return lang === "fr" ? "Passer à l'annuel" : "Switch to annual";
+    return lang === "fr" ? "Passer à l’annuel" : "Switch to annual";
   }
   if (action === "upgrade") {
     if (viewAnnual && PLAN_RANK[target] < PLAN_RANK[currentPlan]) {

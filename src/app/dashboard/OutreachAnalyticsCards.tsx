@@ -63,7 +63,7 @@ export function OutreachAnalyticsCards({
     { label: lang === "fr" ? "Envoyés" : "Sent", value: String(stats.sent) },
     { label: lang === "fr" ? "Ouverts" : "Opened", value: String(stats.opened) },
     { label: lang === "fr" ? "Réponses" : "Replies", value: String(stats.replied) },
-    { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: `${replyRate}%` },
+    { label: lang === "fr" ? "Taux de réponse" : "Reply rate", value: lang === "fr" ? `${replyRate} %` : `${replyRate}%` },
     { label: lang === "fr" ? "Convertis" : "Converted", value: String(stats.converted) },
   ];
 

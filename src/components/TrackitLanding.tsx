@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
+import { legalLinks } from "@/lib/legal-links";
 import { ChaoticWorkSection } from "@/components/ChaoticWorkSection";
 import { MinoCompanion } from "@/components/MinoCompanion";
-import { HeroPreviewShell } from "@/app/hero-preview/HeroPreviewShell";
+import { HeroPreviewShell, LangSwitch } from "@/app/hero-preview/HeroPreviewShell";
 import { annualBilledSubtitle, annualFreeMonthsBadge, checkoutCurrencyFromLang, formatPricingAmount, getPlanAnnualMonthlyEquivalent, getPlanAnnualTotal, planDisplayName, PLAN_PRICES } from "@/lib/plan-marketing";
 import { getGrowthPriceId, getProPriceId, getScalePriceId } from "@/lib/stripe-config";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
@@ -64,28 +65,28 @@ function formatBentoFeatureLine(item: PricingHighlight, lang: "en" | "fr"): stri
       if (leadingNumber) return fr ? `${leadingNumber} boutiques Shopify` : `${leadingNumber} Shopify stores`;
       return item.label;
     case "affiliate":
-      return fr ? "Liens d'affiliation trackés (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
+      return fr ? "Liens d’affiliation suivis (clics, ventes, CA)" : "Tracked affiliate links (clicks, sales, revenue)";
     case "commissions":
       return fr ? "Calcul automatique des commissions" : "Automatic commission calculation";
     case "templates":
-      return fr ? "Modèles et historique d'outreach" : "Outreach templates and history";
+      return fr ? "Modèles et historique d’outreach" : "Outreach templates and history";
     case "payout":
       if (/manuel|manual/i.test(item.value)) return fr ? "Paiements créateurs manuels" : "Manual creator payouts";
       return fr ? "Paiements créateurs automatiques via Stripe" : "Automatic creator payouts via Stripe";
     case "includes-starter":
-      return fr ? "Tout Starter, plus" : "Everything in Starter, plus";
+      return fr ? "Tout Starter, et en plus :" : "Everything in Starter, plus";
     case "includes-pro":
-      return fr ? "Tout Pro, plus" : "Everything in Pro, plus";
+      return fr ? "Tout Pro, et en plus :" : "Everything in Pro, plus";
     case "ai":
       return fr ? "Outreach IA illimité" : "Unlimited AI outreach";
     case "creator-dashboard":
-      return fr ? "Dashboard dédié à vos créateurs" : "Dedicated dashboard for your creators";
+      return fr ? "Tableau de bord dédié à vos créateurs" : "Dedicated dashboard for your creators";
     case "creator-content":
-      return fr ? "Upload de contenus et stats de performance" : "Content upload and performance stats";
+      return fr ? "Import de contenus et statistiques de performance" : "Content upload and performance stats";
     case "automation":
       return fr ? "Scripts et briefs inclus" : "Scripts and briefs included";
     case "support":
-      return fr ? "Support dédié, réponse prioritaire" : "Dedicated support, priority response";
+      return fr ? "Support dédié et prioritaire" : "Dedicated support, priority response";
     default:
       if (!item.value.trim()) return item.label;
       if (leadingNumber) return `${leadingNumber} ${item.label}`;
@@ -135,6 +136,7 @@ export default function TrackitLanding() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [faqOpen, setFaqOpen] = useState<number | null>(0);
   const lang = useLang();
+  const localeHref = useLocaleHref();
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -147,21 +149,21 @@ export default function TrackitLanding() {
   nav_login: lang === "fr" ? "Se connecter" : "Log in",
   nav_cta: lang === "fr" ? "Ouvrir thentrack.it" : "Open thentrack.it",
   hero_badge: lang === "fr" ? "Marketing d'influence, automatisé" : "Influencer marketing, automated",
-  hero_title_1: lang === "fr" ? "Trouver des influenceurs." : "Find creators.",
+  hero_title_1: lang === "fr" ? "Trouvez des créateurs." : "Find creators.",
   hero_title_2: lang === "fr" ? "Suivez vos ventes." : "Track sales.",
-  hero_title_3: lang === "fr" ? "Payez vos commissions" : "Pay commissions.",
-  hero_italic: lang === "fr" ? "A un seul endroit." : "All in one place.",
+  hero_title_3: lang === "fr" ? "Payez les commissions." : "Pay commissions.",
+  hero_italic: lang === "fr" ? "Au même endroit." : "All in one place.",
   hero_sub: lang === "fr" ? "Arrêtez de passer des heures à chercher manuellement sur TikTok. Trackit trouve les bons créateurs pour votre marque, suit chaque vente générée et paie les commissions automatiquement. Sans tableurs. Sans outils à 300€/mois." : `Stop spending hours searching TikTok manually. Trackit finds the right creators for your brand, tracks every sale they drive, and pays commissions automatically. No spreadsheets. No ${formatPricingAmount(300, lang)}/month enterprise tools.`,
   hero_cta: lang === "fr" ? "Commencer" : "Get Started",
-  hero_cta_hover: lang === "fr" ? "Gratuit !!" : "For Free!!",
+  hero_cta_hover: lang === "fr" ? "C’est gratuit !" : "For Free!!",
   hero_sub_cta: lang === "fr" ? "Sans carte bancaire" : "No credit card required",
   hero_commission: lang === "fr" ? "Suivi des Commissions" : "Commission Tracking",
   hero_automated: lang === "fr" ? "Automatisé" : "Automated",
   hero_bank_line1: lang === "fr" ? "0€ de Virements" : `${formatPricingAmount(0, lang)} Manual Bank`,
   hero_bank_line2: lang === "fr" ? "Bancaires Manuels" : "Transfers",
-  section_title_line1: lang === "fr" ? "Gérer tout votre" : "Manage all your",
-  section_title_line2: lang === "fr" ? "affiliation à un seul endroit" : "affiliation in one place",
-  section_sub: lang === "fr" ? "De la recherche du créateur parfait au paiement automatique de ses commissions. Conçu pour les marques Shopify sérieuses." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
+  section_title_line1: lang === "fr" ? "Gérez toute votre" : "Manage all your",
+  section_title_line2: lang === "fr" ? "affiliation au même endroit" : "affiliation in one place",
+  section_sub: lang === "fr" ? "De la recherche du créateur idéal au paiement automatique de ses commissions. Conçu pour les marques Shopify qui prennent le marketing d’influence au sérieux." : "From finding the perfect creator to paying their commission automatically. Built for Shopify brands who are serious about creator marketing.",
   feat_1_title: lang === "fr" ? "Découverte de Créateurs" : "Creator Discovery",
   feat_1_desc: lang === "fr" ? "Trouvez les bons créateurs, invitez-les, et gardez-les dans Trackit. Profils, listes et invitations restent dans le Workspace : plus de recherche éparpillée entre TikTok, Instagram et des tableurs. Un créateur trouvé est un affilié Trackit, pas un onglet de plus." : "Find the right creators, invite them, and keep them in Trackit. Profiles, lists, and invitations stay in the Workspace: no more searching across TikTok, Instagram, and spreadsheets. A creator you find becomes a Trackit affiliate, not another tab.",
   feat_2_title: lang === "fr" ? "Ask Mino" : "Ask Mino",
@@ -197,7 +199,7 @@ export default function TrackitLanding() {
   why_sub_line2: lang === "fr" ? "comme la vôtre" : "",
   why_sub2: lang === "fr" ? "Pas pour les entreprises." : "Not for enterprise",
   why_desc: lang === "fr" ? "Chaque autre outil a été conçu pour des agences avec 10 personnes et 500€/mois. Trackit a été conçu pour les marques Shopify agiles qui ont besoin de résultats." : "Every other tool was built for agencies with 10 people and $500/month budgets. Trackit was built for lean Shopify brands who need results not complexity.",
-  pricing_sub: lang === "fr" ? "Commencez gratuitement. Résiliez à tout moment. Pas de frais cachés." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
+  pricing_sub: lang === "fr" ? "Commencez gratuitement. Changez d’offre quand vous êtes prêt. Résiliable à tout moment, sans frais cachés ni engagement annuel imposé." : "Start free. Upgrade when you're ready. Cancel anytime. No hidden fees. No annual contracts forced on you.",
   pricing_save: annualFreeMonthsBadge(lang),
   pricing_scale_pill: lang === "fr" ? "Agences & multi-marques" : "Agencies & multi-brand",
   pricing_most_popular: lang === "fr" ? "Le plus populaire" : "Most Popular",
@@ -206,10 +208,10 @@ export default function TrackitLanding() {
   pricing_year: lang === "fr" ? "par an" : "/year",
   pricing_annually: lang === "fr" ? "Annuel" : "Annually",
   pricing_everything_in_pro: lang === "fr" ? "Tout le plan Pro" : "Everything in Pro",
-  footer_social: lang === "fr" ? "Réseaux" : "Social Media",
+  footer_social: lang === "fr" ? "Réseaux sociaux" : "Social Media",
   footer_reach: lang === "fr" ? "Contactez-nous" : "Reach out to us",
   footer_contact_title: lang === "fr" ? "Écrivez-nous par e-mail" : "Contact us by email",
-  footer_contact_sub: lang === "fr" ? "On vous répond sous 24h." : "Our team replies within 24h.",
+  footer_contact_sub: lang === "fr" ? "Notre équipe répond sous 24 h." : "Our team replies within 24h.",
   footer_col_features: lang === "fr" ? "Produit" : "Product",
   footer_col_explore: lang === "fr" ? "Explorer" : "Explore",
   footer_col_help: lang === "fr" ? "Aide" : "Help",
@@ -225,8 +227,8 @@ export default function TrackitLanding() {
   footer_solutions: lang === "fr" ? "Solutions" : "Solutions",
   footer_about: lang === "fr" ? "À propos" : "About",
   footer_rights: lang === "fr" ? "Tous droits réservés." : "All rights reserved.",
-  footer_terms: lang === "fr" ? "Conditions générales" : "Terms of Service",
-  footer_privacy: lang === "fr" ? "Politique de confidentialité" : "Privacy Policy",
+  footer_legal: lang === "fr" ? "Informations légales" : "Legal",
+  toggle_billing: lang === "fr" ? "Basculer en facturation annuelle" : "Toggle billing",
   faq_title: lang === "fr" ? "Questions fréquentes sur Trackit" : "Frequently asked questions about Trackit",
   faq_title_line1: lang === "fr" ? "Encore une question ?" : "Still have a question?",
   faq_title_line2: lang === "fr" ? "Voici les réponses." : "Here are the answers.",
@@ -329,7 +331,7 @@ export default function TrackitLanding() {
         annual,
       });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Could not start checkout");
+      alert(err instanceof Error ? err.message : lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout");
     } finally {
       setPayingTier(null);
     }
@@ -418,7 +420,7 @@ export default function TrackitLanding() {
           <span className="section-title-line">
             {lang === "fr" ? (
               <>
-                affiliation à un seul{" "}
+                affiliation au même{" "}
                 <span className="features-title-end">
                   endroit
                   <span className="features-icon-dock" aria-hidden>
@@ -585,7 +587,7 @@ export default function TrackitLanding() {
               <button
                 type="button"
                 className={`pb-switch${basicAnnual ? " is-on" : ""}`}
-                aria-label="Toggle billing"
+                aria-label={t.toggle_billing}
                 aria-pressed={basicAnnual}
                 onClick={() => setBasicAnnual((on) => !on)}
               >
@@ -620,7 +622,7 @@ export default function TrackitLanding() {
               <button
                 type="button"
                 className={`pb-switch${trackitAnnual ? " is-on" : ""}`}
-                aria-label="Toggle billing"
+                aria-label={t.toggle_billing}
                 aria-pressed={trackitAnnual}
                 onClick={() => setTrackitAnnual((on) => !on)}
               >
@@ -629,7 +631,7 @@ export default function TrackitLanding() {
             </div>
             <p className="pb-card__headline">
               <span className="is-strong">{lang === "fr" ? "Pour les marques qui" : "For brands ready to"}</span>
-              <span className="is-mute">{lang === "fr" ? "opèrent de bout en bout." : "run campaigns end to end."}</span>
+              <span className="is-mute">{lang === "fr" ? "gèrent leurs campagnes de A à Z." : "run campaigns end to end."}</span>
             </p>
             <div className="pb-card__buy">
               <div className="pb-price">
@@ -657,7 +659,7 @@ export default function TrackitLanding() {
               <button
                 type="button"
                 className={`pb-switch${proAnnual ? " is-on" : ""}`}
-                aria-label="Toggle billing"
+                aria-label={t.toggle_billing}
                 aria-pressed={proAnnual}
                 onClick={() => setProAnnual((on) => !on)}
               >
@@ -698,8 +700,8 @@ export default function TrackitLanding() {
             </h2>
             <p className="seo-faq-subtitle">{t.faq_subtitle}</p>
             <div className="seo-faq-links">
-              <Link href="/blog">{t.footer_blog}</Link>
-              <Link href="/solutions/creator-affiliate-platform">{t.footer_solutions}</Link>
+              <Link href={localeHref("/blog")}>{t.footer_blog}</Link>
+              <Link href={localeHref("/solutions/creator-affiliate-platform")}>{t.footer_solutions}</Link>
             </div>
           </header>
           <div className="seo-faq-list">
@@ -738,7 +740,7 @@ export default function TrackitLanding() {
                 ? "Découverte, outreach, contenus, liens Trackit et paiements. Enfin au même endroit."
                 : "Discovery, outreach, content, Trackit links, and payouts. Finally in one place."}
             </p>
-            <Link href="/auth" className="prefooter__cta">
+            <Link href={localeHref("/auth")} className="prefooter__cta">
               {lang === "fr" ? "Commencer" : "Get started"}
             </Link>
           </div>
@@ -779,23 +781,23 @@ export default function TrackitLanding() {
             <div className="footer-grid">
               <nav className="footer-col" aria-label={t.footer_col_features}>
                 <p className="footer-col__title">{t.footer_col_features}</p>
-                <Link href="/#features">{t.footer_discovery}</Link>
-                <Link href="/#features">{t.footer_mino}</Link>
-                <Link href="/#features">{t.footer_campaigns}</Link>
-                <Link href="/#features">{t.footer_trackpay}</Link>
+                <Link href={localeHref("/#features")}>{t.footer_discovery}</Link>
+                <Link href={localeHref("/#features")}>{t.footer_mino}</Link>
+                <Link href={localeHref("/#features")}>{t.footer_campaigns}</Link>
+                <Link href={localeHref("/#features")}>{t.footer_trackpay}</Link>
               </nav>
               <nav className="footer-col" aria-label={t.footer_col_explore}>
                 <p className="footer-col__title">{t.footer_col_explore}</p>
-                <Link href="/solutions">{t.footer_solutions}</Link>
-                <Link href="/solutions/shopify-creator-tracking">{t.footer_shopify}</Link>
-                <Link href="/blog">{t.footer_blog}</Link>
-                <Link href="/#pricing">{t.footer_pricing}</Link>
+                <Link href={localeHref("/solutions")}>{t.footer_solutions}</Link>
+                <Link href={localeHref("/solutions/shopify-creator-tracking")}>{t.footer_shopify}</Link>
+                <Link href={localeHref("/blog")}>{t.footer_blog}</Link>
+                <Link href={localeHref("/#pricing")}>{t.footer_pricing}</Link>
               </nav>
               <nav className="footer-col" aria-label={t.footer_col_help}>
                 <p className="footer-col__title">{t.footer_col_help}</p>
-                <Link href="/#faq">{t.footer_faq}</Link>
-                <Link href="/contact">{t.footer_contact}</Link>
-                <Link href="/about">{t.footer_about}</Link>
+                <Link href={localeHref("/#faq")}>{t.footer_faq}</Link>
+                <Link href={localeHref("/contact")}>{t.footer_contact}</Link>
+                <Link href={localeHref("/about")}>{t.footer_about}</Link>
               </nav>
             </div>
           </div>
@@ -806,10 +808,14 @@ export default function TrackitLanding() {
 
           <div className="footer-bottom">
             <div>©2026 Trackit. {t.footer_rights}</div>
-            <div className="footer-legal">
-              <Link href="/terms">{t.footer_terms}</Link>
-              <Link href="/privacy">{t.footer_privacy}</Link>
-            </div>
+            <nav className="footer-legal" aria-label={t.footer_legal}>
+              {legalLinks(lang).map((link) => (
+                <Link key={link.key} href={link.href}>
+                  {link.label}
+                </Link>
+              ))}
+              <LangSwitch />
+            </nav>
           </div>
         </div>
       </footer>

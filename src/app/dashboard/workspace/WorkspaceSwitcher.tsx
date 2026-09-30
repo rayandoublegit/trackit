@@ -139,8 +139,8 @@ export function WorkspaceSwitcher({
   useEffect(() => {
     const found = workspaces.find((w) => w.id === activeId);
     if (found?.name?.trim()) applyDashboardTabTitle(found.name);
-    else if (!loading && workspaces.length === 0) applyDashboardTabTitle("Dashboard");
-  }, [activeId, loading, workspaces]);
+    else if (!loading && workspaces.length === 0) applyDashboardTabTitle(fr ? "Tableau de bord" : "Dashboard");
+  }, [activeId, loading, workspaces, fr]);
 
   const requestSwitch = (ws: BrandWorkspace) => {
     if (ws.id === activeId) {

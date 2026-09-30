@@ -507,7 +507,11 @@ export function AddBrandContentPanel({
                 type="url"
                 value={postUrl}
                 onChange={(e) => setPostUrl(e.target.value)}
-                placeholder="https://www.tiktok.com/@…/video/… or https://www.instagram.com/reel/…"
+                placeholder={
+                  lang === "fr"
+                    ? "https://www.tiktok.com/@…/video/… ou https://www.instagram.com/reel/…"
+                    : "https://www.tiktok.com/@…/video/… or https://www.instagram.com/reel/…"
+                }
                 style={inputStyle}
               />
               <p style={{ fontSize: 12, color: "#9A9A9A", margin: "8px 0 0", lineHeight: 1.45 }}>

@@ -331,7 +331,7 @@ export function CampaignLinksTab({
 
       <div style={{ border: "1px solid var(--ws-border)", borderRadius: 16, padding: isMobile ? "20px 16px" : "24px 22px", background: "var(--ws-surface)" }}>
         <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>
-          {lang === "fr" ? "Générer un lien d'affiliation" : "Generate affiliate link"}
+          {lang === "fr" ? "Générer un lien d’affiliation" : "Generate affiliate link"}
         </h3>
         <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
           {lang === "fr"
@@ -350,7 +350,7 @@ export function CampaignLinksTab({
           >
             <p style={{ margin: "0 0 12px", fontSize: 14, color: "var(--ws-text-muted)", lineHeight: 1.5 }}>
               {lang === "fr"
-                ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Starter pour générer et mesurer vos liens d'affiliation."
+                ? "Les liens trackés (clics, ventes, CA) sont bloqués sur Free. Passez à Starter pour générer et mesurer vos liens d’affiliation."
                 : "Tracked links (clicks, sales, revenue) are locked on Free. Upgrade to Starter to generate and measure affiliate links."}
             </p>
             {onUpgrade ? (
@@ -410,7 +410,7 @@ export function CampaignLinksTab({
                 type="url"
                 value={destinationUrl}
                 onChange={(e) => setDestinationUrl(e.target.value)}
-                placeholder="https://your-store.com"
+                placeholder={lang === "fr" ? "https://votre-boutique.com" : "https://your-store.com"}
                 style={fieldInput}
               />
             </div>
@@ -476,7 +476,7 @@ export function CampaignLinksTab({
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {aggregateByDay.slice(-14).map(([day, count]) => (
                   <div key={day} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ width: 72, fontSize: 12, color: "var(--ws-text-dim)", flexShrink: 0 }}>{day.slice(5)}</span>
+                    <span style={{ width: 72, fontSize: 12, color: "var(--ws-text-dim)", flexShrink: 0 }}>{lang === "fr" ? `${day.slice(8, 10)}/${day.slice(5, 7)}` : day.slice(5)}</span>
                     <div style={{ flex: 1, height: 8, background: "var(--ws-pill)", borderRadius: 999, overflow: "hidden" }}>
                       <div
                         style={{
@@ -622,10 +622,10 @@ export function CampaignLinksTab({
                 </div>
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: "var(--ws-text-muted)" }}>
                   <span>
-                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.clicks}</strong> {lang === "fr" ? "clics" : "clicks"}
+                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.clicks}</strong> {lang === "fr" ? (link.metrics.clicks > 1 ? "clics" : "clic") : "clicks"}
                   </span>
                   <span>
-                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.uniques}</strong> {lang === "fr" ? "uniques" : "uniques"}
+                    <strong style={{ color: "var(--ws-text)" }}>{link.metrics.uniques}</strong> {lang === "fr" ? (link.metrics.uniques > 1 ? "uniques" : "unique") : "uniques"}
                   </span>
                 </div>
               </div>

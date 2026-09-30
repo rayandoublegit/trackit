@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
 import { prefersReducedMotion } from "@/app/dashboard/sample-motion";
 import { MinoCompanion } from "@/components/MinoCompanion";
 import "./product-film.css";
@@ -152,7 +152,7 @@ function FindShot({ p, lang }: { p: number; lang: Lang }) {
       >
         <div className="pf-bar" style={pop(p, 0, 520, 24)}>
         <SearchIcon />
-        <Typed p={p} at={420} text={fr ? "Trouve les créateurs qui vendent vraiment." : "Find the creators who actually sell."} />
+        <Typed p={p} at={420} text={fr ? "Trouvez les créateurs qui vendent vraiment." : "Find the creators who actually sell."} />
         <span className="pf-bar__go" style={{ opacity: lift, transform: `scale(${0.6 + 0.4 * lift})` }}>
           {fr ? "Rechercher" : "Search"}
         </span>
@@ -162,7 +162,7 @@ function FindShot({ p, lang }: { p: number; lang: Lang }) {
         <span>{fr ? "Beauté" : "Beauty"}</span>
         <span>10 k – 150 k</span>
         <span>TikTok</span>
-        <span>{fr ? "France" : "France"}</span>
+        <span>France</span>
         <b>{fr ? "212 résultats" : "212 results"}</b>
       </div>
       <div className="pf-grid">
@@ -189,7 +189,7 @@ function FindShot({ p, lang }: { p: number; lang: Lang }) {
                 {c.views}
               </span>
               <span className="pf-card__match">
-                <em>Match</em>
+                <em>{fr ? "Affinité" : "Match"}</em>
                 {c.match} %
               </span>
             </div>
@@ -688,6 +688,7 @@ function Chip({ icon, children }: { icon: ReactNode; children: ReactNode }) {
 
 export function ProductFilmHero() {
   const lang = useLang();
+  const localeHref = useLocaleHref();
   const fr = lang === "fr";
   return (
     <section className="pf-hero" aria-labelledby="pf-title">
@@ -727,7 +728,7 @@ export function ProductFilmHero() {
           <Chip icon={<LiveIcon />}>{fr ? "Ventes suivies en direct" : "Sales tracked live"}</Chip>
           <Chip icon={<GiftIcon />}>{fr ? "Gifting avec contrat" : "Gifting with contracts"}</Chip>
         </ul>
-        <a className="pf-cta" href="/auth?mode=signup">
+        <a className="pf-cta" href={localeHref("/auth?mode=signup")}>
           {fr ? "Commencer gratuitement" : "Start for free"}
           <span className="pf-cta__arrow" aria-hidden>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">

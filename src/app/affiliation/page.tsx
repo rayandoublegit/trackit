@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
 import { formatPricingAmount, PLAN_PRICES } from "@/lib/plan-marketing";
 import { AffiliationHeroSection } from "@/components/AffiliationHeroSection";
 import { AffiliationStepMotion } from "@/components/AffiliationStepMotion";
@@ -17,6 +17,7 @@ const BG = "#fff";
 
 export default function AffiliationPage() {
   const lang = useLang();
+  const localeHref = useLocaleHref();
   const [users, setUsers] = useState(10);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [panelOpen, setPanelOpen] = useState(false);
@@ -53,7 +54,7 @@ export default function AffiliationPage() {
 
   const FAQ_ITEMS = [
     {
-      q: lang === "fr" ? "Comment obtenir mon lien affilié ?" : "How do I get my affiliate link?",
+      q: lang === "fr" ? "Comment obtenir mon lien d’affiliation ?" : "How do I get my affiliate link?",
       a:
         lang === "fr"
           ? "Inscrivez-vous gratuitement, allez dans Paramètres → Affiliation, et votre lien unique est prêt à être partagé."
@@ -111,7 +112,7 @@ export default function AffiliationPage() {
       title: lang === "fr" ? "Vous êtes payé" : "You get paid",
       desc:
         lang === "fr"
-          ? "Commission récurrente de 20% déposée chaque mois. Tant qu'ils restent abonnés, vous continuez à gagner."
+          ? "Une commission récurrente de 20 % versée chaque mois. Tant qu’ils restent abonnés, vous continuez à gagner."
           : "20% recurring commission deposited every month. As long as they stay subscribed, you keep earning.",
     },
   ];
@@ -134,11 +135,11 @@ export default function AffiliationPage() {
           paddingRight: 20,
         }}
       >
-        <Link href="/" className="nav-logo" aria-label="Trackit home">
+        <Link href={localeHref("/")} className="nav-logo" aria-label={lang === "fr" ? "Accueil Trackit" : "Trackit home"}>
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
         </Link>
         <Link
-          href="/"
+          href={localeHref("/")}
           style={{
             color: TEXT,
             textDecoration: "none",
@@ -239,14 +240,14 @@ export default function AffiliationPage() {
           </h2>
           <p style={{ fontSize: 14, color: SUBTEXT, margin: "0 0 28px", letterSpacing: "-0.01em" }}>
             {lang === "fr"
-              ? "Chaque utilisateur que vous apportez vous rapporte 20% de son abonnement. Chaque mois."
+              ? "Chaque utilisateur que vous apportez vous rapporte 20 % de son abonnement. Chaque mois."
               : "Every user you bring earns you 20% of their subscription. Every month."}
           </p>
 
           <div style={{ marginBottom: 24 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
               <span style={{ fontSize: 13, color: "#555", letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Utilisateurs référencés" : "Users you refer"}
+                {lang === "fr" ? "Utilisateurs parrainés" : "Users you refer"}
               </span>
               <span style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
                 {users}{" "}
@@ -289,11 +290,11 @@ export default function AffiliationPage() {
           >
             <span style={{ fontSize: 13, color: SUBTEXT, letterSpacing: "-0.01em" }}>
               {lang === "fr"
-                ? `Votre commission (20% de ${formatPricingAmount(PLAN_PRICES.proMonthly, lang)}/mois par utilisateur)`
+                ? `Votre commission (20 % de ${formatPricingAmount(PLAN_PRICES.proMonthly, lang)}/mois par utilisateur)`
                 : `Your commission (20% of ${formatPricingAmount(PLAN_PRICES.proMonthly, lang)}/mo per user)`}
             </span>
             <span style={{ fontSize: 14, fontWeight: 600, color: BLUE, letterSpacing: "-0.02em" }}>
-              {formatPricingAmount(earnings, lang)}/mo
+              {formatPricingAmount(earnings, lang)}{lang === "fr" ? "/mois" : "/mo"}
             </span>
           </div>
 
@@ -311,7 +312,7 @@ export default function AffiliationPage() {
               onClick={() => setPanelOpen(true)}
               style={{ border: "none", cursor: "pointer" }}
             >
-              {lang === "fr" ? "Obtenir mon lien affilié →" : "Get my affiliate link →"}
+              {lang === "fr" ? "Obtenir mon lien d’affiliation →" : "Get my affiliate link →"}
             </button>
           </div>
         </div>
@@ -431,7 +432,7 @@ export default function AffiliationPage() {
           }}
         >
           {lang === "fr"
-            ? "Rejoignez notre programme partenaire gratuitement. Sans validation. Sans trafic minimum."
+            ? "Rejoignez gratuitement notre programme partenaire. Sans validation. Sans trafic minimum."
             : "Join our partner program for free. No approval. No minimum traffic."}
         </p>
         <button
@@ -440,7 +441,7 @@ export default function AffiliationPage() {
           onClick={() => setPanelOpen(true)}
           style={{ marginTop: 0, border: "none", cursor: "pointer" }}
         >
-          {lang === "fr" ? "Obtenir mon lien affilié →" : "Get my affiliate link →"}
+          {lang === "fr" ? "Obtenir mon lien d’affiliation →" : "Get my affiliate link →"}
         </button>
       </section>
 
@@ -466,6 +467,7 @@ export default function AffiliationPage() {
             <button
               type="button"
               onClick={() => setPanelOpen(false)}
+              aria-label={lang === "fr" ? "Fermer" : "Close"}
               style={{ position: "absolute", top: 20, right: 20, background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "#9A9A9A" }}
             >×</button>
 
@@ -477,7 +479,7 @@ export default function AffiliationPage() {
                 </h2>
                 <p style={{ fontSize: 14, color: "#7A7A7A", lineHeight: 1.6 }}>
                   {lang === "fr"
-                    ? "Nous examinerons votre candidature et vous enverrons votre lien affilié sous 24 heures."
+                    ? "Nous étudions votre candidature et vous envoyons votre lien d’affiliation sous 24 heures."
                     : "We'll review your application and send your affiliate link within 24 hours."}
                 </p>
               </div>
@@ -529,7 +531,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.email}
                       onChange={e => setFormData(p => ({ ...p, email: e.target.value }))}
-                      placeholder="your@email.com"
+                      placeholder={lang === "fr" ? "vous@exemple.com" : "your@email.com"}
                       type="email"
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
@@ -568,7 +570,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.instagram}
                       onChange={e => setFormData(p => ({ ...p, instagram: e.target.value }))}
-                      placeholder="https://instagram.com/yourhandle"
+                      placeholder={lang === "fr" ? "https://instagram.com/votrecompte" : "https://instagram.com/yourhandle"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -577,7 +579,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.tiktok}
                       onChange={e => setFormData(p => ({ ...p, tiktok: e.target.value }))}
-                      placeholder="https://tiktok.com/@yourhandle"
+                      placeholder={lang === "fr" ? "https://tiktok.com/@votrecompte" : "https://tiktok.com/@yourhandle"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -586,7 +588,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.youtube}
                       onChange={e => setFormData(p => ({ ...p, youtube: e.target.value }))}
-                      placeholder="https://youtube.com/yourchannel"
+                      placeholder={lang === "fr" ? "https://youtube.com/votrechaine" : "https://youtube.com/yourchannel"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -595,7 +597,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.twitter}
                       onChange={e => setFormData(p => ({ ...p, twitter: e.target.value }))}
-                      placeholder="https://x.com/yourhandle"
+                      placeholder={lang === "fr" ? "https://x.com/votrecompte" : "https://x.com/yourhandle"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -604,7 +606,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.linkedin}
                       onChange={e => setFormData(p => ({ ...p, linkedin: e.target.value }))}
-                      placeholder="https://linkedin.com/in/yourhandle"
+                      placeholder={lang === "fr" ? "https://linkedin.com/in/votreprofil" : "https://linkedin.com/in/yourhandle"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -613,7 +615,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.facebook}
                       onChange={e => setFormData(p => ({ ...p, facebook: e.target.value }))}
-                      placeholder="https://facebook.com/yourpage"
+                      placeholder={lang === "fr" ? "https://facebook.com/votrepage" : "https://facebook.com/yourpage"}
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
@@ -627,7 +629,7 @@ export default function AffiliationPage() {
                       onChange={e => setFormData(p => ({ ...p, why: e.target.value }))}
                       placeholder={
                         lang === "fr"
-                          ? "Je promouvrai Trackit sur (YouTube, TikTok, blog, newsletter, communauté...) Je le ferai en (méthode détaillée...) Je peux amener environ (nombre d'utilisateurs)..."
+                          ? "Je présenterai Trackit sur (YouTube, TikTok, blog, newsletter, communauté…). Ma méthode : (détaillez…). Je peux apporter environ (nombre d’utilisateurs)…"
                           : "I will promote Trackit on (YouTube, TikTok, blog, newsletter, community...) I will promote it by (detailed method...) I can bring approximately (how many users)..."
                       }
                       rows={5}
@@ -644,7 +646,7 @@ export default function AffiliationPage() {
                     <input
                       value={formData.phone}
                       onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
-                      placeholder="+1 555 123 4567"
+                      placeholder={lang === "fr" ? "+33 6 12 34 56 78" : "+1 555 123 4567"}
                       type="tel"
                       style={{ width: "100%", padding: "10px 14px", border: "1px solid #E5E5E5", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
                     />
@@ -659,7 +661,7 @@ export default function AffiliationPage() {
                     />
                     <span>
                       {lang === "fr"
-                        ? "En vous inscrivant, vous acceptez l'accord partenaire Trackit"
+                        ? "En vous inscrivant, vous acceptez le contrat partenaire Trackit"
                         : "By signing up, you agree to the Trackit Partner Agreement"}
                     </span>
                   </label>
@@ -711,7 +713,7 @@ export default function AffiliationPage() {
                   >
                     {submitting
                       ? lang === "fr"
-                        ? "Envoi en cours..."
+                        ? "Envoi en cours…"
                         : "Sending..."
                       : lang === "fr"
                         ? "Envoyer la candidature →"

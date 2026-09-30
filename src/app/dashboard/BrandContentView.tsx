@@ -89,7 +89,7 @@ function ContentCard({ item, lang, brandId }: { item: ContentListItem; lang: "fr
               { label: lang === "fr" ? "Vues" : "Views", value: item.views },
               { label: lang === "fr" ? "Likes" : "Likes", value: item.likes },
               { label: lang === "fr" ? "Comms" : "Comments", value: item.comments },
-              { label: lang === "fr" ? "Shares" : "Shares", value: item.shares },
+              { label: lang === "fr" ? "Partages" : "Shares", value: item.shares },
             ] as const
           ).map((m) => (
             <div key={m.label} className="bc-card__metric">

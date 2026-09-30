@@ -6,7 +6,7 @@ import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignKindChooser } from "./CampaignKindChooser";
 import { EmptyStage } from "./EmptyStage";
-import { hideSamples, SAMPLE_CAMPAIGNS, samplesHidden } from "@/lib/sample-workspace";
+import { hideSamples, sampleCampaignsFor, samplesHidden } from "@/lib/sample-workspace";
 import { GiftingView } from "./GiftingView";
 import { SampleCampaignPreview } from "./SampleCampaignPreview";
 import "./discovery-motion.css";
@@ -95,6 +95,7 @@ type CampaignAnalyticsExport = {
   totals: { sales: number; commission: number };
   pendingPayouts: number;
   roi: number | null;
+  lang?: "en" | "fr";
 };
 
 type CampaignCreatorRow = {
@@ -176,6 +177,14 @@ function formatCampaignDate(value: unknown): string {
   const d = new Date(String(value));
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** English keeps the stored en-US label; French re-formats the raw date. */
+function localizedCampaignDate(raw: string | undefined, label: string, lang: "en" | "fr"): string {
+  if (lang !== "fr" || !raw) return label;
+  const d = new Date(String(raw));
+  if (Number.isNaN(d.getTime())) return label;
+  return d.toLocaleDateString("fr-FR", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function parseCampaignDate(value: string | undefined): Date | null {
@@ -567,17 +576,17 @@ function computeCreatorCampaignRoi(revenue: number, brandCost: number): number |
   return revenue / brandCost;
 }
 
-function formatCampaignRoi(roi: number | null | undefined): string {
+function formatCampaignRoi(roi: number | null | undefined, lang: "en" | "fr" = "en"): string {
   if (roi == null || roi <= 0) return "—";
-  return `${roi.toFixed(1)}×`;
+  return lang === "fr" ? `${roi.toFixed(1).replace(".", ",")}×` : `${roi.toFixed(1)}×`;
 }
 
-function CampaignRoiCell({ roi }: { roi: number | null | undefined; lang?: "en" | "fr" }) {
+function CampaignRoiCell({ roi, lang = "en" }: { roi: number | null | undefined; lang?: "en" | "fr" }) {
   if (roi == null || roi <= 0) return <span>—</span>;
   const profitable = roi >= 1;
   return (
     <span style={{ fontWeight: 500, color: profitable ? "#166534" : "#991B1B" }}>
-      {formatCampaignRoi(roi)}
+      {formatCampaignRoi(roi, lang)}
     </span>
   );
 }
@@ -1118,9 +1127,9 @@ const dateInputStyle: React.CSSProperties = {
 
 function campaignStatusLabel(status: string, lang: "en" | "fr"): string {
   const labels: Record<string, { en: string; fr: string }> = {
-    Active: { en: "Active", fr: "Actif" },
+    Active: { en: "Active", fr: "Active" },
     Paused: { en: "Paused", fr: "En pause" },
-    Completed: { en: "Completed", fr: "Terminé" },
+    Completed: { en: "Completed", fr: "Terminée" },
     Draft: { en: "Draft", fr: "Brouillon" },
   };
   return labels[status]?.[lang] ?? labels[status]?.en ?? status;
@@ -1166,7 +1175,7 @@ function formatCampaignDateRangeLabel(range: CampaignDateRange, lang: "en" | "fr
   const today = new Date().toISOString().slice(0, 10);
   const endLabel = range.end === today
     ? lang === "fr"
-      ? "Aujourd'hui"
+      ? "Aujourd’hui"
       : "Today"
     : formatShortCampaignDate(range.end, lang);
   return `${formatShortCampaignDate(range.start, lang)} - ${endLabel}`;
@@ -1191,10 +1200,31 @@ function ChevronDownIcon() {
   );
 }
 
-function campaignExportFilename(campaignName: string, extension: "csv" | "xlsx") {
-  const slug = campaignName.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || "campaign";
+function campaignExportFilename(campaignName: string, extension: "csv" | "xlsx", lang: "en" | "fr" = "en") {
+  const slug = campaignName.replace(/[^a-z0-9-_]+/gi, "-").toLowerCase() || (lang === "fr" ? "campagne" : "campaign");
   const date = new Date().toISOString().split("T")[0];
-  return `trackit-campaign-${slug}-${date}.${extension}`;
+  return lang === "fr"
+    ? `trackit-campagne-${slug}-${date}.${extension}`
+    : `trackit-campaign-${slug}-${date}.${extension}`;
+}
+
+function campaignExportLabels(lang: "en" | "fr") {
+  const fr = lang === "fr";
+  return {
+    campaign: fr ? "Campagne" : "Campaign",
+    dateRange: fr ? "Période" : "Date range",
+    currency: fr ? "Devise" : "Currency",
+    metric: fr ? "Indicateur" : "Metric",
+    value: fr ? "Valeur" : "Value",
+    totalSales: fr ? "Ventes totales" : "Total sales",
+    totalCommission: fr ? "Commission totale" : "Total commission",
+    pendingPayouts: fr ? "Paiements en attente" : "Pending payouts",
+    creatorHeaders: fr
+      ? ["Créateur", "Identifiant", "Plateforme", "Nombre de ventes", "Chiffre d’affaires", "Commission", "Commission payée", "ROI"]
+      : ["Creator", "Handle", "Platform", "Sales count", "Revenue", "Commission", "Commission paid", "ROI"],
+    summarySheet: fr ? "Résumé" : "Summary",
+    creatorsSheet: fr ? "Créateurs" : "Creators",
+  };
 }
 
 function downloadExportFile(filename: string, blob: Blob) {
@@ -1210,17 +1240,19 @@ function downloadExportFile(filename: string, blob: Blob) {
 }
 
 function exportCampaignAnalyticsCsv(data: CampaignAnalyticsExport) {
+  const lang = data.lang ?? "en";
+  const t = campaignExportLabels(lang);
   const rows: (string | number)[][] = [
-    ["Campaign", data.campaignName],
-    ["Date range", `${data.dateRange.start} - ${data.dateRange.end}`],
-    ["Currency", data.currency],
-    ["Metric", "Value"],
-    ["Total sales", data.totals.sales],
-    ["Total commission", data.totals.commission],
-    ["Pending payouts", data.pendingPayouts],
-    ["ROI", formatCampaignRoi(data.roi)],
+    [t.campaign, data.campaignName],
+    [t.dateRange, `${data.dateRange.start} - ${data.dateRange.end}`],
+    [t.currency, data.currency],
+    [t.metric, t.value],
+    [t.totalSales, data.totals.sales],
+    [t.totalCommission, data.totals.commission],
+    [t.pendingPayouts, data.pendingPayouts],
+    ["ROI", formatCampaignRoi(data.roi, lang)],
     [],
-    ["Creator", "Handle", "Platform", "Sales count", "Revenue", "Commission", "Commission paid", "ROI"],
+    t.creatorHeaders,
     ...data.rows.map((row) => [
       row.full_name || row.handle || "",
       row.handle || "",
@@ -1229,30 +1261,32 @@ function exportCampaignAnalyticsCsv(data: CampaignAnalyticsExport) {
       row.salesAmount,
       row.commission,
       row.commissionPaid,
-      formatCampaignRoi(row.roi),
+      formatCampaignRoi(row.roi, lang),
     ]),
   ];
 
   const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n")}`;
   downloadExportFile(
-    campaignExportFilename(data.campaignName, "csv"),
+    campaignExportFilename(data.campaignName, "csv", lang),
     new Blob([csv], { type: "text/csv;charset=utf-8;" }),
   );
 }
 
 async function exportCampaignAnalyticsExcel(data: CampaignAnalyticsExport) {
   const XLSX = await import("xlsx");
+  const lang = data.lang ?? "en";
+  const t = campaignExportLabels(lang);
   const summary = [
-    ["Campaign", data.campaignName],
-    ["Date range", `${data.dateRange.start} - ${data.dateRange.end}`],
-    ["Currency", data.currency],
-    ["Total sales", data.totals.sales],
-    ["Total commission", data.totals.commission],
-    ["Pending payouts", data.pendingPayouts],
-    ["ROI", formatCampaignRoi(data.roi)],
+    [t.campaign, data.campaignName],
+    [t.dateRange, `${data.dateRange.start} - ${data.dateRange.end}`],
+    [t.currency, data.currency],
+    [t.totalSales, data.totals.sales],
+    [t.totalCommission, data.totals.commission],
+    [t.pendingPayouts, data.pendingPayouts],
+    ["ROI", formatCampaignRoi(data.roi, lang)],
   ];
   const creators = [
-    ["Creator", "Handle", "Platform", "Sales count", "Revenue", "Commission", "Commission paid", "ROI"],
+    t.creatorHeaders,
     ...data.rows.map((row) => [
       row.full_name || row.handle || "",
       row.handle || "",
@@ -1261,15 +1295,15 @@ async function exportCampaignAnalyticsExcel(data: CampaignAnalyticsExport) {
       row.salesAmount,
       row.commission,
       row.commissionPaid,
-      formatCampaignRoi(row.roi),
+      formatCampaignRoi(row.roi, lang),
     ]),
   ];
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summary), "Summary");
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(creators), "Creators");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summary), t.summarySheet);
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(creators), t.creatorsSheet);
   const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   downloadExportFile(
-    campaignExportFilename(data.campaignName, "xlsx"),
+    campaignExportFilename(data.campaignName, "xlsx", lang),
     new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
   );
 }
@@ -1625,7 +1659,7 @@ export function CampaignsView({
       creatorAttachments: Object.keys(creatorAttachments).length ? creatorAttachments : undefined,
     });
     if (!ok) {
-      alert(lang === "fr" ? "Impossible d'ajouter les créateurs." : "Could not add creators.");
+      alert(lang === "fr" ? "Impossible d’ajouter les créateurs." : "Could not add creators.");
       return;
     }
 
@@ -1754,7 +1788,7 @@ export function CampaignsView({
     if (failed > 0) {
       alert(
         lang === "fr"
-          ? `${failed} campagne${failed > 1 ? "s" : ""} n'ont pas pu être supprimée${failed > 1 ? "s" : ""}.`
+          ? `${failed} campagne${failed > 1 ? "s" : ""} ${failed > 1 ? "n’ont" : "n’a"} pas pu être supprimée${failed > 1 ? "s" : ""}.`
           : `${failed} campaign${failed > 1 ? "s" : ""} could not be deleted.`,
       );
     }
@@ -1957,7 +1991,7 @@ export function CampaignsView({
   }
 
   const samplePreview = samplePreviewId && campaigns.length === 0 && !samplesOff ? getSampleCampaignDetail(samplePreviewId) : null;
-  const samplePreviewCampaign = samplePreview ? SAMPLE_CAMPAIGNS.find((c) => c.id === samplePreview.id) : null;
+  const samplePreviewCampaign = samplePreview ? sampleCampaignsFor(lang).find((c) => c.id === samplePreview.id) : null;
   if (samplePreview && samplePreviewCampaign) {
     return (
       <SampleCampaignPreview
@@ -1985,7 +2019,7 @@ export function CampaignsView({
       <CampaignsBoard
         lang={lang}
         isMobile={isMobile}
-        campaigns={campaigns.length === 0 && !samplesOff ? SAMPLE_CAMPAIGNS : campaigns}
+        campaigns={campaigns.length === 0 && !samplesOff ? sampleCampaignsFor(lang) : campaigns}
         onDismissSamples={
           campaigns.length === 0 && !samplesOff
             ? () => {
@@ -2211,13 +2245,13 @@ function CampaignsBoard({
     { id: "active", label: lang === "fr" ? "Actives" : "Active", count: tabCounts.active },
     { id: "drafts", label: lang === "fr" ? "Brouillons" : "Drafts", count: tabCounts.drafts },
     { id: "finished", label: lang === "fr" ? "Terminées" : "Finished", count: tabCounts.finished },
-    { id: "gifting", label: lang === "fr" ? "Cadeaux" : "Gifting", count: null },
+    { id: "gifting", label: "Gifting", count: null },
   ];
 
   if (campaigns.length === 0 && boardTab !== "gifting") {
     return (
       <EmptyStage
-        secondaryLabel={fr ? "Voir les cadeaux" : "See gifting"}
+        secondaryLabel={fr ? "Voir le gifting" : "See gifting"}
         onSecondary={() => setBoardTab("gifting")}
         isMobile={isMobile}
         scene="campaign"
@@ -2550,7 +2584,7 @@ function CampaignRowActions({
 
   if (campaign.status === "Active") {
     menuItems.push({
-      label: lang === "fr" ? "Pause" : "Pause",
+      label: lang === "fr" ? "Mettre en pause" : "Pause",
       onClick: () => void onStatusChange(campaign.id, "Paused"),
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -2648,13 +2682,13 @@ function CampaignDetailActions({
   };
 
   const finishItem: SplitMenuItem = {
-    label: lang === "fr" ? "Terminée" : "Finish",
+    label: lang === "fr" ? "Terminer" : "Finish",
     onClick: () => void onStatusChange(campaign.id, "Completed"),
     icon: finishMenuIcon,
   };
 
   const pauseItem: SplitMenuItem = {
-    label: lang === "fr" ? "Pause" : "Pause",
+    label: lang === "fr" ? "Mettre en pause" : "Pause",
     onClick: () => void onStatusChange(campaign.id, "Paused"),
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -2743,7 +2777,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
     return list;
   }, [campaigns, filter, search]);
 
-  if (!campaigns || campaigns.length === 0) return <div>No campaigns yet.</div>;
+  if (!campaigns || campaigns.length === 0) return <div>{lang === "fr" ? "Aucune campagne pour le moment." : "No campaigns yet."}</div>;
 
   const salesTrendSub = formatSalesTrendSub(kpiStats.salesTrend, lang);
 
@@ -2753,7 +2787,7 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
         <FilterPills lang={lang} filter={filter} setFilter={setFilter} />
         <div style={{ flex: 1, minWidth: 200, display: "flex", alignItems: "center", gap: 8, background: "var(--ws-surface-2)", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "8px 12px" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="var(--ws-text-dim)" strokeWidth="2"/><path d="M21 21l-4.35-4.35" stroke="var(--ws-text-dim)" strokeWidth="2" strokeLinecap="round"/></svg>
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search campaigns..." style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", flex: 1, color: "var(--ws-text)" }} />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={lang === "fr" ? "Rechercher une campagne…" : "Search campaigns..."} style={{ background: "transparent", border: "none", outline: "none", fontSize: 13, fontFamily: "inherit", flex: 1, color: "var(--ws-text)" }} />
         </div>
       </div>
 
@@ -2801,8 +2835,8 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
                   <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{formatCurrency(c.sales ?? 0, lang)}</td>
                   <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text)" }}>{formatCurrency(c.commission ?? 0, lang)}</td>
                   <td style={{ padding: "14px" }}><CampaignBadge lang={lang} status={c.status} /></td>
-                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{c.start}</td>
-                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{c.end}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{localizedCampaignDate(c.startRaw, c.start, lang)}</td>
+                  <td style={{ padding: "14px", color: isPaused ? "var(--ws-text-dim)" : "var(--ws-text-muted)" }}>{localizedCampaignDate(c.endRaw, c.end, lang)}</td>
                   <td style={{ padding: "14px" }}>
                     <CampaignRowActions
                       lang={lang}
@@ -2831,9 +2865,9 @@ function CampaignsList({ lang, campaigns, kpiStats, filter, setFilter, search, s
 function FilterPills({ lang, filter, setFilter }: { lang: "en" | "fr"; filter: CampaignFilter; setFilter: (f: CampaignFilter) => void }) {
   const pills: { id: CampaignFilter; label: string }[] = [
     { id: "all", label: lang === "fr" ? "Tout" : "All" },
-    { id: "active", label: lang === "fr" ? "Actif" : "Active" },
+    { id: "active", label: lang === "fr" ? "Actives" : "Active" },
     { id: "paused", label: lang === "fr" ? "En pause" : "Paused" },
-    { id: "completed", label: lang === "fr" ? "Terminé" : "Completed" },
+    { id: "completed", label: lang === "fr" ? "Terminées" : "Completed" },
   ];
   return (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -3357,7 +3391,7 @@ function CampaignDetailToolbar({
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
-            aria-label={lang === "fr" ? "Plus d'actions" : "More actions"}
+            aria-label={lang === "fr" ? "Plus d’actions" : "More actions"}
             aria-expanded={moreOpen}
             aria-haspopup="menu"
             style={{ ...toolbarControl, padding: "6px 8px" }}
@@ -3614,6 +3648,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
         totals: snapshot.totals,
         pendingPayouts: snapshot.pendingPayouts,
         roi: snapshot.roi,
+        lang,
       };
       if (format === "csv") {
         exportCampaignAnalyticsCsv(data);
@@ -3622,7 +3657,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       }
     } catch (error) {
       console.error("Campaign analytics export failed:", error);
-      alert(lang === "fr" ? "Impossible d'exporter les analytiques." : "Could not export analytics.");
+      alert(lang === "fr" ? "Impossible d’exporter les analytiques." : "Could not export analytics.");
     }
   };
 
@@ -3720,7 +3755,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
                   ? "Revenus divisés par le coût créateur. Au-dessus de 1×, la campagne est rentable."
                   : "Revenue divided by creator cost. Above 1×, the campaign is profitable."
               }
-              value={formatCampaignRoi(roi)}
+              value={formatCampaignRoi(roi, lang)}
               trend={roiTrend}
               sparklineSeries={roiSparklineSeries}
               lang={lang}
@@ -4503,7 +4538,7 @@ function PayoutsTab({
           const fromCampaign = creatorMap.get(creatorId) ?? payoutCreatorMap[creatorId];
           const dueRaw = p.paid_at || p.created_at;
           const dueDate = dueRaw
-            ? new Date(String(dueRaw)).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            ? new Date(String(dueRaw)).toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" })
             : "—";
           nextRows.push({
             id: String(p.id),
@@ -4571,7 +4606,7 @@ function PayoutsTab({
     } else {
       alert(
         lang === "fr"
-          ? `${creator.full_name || creator.handle} n'a pas encore ajouté ses coordonnées de paiement.`
+          ? `${creator.full_name || creator.handle} n’a pas encore ajouté ses coordonnées de paiement.`
           : `${creator.full_name || creator.handle} hasn't added their payment details yet.`,
       );
       return;
@@ -4581,7 +4616,7 @@ function PayoutsTab({
     setTimeout(() => {
       setConfirmPay({
         creatorId: creator.id,
-        name: creator.full_name || creator.handle || "creator",
+        name: creator.full_name || creator.handle || (lang === "fr" ? "créateur" : "creator"),
         amount,
         method,
       });
@@ -4624,7 +4659,7 @@ function PayoutsTab({
             avatar_url: paidRow?.avatar_url,
             amount,
             status: "paid",
-            dueDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            dueDate: new Date().toLocaleDateString(lang === "fr" ? "fr-FR" : "en-US", { month: "short", day: "numeric", year: "numeric" }),
             kind: "history",
           };
           return [historyRow, ...withoutPending];
@@ -4632,7 +4667,7 @@ function PayoutsTab({
         setPendingTotal((sum) => Math.max(0, sum - amount));
         dispatchPayoutsUpdated();
       } else {
-        alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || "unknown"));
+        alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || (lang === "fr" ? "inconnue" : "unknown")));
       }
     } finally {
       setPayingId(null);
@@ -4662,11 +4697,11 @@ function PayoutsTab({
         {!loading && creatorCount > 0 && (
           <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
             <div style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>
-              {lang === "fr" ? "En attente" : "Pending"}:{" "}
+              {lang === "fr" ? "En attente :" : "Pending:"}{" "}
               <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(pendingTotal, lang)}</strong>
             </div>
             <div style={{ fontSize: 13, color: "var(--ws-text-muted)" }}>
-              {lang === "fr" ? "Commission campagne" : "Campaign commission"}:{" "}
+              {lang === "fr" ? "Commission de la campagne :" : "Campaign commission:"}{" "}
               <strong style={{ color: "var(--ws-text)" }}>{formatCurrency(campaign.commission ?? 0, lang)}</strong>
             </div>
           </div>
@@ -4792,26 +4827,26 @@ function SettingsTab({
         <Field label={lang === "fr" ? "Nom de la campagne" : "Campaign name"}>
           <input type="text" defaultValue={campaign.name} style={inputStyle} onBlur={(e) => onUpdate({ ...campaign, name: e.target.value })} />
         </Field>
-        <Field label="Platform">
+        <Field label={lang === "fr" ? "Plateforme" : "Platform"}>
           <input type="text" defaultValue={campaign.platform} style={inputStyle} onBlur={(e) => onUpdate({ ...campaign, platform: e.target.value })} />
         </Field>
         <Field label={lang === "fr" ? "Description" : "Description"}>
           <textarea defaultValue={campaign.description ?? ""} rows={3} style={{ ...inputStyle, resize: "vertical" }} onBlur={(e) => onUpdate({ ...campaign, description: e.target.value })} />
         </Field>
       </Card>
-      <Card title="Commission & tracking">
-        <Field label="Default commission rate">
+      <Card title={lang === "fr" ? "Commission et suivi" : "Commission & tracking"}>
+        <Field label={lang === "fr" ? "Taux de commission par défaut" : "Default commission rate"}>
           <input type="text" defaultValue="8%" style={inputStyle} readOnly />
         </Field>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <Toggle on={autoPayout} onChange={setAutoPayout} label="Auto-pay commissions on the 1st and 15th" />
-          <Toggle on={trackClicks} onChange={setTrackClicks} label="Track link clicks and UTM parameters" />
+          <Toggle on={autoPayout} onChange={setAutoPayout} label={lang === "fr" ? "Payer automatiquement les commissions le 1er et le 15 du mois" : "Auto-pay commissions on the 1st and 15th"} />
+          <Toggle on={trackClicks} onChange={setTrackClicks} label={lang === "fr" ? "Suivre les clics sur les liens et les paramètres UTM" : "Track link clicks and UTM parameters"} />
         </div>
       </Card>
-      <Card title="Danger zone">
-        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 16px" }}>Mark this campaign as completed or delete it permanently.</p>
+      <Card title={lang === "fr" ? "Zone de danger" : "Danger zone"}>
+        <p style={{ fontSize: 13, color: "var(--ws-text-muted)", margin: "0 0 16px" }}>{lang === "fr" ? "Marquez cette campagne comme terminée ou supprimez-la définitivement." : "Mark this campaign as completed or delete it permanently."}</p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <BtnSm onClick={() => onUpdate({ ...campaign, status: "Completed" })}>Mark completed</BtnSm>
+          <BtnSm onClick={() => onUpdate({ ...campaign, status: "Completed" })}>{lang === "fr" ? "Marquer comme terminée" : "Mark completed"}</BtnSm>
           <BtnSm variant="danger" onClick={onDelete}>{lang === "fr" ? "Supprimer la campagne" : "Delete campaign"}</BtnSm>
         </div>
       </Card>
@@ -4838,7 +4873,7 @@ function formatCreatorCommissionLabel(entry: AddedCampaignCreator, lang: "en" | 
   if (entry.commissionType === "flat") {
     return `${formatCurrency(Number(entry.commissionRate) || 0, lang)} ${lang === "fr" ? "fixe" : "flat"}`;
   }
-  return `${clampRate(entry.commissionRate)}%`;
+  return lang === "fr" ? `${clampRate(entry.commissionRate)} %` : `${clampRate(entry.commissionRate)}%`;
 }
 
 function InfoHint({ title }: { title: string }) {
@@ -5234,7 +5269,7 @@ function NewCampaignOnboarding({
     const selected = addedCreators.length;
     const remaining = remainingSlots ?? 0;
     return lang === "fr"
-      ? `${selected} sélectionné${selected > 1 ? "s" : ""} · jusqu'à ${maxCreators} par campagne${remaining > 0 ? ` (${remaining} restant${remaining > 1 ? "s" : ""})` : ""}`
+      ? `${selected} sélectionné${selected > 1 ? "s" : ""} · jusqu’à ${maxCreators} par campagne${remaining > 0 ? ` (${remaining} restant${remaining > 1 ? "s" : ""})` : ""}`
       : `${selected} selected · up to ${maxCreators} per campaign${remaining > 0 ? ` (${remaining} remaining)` : ""}`;
   }, [loadingCreators, findItRows.length, maxCreators, addedCreators.length, remainingSlots, lang, isAddCreatorsMode, existingCampaign?.creatorIds?.length]);
 
@@ -5907,7 +5942,7 @@ function NewCampaignOnboarding({
               <p style={{ fontSize: 15, color: "var(--ws-text)", margin: "0 0 28px", lineHeight: 1.5 }}>
                 {(existingCampaign.creatorIds?.length ?? 0) > 0
                   ? lang === "fr"
-                    ? `${existingCampaign.creatorIds?.length} créateur${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} déjà dans « ${existingCampaign.name} ». Ajoutez-en d'autres ou mettez la liste à jour.`
+                    ? `${existingCampaign.creatorIds?.length} créateur${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} déjà dans « ${existingCampaign.name} ». Ajoutez-en d’autres ou mettez la liste à jour.`
                     : `${existingCampaign.creatorIds?.length} creator${(existingCampaign.creatorIds?.length ?? 0) > 1 ? "s" : ""} already in "${existingCampaign.name}". Add more or update the list.`
                   : lang === "fr"
                     ? `Ajoutez des créateurs à la campagne « ${existingCampaign.name} ».`
@@ -6010,7 +6045,7 @@ function NewCampaignOnboarding({
               {manualSearchNotFound && (
                 <p style={{ fontSize: 14, color: "var(--ws-text)", margin: "10px 0 0" }}>
                   {lang === "fr"
-                    ? "Nous n'avons pas trouvé de créateurs correspondant à cette recherche"
+                    ? "Nous n’avons pas trouvé de créateurs correspondant à cette recherche"
                     : "We couldn't find any creators matching this search"}
                 </p>
               )}

@@ -324,17 +324,20 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
       commissionPaid?: number;
     }>;
 
+    const fr = lang === "fr";
     const rows = [
-      ["Metric", "Value"],
-      ["Total Revenue", analyticsData.totalRevenue || 0],
-      ["Total Commissions Paid", analyticsData.totalCommissions || 0],
-      ["Accrued Commissions", analyticsData.accruedCommissions || 0],
-      ["Total Creators Contacted", analyticsData.totalSent || 0],
-      ["Outreach Messages Sent", analyticsData.outreachMessagesSent || 0],
-      ["Response Rate", `${analyticsData.responseRate || 0}%`],
-      ["Converted", analyticsData.converted || 0],
+      fr ? ["Métrique", "Valeur"] : ["Metric", "Value"],
+      [fr ? "Revenus totaux" : "Total Revenue", analyticsData.totalRevenue || 0],
+      [fr ? "Commissions totales payées" : "Total Commissions Paid", analyticsData.totalCommissions || 0],
+      [fr ? "Commissions dues" : "Accrued Commissions", analyticsData.accruedCommissions || 0],
+      [fr ? "Créateurs contactés" : "Total Creators Contacted", analyticsData.totalSent || 0],
+      [fr ? "Messages de prospection envoyés" : "Outreach Messages Sent", analyticsData.outreachMessagesSent || 0],
+      [fr ? "Taux de réponse" : "Response Rate", `${analyticsData.responseRate || 0}%`],
+      [fr ? "Convertis" : "Converted", analyticsData.converted || 0],
       "",
-      ["Creator", "Platform", "Revenue", "Commission", "Commission Paid"],
+      fr
+        ? ["Créateur", "Plateforme", "Revenus", "Commission", "Commission payée"]
+        : ["Creator", "Platform", "Revenue", "Commission", "Commission Paid"],
       ...creatorRows.map((c) => [
         c.full_name || c.handle || "",
         c.platform || "",
@@ -343,7 +346,9 @@ function BrandAnalyticsView({ userId, isMobile, lang: langProp, plan, shopifySto
         c.commissionPaid || 0,
       ]),
       "",
-      ["Campaign", "Creators", "Sales", "Commissions", "Status"],
+      fr
+        ? ["Campagne", "Créateurs", "Ventes", "Commissions", "Statut"]
+        : ["Campaign", "Creators", "Sales", "Commissions", "Status"],
       ...(analyticsData.campaigns || []).map((c: { name?: string; creatorCount?: number; totalSales?: number; totalCommissions?: number; status?: string }) => [
         c.name,
         c.creatorCount ?? 0,

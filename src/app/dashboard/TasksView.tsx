@@ -62,15 +62,15 @@ export function TasksView({
 
   const firstName =
     (displayName || "").trim().split(/\s+/)[0] ||
-    (fr ? "toi" : "there");
+    (fr ? "" : "there");
 
   const suggestions = useMemo(
     () =>
       fr
         ? [
-            "Envoyer un follow-up à 18:00",
+            "Envoyer une relance à 18h",
             "Contacter @lena demain matin",
-            "Préparer le brief campagne payouts",
+            "Préparer le brief de la campagne paiements",
           ]
         : [
             "Send a follow-up at 6pm",
@@ -192,7 +192,7 @@ export function TasksView({
         <button
           type="button"
           className="tsk-check"
-          aria-label={opts?.done ? "Undo" : "Done"}
+          aria-label={opts?.done ? (fr ? "Annuler" : "Undo") : fr ? "Terminé" : "Done"}
           onClick={() =>
             persist(tasks.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)))
           }
@@ -205,7 +205,7 @@ export function TasksView({
           type="button"
           className="tsk-row__del"
           onClick={() => persist(tasks.filter((t) => t.id !== task.id))}
-          aria-label="Delete"
+          aria-label={fr ? "Supprimer" : "Delete"}
         >
           ×
         </button>
@@ -230,7 +230,9 @@ export function TasksView({
         <div className="tsk-hero">
           <h1 className="tsk-hero__greet">
             {fr
-              ? `${firstName} ! Prêt à vider ta to-do ?`
+              ? firstName
+                ? `${firstName}, prêt à vider votre to-do ?`
+                : "Prêt à vider votre to-do ?"
               : `${firstName}! Ready to clear your to-do?`}
           </h1>
 
@@ -253,7 +255,9 @@ export function TasksView({
                   onChange={(e) => setPrompt(e.target.value)}
                   placeholder={
                     fr
-                      ? `Hey ${firstName}… décris ta tâche`
+                      ? firstName
+                        ? `${firstName}… décrivez votre tâche`
+                        : "Décrivez votre tâche…"
                       : `Hey ${firstName}… describe your task`
                   }
                   rows={isMobile ? 3 : 2}
@@ -335,7 +339,7 @@ export function TasksView({
         </div>
       ) : (
         <div className="tsk-manual">
-          <h1 className="tsk-manual__title">{fr ? "Tasks" : "Tasks"}</h1>
+          <h1 className="tsk-manual__title">{fr ? "Tâches" : "Tasks"}</h1>
 
           {open.length === 0 && done.length === 0 && !addingManual ? (
             <p className="tsk-empty tsk-empty--manual">
@@ -383,7 +387,7 @@ export function TasksView({
               <span className="tsk-manual__add-plus" aria-hidden>
                 +
               </span>
-              {fr ? "Créer une nouvelle task" : "Add task"}
+              {fr ? "Ajouter une tâche" : "Add task"}
             </button>
           )}
         </div>

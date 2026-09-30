@@ -3,9 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SITE_EMAIL } from "@/lib/site-seo";
+import { useLang, useLocaleHref } from "@/lib/useLang";
 
 export default function ContactPage() {
   const [copied, setCopied] = useState(false);
+  const lang = useLang();
+  const localeHref = useLocaleHref();
+  const fr = lang === "fr";
 
   const copyEmail = () => {
     void navigator.clipboard.writeText(SITE_EMAIL);
@@ -17,15 +21,17 @@ export default function ContactPage() {
     <div style={{ background: "#000", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif", padding: 24 }}>
       <div style={{ maxWidth: 480, width: "100%", textAlign: "center" }}>
 
-        <Link href="/" style={{ display: "inline-block", marginBottom: 48 }}>
+        <Link href={localeHref("/")} style={{ display: "inline-block", marginBottom: 48 }}>
           <img src="/favicon.png" alt="Trackit" style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover" }} />
         </Link>
 
         <h1 style={{ fontSize: 32, fontWeight: 700, letterSpacing: "-0.03em", color: "#fff", marginBottom: 12 }}>
-          Contact Trackit
+          {fr ? "Contacter Trackit" : "Contact Trackit"}
         </h1>
         <p style={{ fontSize: 15, color: "rgba(255,255,255,0.4)", marginBottom: 48, lineHeight: 1.6 }}>
-          Have a question, feedback, or need help? Reach out to the Trackit team directly.
+          {fr
+            ? "Une question, un retour ou besoin d’aide ? Écrivez directement à l’équipe Trackit."
+            : "Have a question, feedback, or need help? Reach out to the Trackit team directly."}
         </p>
 
         <div style={{
@@ -40,7 +46,7 @@ export default function ContactPage() {
           marginBottom: 24,
         }}>
           <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Email</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.3)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>{fr ? "E-mail" : "Email"}</div>
             <a href={`mailto:${SITE_EMAIL}`} style={{ fontSize: 16, fontWeight: 600, color: "#fff", letterSpacing: "-0.01em", textDecoration: "none" }}>{SITE_EMAIL}</a>
           </div>
           <button
@@ -60,16 +66,16 @@ export default function ContactPage() {
               transition: "all 0.2s",
             }}
           >
-            {copied ? "Copied ✓" : "Copy"}
+            {copied ? (fr ? "Copié ✓" : "Copied ✓") : fr ? "Copier" : "Copy"}
           </button>
         </div>
 
         <p style={{ fontSize: 13, color: "rgba(255,255,255,0.25)", lineHeight: 1.6 }}>
-          We typically respond within 24 hours.
+          {fr ? "Nous répondons généralement sous 24 heures." : "We typically respond within 24 hours."}
         </p>
 
-        <Link href="/" style={{ display: "inline-block", marginTop: 40, fontSize: 13, color: "rgba(255,255,255,0.3)", textDecoration: "none" }}>
-          ← Back to Trackit
+        <Link href={localeHref("/")} style={{ display: "inline-block", marginTop: 40, fontSize: 13, color: "rgba(255,255,255,0.3)", textDecoration: "none" }}>
+          {fr ? "← Retour à Trackit" : "← Back to Trackit"}
         </Link>
       </div>
     </div>

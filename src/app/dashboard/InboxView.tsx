@@ -21,7 +21,7 @@ type Filter = "all" | "unread" | NotificationKind;
 
 const KINDS: { kind: NotificationKind; en: string; fr: string; icon: WsIconName }[] = [
   { kind: "campaign", en: "Campaigns", fr: "Campagnes", icon: "campaign" },
-  { kind: "outreach", en: "Outreach", fr: "Outreach", icon: "invite" },
+  { kind: "outreach", en: "Outreach", fr: "Prospection", icon: "invite" },
   { kind: "payout", en: "Payouts", fr: "Paiements", icon: "payit" },
   { kind: "team", en: "Team", fr: "Équipe", icon: "users" },
   { kind: "system", en: "System", fr: "Système", icon: "settings" },
@@ -165,7 +165,7 @@ export function InboxView({
   ];
 
   const quickLinks: { view: DashboardView; label: string; hint: string; icon: WsIconName }[] = [
-    { view: "discovery", label: "Discover", hint: fr ? "Trouver des créateurs" : "Find creators", icon: "findit" },
+    { view: "discovery", label: fr ? "Découvrir" : "Discover", hint: fr ? "Trouver des créateurs" : "Find creators", icon: "findit" },
     { view: "campaigns", label: fr ? "Campagnes" : "Campaigns", hint: fr ? "Suivre vos campagnes" : "Track your campaigns", icon: "trackit" },
     { view: "payouts", label: "Pay it", hint: fr ? "Payer vos créateurs" : "Pay your creators", icon: "payit" },
   ];

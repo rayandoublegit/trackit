@@ -10,10 +10,16 @@ import { crmFromSnapshot, emailFromRow, metricsFromRow, type CreatorCrm } from "
 import { CreatorAvatar } from "./CreatorAvatar";
 import { PlatformBrandIcon } from "./PlatformBrandIcon";
 import type { discoveryCopy } from "@/lib/discovery-copy";
+import { useLang } from "@/lib/useLang";
 
 type Copy = ReturnType<typeof discoveryCopy>;
 
-function fmtCount(n: number): string {
+function fmtCount(n: number, lang: "en" | "fr" = "en"): string {
+  if (lang === "fr") {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",") + " M";
+    if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1).replace(".", ",") + " k";
+    return String(Math.round(n));
+  }
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1) + "K";
   return String(Math.round(n));
@@ -76,6 +82,7 @@ function EditablePercentCell({
   width?: number;
   invalidMessage?: string;
 }) {
+  const lang = useLang();
   const displayValue = value != null && Number.isFinite(value) ? String(value) : "";
   const [draft, setDraft] = useState(displayValue);
   const [focused, setFocused] = useState(false);
@@ -88,7 +95,7 @@ function EditablePercentCell({
   const commit = () => {
     const trimmed = draft.trim().replace(/%$/, "").replace(",", ".");
     if (!isValidCommissionPercent(trimmed)) {
-      setError(invalidMessage ?? "Invalid percentage");
+      setError(invalidMessage ?? (lang === "fr" ? "Pourcentage invalide" : "Invalid percentage"));
       setDraft(displayValue);
       return;
     }
@@ -173,6 +180,7 @@ function EditableTextCell({
   validate?: (v: string) => boolean;
   invalidMessage?: string;
 }) {
+  const lang = useLang();
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +192,7 @@ function EditableTextCell({
   const commit = () => {
     const trimmed = draft.trim();
     if (validate && trimmed && !validate(trimmed)) {
-      setError(invalidMessage ?? "Invalid email");
+      setError(invalidMessage ?? (lang === "fr" ? "E-mail invalide" : "Invalid email"));
       setDraft(value);
       return;
     }
@@ -510,6 +518,7 @@ export function CreatorListTable({
   onOpenContent: (row: SavedRow) => void;
   onDelete: (username: string) => void;
 }) {
+  const lang = useLang();
   const columns: { key: string; label: string; minWidth: number }[] = [
     { key: "creator", label: t.creatorCol(rows.length), minWidth: 230 },
     { key: "channel", label: t.channelCol, minWidth: 80 },
@@ -523,7 +532,7 @@ export function CreatorListTable({
     { key: "promoCode", label: t.colPromoCode, minWidth: 130 },
     { key: "label", label: t.colLabel, minWidth: 120 },
     { key: "scripts", label: t.colScripts, minWidth: 140 },
-    { key: "content", label: t.colContent, minWidth: 130 },
+    { key: "content", label: lang === "fr" ? "Contenu" : t.colContent, minWidth: 130 },
     { key: "notes", label: t.colNotes, minWidth: 180 },
     { key: "birthday", label: t.colBirthday, minWidth: 120 },
     { key: "address", label: t.colAddress, minWidth: 160 },
@@ -606,7 +615,7 @@ export function CreatorListTable({
                     onChange={(status) => onStatusChange(r.creator_username, status)}
                   />
                 </td>
-                <td style={tdStyle}>{fmtCount(r.followers)}</td>
+                <td style={tdStyle}>{fmtCount(r.followers, lang)}</td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                   <TextPill value={email} />
                 </td>
@@ -701,11 +710,17 @@ export function CreatorListTable({
                     width={110}
                   />
                 </td>
-                <td style={tdStyle}>{metrics.engagement > 0 ? `${metrics.engagement.toFixed(1)}%` : "—"}</td>
-                <td style={tdStyle}>{metrics.avgViews > 0 ? fmtCount(metrics.avgViews) : "—"}</td>
-                <td style={tdStyle}>{metrics.avgLikes > 0 ? fmtCount(metrics.avgLikes) : "—"}</td>
-                <td style={tdStyle}>{metrics.avgComments > 0 ? fmtCount(metrics.avgComments) : "—"}</td>
-                <td style={tdStyle}>{metrics.avgShares > 0 ? fmtCount(metrics.avgShares) : "—"}</td>
+                <td style={tdStyle}>
+                  {metrics.engagement > 0
+                    ? lang === "fr"
+                      ? `${metrics.engagement.toFixed(1).replace(".", ",")} %`
+                      : `${metrics.engagement.toFixed(1)}%`
+                    : "—"}
+                </td>
+                <td style={tdStyle}>{metrics.avgViews > 0 ? fmtCount(metrics.avgViews, lang) : "—"}</td>
+                <td style={tdStyle}>{metrics.avgLikes > 0 ? fmtCount(metrics.avgLikes, lang) : "—"}</td>
+                <td style={tdStyle}>{metrics.avgComments > 0 ? fmtCount(metrics.avgComments, lang) : "—"}</td>
+                <td style={tdStyle}>{metrics.avgShares > 0 ? fmtCount(metrics.avgShares, lang) : "—"}</td>
                 <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"

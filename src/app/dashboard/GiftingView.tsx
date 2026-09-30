@@ -174,7 +174,12 @@ export function GiftingView({
     try {
       await uploadGiftVideoResumable(file, ticket.path, ticket.token, setUploadPercent);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : (fr ? "Envoi de la vidéo impossible." : "Video upload failed."));
+      if (fr) {
+        const detail = cause instanceof Error ? friendlyGiftError(cause.message, lang) : "";
+        setError(detail && cause instanceof Error && detail !== cause.message ? detail : "Envoi de la vidéo impossible. Réessayez.");
+      } else {
+        setError(cause instanceof Error ? cause.message : "Video upload failed.");
+      }
       return;
     } finally {
       setBusy(false);
@@ -393,13 +398,13 @@ export function GiftingView({
                   </div>
                   <span className={`gv-rights${campaign.allow_ads ? " is-yes" : ""}`}>
                     {campaign.allow_ads
-                      ? `Ads · ${campaign.rights_days} ${fr ? "j" : "d"} · ${campaign.territories}`
-                      : fr ? "Pas d’usage ads" : "No ad use"}
+                      ? `${fr ? "Pub" : "Ads"} · ${campaign.rights_days} ${fr ? "j" : "d"} · ${campaign.territories}`
+                      : fr ? "Pas d’usage publicitaire" : "No ad use"}
                   </span>
                 </div>
                 <div className="gv-campaign__bottom">
                   <span className="gv-muted">
-                    {count} mission{count === 1 ? "" : "s"}
+                    {count} mission{(fr ? count <= 1 : count === 1) ? "" : "s"}
                   </span>
                   <form
                     className="gv-inline"
@@ -427,10 +432,10 @@ export function GiftingView({
                       value={value}
                       required={paid}
                       onChange={(event) => setInviteHandles((prev) => ({ ...prev, [campaign.id]: event.target.value }))}
-                      placeholder="@handle"
+                      placeholder={fr ? "@pseudo" : "@handle"}
                     />
                     <button className="gv-btn" disabled={busy}>
-                      {paid ? (fr ? "Envoyer la mission" : "Send mission") : fr ? "Envoi — payant" : "Send — upgrade"}
+                      {paid ? (fr ? "Envoyer la mission" : "Send mission") : fr ? "Envoyer — offre payante" : "Send — upgrade"}
                     </button>
                   </form>
                 </div>
@@ -448,7 +453,7 @@ export function GiftingView({
               <h2>{fr ? "Voici à quoi ressemble une campagne en cours" : "This is what a running campaign looks like"}</h2>
               <p>
                 {fr
-                  ? "Créateurs fictifs. Chaque carte avance d’une colonne à chaque étape : signature, envoi, réception, vidéo, validation."
+                  ? "Créateurs fictifs. Chaque carte avance d’une colonne à chaque étape : signature, expédition, livraison, vidéo, validation."
                   : "Fictional creators. Each card moves one column per step: signature, shipping, delivery, video, approval."}
               </p>
             </div>
@@ -468,7 +473,7 @@ export function GiftingView({
             <h2>{fr ? "Missions et colis" : "Missions and parcels"}</h2>
             {stats.declined > 0 ? (
               <span className="gv-muted">
-                {stats.declined} {fr ? "refusée(s)" : "declined"}
+                {stats.declined} {fr ? (stats.declined === 1 ? "refusée" : "refusées") : "declined"}
               </span>
             ) : null}
           </div>
@@ -609,7 +614,7 @@ export function GiftingView({
                         value={value}
                         required
                         onChange={(event) => setHandles((prev) => ({ ...prev, [list.id]: event.target.value }))}
-                        placeholder="@handle"
+                        placeholder={fr ? "@pseudo" : "@handle"}
                       />
                       <button className="gv-btn" disabled={busy}>
                         {fr ? "Ajouter" : "Add"}
@@ -678,7 +683,7 @@ function ContractSheet({
       <p className="gift-contract__kicker">{fr ? "Contrat" : "Contract"}</p>
       <h3>{fr ? "Accord de gifting" : "Gifting agreement"}</h3>
       <div className={`gift-contract__ads${granted ? " is-yes" : " is-no"}`}>
-        <span>{fr ? "Autorisation d’utiliser les vidéos en ads" : "Authorization to use the videos in ads"}</span>
+        <span>{fr ? "Autorisation d’utiliser les vidéos en publicité" : "Authorization to use the videos in ads"}</span>
         <strong>{granted ? (fr ? "Accordée" : "Granted") : (fr ? "Refusée" : "Not granted")}</strong>
       </div>
       {lines.map((line, index) => (
@@ -793,7 +798,7 @@ function MissionPanel({
               <strong>
                 {mission.carrier} · {mission.tracking_number}
               </strong>
-              <small>{fr ? "Suivi déclaré à la main, pas une preuve transporteur." : "Tracking entered by hand, not carrier proof."}</small>
+              <small>{fr ? "Suivi déclaré manuellement : ce n’est pas une preuve du transporteur." : "Tracking entered by hand, not carrier proof."}</small>
             </div>
           )}
           {video && (
@@ -842,7 +847,7 @@ function MissionPanel({
               <label className="gv-check">
                 <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
                 {fr
-                  ? "Je signe ce contrat, y compris l’autorisation ads indiquée. Le texte reste figé."
+                  ? "Je signe ce contrat, y compris l’autorisation d’usage publicitaire indiquée. Son texte reste figé."
                   : "I sign this contract, including the ads authorization shown. The text stays frozen."}
               </label>
               <button className="es-primary" disabled={busy || !consent}>
@@ -861,13 +866,13 @@ function MissionPanel({
               <input className="gv-field" aria-label={fr ? "Transporteur" : "Carrier"} required value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder={fr ? "Transporteur (Colissimo, UPS…)" : "Carrier (UPS, DHL…)"} />
               <input className="gv-field" aria-label={fr ? "Numéro de suivi" : "Tracking number"} required value={tracking} onChange={(event) => setTracking(event.target.value)} placeholder={fr ? "Numéro de suivi" : "Tracking number"} />
               <button className="es-primary" disabled={busy}>
-                {fr ? "Marquer envoyé" : "Mark sent"}
+                {fr ? "Marquer comme expédié" : "Mark sent"}
               </button>
             </form>
           )}
           {mission.status === "shipped" && (
             <button className="es-primary" disabled={busy} onClick={() => onAct({ type: "deliver" })}>
-              {fr ? "Marquer reçu" : "Mark received"}
+              {fr ? "Marquer comme livré" : "Mark received"}
             </button>
           )}
           {isCreator && (mission.status === "delivered" || mission.status === "submitted") && (
@@ -905,7 +910,7 @@ function MissionPanel({
                   onAct({ type: "request_changes", feedback });
                 }}
               >
-                <input className="gv-field" aria-label={fr ? "Retour" : "Feedback"} required value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder={fr ? "Ce qu’il faut changer" : "What should change"} />
+                <input className="gv-field" aria-label={fr ? "Retour à transmettre" : "Feedback"} required value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder={fr ? "Ce qu’il faut changer" : "What should change"} />
                 <button className="gv-btn" disabled={busy}>
                   {fr ? "Demander une modification" : "Request changes"}
                 </button>

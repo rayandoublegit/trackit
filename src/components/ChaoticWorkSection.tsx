@@ -160,20 +160,22 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
   const stats =
     lang === "fr"
       ? [
-          "500+ heures/an perdues à chercher des créateurs.",
+          "500+ heures par an perdues à chercher des créateurs.",
           "6 tableurs ouverts pour une seule campagne.",
-          "2x plus de temps perdu à jongler entre outils.",
+          "2 fois plus de temps perdu à jongler entre les outils.",
         ]
       : [
           "500+ hours/year lost searching for creators.",
           "6 spreadsheets open for a single campaign.",
           "2x more time wasted switching between tools.",
         ];
+  const iconLabel = (name: string) => (lang === "fr" ? `Icône : ${name}` : `Icon: ${name}`);
+  const curveLabel = (from: string, to: string) => (lang === "fr" ? `Courbe : ${from} → ${to}` : `Curve: ${from} → ${to}`);
 
   const iconEntries = [
     {
       id: icons.figma,
-      label: "Icon: Gmail",
+      label: iconLabel("Gmail"),
       className: "chaotic-work__icon chaotic-work__icon--figma",
       body: (
         <>
@@ -186,12 +188,12 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.calendar,
-      label: "Icon: Calendar",
+      label: lang === "fr" ? "Icône : Agenda" : "Icon: Calendar",
       className: "chaotic-work__icon chaotic-work__icon--calendar",
       body: (
         <>
           <div className="chaotic-work__app chaotic-work__app--calendar">
-            <span className="chaotic-work__calendar-day">MON</span>
+            <span className="chaotic-work__calendar-day">{lang === "fr" ? "LUN" : "MON"}</span>
             <span className="chaotic-work__calendar-num">31</span>
           </div>
           <span className="chaotic-work__badge chaotic-work__badge--red chaotic-work__badge--99">99+</span>
@@ -200,7 +202,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.slack,
-      label: "Icon: TikTok",
+      label: iconLabel("TikTok"),
       className: "chaotic-work__icon chaotic-work__icon--slack",
       body: (
         <>
@@ -213,7 +215,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.meet,
-      label: "Icon: Google Meet",
+      label: iconLabel("Google Meet"),
       className: "chaotic-work__icon chaotic-work__icon--meet",
       body: (
         <div className="chaotic-work__app">
@@ -223,7 +225,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.miro,
-      label: "Icon: Google Drive",
+      label: iconLabel("Google Drive"),
       className: "chaotic-work__icon chaotic-work__icon--miro",
       body: (
         <div className="chaotic-work__app chaotic-work__app--miro">
@@ -233,7 +235,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.drive,
-      label: "Icon: Microsoft Excel",
+      label: iconLabel("Microsoft Excel"),
       className: "chaotic-work__icon chaotic-work__icon--drive",
       body: (
         <div className="chaotic-work__app chaotic-work__app--drive">
@@ -243,7 +245,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.messages,
-      label: "Icon: Instagram",
+      label: iconLabel("Instagram"),
       className: "chaotic-work__icon chaotic-work__icon--messages",
       body: (
         <>
@@ -256,7 +258,7 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
     },
     {
       id: icons.notion,
-      label: "Icon: Claude",
+      label: iconLabel("Claude"),
       className: "chaotic-work__icon chaotic-work__icon--notion",
       body: (
         <div className="chaotic-work__app chaotic-work__app--notion">
@@ -489,21 +491,21 @@ export function ChaoticWorkSection({ lang }: { lang: Lang }) {
         <svg className="chaotic-work__lines" viewBox="0 0 1024 713" fill="none" aria-hidden>
           <ChaoticLine
             id={lines.figmaCalendar}
-            label="Curve: Gmail → Calendar"
+            label={lang === "fr" ? "Courbe : Gmail → Agenda" : "Curve: Gmail → Calendar"}
             d="M 100 160 Q 172 143, 258 78"
             fadeEnd
             gradient={{ x1: 100, y1: 160, x2: 258, y2: 78 }}
           />
           <ChaoticLine
             id={lines.meetMiro}
-            label="Curve: Google Meet → Miro"
+            label={curveLabel("Google Meet", "Miro")}
             d="M 808 104 Q 832 205, 922 252"
             fadeEnd
             gradient={{ x1: 808, y1: 104, x2: 922, y2: 252 }}
           />
           <ChaoticLine
             id={lines.messagesNotion}
-            label="Curve: Messages → Notion"
+            label={curveLabel("Messages", "Notion")}
             d="M 595 425 Q 662 395, 728 439"
             fadeEnd
             gradient={{ x1: 595, y1: 425, x2: 728, y2: 439 }}

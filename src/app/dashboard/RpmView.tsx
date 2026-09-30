@@ -382,7 +382,7 @@ export function RpmView({
       });
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        setError(String(data.error || (fr ? "Sync impossible" : "Sync failed")));
+        setError(String(data.error || (fr ? "Synchronisation impossible" : "Sync failed")));
         return;
       }
       applySnapshotPayload(data);
@@ -746,10 +746,10 @@ export function RpmView({
             >
               {settling
                 ? fr
-                  ? "Sync ScrapeCreators…"
+                  ? "Synchro ScrapeCreators…"
                   : "Syncing ScrapeCreators…"
                 : fr
-                  ? "Sync vues & calculer RPM"
+                  ? "Synchroniser les vues & calculer le RPM"
                   : "Sync views & calculate RPM"}
             </button>
             <button
@@ -800,7 +800,7 @@ export function RpmView({
                     value: `${(totals?.engagementRate ?? 0).toFixed(2)}%`,
                   },
                   {
-                    label: fr ? "Dû (accrued)" : "Accrued owed",
+                    label: fr ? "Montant dû" : "Accrued owed",
                     value: money(totals?.accrued ?? 0, lang),
                   },
                 ] as const
@@ -844,7 +844,7 @@ export function RpmView({
                 </div>
                 <div style={{ fontSize: 12, color: "var(--ws-text-dim)", maxWidth: 320, textAlign: "right" }}>
                   {fr
-                    ? "Sync tire les vues via ScrapeCreators, calcule le RPM, crédite le solde. Paiement final dans Pay it."
+                    ? "La synchro récupère les vues via ScrapeCreators, calcule le RPM et crédite le solde. Paiement final dans Pay it."
                     : "Sync pulls views via ScrapeCreators, calculates RPM, credits balance. Final payment in Pay it."}
                 </div>
               </div>
@@ -861,9 +861,9 @@ export function RpmView({
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Contenus" : "Posts"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Vues" : "Views"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Likes" : "Likes"}</th>
-                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>ER</th>
-                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Accru" : "Accrued"}</th>
-                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Pending" : "Pending"}</th>
+                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "TE" : "ER"}</th>
+                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Dû" : "Accrued"}</th>
+                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "En attente" : "Pending"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600 }} />
                   </tr>
                 </thead>
@@ -936,8 +936,8 @@ export function RpmView({
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Créateur" : "Creator"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Vues" : "Views"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Likes" : "Likes"}</th>
-                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Accru" : "Accrued"}</th>
-                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Pending" : "Pending"}</th>
+                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "Dû" : "Accrued"}</th>
+                    <th style={{ padding: "12px 14px", fontWeight: 600, fontFamily: "inherit", letterSpacing: "-0.02em" }}>{fr ? "En attente" : "Pending"}</th>
                     <th style={{ padding: "12px 14px", fontWeight: 600 }} />
                   </tr>
                 </thead>
@@ -988,7 +988,7 @@ export function RpmView({
                               {refreshingContentId === row.id
                                 ? "…"
                                 : fr
-                                  ? "Refresh"
+                                  ? "Actualiser"
                                   : "Refresh"}
                             </button>
                           ) : null}

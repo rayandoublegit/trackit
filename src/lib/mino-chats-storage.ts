@@ -79,6 +79,12 @@ export function titleFromMessage(text: string, fr: boolean) {
   return clean.length > 42 ? `${clean.slice(0, 42)}…` : clean;
 }
 
+/** A stored default title follows the current language ("New chat" ⇄ "Nouvelle conversation"). */
+export function displayMinoChatTitle(title: string, fr: boolean) {
+  if (title === "New chat" || title === "Nouvelle conversation") return fr ? "Nouvelle conversation" : "New chat";
+  return title;
+}
+
 export function loadMinoChats(userId?: string): MinoChat[] {
   if (typeof window === "undefined") return [];
   try {

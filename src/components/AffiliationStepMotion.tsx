@@ -26,8 +26,8 @@ export function AffiliationStepMotion({ step }: { step: StepVariant }) {
                 />
               </svg>
             </span>
-            <span className="aff-step-motion__link-url">trackit.app/ref/you</span>
-            <span className="aff-step-motion__link-copy">Copy</span>
+            <span className="aff-step-motion__link-url">{lang === "fr" ? "thentrack.it/ref/vous" : "thentrack.it/ref/you"}</span>
+            <span className="aff-step-motion__link-copy">{lang === "fr" ? "Copier" : "Copy"}</span>
           </div>
           <span className="aff-step-motion__pulse aff-step-motion__pulse--1" />
           <span className="aff-step-motion__pulse aff-step-motion__pulse--2" />
@@ -71,7 +71,7 @@ export function AffiliationStepMotion({ step }: { step: StepVariant }) {
           </div>
           <div className="aff-step-motion__payout-meta">
             <span className="aff-step-motion__payout-amount">+{payoutSample}</span>
-            <span className="aff-step-motion__payout-label">20% · monthly</span>
+            <span className="aff-step-motion__payout-label">{lang === "fr" ? "20 % · mensuel" : "20% · monthly"}</span>
           </div>
         </div>
         <span className="aff-step-motion__deposit aff-step-motion__deposit--1" />

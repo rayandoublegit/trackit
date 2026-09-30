@@ -60,7 +60,7 @@ export function FeedbackView({ isMobile }: { isMobile?: boolean }) {
     setSaving(false);
   };
 
-  if (loading) return <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, color: "var(--ws-text-muted)", fontSize: 14 }}>Loading...</div>;
+  if (loading) return <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, color: "var(--ws-text-muted)", fontSize: 14 }}>{lang === "fr" ? "Chargement..." : "Loading..."}</div>;
 
   if (existing && !editing) {
     return (
@@ -103,7 +103,7 @@ export function FeedbackView({ isMobile }: { isMobile?: boolean }) {
   return (
     <div style={{ paddingTop: isMobile ? 16 : 40, paddingRight: isMobile ? 16 : 40, paddingBottom: isMobile ? 16 : 40, paddingLeft: isMobile ? 16 : 40, maxWidth: 520 }}>
       <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.03em", margin: "0 0 6px", color: "var(--ws-text)" }}>
-        {editing ? "Update your review" : lang === "fr" ? "Laisser un avis" : "Leave a review"}
+        {editing ? (lang === "fr" ? "Modifier votre avis" : "Update your review") : lang === "fr" ? "Laisser un avis" : "Leave a review"}
       </h1>
       <p style={{ fontSize: 14, color: "var(--ws-text-muted)", margin: "0 0 32px" }}>{lang === "fr" ? "Comment Trackit fonctionne-t-il pour vous ?" : "How is Trackit working for you?"}</p>
       <div style={{ background: "var(--ws-surface)", border: "1px solid var(--ws-border)", borderRadius: 16, padding: 28, display: "flex", flexDirection: "column", gap: 24 }}>
@@ -138,7 +138,7 @@ export function FeedbackView({ isMobile }: { isMobile?: boolean }) {
               type="button"
               onClick={() => setEditing(false)}
               style={{ background: "none", border: "1px solid var(--ws-border)", borderRadius: 10, padding: "12px 20px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: "pointer", color: "var(--ws-text)" }}
-            >Cancel</button>
+            >{lang === "fr" ? "Annuler" : "Cancel"}</button>
           )}
           <button
             type="button"
@@ -146,7 +146,7 @@ export function FeedbackView({ isMobile }: { isMobile?: boolean }) {
             disabled={!rating || saving}
             style={{ background: rating ? "var(--ws-accent)" : "var(--ws-border)", color: rating ? "#fff" : "var(--ws-text-dim)", border: "none", borderRadius: 10, padding: "12px 20px", fontSize: 14, fontWeight: 600, fontFamily: "inherit", cursor: rating ? "pointer" : "not-allowed", letterSpacing: "-0.02em" }}
           >
-            {saving ? "Saving..." : lang === "fr" ? "Soumettre l'avis →" : "Submit review →"}
+            {saving ? (lang === "fr" ? "Enregistrement..." : "Saving...") : lang === "fr" ? "Soumettre l'avis →" : "Submit review →"}
           </button>
         </div>
       </div>

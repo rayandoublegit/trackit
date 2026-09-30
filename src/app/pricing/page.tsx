@@ -5,9 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { PricingPlans } from "@/components/PricingPlans";
 import { normalizePlan, type PlanTier } from "@/lib/plan-limits";
 import type { BillingInterval } from "@/lib/stripe-billing";
+import { useLocaleHref } from "@/lib/useLang";
 
 function PricingPageContent() {
   const searchParams = useSearchParams();
+  const localeHref = useLocaleHref();
   const [currentPlan, setCurrentPlan] = useState<PlanTier>("free");
   const [subscriptionInterval, setSubscriptionInterval] = useState<BillingInterval | null>(null);
   const [loadingPlan, setLoadingPlan] = useState(true);
@@ -36,7 +38,7 @@ function PricingPageContent() {
 
   const cancelUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/pricing?returnTo=${encodeURIComponent(returnTo)}`
+      ? `${window.location.origin}${localeHref(`/pricing?returnTo=${encodeURIComponent(returnTo)}`)}`
       : undefined;
 
   return (

@@ -6,6 +6,7 @@ import { saveCreator, getSavedCreators, removeCreator } from "@/lib/db";
 import { notifyCreatorSaved } from "@/lib/notifications-storage";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { nicheLabel } from "@/lib/niche-tree";
 import { selectionPillColors, TRACKIT_SELECTION_BLUE } from "@/lib/selection-card-styles";
 import {
   setDiscoveryPrefs,
@@ -87,6 +88,27 @@ type OutreachContact = {
 };
 
 const INITIAL_OUTREACH_TEMPLATES: OutreachTemplate[] = [];
+
+const OUTREACH_TONE_LABELS_FR: Record<OutreachTone, string> = {
+  Casual: "Décontracté",
+  Professional: "Professionnel",
+  Friendly: "Amical",
+  Direct: "Direct",
+};
+
+const OUTREACH_PLATFORM_LABELS_FR: Record<OutreachPlatform, string> = {
+  "TikTok DM": "DM TikTok",
+  "Instagram DM": "DM Instagram",
+  Email: "E-mail",
+};
+
+function outreachToneLabel(tone: OutreachTone, lang: "en" | "fr") {
+  return lang === "fr" ? OUTREACH_TONE_LABELS_FR[tone] : tone;
+}
+
+function outreachPlatformLabel(platform: OutreachPlatform, lang: "en" | "fr") {
+  return lang === "fr" ? OUTREACH_PLATFORM_LABELS_FR[platform] ?? platform : platform;
+}
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
@@ -223,12 +245,29 @@ const filterSelectStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-function formatCount(n: number) {
+function formatCount(n: number, lang: "en" | "fr" = "en") {
   const num = Number(n);
   if (!Number.isFinite(num) || num < 0) return "0";
+  if (lang === "fr") {
+    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1).replace(".", ",")} M`;
+    if (num >= 1_000) return `${(num / 1_000).toFixed(1).replace(".", ",")} k`;
+    return String(Math.round(num));
+  }
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
   return String(Math.round(num));
+}
+
+/** "4.2%" in English, "4,2 %" in French. */
+function formatPercent(value: number | string, lang: "en" | "fr") {
+  return lang === "fr" ? `${String(value).replace(".", ",")} %` : `${value}%`;
+}
+
+/** Niche tag as shown to the user; English keeps the raw tag. */
+function nicheTagLabel(tag: string, lang: "en" | "fr") {
+  if (lang !== "fr") return tag;
+  if (tag.trim().toLowerCase() === "creator") return "Créateur";
+  return nicheLabel(tag, "fr");
 }
 
 function DiscoveryHeader({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boolean }) {
@@ -238,7 +277,7 @@ function DiscoveryHeader({ lang, isMobile }: { lang: "en" | "fr"; isMobile?: boo
         {lang === "fr" ? "Recherche" : "Discovery"}
       </h1>
       <p style={{ fontSize: 14, color: "#7A7A7A", letterSpacing: "-0.02em", margin: 0 }}>
-        {lang === "fr" ? "Recherchez parmi 250M+ créateurs sur toutes les grandes plateformes" : "Search 250M+ creators across every major platform"}
+        {lang === "fr" ? "Recherchez parmi 250 M+ créateurs sur toutes les grandes plateformes" : "Search 250M+ creators across every major platform"}
       </p>
     </div>
   );
@@ -658,7 +697,7 @@ function VideoPreviews({ creator, size, lang }: { creator: Creator; size: "card"
               letterSpacing: "-0.01em",
             }}
           >
-            {formatCount(video.views)} {lang === "fr" ? "vues" : "views"}
+            {formatCount(video.views, lang)} {lang === "fr" ? "vues" : "views"}
           </div>
           )}
         </Wrapper>
@@ -716,7 +755,7 @@ function CreatorProfileModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={lang === "fr" ? "Fermer" : "Close"}
           style={{
             position: "absolute",
             top: 16,
@@ -782,10 +821,10 @@ function CreatorProfileModal({
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 20 }}>
           {[
-            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
-            { label: lang === "fr" ? "Taux d'engagement" : "Engagement Rate", value: `${creator.engagementRate}%` },
-            { label: lang === "fr" ? "Vues moyennes" : "Avg Views", value: formatCount(creator.avgViews) },
-            { label: lang === "fr" ? "Likes totaux" : "Total Likes", value: formatCount(totalLikes) },
+            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount, lang) },
+            { label: lang === "fr" ? "Taux d'engagement" : "Engagement Rate", value: formatPercent(creator.engagementRate, lang) },
+            { label: lang === "fr" ? "Vues moyennes" : "Avg Views", value: formatCount(creator.avgViews, lang) },
+            { label: lang === "fr" ? "Likes totaux" : "Total Likes", value: formatCount(totalLikes, lang) },
           ].map((stat) => (
             <div key={stat.label} style={{ background: "#FAFAFA", borderRadius: 10, padding: "12px 8px", textAlign: "center" }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A" }}>{stat.value}</div>
@@ -807,7 +846,7 @@ function CreatorProfileModal({
                 letterSpacing: "-0.01em",
               }}
             >
-              {tag}
+              {nicheTagLabel(tag, lang)}
             </span>
           ))}
         </div>
@@ -923,13 +962,14 @@ function OutreachModal({
           brand: product,
           tone: tone.toLowerCase(),
           platform,
+          lang,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error("Generation failed");
       setMessage(data.message);
     } catch {
-      setGenerateError("Generation failed. Try again.");
+      setGenerateError(lang === "fr" ? "La génération a échoué. Réessayez." : "Generation failed. Try again.");
     } finally {
       setGenerating(false);
     }
@@ -948,7 +988,7 @@ function OutreachModal({
     if (!message.trim()) return;
     onSaveTemplate({
       id: newTemplateId(),
-      name: `Outreach — ${creator.displayName}`,
+      name: lang === "fr" ? `Prospection — ${creator.displayName}` : `Outreach — ${creator.displayName}`,
       body: message,
       platform,
     });
@@ -989,7 +1029,7 @@ function OutreachModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close"
+          aria-label={lang === "fr" ? "Fermer" : "Close"}
           style={{
             position: "absolute",
             top: 16,
@@ -1014,9 +1054,9 @@ function OutreachModal({
         <div style={{ display: "flex", gap: 4, borderBottom: "1px solid #EFEFEF", marginBottom: 24, paddingRight: 40 }}>
           {(
             [
-              { id: "generate" as const, label: "Generate" },
-              { id: "templates" as const, label: "Templates" },
-              { id: "send" as const, label: "Send" },
+              { id: "generate" as const, label: lang === "fr" ? "Générer" : "Generate" },
+              { id: "templates" as const, label: lang === "fr" ? "Modèles" : "Templates" },
+              { id: "send" as const, label: lang === "fr" ? "Envoyer" : "Send" },
             ] as const
           ).map((t) => (
             <button
@@ -1045,17 +1085,17 @@ function OutreachModal({
           <>
             <CreatorMiniCard creator={creator} />
             <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", marginBottom: 16, letterSpacing: "-0.02em" }}>
-              Generate with Trackit AI
+              {lang === "fr" ? "Générer avec Trackit AI" : "Generate with Trackit AI"}
             </div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>What are you selling?</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Que vendez-vous ?" : "What are you selling?"}</label>
             <input
               type="text"
               value={product}
               onChange={(e) => setProduct(e.target.value)}
-              placeholder="Your product or brand"
+              placeholder={lang === "fr" ? "Votre produit ou marque" : "Your product or brand"}
               style={{ ...inputStyle, marginBottom: 16 }}
             />
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>Tone</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Ton" : "Tone"}</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
               {tones.map((t) => (
                 <button
@@ -1071,11 +1111,11 @@ function OutreachModal({
                     borderColor: tone === t ? "#1A1A1A" : "#E5E5E5",
                   }}
                 >
-                  {t}
+                  {outreachToneLabel(t, lang)}
                 </button>
               ))}
             </div>
-            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>Platform</label>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "#9A9A9A", marginBottom: 8 }}>{lang === "fr" ? "Plateforme" : "Platform"}</label>
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
               {platforms.map((p) => {
                 const isActive = platform === p;
@@ -1094,15 +1134,15 @@ function OutreachModal({
                     borderColor: pill.borderColor,
                   }}
                 >
-                  {p}
+                  {outreachPlatformLabel(p, lang)}
                 </button>
               );})}
             </div>
             <button type="button" onClick={handleGenerate} disabled={generating} style={{ ...btnBlack, width: "100%", marginBottom: 20, opacity: generating ? 0.7 : 1 }}>
-              Generate outreach →
+              {lang === "fr" ? "Générer un message →" : "Generate outreach →"}
             </button>
             {generating && (
-              <p style={{ fontSize: 14, color: "#7A7A7A", textAlign: "center", margin: "0 0 16px" }}>Generating personalized message...</p>
+              <p style={{ fontSize: 14, color: "#7A7A7A", textAlign: "center", margin: "0 0 16px" }}>{lang === "fr" ? "Génération du message personnalisé..." : "Generating personalized message..."}</p>
             )}
             {generateError && !generating && (
               <p style={{ fontSize: 14, color: "#DC2626", textAlign: "center", margin: "0 0 16px" }}>{generateError}</p>
@@ -1116,13 +1156,17 @@ function OutreachModal({
                   style={{ ...inputStyle, resize: "vertical", lineHeight: 1.55, marginBottom: 8 }}
                 />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                  <span style={{ fontSize: 12, color: "#9A9A9A" }}>{message.length} characters</span>
+                  <span style={{ fontSize: 12, color: "#9A9A9A" }}>
+                    {lang === "fr"
+                      ? `${message.length.toLocaleString("fr-FR")} ${message.length <= 1 ? "caractère" : "caractères"}`
+                      : `${message.length} characters`}
+                  </span>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button type="button" onClick={() => void handleCopy()} style={{ ...btnSecondary, fontSize: 12, padding: "8px 14px" }}>
-                      Copy message
+                      {lang === "fr" ? "Copier le message" : "Copy message"}
                     </button>
                     <button type="button" onClick={handleSaveAsTemplate} style={{ ...btnSecondary, fontSize: 12, padding: "8px 14px" }}>
-                      Save as template
+                      {lang === "fr" ? "Enregistrer comme modèle" : "Save as template"}
                     </button>
                   </div>
                 </div>
@@ -1152,7 +1196,7 @@ function OutreachModal({
                         </p>
                       </div>
                       <span style={{ fontSize: 10, fontWeight: 500, background: "#F0F0F0", padding: "4px 8px", borderRadius: 999, flexShrink: 0 }}>
-                        {tpl.platform}
+                        {outreachPlatformLabel(tpl.platform, lang)}
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1165,7 +1209,7 @@ function OutreachModal({
                           setTab("generate");
                         }}
                       >
-                        Use this template
+                        {lang === "fr" ? "Utiliser ce modèle" : "Use this template"}
                       </button>
                       <button
                         type="button"
@@ -1181,7 +1225,7 @@ function OutreachModal({
                           padding: 0,
                         }}
                       >
-                        Delete
+                        {lang === "fr" ? "Supprimer" : "Delete"}
                       </button>
                     </div>
                   </div>
@@ -1193,64 +1237,66 @@ function OutreachModal({
 
         {tab === "send" && (
           <>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.03em" }}>How to send your message</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1A1A1A", margin: "0 0 6px", letterSpacing: "-0.03em" }}>{lang === "fr" ? "Comment envoyer votre message" : "How to send your message"}</h3>
             <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 20px", lineHeight: 1.5 }}>
-              Direct sending requires creator login. For now copy your message and send manually.
+              {lang === "fr"
+                ? "L'envoi direct nécessite la connexion du créateur. Pour l'instant, copiez votre message et envoyez-le manuellement."
+                : "Direct sending requires creator login. For now copy your message and send manually."}
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 20 }}>
               <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: 20 }}>🎵</span>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Send on TikTok</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{lang === "fr" ? "Envoyer sur TikTok" : "Send on TikTok"}</div>
                 </div>
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>Open TikTok DMs → copy your message and paste it</p>
+                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>{lang === "fr" ? "Ouvrez vos DM TikTok → copiez votre message et collez-le" : "Open TikTok DMs → copy your message and paste it"}</p>
                 <button
                   type="button"
                   style={{ ...btnSecondary, fontSize: 12 }}
                   onClick={() => window.open("https://tiktok.com/messages", "_blank", "noopener,noreferrer")}
                 >
-                  Open TikTok →
+                  {lang === "fr" ? "Ouvrir TikTok →" : "Open TikTok →"}
                 </button>
               </div>
               <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: 20 }}>📷</span>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Send on Instagram</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{lang === "fr" ? "Envoyer sur Instagram" : "Send on Instagram"}</div>
                 </div>
-                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>Open Instagram DMs → copy your message and paste it</p>
+                <p style={{ fontSize: 13, color: "#7A7A7A", margin: "0 0 12px" }}>{lang === "fr" ? "Ouvrez vos DM Instagram → copiez votre message et collez-le" : "Open Instagram DMs → copy your message and paste it"}</p>
                 <button
                   type="button"
                   style={{ ...btnSecondary, fontSize: 12 }}
                   onClick={() => window.open("https://instagram.com/direct/inbox", "_blank", "noopener,noreferrer")}
                 >
-                  Open Instagram →
+                  {lang === "fr" ? "Ouvrir Instagram →" : "Open Instagram →"}
                 </button>
               </div>
               <div style={{ border: "1px solid #EFEFEF", borderRadius: 12, padding: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                   <span style={{ fontSize: 20 }}>✉️</span>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>Send via Email</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#1A1A1A" }}>{lang === "fr" ? "Envoyer par e-mail" : "Send via Email"}</div>
                 </div>
-                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>Creator email address</label>
+                <label style={{ display: "block", fontSize: 12, color: "#9A9A9A", marginBottom: 6 }}>{lang === "fr" ? "Adresse e-mail du créateur" : "Creator email address"}</label>
                 <input
                   type="email"
                   value={creatorEmail}
                   onChange={(e) => setCreatorEmail(e.target.value)}
-                  placeholder="creator@email.com"
+                  placeholder={lang === "fr" ? "createur@email.com" : "creator@email.com"}
                   style={{ ...inputStyle, marginBottom: 12 }}
                 />
                 <button
                   type="button"
                   disabled
-                  title="Coming soon"
+                  title={lang === "fr" ? "Bientôt disponible" : "Coming soon"}
                   style={{ ...btnSecondary, fontSize: 12, opacity: 0.45, cursor: "not-allowed" }}
                 >
-                  Send email →
+                  {lang === "fr" ? "Envoyer l'e-mail →" : "Send email →"}
                 </button>
               </div>
             </div>
             <button type="button" onClick={onMarkSent} style={{ ...btnPrimary, width: "100%" }}>
-              Mark as sent
+              {lang === "fr" ? "Marquer comme envoyé" : "Mark as sent"}
             </button>
           </>
         )}
@@ -1371,12 +1417,14 @@ function reachTrendDelta(reach: number, followers: number) {
 }
 
 function GrowthTrendBadge({
+  lang,
   trend,
   color,
   background,
   title,
   rows,
 }: {
+  lang: "en" | "fr";
   trend: number;
   color: string;
   background: string;
@@ -1420,7 +1468,7 @@ function GrowthTrendBadge({
         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M6 15l6-8 6 8" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        +{trend}%
+        +{formatPercent(trend, lang)}
       </button>
 
       {open && (
@@ -1484,23 +1532,24 @@ function ReachStatPanel({
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-          {formatCount(reach)}
+          {formatCount(reach, lang)}
         </span>
         <GrowthTrendBadge
+          lang={lang}
           trend={trend}
           color="#0047FF"
           background="#EEF4FF"
           title={lang === "fr" ? "Détails portée" : "Reach details"}
           rows={[
-            { label: lang === "fr" ? "Portée estimée" : "Estimated reach", value: formatCount(reach) },
-            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(followers) },
+            { label: lang === "fr" ? "Portée estimée" : "Estimated reach", value: formatCount(reach, lang) },
+            { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(followers, lang) },
             {
               label: lang === "fr" ? "Ratio portée / abonnés" : "Reach / followers ratio",
-              value: `${reachRatio}%`,
+              value: formatPercent(reachRatio, lang),
             },
-            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${trend}%` },
+            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${formatPercent(trend, lang)}` },
             ...(avgViews && avgViews > 0
-              ? [{ label: lang === "fr" ? "Vues moyennes" : "Average views", value: formatCount(avgViews) }]
+              ? [{ label: lang === "fr" ? "Vues moyennes" : "Average views", value: formatCount(avgViews, lang) }]
               : []),
           ]}
         />
@@ -1537,24 +1586,25 @@ function EngagementStatPanel({
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 6 }}>
         <span style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A", letterSpacing: "-0.02em" }}>
-          {rate}%
+          {formatPercent(rate, lang)}
         </span>
         <GrowthTrendBadge
+          lang={lang}
           trend={trend}
           color="#059669"
           background="#ECFDF5"
           title={lang === "fr" ? "Détails engagement" : "Engagement details"}
           rows={[
-            { label: lang === "fr" ? "Taux d'engagement" : "Engagement rate", value: `${rate}%` },
+            { label: lang === "fr" ? "Taux d'engagement" : "Engagement rate", value: formatPercent(rate, lang) },
             {
               label: lang === "fr" ? "Interactions estimées" : "Estimated interactions",
-              value: formatCount(estInteractions),
+              value: formatCount(estInteractions, lang),
             },
             {
               label: lang === "fr" ? "Par publication (est.)" : "Per post (est.)",
-              value: formatCount(estPerPost),
+              value: formatCount(estPerPost, lang),
             },
-            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${trend}%` },
+            { label: lang === "fr" ? "Croissance 30 j" : "30d growth", value: `+${formatPercent(trend, lang)}` },
           ]}
         />
       </div>
@@ -1624,7 +1674,7 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
                   textTransform: "capitalize",
                 }}
               >
-                {tag}
+                {nicheTagLabel(tag, lang)}
               </span>
             ))}
           </div>
@@ -1681,7 +1731,7 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
                 const days = Math.floor((Date.now() - new Date(creator.lastPostAt).getTime()) / 86400000);
                 if (days <= 0) return lang === "fr" ? "Actif aujourd'hui" : "Active today";
                 if (days === 1) return lang === "fr" ? "Actif hier" : "Active yesterday";
-                if (days < 30) return lang === "fr" ? `Actif il y a ${days} j` : `Active ${days}d ago`;
+                if (days < 30) return lang === "fr" ? `Actif il y a ${days} jours` : `Active ${days}d ago`;
                 return lang === "fr" ? `Actif il y a ${Math.floor(days / 30)} mois` : `Active ${Math.floor(days / 30)}mo ago`;
               })()}
             </span>
@@ -1734,8 +1784,8 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
         }}
       >
         {[
-          { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount) },
-          { label: lang === "fr" ? "Vues moy." : "Avg views", value: formatCount(creator.avgViews) },
+          { label: lang === "fr" ? "Abonnés" : "Followers", value: formatCount(creator.followersCount, lang) },
+          { label: lang === "fr" ? "Vues moy." : "Avg views", value: formatCount(creator.avgViews, lang) },
         ].map((stat) => (
           <div
             key={stat.label}
@@ -1806,7 +1856,7 @@ function CreatorCardBody({ creator, lang }: { creator: Creator; lang: "en" | "fr
               padding: "6px 10px",
             }}
           >
-            {lang === "fr" ? "Contact via DM" : "Contact via DM"}
+            {lang === "fr" ? "Contact par DM" : "Contact via DM"}
           </span>
         )}
         <a
@@ -2333,7 +2383,7 @@ export function DiscoveryView({
     });
     writeSavedCreatorSnapshot(creator);
     setSavedCreators(prev => [...prev.filter(c => (c.username  ?? "") !== (creator.username ?? "")), creator]);
-    setToast("Creator saved ✓");
+    setToast(lang === "fr" ? "Créateur sauvegardé ✓" : "Creator saved ✓");
     notifyCreatorSaved(lang, creator.displayName || `@${creator.username ?? "creator"}`, user.id);
   };
 
@@ -2422,7 +2472,9 @@ export function DiscoveryView({
       });
 
       if (!res.ok) {
-        throw new Error("Search failed. Please try again.");
+        throw new Error(
+          lang === "fr" ? "La recherche a échoué. Veuillez réessayer." : "Search failed. Please try again."
+        );
       }
 
       const data = (await res.json()) as {
@@ -2459,7 +2511,9 @@ export function DiscoveryView({
     } catch (e) {
       setCreators([]);
       setFollowerFilterHint(null);
-      setError(e instanceof Error ? e.message : "Something went wrong.");
+      setError(
+        e instanceof Error ? e.message : lang === "fr" ? "Une erreur est survenue." : "Something went wrong."
+      );
     } finally {
       setLoading(false);
     }
@@ -2565,11 +2619,11 @@ export function DiscoveryView({
               onChange={setFollowers}
               options={[
                 { value: "", label: lang === "fr" ? "Tous" : "All" },
-                { value: "1-10k", label: "1–10K" },
-                { value: "10-20k", label: "10–20K" },
-                { value: "20-50k", label: "20–50K" },
-                { value: "50-100k", label: "50–100K" },
-                { value: "100k+", label: "100K+" },
+                { value: "1-10k", label: lang === "fr" ? "1–10 k" : "1–10K" },
+                { value: "10-20k", label: lang === "fr" ? "10–20 k" : "10–20K" },
+                { value: "20-50k", label: lang === "fr" ? "20–50 k" : "20–50K" },
+                { value: "50-100k", label: lang === "fr" ? "50–100 k" : "50–100K" },
+                { value: "100k+", label: lang === "fr" ? "100 k+" : "100K+" },
               ]}
             />
             <FilterSelect
@@ -2578,10 +2632,10 @@ export function DiscoveryView({
               onChange={setEngagement}
               options={[
                 { value: "", label: lang === "fr" ? "Tous" : "All" },
-                { value: "1+", label: "1%+" },
-                { value: "3+", label: "3%+" },
-                { value: "5+", label: "5%+" },
-                { value: "7+", label: "7%+" },
+                { value: "1+", label: lang === "fr" ? "1 %+" : "1%+" },
+                { value: "3+", label: lang === "fr" ? "3 %+" : "3%+" },
+                { value: "5+", label: lang === "fr" ? "5 %+" : "5%+" },
+                { value: "7+", label: lang === "fr" ? "7 %+" : "7%+" },
               ]}
             />
             <FilterSelect
@@ -2621,9 +2675,9 @@ export function DiscoveryView({
               onChange={setMinViews}
               options={[
                 { value: "", label: lang === "fr" ? "Tous" : "All" },
-                { value: "10000", label: "10K+" },
-                { value: "50000", label: "50K+" },
-                { value: "100000", label: "100K+" },
+                { value: "10000", label: lang === "fr" ? "10 k+" : "10K+" },
+                { value: "50000", label: lang === "fr" ? "50 k+" : "50K+" },
+                { value: "100000", label: lang === "fr" ? "100 k+" : "100K+" },
               ]}
             />
             <FilterSelect
@@ -2665,7 +2719,7 @@ export function DiscoveryView({
             </div>
             <div>
               <div style={{ fontSize: 11, color: "#9A9A9A", marginBottom: 4, letterSpacing: "-0.01em" }}>
-                {lang === "fr" ? "Avec email" : "Has email"}
+                {lang === "fr" ? "Avec e-mail" : "Has email"}
               </div>
               <label
                 style={{
@@ -2811,7 +2865,7 @@ export function DiscoveryView({
                 }}
               >
                 {lang === "fr"
-                  ? `${followerFilterHint.filteredOut} créateurs disponibles dans cette niche, mais aucun dans votre fourchette d'abonnés. Les créateurs de cette niche vont de ${formatCount(followerFilterHint.followerRange[0]).replace(".", ",")} à ${formatCount(followerFilterHint.followerRange[1]).replace(".", ",")} abonnés.`
+                  ? `${followerFilterHint.filteredOut.toLocaleString("fr-FR")} ${followerFilterHint.filteredOut <= 1 ? "créateur disponible" : "créateurs disponibles"} dans cette niche, mais aucun dans votre fourchette d'abonnés. Les créateurs de cette niche vont de ${formatCount(followerFilterHint.followerRange[0], lang)} à ${formatCount(followerFilterHint.followerRange[1], lang)} abonnés.`
                   : `${followerFilterHint.filteredOut} creators available in this niche, but none in your follower range. Creators in this niche range from ${formatCount(followerFilterHint.followerRange[0])} to ${formatCount(followerFilterHint.followerRange[1])} followers.`}
               </p>
               <button
@@ -2952,10 +3006,10 @@ export function DiscoveryView({
                 { username: outreachCreator.username, displayName: outreachCreator.displayName, status: "Contacted" },
               ];
             });
-            setToast("Outreach marked as sent ✓");
+            setToast(lang === "fr" ? "Prospection marquée comme envoyée ✓" : "Outreach marked as sent ✓");
             setOutreachCreator(null);
           }}
-          userName="You"
+          userName={lang === "fr" ? "Vous" : "You"}
         />
       )}
       {upgradeModalOpen && creatorLimitModal && (

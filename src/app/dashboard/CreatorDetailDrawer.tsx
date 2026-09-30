@@ -36,6 +36,7 @@ import {
 import { hasReliableCreatorMetrics } from "@/lib/creator-metrics";
 import { MIN_VIEWS_FOR_VALUE_METRICS } from "@/lib/creator-value";
 import { supabase } from "@/lib/supabase";
+import { formatCurrencyWithCode } from "@/lib/useCurrency";
 import { hideCreator, isCreatorHidden, unhideCreator } from "@/lib/hidden-creators-storage";
 import { dispatchCampaignsUpdated } from "@/lib/outreach-history-events";
 
@@ -47,10 +48,21 @@ export type CreatorDetail = FeedCreator & {
   niches?: string[];
 };
 
-function fmt(n: number): string {
+function fmt(n: number, lang: Lang = "en"): string {
+  if (lang === "fr") {
+    if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(".", ",") + " M";
+    if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1).replace(".", ",") + " k";
+    return String(Math.round(n));
+  }
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 100_000 ? 0 : 1) + "K";
   return String(Math.round(n));
+}
+
+/** Percent text: "3.45%" in English, "3,45 %" in French. */
+function pct(n: number, lang: Lang, digits?: number): string {
+  const s = digits == null ? String(n) : n.toFixed(digits);
+  return lang === "fr" ? `${s.replace(".", ",")} %` : `${s}%`;
 }
 
 const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
@@ -399,10 +411,10 @@ function AdvancedMetricsDiagrams({ d, lang }: { d: CreatorDetail; lang: Lang }) 
       <ChartCard title={t.engagementBreakdown}>
         <VerticalMetricBars
           items={[
-            { label: t.avgViewsLong, value: avgViews, display: fmt(avgViews) },
-            { label: t.avgLikes, value: avgLikes, display: fmt(avgLikes) },
-            { label: t.avgComments, value: avgComments, display: fmt(avgComments) },
-            { label: t.avgShares, value: avgShares, display: fmt(avgShares) },
+            { label: t.avgViewsLong, value: avgViews, display: fmt(avgViews, lang) },
+            { label: t.avgLikes, value: avgLikes, display: fmt(avgLikes, lang) },
+            { label: t.avgComments, value: avgComments, display: fmt(avgComments, lang) },
+            { label: t.avgShares, value: avgShares, display: fmt(avgShares, lang) },
           ]}
         />
       </ChartCard>
@@ -410,10 +422,10 @@ function AdvancedMetricsDiagrams({ d, lang }: { d: CreatorDetail; lang: Lang }) 
       <ChartCard title={t.ratesDistribution}>
         <RateBars
           items={[
-            { label: t.likeRate, pct: likeRate, display: `${likeRate.toFixed(2)}%` },
-            { label: t.commentRate, pct: commentRate, display: `${commentRate.toFixed(2)}%` },
-            { label: t.shareRate, pct: shareRate, display: `${shareRate.toFixed(2)}%` },
-            { label: t.engagementRate, pct: d.engagementRate, display: `${d.engagementRate}%` },
+            { label: t.likeRate, pct: likeRate, display: pct(likeRate, lang, 2) },
+            { label: t.commentRate, pct: commentRate, display: pct(commentRate, lang, 2) },
+            { label: t.shareRate, pct: shareRate, display: pct(shareRate, lang, 2) },
+            { label: t.engagementRate, pct: d.engagementRate, display: pct(d.engagementRate, lang) },
           ]}
         />
       </ChartCard>
@@ -421,8 +433,8 @@ function AdvancedMetricsDiagrams({ d, lang }: { d: CreatorDetail; lang: Lang }) 
       <ChartCard title={t.qualityScores}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
           <ScoreRing label={t.authenticity} value={d.authenticityScore} max={100} display={`${d.authenticityScore}`} />
-          <ScoreRing label={t.engagementRate} value={d.engagementRate} max={12} display={`${d.engagementRate}%`} />
-          <ScoreRing label={t.reachPerFollower} value={reachPct} max={25} display={`${reachPct}%`} />
+          <ScoreRing label={t.engagementRate} value={d.engagementRate} max={12} display={pct(d.engagementRate, lang)} />
+          <ScoreRing label={t.reachPerFollower} value={reachPct} max={25} display={pct(reachPct, lang)} />
         </div>
       </ChartCard>
     </div>
@@ -452,18 +464,18 @@ function MetricBarRow({ label, value, pct, trend }: { label: string; value: stri
   );
 }
 
-function fmtRate(num: number, denom: number): string {
+function fmtRate(num: number, denom: number, lang: Lang): string {
   if (!denom) return "—";
-  return `${((num / denom) * 100).toFixed(2)}%`;
+  return pct((num / denom) * 100, lang, 2);
 }
 
 function valueTierLabel(tier: ValueTier, lang: Lang): string {
   const labels: Record<ValueTier, { fr: string; en: string }> = {
     nano: { fr: "Nano", en: "Nano" },
     micro: { fr: "Micro", en: "Micro" },
-    mid: { fr: "Mid", en: "Mid" },
+    mid: { fr: "Intermédiaire", en: "Mid" },
     macro: { fr: "Macro", en: "Macro" },
-    mega: { fr: "Mega", en: "Mega" },
+    mega: { fr: "Méga", en: "Mega" },
   };
   return lang === "fr" ? labels[tier].fr : labels[tier].en;
 }
@@ -485,15 +497,28 @@ function BrandSignalsGrid({ d, lang }: { d: CreatorDetail; lang: Lang }) {
         </p>
       ) : null}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-        <Stat label={t.likeRate} value={fmtRate(d.avgLikes ?? 0, avgViews)} />
-        <Stat label={t.commentRate} value={fmtRate(d.avgComments ?? 0, avgViews)} />
-        <Stat label={t.shareRate} value={fmtRate(d.avgShares ?? 0, avgViews)} />
-        <Stat label={t.estCpm} value={cpmReady ? `$${d.estCpm}` : "—"} accent />
-        <Stat label={t.estCostPerPost} value={d.estCostPerPost > 0 ? `$${d.estCostPerPost.toLocaleString("en-US")}` : "—"} />
+        <Stat label={t.likeRate} value={fmtRate(d.avgLikes ?? 0, avgViews, lang)} />
+        <Stat label={t.commentRate} value={fmtRate(d.avgComments ?? 0, avgViews, lang)} />
+        <Stat label={t.shareRate} value={fmtRate(d.avgShares ?? 0, avgViews, lang)} />
+        <Stat
+          label={t.estCpm}
+          value={cpmReady
+            ? (lang === "fr"
+              ? d.estCpm.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 2 })
+              : `$${d.estCpm}`)
+            : "—"}
+          accent
+        />
+        <Stat
+          label={t.estCostPerPost}
+          value={d.estCostPerPost > 0
+            ? (lang === "fr" ? formatCurrencyWithCode(d.estCostPerPost, "EUR") : `$${d.estCostPerPost.toLocaleString("en-US")}`)
+            : "—"}
+        />
         <Stat label={t.valueScore} value={reliable && d.valueScore > 0 ? `${d.valueScore}/100` : "—"} accent />
         <Stat label={t.postFrequency} value={frequency > 0 ? t.postsPerWeek(frequency) : "—"} />
         <Stat label={t.creatorTier} value={d.valueTier ? valueTierLabel(d.valueTier, lang) : "—"} />
-        <Stat label={t.engagementByFollower} value={d.engagementByFollower > 0 ? `${d.engagementByFollower.toFixed(2)}%` : "—"} />
+        <Stat label={t.engagementByFollower} value={d.engagementByFollower > 0 ? pct(d.engagementByFollower, lang, 2) : "—"} />
       </div>
     </>
   );
@@ -508,10 +533,10 @@ function ContentAnalyticsPanel({ d, lang }: { d: CreatorDetail; lang: Lang }) {
   const reachRatio = d.viewsPerFollower ?? 0;
 
   const metrics = [
-    { label: t.avgViewsLong, value: fmt(avgViews), raw: avgViews, trend: avgViews > 0 && reachRatio >= 0.05 },
-    { label: t.avgLikes, value: fmt(avgLikes), raw: avgLikes, trend: avgLikes > 0 && d.engagementRate >= 3 },
-    { label: t.avgComments, value: fmt(avgComments), raw: avgComments, trend: avgComments > 0 && d.engagementRate >= 2 },
-    { label: t.avgShares, value: fmt(avgShares), raw: avgShares, trend: avgShares > 0 },
+    { label: t.avgViewsLong, value: fmt(avgViews, lang), raw: avgViews, trend: avgViews > 0 && reachRatio >= 0.05 },
+    { label: t.avgLikes, value: fmt(avgLikes, lang), raw: avgLikes, trend: avgLikes > 0 && d.engagementRate >= 3 },
+    { label: t.avgComments, value: fmt(avgComments, lang), raw: avgComments, trend: avgComments > 0 && d.engagementRate >= 2 },
+    { label: t.avgShares, value: fmt(avgShares, lang), raw: avgShares, trend: avgShares > 0 },
   ];
   const max = Math.max(1, ...metrics.map((m) => m.raw));
 
@@ -520,7 +545,7 @@ function ContentAnalyticsPanel({ d, lang }: { d: CreatorDetail; lang: Lang }) {
       <div style={{ display: "grid", gridTemplateColumns: "118px 1fr", gap: 12, alignItems: "start", marginBottom: 6, paddingBottom: 14, borderBottom: "1px solid var(--ws-border)" }}>
         <span style={{ fontSize: 13, color: "var(--ws-text-dim)", paddingTop: 6 }}>{t.engagementRate}</span>
         <div>
-          <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1.1 }}>{d.engagementRate}%</div>
+          <div style={{ fontSize: 28, fontWeight: 600, color: "var(--ws-text)", letterSpacing: "-0.04em", lineHeight: 1.1 }}>{pct(d.engagementRate, lang)}</div>
           <div style={{ fontSize: 12, color: "var(--ws-text-dim)", marginTop: 6, lineHeight: 1.45, letterSpacing: "-0.01em" }}>
             {engagementInsight(d.engagementRate, lang)}
           </div>
@@ -597,7 +622,7 @@ function VideoTile({ v, username, lang }: {
         </span>
       )}
       {v.views > 0 && (
-        <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 10, fontWeight: 600, color: "#FFFFFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{fmt(v.views)} {t.views}</span>
+        <span style={{ position: "absolute", left: 6, bottom: 6, fontSize: 10, fontWeight: 600, color: "#FFFFFF", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{fmt(v.views, lang)} {t.views}</span>
       )}
     </button>
   );
@@ -690,7 +715,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
       const list = (rows || [])
         .map((r: { id?: string; name?: string; status?: string }) => ({
           id: String(r.id || ""),
-          name: String(r.name || "Campaign"),
+          name: String(r.name || ""),
           status: String(r.status || ""),
         }))
         .filter((r) => r.id && r.status !== "Draft");
@@ -1093,7 +1118,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 18 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{t.relationship}</h2>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 650, color: "var(--ws-text)", letterSpacing: "-0.02em" }}>{fr ? "Relation" : t.relationship}</h2>
             {isPaid ? (
               <select value={stage} onChange={(e) => void onStageChange(e.target.value)} aria-label={t.pipelineStageAria} style={{ ...drawerSelect, padding: "5px 8px", fontSize: 12 }}>
                 {stages.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
@@ -1127,14 +1152,14 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 <div style={{ fontSize: 12, color: "var(--ws-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>@{d.username}</div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 650, color: "var(--ws-text)" }}>{fmt(d.followersCount)}</div>
-                <div style={{ fontSize: 11, color: "var(--ws-text-dim)" }}>{d.engagementRate}% ER</div>
+                <div style={{ fontSize: 12, fontWeight: 650, color: "var(--ws-text)" }}>{fmt(d.followersCount, lang)}</div>
+                <div style={{ fontSize: 11, color: "var(--ws-text-dim)" }}>{fr ? `${pct(d.engagementRate, lang)} eng.` : `${d.engagementRate}% ER`}</div>
               </div>
             </a>
           </section>
 
           <section style={{ marginBottom: 22 }}>
-            <h3 style={leftSectionTitle}>{t.emails}</h3>
+            <h3 style={leftSectionTitle}>{fr ? "E-mails" : t.emails}</h3>
             {d.email ? (
               <a
                 href={`mailto:${d.email}`}
@@ -1168,7 +1193,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 onClick={() => setCampaignMenuOpen((o) => !o)}
                 style={{ ...drawerBtnSecondary, width: "100%" }}
               >
-                {t.addShort} ▾
+                {fr ? "Ajouter" : t.addShort} ▾
               </button>
               {campaignMenuOpen && (
                 <div
@@ -1217,7 +1242,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                           }}
                         >
                           <span style={{ fontSize: 13, fontWeight: 550, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {c.name}
+                            {c.name || (fr ? "Campagne" : "Campaign")}
                           </span>
                           {on ? (
                             <span style={{ fontSize: 11, fontWeight: 650, color: "var(--ws-accent)", flexShrink: 0 }}>{t.campaignAdded}</span>
@@ -1261,7 +1286,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={fr ? "Fermer" : "Close"}
               style={{ ...drawerActionBase, width: 32, height: 32, borderRadius: 8, border: "1px solid var(--ws-border)", background: "var(--ws-surface)", color: "var(--ws-text-muted)", cursor: "pointer", lineHeight: 1 }}
             >
               ×
@@ -1354,7 +1379,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                   opacity: saveBusy ? 0.7 : 1,
                 }}
               >
-                {t.saveShort}
+                {fr ? "Sauvegarder" : t.saveShort}
               </button>
               {folderOpen && (
                 <div
@@ -1409,9 +1434,9 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
               border: "1px solid var(--ws-border)",
             }}
           >
-            <Stat label={t.followers} value={fmt(d.followersCount)} />
-            <Stat label={t.engagement} value={`${d.engagementRate}%`} />
-            <Stat label={t.avgViews} value={fmt(d.avgViews)} />
+            <Stat label={t.followers} value={fmt(d.followersCount, lang)} />
+            <Stat label={t.engagement} value={pct(d.engagementRate, lang)} />
+            <Stat label={t.avgViews} value={fmt(d.avgViews, lang)} />
           </div>
 
           <DrawerSection
@@ -1432,7 +1457,7 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                 <ContentAnalyticsPanel d={d} lang={lang} />
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, marginTop: 20 }}>
                   <Stat label={t.authenticity} value={`${d.authenticityScore}/100`} />
-                  <Stat label={t.reachPerFollower} value={`${reachPct > 0 ? reachPct : Math.round((d.viewsPerFollower ?? 0) * 100)}%`} />
+                  <Stat label={t.reachPerFollower} value={pct(reachPct > 0 ? reachPct : Math.round((d.viewsPerFollower ?? 0) * 100), lang)} />
                   <Stat label={t.postsAnalyzed} value={String(d.postsAnalyzed ?? 0)} />
                 </div>
                 <BrandSignalsGrid d={d} lang={lang} />
@@ -1457,9 +1482,9 @@ export function CreatorDetailDrawer({ creator, plan, lang, onClose, onUpgrade, o
                         ))}
                       </div>
                     )}
-                    {analysis.style && <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5 }}><span style={{ color: "var(--ws-text)", fontWeight: 600 }}>{t.style}:</span> {analysis.style}</div>}
-                    {analysis.production && <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5 }}><span style={{ color: "var(--ws-text)", fontWeight: 600 }}>{t.production}:</span> {analysis.production}</div>}
-                    {analysis.brandFit && <div style={{ fontSize: 12.5, color: "var(--ws-text)", background: "var(--ws-accent-soft)", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}><span style={{ fontWeight: 600 }}>{t.brandFit}:</span> {analysis.brandFit}</div>}
+                    {analysis.style && <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5 }}><span style={{ color: "var(--ws-text)", fontWeight: 600 }}>{t.style}{fr ? " :" : ":"}</span> {analysis.style}</div>}
+                    {analysis.production && <div style={{ fontSize: 12.5, color: "var(--ws-text-muted)", lineHeight: 1.5 }}><span style={{ color: "var(--ws-text)", fontWeight: 600 }}>{t.production}{fr ? " :" : ":"}</span> {analysis.production}</div>}
+                    {analysis.brandFit && <div style={{ fontSize: 12.5, color: "var(--ws-text)", background: "var(--ws-accent-soft)", borderRadius: 8, padding: "8px 10px", lineHeight: 1.5 }}><span style={{ fontWeight: 600 }}>{t.brandFit}{fr ? " :" : ":"}</span> {analysis.brandFit}</div>}
                     {!analysis.brandSafe && <div style={{ fontSize: 12, color: "var(--ws-danger)", background: "var(--ws-hover)", borderRadius: 8, padding: "6px 10px" }}>⚠ {t.brandSensitive}</div>}
                   </div>
                 ) : (

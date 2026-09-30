@@ -141,9 +141,9 @@ function PayItWelcomeMock({ lang, isMobile }: { lang: Lang; isMobile?: boolean }
   const mockPayouts =
     lang === "fr"
       ? [
-          { name: "@sarah.creates", amount: "€ 420", status: "Payé", statusBg: "#E8F5E9", statusColor: "#2E7D32" },
-          { name: "@mike.style", amount: "€ 280", status: "En attente", statusBg: "#FEF3C7", statusColor: "#B45309" },
-          { name: "@luna.beauty", amount: "€ 150", status: "Commission", statusBg: "#EEF2FF", statusColor: "#0047FF" },
+          { name: "@sarah.creates", amount: "420 €", status: "Payé", statusBg: "#E8F5E9", statusColor: "#2E7D32" },
+          { name: "@mike.style", amount: "280 €", status: "En attente", statusBg: "#FEF3C7", statusColor: "#B45309" },
+          { name: "@luna.beauty", amount: "150 €", status: "Commission", statusBg: "#EEF2FF", statusColor: "#0047FF" },
         ]
       : [
           { name: "@sarah.creates", amount: "€ 420", status: "Paid", statusBg: "#E8F5E9", statusColor: "#2E7D32" },
@@ -385,7 +385,7 @@ export function PayItWelcomeView({
             ),
             title: "Historique complet",
             description:
-              "Suivez chaque paiement et commission dans un ledger clair, filtrable et groupé par mois.",
+              "Suivez chaque paiement et commission dans un registre clair, filtrable et groupé par mois.",
           },
         ]
       : [

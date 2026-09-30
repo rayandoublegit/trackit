@@ -353,10 +353,10 @@ export function AddSalePanel({
   const salesCounter =
     manualSalesUsed != null
       ? lang === "fr"
-        ? `Ventes manuelles : ${manualSalesUsed}/${FREE_MAX_MANUAL_SALES} lifetime`
+        ? `Ventes manuelles : ${manualSalesUsed}/${FREE_MAX_MANUAL_SALES} à vie`
         : `Manual sales: ${manualSalesUsed}/${FREE_MAX_MANUAL_SALES} lifetime`
       : lang === "fr"
-        ? `Plan Free : ${FREE_MAX_MANUAL_SALES} ventes manuelles lifetime`
+        ? `Plan Free : ${FREE_MAX_MANUAL_SALES} ventes manuelles à vie`
         : `Free plan: ${FREE_MAX_MANUAL_SALES} manual sales lifetime`;
 
   const subtitle = campaign

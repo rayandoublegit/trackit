@@ -44,7 +44,7 @@ export function AffiliateLinksView({
       const list = (rows || [])
         .map((r: { id?: string; name?: string }) => ({
           id: String(r.id || ""),
-          name: String(r.name || "Campaign"),
+          name: String(r.name || ""),
         }))
         .filter((r) => r.id);
       setCampaigns(list);
@@ -253,7 +253,7 @@ export function AffiliateLinksView({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {c.name}
+                    {c.name || (lang === "fr" ? "Campagne" : "Campaign")}
                   </button>
                 );
               })}

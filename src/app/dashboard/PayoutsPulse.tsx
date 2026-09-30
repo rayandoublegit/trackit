@@ -9,11 +9,14 @@ import "./payouts-pulse.css";
 
 export type PulseBucket = { dateKey: string; earned: number; paid: number };
 
-function shortDate(key: string): string {
+type PulseLang = "en" | "fr";
+
+function shortDate(key: string, lang: PulseLang = "en"): string {
   const d = new Date(`${key.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(d.getTime())) return key;
-  if (key.length > 10) return d.toLocaleTimeString("en-US", { hour: "numeric" });
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const locale = lang === "fr" ? "fr-FR" : "en-US";
+  if (key.length > 10) return d.toLocaleTimeString(locale, { hour: "numeric" });
+  return d.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 /** Smooth path through the points (Catmull-Rom converted to cubic Béziers). */
@@ -35,7 +38,15 @@ function smoothPath(pts: [number, number][]): string {
   return d;
 }
 
-function AreaChart({ buckets, format }: { buckets: PulseBucket[]; format: (n: number) => string }) {
+function AreaChart({
+  buckets,
+  format,
+  lang,
+}: {
+  buckets: PulseBucket[];
+  format: (n: number) => string;
+  lang: PulseLang;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 640;
   const H = 170;
@@ -94,22 +105,22 @@ function AreaChart({ buckets, format }: { buckets: PulseBucket[]; format: (n: nu
       {h ? (
         <div className="pp-chart__tip" style={{ left: `${(hover! / Math.max(1, buckets.length - 1)) * 100}%` }}>
           <b>{format(h.earned)}</b>
-          <span>{shortDate(h.dateKey)}</span>
-          {h.paid ? <em>{format(h.paid)} paid</em> : null}
+          <span>{shortDate(h.dateKey, lang)}</span>
+          {h.paid ? <em>{format(h.paid)} {lang === "fr" ? "payé" : "paid"}</em> : null}
         </div>
       ) : null}
       {buckets.length > 1 ? (
         <div className="pp-chart__axis">
-          <span>{shortDate(buckets[0].dateKey)}</span>
-          <span>{shortDate(buckets[Math.floor(buckets.length / 2)].dateKey)}</span>
-          <span>{shortDate(buckets[buckets.length - 1].dateKey)}</span>
+          <span>{shortDate(buckets[0].dateKey, lang)}</span>
+          <span>{shortDate(buckets[Math.floor(buckets.length / 2)].dateKey, lang)}</span>
+          <span>{shortDate(buckets[buckets.length - 1].dateKey, lang)}</span>
         </div>
       ) : null}
     </div>
   );
 }
 
-function Ring({ pct }: { pct: number }) {
+function Ring({ pct, lang }: { pct: number; lang: PulseLang }) {
   const r = 46;
   const c = 2 * Math.PI * r;
   const v = Math.max(0, Math.min(1, pct));
@@ -128,7 +139,7 @@ function Ring({ pct }: { pct: number }) {
       </svg>
       <div className="pp-ring__label">
         <b>{Math.round(v * 100)}%</b>
-        <span>paid out</span>
+        <span>{lang === "fr" ? "versé" : "paid out"}</span>
       </div>
     </div>
   );
@@ -182,6 +193,7 @@ export function PayoutsPulse({
   salesCount,
   format,
   isMobile,
+  lang = "en",
 }: {
   title: string;
   amount: number;
@@ -197,7 +209,9 @@ export function PayoutsPulse({
   salesCount: number;
   format: (n: number) => string;
   isMobile?: boolean;
+  lang?: PulseLang;
 }) {
+  const fr = lang === "fr";
   const paidShare = paid + owed > 0 ? paid / (paid + owed) : 0;
   return (
     <section className={`pp${isMobile ? " is-mobile" : ""}`}>
@@ -214,16 +228,16 @@ export function PayoutsPulse({
             <CountUp value={amount} format={format} />
           </div>
           <div className="pp-hero__sub">{salesLine}</div>
-          <AreaChart buckets={buckets} format={format} />
+          <AreaChart buckets={buckets} format={format} lang={lang} />
         </div>
         <div className="pp-hero__side">
-          <Ring pct={paidShare} />
+          <Ring pct={paidShare} lang={lang} />
           <div className="pp-hero__legend">
             <span>
-              <i className="is-paid" /> Paid <b>{format(paid)}</b>
+              <i className="is-paid" /> {fr ? "Payé" : "Paid"} <b>{format(paid)}</b>
             </span>
             <span>
-              <i className="is-owed" /> Owed <b>{format(owed)}</b>
+              <i className="is-owed" /> {fr ? "Dû" : "Owed"} <b>{format(owed)}</b>
             </span>
           </div>
         </div>
@@ -233,7 +247,7 @@ export function PayoutsPulse({
         <Tile
           index={0}
           tone="amber"
-          label="Amount owed"
+          label={fr ? "Montant dû" : "Amount owed"}
           value={<CountUp value={owed} format={format} />}
           hint={owedHint}
           icon={<Svg d="M12 8v4l3 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z" />}
@@ -249,9 +263,17 @@ export function PayoutsPulse({
         <Tile
           index={2}
           tone="blue"
-          label="Avg commission per sale"
+          label={fr ? "Commission moyenne par vente" : "Avg commission per sale"}
           value={<CountUp value={avgPerSale} format={format} />}
-          hint={salesCount ? `${salesCount} sale${salesCount > 1 ? "s" : ""} in period` : "No sales in period"}
+          hint={
+            fr
+              ? salesCount
+                ? `${salesCount} vente${salesCount > 1 ? "s" : ""} sur la période`
+                : "Aucune vente sur la période"
+              : salesCount
+                ? `${salesCount} sale${salesCount > 1 ? "s" : ""} in period`
+                : "No sales in period"
+          }
           icon={<Svg d="M3 3v18h18M7 14l4-4 4 4 5-6" />}
         />
       </div>

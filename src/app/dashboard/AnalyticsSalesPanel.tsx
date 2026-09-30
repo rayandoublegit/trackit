@@ -334,7 +334,7 @@ export function AnalyticsSalesPanel({
               />
               {filteredSales.map((sale) => {
                 const creator = saleCreatorMeta(sale);
-                const handle = String(creator?.handle || creator?.full_name || "creator").replace(/^@/, "");
+                const handle = String(creator?.handle || creator?.full_name || (lang === "fr" ? "créateur" : "creator")).replace(/^@/, "");
                 const shopify = isShopifySale(sale);
                 const title = shopify
                   ? lang === "fr"

@@ -104,9 +104,9 @@ function mediaKindFromUrl(url: string | null | undefined): "image" | "audio" | "
   return "image";
 }
 
-function formatBubbleTime(iso: string) {
+function formatBubbleTime(iso: string, fr = false) {
   try {
-    return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString(fr ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
   } catch {
     return "";
   }
@@ -120,6 +120,13 @@ function replySnippet(
   if (preview.body?.trim()) return preview.body.trim();
   if (preview.imageUrl) return fr ? "Photo" : "Photo";
   return fr ? "Message" : "Message";
+}
+
+function roleLabel(role: string, fr: boolean): string {
+  if (!fr) return role;
+  if (role === "owner") return "propriétaire";
+  if (role === "member") return "membre";
+  return role;
 }
 
 function renderBody(text: string | null) {
@@ -302,7 +309,7 @@ export function CommunityView({
           .filter((r) => r.linked_user_id)
           .map((r) => ({
             userId: String(r.linked_user_id),
-            name: r.full_name || (r.handle ? `@${r.handle}` : "Creator"),
+            name: r.full_name || (r.handle ? `@${r.handle}` : fr ? "Créateur" : "Creator"),
             handle: (r.handle || "").replace(/^@/, ""),
             avatarUrl: r.avatar_url || null,
           })),
@@ -310,7 +317,7 @@ export function CommunityView({
     } catch {
       setCreatorOptions([]);
     }
-  }, [isCreator, userId]);
+  }, [isCreator, userId, fr]);
 
   useEffect(() => {
     void loadCommunities();
@@ -773,7 +780,7 @@ export function CommunityView({
                     {!createAvatar ? <CommunityGlyph size={32} color="#fff" /> : null}
                   </div>
                   <button type="button" style={secondaryBtn} onClick={() => createFileRef.current?.click()}>
-                    {fr ? "Uploader une photo" : "Upload a photo"}
+                    {fr ? "Importer une photo" : "Upload a photo"}
                   </button>
                   <input
                     ref={createFileRef}
@@ -948,7 +955,7 @@ export function CommunityView({
           <button type="button" className="cm-back" onClick={() => setScreen("chat")}>
             ← {fr ? "Retour au chat" : "Back to chat"}
           </button>
-          <h1 className="cm-title">{fr ? "Configuration" : "Settings"}</h1>
+          <h1 className="cm-title">{fr ? "Paramètres" : "Settings"}</h1>
           {error ? <p className="cm-error">{error}</p> : null}
 
           <div className="cm-panel">
@@ -963,7 +970,7 @@ export function CommunityView({
                 onChange={(e) => setEditMembersCanPost(e.target.checked)}
               />
               {fr
-                ? "Les membres (rôle Member) peuvent répondre — appliqué à tous les membres à l’enregistrement"
+                ? "Les membres (rôle Membre) peuvent répondre — appliqué à tous les membres à l’enregistrement"
                 : "Members (Member role) can reply — applied to all members on save"}
             </label>
             <button type="button" className="cm-btn" disabled={savingSettings} onClick={() => void saveSettings()}>
@@ -993,7 +1000,7 @@ export function CommunityView({
             <h2 className="cm-section-title">{fr ? "Membres & rôles" : "Members & roles"}</h2>
             <p className="cm-hint">
               {fr
-                ? "Admin peut toujours parler. Member : cochez « Peut parler » pour autoriser les messages."
+                ? "Les admins peuvent toujours parler. Membres : cochez « Peut parler » pour autoriser les messages."
                 : "Admins can always speak. Members: enable “Can speak” to allow messages."}
             </p>
             <ul className="cm-member-list">
@@ -1001,7 +1008,7 @@ export function CommunityView({
                 <li key={m.userId}>
                   <div className="cm-member-main">
                     <strong>{m.name}</strong>
-                    <span className={`cm-role-pill is-${m.role}`}>{m.role}</span>
+                    <span className={`cm-role-pill is-${m.role}`}>{roleLabel(m.role, fr)}</span>
                   </div>
                   {m.role !== "owner" ? (
                     <div className="cm-member-actions">
@@ -1010,7 +1017,7 @@ export function CommunityView({
                         onChange={(e) => void updateMember(m.userId, { role: e.target.value })}
                         aria-label={fr ? "Rôle" : "Role"}
                       >
-                        <option value="member">{fr ? "Member" : "Member"}</option>
+                        <option value="member">{fr ? "Membre" : "Member"}</option>
                         <option value="admin">Admin</option>
                       </select>
                       <label className="cm-check compact">
@@ -1072,12 +1079,12 @@ export function CommunityView({
                 </span>
                 <div>
                   <h2>{detail.name}</h2>
-                  <p>{detail.description || (fr ? `${members.length} membres` : `${members.length} members`)}</p>
+                  <p>{detail.description || (fr ? `${members.length} membre${members.length > 1 ? "s" : ""}` : `${members.length} members`)}</p>
                 </div>
               </div>
               {!isCreator ? (
                 <button type="button" className="cm-btn-secondary" onClick={() => setScreen("settings")}>
-                  {fr ? "Config" : "Settings"}
+                  {fr ? "Paramètres" : "Settings"}
                 </button>
               ) : null}
             </header>
@@ -1162,7 +1169,7 @@ export function CommunityView({
                         {hasText ? <div className="cm-bubble__text">{renderBody(m.body)}</div> : null}
 
                         <div className={`cm-bubble__meta${mediaOnly ? " on-media" : ""}`}>
-                          <time dateTime={m.createdAt}>{formatBubbleTime(m.createdAt)}</time>
+                          <time dateTime={m.createdAt}>{formatBubbleTime(m.createdAt, fr)}</time>
                         </div>
 
                         {canPost ? (
@@ -1323,7 +1330,7 @@ export function CommunityView({
                       className="cm-composer__input"
                       value={draft}
                       onChange={(e) => onDraftChange(e.target.value)}
-                      placeholder={fr ? "Envoyer un chat…" : "Send a chat…"}
+                      placeholder={fr ? "Envoyer un message…" : "Send a chat…"}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();

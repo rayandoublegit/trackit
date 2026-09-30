@@ -244,7 +244,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     if (!infoComplete) {
       setSaveError(
         lang === "fr"
-          ? "Remplis toutes les infos avant d'ajouter."
+          ? "Remplissez toutes les infos avant d'ajouter."
           : "Fill every field before adding.",
       );
       setHoldProgress(0);
@@ -252,7 +252,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
       return;
     }
     if (folders.length > 0 && !selectedFolderId) {
-      setSaveError(lang === "fr" ? "Choisis une liste." : "Choose a list.");
+      setSaveError(lang === "fr" ? "Choisissez une liste." : "Choose a list.");
       setHoldProgress(0);
       holdDone.current = false;
       return;
@@ -348,7 +348,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
     if (!infoComplete) {
       setSaveError(
         lang === "fr"
-          ? "Remplis toutes les infos pour continuer."
+          ? "Remplissez toutes les infos pour continuer."
           : "Fill every field to continue.",
       );
       return;
@@ -774,7 +774,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                   disabled={saving}
                   onClick={() => setPhase("info")}
                 >
-                  Add Info
+                  {lang === "fr" ? "Ajouter des infos" : "Add Info"}
                 </button>
               </div>
             </div>
@@ -804,10 +804,10 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                 <p className="ncm-model-hint">
                   {payoutModel === "rpm"
                     ? lang === "fr"
-                      ? "Prix pour un nombre de vues (ex. 1 € / 1 000 vues). Switch pour revenir à la commission."
+                      ? "Prix pour un nombre de vues (ex. 1 € / 1 000 vues). Repassez à la commission à tout moment."
                       : "Price for a number of views (e.g. €1 / 1,000 views). Switch back to commission anytime."
                     : lang === "fr"
-                      ? "Commission sur les ventes. Switch pour passer en RPM (vues)."
+                      ? "Commission sur les ventes. Passez au RPM (vues) à tout moment."
                       : "Commission on sales. Switch to RPM (views) anytime."}
                 </p>
 
@@ -911,7 +911,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                     inputMode="numeric"
                     value={followers}
                     onChange={(e) => setFollowers(e.target.value)}
-                    placeholder={lang === "fr" ? "Ex : 10M, 1.2B, 450000" : "e.g. 10M, 1.2B"}
+                    placeholder={lang === "fr" ? "Ex : 10M, 1.2M, 450000" : "e.g. 10M, 1.2B"}
                     className="ncm-field"
                     style={fieldStyle}
                     disabled={saving || showList}
@@ -919,7 +919,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>{lang === "fr" ? "Taux (%)" : "Rate (%)"} *</label>
+                  <label style={labelStyle}>{lang === "fr" ? "Taux d'engagement (%)" : "Rate (%)"} *</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -1014,7 +1014,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                             : "Adding…"
                           : holdProgress > 0 && holdProgress < 1
                             ? lang === "fr"
-                              ? `Maintiens… ${holdPct}%`
+                              ? `Maintenez… ${holdPct} %`
                               : `Hold… ${holdPct}%`
                             : lang === "fr"
                               ? "Maintenir pour ajouter"
@@ -1023,7 +1023,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
                     </button>
                     <p className="ncm-hold-hint">
                       {lang === "fr"
-                        ? "Maintiens le bouton jusqu'à la fin pour confirmer"
+                        ? "Maintenez le bouton jusqu'à ce qu'il se remplisse pour confirmer"
                         : "Keep holding until the button fills to confirm"}
                     </p>
                   </>
@@ -1044,7 +1044,7 @@ export function NewCreatorModal({ brandId }: { brandId?: string }) {
           {queue.length > 1 ? (
             <div style={{ marginTop: 10, textAlign: "center", fontSize: 12, color: "#6E6E6E" }}>
               {lang === "fr"
-                ? `+${queue.length - 1} autre(s) en attente`
+                ? `+${queue.length - 1} ${queue.length - 1 > 1 ? "autres" : "autre"} en attente`
                 : `+${queue.length - 1} more waiting`}
             </div>
           ) : null}
