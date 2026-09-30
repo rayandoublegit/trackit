@@ -260,6 +260,18 @@ export function CreatorApp({
     document.title = lang === "fr" ? "Trackit Créateurs" : "Trackit Creators";
   }, [lang]);
 
+  // Dark page behind the app too (overscroll, safe areas).
+  useEffect(() => {
+    const html = document.documentElement.style.background;
+    const body = document.body.style.background;
+    document.documentElement.style.background = "#0a0a0c";
+    document.body.style.background = "#0a0a0c";
+    return () => {
+      document.documentElement.style.background = html;
+      document.body.style.background = body;
+    };
+  }, []);
+
   return (
     <div className="ca" data-lang={lang}>
       <header className="ca-top">
