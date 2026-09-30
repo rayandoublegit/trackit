@@ -108,6 +108,26 @@ async function brandNames(admin: NonNullable<ReturnType<typeof getSupabaseAdmin>
 const BRAND_ACTIONS = new Set(["ship", "deliver", "approve", "request_changes"]);
 const CREATOR_ACTIONS = new Set(["accept", "decline", "sign", "deliver", "submit"]);
 
+type ContentLookup = { status?: string | null; storage_path?: string | null; kind?: string | null };
+
+/**
+ * One content row of a mission. Before migration 000045 the table has no
+ * position/kind columns: only slot 1 exists, found by mission alone.
+ */
+async function findContent(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  missionId: string,
+  position: number,
+  columns: string,
+): Promise<{ data: ContentLookup | null; error: { message: string } | null; legacy: boolean }> {
+  const res = await admin.from("gift_videos").select(columns).eq("mission_id", missionId).eq("position", position).maybeSingle();
+  if (!res.error || res.error.code !== "42703") return { data: (res.data as ContentLookup | null) ?? null, error: res.error, legacy: false };
+  if (position !== 1) return { data: null, error: null, legacy: true };
+  const legacyColumns = columns.split(",").map((c) => c.trim()).filter((c) => c !== "kind").join(", ");
+  const old = await admin.from("gift_videos").select(legacyColumns).eq("mission_id", missionId).maybeSingle();
+  return { data: (old.data as ContentLookup | null) ?? null, error: old.error, legacy: true };
+}
+
 export async function GET(request: NextRequest) {
   const actorId = await getAuthedActorId(request);
   if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -564,8 +584,12 @@ async function mediaOnMission(
     }
     const [campaign, existing] = await Promise.all([
       admin.from("gift_campaigns").select("video_count").eq("id", mission.campaign_id).maybeSingle(),
-      admin.from("gift_videos").select("status").eq("mission_id", mission.id).eq("position", position).maybeSingle(),
+      findContent(admin, mission.id, position, "status"),
     ]);
+    if (existing.legacy && position > 1) {
+      // Database not migrated yet (000045): a second file would overwrite the first.
+      return NextResponse.json({ error: "Only one content per mission is available for now." }, { status: 409 });
+    }
     if (position > giftExpectedCount(campaign.data?.video_count)) {
       return NextResponse.json({ error: "This campaign does not expect that many contents." }, { status: 400 });
     }
@@ -581,8 +605,7 @@ async function mediaOnMission(
   }
 
   if (!isCreator && !isBrand) return NextResponse.json({ error: "Access denied." }, { status: 403 });
-  const { data: content, error: contentError } = await admin.from("gift_videos")
-    .select("storage_path, kind").eq("mission_id", mission.id).eq("position", position).maybeSingle();
+  const { data: content, error: contentError } = await findContent(admin, mission.id, position, "storage_path, kind");
   if (contentError) return NextResponse.json({ error: contentError.message }, { status: 500 });
   if (!content?.storage_path || !isGiftContentPath(mission.id, content.storage_path)) {
     return NextResponse.json({ error: "No uploaded content." }, { status: 404 });
