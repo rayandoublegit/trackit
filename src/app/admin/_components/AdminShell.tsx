@@ -61,7 +61,7 @@ const NAV: { section: string; sectionFr: string; items: NavItem[] }[] = [
 function LangToggle() {
   const lang = useLang();
   return (
-    <div className="ad-seg" role="group" aria-label={lang === "fr" ? "Langue" : "Language"} style={{ marginLeft: "auto" }}>
+    <div className="tc-seg" role="group" aria-label={lang === "fr" ? "Langue" : "Language"} style={{ marginLeft: "auto" }}>
       {(["fr", "en"] as const).map((l) => (
         <button key={l} type="button" className={lang === l ? "is-on" : ""} aria-pressed={lang === l} onClick={() => setAppLang(l)}>
           {l.toUpperCase()}
@@ -90,10 +90,10 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
   const current = NAV.flatMap((s) => s.items).find(isActive);
 
   return (
-    <div className={`ad-shell${menuOpen ? " is-menu-open" : ""}`}>
-      <aside className="ad-side">
-        <Link href="/admin" className="ad-brand">
-          <span className="ad-brand__mark">T</span>
+    <div className={`tc-shell${menuOpen ? " is-menu-open" : ""}`}>
+      <aside className="tc-side">
+        <Link href="/admin" className="tc-brand">
+          <span className="tc-brand__mark">T</span>
           <span>
             <strong>Trackit</strong>
             <small>{fr ? "Console interne" : "Staff console"}</small>
@@ -101,10 +101,10 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
         </Link>
         <nav aria-label={fr ? "Administration" : "Admin"}>
           {NAV.map((section) => (
-            <div key={section.section} className="ad-nav__section">
+            <div key={section.section} className="tc-nav__section">
               <p>{fr ? section.sectionFr : section.section}</p>
               {section.items.map((item) => (
-                <Link key={item.href} href={item.href} className={`ad-nav__link${isActive(item) ? " is-active" : ""}`}>
+                <Link key={item.href} href={item.href} className={`tc-nav__link${isActive(item) ? " is-active" : ""}`}>
                   {item.icon}
                   <span>{fr ? item.labelFr : item.label}</span>
                 </Link>
@@ -112,13 +112,13 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="ad-side__foot">
-          <Link href="/dashboard" className="ad-nav__link">
+        <div className="tc-side__foot">
+          <Link href="/dashboard" className="tc-nav__link">
             <Icon d={<path d="M15 18l-6-6 6-6" />} />
             <span>{fr ? "Retour à l’app" : "Back to the app"}</span>
           </Link>
-          <div className="ad-me">
-            <span className="ad-me__dot" />
+          <div className="tc-me">
+            <span className="tc-me__dot" />
             <span>
               <strong>{me.email}</strong>
               <small>{me.role === "user" ? (fr ? "admin (liste)" : "admin (list)") : me.role}</small>
@@ -126,20 +126,20 @@ export function AdminShell({ me, children }: { me: Me; children: ReactNode }) {
           </div>
         </div>
       </aside>
-      {menuOpen ? <button type="button" className="ad-backdrop" aria-label={fr ? "Fermer le menu" : "Close menu"} onClick={() => setMenuOpen(false)} /> : null}
-      <div className="ad-main">
-        <div className="ad-topbar">
-          <button type="button" className="ad-burger" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
+      {menuOpen ? <button type="button" className="tc-backdrop" aria-label={fr ? "Fermer le menu" : "Close menu"} onClick={() => setMenuOpen(false)} /> : null}
+      <div className="tc-main">
+        <div className="tc-topbar">
+          <button type="button" className="tc-burger" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <path d="M4 7h16M4 12h16M4 17h16" />
             </svg>
           </button>
-          <span className="ad-crumb">
+          <span className="tc-crumb">
             Console <b>/</b> {current ? (fr ? current.labelFr : current.label) : fr ? "Administration" : "Admin"}
           </span>
           <LangToggle />
         </div>
-        <main className="ad-content">
+        <main className="tc-content">
           {children}
         </main>
       </div>

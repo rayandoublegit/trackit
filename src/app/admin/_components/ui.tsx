@@ -140,12 +140,12 @@ export function translateWarning(w: string, lang: Lang): string {
 
 export function PageHead({ title, lead, actions }: { title: string; lead?: string; actions?: ReactNode }) {
   return (
-    <header className="ad-head">
+    <header className="tc-head">
       <div>
         <h1>{title}</h1>
         {lead ? <p>{lead}</p> : null}
       </div>
-      {actions ? <div className="ad-head__actions">{actions}</div> : null}
+      {actions ? <div className="tc-head__actions">{actions}</div> : null}
     </header>
   );
 }
@@ -164,9 +164,9 @@ export function Card({
   delay?: number;
 }) {
   return (
-    <section className={`ad-card ${className}`} style={{ animationDelay: `${delay}ms` }}>
+    <section className={`tc-card ${className}`} style={{ animationDelay: `${delay}ms` }}>
       {title || aside ? (
-        <div className="ad-card__head">
+        <div className="tc-card__head">
           {title ? <h2>{title}</h2> : <span />}
           {aside}
         </div>
@@ -196,12 +196,12 @@ export function Kpi({
   const f = useAdminFormat();
   const fr = useLang() === "fr";
   return (
-    <div className={`ad-kpi${tone ? ` is-${tone}` : ""}`} style={{ animationDelay: `${delay}ms` }}>
-      <span className="ad-kpi__label">{label}</span>
-      <strong className="ad-kpi__value">
+    <div className={`tc-kpi${tone ? ` is-${tone}` : ""}`} style={{ animationDelay: `${delay}ms` }}>
+      <span className="tc-kpi__label">{label}</span>
+      <strong className="tc-kpi__value">
         {value === null || value === undefined ? "—" : <CountUp value={value} format={format ?? f.num} delayMs={delay} />}
       </strong>
-      <span className="ad-kpi__sub">
+      <span className="tc-kpi__sub">
         {trend !== undefined && trend !== null ? (
           <em className={trend >= 0 ? "is-up" : "is-down"}>
             {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}{fr ? " %" : "%"}
@@ -214,14 +214,14 @@ export function Kpi({
 }
 
 export function Pill({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "good" | "warn" | "bad" | "accent" }) {
-  return <span className={`ad-pill is-${tone}`}>{children}</span>;
+  return <span className={`tc-pill is-${tone}`}>{children}</span>;
 }
 
 export function Warnings({ items }: { items: string[] | undefined }) {
   const lang = useLang();
   if (!items || items.length === 0) return null;
   return (
-    <div className="ad-warn" role="status">
+    <div className="tc-warn" role="status">
       <strong>{lang === "fr" ? "Lectures incomplètes" : "Incomplete reads"}</strong>
       <ul>
         {items.map((w) => (
@@ -236,10 +236,10 @@ export function LoadState({ loading, error, onRetry }: { loading: boolean; error
   const fr = useLang() === "fr";
   if (error) {
     return (
-      <div className="ad-error" role="alert">
+      <div className="tc-error" role="alert">
         <strong>{fr ? "Chargement impossible" : "Could not load"}</strong>
         <p>{error}</p>
-        <button type="button" className="ad-btn" onClick={onRetry}>
+        <button type="button" className="tc-btn" onClick={onRetry}>
           {fr ? "Réessayer" : "Retry"}
         </button>
       </div>
@@ -247,7 +247,7 @@ export function LoadState({ loading, error, onRetry }: { loading: boolean; error
   }
   if (loading) {
     return (
-      <div className="ad-skeleton" aria-label={fr ? "Chargement" : "Loading"}>
+      <div className="tc-skeleton" aria-label={fr ? "Chargement" : "Loading"}>
         {[0, 1, 2, 3].map((i) => (
           <span key={i} style={{ animationDelay: `${i * 0.1}s` }} />
         ))}
@@ -258,14 +258,14 @@ export function LoadState({ loading, error, onRetry }: { loading: boolean; error
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="ad-empty">{children}</p>;
+  return <p className="tc-empty">{children}</p>;
 }
 
 export function RefreshButton({ onClick, loading }: { onClick: () => void; loading?: boolean }) {
   const fr = useLang() === "fr";
   return (
-    <button type="button" className="ad-btn" onClick={onClick} disabled={loading}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className={loading ? "ad-spin" : ""}>
+    <button type="button" className="tc-btn" onClick={onClick} disabled={loading}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className={loading ? "tc-spin" : ""}>
         <path d="M20 11a8 8 0 10-2.3 5.7M20 4v7h-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       {fr ? "Actualiser" : "Refresh"}

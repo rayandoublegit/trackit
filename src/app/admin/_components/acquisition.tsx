@@ -18,7 +18,7 @@ export function AcquisitionSection({ acquisition }: { acquisition: OverviewData[
   const { num, pct } = useAdminFormat();
 
   const toggle = (
-    <div className="ad-seg" role="group" aria-label={t("Period", "Période")}>
+    <div className="tc-seg" role="group" aria-label={t("Period", "Période")}>
       {(
         [
           ["d30", t("30 days", "30 jours")],
@@ -44,7 +44,7 @@ export function AcquisitionSection({ acquisition }: { acquisition: OverviewData[
   const total = f.total;
 
   return (
-    <div className="ad-grid ad-grid--wide">
+    <div className="tc-grid tc-grid--wide">
       <Card title={t("Funnel by source · brands", "Funnel par source · marques")} aside={toggle}>
         {total.signups === 0 ? (
           <Empty>{t("No brand signup in this period.", "Aucune inscription de marque sur cette période.")}</Empty>
@@ -57,29 +57,29 @@ export function AcquisitionSection({ acquisition }: { acquisition: OverviewData[
                 { label: t("Paying", "Payants"), value: total.paying },
               ]}
             />
-            <div className="ad-table-wrap" style={{ marginTop: 16 }}>
-              <table className="ad-table">
+            <div className="tc-table-wrap" style={{ marginTop: 16 }}>
+              <table className="tc-table">
                 <thead>
                   <tr>
                     <th>{t("Source", "Source")}</th>
-                    <th className="ad-num">{t("Signups", "Inscrits")}</th>
-                    <th className="ad-num">{t("Onboarded", "Onboardés")}</th>
-                    <th className="ad-num">{t("Signup → onb.", "Inscr. → onb.")}</th>
-                    <th className="ad-num">{t("Paying", "Payants")}</th>
-                    <th className="ad-num">{t("Onb. → paying", "Onb. → payant")}</th>
-                    <th className="ad-num">{t("Signup → paying", "Inscr. → payant")}</th>
+                    <th className="tc-num">{t("Signups", "Inscrits")}</th>
+                    <th className="tc-num">{t("Onboarded", "Onboardés")}</th>
+                    <th className="tc-num">{t("Signup → onb.", "Inscr. → onb.")}</th>
+                    <th className="tc-num">{t("Paying", "Payants")}</th>
+                    <th className="tc-num">{t("Onb. → paying", "Onb. → payant")}</th>
+                    <th className="tc-num">{t("Signup → paying", "Inscr. → payant")}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...f.bySource, total].map((r) => (
                     <tr key={r.key} style={r.key === "all" ? { fontWeight: 700 } : undefined}>
                       <td>{channelLabel(r.key, lang)}</td>
-                      <td className="ad-num">{num(r.signups)}</td>
-                      <td className="ad-num">{num(r.onboarded)}</td>
-                      <td className="ad-num">{pct(r.onboardRatePct)}</td>
-                      <td className="ad-num">{num(r.paying)}</td>
-                      <td className="ad-num">{pct(r.payFromOnboardedPct)}</td>
-                      <td className="ad-num">{pct(r.payRatePct)}</td>
+                      <td className="tc-num">{num(r.signups)}</td>
+                      <td className="tc-num">{num(r.onboarded)}</td>
+                      <td className="tc-num">{pct(r.onboardRatePct)}</td>
+                      <td className="tc-num">{num(r.paying)}</td>
+                      <td className="tc-num">{pct(r.payFromOnboardedPct)}</td>
+                      <td className="tc-num">{pct(r.payRatePct)}</td>
                     </tr>
                   ))}
                 </tbody>

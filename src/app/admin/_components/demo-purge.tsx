@@ -59,7 +59,7 @@ export function DemoPurgeCard() {
     <Card
       title={t("Demo data in real accounts", "Données de démo dans les vrais comptes")}
       aside={
-        <button type="button" className="ad-btn ad-btn--danger" disabled={busy || scan.loading || total === 0 || Boolean(result)} onClick={() => void purge()}>
+        <button type="button" className="tc-btn tc-btn--danger" disabled={busy || scan.loading || total === 0 || Boolean(result)} onClick={() => void purge()}>
           {busy ? t("Deleting…", "Suppression…") : t("Delete all demo data", "Supprimer toutes les données de démo")}
         </button>
       }
@@ -71,9 +71,9 @@ export function DemoPurgeCard() {
         )}
       </p>
       {!report ? <LoadState loading={scan.loading} error={scan.error} onRetry={scan.reload} /> : null}
-      {failure ? <div className="ad-error" role="alert"><p>{failure}</p></div> : null}
+      {failure ? <div className="tc-error" role="alert"><p>{failure}</p></div> : null}
       {result ? (
-        <div className="ad-warn" role="status" style={{ marginBottom: 12 }}>
+        <div className="tc-warn" role="status" style={{ marginBottom: 12 }}>
           <strong>{t(`Deleted ${num(total)} rows.`, `${num(total)} lignes supprimées.`)}</strong>
           {result.errors.length ? <ul>{result.errors.map((e) => <li key={e}>{e}</li>)}</ul> : null}
         </div>
@@ -82,11 +82,11 @@ export function DemoPurgeCard() {
         total === 0 ? (
           <Empty>{t("No demo data left. Everything shown is real.", "Plus aucune donnée de démo. Tout ce qui s’affiche est réel.")}</Empty>
         ) : (
-          <div className="ad-facts">
+          <div className="tc-facts">
             {(Object.keys(TABLE_LABEL) as PurgeTable[])
               .filter((k) => report.counts[k] > 0)
               .map((k) => (
-                <div className="ad-fact" key={k}>
+                <div className="tc-fact" key={k}>
                   <span>{TABLE_LABEL[k][lang]}</span>
                   <strong>{num(report.counts[k])}</strong>
                 </div>
@@ -95,7 +95,7 @@ export function DemoPurgeCard() {
         )
       ) : null}
       {report && !result && report.errors.length ? (
-        <div className="ad-warn" role="status" style={{ marginTop: 12 }}>
+        <div className="tc-warn" role="status" style={{ marginTop: 12 }}>
           <ul>{report.errors.map((e) => <li key={e}>{e}</li>)}</ul>
         </div>
       ) : null}

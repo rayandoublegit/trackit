@@ -42,7 +42,7 @@ export default function AdminOverviewPage() {
       {data ? (
         <>
           <Warnings items={data.warnings} />
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi label={t("Estimated MRR", "MRR estimé")} value={data.paying.mrrEstimate} format={(n) => eur(n)} tone="accent" sub={<>{num(data.paying.count)} {t("paying", "payants")}</>} />
             <Kpi
               label={t("Users", "Utilisateurs")}
@@ -79,11 +79,11 @@ export default function AdminOverviewPage() {
 
           <AcquisitionSection acquisition={data.acquisition} />
 
-          <div className="ad-grid ad-grid--wide">
+          <div className="tc-grid tc-grid--wide">
             <Card
               title={t("Tracked revenue, last 30 days", "CA suivi, 30 derniers jours")}
               aside={
-                <Link className="ad-btn" href="/admin/activity">
+                <Link className="tc-btn" href="/admin/activity">
                   {t("Details", "Détails")}
                 </Link>
               }
@@ -99,7 +99,7 @@ export default function AdminOverviewPage() {
               {data.attention.length === 0 ? (
                 <Empty>{t("Nothing urgent. Everything read without errors.", "Rien d’urgent. Tout a été lu sans erreur.")}</Empty>
               ) : (
-                <ul className="ad-attn">
+                <ul className="tc-attn">
                   {data.attention.map((a, i) => (
                     <li key={`${a.kind}-${a.label}`}>
                       <Link href={a.href} style={{ animationDelay: `${i * 60}ms` }}>
@@ -114,14 +114,14 @@ export default function AdminOverviewPage() {
             </Card>
           </div>
 
-          <div className="ad-grid ad-grid--3">
+          <div className="tc-grid tc-grid--3">
             <Card title={t("Signups per day", "Inscriptions par jour")} delay={200}>
               {data.users.signups ? <Bars series={data.users.signups} format={(n) => `${num(n)} ${t("signups", "inscriptions")}`} height={130} /> : <Empty>—</Empty>}
             </Card>
             <Card
               title={t("Subscribers by plan", "Abonnés par offre")}
               aside={
-                <Link className="ad-btn" href="/admin/revenue">
+                <Link className="tc-btn" href="/admin/revenue">
                   {t("Revenue", "Revenus")}
                 </Link>
               }
@@ -138,22 +138,22 @@ export default function AdminOverviewPage() {
               )}
             </Card>
             <Card title={t("Comped accounts", "Comptes offerts")} delay={280}>
-              <div className="ad-facts">
-                <div className="ad-fact">
+              <div className="tc-facts">
+                <div className="tc-fact">
                   <span>{t("Active comped access", "Accès offerts actifs")}</span>
                   <strong>{num(data.paying.comped)}</strong>
                 </div>
-                <div className="ad-fact">
+                <div className="tc-fact">
                   <span>{t("Paying share", "Part de payants")}</span>
                   <strong>
                     {data.users.total && data.paying.count !== null ? pct((data.paying.count / data.users.total) * 100) : "—"}
                   </strong>
                 </div>
-                <div className="ad-fact">
+                <div className="tc-fact">
                   <span>{t("Active today", "Actifs aujourd’hui")}</span>
                   <strong>{num(data.active.d1)}</strong>
                 </div>
-                <div className="ad-fact">
+                <div className="tc-fact">
                   <span>{t("Active 30d", "Actifs 30 j")}</span>
                   <strong>{num(data.active.d30)}</strong>
                 </div>

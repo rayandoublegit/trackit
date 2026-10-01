@@ -13,12 +13,12 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <>
-      <table className="ad-table">
+      <table className="tc-table">
         <thead>
           <tr>
             <th>{t("Request", "Demande")}</th>
-            <th className="ad-num">{t("Times", "Fois")}</th>
-            <th className="ad-num">{t("Last", "Dernière")}</th>
+            <th className="tc-num">{t("Times", "Fois")}</th>
+            <th className="tc-num">{t("Last", "Dernière")}</th>
           </tr>
         </thead>
         <tbody>
@@ -32,19 +32,19 @@ function GroupTable({ rows, empty, prefix = "" }: { rows: RequestGroup[] | null;
                   </span>
                   {r.count >= 5 ? <Pill tone="warn">{t("high demand", "forte demande")}</Pill> : null}
                 </div>
-                <div className="ad-barlist__track" style={{ marginTop: 6 }}>
+                <div className="tc-barlist__track" style={{ marginTop: 6 }}>
                   <span style={{ ["--w" as string]: `${(r.count / max) * 100}%` }} />
                 </div>
               </td>
-              <td className="ad-num">{num(r.count)}</td>
-              <td className="ad-num">{ago(r.last)}</td>
+              <td className="tc-num">{num(r.count)}</td>
+              <td className="tc-num">{ago(r.last)}</td>
             </tr>
           ))}
         </tbody>
       </table>
       {rows.length > limit ? (
         <div style={{ padding: 12, display: "flex", justifyContent: "center" }}>
-          <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 30)}>
+          <button type="button" className="tc-btn" onClick={() => setLimit((l) => l + 30)}>
             {t("Show more", "Voir plus")} ({num(rows.length - limit)})
           </button>
         </div>
@@ -73,7 +73,7 @@ export default function AdminRequestsPage() {
       {data ? (
         <>
           <Warnings items={data.warnings} />
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi
               label={t("Requested niches", "Niches demandées")}
               value={total(data.niches)}
@@ -88,28 +88,28 @@ export default function AdminRequestsPage() {
             />
             <Kpi label={t("v2 waitlist", "Liste d’attente v2")} value={data.waitlist?.length ?? null} delay={120} />
           </div>
-          <div className="ad-grid ad-grid--2">
-            <Card title={t("Missing niches", "Niches manquantes")} className="ad-card--flush" delay={80}>
+          <div className="tc-grid tc-grid--2">
+            <Card title={t("Missing niches", "Niches manquantes")} className="tc-card--flush" delay={80}>
               <GroupTable rows={data.niches} empty={t("No niches requested.", "Aucune niche demandée.")} />
             </Card>
-            <Card title={t("Creator searches with no result", "Recherches de créateurs sans résultat")} className="ad-card--flush" delay={120}>
+            <Card title={t("Creator searches with no result", "Recherches de créateurs sans résultat")} className="tc-card--flush" delay={120}>
               <GroupTable rows={data.lookups} empty={t("No searches without results.", "Aucune recherche sans résultat.")} prefix="@" />
             </Card>
           </div>
-          <Card title={t("v2 waitlist", "Liste d’attente v2")} className="ad-card--flush" delay={160}>
+          <Card title={t("v2 waitlist", "Liste d’attente v2")} className="tc-card--flush" delay={160}>
             {data.waitlist === null ? (
               <Empty>{t("Table could not be read.", "La table n’a pas pu être lue.")}</Empty>
             ) : data.waitlist.length === 0 ? (
               <Empty>{t("Nobody on the list yet.", "Personne sur la liste pour l’instant.")}</Empty>
             ) : (
-              <div className="ad-table-wrap">
-                <table className="ad-table">
+              <div className="tc-table-wrap">
+                <table className="tc-table">
                   <thead>
                     <tr>
                       <th>{t("First name", "Prénom")}</th>
                       <th>{t("Email", "E-mail")}</th>
                       <th>{t("Expectations", "Attentes")}</th>
-                      <th className="ad-num">{t("Joined", "Inscription")}</th>
+                      <th className="tc-num">{t("Joined", "Inscription")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -118,7 +118,7 @@ export default function AdminRequestsPage() {
                         <td>{w.first_name ?? "—"}</td>
                         <td>{w.email}</td>
                         <td style={{ color: "var(--ad-muted)" }}>{w.expectations ?? "—"}</td>
-                        <td className="ad-num">{dateFr(w.created_at)}</td>
+                        <td className="tc-num">{dateFr(w.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>

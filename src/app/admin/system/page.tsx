@@ -87,7 +87,7 @@ export default function AdminSystemPage() {
       {!data ? <LoadState loading={system.loading} error={system.error} onRetry={system.reload} /> : null}
       {data ? (
         <>
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi
               label={tr("Connected services", "Services connectés")}
               value={data.env.length - envKo.length}
@@ -110,10 +110,10 @@ export default function AdminSystemPage() {
               }
             />
             <Kpi label={tr("Tables with errors", "Tables en erreur")} value={failing.length} delay={120} tone={failing.length ? "warn" : undefined} />
-            <div className="ad-kpi" style={{ animationDelay: "180ms" }}>
-              <span className="ad-kpi__label">{tr("Deployment", "Déploiement")}</span>
-              <strong className="ad-kpi__value" style={{ fontSize: 20 }}>{data.deploy.commit ?? tr("local", "local")}</strong>
-              <span className="ad-kpi__sub">
+            <div className="tc-kpi" style={{ animationDelay: "180ms" }}>
+              <span className="tc-kpi__label">{tr("Deployment", "Déploiement")}</span>
+              <strong className="tc-kpi__value" style={{ fontSize: 20 }}>{data.deploy.commit ?? tr("local", "local")}</strong>
+              <span className="tc-kpi__sub">
                 {data.deploy.environment}
                 {data.deploy.branch ? ` · ${data.deploy.branch}` : ""}
                 {data.deploy.region ? ` · ${data.deploy.region}` : ""}
@@ -122,7 +122,7 @@ export default function AdminSystemPage() {
           </div>
 
           <Card title={tr("Services", "Services")} delay={80}>
-            <ul className="ad-checks">
+            <ul className="tc-checks">
               {data.env.map((e, i) => (
                 <li key={e.key} style={{ animationDelay: `${i * 30}ms` }}>
                   <i className={e.ok ? "is-ok" : "is-ko"}>{e.ok ? "✓" : "!"}</i>
@@ -134,7 +134,7 @@ export default function AdminSystemPage() {
           </Card>
 
           <Card title={tr("Tables", "Tables")} delay={120}>
-            <ul className="ad-checks">
+            <ul className="tc-checks">
               {data.tables.map((t, i) => (
                 <li key={t.table} style={{ animationDelay: `${i * 25}ms` }}>
                   <i className={t.missing || t.error ? "is-ko" : "is-ok"}>{t.missing || t.error ? "!" : "✓"}</i>
@@ -162,7 +162,7 @@ export default function AdminSystemPage() {
         </>
       ) : null}
 
-      <Card title={tr("Audit log", "Journal d’audit")} className="ad-card--flush" delay={160}>
+      <Card title={tr("Audit log", "Journal d’audit")} className="tc-card--flush" delay={160}>
         {audit.data?.missing ? (
           <div style={{ padding: 16 }}>
             <Pill tone="warn">{tr("admin_audit_log table missing", "Table admin_audit_log absente")}</Pill>
@@ -185,8 +185,8 @@ export default function AdminSystemPage() {
         ) : audit.data.entries.length === 0 ? (
           <Empty>{tr("No staff actions recorded.", "Aucune action de l’équipe enregistrée.")}</Empty>
         ) : (
-          <div className="ad-table-wrap">
-            <table className="ad-table">
+          <div className="tc-table-wrap">
+            <table className="tc-table">
               <thead>
                 <tr>
                   <th>{tr("When", "Quand")}</th>

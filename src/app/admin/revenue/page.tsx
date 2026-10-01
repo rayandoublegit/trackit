@@ -58,7 +58,7 @@ export default function AdminRevenuePage() {
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
       {data && m ? (
         <>
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi label="MRR" value={m.mrr} format={(n) => eur(n)} tone="accent" sub={<>ARR {eur(m.arr)}</>} />
             <Kpi label={t("Active subscribers", "Abonnés actifs")} value={m.activeSubscribers} delay={60} sub={<>{num(m.trialing)} {t("trialing", "en essai")}</>} />
             <Kpi label={t("New this month", "Nouveaux ce mois-ci")} value={m.newThisMonth} delay={120} tone="good" />
@@ -74,7 +74,7 @@ export default function AdminRevenuePage() {
             <Kpi label={t("Estimated LTV", "LTV estimée")} value={g?.ltv ?? null} format={(n) => eur(n)} delay={360} sub="ARPU ÷ churn" />
           </div>
 
-          <div className="ad-grid ad-grid--3">
+          <div className="tc-grid tc-grid--3">
             <Card title={t("MRR by plan", "MRR par offre")} delay={80}>
               {Object.keys(m.mrrByPlan).length === 0 ? (
                 <Empty>{t("No recurring revenue.", "Aucun revenu récurrent.")}</Empty>
@@ -110,7 +110,7 @@ export default function AdminRevenuePage() {
             </Card>
           </div>
 
-          <div className="ad-grid ad-grid--wide">
+          <div className="tc-grid tc-grid--wide">
             <Card title={t("MRR added per month", "MRR ajouté par mois")} delay={200}>
               {g && g.monthly.length > 0 ? (
                 <>
@@ -119,22 +119,22 @@ export default function AdminRevenuePage() {
                     format={(n) => eur(n)}
                     height={150}
                   />
-                  <table className="ad-table" style={{ marginTop: 12 }}>
+                  <table className="tc-table" style={{ marginTop: 12 }}>
                     <thead>
                       <tr>
                         <th>{t("Month", "Mois")}</th>
-                        <th className="ad-num">{t("New", "Nouveaux")}</th>
-                        <th className="ad-num">{t("Canceled", "Résiliés")}</th>
-                        <th className="ad-num">{t("MRR added", "MRR ajouté")}</th>
+                        <th className="tc-num">{t("New", "Nouveaux")}</th>
+                        <th className="tc-num">{t("Canceled", "Résiliés")}</th>
+                        <th className="tc-num">{t("MRR added", "MRR ajouté")}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {g.monthly.map((p) => (
                         <tr key={p.month}>
                           <td>{monthLabel(p.month, lang)}</td>
-                          <td className="ad-num">{num(p.newSubs)}</td>
-                          <td className="ad-num">{num(p.canceledSubs)}</td>
-                          <td className="ad-num">{eur(p.netMrrAdded)}</td>
+                          <td className="tc-num">{num(p.newSubs)}</td>
+                          <td className="tc-num">{num(p.canceledSubs)}</td>
+                          <td className="tc-num">{eur(p.netMrrAdded)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -160,21 +160,21 @@ export default function AdminRevenuePage() {
           <Card
             title={t("Unpaid invoices", "Factures impayées")}
             aside={<Pill tone={data.ops.failedPayments.length ? "warn" : "good"}>{num(data.ops.failedPayments.length)}</Pill>}
-            className="ad-card--flush"
+            className="tc-card--flush"
             delay={280}
           >
             {data.ops.failedPayments.length === 0 ? (
               <Empty>{t("No pending invoices.", "Aucune facture en attente.")}</Empty>
             ) : (
-              <div className="ad-table-wrap">
-                <table className="ad-table">
+              <div className="tc-table-wrap">
+                <table className="tc-table">
                   <thead>
                     <tr>
                       <th>{t("Customer", "Client")}</th>
                       <th>{t("Issued", "Émise le")}</th>
                       <th>{t("Status", "Statut")}</th>
-                      <th className="ad-num">{t("Amount due", "Montant dû")}</th>
-                      <th className="ad-num">{t("Link", "Lien")}</th>
+                      <th className="tc-num">{t("Amount due", "Montant dû")}</th>
+                      <th className="tc-num">{t("Link", "Lien")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -185,8 +185,8 @@ export default function AdminRevenuePage() {
                         <td>
                           <Pill tone="warn">{invoiceStatus(f.status ?? "open", lang)}</Pill>
                         </td>
-                        <td className="ad-num">{eur(f.amountDue, 2)}</td>
-                        <td className="ad-num">
+                        <td className="tc-num">{eur(f.amountDue, 2)}</td>
+                        <td className="tc-num">
                           {f.hostedUrl ? (
                             <a href={f.hostedUrl} target="_blank" rel="noopener noreferrer">
                               {t("Open", "Ouvrir")}

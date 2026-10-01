@@ -30,7 +30,7 @@ export default function AdminActivityPage() {
       {data ? (
         <>
           <Warnings items={data.warnings} />
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi
               label={t("Tracked revenue (30d)", "CA suivi (30 j)")}
               value={data.sales?.revenue ?? null}
@@ -44,7 +44,7 @@ export default function AdminActivityPage() {
             <Kpi label={t("Gifting missions", "Missions gifting")} value={data.gifting ? giftTotal : null} delay={240} />
           </div>
 
-          <div className="ad-grid ad-grid--wide">
+          <div className="tc-grid tc-grid--wide">
             <Card title={t("Tracked sales per day", "Ventes suivies par jour")} delay={80}>
               {data.sales ? (
                 <AreaChart series={data.sales.series} format={(n) => eur(n)} height={210} />
@@ -64,7 +64,7 @@ export default function AdminActivityPage() {
             </Card>
           </div>
 
-          <div className="ad-grid ad-grid--3">
+          <div className="tc-grid tc-grid--3">
             <Card title={t("Campaigns by status", "Campagnes par statut")} delay={160}>
               {data.campaigns && data.campaigns.byStatus.length > 0 ? (
                 <Donut
@@ -100,7 +100,7 @@ export default function AdminActivityPage() {
             </Card>
           </div>
 
-          <div className="ad-grid ad-grid--3">
+          <div className="tc-grid tc-grid--3">
             <Card title={t("Campaigns created per day", "Campagnes créées par jour")} delay={280}>
               {data.campaigns ? <Bars series={data.campaigns.created} format={(n) => `${num(n)} ${t("campaigns", "campagnes")}`} /> : <Empty>—</Empty>}
             </Card>

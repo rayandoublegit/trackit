@@ -23,7 +23,7 @@ export function AreaChart({
   color?: string;
 }) {
   const lang = useLang();
-  const gid = `ad-area-${useId().replace(/:/g, "")}`;
+  const gid = `tc-area-${useId().replace(/:/g, "")}`;
   const [hover, setHover] = useState<number | null>(null);
   const w = 600;
   const h = height;
@@ -37,8 +37,8 @@ export function AreaChart({
 
   if (series.length === 0) return null;
   return (
-    <div className="ad-chart">
-      <div className="ad-chart__plot" style={{ height }}>
+    <div className="tc-chart">
+      <div className="tc-chart__plot" style={{ height }}>
         <svg
           viewBox={`0 0 ${w} ${h}`}
           preserveAspectRatio="none"
@@ -58,26 +58,26 @@ export function AreaChart({
             </linearGradient>
           </defs>
           {[0.25, 0.5, 0.75].map((f) => (
-            <line key={f} x1={0} x2={w} y1={h * f} y2={h * f} className="ad-chart__grid" />
+            <line key={f} x1={0} x2={w} y1={h * f} y2={h * f} className="tc-chart__grid" />
           ))}
-          <path d={area} fill={`url(#${gid})`} className="ad-chart__area" />
-          <path d={line} fill="none" stroke={color} className="ad-chart__line" pathLength={1} />
-          {hover !== null ? <line x1={pts[hover][0]} x2={pts[hover][0]} y1={0} y2={h} className="ad-chart__cursor" /> : null}
+          <path d={area} fill={`url(#${gid})`} className="tc-chart__area" />
+          <path d={line} fill="none" stroke={color} className="tc-chart__line" pathLength={1} />
+          {hover !== null ? <line x1={pts[hover][0]} x2={pts[hover][0]} y1={0} y2={h} className="tc-chart__cursor" /> : null}
         </svg>
         {active ? (
           <span
-            className={`ad-chart__dot${hover === null ? " is-pulse" : ""}`}
+            className={`tc-chart__dot${hover === null ? " is-pulse" : ""}`}
             style={{ left: `${(active[0] / w) * 100}%`, top: `${(active[1] / h) * 100}%`, borderColor: color }}
           />
         ) : null}
         {hover !== null ? (
-          <div className="ad-chart__tip" style={{ left: `${(pts[hover][0] / w) * 100}%` }}>
+          <div className="tc-chart__tip" style={{ left: `${(pts[hover][0] / w) * 100}%` }}>
             <span>{dayLabel(series[hover].day, lang)}</span>
             <strong>{format(series[hover].value)}</strong>
           </div>
         ) : null}
       </div>
-      <div className="ad-chart__axis">
+      <div className="tc-chart__axis">
         <span>{dayLabel(series[0].day, lang)}</span>
         <span>{dayLabel(series[Math.floor(series.length / 2)].day, lang)}</span>
         <span>{dayLabel(series[series.length - 1].day, lang)}</span>
@@ -90,7 +90,7 @@ export function Bars({ series, format, height = 120 }: { series: DayPoint[]; for
   const lang = useLang();
   const max = Math.max(1, ...series.map((p) => p.value));
   return (
-    <div className="ad-bars" style={{ height }}>
+    <div className="tc-bars" style={{ height }}>
       {series.map((p, i) => (
         <span
           key={p.day}
@@ -113,14 +113,14 @@ export function BarList({
 }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
-    <ul className="ad-barlist">
+    <ul className="tc-barlist">
       {items.map((item, i) => (
         <li key={item.key} style={{ animationDelay: `${i * 50}ms` }}>
-          <div className="ad-barlist__row">
+          <div className="tc-barlist__row">
             <span>{labelOf(item.key)}</span>
             <strong>{format(item.value)}</strong>
           </div>
-          <div className="ad-barlist__track">
+          <div className="tc-barlist__track">
             <span style={{ ["--w" as string]: `${(item.value / max) * 100}%`, animationDelay: `${100 + i * 60}ms` }} />
           </div>
           {item.hint ? <small>{item.hint}</small> : null}
@@ -147,10 +147,10 @@ export function Donut({
   const c = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <div className="ad-donut">
-      <div className="ad-donut__ring">
+    <div className="tc-donut">
+      <div className="tc-donut__ring">
         <svg viewBox="0 0 100 100" aria-hidden>
-          <circle cx="50" cy="50" r={r} className="ad-donut__track" />
+          <circle cx="50" cy="50" r={r} className="tc-donut__track" />
           {total > 0
             ? parts.map((p, i) => {
                 const len = (p.value / total) * c;
@@ -163,7 +163,7 @@ export function Donut({
                     stroke={DONUT_COLORS[i % DONUT_COLORS.length]}
                     strokeDasharray={`${len} ${c - len}`}
                     strokeDashoffset={-offset}
-                    className="ad-donut__seg"
+                    className="tc-donut__seg"
                     style={{ animationDelay: `${i * 120}ms` }}
                   />
                 );
@@ -173,13 +173,13 @@ export function Donut({
             : null}
         </svg>
         {center ? (
-          <div className="ad-donut__center">
+          <div className="tc-donut__center">
             <strong>{center.value}</strong>
             <span>{center.label}</span>
           </div>
         ) : null}
       </div>
-      <ul className="ad-legend">
+      <ul className="tc-legend">
         {parts.map((p, i) => (
           <li key={p.key}>
             <i style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />
@@ -196,10 +196,10 @@ export function Funnel({ steps }: { steps: { label: string; value: number }[] })
   const fr = useLang() === "fr";
   const top = Math.max(1, steps[0]?.value ?? 1);
   return (
-    <ol className="ad-funnel">
+    <ol className="tc-funnel">
       {steps.map((s, i) => (
         <li key={s.label} style={{ animationDelay: `${i * 90}ms` }}>
-          <div className="ad-funnel__bar" style={{ ["--w" as string]: `${Math.max(4, (s.value / top) * 100)}%` }}>
+          <div className="tc-funnel__bar" style={{ ["--w" as string]: `${Math.max(4, (s.value / top) * 100)}%` }}>
             <span>{s.label}</span>
             <strong>{new Intl.NumberFormat(fr ? "fr-FR" : "en-US").format(s.value)}</strong>
           </div>

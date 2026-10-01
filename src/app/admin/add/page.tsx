@@ -157,7 +157,7 @@ export default function AddCreatorPage() {
   const pending = rows.filter((r) => r.handle.trim()).length;
 
   return (
-    <div className="ad-card" style={{ maxWidth: 640, width: "100%", padding: 24, color: "var(--ad-text)" }}>
+    <div className="tc-card" style={{ maxWidth: 640, width: "100%", padding: 24, color: "var(--ad-text)" }}>
       <h1 style={{ fontSize: 22, marginBottom: 4, letterSpacing: "-0.03em" }}>{t("Add creators", "Ajouter des créateurs")}</h1>
       <p style={{ color: "var(--ad-muted)", fontSize: 13, marginBottom: 20 }}>
         {fr ? (

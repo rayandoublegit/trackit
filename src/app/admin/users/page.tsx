@@ -28,7 +28,7 @@ function Avatar({ name }: { name: string }) {
     .join("");
   const h = hueOf(name);
   return (
-    <span className="ad-avatar" style={{ background: `linear-gradient(135deg, hsl(${h} 70% 62%), hsl(${(h + 40) % 360} 65% 48%))` }} aria-hidden>
+    <span className="tc-avatar" style={{ background: `linear-gradient(135deg, hsl(${h} 70% 62%), hsl(${(h + 40) % 360} 65% 48%))` }} aria-hidden>
       {initials || "?"}
     </span>
   );
@@ -101,10 +101,10 @@ export default function AdminUsersPage() {
       />
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
       {data ? (
-        <Card className="ad-card--flush">
-          <div className="ad-toolbar">
+        <Card className="tc-card--flush">
+          <div className="tc-toolbar">
             <input
-              className="ad-input"
+              className="tc-input"
               placeholder={t("Search an email, a name, an ID…", "Rechercher un e-mail, un nom, un ID…")}
               value={query}
               onChange={(e) => {
@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
               }}
               aria-label={t("Search users", "Rechercher des utilisateurs")}
             />
-            <div className="ad-seg" role="group" aria-label={t("Account type", "Type de compte")}>
+            <div className="tc-seg" role="group" aria-label={t("Account type", "Type de compte")}>
               {(
                 [
                   ["all", t("All", "Tous")],
@@ -126,7 +126,7 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <div className="ad-seg" role="group" aria-label={t("Billing", "Facturation")}>
+            <div className="tc-seg" role="group" aria-label={t("Billing", "Facturation")}>
               {(
                 [
                   ["all", `${t("All", "Tous")} (${num(data.users.length)})`],
@@ -140,14 +140,14 @@ export default function AdminUsersPage() {
                 </button>
               ))}
             </div>
-            <select className="ad-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t("Sort", "Trier")}>
+            <select className="tc-select" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={t("Sort", "Trier")}>
               <option value="recent">{t("Most recent", "Plus récents")}</option>
               <option value="name">{t("Name A-Z", "Nom A-Z")}</option>
               <option value="plan">{t("Highest plan", "Offre la plus haute")}</option>
             </select>
           </div>
-          <div className="ad-table-wrap">
-            <table className="ad-table">
+          <div className="tc-table-wrap">
+            <table className="tc-table">
               <thead>
                 <tr>
                   <th>{t("Account", "Compte")}</th>
@@ -155,7 +155,7 @@ export default function AdminUsersPage() {
                   <th>{t("Plan", "Offre")}</th>
                   <th>{t("Billing", "Facturation")}</th>
                   <th>{t("Role", "Rôle")}</th>
-                  <th className="ad-num">{t("Joined", "Inscription")}</th>
+                  <th className="tc-num">{t("Joined", "Inscription")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -167,7 +167,7 @@ export default function AdminUsersPage() {
                     onClick={() => setOpenId(user.id)}
                   >
                     <td>
-                      <span className="ad-who">
+                      <span className="tc-who">
                         <Avatar name={displayName(user)} />
                         <span>
                           <strong>{displayName(user)}</strong>
@@ -181,7 +181,7 @@ export default function AdminUsersPage() {
                       <Pill tone={billingTone(billing.source)}>{BILLING_LABELS[billing.source]}</Pill>
                     </td>
                     <td>{(user.role ?? "user") === "user" ? <span style={{ color: "var(--ad-muted)" }}>—</span> : <Pill tone="bad">{user.role}</Pill>}</td>
-                    <td className="ad-num">{dateFr(user.created_at)}</td>
+                    <td className="tc-num">{dateFr(user.created_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -189,7 +189,7 @@ export default function AdminUsersPage() {
             {rows.length === 0 ? <Empty>{t("No matching accounts.", "Aucun compte correspondant.")}</Empty> : null}
             {rows.length > limit ? (
               <div style={{ padding: 14, display: "flex", justifyContent: "center" }}>
-                <button type="button" className="ad-btn" onClick={() => setLimit((l) => l + 200)}>
+                <button type="button" className="tc-btn" onClick={() => setLimit((l) => l + 200)}>
                   {lang === "fr" ? (
                     <>
                       Afficher {Math.min(200, rows.length - limit)} de plus ({num(rows.length - limit)} restants)
@@ -278,38 +278,38 @@ function UserDrawer({
 
   return (
     <>
-      <button type="button" className="ad-drawer-bg" aria-label={t("Close", "Fermer")} onClick={onClose} />
-      <aside className="ad-drawer" role="dialog" aria-modal="true" aria-label={`${t("Account", "Compte")} ${displayName(user)}`}>
-        <div className="ad-drawer__head">
-          <span className="ad-who">
+      <button type="button" className="tc-drawer-bg" aria-label={t("Close", "Fermer")} onClick={onClose} />
+      <aside className="tc-drawer" role="dialog" aria-modal="true" aria-label={`${t("Account", "Compte")} ${displayName(user)}`}>
+        <div className="tc-drawer__head">
+          <span className="tc-who">
             <Avatar name={displayName(user)} />
             <span>
               <h2>{displayName(user)}</h2>
               <p>{user.email ?? "—"}</p>
             </span>
           </span>
-          <button type="button" className="ad-btn" onClick={onClose}>
+          <button type="button" className="tc-btn" onClick={onClose}>
             {t("Close", "Fermer")}
           </button>
         </div>
 
-        <div className="ad-facts">
-          <div className="ad-fact">
+        <div className="tc-facts">
+          <div className="tc-fact">
             <span>{t("Applied plan", "Offre appliquée")}</span>
             <strong>{PLAN_LABELS[billing.plan]}</strong>
           </div>
-          <div className="ad-fact">
+          <div className="tc-fact">
             <span>{t("Billing", "Facturation")}</span>
             <strong>
               {BILLING_LABELS[billing.source]}
               {billing.until ? t(` · until ${dateFr(billing.until)}`, ` · jusqu’au ${dateFr(billing.until)}`) : ""}
             </strong>
           </div>
-          <div className="ad-fact">
+          <div className="tc-fact">
             <span>{t("Joined", "Inscription")}</span>
             <strong>{dateFr(user.created_at)}</strong>
           </div>
-          <div className="ad-fact">
+          <div className="tc-fact">
             <span>{t("Last activity", "Dernière activité")}</span>
             <strong>{sessions[0] ? ago(sessions[0].last_active_at) : loading ? "…" : "—"}</strong>
           </div>
@@ -318,20 +318,20 @@ function UserDrawer({
         {error ? <LoadState loading={false} error={error} onRetry={reload} /> : null}
 
         <Card title={t("Product usage", "Usage du produit")}>
-          <div className="ad-facts">
-            <div className="ad-fact"><span>{t("Campaigns", "Campagnes")}</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
-            <div className="ad-fact"><span>{t("Managed creators", "Créateurs gérés")}</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
-            <div className="ad-fact"><span>{t("Tracked sales", "Ventes suivies")}</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
-            <div className="ad-fact"><span>{t("Tracked revenue", "CA suivi")}</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
-            <div className="ad-fact"><span>{t("Messages sent", "Messages envoyés")}</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
-            <div className="ad-fact"><span>{t("Gifting missions", "Missions gifting")}</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
+          <div className="tc-facts">
+            <div className="tc-fact"><span>{t("Campaigns", "Campagnes")}</span><strong>{loading ? "…" : num(usage?.campaigns)}</strong></div>
+            <div className="tc-fact"><span>{t("Managed creators", "Créateurs gérés")}</span><strong>{loading ? "…" : num(usage?.creators)}</strong></div>
+            <div className="tc-fact"><span>{t("Tracked sales", "Ventes suivies")}</span><strong>{loading ? "…" : num(usage?.sales)}</strong></div>
+            <div className="tc-fact"><span>{t("Tracked revenue", "CA suivi")}</span><strong>{loading ? "…" : eur(usage?.salesRevenue)}</strong></div>
+            <div className="tc-fact"><span>{t("Messages sent", "Messages envoyés")}</span><strong>{loading ? "…" : num(usage?.outreach)}</strong></div>
+            <div className="tc-fact"><span>{t("Gifting missions", "Missions gifting")}</span><strong>{loading ? "…" : num(usage?.giftMissions)}</strong></div>
           </div>
         </Card>
 
         <Card title={t("Actions", "Actions")}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="ad-actions">
-              <select className="ad-select" value={plan} onChange={(e) => setPlan(e.target.value)} aria-label={t("Plan", "Offre")}>
+            <div className="tc-actions">
+              <select className="tc-select" value={plan} onChange={(e) => setPlan(e.target.value)} aria-label={t("Plan", "Offre")}>
                 <option value="basic">Growth</option>
                 <option value="pro">Pro</option>
                 <option value="scale">Scale</option>
@@ -339,7 +339,7 @@ function UserDrawer({
               </select>
               <button
                 type="button"
-                className="ad-btn ad-btn--primary"
+                className="tc-btn tc-btn--primary"
                 disabled={busy}
                 onClick={() =>
                   void act(
@@ -362,7 +362,7 @@ function UserDrawer({
               {plan !== "free" ? (
                 <button
                   type="button"
-                  className="ad-btn"
+                  className="tc-btn"
                   disabled={busy}
                   onClick={() => void act("giftMonth", plan, t(`Gift 1 month of ${plan}?`, `Offrir 1 mois de ${PLAN_LABELS[plan as keyof typeof PLAN_LABELS] ?? plan} ?`))}
                 >
@@ -371,7 +371,7 @@ function UserDrawer({
               ) : null}
               <button
                 type="button"
-                className="ad-btn"
+                className="tc-btn"
                 disabled={busy}
                 title={t("Free plan discovery allowance back to zero, to test the paywall again.", "Remet à zéro les découvertes gratuites utilisées, pour retester la paywall.")}
                 onClick={() => void act("resetQuota", undefined, t("Reset this account's free usage quota?", "Remettre à zéro le quota gratuit de ce compte ?"))}
@@ -381,7 +381,7 @@ function UserDrawer({
               {isOffered(billing.source) ? (
                 <button
                   type="button"
-                  className="ad-btn ad-btn--danger"
+                  className="tc-btn tc-btn--danger"
                   disabled={busy}
                   onClick={() => void act("revokeComp", undefined, t("Revoke comped access?", "Révoquer l’accès offert ?"))}
                 >
@@ -389,15 +389,15 @@ function UserDrawer({
                 </button>
               ) : null}
             </div>
-            <div className="ad-actions">
-              <select className="ad-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label={t("Role", "Rôle")}>
+            <div className="tc-actions">
+              <select className="tc-select" value={role} onChange={(e) => setRole(e.target.value)} aria-label={t("Role", "Rôle")}>
                 <option value="user">{t("User", "Utilisateur")}</option>
                 <option value="staff">{t("Staff", "Équipe")}</option>
                 <option value="admin">Admin</option>
               </select>
               <button
                 type="button"
-                className="ad-btn"
+                className="tc-btn"
                 disabled={busy || role === (user.role ?? "user")}
                 onClick={() => void act("role", role, t(`Give this account the "${role}" role?`, `Donner le rôle « ${role} » à ce compte ?`))}
               >
@@ -405,10 +405,10 @@ function UserDrawer({
               </button>
             </div>
             {user.stripe_subscription_id ? (
-              <div className="ad-actions">
+              <div className="tc-actions">
                 <button
                   type="button"
-                  className="ad-btn"
+                  className="tc-btn"
                   disabled={busy}
                   onClick={() => void act("cancel", undefined, t("Cancel the Stripe subscription at the end of the period?", "Résilier l’abonnement Stripe à la fin de la période ?"))}
                 >
@@ -416,7 +416,7 @@ function UserDrawer({
                 </button>
                 <button
                   type="button"
-                  className="ad-btn ad-btn--danger"
+                  className="tc-btn tc-btn--danger"
                   disabled={busy}
                   onClick={() =>
                     void act(
@@ -439,14 +439,14 @@ function UserDrawer({
 
         {sub ? (
           <Card title={t("Stripe subscription", "Abonnement Stripe")}>
-            <div className="ad-facts">
-              <div className="ad-fact"><span>{t("Status", "Statut")}</span><strong>{subscriptionStatus(sub.status, lang)}{sub.cancelAtPeriodEnd ? t(" · ending", " · se termine") : ""}</strong></div>
-              <div className="ad-fact"><span>{t("Amount", "Montant")}</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? t("year", "an") : t("month", "mois")}</strong></div>
-              <div className="ad-fact"><span>{t("Period end", "Fin de période")}</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
-              <div className="ad-fact"><span>{t("Price", "Prix")}</span><strong>{sub.priceId ?? "—"}</strong></div>
+            <div className="tc-facts">
+              <div className="tc-fact"><span>{t("Status", "Statut")}</span><strong>{subscriptionStatus(sub.status, lang)}{sub.cancelAtPeriodEnd ? t(" · ending", " · se termine") : ""}</strong></div>
+              <div className="tc-fact"><span>{t("Amount", "Montant")}</span><strong>{eur(sub.amount)} / {sub.interval === "year" ? t("year", "an") : t("month", "mois")}</strong></div>
+              <div className="tc-fact"><span>{t("Period end", "Fin de période")}</span><strong>{dateFr(sub.currentPeriodEnd)}</strong></div>
+              <div className="tc-fact"><span>{t("Price", "Prix")}</span><strong>{sub.priceId ?? "—"}</strong></div>
             </div>
             {detail && detail.invoices.length > 0 ? (
-              <table className="ad-table" style={{ marginTop: 12 }}>
+              <table className="tc-table" style={{ marginTop: 12 }}>
                 <tbody>
                   {detail.invoices.map((inv) => (
                     <tr key={inv.id}>
@@ -454,8 +454,8 @@ function UserDrawer({
                       <td>
                         <Pill tone={inv.status === "paid" ? "good" : inv.status === "open" ? "warn" : "muted"}>{inv.status === null ? "—" : invoiceStatus(inv.status, lang)}</Pill>
                       </td>
-                      <td className="ad-num">{eur(inv.amountPaid, 2)}</td>
-                      <td className="ad-num">
+                      <td className="tc-num">{eur(inv.amountPaid, 2)}</td>
+                      <td className="tc-num">
                         {inv.pdf ? (
                           <a href={inv.pdf} target="_blank" rel="noopener noreferrer">
                             PDF
@@ -476,14 +476,14 @@ function UserDrawer({
           {sessions.length === 0 ? (
             <Empty>{loading ? t("Loading…", "Chargement…") : t("No sessions recorded.", "Aucune session enregistrée.")}</Empty>
           ) : (
-            <table className="ad-table">
+            <table className="tc-table">
               <tbody>
                 {sessions.map((s, i) => (
                   <tr key={`${s.last_active_at}-${i}`}>
                     <td>{s.device_label ?? "—"}</td>
                     <td>{s.location_label ?? "—"}</td>
                     <td style={{ color: "var(--ad-muted)" }}>{s.ip_address ?? "—"}</td>
-                    <td className="ad-num">{ago(s.last_active_at)}</td>
+                    <td className="tc-num">{ago(s.last_active_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -492,7 +492,7 @@ function UserDrawer({
         </Card>
 
         <Card title={t("Technical details", "Détails techniques")}>
-          <dl className="ad-kv">
+          <dl className="tc-kv">
             {shownKeys.map((k) => (
               <div key={k} style={{ display: "contents" }}>
                 <dt>{k}</dt>
@@ -502,7 +502,7 @@ function UserDrawer({
           </dl>
         </Card>
       </aside>
-      {toast ? <div className="ad-toast" role="status">{toast}</div> : null}
+      {toast ? <div className="tc-toast" role="status">{toast}</div> : null}
     </>
   );
 }

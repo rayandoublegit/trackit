@@ -22,9 +22,9 @@ export function AdminGate({ status, email }: { status: Status; email?: string })
   };
 
   return (
-    <div className="ad-gate">
-      <div className="ad-gate__box">
-        <span className="ad-gate__lock" aria-hidden>
+    <div className="tc-gate">
+      <div className="tc-gate__box">
+        <span className="tc-gate__lock" aria-hidden>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="5" y="11" width="14" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 118 0v4" />
@@ -35,7 +35,7 @@ export function AdminGate({ status, email }: { status: Status; email?: string })
           <>
             <h1>{fr ? "Connectez-vous" : "Sign in"}</h1>
             <p>{fr ? "Cet espace est réservé à l’équipe. Connectez-vous avec un compte admin." : "This area is for the team. Sign in with an admin account."}</p>
-            <a className="ad-btn ad-btn--primary ad-btn--block" href={SIGN_IN}>
+            <a className="tc-btn tc-btn--primary tc-btn--block" href={SIGN_IN}>
               {fr ? "Se connecter" : "Sign in"}
             </a>
           </>
@@ -45,16 +45,16 @@ export function AdminGate({ status, email }: { status: Status; email?: string })
           <>
             <h1>{fr ? "Ce compte n’est pas admin" : "This account is not an admin"}</h1>
             <p>{fr ? "Vous êtes connecté avec :" : "You are signed in as:"}</p>
-            <code className="ad-gate__email">{email}</code>
+            <code className="tc-gate__email">{email}</code>
             <p>
               {fr
                 ? "Ajoutez cette adresse à ADMIN_EMAILS ou donnez-lui le rôle admin dans profiles, ou changez de compte."
                 : "Add this address to ADMIN_EMAILS or give it the admin role in profiles, or switch accounts."}
             </p>
-            <button type="button" className="ad-btn ad-btn--primary ad-btn--block" onClick={switchAccount} disabled={leaving}>
+            <button type="button" className="tc-btn tc-btn--primary tc-btn--block" onClick={switchAccount} disabled={leaving}>
               {fr ? "Changer de compte" : "Switch account"}
             </button>
-            <a className="ad-btn ad-btn--ghost ad-btn--block" href="/dashboard">
+            <a className="tc-btn tc-btn--ghost tc-btn--block" href="/dashboard">
               {fr ? "Retour à l’app" : "Back to the app"}
             </a>
           </>
@@ -68,7 +68,7 @@ export function AdminGate({ status, email }: { status: Status; email?: string })
                 ? "Le serveur n’a pas pu vérifier votre accès (Supabase indisponible ou mal configuré). Réessayez dans un instant."
                 : "The server could not check your access (Supabase is down or not configured). Try again in a moment."}
             </p>
-            <button type="button" className="ad-btn ad-btn--primary ad-btn--block" onClick={() => window.location.reload()}>
+            <button type="button" className="tc-btn tc-btn--primary tc-btn--block" onClick={() => window.location.reload()}>
               {fr ? "Réessayer" : "Try again"}
             </button>
           </>

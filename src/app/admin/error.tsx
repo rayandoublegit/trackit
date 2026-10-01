@@ -13,14 +13,14 @@ export default function AdminError({ error, retry }: { error: Error & { digest?:
   }, [error]);
 
   return (
-    <div className="ad-error ad-error--page" role="alert">
+    <div className="tc-error tc-error--page" role="alert">
       <strong>{fr ? "Cette page a planté" : "This page crashed"}</strong>
       <p>{fr ? "Le reste de la console fonctionne. Détail de l’erreur :" : "The rest of the console still works. Error details:"}</p>
-      <code className="ad-error__detail">
+      <code className="tc-error__detail">
         {error.message || (fr ? "Erreur inconnue" : "Unknown error")}
         {error.digest ? ` · ${error.digest}` : ""}
       </code>
-      <button type="button" className="ad-btn ad-btn--primary" onClick={() => retry()}>
+      <button type="button" className="tc-btn tc-btn--primary" onClick={() => retry()}>
         {fr ? "Réessayer" : "Try again"}
       </button>
     </div>

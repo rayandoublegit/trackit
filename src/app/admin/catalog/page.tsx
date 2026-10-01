@@ -62,7 +62,7 @@ export default function AdminCatalogPage() {
         )}
         actions={
           <>
-            <Link className="ad-btn ad-btn--primary" href="/admin/add">
+            <Link className="tc-btn tc-btn--primary" href="/admin/add">
               {t("Add a creator", "Ajouter un créateur")}
             </Link>
             <RefreshButton onClick={reload} loading={loading} />
@@ -72,7 +72,7 @@ export default function AdminCatalogPage() {
       {!data ? <LoadState loading={loading} error={error} onRetry={reload} /> : null}
       {data && tiers ? (
         <>
-          <div className="ad-grid ad-grid--kpi">
+          <div className="tc-grid tc-grid--kpi">
             <Kpi label={t("Indexed profiles", "Profils indexés")} value={data.total} format={compact} tone="accent" />
             <Kpi
               label={t("Hand-verified", "Vérifiés à la main")}
@@ -95,14 +95,14 @@ export default function AdminCatalogPage() {
               }
             />
           </div>
-          <div className="ad-grid ad-grid--wide">
-            <Card title={t("Niches", "Niches")} className="ad-card--flush" delay={80}>
-              <div className="ad-table-wrap">
-                <table className="ad-table">
+          <div className="tc-grid tc-grid--wide">
+            <Card title={t("Niches", "Niches")} className="tc-card--flush" delay={80}>
+              <div className="tc-table-wrap">
+                <table className="tc-table">
                   <thead>
                     <tr>
                       <th>{t("Niche", "Niche")}</th>
-                      <th className="ad-num">{t("Profiles", "Profils")}</th>
+                      <th className="tc-num">{t("Profiles", "Profils")}</th>
                       <th>{t("Nano · micro · influencer split", "Répartition nano · micro · influenceur")}</th>
                       <th>{t("Verified / target", "Vérifiés / objectif")}</th>
                     </tr>
@@ -117,7 +117,7 @@ export default function AdminCatalogPage() {
                             <td>
                               <strong>{(fr ? NICHE_LABEL_FR : NICHE_LABEL)[n.niche] ?? n.niche}</strong>
                             </td>
-                            <td className="ad-num">{num(n.total)}</td>
+                            <td className="tc-num">{num(n.total)}</td>
                             <td style={{ minWidth: 200 }}>
                               <div style={{ display: "flex", height: 8, borderRadius: 99, overflow: "hidden", background: "var(--ad-surface-2)" }}>
                                 <span style={{ width: `${(n.under10k / t) * 100}%`, background: "#93b4ff" }} title={fr ? `Nano : ${num(n.under10k)}` : `Nano: ${num(n.under10k)}`} />
@@ -130,7 +130,7 @@ export default function AdminCatalogPage() {
                             </td>
                             <td style={{ minWidth: 150 }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div className="ad-barlist__track" style={{ flex: 1 }}>
+                                <div className="tc-barlist__track" style={{ flex: 1 }}>
                                   <span style={{ ["--w" as string]: `${Math.min(100, (n.curated / Math.max(1, n.target)) * 100)}%` }} />
                                 </div>
                                 {n.curated >= n.target ? <Pill tone="good">OK</Pill> : <small>{num(n.curated)}/{num(n.target)}</small>}
