@@ -88,8 +88,10 @@ describe("refresh schedule: every creator once a week", () => {
     expect(scrapePriority({ ...base, lastPostAt: new Date(NOW - 90 * DAY).toISOString() }, NOW)).toBe(8);
   });
 
-  it("comes back 7 days later whatever the priority", () => {
-    for (const p of [1, 3, 6, 8]) expect(nextScrapeAt(p, NOW)).toBe(new Date(NOW + 7 * DAY).toISOString());
+  it("comes back weekly when it matters, less often for small or inactive accounts", () => {
+    for (const p of [1, 2, 3, 4]) expect(nextScrapeAt(p, NOW)).toBe(new Date(NOW + 7 * DAY).toISOString());
+    expect(nextScrapeAt(6, NOW)).toBe(new Date(NOW + 14 * DAY).toISOString());
+    expect(nextScrapeAt(8, NOW)).toBe(new Date(NOW + 28 * DAY).toISOString());
     vi.stubEnv("SCRAPE_REFRESH_INTERVAL_DAYS", "14");
     expect(nextScrapeAt(1, NOW)).toBe(new Date(NOW + 14 * DAY).toISOString());
   });
@@ -118,7 +120,7 @@ describe("weekly budget", () => {
   });
 
   it("reads the caps from the environment", () => {
-    expect(weeklyCaps()).toEqual({ refreshes: 52_000, discoveryKeywords: 600, newCreators: 8_000 });
+    expect(weeklyCaps()).toEqual({ refreshes: 65_000, discoveryKeywords: 1_200, newCreators: 12_000 });
     vi.stubEnv("SCRAPE_WEEKLY_MAX_CREATORS", "50000");
     vi.stubEnv("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", "0");
     expect(weeklyCaps()).toMatchObject({ refreshes: 50_000, discoveryKeywords: 0 });

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { remaining, weeklyCaps, weeklyUsage } from "./budget";
-import { CreatorNotFound, discoverKeyword, recordCreatorFailure, refreshCreator } from "./ingest";
+import { CreatorNotFound, discoverKeyword, discoverMarketplace, recordCreatorFailure, refreshCreator } from "./ingest";
+import { isMarketTarget } from "./marketplace";
 import { normalizePlatform } from "./identity";
 import { trackedIntervalDays } from "./schedule";
 import { AllProvidersFailed, enabledPlatforms, sourceFor } from "./sources";
@@ -142,6 +143,7 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
   let newCreatorsLeft = left.newCreators;
   const minFollowers = opts.minFollowers ?? envInt("SCRAPE_DISCOVERY_MIN_FOLLOWERS", 5_000);
   const maxFollowers = opts.maxFollowers ?? envInt("SCRAPE_DISCOVERY_MAX_FOLLOWERS", 2_000_000);
+  const marketMaxPage = envInt("SCRAPE_MARKET_MAX_PAGE", 100);
   const handBack: Job[] = [];
   const handBackLater: Job[] = [];
   let stopped = false;
@@ -153,7 +155,7 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
       handBack.push(job);
       return;
     }
-    if (!platform || !source) {
+    if (!platform || !source || (isMarketTarget(job.target) && !process.env.SCRAPECREATORS_API_KEY)) {
       // No provider for this platform right now: try again tomorrow, no call spent.
       handBackLater.push(job);
       return;
@@ -162,7 +164,12 @@ export async function runScrapeWorker(admin: SupabaseClient, opts: WorkerOptions
     if (job.kind === "creator_discover") summary.discoverJobs += 1;
     else summary.refreshJobs += 1;
     try {
-      if (job.kind === "creator_discover") {
+      if (job.kind === "creator_discover" && isMarketTarget(job.target)) {
+        const r = await discoverMarketplace(admin, job.target, { meter: jobMeter, minFollowers, maxFollowers, maxNew: newCreatorsLeft, maxPage: marketMaxPage });
+        newCreatorsLeft = Math.max(0, newCreatorsLeft - r.added);
+        summary.discovered += r.added;
+        summary.creatorsNew += r.added;
+      } else if (job.kind === "creator_discover") {
         const r = await discoverKeyword(admin, source, job.target, { meter: jobMeter, minFollowers, maxFollowers, maxNew: newCreatorsLeft });
         newCreatorsLeft = Math.max(0, newCreatorsLeft - r.added);
         summary.discovered += r.added;

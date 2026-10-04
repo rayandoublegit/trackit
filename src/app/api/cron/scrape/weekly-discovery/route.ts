@@ -4,6 +4,7 @@ import { remaining, weekIndex, weeklyCaps, weeklyUsage } from "@/lib/scraper/bud
 import { weeklyDiscoveryPlan } from "@/lib/scraper/discovery-plan";
 import { normalizePlatform } from "@/lib/scraper/identity";
 import { enabledPlatforms } from "@/lib/scraper/sources";
+import { marketSeeds, marketTarget } from "@/lib/scraper/marketplace";
 import type { ScrapePlatform } from "@/lib/scraper/types";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,22 @@ export async function GET(request: Request) {
     .eq("kind", "creator_discover")
     .in("status", ["queued", "running"]);
   const left = remaining(weeklyCaps(), await weeklyUsage(admin)).discoveryKeywords - Number(waiting ?? 0);
-  const max = Math.max(0, Math.min(left, Number(params.get("max") || left)));
+  let max = Math.max(0, Math.min(left, Number(params.get("max") || left)));
+
+  // Creator Marketplace walks first (TikTok via ScrapeCreators): pages of 20
+  // real creators per country / follower range, French creators first. Each
+  // walk queues its own next pages while they bring new creators.
+  let marketQueued = 0;
+  if (platforms.includes("tiktok") && process.env.SCRAPECREATORS_API_KEY && params.get("market") !== "0") {
+    for (const seed of marketSeeds()) {
+      if (marketQueued >= max) break;
+      const { error } = await admin
+        .from("scrape_jobs")
+        .insert({ kind: "creator_discover", platform: "tiktok", target: marketTarget(seed), priority: seed.country === "FR" ? 1 : 2 });
+      if (!error) marketQueued += 1;
+    }
+    max -= marketQueued;
+  }
   const extra = (params.get("discover") || "").split(",").map((k) => k.trim()).filter(Boolean).slice(0, 50);
   const plan = weeklyDiscoveryPlan({ platforms, maxKeywords: max, weekIndex: weekIndex(), extra });
 
@@ -56,7 +72,7 @@ export async function GET(request: Request) {
   await admin.from("scrape_runs").insert({
     trigger: "weekly-discovery",
     finished_at: new Date().toISOString(),
-    notes: { queued, planned: plan.length, platforms, weeklyLeft: left },
+    notes: { queued, marketQueued, planned: plan.length, platforms, weeklyLeft: left },
   });
-  return NextResponse.json({ ok: true, queued, planned: plan.length, platforms, perPlatform: Object.fromEntries(platforms.map((p) => [p, plan.filter((i) => i.platform === p).length])) });
+  return NextResponse.json({ ok: true, queued, marketQueued, planned: plan.length, platforms, perPlatform: Object.fromEntries(platforms.map((p) => [p, plan.filter((i) => i.platform === p).length])) });
 }

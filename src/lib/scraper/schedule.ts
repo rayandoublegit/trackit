@@ -1,4 +1,6 @@
-// How often each creator is refreshed: once a week, every creator.
+// How often each creator is refreshed: weekly for creators who matter now,
+// less often for small or inactive accounts, so a base of 100,000 fits the
+// weekly caps.
 //
 // - Every refresh sets next_scrape_at = now + 7 days (SCRAPE_REFRESH_INTERVAL_DAYS).
 //   The weekly enqueue (Monday) queues every creator due within the coming
@@ -10,7 +12,9 @@
 //   refreshes a week instead of one for the creators a brand is actually
 //   watching, so their numbers are fresh when they matter (+1 refresh per
 //   tracked creator per week). 0 turns it off.
-// - Priority only orders the queue (growers first); it no longer changes the rhythm.
+// - Priority orders the queue (growers first) and sets the rhythm: priorities
+//   1-4 (growing, active, 100K+ followers) every interval (7 days), 6 (smaller
+//   active accounts) every 2 intervals, 8 (no post in 60 days) every 4.
 // - Failures back off: 1, 2, 4, 8 weeks; after 5 failures in a row the
 //   creator is no longer queued (history is kept, nothing is deleted).
 
@@ -50,9 +54,10 @@ export function scrapePriority(c: ScheduleInput, nowMs = Date.now()): number {
   return 6;
 }
 
-/** Next refresh: a week from now for everyone (the priority only orders the queue). */
-export function nextScrapeAt(_priority: number, nowMs = Date.now()): string {
-  return new Date(nowMs + refreshIntervalDays() * DAY).toISOString();
+/** Next refresh: one interval for priorities 1-4, two for 6, four for 8 (inactive). */
+export function nextScrapeAt(priority: number, nowMs = Date.now()): string {
+  const factor = priority >= 8 ? 4 : priority >= 5 ? 2 : 1;
+  return new Date(nowMs + refreshIntervalDays() * factor * DAY).toISOString();
 }
 
 /** After a failure (or "account not found"): 1, 2, 4 then 8 weeks. */

@@ -5,10 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // records how many refresh / discovery jobs it ran and how many creators it
 // added), so the caps hold across every invocation of the week.
 //
-// Defaults are sized for a base of ~50,000 creators (docs/SCRAPING.md):
-//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 52,000)
-//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  keyword searches per week, all platforms (default 600)
-//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 8,000)
+// Defaults are sized to grow the base to 100,000+ creators (docs/SCRAPING.md):
+//   SCRAPE_WEEKLY_MAX_CREATORS            creator refreshes per week (default 65,000)
+//   SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS  searches + Creator Marketplace pages per week (default 1,200)
+//   SCRAPE_WEEKLY_MAX_NEW_CREATORS        new creators discovery may add per week (default 12,000)
 
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
@@ -25,9 +25,9 @@ export type WeeklyCaps = { refreshes: number; discoveryKeywords: number; newCrea
 
 export function weeklyCaps(): WeeklyCaps {
   return {
-    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 52_000),
-    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 600),
-    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 8_000),
+    refreshes: envInt("SCRAPE_WEEKLY_MAX_CREATORS", 65_000),
+    discoveryKeywords: envInt("SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS", 1_200),
+    newCreators: envInt("SCRAPE_WEEKLY_MAX_NEW_CREATORS", 12_000),
   };
 }
 

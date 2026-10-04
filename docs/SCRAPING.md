@@ -56,7 +56,17 @@ every video) without calling a scraping API when someone opens the app.
   refreshes a week. These are the creators a brand is about to contact, pay or
   send product to: fresher numbers matter there, and they are a few hundred, so
   it costs about +2 calls per tracked creator per week. They go first in the queue.
-- `scrape_priority` only orders the queue inside a week (fast growers first).
+- `scrape_priority` orders the queue (fast growers first) and sets the rhythm:
+  priorities 1-4 (growing, active, 100K+ followers) every 7 days, 6 (smaller
+  active accounts) every 14, 8 (no post in 60 days) every 28. That is what lets
+  a base of 100,000 creators fit in ~65,000 refreshes a week.
+- **Every refresh re-analyses the profile** (`profileAnalysis` in `ingest.ts`):
+  language from the language TikTok detected on each video (`desc_language`),
+  else from the captions and bio (`lib/creator-language.ts`); country from the
+  account region on the videos (`author.region`); niche from the captions,
+  hashtags and bio (`lib/creator-niche.ts`), kept only when the content clearly
+  backs it (a niche coming from the search keyword alone is cleared); brand
+  accounts flagged (`lib/brand-detect.ts`).
 - **Failures back off**: a job is retried up to 3 times (30, 60 min later); then
   the creator waits 1, 2, 4, then 8 weeks; after 5 failures in a row it is no
   longer queued. History is never deleted.
@@ -66,13 +76,33 @@ every video) without calling a scraping API when someone opens the app.
   account shows up again as a new creator when discovery finds its new handle
   (we never key on provider ids, so there is no automatic link).
 
+## Creator Marketplace walks (the main source of new creators)
+
+Keyword searches return about 30 accounts each with no next page, so they top
+out around 15-20k creators. The TikTok Creator Marketplace listing
+(ScrapeCreators `GET /v1/tiktok/creators/popular`, 1 credit per page of 20) lists
+real creators (no brand pages) by creator country × follower range × sort, with
+the country TikTok has on file, and pages deep (`lib/scraper/marketplace.ts`).
+
+- Monday, `weekly-discovery` queues page 1 of every walk (24 countries × 3
+  follower ranges × 3 sorts = 216), French creators first (priority 1), as
+  `creator_discover` jobs with the target `market:FR:10K-100K:follower:1`.
+- Each page adds the creators we don't know yet (country set, first refresh
+  queued) and queues the next page while pages bring new creators (or for the
+  first 3 pages), up to `SCRAPE_MARKET_MAX_PAGE`.
+- Pages count against `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS`, new creators
+  against `SCRAPE_WEEKLY_MAX_NEW_CREATORS`: ~12,000 new creators a week at most,
+  so 100,000 takes about 7-8 weeks from today's base.
+- `?market=0` on `weekly-discovery` skips the walks for a week.
+
 ## Weekly caps (env)
 
 | Env | Default | Caps |
 | --- | --- | --- |
-| `SCRAPE_WEEKLY_MAX_CREATORS` | 52,000 | creator refreshes per week (all platforms, tracked ones and first refreshes of new creators included) |
-| `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` | 600 | keyword searches per week (all platforms) |
-| `SCRAPE_WEEKLY_MAX_NEW_CREATORS` | 8,000 | creators discovery may add per week |
+| `SCRAPE_WEEKLY_MAX_CREATORS` | 65,000 | creator refreshes per week (all platforms, tracked ones and first refreshes of new creators included) |
+| `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` | 1,200 | keyword searches + Creator Marketplace pages per week (all platforms) |
+| `SCRAPE_MARKET_MAX_PAGE` | 100 | deepest Creator Marketplace page a walk goes to |
+| `SCRAPE_WEEKLY_MAX_NEW_CREATORS` | 12,000 | creators discovery may add per week |
 | `SCRAPE_DISCOVERY_MIN_FOLLOWERS` / `_MAX_FOLLOWERS` | 5,000 / 2,000,000 | size of creators discovery adds (hits without a follower count are skipped) |
 | `SCRAPE_BATCH`, `SCRAPE_CONCURRENCY` | 60 (the cron passes budget=150), 6 | jobs per worker pass, parallel jobs |
 | `SCRAPE_PLATFORMS` | `tiktok,instagram,youtube` | platforms scraped (a platform also needs a provider key) |
@@ -177,7 +207,8 @@ A month is 4.35 weeks.
 | Base | Calls / week | Calls / month |
 | --- | --- | --- |
 | Today: 17,800 TikTok creators + 150 searches | 17,800 × 2 + 150 = **35,750** | **≈ 155,500** |
-| Default caps fully used (52,000 refreshes, mostly TikTok, + 600 searches) | ≈ 104,600 | ≈ 455,000 |
+| Default caps fully used (65,000 refreshes, mostly TikTok, + 1,200 searches/pages) | ≈ 131,200 | ≈ 571,000 |
+| 100,000 creators at the tiered rhythm (≈40% weekly, 45% every 2 weeks, 15% every 4) | ≈ 133,000 | ≈ 578,000 |
 | Target: 50,000 creators (30k TikTok, 12k Instagram, 8k YouTube) + 150 searches | 60,000 + 24,000 + 24,000 + 150 = **108,150** | **≈ 470,300** |
 
 Add 2 calls per week for each creator brands are tracking (e.g. 500 tracked →
