@@ -8,10 +8,14 @@ import { storeVideoCoverBuffer } from "@/lib/tiktok-video-thumbs";
 import { storeTikTokAvatar } from "@/lib/tiktok-avatar";
 import { classifyNiche } from "@/lib/rapidapi-creators";
 import { detectBrand } from "@/lib/brand-detect";
+import { creatorCountry, creatorLanguage } from "@/lib/creator-language";
+import { classifyCreatorNiche } from "@/lib/creator-niche";
 import { buildSeedTargets } from "@/lib/niche-tree";
 import { creatorKey, handleFromKey, knownKeys, normalizeHandle, normalizePlatform } from "./identity";
 import { nextScrapeAt, retryAfterFailure, scrapePriority } from "./schedule";
 import { CallMeter, type CreatorSource, type ScrapedVideo } from "./types";
+import { marketTarget, nextMarketPage, parseMarketPage, parseMarketTarget } from "./marketplace";
+import { scrapeCreatorsGet } from "./sc-client";
 
 // One refresh of one creator: fetch profile + latest videos (2 API calls for
 // TikTok and Instagram, 3 for YouTube), store what expires (covers, avatar),
@@ -104,6 +108,44 @@ async function storedCovers(
   return { covers, stored };
 }
 
+/**
+ * Language, country and niche from the creator's own posts, on every refresh:
+ * the languages and account region the platform reports first, then the words
+ * and hashtags of the captions. A niche only sticks when the content backs it;
+ * one found through a search keyword with nothing in the videos is dropped.
+ */
+export function profileAnalysis(
+  bio: string,
+  videos: ScrapedVideo[],
+  existing: { primary_niche?: unknown; niches?: unknown } | null,
+): Record<string, unknown> {
+  const captions = videos.map((v) => v.caption).filter(Boolean);
+  const out: Record<string, unknown> = {};
+  const language = creatorLanguage({ videoLanguages: videos.map((v) => v.language), captions, bio });
+  if (language) out.language = language;
+  const country = creatorCountry({ regions: videos.map((v) => v.region) });
+  if (country) out.country_code = country;
+
+  const niche = classifyCreatorNiche({ bio, captions, hashtags: videos.flatMap((v) => v.hashtags) });
+  if (niche.confident && niche.primaryNiche) {
+    out.primary_niche = niche.primaryNiche;
+    out.niches = niche.niches;
+    return out;
+  }
+  const current = typeof existing?.primary_niche === "string" ? existing.primary_niche : "";
+  if (current && (niche.scores[current] ?? 0) >= 2) return out; // some evidence: keep it
+  if (captions.length >= 3) {
+    // Enough posts and nothing points to the stored niche: clear it rather than mislabel.
+    out.primary_niche = null;
+    out.niches = [];
+  } else if (!current) {
+    const classified = classifyNiche([bio, ...captions].join("\n"), "lifestyle");
+    out.primary_niche = classified.primaryNiche;
+    out.niches = classified.niches;
+  }
+  return out;
+}
+
 export async function refreshCreator(
   admin: SupabaseClient,
   source: CreatorSource,
@@ -125,7 +167,7 @@ export async function refreshCreator(
 
   const { data: existing } = await admin
     .from("creators_index")
-    .select("username, platform, avatar_url, primary_niche, niches, first_seen_at")
+    .select("username, platform, avatar_url, primary_niche, niches, first_seen_at, language, country_code")
     .eq("username", key)
     .maybeSingle();
   if (existing && normalizePlatform(existing.platform) !== platform) {
@@ -159,13 +201,7 @@ export async function refreshCreator(
     avatarUrl = (await storeTikTokAvatar(admin, profile.avatarUrl, key)) || profile.avatarUrl;
   }
 
-  // Niche from bio + captions when the creator has none yet (keyword rules, no AI call).
-  const nicheMerge: Record<string, unknown> = {};
-  if (!existing?.primary_niche) {
-    const classified = classifyNiche([profile.bio, ...videos.map((v) => v.caption)].join("\n"), "lifestyle");
-    nicheMerge.primary_niche = classified.primaryNiche;
-    nicheMerge.niches = Array.from(new Set([...((existing?.niches as string[]) ?? []), ...classified.niches]));
-  }
+  const nicheMerge = profileAnalysis(profile.bio, videos, existing);
 
   // Brand / company accounts stay in the catalog, hidden from Discovery by default.
   const brand = detectBrand({
@@ -384,4 +420,77 @@ export async function discoverKeyword(
   if (jobErr) for (const job of jobs) await admin.from("scrape_jobs").insert(job);
 
   return { found: hits.length, added: rows.length, apiCalls: calls(), addedKeys: rows.map((r) => r.username) };
+}
+
+/**
+ * One page of a Creator Marketplace walk (scraper/marketplace.ts): adds the
+ * creators we don't know yet as light rows (with the country TikTok has on
+ * file), queues their first refresh, then queues the next page of the walk.
+ */
+export async function discoverMarketplace(
+  admin: SupabaseClient,
+  target: string,
+  opts: DiscoverOptions & { maxPage?: number } = {},
+): Promise<{ found: number; added: number; apiCalls: number; addedKeys: string[]; next: string | null }> {
+  const t = parseMarketTarget(target);
+  if (!t) throw new Error(`bad marketplace target ${target}`);
+  const meter = opts.meter ?? new CallMeter();
+  const callsBefore = meter.calls;
+  const raw = await scrapeCreatorsGet(
+    "/v1/tiktok/creators/popular",
+    { page: String(t.page), sortBy: t.sort, followerCount: t.range, creatorCountry: t.country },
+    "scrapecreators-tiktok",
+    meter,
+  );
+  const page = parseMarketPage(raw);
+  const min = opts.minFollowers ?? 5_000;
+  const max = opts.maxFollowers ?? Number.POSITIVE_INFINITY;
+  const hits = page.creators.filter((c) => c.followers >= min && c.followers <= max);
+
+  let addedKeys: string[] = [];
+  if (hits.length) {
+    const candidates = hits.flatMap((h) => knownKeys("tiktok", h.username));
+    const { data: known } = await admin.from("creators_index").select("username").in("username", candidates);
+    const taken = new Set((known ?? []).map((k) => normalizeHandle(String(k.username))));
+    const fresh = hits
+      .filter((h) => !knownKeys("tiktok", h.username).some((k) => taken.has(normalizeHandle(k))))
+      .slice(0, Math.max(0, opts.maxNew ?? Number.POSITIVE_INFINITY));
+    if (fresh.length) {
+      const nowIso = new Date().toISOString();
+      const rows = fresh.map((h) => {
+        const brand = detectBrand({ username: h.username, displayName: h.displayName });
+        return {
+          username: creatorKey("tiktok", h.username),
+          platform: "tiktok",
+          display_name: h.displayName || h.username,
+          followers: h.followers,
+          country_code: h.countryCode,
+          niches: [] as string[],
+          enrichment_status: "pending",
+          scrape_priority: 3,
+          next_scrape_at: nowIso,
+          first_seen_at: nowIso,
+          is_brand: brand.isBrand ? true : null,
+          brand_reason: brand.reason,
+        };
+      });
+      const { error } = await writeTolerant(
+        (r) => admin.from("creators_index").upsert(r, { onConflict: "username", ignoreDuplicates: true }),
+        rows,
+        ["is_brand", "brand_reason"],
+      );
+      if (error) throw new Error(`creators_index: ${error.message}`);
+      const jobs = rows.map((r) => ({ kind: "creator_refresh", platform: "tiktok", target: r.username, priority: 3 }));
+      const { error: jobErr } = await admin.from("scrape_jobs").insert(jobs);
+      if (jobErr) for (const job of jobs) await admin.from("scrape_jobs").insert(job);
+      addedKeys = rows.map((r) => r.username);
+    }
+  }
+
+  const following = nextMarketPage(t, page.hasMore, addedKeys.length, opts.maxPage ?? 100);
+  const next = following ? marketTarget(following) : null;
+  // One live job per target: a duplicate insert is refused, which is fine.
+  if (next) await admin.from("scrape_jobs").insert({ kind: "creator_discover", platform: "tiktok", target: next, priority: t.country === "FR" ? 1 : 2 });
+
+  return { found: page.creators.length, added: addedKeys.length, apiCalls: meter.calls - callsBefore, addedKeys, next };
 }

@@ -73,9 +73,20 @@ export function parseRapidVideos(raw: any, username: string): ScrapedVideo[] {
       comments: num(v?.comment_count),
       shares: num(v?.share_count),
       saves: num(v?.collect_count),
+      ...langAndRegion(v?.desc_language ?? v?.language, v?.region ?? v?.author?.region),
     });
   }
   return out;
+}
+
+/** Optional language / region fields, left out when the source doesn't say. */
+function langAndRegion(language: unknown, region: unknown): { language?: string; region?: string } {
+  const lang = str(language).trim().toLowerCase();
+  const reg = str(region).trim().toUpperCase();
+  return {
+    ...(lang && lang !== "un" && lang !== "und" ? { language: lang } : {}),
+    ...(/^[A-Z]{2}$/.test(reg) ? { region: reg } : {}),
+  };
 }
 
 // ── Videos: ScrapeCreators (TikTok app shape, aweme_list) ───────────────────────
@@ -110,6 +121,7 @@ export function parseScrapeCreatorsTikTokVideos(raw: any, username: string): Scr
       comments: num(st.comment_count),
       shares: num(st.share_count),
       saves: num(st.collect_count),
+      ...langAndRegion(a?.desc_language, a?.author?.region ?? a?.region),
     });
   }
   return out;

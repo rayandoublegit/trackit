@@ -53,6 +53,10 @@ export type ScrapedVideo = {
   comments: number;
   shares: number;
   saves: number;
+  /** Language the platform detected for the caption (TikTok desc_language), when given. */
+  language?: string;
+  /** Country of the account that posted it (TikTok author.region), when given. */
+  region?: string;
 };
 
 /** followers is null when the search result does not say (the hit is then skipped). */
