@@ -30,7 +30,7 @@ every video) without calling a scraping API when someone opens the app.
 | --- | --- | --- | --- |
 | `/api/cron/scrape/weekly-discovery` | Mondays 00:05 | queues this week's keyword searches (next slice of the niche tree, split across platforms) | none |
 | `/api/cron/scrape/weekly-refresh` | Mondays 00:15 | queues every creator due this week (`enqueue_weekly_refresh`) | none |
-| `/api/cron/scrape?budget=60` | every 10 minutes | the worker: runs up to 60 queued jobs within the weekly caps | only when jobs are queued |
+| `/api/cron/scrape?budget=150` | every 10 minutes | the worker: runs up to 150 queued jobs within the weekly caps | only when jobs are queued |
 
 - The worker costs nothing when the queue is empty: it asks the database to queue
   creators brands work with (database only), sees nothing is ready, and returns
@@ -70,11 +70,11 @@ every video) without calling a scraping API when someone opens the app.
 
 | Env | Default | Caps |
 | --- | --- | --- |
-| `SCRAPE_WEEKLY_MAX_CREATORS` | 20,000 | creator refreshes per week (all platforms, tracked ones and first refreshes of new creators included) |
-| `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` | 150 | keyword searches per week (all platforms) |
-| `SCRAPE_WEEKLY_MAX_NEW_CREATORS` | 2,500 | creators discovery may add per week |
+| `SCRAPE_WEEKLY_MAX_CREATORS` | 52,000 | creator refreshes per week (all platforms, tracked ones and first refreshes of new creators included) |
+| `SCRAPE_WEEKLY_MAX_DISCOVERY_KEYWORDS` | 600 | keyword searches per week (all platforms) |
+| `SCRAPE_WEEKLY_MAX_NEW_CREATORS` | 8,000 | creators discovery may add per week |
 | `SCRAPE_DISCOVERY_MIN_FOLLOWERS` / `_MAX_FOLLOWERS` | 5,000 / 2,000,000 | size of creators discovery adds (hits without a follower count are skipped) |
-| `SCRAPE_BATCH`, `SCRAPE_CONCURRENCY` | 60, 4 | jobs per worker pass, parallel jobs |
+| `SCRAPE_BATCH`, `SCRAPE_CONCURRENCY` | 60 (the cron passes budget=150), 6 | jobs per worker pass, parallel jobs |
 | `SCRAPE_PLATFORMS` | `tiktok,instagram,youtube` | platforms scraped (a platform also needs a provider key) |
 
 A week starts Monday 00:00 UTC. The worker reads this week's usage back from
@@ -177,7 +177,7 @@ A month is 4.35 weeks.
 | Base | Calls / week | Calls / month |
 | --- | --- | --- |
 | Today: 17,800 TikTok creators + 150 searches | 17,800 × 2 + 150 = **35,750** | **≈ 155,500** |
-| Default caps fully used (20,000 refreshes, mostly TikTok/Instagram, + 150 searches) | ≈ 40,150 | ≈ 174,600 |
+| Default caps fully used (52,000 refreshes, mostly TikTok, + 600 searches) | ≈ 104,600 | ≈ 455,000 |
 | Target: 50,000 creators (30k TikTok, 12k Instagram, 8k YouTube) + 150 searches | 60,000 + 24,000 + 24,000 + 150 = **108,150** | **≈ 470,300** |
 
 Add 2 calls per week for each creator brands are tracking (e.g. 500 tracked →
