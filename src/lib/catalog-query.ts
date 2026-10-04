@@ -14,6 +14,7 @@ import { searchRapidApiCreators } from "@/lib/rapidapi-creators";
 import { feedAvatarUrlForCreator } from "@/lib/feed-avatar-url";
 import { imgProxyUrl } from "@/lib/client-image-url";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { detectBrand } from "@/lib/brand-detect";
 
 // One query for the creator catalog (creators_index), shared by /api/catalog
 // and Mino's creator search, plus a live search through RapidAPI for what the
@@ -28,6 +29,8 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 //   likes/comments/shares  avg_likes / avg_comments / avg_shares (medians per post)
 //   viral video            viral_videos > 0 (rule in lib/viral.ts), migration 000047
 //   growth                 followers_growth_pct_30d, migration 000044
+//   exclude brands         is_brand (migration 000048), on unless excludeBrands === false;
+//                          rows not classified yet are checked by name and bio (lib/brand-detect.ts)
 // A filter on a value a creator does not have yet excludes that creator; any
 // other filter keeps it. Platform is compared without case ("TikTok" = "tiktok").
 
@@ -58,6 +61,8 @@ export type CatalogQuery = {
   viral?: boolean;
   /** Follower growth over 30 days, in percent (needs tracked history). */
   minGrowthPct30d?: number;
+  /** Hide brand / company accounts. On unless explicitly false. */
+  excludeBrands?: boolean;
   platform?: CatalogPlatform;
   sort?: CatalogSort;
   offset?: number;
@@ -77,9 +82,10 @@ const SORT_COLUMN: Record<CatalogSort, string> = {
 };
 
 // Which optional columns exist: 0 = base, 1 = + growth (migration 000044),
-// 2 = + video stats (migration 000047). Detected once, then cached; until a
-// migration is applied the catalog keeps working without what it adds.
-type SchemaLevel = 0 | 1 | 2;
+// 2 = + video stats (migration 000047), 3 = + is_brand (migration 000048).
+// Detected once, then cached; until a migration is applied the catalog keeps
+// working without what it adds.
+type SchemaLevel = 0 | 1 | 2 | 3;
 let schemaLevel: SchemaLevel | null = null;
 
 /** Tests only: forget the detected schema. */
@@ -88,7 +94,14 @@ export function resetCatalogSchemaCache() {
 }
 
 function columnsFor(level: SchemaLevel): string {
-  return [CREATOR_LIST_COLUMNS, level >= 1 ? CREATOR_GROWTH_COLUMNS : "", level >= 2 ? CREATOR_VIDEO_STATS_COLUMNS : ""].filter(Boolean).join(",");
+  return [
+    CREATOR_LIST_COLUMNS,
+    level >= 1 ? CREATOR_GROWTH_COLUMNS : "",
+    level >= 2 ? CREATOR_VIDEO_STATS_COLUMNS : "",
+    level >= 3 ? "is_brand" : "",
+  ]
+    .filter(Boolean)
+    .join(",");
 }
 
 export const isMissingColumn = (message: string) => /column .* does not exist|could not find the .* column/i.test(message);
@@ -170,6 +183,8 @@ export function catalogQueryFromParams(p: URLSearchParams): CatalogQuery {
     minShares: positive(p.get("minShares")),
     viral: flag(p.get("viral")),
     minGrowthPct30d: positive(p.get("minGrowth")),
+    // Brands are hidden unless the client sends excludeBrands=0.
+    excludeBrands: p.get("excludeBrands") !== "0" && p.get("excludeBrands") !== "false",
     platform: parsePlatform(p.get("platform")),
     sort: sort && CATALOG_SORTS.includes(sort) ? sort : "followers",
     offset: Math.max(0, Math.floor(Number(p.get("offset")) || 0)),
@@ -184,7 +199,7 @@ export function catalogQueryFromParams(p: URLSearchParams): CatalogQuery {
 export async function queryCatalog(q: CatalogQuery, client?: SupabaseClient | null): Promise<CatalogResult> {
   const admin = client ?? getSupabaseAdmin();
   if (!admin) return { creators: [], hasMore: false, error: "no db" };
-  let level: SchemaLevel = schemaLevel ?? 2;
+  let level: SchemaLevel = schemaLevel ?? 3;
   for (;;) {
     const result = await runCatalogQuery(admin, q, level);
     if (result.error && isMissingColumn(result.error) && level > 0) {
@@ -229,6 +244,9 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
   if (q.minGrowthPct30d) query = query.gte("followers_growth_pct_30d", q.minGrowthPct30d);
   if (q.hasEmail) query = query.not("email", "is", null).neq("email", "");
   if (q.verified) query = query.gte("authenticity_score", 60);
+  const excludeBrands = q.excludeBrands !== false;
+  // `not is true` keeps creators not classified yet (null).
+  if (excludeBrands && level >= 3) query = query.not("is_brand", "is", true);
   if (q.activeWithinDays) {
     const since = new Date(Date.now() - q.activeWithinDays * 86_400_000).toISOString();
     query = query.gte("last_post_at", since);
@@ -267,10 +285,22 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
     const { data, error } = await query;
     if (error) return { creators: [], hasMore: false, error: error.message };
     const rows = (data ?? []) as Record<string, unknown>[];
-    return { creators: rows.slice(0, limit).map(catalogRowToFeedCreator), hasMore: rows.length > limit };
+    const page = rows.slice(0, limit).filter((row) => !excludeBrands || !isBrandRow(row));
+    return { creators: page.map(catalogRowToFeedCreator), hasMore: rows.length > limit };
   } catch (e) {
     return { creators: [], hasMore: false, error: e instanceof Error ? e.message : "catalog failed" };
   }
+}
+
+/** A brand by its stored flag, or, when not classified yet, by name and bio. */
+export function isBrandRow(row: Record<string, unknown>): boolean {
+  if (row.is_brand === true) return true;
+  if (row.is_brand === false) return false;
+  return detectBrand({
+    username: typeof row.username === "string" ? row.username : "",
+    displayName: typeof row.display_name === "string" ? row.display_name : "",
+    bio: typeof row.bio === "string" ? row.bio : "",
+  }).isBrand;
 }
 
 function liveToFeedCreator(c: DiscoveryCreatorResult): FeedCreator {
@@ -305,13 +335,14 @@ export async function liveCreatorSearch(
   keyword: string,
   platform: CatalogPlatform,
   limit: number,
-  bounds: { minFollowers?: number; maxFollowers?: number } = {},
+  bounds: { minFollowers?: number; maxFollowers?: number; excludeBrands?: boolean } = {},
 ): Promise<FeedCreator[]> {
   if (!keyword.trim() || !liveSearchAvailable(platform)) return [];
   try {
     const rows = await searchRapidApiCreators(keyword.trim(), platform, Math.min(30, limit * 2));
     return rows
       .filter((c) => creatorMatchesFollowerRange(c.followersCount, { min: bounds.minFollowers, max: bounds.maxFollowers }))
+      .filter((c) => bounds.excludeBrands === false || !detectBrand({ username: c.username, displayName: c.displayName, bio: c.bio }).isBrand)
       .sort((a, b) => b.followersCount - a.followersCount)
       .slice(0, limit)
       .map(liveToFeedCreator);

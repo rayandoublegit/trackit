@@ -34,6 +34,8 @@ export type CatalogFilters = {
   verified: boolean;
   hideSaved: boolean;
   showHidden: boolean;
+  /** Hide brand / company accounts; on by default, so it doesn't count as an active filter. */
+  excludeBrands: boolean;
 };
 
 type Option = { value: string; label: string };
@@ -926,6 +928,21 @@ export function CatalogFilterBar({
               icon={
                 <Svg size={11}>
                   <path d="M12 2l3 3h4v4l3 3-3 3v4h-4l-3 3-3-3H5v-4l-3-3 3-3V5h4z" />
+                </Svg>
+              }
+            />
+            <Toggle
+              label={fr ? "Exclure les marques" : "Exclude brands"}
+              title={
+                fr
+                  ? "Masque les comptes de marques et d’entreprises (boutiques, comptes officiels) pour ne garder que les créateurs."
+                  : "Hides brand and company accounts (shops, official accounts) to keep creators only."
+              }
+              on={filters.excludeBrands}
+              onClick={() => change({ excludeBrands: !filters.excludeBrands })}
+              icon={
+                <Svg size={11}>
+                  <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
                 </Svg>
               }
             />

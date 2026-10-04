@@ -7,6 +7,7 @@ import { isStablePublicImageUrl } from "@/lib/client-image-url";
 import { storeVideoCoverBuffer } from "@/lib/tiktok-video-thumbs";
 import { storeTikTokAvatar } from "@/lib/tiktok-avatar";
 import { classifyNiche } from "@/lib/rapidapi-creators";
+import { detectBrand } from "@/lib/brand-detect";
 import { buildSeedTargets } from "@/lib/niche-tree";
 import { creatorKey, handleFromKey, knownKeys, normalizeHandle, normalizePlatform } from "./identity";
 import { nextScrapeAt, retryAfterFailure, scrapePriority } from "./schedule";
@@ -42,11 +43,16 @@ type Writer = (row: Record<string, unknown>[]) => PromiseLike<{ error: { message
  * (migration 000046 not applied), writes again without them.
  */
 async function writeTolerant(write: Writer, rows: Record<string, unknown>[], optional: string[]): Promise<{ error: { message: string } | null }> {
-  const first = await write(rows);
-  if (!first.error) return first;
-  const missing = optional.filter((c) => first.error!.message.includes(c));
-  if (!missing.length) return first;
-  return write(rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !missing.includes(k)))));
+  // The database names one missing column per error: drop it and try again.
+  const dropped = new Set<string>();
+  for (;;) {
+    const current = dropped.size ? rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !dropped.has(k)))) : rows;
+    const result = await write(current);
+    if (!result.error) return result;
+    const missing = optional.filter((c) => !dropped.has(c) && result.error!.message.includes(c));
+    if (!missing.length) return result;
+    for (const c of missing) dropped.add(c);
+  }
 }
 
 function toRich(v: ScrapedVideo, cover: string): RichVideo {
@@ -161,9 +167,21 @@ export async function refreshCreator(
     nicheMerge.niches = Array.from(new Set([...((existing?.niches as string[]) ?? []), ...classified.niches]));
   }
 
+  // Brand / company accounts stay in the catalog, hidden from Discovery by default.
+  const brand = detectBrand({
+    username: key,
+    displayName: profile.displayName,
+    bio: profile.bio,
+    bioLink: profile.bioLink,
+    seller: profile.seller,
+    category: profile.category,
+  });
+
   const upsert = {
     ...row,
     ...nicheMerge,
+    is_brand: brand.isBrand,
+    brand_reason: brand.reason,
     username: key,
     platform,
     top_videos: topWithStableCovers,
@@ -178,7 +196,7 @@ export async function refreshCreator(
     scrape_status: "ok",
     ...(existing ? {} : { first_seen_at: nowIso }),
   };
-  const { error: upErr } = await writeTolerant((r) => admin.from("creators_index").upsert(r, { onConflict: "username" }), [upsert], ["scrape_status"]);
+  const { error: upErr } = await writeTolerant((r) => admin.from("creators_index").upsert(r, { onConflict: "username" }), [upsert], ["scrape_status", "is_brand", "brand_reason"]);
   if (upErr) throw new Error(`creators_index: ${upErr.message}`);
 
   // History: one snapshot per creator per day, same key whatever the provider.
@@ -336,18 +354,28 @@ export async function discoverKeyword(
 
   const nowIso = new Date().toISOString();
   const niches = nicheTagsForKeyword(keyword);
-  const rows = fresh.map((h) => ({
-    username: creatorKey(platform, h.username),
-    platform,
-    display_name: h.displayName || h.username,
-    followers: h.followers,
-    niches,
-    enrichment_status: "pending",
-    scrape_priority: 3,
-    next_scrape_at: nowIso,
-    first_seen_at: nowIso,
-  }));
-  const { error } = await admin.from("creators_index").upsert(rows, { onConflict: "username", ignoreDuplicates: true });
+  const rows = fresh.map((h) => {
+    // Name-only check for now; the first refresh classifies with the bio too.
+    const brand = detectBrand({ username: h.username, displayName: h.displayName });
+    return {
+      username: creatorKey(platform, h.username),
+      platform,
+      display_name: h.displayName || h.username,
+      followers: h.followers,
+      niches,
+      enrichment_status: "pending",
+      scrape_priority: 3,
+      next_scrape_at: nowIso,
+      first_seen_at: nowIso,
+      is_brand: brand.isBrand ? true : null,
+      brand_reason: brand.reason,
+    };
+  });
+  const { error } = await writeTolerant(
+    (r) => admin.from("creators_index").upsert(r, { onConflict: "username", ignoreDuplicates: true }),
+    rows,
+    ["is_brand", "brand_reason"],
+  );
   if (error) throw new Error(`creators_index: ${error.message}`);
 
   // Their first refresh is queued now (one live job per creator).

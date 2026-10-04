@@ -43,6 +43,7 @@ import { UpgradeModal } from "./UpgradeModal";
 import { CatalogFilterBar, type CatalogMode, type CatalogPreset, type CatalogSortKey } from "./CatalogFilterBar";
 import { COUNT_VAL, ENGAGEMENT_VAL, VIEWS_VAL, creatorFiltersToParams } from "@/lib/catalog-filter-params";
 import { PlatformLogo, platformKey } from "@/components/PlatformLogo";
+import { detectBrand } from "@/lib/brand-detect";
 import { isStablePublicImageUrl } from "@/lib/client-image-url";
 
 function fmt(n: number, lang: "en" | "fr" = "en"): string {
@@ -101,6 +102,8 @@ type FilterState = {
   comments: string;
   shares: string;
   viral: boolean;
+  /** Hide brand / company accounts (on by default). */
+  excludeBrands: boolean;
 };
 
 const EMPTY_FILTERS: FilterState = {
@@ -125,6 +128,7 @@ const EMPTY_FILTERS: FilterState = {
   comments: "",
   shares: "",
   viral: false,
+  excludeBrands: true,
 };
 
 /** Catalogue sans niche choisie : pas de cap plan ni quota decouverte. */
@@ -211,6 +215,7 @@ function applyClientFilters(
     }
     if (f.hasEmail) out = out.filter((c) => Boolean(c.email));
     if (f.verified) out = out.filter((c) => c.authenticityScore >= 60);
+    if (f.excludeBrands) out = out.filter((c) => !detectBrand({ username: c.username, displayName: c.displayName, bio: c.bio }).isBrand);
     if (Number(f.reach) > 0) out = out.filter((c) => (c.viewsPerFollower ?? 0) >= Number(f.reach));
     if (COUNT_VAL[f.likes]) out = out.filter((c) => (c.avgLikes ?? 0) >= COUNT_VAL[f.likes]);
     if (COUNT_VAL[f.comments]) out = out.filter((c) => (c.avgComments ?? 0) >= COUNT_VAL[f.comments]);

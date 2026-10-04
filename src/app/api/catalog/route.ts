@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     const live = await liveCreatorSearch(keyword, q.platform, Math.min(q.limit || 24, 30), {
       minFollowers: q.minFollowers,
       maxFollowers: q.maxFollowers,
+      excludeBrands: q.excludeBrands,
     });
     return NextResponse.json({ creators: live, hasMore: false, count: live.length, source: "live" });
   }

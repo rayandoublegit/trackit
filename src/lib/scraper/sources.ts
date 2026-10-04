@@ -37,6 +37,8 @@ export function parseRapidProfile(raw: any, username: string): ScrapedProfile | 
     totalLikes: s.heartCount != null || s.heart != null ? num(s.heartCount ?? s.heart) : null,
     videoCount: s.videoCount != null ? num(s.videoCount) : null,
     verified: Boolean(u.verified),
+    seller: u.ttSeller == null ? null : Boolean(u.ttSeller),
+    category: str(u.commerceUserInfo?.category ?? u.commerce_user_info?.category) || null,
   };
 }
 export const parseScrapeCreatorsTikTokProfile = (raw: any, username: string) =>

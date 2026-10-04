@@ -213,3 +213,16 @@ describe("viral rule", () => {
     expect(medianViews([10, 40, 20, 30])).toBe(25);
   });
 });
+
+describe("exclude brands filter", () => {
+  it("is on by default and only sent when turned off", () => {
+    expect(creatorFiltersToParams(creatorBase).excludeBrands).toBeUndefined();
+    expect(creatorFiltersToParams({ ...creatorBase, excludeBrands: true }).excludeBrands).toBeUndefined();
+    expect(creatorFiltersToParams({ ...creatorBase, excludeBrands: false }).excludeBrands).toBe("0");
+  });
+
+  it("the API hides brands unless asked not to", () => {
+    expect(catalogQueryFromParams(new URLSearchParams("")).excludeBrands).toBe(true);
+    expect(catalogQueryFromParams(new URLSearchParams("excludeBrands=0")).excludeBrands).toBe(false);
+  });
+});

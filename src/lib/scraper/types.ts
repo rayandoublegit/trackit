@@ -21,6 +21,10 @@ export type ScrapedProfile = {
   totalLikes: number | null;
   videoCount: number | null;
   verified: boolean;
+  /** TikTok Shop seller account (TikTok only). */
+  seller?: boolean | null;
+  /** Business category shown on the profile ("Clothing (Brand)", "Digital creator"…). */
+  category?: string | null;
 };
 
 /**

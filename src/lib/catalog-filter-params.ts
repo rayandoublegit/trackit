@@ -29,6 +29,8 @@ export type CreatorFilterInput = {
   activity: string;
   hasEmail: boolean;
   verified: boolean;
+  /** Hide brand / company accounts. The API hides them unless this is false. */
+  excludeBrands?: boolean;
 };
 
 /** Query params for /api/catalog. A name search keeps the performance filters but drops niche and place. */
@@ -37,6 +39,7 @@ export function creatorFiltersToParams(f: CreatorFilterInput, search = "", sort 
   const p: Record<string, string> = { platform: f.platform || "tiktok", sort };
   if (f.hasEmail) p.hasEmail = "1";
   if (f.verified) p.verified = "1";
+  if (f.excludeBrands === false) p.excludeBrands = "0";
   if (f.viral) p.viral = "1";
   if (Number(f.activity) > 0) p.activeWithinDays = String(Number(f.activity));
   if (Number(f.reach) > 0) p.minReach = String(Number(f.reach));

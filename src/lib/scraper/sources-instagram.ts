@@ -23,6 +23,7 @@ export function parseInstagramProfile(raw: any, handle: string): ScrapedProfile 
     totalLikes: null,
     videoCount: u.edge_owner_to_timeline_media?.count != null || u.media_count != null ? num(u.edge_owner_to_timeline_media?.count ?? u.media_count) : null,
     verified: Boolean(u.is_verified),
+    category: str(u.category_name ?? u.business_category_name ?? u.category) || null,
   };
 }
 

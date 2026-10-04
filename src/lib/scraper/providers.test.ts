@@ -111,8 +111,14 @@ describe("Instagram (ScrapeCreators)", () => {
       totalLikes: null,
       videoCount: 90,
       verified: false,
+      category: null,
     });
     expect(parseInstagramProfile({ success: true, data: {} }, "ghost")).toBeNull();
+  });
+
+  it("reads the business category", () => {
+    const profile = { ...igProfile, data: { ...igProfile.data, user: { ...igProfile.data.user, category_name: "Clothing (Brand)" } } };
+    expect(parseInstagramProfile(profile, "mia.style")?.category).toBe("Clothing (Brand)");
   });
 
   it("reads reels and carousels into the shared video shape", () => {
