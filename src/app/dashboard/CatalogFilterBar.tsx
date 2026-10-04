@@ -569,6 +569,7 @@ export function CatalogFilterBar({
   sort,
   mode,
   count,
+  total,
   loading,
   isPaid,
   isFree,
@@ -591,6 +592,8 @@ export function CatalogFilterBar({
   sort: CatalogSortKey;
   mode: CatalogMode;
   count: number;
+  /** Every creator matching the filters in the database; shown instead of `count` when known. */
+  total?: number | null;
   loading: boolean;
   isPaid: boolean;
   isFree: boolean;
@@ -659,11 +662,11 @@ export function CatalogFilterBar({
                 : "Searching"
               : fr
                 ? (() => {
-                    const n = mode === "videos" ? videoCount : count;
+                    const n = mode === "videos" ? videoCount : Math.max(total ?? 0, count);
                     const noun = mode === "videos" ? (n > 1 ? "vidéos" : "vidéo") : n > 1 ? "créateurs" : "créateur";
                     return `${n.toLocaleString("fr-FR")} ${noun}`;
                   })()
-                : `${(mode === "videos" ? videoCount : count).toLocaleString("en-US")} ${mode === "videos" ? "videos" : "creators"}`}
+                : `${(mode === "videos" ? videoCount : Math.max(total ?? 0, count)).toLocaleString("en-US")} ${mode === "videos" ? "videos" : "creators"}`}
           </span>
         </div>
         <label className={`cf-search${searchLocked ? " is-locked" : ""}`}>

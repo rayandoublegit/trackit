@@ -69,7 +69,13 @@ export type CatalogQuery = {
   limit?: number;
 };
 
-export type CatalogResult = { creators: FeedCreator[]; hasMore: boolean; error?: string };
+export type CatalogResult = {
+  creators: FeedCreator[];
+  hasMore: boolean;
+  /** Every creator matching the filters in the database (first page only, null when not counted). */
+  total?: number | null;
+  error?: string;
+};
 
 const SORT_COLUMN: Record<CatalogSort, string> = {
   followers: "followers",
@@ -213,7 +219,7 @@ export async function queryCatalog(q: CatalogQuery, client?: SupabaseClient | nu
 
 async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: SchemaLevel): Promise<CatalogResult> {
   // A filter on a value this database does not hold yet matches nobody.
-  if ((q.viral && level < 2) || (q.minGrowthPct30d && level < 1)) return { creators: [], hasMore: false };
+  if ((q.viral && level < 2) || (q.minGrowthPct30d && level < 1)) return { creators: [], hasMore: false, total: 0 };
 
   const search = q.search ? cleanSearch(q.search) : "";
   const offset = Math.max(0, q.offset ?? 0);
@@ -225,7 +231,9 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
   if (sortKey === "growth" && level < 1) sortKey = "reach";
   if (sortKey === "viral" && level < 2) sortKey = "views";
 
-  let query: any = admin.from("creators_index").select(columnsFor(level));
+  // The first page also counts every match, for the "N creators" header.
+  const withTotal = offset === 0;
+  let query: any = admin.from("creators_index").select(columnsFor(level), withTotal ? { count: "exact" } : undefined);
   const orGroups: string[] = [];
 
   // Stored platform values vary in case: ilike without wildcards = equality without case.
@@ -264,7 +272,7 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
     if (q.niche) {
       const or = nicheClause(q.niche);
       // A niche we have no tag for matches nobody (Mino then tries names and handles).
-      if (!or) return { creators: [], hasMore: false };
+      if (!or) return { creators: [], hasMore: false, total: 0 };
       orGroups.push(or);
     }
   }
@@ -282,11 +290,15 @@ async function runCatalogQuery(admin: SupabaseClient, q: CatalogQuery, level: Sc
   query = query.order("username", { ascending: true }).range(offset, offset + limit);
 
   try {
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) return { creators: [], hasMore: false, error: error.message };
     const rows = (data ?? []) as Record<string, unknown>[];
     const page = rows.slice(0, limit).filter((row) => !excludeBrands || !isBrandRow(row));
-    return { creators: page.map(catalogRowToFeedCreator), hasMore: rows.length > limit };
+    return {
+      creators: page.map(catalogRowToFeedCreator),
+      hasMore: rows.length > limit,
+      total: withTotal && typeof count === "number" ? count : null,
+    };
   } catch (e) {
     return { creators: [], hasMore: false, error: e instanceof Error ? e.message : "catalog failed" };
   }

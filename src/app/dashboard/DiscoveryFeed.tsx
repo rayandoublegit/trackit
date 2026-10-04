@@ -679,6 +679,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
   const [folders, setFolders] = useState<FolderRow[]>([]);
   const [folderItems, setFolderItems] = useState<FolderItem[]>([]);
   const [hasMore, setHasMore] = useState(() => !(plan === "free" && readFreeDiscoveryGateLock()));
+  /** Creators matching the filters in the whole database (null = not counted, e.g. live search). */
+  const [catalogTotal, setCatalogTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -843,9 +845,13 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
       // A failed catalog call returns no creators: keep what is already listed and never spend quota on it.
       setError(d.error);
       setHasMore(false);
-      if (mode !== "append") setCreators([]);
+      if (mode !== "append") {
+        setCreators([]);
+        setCatalogTotal(null);
+      }
       return { count: 0 };
     }
+    if (mode !== "append") setCatalogTotal(typeof d.total === "number" ? d.total : null);
 
     const list: FeedCreator[] = Array.isArray(d.creators) ? d.creators : [];
     const rows = list;
@@ -1185,6 +1191,8 @@ export function DiscoveryFeed({ plan, workspaceUserId, isMobile, onUpgrade, onRe
           sort={sort}
           mode={mode}
           count={filtered.length}
+          // Client-only filters (saved / hidden) aren't in the database count.
+          total={filters.hideSaved || filters.showHidden ? null : catalogTotal}
           loading={loading}
           isPaid={isPaid}
           isFree={plan === "free"}

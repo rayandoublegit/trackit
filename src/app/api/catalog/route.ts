@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
     creators: result.creators,
     hasMore: result.hasMore,
     count: result.creators.length,
+    total: result.total ?? null,
     source: "catalog",
     ...(q.search ? { search: q.search } : {}),
     ...(result.error ? { error: result.error } : {}),
