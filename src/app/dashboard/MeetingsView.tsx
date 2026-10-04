@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { MEETINGS_UPDATED_EVENT } from "@/lib/assistant-actions";
 import { workspaceStorageKey } from "@/lib/workspaces";
 
@@ -139,7 +140,7 @@ export function MeetingsView({
         meeting?: { title: string; when: string; withWho: string; notes: string };
       };
       if (!res.ok || !data.ok || !data.meeting) {
-        setError(data.error || (fr ? "Impossible de comprendre le rendez-vous" : "Couldn’t parse the meeting"));
+        setError(apiErrorText(data, lang, { en: "Couldn’t parse the meeting", fr: "Impossible de comprendre le rendez-vous" }));
         return;
       }
       addMeeting({

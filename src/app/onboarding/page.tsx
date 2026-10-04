@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { selectProfileRow } from "@/lib/profile-row";
 import { useLang, useLocaleHref } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { PricingPlans } from "@/components/PricingPlans";
 import {
   isSocialReferralSource,
@@ -332,9 +333,9 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as { error?: string; errorFr?: string };
       if (!res.ok) {
-        setError(data.error ?? (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
+        setError(apiErrorText(data, lang, { en: "Could not save profile.", fr: "Impossible d'enregistrer le profil." }));
         return null;
       }
       return payload;

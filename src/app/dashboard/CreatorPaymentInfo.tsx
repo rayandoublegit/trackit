@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 
 const BLUE = "#0047FF";
 
@@ -127,7 +128,7 @@ export function CreatorPaymentInfo({ userId, isMobile }: { userId?: string; isMo
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) { setError(data?.error || (lang === "fr" ? "Échec de l'enregistrement." : "Save failed.")); return; }
+      if (!res.ok || !data?.ok) { setError(apiErrorText(data, lang, { en: "Save failed.", fr: "Échec de l'enregistrement." })); return; }
       setSaved(true);
     } finally {
       setSaving(false);

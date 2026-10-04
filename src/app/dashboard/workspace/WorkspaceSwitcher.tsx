@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { setWorkspaceClientIdentity } from "@/lib/supabase";
 import { uploadWorkspaceMark } from "@/lib/workspace-avatar";
+import { apiErrorText } from "@/lib/api-error-text";
 import {
   rememberClientBrandSpace,
 } from "@/lib/brand-workspace";
@@ -184,7 +185,7 @@ export function WorkspaceSwitcher({
         workspace?: BrandWorkspace;
       };
       if (!res.ok || !data.ok || !data.workspace) {
-        setError(data.error || (fr ? "Création impossible" : "Could not create workspace"));
+        setError(apiErrorText(data, lang, { en: "Could not create workspace", fr: "Création impossible" }));
         setSaving(false);
         return;
       }

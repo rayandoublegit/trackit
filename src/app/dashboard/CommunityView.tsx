@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { getLastCommunityId, rememberLastCommunityId } from "@/lib/last-community-storage";
 import { CommunityGlyph, PersonGlyph } from "@/components/FallbackGlyphs";
 
@@ -218,7 +219,7 @@ export function CommunityView({
       const res = await fetch(url, { credentials: "include", cache: "no-store" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Chargement impossible" : "Could not load"));
+        setError(apiErrorText(data, lang, { en: "Could not load", fr: "Chargement impossible" }));
         setCommunities([]);
         return [];
       }
@@ -246,7 +247,7 @@ export function CommunityView({
     } finally {
       setLoading(false);
     }
-  }, [userId, isCreator, fr, initialCommunityId, onCommunityChange, screen]);
+  }, [userId, isCreator, fr, lang, initialCommunityId, onCommunityChange, screen]);
 
   const loadDetail = useCallback(
     async (communityId: string) => {
@@ -256,7 +257,7 @@ export function CommunityView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Impossible d’ouvrir la communauté" : "Could not open community"));
+        setError(apiErrorText(data, lang, { en: "Could not open community", fr: "Impossible d’ouvrir la communauté" }));
         return;
       }
       setDetail(data.community as CommunityRow);
@@ -266,7 +267,7 @@ export function CommunityView({
       setEditDesc(data.community?.description || "");
       setEditMembersCanPost(data.community?.members_can_post !== false);
     },
-    [fr],
+    [lang],
   );
 
   const loadMessages = useCallback(async (communityId: string, opts?: { forceScroll?: boolean }) => {
@@ -277,7 +278,7 @@ export function CommunityView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Impossible de charger les messages" : "Could not load messages"));
+        setError(apiErrorText(data, lang, { en: "Could not load messages", fr: "Impossible de charger les messages" }));
         return;
       }
       setMessages((data.messages || []) as MessageRow[]);
@@ -288,7 +289,7 @@ export function CommunityView({
     } catch {
       setError(fr ? "Erreur réseau (messages)" : "Network error (messages)");
     }
-  }, [fr]);
+  }, [fr, lang]);
 
   const loadCreators = useCallback(async () => {
     if (isCreator || !userId) return;
@@ -387,7 +388,7 @@ export function CommunityView({
       upsert: false,
       contentType: file.type || undefined,
     });
-    if (upErr) throw new Error(upErr.message);
+    if (upErr) throw new Error(fr ? "Envoi du fichier impossible" : upErr.message);
     const { data: pub } = supabase.storage.from("community-media").getPublicUrl(path);
     return pub.publicUrl;
   };
@@ -412,7 +413,7 @@ export function CommunityView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Création impossible" : "Could not create"));
+        setError(apiErrorText(data, lang, { en: "Could not create", fr: "Création impossible" }));
         return;
       }
       const newId = data.community?.id as string | undefined;
@@ -520,7 +521,7 @@ export function CommunityView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Envoi impossible" : "Could not send"));
+        setError(apiErrorText(data, lang, { en: "Could not send", fr: "Envoi impossible" }));
         return;
       }
 
@@ -576,7 +577,7 @@ export function CommunityView({
       clearPending();
       void loadMessages(communityId);
     } catch (e) {
-      setError((e as Error).message || (fr ? "Erreur réseau" : "Network error"));
+      setError(fr ? "Envoi impossible. Réessayez." : (e as Error).message || "Network error");
     } finally {
       sendingLockRef.current = false;
       setSending(false);
@@ -600,7 +601,7 @@ export function CommunityView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Enregistrement impossible" : "Could not save"));
+        setError(apiErrorText(data, lang, { en: "Could not save", fr: "Enregistrement impossible" }));
         return;
       }
       setDetail(data.community);
@@ -624,7 +625,7 @@ export function CommunityView({
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(data.error || (fr ? "Ajout impossible" : "Could not add"));
+      setError(apiErrorText(data, lang, { en: "Could not add", fr: "Ajout impossible" }));
       return;
     }
     setAddUserId("");
@@ -657,7 +658,7 @@ export function CommunityView({
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(data.error || (fr ? "Mise à jour du rôle impossible" : "Could not update role"));
+      setError(apiErrorText(data, lang, { en: "Could not update role", fr: "Mise à jour du rôle impossible" }));
       await loadDetail(activeId);
       return;
     }
@@ -1018,7 +1019,7 @@ export function CommunityView({
                         aria-label={fr ? "Rôle" : "Role"}
                       >
                         <option value="member">{fr ? "Membre" : "Member"}</option>
-                        <option value="admin">Admin</option>
+                        <option value="admin">{fr ? "Administrateur" : "Admin"}</option>
                       </select>
                       <label className="cm-check compact">
                         <input
@@ -1265,7 +1266,9 @@ export function CommunityView({
                               ? "Vidéo"
                               : "Video"
                             : pendingKind === "audio"
-                              ? "Audio"
+                              ? fr
+                                ? "Audio"
+                                : "Audio"
                               : fr
                                 ? "Image"
                                 : "Image"}
@@ -1307,7 +1310,7 @@ export function CommunityView({
                             {fr ? "Image" : "Image"}
                           </button>
                           <button type="button" role="menuitem" onClick={() => openAttachPicker("audio")}>
-                            Audio
+                            {fr ? "Audio" : "Audio"}
                           </button>
                           <button type="button" role="menuitem" onClick={() => openAttachPicker("video")}>
                             {fr ? "Vidéo" : "Video"}

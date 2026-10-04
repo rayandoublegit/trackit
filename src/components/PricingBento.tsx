@@ -21,6 +21,7 @@ import type { StripePriceMatrix } from "@/lib/stripe-config";
 import type { BillingInterval } from "@/lib/stripe-billing";
 import { useLang } from "@/lib/useLang";
 import { localizeHref } from "@/lib/locale-preferences";
+import { apiErrorText } from "@/lib/api-error-text";
 
 const disabledPricingCtaStyle: CSSProperties = {
   background: "#E8E8E8",
@@ -216,13 +217,13 @@ export function PricingBento({
             onboarding,
           }),
         });
-        const whopData = (await whop.json().catch(() => ({}))) as { url?: string; error?: string; fallback?: boolean };
+        const whopData = (await whop.json().catch(() => ({}))) as { url?: string; error?: string; errorFr?: string; fallback?: boolean };
         if (whop.ok && whopData.url) {
           window.location.href = whopData.url;
           return;
         }
         if (!whopData.fallback) {
-          alert(whopData.error || (lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout"));
+          alert(apiErrorText(whopData, lang, { en: "Could not start checkout", fr: "Impossible de démarrer le paiement." }));
           return;
         }
         const res = await fetch("/api/create-checkout", {
@@ -237,9 +238,9 @@ export function PricingBento({
             onboarding,
           }),
         });
-        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; errorFr?: string };
         if (!res.ok || !data.url) {
-          alert(data.error || (lang === "fr" ? "Impossible de démarrer le paiement." : "Could not start checkout"));
+          alert(apiErrorText(data, lang, { en: "Could not start checkout", fr: "Impossible de démarrer le paiement." }));
           return;
         }
         window.location.href = data.url;
@@ -260,7 +261,14 @@ export function PricingBento({
         annual,
       });
     } catch (err) {
-      alert(err instanceof Error ? err.message : lang === "fr" ? "Impossible de démarrer le paiement" : "Could not start checkout");
+      // checkout.ts throws already-localized messages; a failed fetch (TypeError) is English-only.
+      alert(
+        err instanceof Error && !(lang === "fr" && err instanceof TypeError)
+          ? err.message
+          : lang === "fr"
+            ? "Impossible de démarrer le paiement"
+            : "Could not start checkout",
+      );
     } finally {
       setPayingTier(null);
     }

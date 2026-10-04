@@ -68,7 +68,9 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
   const { theme } = useDashboardTheme();
   const stageRef = useRef<HTMLDivElement>(null);
   const [boardId, setBoardId] = useState<string | null>(null);
-  const [boardName, setBoardName] = useState("Whiteboard");
+  // Empty name = unnamed board, shown with the localized default name.
+  const [boardName, setBoardName] = useState("");
+  const shownBoardName = boardName || (fr ? "Tableau blanc" : "Whiteboard");
   const [boardColor, setBoardColor] = useState<string>(WB_BOARD_COLORS[0]);
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -153,7 +155,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
     setActiveWbBoardId(userId, id);
     setBoardId(id);
     const meta = boards.find((b) => b.id === id);
-    setBoardName(meta?.name || "Whiteboard");
+    setBoardName(meta?.name || "");
     setBoardColor(meta?.color || WB_BOARD_COLORS[0]);
     setRenaming(false);
     setColorOpen(false);
@@ -607,7 +609,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
   const stageToolClass = tool === "draw" ? `draw-${drawStyle}` : tool;
 
   const startRename = () => {
-    setDraftName(boardName);
+    setDraftName(shownBoardName);
     setRenaming(true);
     setColorOpen(false);
   };
@@ -617,11 +619,11 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
       setRenaming(false);
       return;
     }
-    const next = draftName.trim() || boardName;
+    const next = draftName.trim() || shownBoardName;
     updateWbBoardMeta(userId, boardId, { name: next });
     setBoardName(next);
     setRenaming(false);
-  }, [boardId, boardName, draftName, userId]);
+  }, [boardId, shownBoardName, draftName, userId]);
 
   const pickBoardColor = (color: string) => {
     if (!boardId) return;
@@ -667,10 +669,10 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
                     if (e.key === "Enter") commitRename();
                     if (e.key === "Escape") {
                       setRenaming(false);
-                      setDraftName(boardName);
+                      setDraftName(shownBoardName);
                     }
                   }}
-                  placeholder={fr ? "Nom du whiteboard" : "Whiteboard name"}
+                  placeholder={fr ? "Nom du tableau blanc" : "Whiteboard name"}
                 />
                 <button
                   type="button"
@@ -688,7 +690,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
                 onClick={startRename}
                 title={fr ? "Renommer" : "Rename"}
               >
-                {boardName}
+                {shownBoardName}
               </button>
             )}
           </div>
@@ -720,8 +722,8 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
                 type="button"
                 className="wb-top__fs"
                 onClick={() => setResetConfirmOpen(true)}
-                title={fr ? "Réinitialiser le whiteboard" : "Reset whiteboard"}
-                aria-label={fr ? "Réinitialiser le whiteboard" : "Reset whiteboard"}
+                title={fr ? "Réinitialiser le tableau blanc" : "Reset whiteboard"}
+                aria-label={fr ? "Réinitialiser le tableau blanc" : "Reset whiteboard"}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
@@ -805,7 +807,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
             aria-labelledby="wb-reset-title"
           >
             <h3 id="wb-reset-title">
-              {fr ? "Réinitialiser le whiteboard ?" : "Reset whiteboard?"}
+              {fr ? "Réinitialiser le tableau blanc ?" : "Reset whiteboard?"}
             </h3>
             <p>
               {fr
@@ -1145,7 +1147,7 @@ export function WhiteboardView({ userId, isMobile }: { userId?: string; isMobile
         ) : null}
 
         {!toolbarCollapsed ? (
-          <div className="wb-toolbar" role="toolbar" aria-label={fr ? "Outils du whiteboard" : "Whiteboard tools"}>
+          <div className="wb-toolbar" role="toolbar" aria-label={fr ? "Outils du tableau blanc" : "Whiteboard tools"}>
             {tools.map((t) => (
               <button
                 key={t.id}

@@ -108,7 +108,8 @@ import {
 } from "@/lib/notifications-storage";
 import { installNotificationSoundUnlock, primeNotificationSound } from "@/lib/notification-sound";
 import { syncBrandServerNotifications } from "@/lib/server-notifications-sync";
-import { PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { localizeHref, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { apiErrorText } from "@/lib/api-error-text";
 import { resolveAvatarUrl } from "@/lib/resolve-avatar-url";
 import { recordLoginIp } from "@/lib/record-login";
 import {
@@ -496,7 +497,7 @@ function DashboardPageContent() {
       setLoading(false);
       return;
     }
-    if (!supabase) { setLoading(false); router.replace("/auth"); return; }
+    if (!supabase) { setLoading(false); router.replace(localizeHref("/auth", lang)); return; }
 
     let cancelled = false;
 
@@ -519,7 +520,7 @@ function DashboardPageContent() {
         const { data: { session } } = await supabase.auth.getSession();
         const authUser = session?.user;
         if (!authUser) {
-          router.replace("/auth");
+          router.replace(localizeHref("/auth", lang));
           setLoading(false);
           return;
         }
@@ -577,10 +578,10 @@ function DashboardPageContent() {
         let workspaceContext: WorkspaceContextResponse | null = contextResult?.workspaceContext ?? null;
         if (contextResult && !contextResult.workspaceRes.ok && workspaceContext?.blocked) {
           setWorkspaceAccessError(
-            workspaceContext.error ||
-              (lang === "fr"
-                ? "Le compte principal n'est pas encore disponible."
-                : "The principal account is not available yet."),
+            apiErrorText(workspaceContext, lang, {
+              en: "The principal account is not available yet.",
+              fr: "Le compte principal n'est pas encore disponible.",
+            }),
           );
           setLoading(false);
           return;
@@ -624,7 +625,7 @@ function DashboardPageContent() {
         if (cancelled) return;
 
         if (!profileData) {
-          if (!earlyCached) router.replace("/auth");
+          if (!earlyCached) router.replace(localizeHref("/auth", lang));
           setLoading(false);
           return;
         }
@@ -815,8 +816,8 @@ function DashboardPageContent() {
 
   const openWebsitePricing = useCallback(() => {
     if (typeof window === "undefined") return;
-    window.location.href = "/pricing?returnTo=%2Fdashboard";
-  }, []);
+    window.location.href = localizeHref("/pricing?returnTo=%2Fdashboard", lang);
+  }, [lang]);
 
   const handleSidebarAvatarError = () => {
     if (!user || !supabase || avatarRetryRef.current) {
@@ -938,7 +939,7 @@ function DashboardPageContent() {
       /* ignore */
     }
     clearUserSessionStorage();
-    router.replace("/auth");
+    router.replace(localizeHref("/auth", lang));
   };
 
   // Creators get their own simple, mobile-first app.
@@ -1478,9 +1479,9 @@ function ShopifyConnectModal({ onClose, userId, lang }: { onClose: () => void; u
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: userId || "", shop: domain, accessToken: token.trim() }),
       });
-      const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shopName?: string };
+      const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; errorFr?: string; shopName?: string };
       if (!res.ok || !payload.ok) {
-        setShopError(payload.error || (lang === "fr" ? "Connexion échouée" : "Connection failed"));
+        setShopError(apiErrorText(payload, lang, { en: "Connection failed", fr: "Connexion échouée" }));
         setLoading(false);
         return;
       }
@@ -1665,6 +1666,18 @@ function buildOutreachPreview(message: string, cta: string, name = "there", lang
   const personalized = (text: string) =>
     personalizeOutreachText(text, name).replace(/\{\{brand\}\}/gi, lang === "fr" ? "votre marque" : "your brand");
   return [personalized(message.trim()), personalized(cta.trim())].filter(Boolean).join("\n\n");
+}
+
+/** sendOutreachEmail returns English errors; French copy for the outreach composer. */
+const OUTREACH_SEND_ERRORS_FR: Record<string, string> = {
+  "No valid recipient emails": "Aucune adresse e-mail de destinataire valide",
+  "Invalid sender email": "Adresse e-mail d'expéditeur invalide",
+  "Subject and message are required": "L'objet et le message sont requis",
+  "Could not build email compose link": "Impossible de préparer l'e-mail",
+};
+
+function outreachSendErrorFr(error: string): string {
+  return OUTREACH_SEND_ERRORS_FR[error] ?? "Impossible d'envoyer l'e-mail. Réessayez.";
 }
 
 function outreachCreatorName(handle?: string) {
@@ -2960,7 +2973,7 @@ function SendOutreachPanel({
         });
 
         if (!result.ok) {
-          setSendError(result.error);
+          setSendError(lang === "fr" ? outreachSendErrorFr(result.error) : result.error);
           setSendingEmail(false);
           return;
         }
@@ -3869,9 +3882,9 @@ function IntegrationsView({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: user?.id || "", shop: domain, accessToken: shopToken.trim() }),
         });
-        const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; shop?: string; shopName?: string };
+        const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; errorFr?: string; shop?: string; shopName?: string };
         if (!res.ok || !payload.ok) {
-          setShopError(payload.error || (lang === "fr" ? "Connexion échouée" : "Connection failed"));
+          setShopError(apiErrorText(payload, lang, { en: "Connection failed", fr: "Connexion échouée" }));
           setConnecting(false);
           return;
         }
@@ -4052,7 +4065,7 @@ function IntegrationsView({
                                   const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
                                   if (!res.ok || !payload.ok) {
                                     setSyncEnabled(!next);
-                                    setSyncMsg(payload.error || (lang === "fr" ? "Échec de la mise à jour" : "Update failed"));
+                                    setSyncMsg(apiErrorText(payload, lang, { en: "Update failed", fr: "Échec de la mise à jour" }));
                                   }
                                 } catch {
                                   setSyncEnabled(!next);
@@ -4091,8 +4104,7 @@ function IntegrationsView({
                                   if (!res.ok) {
                                     setSyncMsg(
                                       (lang === "fr" ? payload.message : payload.messageEn) ||
-                                        payload.error ||
-                                        (lang === "fr" ? "La synchronisation a échoué" : "Sync failed")
+                                        apiErrorText(payload, lang, { en: "Sync failed", fr: "La synchronisation a échoué" })
                                     );
                                   } else if (payload.error === "no_creator_codes") {
                                     setSyncMsg(
@@ -4140,7 +4152,11 @@ function IntegrationsView({
                                       }
                                     }
                                     if (payload.dbErrors?.length) {
-                                      setSyncMsg(`DB: ${payload.dbErrors[0]}`);
+                                      setSyncMsg(
+                                        lang === "fr"
+                                          ? "Certaines commandes n'ont pas pu être enregistrées."
+                                          : `DB: ${payload.dbErrors[0]}`,
+                                      );
                                     }
                                   }
                                 } catch {
@@ -4255,8 +4271,10 @@ function IntegrationsView({
                           const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
                           if (!res.ok || !payload.ok) {
                             setStripeError(
-                              payload.error ||
-                                (lang === "fr" ? "Impossible de déconnecter Stripe." : "Could not disconnect Stripe."),
+                              apiErrorText(payload, lang, {
+                                en: "Could not disconnect Stripe.",
+                                fr: "Impossible de déconnecter Stripe.",
+                              }),
                             );
                             return;
                           }
@@ -4916,9 +4934,7 @@ function AddAffiliatePanel({
       });
       if (!created.ok || !created.slug) {
         setGenError(
-          (lang === "fr" ? created.errorFr : undefined) ||
-            created.error ||
-            (lang === "fr" ? "Impossible de créer le lien." : "Could not create link."),
+          apiErrorText(created, lang, { en: "Could not create link.", fr: "Impossible de créer le lien." }),
         );
         return;
       }

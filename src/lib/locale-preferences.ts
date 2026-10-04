@@ -61,7 +61,9 @@ export function isFrPath(pathname: string): boolean {
 
 // The app (signed-in areas and auth hand-offs) has no /fr twin for every
 // screen: it follows the language the visitor last chose on the site.
-const APP_PATH_PREFIXES = ["/dashboard", "/onboarding", "/settings", "/admin", "/invite", "/auth/callback", "/auth/confirm", "/auth/reset", "/l/"];
+// /auth is included: sign-out, expired sessions and the middleware all land on
+// /auth without the /fr prefix. Keep in sync with the boot script in app/layout.tsx.
+export const APP_PATH_PREFIXES = ["/dashboard", "/onboarding", "/settings", "/admin", "/invite", "/auth", "/l/"];
 
 export function isAppPath(pathname: string): boolean {
   const path = isFrPath(pathname) ? pathname.slice(3) || "/" : pathname;
@@ -103,12 +105,33 @@ function syncDocumentLang(lang: AppLang) {
   document.documentElement.lang = lang;
 }
 
+/**
+ * What to remember after showing `lang` on `pathname`. A /fr page is a clear
+ * choice of French. An unprefixed public page is English only by default (the
+ * app sends people to /auth, /pricing… without /fr), so it must not overwrite a
+ * French choice: that reset is what turned the dashboard English after a sign-in.
+ */
+export function langToRemember(
+  pathname: string,
+  lang: AppLang,
+  stored: string | null,
+  explicit?: string | null,
+): AppLang | null {
+  // A language switch link (…?lang=en) is an explicit choice.
+  if ((explicit === "en" || explicit === "fr") && explicit === lang) return stored === explicit ? null : explicit;
+  if (isFrPath(pathname)) return stored === "fr" ? null : "fr";
+  if (isAppPath(pathname)) return null;
+  return stored === "fr" || stored === "en" ? null : lang;
+}
+
 /** Current app language; remembers it so the signed-in app keeps it. */
 export function getAppLang(): AppLang {
   if (typeof window === "undefined") return "en";
   const lang = detectAppLangFromLocation();
   try {
-    if (localStorage.getItem(TRACKIT_LANG_KEY) !== lang) localStorage.setItem(TRACKIT_LANG_KEY, lang);
+    const explicit = new URLSearchParams(window.location.search).get("lang");
+    const remember = langToRemember(window.location.pathname, lang, localStorage.getItem(TRACKIT_LANG_KEY), explicit);
+    if (remember) localStorage.setItem(TRACKIT_LANG_KEY, remember);
   } catch {
     // storage blocked: the address still decides
   }

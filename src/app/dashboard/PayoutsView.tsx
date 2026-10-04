@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { CreatorPaymentInfo } from "./CreatorPaymentInfo";
 import {
   canUseAutoPayouts,
@@ -2497,7 +2498,7 @@ export function PayoutsView({
       void loadCompletedPayouts();
       dispatchPayoutsUpdated();
     } else {
-      alert((lang === "fr" ? "Erreur : " : "Error: ") + (data.error || (lang === "fr" ? "inconnue" : "unknown")));
+      alert((lang === "fr" ? "Erreur : " : "Error: ") + apiErrorText(data, lang, { en: "unknown", fr: "inconnue" }));
     }
   };
 
@@ -2628,7 +2629,7 @@ export function PayoutsView({
             dispatchPayoutsUpdated();
             closeCreatorPayout();
           } else {
-            alert(data.error || (lang === "fr" ? "Échec du paiement" : "Payout failed"));
+            alert(apiErrorText(data, lang, { en: "Payout failed", fr: "Échec du paiement" }));
           }
         } catch {
           alert(lang === "fr" ? "Échec du paiement" : "Payout failed");
@@ -2646,7 +2647,7 @@ export function PayoutsView({
           });
           const data = await res.json().catch(() => ({}));
           if (data.url) window.open(data.url, "_blank");
-          else alert(data.error || (lang === "fr" ? "Impossible de lancer la connexion bancaire" : "Could not start bank connection"));
+          else alert(apiErrorText(data, lang, { en: "Could not start bank connection", fr: "Impossible de lancer la connexion bancaire" }));
         } catch {
           alert(lang === "fr" ? "Impossible de lancer la connexion bancaire" : "Could not start bank connection");
         } finally {
@@ -3631,7 +3632,7 @@ export function BalanceView({
       const data = await res.json().catch(() => ({}));
       if (data.url) window.location.href = data.url;
       else {
-        alert(data.error || (lang === "fr" ? "Impossible de démarrer Stripe" : "Could not start Stripe onboarding"));
+        alert(apiErrorText(data, lang, { en: "Could not start Stripe onboarding", fr: "Impossible de démarrer Stripe" }));
         setConnectLoading(false);
       }
     } catch {

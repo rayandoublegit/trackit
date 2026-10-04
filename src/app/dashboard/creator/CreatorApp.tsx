@@ -562,7 +562,7 @@ function LangSwitch({ lang }: { lang: "en" | "fr" }) {
   const pathname = usePathname();
   const router = useRouter();
   return (
-    <div className="ca-lang" role="group" aria-label="Language">
+    <div className="ca-lang" role="group" aria-label={lang === "fr" ? "Langue" : "Language"}>
       {(["fr", "en"] as const).map((l) => (
         <button
           key={l}

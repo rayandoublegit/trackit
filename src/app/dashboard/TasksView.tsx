@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { TASKS_UPDATED_EVENT } from "@/lib/assistant-actions";
 import { workspaceStorageKey } from "@/lib/workspaces";
 
@@ -149,7 +150,7 @@ export function TasksView({
         task?: { title: string; due: string };
       };
       if (!res.ok || !data.ok || !data.task) {
-        setError(data.error || (fr ? "Impossible de comprendre la tâche" : "Couldn’t parse the task"));
+        setError(apiErrorText(data, lang, { en: "Couldn’t parse the task", fr: "Impossible de comprendre la tâche" }));
         return;
       }
       addTask(data.task.title, data.task.due || "");

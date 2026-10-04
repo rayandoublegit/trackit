@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { canUseScripts, type PlanTier } from "@/lib/plan-limits";
 import { UpgradeModal } from "./UpgradeModal";
 
@@ -90,7 +91,7 @@ export function ScriptsManager({
         const ext = file.name.split(".").pop() || "bin";
         const path = `${brandId}/${Date.now()}.${ext}`;
         const { error: upErr } = await supabase.storage.from("scripts").upload(path, file, { upsert: true, contentType: file.type });
-        if (upErr) { setError(upErr.message); return; }
+        if (upErr) { setError(lang === "fr" ? "Envoi du fichier impossible." : upErr.message); return; }
         const { data: pub } = supabase.storage.from("scripts").getPublicUrl(path);
         fileUrl = pub.publicUrl;
       }
@@ -100,7 +101,7 @@ export function ScriptsManager({
         body: JSON.stringify({ brandId, title: title.trim(), content: content.trim(), fileUrl, targetCreatorId: target === "all" ? null : target }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.ok) { setError(data?.error || (lang === "fr" ? "Échec." : "Failed.")); return; }
+      if (!res.ok || !data?.ok) { setError(apiErrorText(data, lang, { en: "Failed.", fr: "Échec." })); return; }
       resetForm(); setFormOpen(false);
       window.dispatchEvent(new CustomEvent("trackit:scripts-updated"));
       await loadScripts();

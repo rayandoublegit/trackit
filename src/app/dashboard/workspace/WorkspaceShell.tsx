@@ -29,6 +29,7 @@ import {
   type WbBoardMeta,
 } from "@/lib/whiteboard-storage";
 import { getWorkspaceEditId, setWorkspaceEditId } from "@/lib/workspace-edit";
+import { apiErrorText } from "@/lib/api-error-text";
 import {
   createMinoChat,
   createMinoFolder,
@@ -423,7 +424,7 @@ export function WorkspaceShell({
       payit: lang === "fr" ? "Paiements" : "Payouts",
       planner: lang === "fr" ? "Planner" : "Planner",
       notes: "Notes",
-      whiteboard: "Whiteboard",
+      whiteboard: lang === "fr" ? "Tableau blanc" : "Whiteboard",
       integrations: lang === "fr" ? "Intégrations" : "Integrations",
       analytics: lang === "fr" ? "Tracking" : "Tracking",
       ai: "Mino",
@@ -625,7 +626,7 @@ export function WorkspaceShell({
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
         setDeleteSpaceError(
-          data.error || (lang === "fr" ? "Suppression impossible" : "Could not delete"),
+          apiErrorText(data, lang, { en: "Could not delete", fr: "Suppression impossible" }),
         );
         setDeleteSpaceBusy(false);
         return;
@@ -674,7 +675,7 @@ export function WorkspaceShell({
         workspace?: BrandWorkspace;
       };
       if (!res.ok || !data.ok || !data.workspace) {
-        setCreateSpaceError(data.error || (lang === "fr" ? "Création impossible" : "Could not create"));
+        setCreateSpaceError(apiErrorText(data, lang, { en: "Could not create", fr: "Création impossible" }));
         setSpacesBusy(false);
         return;
       }
@@ -1078,7 +1079,7 @@ export function WorkspaceShell({
                   <div className="ws-menu__label">{lang === "fr" ? "Outils" : "Personal Tools"}</div>
                   <button type="button" className="ws-menu__item" onClick={() => { onNavigate("whiteboard"); setProfileOpen(false); }}>
                     <WsIcon name="whiteboard" size={16} />
-                    Whiteboard
+                    {lang === "fr" ? "Tableau blanc" : "Whiteboard"}
                   </button>
                   <button type="button" className="ws-menu__item" onClick={() => { onNavigate("ai"); setProfileOpen(false); }}>
                     <WsIcon name="ai" size={16} />
@@ -1306,11 +1307,11 @@ export function WorkspaceShell({
                         className="ws-sidebar__section-label"
                         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}
                       >
-                        <span>Whiteboards</span>
+                        <span>{lang === "fr" ? "Tableaux blancs" : "Whiteboards"}</span>
                         <button
                           type="button"
                           className="ws-spaces-add"
-                          title={lang === "fr" ? "Nouveau whiteboard" : "New whiteboard"}
+                          title={lang === "fr" ? "Nouveau tableau blanc" : "New whiteboard"}
                           onClick={() => {
                             setCreateWbOpen((v) => !v);
                             setNewWbName("");
@@ -1377,7 +1378,7 @@ export function WorkspaceShell({
                           <input
                             value={newWbName}
                             onChange={(e) => setNewWbName(e.target.value)}
-                            placeholder={lang === "fr" ? "Nom du whiteboard" : "Whiteboard name"}
+                            placeholder={lang === "fr" ? "Nom du tableau blanc" : "Whiteboard name"}
                             autoFocus
                             maxLength={60}
                             onKeyDown={(e) => {
@@ -1422,7 +1423,7 @@ export function WorkspaceShell({
                         >
                           <WsIcon name="plus" size={15} />
                           <span>
-                            {lang === "fr" ? "Créer un nouveau whiteboard" : "Create new whiteboard"}
+                            {lang === "fr" ? "Créer un nouveau tableau blanc" : "Create new whiteboard"}
                           </span>
                         </button>
                       )}

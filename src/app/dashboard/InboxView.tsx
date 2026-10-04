@@ -176,7 +176,7 @@ export function InboxView({
         <header className="nx-head">
           <div>
             <p className="nx-eyebrow">{fr ? "Centre d’activité" : "Activity center"}</p>
-            <h1>Inbox</h1>
+            <h1>{fr ? "Boîte de réception" : "Inbox"}</h1>
           </div>
           {unreadCount > 0 ? (
             <button type="button" className="nx-ghost" onClick={() => persist(items.map((n) => ({ ...n, read: true })))}>

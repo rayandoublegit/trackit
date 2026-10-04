@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useLang } from "@/lib/useLang";
+import { useLang, useLocaleHref } from "@/lib/useLang";
 
 const FONT = "'InterDisplay', 'Inter Display', sans-serif";
 const BLUE = "#0047FF";
@@ -126,6 +126,7 @@ function V2ProcessVisual({ type, lang }: { type: V2StepVisual; lang: "en" | "fr"
 
 export default function V2Page() {
   const lang = useLang();
+  const localeHref = useLocaleHref();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [panelOpen, setPanelOpen] = useState(false);
   const [formData, setFormData] = useState({ firstName: "", email: "", note: "" });
@@ -352,11 +353,11 @@ export default function V2Page() {
           paddingRight: 20,
         }}
       >
-        <Link href="/" className="nav-logo" aria-label="Trackit home">
+        <Link href={localeHref("/")} className="nav-logo" aria-label={lang === "fr" ? "Accueil Trackit" : "Trackit home"}>
           <img src="https://i.ibb.co/20jgns98/navbarlogotransparent.png" alt="Trackit" />
         </Link>
         <Link
-          href="/"
+          href={localeHref("/")}
           style={{
             color: TEXT,
             textDecoration: "none",
@@ -415,7 +416,7 @@ export default function V2Page() {
               : "Trackit v2 is finally here. A faster, smarter, smoother experience to find creators, track sales, and pay commissions — all in one place."}
           </p>
           <Link
-            href="/auth"
+            href={localeHref("/auth")}
             className="hero-cta"
             style={{ marginTop: 8, marginBottom: 12, border: "none", cursor: "pointer", textDecoration: "none" }}
           >
@@ -529,7 +530,7 @@ export default function V2Page() {
                 ? "disponible maintenant · gratuit pour commencer"
                 : "available now · free to get started"}
             </div>
-            <Link href="/auth" className="affiliation-earnings-cta">
+            <Link href={localeHref("/auth")} className="affiliation-earnings-cta">
               {lang === "fr" ? "Commencer gratuitement →" : "Get started for free →"}
             </Link>
           </div>
@@ -652,7 +653,7 @@ export default function V2Page() {
             : "Get started for free with Trackit v2 and enjoy a rebuilt experience to manage creators, sales, and payouts."}
         </p>
         <Link
-          href="/auth"
+          href={localeHref("/auth")}
           className="hero-cta"
           style={{ marginTop: 0, border: "none", cursor: "pointer", textDecoration: "none", display: "inline-flex" }}
         >
@@ -876,7 +877,7 @@ export default function V2Page() {
 
                   <p style={{ fontSize: 12, color: "#7A7A7A", textAlign: "center", margin: 0 }}>
                     {lang === "fr" ? "Déjà client ? " : "Already a customer? "}
-                    <Link href="/auth" style={{ color: "#0047FF", textDecoration: "none" }}>
+                    <Link href={localeHref("/auth")} style={{ color: "#0047FF", textDecoration: "none" }}>
                       {lang === "fr" ? "Se connecter" : "Sign in"}
                     </Link>
                   </p>

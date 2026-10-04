@@ -13,6 +13,10 @@ import { CONTENT_UPDATED_EVENT, dispatchContentUpdated } from "@/lib/outreach-hi
 import { supabase } from "@/lib/supabase";
 import { formatCompactStat } from "@/lib/content-shared";
 import { InfoTip } from "./analytics-metric-cards";
+import { apiErrorText } from "@/lib/api-error-text";
+
+/** Error whose message is already in the user's language. */
+class ShownError extends Error {}
 
 const drawerFont = "'InterDisplay', 'Inter Display', sans-serif";
 
@@ -435,16 +439,17 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
         error?: string;
       };
       if (!prepRes.ok) {
-        throw new Error(prep.error ?? (fr ? "Impossible de charger vos marques." : "Could not load your brands."));
+        throw new ShownError(
+          apiErrorText(prep, lang, { en: "Could not load your brands.", fr: "Impossible de charger vos marques." }),
+        );
       }
       const brandList = prep.brands?.length ? prep.brands : brands;
       const uploadBrand = brandList.find((b) => b.id === brandId) ?? brandList[0] ?? null;
       if (!uploadBrand?.id) {
-        throw new Error(
-          prep.linkError ??
-            (fr
-              ? "Aucune marque liée. Acceptez d'abord l'invitation de la marque."
-              : "No linked brand. Accept the brand invite first."),
+        throw new ShownError(
+          fr
+            ? "Aucune marque liée. Acceptez d'abord l'invitation de la marque."
+            : prep.linkError ?? "No linked brand. Accept the brand invite first.",
         );
       }
       if (!brandId) setBrandId(uploadBrand.id);
@@ -494,9 +499,11 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
           rpm?: { amount?: number; rpmRate?: number };
         };
         if (!res.ok || !data?.ok) {
-          throw new Error(
-            data.error ??
-              (fr ? "Impossible de lier votre compte à la marque." : "Could not link your account to the brand."),
+          throw new ShownError(
+            apiErrorText(data, lang, {
+              en: "Could not link your account to the brand.",
+              fr: "Impossible de lier votre compte à la marque.",
+            }),
           );
         }
         if (data.brandId) setBrandId(data.brandId);
@@ -509,12 +516,12 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
 
       if (pendingFiles.length > 0) {
         if (!supabase) {
-          throw new Error(fr ? "Stockage indisponible." : "Storage unavailable.");
+          throw new ShownError(fr ? "Stockage indisponible." : "Storage unavailable.");
         }
         for (let i = 0; i < pendingFiles.length; i++) {
           const file = pendingFiles[i];
           if (isCreatorContentFileTooLarge(file.size)) {
-            throw new Error(creatorContentFileTooLargeMessage(lang, file.name));
+            throw new ShownError(creatorContentFileTooLargeMessage(lang, file.name));
           }
           const path = `${userId}/${uploadBrand.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeStorageName(file.name)}`;
           const { error: upErr } = await supabase.storage
@@ -524,7 +531,11 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
               contentType: file.type || undefined,
               cacheControl: "3600",
             });
-          if (upErr) throw new Error(creatorContentStorageErrorMessage(lang, upErr.message));
+          if (upErr) {
+            const storageMsg = creatorContentStorageErrorMessage(lang, upErr.message);
+            // The helper passes unknown (English) storage errors through as-is.
+            throw new ShownError(fr && storageMsg === upErr.message ? "Envoi du fichier impossible." : storageMsg);
+          }
 
           const { data: pub } = supabase.storage.from("creator-content").getPublicUrl(path);
           const itemTitle =
@@ -586,7 +597,9 @@ export function CreatorContent({ userId, isMobile }: { userId?: string; isMobile
       }
     } catch (err) {
       setMessageTone("error");
-      setMessage(err instanceof Error ? err.message : fr ? "Échec de l'envoi." : "Upload failed.");
+      setMessage(
+        err instanceof ShownError || (!fr && err instanceof Error) ? err.message : fr ? "Échec de l'envoi." : "Upload failed.",
+      );
     } finally {
       setUploading(false);
     }

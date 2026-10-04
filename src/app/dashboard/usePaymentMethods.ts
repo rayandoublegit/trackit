@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { BillingPaymentMethod } from "@/lib/billing-payment-methods";
 import { openStripeBillingPortal } from "@/lib/open-billing-portal";
+import { apiErrorText } from "@/lib/api-error-text";
+import { useLang } from "@/lib/useLang";
 
 export type PaymentMethod = BillingPaymentMethod;
 
@@ -20,10 +22,13 @@ export function formatPaymentLabelShort(method: PaymentMethod, lang: "en" | "fr"
     : `${method.brand} ···· ${method.last4}`;
 }
 
+const LOAD_ERROR = { en: "Failed to load payment methods", fr: "Impossible de charger les moyens de paiement" };
+
 type SharedPaymentMethodsSnapshot = {
   methods: PaymentMethod[];
   hasStripeCustomer: boolean;
-  error: string | null;
+  /** Failed API payload (or {} for a network error); shown via apiErrorText in the viewer's language. */
+  error: { error?: string; errorFr?: string } | null;
   loading: boolean;
 };
 
@@ -56,9 +61,16 @@ async function fetchSharedPaymentMethods() {
         methods?: PaymentMethod[];
         hasStripeCustomer?: boolean;
         error?: string;
+        errorFr?: string;
       };
       if (!res.ok) {
-        throw new Error(data.error ?? "Failed to load payment methods");
+        sharedSnapshot = {
+          methods: [],
+          hasStripeCustomer: false,
+          error: { error: data.error, errorFr: data.errorFr },
+          loading: false,
+        };
+        return;
       }
       sharedSnapshot = {
         methods: data.methods ?? [],
@@ -70,7 +82,7 @@ async function fetchSharedPaymentMethods() {
       sharedSnapshot = {
         methods: [],
         hasStripeCustomer: false,
-        error: err instanceof Error ? err.message : "Failed to load payment methods",
+        error: { error: err instanceof Error ? err.message : undefined },
         loading: false,
       };
     } finally {
@@ -88,6 +100,7 @@ export function refreshPaymentMethods() {
 }
 
 export function usePaymentMethods() {
+  const lang = useLang();
   const [, bump] = useState(0);
 
   useEffect(() => {
@@ -130,7 +143,7 @@ export function usePaymentMethods() {
     methods: sharedSnapshot.methods,
     defaultMethod,
     loading: sharedSnapshot.loading,
-    error: sharedSnapshot.error,
+    error: sharedSnapshot.error ? apiErrorText(sharedSnapshot.error, lang, LOAD_ERROR) : null,
     hasStripeCustomer: sharedSnapshot.hasStripeCustomer,
     hasPaymentMethod: sharedSnapshot.methods.length > 0,
     manageInBilling: true,

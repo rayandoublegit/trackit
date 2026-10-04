@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useCreatorStats } from "@/lib/useCreatorStats";
 import { supabase } from "@/lib/supabase";
@@ -205,7 +206,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setRpmError(data.error || (fr ? "Chargement RPM impossible" : "Could not load RPM"));
+        setRpmError(apiErrorText(data, lang, { en: "Could not load RPM", fr: "Chargement RPM impossible" }));
         setRpm(null);
         return;
       }
@@ -219,7 +220,7 @@ export function CreatorAnalytics({ userId, isMobile }: { userId?: string; isMobi
     } finally {
       setRpmLoading(false);
     }
-  }, [userId, fr]);
+  }, [userId, fr, lang]);
 
   useEffect(() => {
     void loadRpm();

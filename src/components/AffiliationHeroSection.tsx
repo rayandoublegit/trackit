@@ -56,10 +56,33 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
       ? "Partagez votre lien, créez du contenu, gagnez de l'argent sur toutes les inscriptions."
       : "Share your link, create content, earn money on all signups.";
 
+  const labels =
+    lang === "fr"
+      ? {
+          views: "Vues",
+          rating: "Note",
+          growth: "Croissance",
+          comments: "Commentaires",
+          shares: "Partages",
+          signups: "Inscriptions",
+          commission: "Commission",
+          likes: "Likes",
+        }
+      : {
+          views: "Views",
+          rating: "Rating",
+          growth: "Growth",
+          comments: "Comments",
+          shares: "Shares",
+          signups: "Signups",
+          commission: "Commission",
+          likes: "Likes",
+        };
+
   return (
     <div className="affiliation-hero" aria-label={ariaLabel}>
       <div className="affiliation-hero__icons-layer">
-        <IndicatorIcon className="affiliation-hero__icon--views" label="Views" badge="12K+">
+        <IndicatorIcon className="affiliation-hero__icon--views" label={labels.views} badge="12K+">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"
@@ -71,13 +94,13 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--star" label="Rating" badge="4.9">
+        <IndicatorIcon className="affiliation-hero__icon--star" label={labels.rating} badge="4.9">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="#F59E0B" aria-hidden>
             <path d="M12 2l2.9 6.26L22 9.27l-5 4.87L18.18 22 12 18.27 5.82 22 7 14.14l-5-4.87 7.1-1.01L12 2z" />
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--chart affiliation-hero__icon--sm" label="Growth" badge="+38%">
+        <IndicatorIcon className="affiliation-hero__icon--chart affiliation-hero__icon--sm" label={labels.growth} badge="+38%">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M4 18h16M7 14l3-4 3 2 5-7"
@@ -90,7 +113,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--comment affiliation-hero__icon--sm" label="Comments" badge="89">
+        <IndicatorIcon className="affiliation-hero__icon--comment affiliation-hero__icon--sm" label={labels.comments} badge="89">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M5 9.5a7 7 0 0 1 14 0v.4a7 7 0 0 1-7 7c-1.2 0-2.3-.3-3.3-.8L5 19l1.4-3.6A6.9 6.9 0 0 1 5 9.9V9.5Z"
@@ -101,7 +124,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--share affiliation-hero__icon--sm" label="Shares" badge="2K+">
+        <IndicatorIcon className="affiliation-hero__icon--share affiliation-hero__icon--sm" label={labels.shares} badge="2K+">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M10 13a4.5 4.5 0 0 0 3.2 1.35M14 7.5a4.5 4.5 0 1 1 0 7.9M10 17.65a4.5 4.5 0 1 1 0-7.9"
@@ -112,7 +135,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--users affiliation-hero__icon--sm" label="Signups" badge="150+">
+        <IndicatorIcon className="affiliation-hero__icon--users affiliation-hero__icon--sm" label={labels.signups} badge="150+">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
             <circle cx="9" cy="8" r="3.2" stroke="#7C3AED" strokeWidth="1.7" />
             <path
@@ -131,7 +154,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--coin" label="Commission" badge="20%">
+        <IndicatorIcon className="affiliation-hero__icon--coin" label={labels.commission} badge="20%">
           <svg width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden>
             <defs>
               <linearGradient id="aff-hero-coin-face" x1="6" y1="5" x2="24" y2="25" gradientUnits="userSpaceOnUse">
@@ -158,7 +181,7 @@ export function AffiliationHeroSection({ lang }: { lang: Lang }) {
           </svg>
         </IndicatorIcon>
 
-        <IndicatorIcon className="affiliation-hero__icon--like" label="Likes" badge="420">
+        <IndicatorIcon className="affiliation-hero__icon--like" label={labels.likes} badge="420">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
               d="M12 20.25s-7-4.35-7-10.2a4.2 4.2 0 0 1 7.35-2.55A4.2 4.2 0 0 1 19 10.05c0 5.85-7 10.2-7 10.2Z"

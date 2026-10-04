@@ -84,7 +84,7 @@ export function BlogShell({ children, narrow, lang = "en", alternateHref }: Blog
         <nav aria-label={t.langLabel} style={{ ...footerRow, marginTop: 10 }}>
           {/* Plain links: a full load so the document language follows the address. */}
           {enHref ? (
-            <a href={enHref} hrefLang="en" lang="en" style={{ color: "#999" }}>
+            <a href={`${enHref}${enHref.includes("?") ? "&" : "?"}lang=en`} hrefLang="en" lang="en" style={{ color: "#999" }}>
               English
             </a>
           ) : (

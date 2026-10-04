@@ -1,7 +1,12 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { saveOnboardingProfileAdmin, type OnboardingSavePayload } from "@/lib/onboarding-save";
-import { profileUsernameSaveError } from "@/lib/profile-username";
+import {
+  isProfileUsernameConflictError,
+  profileUsernameInvalidMessage,
+  profileUsernameSaveError,
+  profileUsernameTakenMessage,
+} from "@/lib/profile-username";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -42,8 +47,15 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as OnboardingSavePayload;
   const saved = await saveOnboardingProfileAdmin(admin, user.id, user.email, body);
   if (!saved.ok) {
+    const failure = { message: saved.error };
+    // The client picks `errorFr` for French users (see apiErrorText).
+    const errorFr = isProfileUsernameConflictError(failure)
+      ? profileUsernameTakenMessage("fr")
+      : saved.error === "Invalid username"
+        ? profileUsernameInvalidMessage("fr")
+        : "Impossible d'enregistrer le profil.";
     return NextResponse.json(
-      { error: profileUsernameSaveError({ message: saved.error }, "en") },
+      { error: profileUsernameSaveError(failure, "en"), errorFr },
       { status: 400 }
     );
   }

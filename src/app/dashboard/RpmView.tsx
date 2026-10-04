@@ -3,7 +3,7 @@
 import "./sample-preview.css";
 import "./campaign-kind.css";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { formatCompactStat } from "@/lib/content-shared";
 import { getSavedCreators, saveCreator } from "@/lib/db";
 import { DEMO_CREATOR_POOL, isDemoPresetSavedCreator } from "@/lib/demo-preset-data";
@@ -14,6 +14,7 @@ import {
 import type { RpmAnalyticsSnapshot, RpmCampaignRow } from "@/lib/rpm";
 import { formatCurrency, useDisplayCurrency } from "@/lib/useCurrency";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { listSaved, type SavedRow } from "@/lib/workspace-client";
 import { useDashboardNavigationOptional } from "./DashboardNavigationProvider";
 
@@ -74,6 +75,11 @@ export function RpmView({
 }) {
   const lang = useLang();
   const fr = lang === "fr";
+  // Read by the loaders so a language switch doesn't refetch.
+  const langRef = useRef(lang);
+  useEffect(() => {
+    langRef.current = lang;
+  }, [lang]);
   const displayCurrency = useDisplayCurrency();
   const dashNav = useDashboardNavigationOptional();
   /** Owner id for /api/rpm + creators (not workspace space id). */
@@ -115,10 +121,17 @@ export function RpmView({
         { credentials: "include" },
         { preferCache: false, ttlMs: 5_000 },
       );
-      if (data?.error) setError(data.error);
+      if (data?.error) {
+        setError(
+          apiErrorText(data, langRef.current, {
+            en: "Could not load campaigns",
+            fr: "Impossible de charger les campagnes",
+          }),
+        );
+      }
       setCampaigns(data?.campaigns ?? []);
     } catch (e) {
-      setError((e as Error).message);
+      setError(langRef.current === "fr" ? "Impossible de charger les campagnes" : (e as Error).message);
       setCampaigns([]);
     } finally {
       setLoading(false);
@@ -138,13 +151,18 @@ export function RpmView({
           { preferCache: false, ttlMs: 5_000 },
         );
         if (data?.error) {
-          setError(data.error);
+          setError(
+            apiErrorText(data, langRef.current, {
+              en: "Could not load the campaign",
+              fr: "Impossible de charger la campagne",
+            }),
+          );
           setSnapshot(null);
         } else {
           setSnapshot(data as RpmAnalyticsSnapshot);
         }
       } catch (e) {
-        setError((e as Error).message);
+        setError(langRef.current === "fr" ? "Impossible de charger la campagne" : (e as Error).message);
         setSnapshot(null);
       } finally {
         setDetailLoading(false);
@@ -346,7 +364,7 @@ export function RpmView({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Création impossible" : "Could not create"));
+        setError(apiErrorText(data, lang, { en: "Could not create", fr: "Création impossible" }));
         return;
       }
       window.dispatchEvent(new Event(CAMPAIGNS_UPDATED_EVENT));
@@ -357,7 +375,7 @@ export function RpmView({
         setScreen("list");
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(fr ? "Création impossible" : (e as Error).message);
     } finally {
       setCreating(false);
     }
@@ -381,7 +399,7 @@ export function RpmView({
       });
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        setError(String(data.error || (fr ? "Synchronisation impossible" : "Sync failed")));
+        setError(apiErrorText(data, lang, { en: "Sync failed", fr: "Synchronisation impossible" }));
         return;
       }
       applySnapshotPayload(data);
@@ -400,7 +418,7 @@ export function RpmView({
       );
       if (!data.campaign) await loadDetail(selectedId);
     } catch (e) {
-      setError((e as Error).message);
+      setError(fr ? "Synchronisation impossible" : (e as Error).message);
     } finally {
       setSettling(false);
     }
@@ -430,7 +448,7 @@ export function RpmView({
       await loadDetail(selectedId);
       setSyncNote(fr ? "Vues mises à jour · RPM recalculé" : "Views updated · RPM recalculated");
     } catch (e) {
-      setError((e as Error).message);
+      setError(fr ? "Impossible de mettre à jour les vues" : (e as Error).message);
     } finally {
       setRefreshingContentId(null);
     }

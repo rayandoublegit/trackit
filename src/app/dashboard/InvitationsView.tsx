@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { canInviteCreators, type PlanTier } from "@/lib/plan-limits";
 import { ActiveDashboardCreatorsPanel } from "./ActiveDashboardCreatorsPanel";
 import { UpgradeModal } from "./UpgradeModal";
@@ -63,7 +64,7 @@ export function InvitationsView({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.ok || !data?.token) {
-        setError(data?.error || (lang === "fr" ? "Impossible de générer le lien." : "Could not generate the link."));
+        setError(apiErrorText(data, lang, { en: "Could not generate the link.", fr: "Impossible de générer le lien." }));
         return;
       }
       setLink(`${window.location.origin}/invite/${data.token}`);

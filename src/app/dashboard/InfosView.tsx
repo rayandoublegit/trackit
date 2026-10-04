@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 
 export type InfoKind = "rules" | "howto" | "pricing";
 
@@ -110,7 +111,7 @@ function BrandInfosView({ userId, isMobile }: { userId?: string; isMobile?: bool
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(data.error || (fr ? "Chargement impossible" : "Could not load"));
+          setError(apiErrorText(data, lang, { en: "Could not load", fr: "Chargement impossible" }));
           return;
         }
         const text = String(data.info?.body || "");
@@ -123,7 +124,7 @@ function BrandInfosView({ userId, isMobile }: { userId?: string; isMobile?: bool
         setLoading(false);
       }
     },
-    [userId, fr],
+    [userId, fr, lang],
   );
 
   useEffect(() => {
@@ -146,7 +147,7 @@ function BrandInfosView({ userId, isMobile }: { userId?: string; isMobile?: bool
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Enregistrement impossible" : "Could not save"));
+        setError(apiErrorText(data, lang, { en: "Could not save", fr: "Enregistrement impossible" }));
         return;
       }
       const text = String(data.info?.body || body);
@@ -321,7 +322,7 @@ function CreatorInfosView({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Chargement impossible" : "Could not load"));
+        setError(apiErrorText(data, lang, { en: "Could not load", fr: "Chargement impossible" }));
         return;
       }
       setItems((data.items || []) as CreatorInfoRow[]);
@@ -331,7 +332,7 @@ function CreatorInfosView({
     } finally {
       setLoading(false);
     }
-  }, [userId, fr, section]);
+  }, [userId, fr, lang, section]);
 
   useEffect(() => {
     setLoading(true);

@@ -117,7 +117,7 @@ export function CampaignScene({ lang }: { lang: "en" | "fr" }) {
         <div className="ash-card__top">
           <div>
             <small>{fr ? "Campagne" : "Campaign"}</small>
-            <strong>Summer drop</strong>
+            <strong>{fr ? "Collection d’été" : "Summer drop"}</strong>
           </div>
           <span className="ash-live"><i />{fr ? "En direct" : "Live"}</span>
         </div>

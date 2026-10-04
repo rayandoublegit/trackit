@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
-import { clearUserSessionStorage, dispatchProfileUpdated, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
+import { apiErrorText } from "@/lib/api-error-text";
+import { clearUserSessionStorage, dispatchProfileUpdated, localizeHref, PROFILE_UPDATED_EVENT, type ProfileUpdatedDetail } from "@/lib/locale-preferences";
 import { patchDashboardBootstrap } from "@/lib/dashboard-bootstrap-cache";
 import { renameCachedAvatarUrl, setCachedAvatarUrl } from "@/lib/avatar-url-cache";
 import { resolveAvatarUrl, toPersistableAvatarUrl } from "@/lib/resolve-avatar-url";
@@ -11,6 +12,7 @@ import { selectionCardStyle, selectionTextPrimary } from "@/lib/selection-card-s
 import { PersonGlyph } from "@/components/FallbackGlyphs";
 import {
   fetchProfileUsernameAvailability,
+  isProfileUsernameConflictError,
   isValidProfileUsername,
   normalizeProfileUsername,
   profileUsernameInvalidMessage,
@@ -82,7 +84,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
     setSigningOut(true);
     await supabase.auth.signOut({ scope: "global" });
     clearUserSessionStorage();
-    window.location.href = "/auth";
+    window.location.href = localizeHref("/auth", lang);
   };
 
   useEffect(() => {
@@ -189,12 +191,17 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
-      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string; errorFr?: string };
       if (data.url) {
         window.location.href = data.url;
         return;
       }
-      setError(data.error || (lang === "fr" ? "Impossible de demarrer la connexion Stripe." : "Could not start Stripe connection."));
+      setError(
+        apiErrorText(data, lang, {
+          en: "Could not start Stripe connection.",
+          fr: "Impossible de démarrer la connexion Stripe.",
+        }),
+      );
       setStripeStarting(false);
     } catch {
       setError(lang === "fr" ? "Erreur reseau." : "Network error.");
@@ -272,7 +279,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           contentType: avatarFile.type || "image/jpeg",
         });
         if (upErr) {
-          if (!options?.silent) setError(upErr.message);
+          if (!options?.silent) setError(lang === "fr" ? "Impossible d'envoyer la photo. Réessayez." : upErr.message);
           return false;
         }
         const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
@@ -299,6 +306,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       });
       let data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        errorFr?: string;
         profile?: { full_name?: string; username?: string; avatar_url?: string | null };
       };
 
@@ -314,7 +322,13 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
           })
           .eq("id", userId);
         if (directErr) {
-          setError(directErr.message);
+          setError(
+            lang !== "fr"
+              ? directErr.message
+              : isProfileUsernameConflictError(directErr)
+                ? profileUsernameTakenMessage(lang)
+                : "Impossible d'enregistrer le profil.",
+          );
           return false;
         }
         data = {
@@ -327,7 +341,7 @@ export function CreatorSettings({ userId, isMobile, onSaved }: { userId?: string
       } else if (!res.ok) {
         const msg = res.status === 409
           ? profileUsernameTakenMessage(lang)
-          : (data.error || (lang === "fr" ? "Impossible d'enregistrer le profil." : "Could not save profile."));
+          : apiErrorText(data, lang, { en: "Could not save profile.", fr: "Impossible d'enregistrer le profil." });
         setError(msg);
         return false;
       }

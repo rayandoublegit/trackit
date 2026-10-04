@@ -9,7 +9,7 @@ import { HeroTrustedTicker } from "@/components/HeroTrustedTicker";
 import { ProductFilmHero } from "@/components/ProductFilmHero";
 import { ANNOUNCEMENT_KEY, AnnouncementBar } from "@/components/AnnouncementBar";
 import { useLang, useLocaleHref } from "@/lib/useLang";
-import { alternateLangPath, setAppLang, type AppLang } from "@/lib/locale-preferences";
+import { alternateLangPath, localizeHref, setAppLang, type AppLang } from "@/lib/locale-preferences";
 // Below the product film: load the dashboard after the page is interactive.
 const PremiumWorkspaceDemo = dynamic(() => import("./PremiumWorkspaceDemo").then((m) => m.PremiumWorkspaceDemo), {
   ssr: false,
@@ -47,8 +47,8 @@ function heroCopy(lang: "en" | "fr") {
         },
       ],
       affiliateItems: [
-        { label: "Commencer", href: "/affiliation" },
-        { label: "Mon compte", href: "/auth?mode=login&role=creator" },
+        { label: "Commencer", href: localizeHref("/affiliation", "fr") },
+        { label: "Mon compte", href: localizeHref("/auth?mode=login&role=creator", "fr") },
       ],
       solutionItems: [
         "Découverte de créateurs",

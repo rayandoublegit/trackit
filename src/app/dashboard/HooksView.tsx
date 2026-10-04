@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 
 type HookRow = {
   id: string;
@@ -67,7 +68,7 @@ function BrandHooksView({ userId, isMobile }: { userId?: string; isMobile?: bool
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Chargement impossible" : "Could not load"));
+        setError(apiErrorText(data, lang, { en: "Could not load", fr: "Chargement impossible" }));
         setHooks([]);
         return;
       }
@@ -78,7 +79,7 @@ function BrandHooksView({ userId, isMobile }: { userId?: string; isMobile?: bool
     } finally {
       setLoading(false);
     }
-  }, [userId, fr]);
+  }, [userId, fr, lang]);
 
   useEffect(() => {
     void load();
@@ -107,7 +108,7 @@ function BrandHooksView({ userId, isMobile }: { userId?: string; isMobile?: bool
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Création impossible" : "Could not create"));
+        setError(apiErrorText(data, lang, { en: "Could not create", fr: "Création impossible" }));
         return;
       }
       if (data.hook) setHooks((prev) => [data.hook as HookRow, ...prev]);
@@ -265,7 +266,7 @@ function CreatorHooksView({ userId, isMobile }: { userId?: string; isMobile?: bo
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || (fr ? "Chargement impossible" : "Could not load"));
+        setError(apiErrorText(data, lang, { en: "Could not load", fr: "Chargement impossible" }));
         return;
       }
       setHooks((data.hooks || []) as CreatorHookRow[]);
@@ -275,7 +276,7 @@ function CreatorHooksView({ userId, isMobile }: { userId?: string; isMobile?: bo
     } finally {
       setLoading(false);
     }
-  }, [userId, fr]);
+  }, [userId, fr, lang]);
 
   useEffect(() => {
     void load();

@@ -6,6 +6,7 @@ import "./discovery-motion.css";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import { getClientBrandWorkspaceId } from "@/lib/workspaces";
 import { getCampaigns } from "@/lib/db";
 import {
@@ -131,7 +132,7 @@ export function FinditInboxView({
       });
       const data = (await res.json()) as { ok?: boolean; error?: string; campaignName?: string };
       if (!res.ok || !data.ok) {
-        setAttachMsg(data.error || (fr ? "Impossible d’ajouter" : "Couldn’t attach"));
+        setAttachMsg(apiErrorText(data, lang, { en: "Couldn’t attach", fr: "Impossible d’ajouter" }));
         return;
       }
       setAttachMsg(

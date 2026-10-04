@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLang } from "@/lib/useLang";
+import { apiErrorText } from "@/lib/api-error-text";
 import {
   getAppTimezone,
   setAppTimezone,
@@ -114,7 +115,7 @@ export function WorkspaceInfoView({
         setActiveId(userId);
         setWorkspaceEditId(userId, { silent: true });
         setMessage({
-          text: data.error || (fr ? "Impossible de charger le workspace." : "Couldn’t load workspace."),
+          text: apiErrorText(data, lang, { en: "Couldn’t load workspace.", fr: "Impossible de charger le workspace." }),
           type: "error",
         });
         return;
@@ -169,7 +170,7 @@ export function WorkspaceInfoView({
         const uploaded = await uploadWorkspaceMark(workspace.id, avatarFile);
         if (!uploaded.ok) {
           setMessage({
-            text: uploaded.error || (fr ? "Impossible d’uploader la photo." : "Couldn’t upload the picture."),
+            text: apiErrorText(uploaded, lang, { en: "Couldn’t upload the picture.", fr: "Impossible d’importer la photo." }),
             type: "error",
           });
           setSaving(false);
@@ -188,7 +189,7 @@ export function WorkspaceInfoView({
         };
         if (!cleared.ok || !clearedData.ok || !clearedData.workspace) {
           setMessage({
-            text: clearedData.error || (fr ? "Enregistrement impossible." : "Couldn’t save."),
+            text: apiErrorText(clearedData, lang, { en: "Couldn’t save.", fr: "Enregistrement impossible." }),
             type: "error",
           });
           setSaving(false);
@@ -210,7 +211,7 @@ export function WorkspaceInfoView({
       };
       if (!res.ok || !data.ok || !data.workspace) {
         setMessage({
-          text: data.error || (fr ? "Enregistrement impossible." : "Couldn’t save."),
+          text: apiErrorText(data, lang, { en: "Couldn’t save.", fr: "Enregistrement impossible." }),
           type: "error",
         });
         setSaving(false);

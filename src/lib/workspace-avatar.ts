@@ -69,7 +69,7 @@ export function workspaceAvatarOrNull(
 export async function uploadWorkspaceMark(
   workspaceId: string,
   file: File,
-): Promise<{ ok: true; workspace: { id: string; avatar_url: string | null; name: string; owner_id: string } } | { ok: false; error: string }> {
+): Promise<{ ok: true; workspace: { id: string; avatar_url: string | null; name: string; owner_id: string } } | { ok: false; error: string; errorFr?: string }> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`/api/workspaces/${workspaceId}/avatar`, {
@@ -80,10 +80,12 @@ export async function uploadWorkspaceMark(
   const data = (await res.json().catch(() => ({}))) as {
     ok?: boolean;
     error?: string;
+    errorFr?: string;
     workspace?: { id: string; avatar_url: string | null; name: string; owner_id: string };
   };
   if (!res.ok || !data.ok || !data.workspace) {
-    return { ok: false, error: data.error || "Couldn’t upload the picture." };
+    // `error` is English; callers show `errorFr` (or their own copy) in French.
+    return { ok: false, error: data.error || "Couldn’t upload the picture.", errorFr: data.errorFr };
   }
   return { ok: true, workspace: data.workspace };
 }

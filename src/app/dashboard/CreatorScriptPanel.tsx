@@ -5,6 +5,10 @@ import type { Lang } from "@/lib/useLang";
 import { discoveryCopy } from "@/lib/discovery-copy";
 import { supabase } from "@/lib/supabase";
 import { CreatorAvatar } from "./CreatorAvatar";
+import { apiErrorText } from "@/lib/api-error-text";
+
+/** Error whose message is already in the user's language. */
+class ShownError extends Error {}
 
 const TRACKIT_LOGO = "https://i.ibb.co/20jgns98/navbarlogotransparent.png";
 
@@ -132,7 +136,7 @@ export function CreatorScriptPanel({
         });
         const creatorData = (await creatorRes.json()) as { id?: string; error?: string };
         if (!creatorRes.ok || !creatorData.id) {
-          throw new Error(creatorData.error ?? t.scriptError);
+          throw new ShownError(apiErrorText(creatorData, lang, { en: t.scriptError, fr: t.scriptError }));
         }
         creatorRowId = creatorData.id;
       }
@@ -144,7 +148,7 @@ export function CreatorScriptPanel({
         const { error: upErr } = await supabase.storage
           .from("scripts")
           .upload(path, file, { upsert: true, contentType: file.type });
-        if (upErr) throw new Error(upErr.message);
+        if (upErr) throw new ShownError(lang === "fr" ? "Envoi du fichier impossible." : upErr.message);
         const { data: pub } = supabase.storage.from("scripts").getPublicUrl(path);
         fileUrl = pub.publicUrl;
       }
@@ -162,7 +166,7 @@ export function CreatorScriptPanel({
       });
       const data = (await res.json()) as { ok?: boolean; id?: string; error?: string };
       if (!res.ok || !data?.ok || !data.id) {
-        throw new Error(data.error ?? t.scriptError);
+        throw new ShownError(apiErrorText(data, lang, { en: t.scriptError, fr: t.scriptError }));
       }
 
       const saved = { id: data.id, title: title.trim() };
@@ -187,7 +191,9 @@ export function CreatorScriptPanel({
       window.dispatchEvent(new CustomEvent("trackit:scripts-updated"));
       onSaved(saved);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.scriptError);
+      setError(
+        err instanceof ShownError || (lang !== "fr" && err instanceof Error) ? err.message : t.scriptError,
+      );
     } finally {
       setSaving(false);
     }

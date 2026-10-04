@@ -224,6 +224,11 @@ const KNOWN_ERRORS: { match: RegExp; en: ErrorText; fr: ErrorText }[] = [
     fr: "Cette campagne n’attend pas autant de contenus.",
   },
   {
+    match: /^only one content per mission is available for now\.$/i,
+    en: "Only one content per mission is available for now.",
+    fr: "Un seul contenu par mission est disponible pour l’instant.",
+  },
+  {
     match: /^this content is already approved\.$/i,
     en: "This content is already approved.",
     fr: "Ce contenu est déjà validé.",
