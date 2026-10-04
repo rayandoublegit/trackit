@@ -26,12 +26,20 @@ export async function GET(req: NextRequest) {
   }
 
   // Profil complet
-  const { data: profile, error } = await db
+  const { data: row, error } = await db
     .from("profiles")
     .select("*")
     .eq("id", userId)
     .maybeSingle();
 
+  let profile = row;
+  if (!error && !profile) {
+    // Sign-in account without a profile row yet: show what auth knows.
+    const { data: authUser } = await db.auth.admin.getUserById(userId);
+    if (authUser.user) {
+      profile = { id: userId, email: authUser.user.email ?? null, created_at: authUser.user.created_at ?? null, plan: null };
+    }
+  }
   if (error || !profile) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }

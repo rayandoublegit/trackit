@@ -5,7 +5,7 @@ import { COMPED_STATUS, giftedStatus, isCompStatus, whopMembershipId } from "@/l
 import { normalizePlan } from "@/lib/plan-limits";
 import { requireAdmin } from "@/lib/admin-auth";
 import { logAdminAction } from "@/lib/admin-data";
-import { selectProfileRow } from "@/lib/profile-row";
+import { selectProfileRow, upsertProfileRow } from "@/lib/profile-row";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { resolveStripeCustomerId, syncFromStripeSubscription } from "@/lib/stripe-billing";
 import { cancelWhopMembership, whopConfigured } from "@/lib/whop";
@@ -126,17 +126,27 @@ export async function POST(req: NextRequest) {
   };
 
   // Recupere le profil cible
-  const target = await selectProfileRow<{
+  type Target = {
     id: string;
     email: string | null;
     role: string | null;
     stripe_subscription_id: string | null;
     stripe_customer_id: string | null;
     subscription_status: string | null;
-  }>(db, userId, ["id", "email", "role", "stripe_subscription_id", "stripe_customer_id", "subscription_status"]);
+  };
+  const targetColumns = ["id", "email", "role", "stripe_subscription_id", "stripe_customer_id", "subscription_status"];
+  let target = await selectProfileRow<Target>(db, userId, targetColumns);
 
   if (!target) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+    // A sign-in account without a profile row: create the row so staff can act on it.
+    const { data: authUser } = await db.auth.admin.getUserById(userId);
+    if (!authUser.user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+    const created = await upsertProfileRow(db, { id: userId, email: authUser.user.email ?? null });
+    if (!created.ok) return NextResponse.json({ error: created.error }, { status: 500 });
+    target = await selectProfileRow<Target>(db, userId, targetColumns);
+    if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
   if (!target.email) {
     const { data: authUser } = await db.auth.admin.getUserById(userId);

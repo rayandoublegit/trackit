@@ -31,22 +31,43 @@ export async function selectProfileRow<T extends Record<string, unknown>>(
   return null;
 }
 
-/** List profiles, dropping columns the live table does not have yet. */
+const PROFILE_PAGE = 1000; // PostgREST caps a single response at 1000 rows.
+
+/**
+ * List every profile, page by page, dropping columns the live table does not
+ * have yet. Without paging, PostgREST silently stops at the first 1000 rows.
+ */
 export async function listProfileRows<T extends Record<string, unknown>>(
   client: SupabaseClient,
-  columns: string[]
+  columns: string[],
+  maxRows = 50_000
 ): Promise<{ rows: T[]; error: string | null }> {
   const wanted = [...columns];
-  for (let attempt = 0; attempt <= columns.length; attempt += 1) {
+  const rows: T[] = [];
+  let from = 0;
+  for (let attempt = 0; attempt <= columns.length; ) {
     if (wanted.length === 0) return { rows: [], error: "No profile columns available" };
-    const query = client.from("profiles").select(wanted.join(","));
-    const ordered = wanted.includes("created_at") ? query.order("created_at", { ascending: false }) : query;
-    const { data, error } = await ordered;
-    if (!error) return { rows: (data ?? []) as unknown as T[], error: null };
-    const column = missingProfileColumn(error.message);
-    const index = column ? wanted.indexOf(column) : -1;
-    if (index < 0) return { rows: [], error: error.message };
-    wanted.splice(index, 1);
+    let query = client
+      .from("profiles")
+      .select(wanted.join(","))
+      .range(from, Math.min(from + PROFILE_PAGE, maxRows) - 1);
+    if (wanted.includes("created_at")) query = query.order("created_at", { ascending: false });
+    query = query.order("id", { ascending: true });
+    const { data, error } = await query;
+    if (error) {
+      const column = missingProfileColumn(error.message);
+      const index = column ? wanted.indexOf(column) : -1;
+      if (index < 0) return { rows: [], error: error.message };
+      wanted.splice(index, 1);
+      rows.length = 0;
+      from = 0;
+      attempt += 1;
+      continue;
+    }
+    const batch = (data ?? []) as unknown as T[];
+    rows.push(...batch);
+    from += PROFILE_PAGE;
+    if (batch.length < PROFILE_PAGE || from >= maxRows) return { rows, error: null };
   }
   return { rows: [], error: "Could not read profiles" };
 }

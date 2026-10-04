@@ -107,19 +107,43 @@ export async function GET(req: NextRequest) {
   }
 
   const emails = new Map<string, string>();
+  const authUsers: { id: string; email: string | null; created_at: string | null; full_name: string | null }[] = [];
   for (let page = 1; page <= 20; page += 1) {
     const { data, error: usersError } = await db.auth.admin.listUsers({ page, perPage: 1000 });
     if (usersError || !data.users.length) break;
     for (const user of data.users) {
       if (user.email) emails.set(user.id, user.email);
+      const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+      authUsers.push({
+        id: user.id,
+        email: user.email ?? null,
+        created_at: user.created_at ?? null,
+        full_name: typeof meta.full_name === "string" ? meta.full_name : null,
+      });
     }
     if (data.users.length < 1000) break;
   }
 
-  const rows = listed.rows.map((user) => ({
+  const rows: ProfileRow[] = listed.rows.map((user) => ({
     ...user,
     email: user.email || emails.get(user.id) || null,
   }));
+  // Accounts that can sign in but never got a profile row would otherwise be invisible here.
+  const withProfile = new Set(rows.map((user) => user.id));
+  for (const user of authUsers) {
+    if (withProfile.has(user.id)) continue;
+    rows.push({
+      ...user,
+      username: null,
+      plan: null,
+      role: null,
+      subscription_active: null,
+      subscription_status: null,
+      stripe_customer_id: null,
+      stripe_subscription_id: null,
+      account_type: null,
+    });
+  }
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   let metrics = metricsFromProfiles(rows);
   let growth = null;
