@@ -22,6 +22,9 @@ function ConfirmContent() {
     }
 
     const client = supabase;
+    // Where to land after confirming (e.g. a campaign join link). Internal paths only.
+    const next = searchParams.get("next") || "";
+    const nextPath = next.startsWith("/") && !next.startsWith("//") && !next.includes("\\") ? next : null;
 
     void (async () => {
       // Handle PKCE code exchange
@@ -33,6 +36,10 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        if (nextPath) {
+          router.replace(nextPath);
+          return;
+        }
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
@@ -66,6 +73,10 @@ function ConfirmContent() {
           return;
         }
         setStatus("success");
+        if (nextPath) {
+          router.replace(nextPath);
+          return;
+        }
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(
@@ -92,6 +103,10 @@ function ConfirmContent() {
       } = await client.auth.getSession();
       if (session) {
         setStatus("success");
+        if (nextPath) {
+          router.replace(nextPath);
+          return;
+        }
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           const profile = await selectProfileRow<{ onboarding_completed?: boolean | null; account_type?: string | null }>(

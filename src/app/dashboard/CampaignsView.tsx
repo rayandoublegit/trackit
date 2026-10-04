@@ -5,6 +5,7 @@ import { saveCampaign, getCampaigns, getSavedCreators, saveCreator, updateCampai
 import { clientBrandScope } from "@/lib/brand-workspace";
 import { CreatorAvatar } from "./CreatorAvatar";
 import { CampaignKindChooser } from "./CampaignKindChooser";
+import { CampaignJoinLinkCard } from "./CampaignJoinLinkCard";
 import { EmptyStage } from "./EmptyStage";
 import { GiftingView } from "./GiftingView";
 import "./discovery-motion.css";
@@ -1614,7 +1615,8 @@ export function CampaignsView({
       setCampaigns((prev) => (prev.some((c) => c.id === mapped.id) ? prev : [mapped, ...prev]));
       notifyCampaignCreated(lang, campaignData.name || (lang === "fr" ? "Nouvelle campagne" : "New campaign"), user.id);
       dispatchCampaignsUpdated();
-      navigate({ view: "campaigns" }, { replace: true });
+      // Land on the creators tab, where the join link is ready to share.
+      navigate({ view: "campaigns", campaign: { type: "detail", id: String(saved.id), tab: "creators" } }, { replace: true });
     } finally {
       creatingCampaignRef.current = false;
     }
@@ -2217,12 +2219,12 @@ function CampaignsBoard({
           fr
             ? [
                 { title: "Posez le brief", body: "Nom, dates, plateforme et taux de commission." },
-                { title: "Ajoutez des créateurs", body: "Depuis Discovery, ou via une invitation." },
+                { title: "Partagez le lien", body: "Les créateurs rejoignent la campagne en un clic." },
                 { title: "Les ventes arrivent", body: "Chaque commande calcule la commission due." },
               ]
             : [
                 { title: "Set the brief", body: "Name, dates, platform and commission rate." },
-                { title: "Add creators", body: "From Discovery, or with an invite." },
+                { title: "Share the link", body: "Creators join the campaign in one click." },
                 { title: "Sales come in", body: "Every order calculates what each creator is owed." },
               ]
         }
@@ -3648,6 +3650,7 @@ function CampaignDetail({ lang, campaign, userId, plan, initialTab = "analytics"
       </div>
     </div>
     <div style={{ padding: isMobile ? 16 : "32px 40px 40px", background: "var(--ws-bg)" }}>
+      {tab === "creators" && <CampaignJoinLinkCard campaignId={campaign.id} status={campaign.status} lang={lang} />}
       {tab === "creators" && (
         <CreatorsTab
           lang={lang}
@@ -4021,8 +4024,8 @@ function CreatorsTab({
             colSpan={headers.length}
             message={
               lang === "fr"
-                ? "Aucun créateur dans cette campagne. Ajoutez-en : leurs ventes, commissions et codes promo s’afficheront ici."
-                : "No creators in this campaign yet. Add some: their sales, commissions and promo codes will show up here."
+                ? "Aucun créateur pour l’instant. Partagez le lien d’inscription ci-dessus ou ajoutez-en vous-même : leurs ventes, commissions et codes promo s’afficheront ici."
+                : "No creators yet. Share the join link above or add some yourself: their sales, commissions and promo codes will show up here."
             }
             actionLabel={lang === "fr" ? "Ajouter des créateurs" : "Add creators"}
             onAction={onAddCreator}
@@ -5493,8 +5496,10 @@ function NewCampaignOnboarding({
     setAddedCreators((list) => list.filter((entry) => entry.key !== key));
   };
 
+  // Creators are optional at launch: anyone can join later through the campaign's
+  // join link. Only the "add creators" flow needs at least one.
   const canLaunch =
-    addedCreators.length > 0 &&
+    (addedCreators.length > 0 || !isAddCreatorsMode) &&
     addedCreators.every(
       (entry) => entry.creatorId || findItRowByHandle.has(normalizeHandle(entry.handle)),
     );
@@ -5604,7 +5609,7 @@ function NewCampaignOnboarding({
     setLaunching(true);
     try {
       const payload = await buildCampaignPayload();
-      if (payload.creatorIds.length === 0) return;
+      if (payload.creatorIds.length === 0 && isAddCreatorsMode) return;
 
       if (isAddCreatorsMode && onAddCreators) {
         await onAddCreators({
@@ -5896,6 +5901,26 @@ function NewCampaignOnboarding({
             ) : (
               <p style={{ fontSize: 15, color: "var(--ws-text)", margin: "0 0 28px" }}>{creatorStepSubtitle}</p>
             )}
+
+            {!isAddCreatorsMode && !isEditMode ? (
+              <div
+                style={{
+                  marginBottom: 28,
+                  padding: "14px 16px",
+                  borderRadius: 12,
+                  border: "1px solid var(--ws-border)",
+                  background: "var(--ws-surface)",
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  color: "var(--ws-text)",
+                }}
+              >
+                <strong style={{ fontWeight: 600 }}>{lang === "fr" ? "Cette étape est facultative." : "This step is optional."}</strong>{" "}
+                {lang === "fr"
+                  ? "Une fois la campagne lancée, vous aurez un lien d’inscription à partager : chaque créateur qui l’ouvre rejoint la campagne tout seul, sans que vous ayez à saisir son pseudo."
+                  : "Once the campaign is live, you get a join link to share: every creator who opens it joins the campaign on their own, no handle to type."}
+              </div>
+            ) : null}
 
             <div style={{ display: "flex", gap: 12, marginBottom: 28, flexWrap: "wrap" }}>
               <div ref={listsRef} style={{ position: "relative", flex: 1, minWidth: 220 }}>
